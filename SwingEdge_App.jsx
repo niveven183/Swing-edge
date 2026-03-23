@@ -1,20 +1,19 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell
-} from "recharts";
+import { useState, useEffect, useMemo } from "react";
 import {
   LayoutDashboard, BookOpen, BarChart2, Rss, Search,
   TrendingUp, TrendingDown, AlertTriangle, CheckCircle,
-  Plus, X, ChevronDown, Filter, RefreshCw, Activity,
-  DollarSign, Target, Shield, Zap, ArrowUpRight,
-  ArrowDownRight, Clock, Eye, Layers, Cpu, Radio
+  Plus, X, Zap
 } from "lucide-react";
 
-// ─── CONSTANTS ────────────────────────────────────────────────────────────────
-const CAPITAL = 25000;
-const RISK_PCT = 0.01;
+import Dashboard   from "./src/components/Dashboard";
+import Journal     from "./src/components/Journal";
+import Analytics   from "./src/components/Analytics";
+import MarketIntel from "./src/components/MarketIntel";
+import Scanner     from "./src/components/Scanner";
 
+import { CAPITAL, RISK_PCT, calcTradeMetrics } from "./src/utils";
+
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const MOCK_TRADES = [
   { id: 1, ticker: "NVDA", date: "2025-01-06", side: "LONG", entry: 138.50, stop: 134.20, target: 148.00, shares: 59, status: "CLOSED", exit: 147.80, setup: "Breakout", notes: "Strong vol. confirmation" },
   { id: 2, ticker: "AMD",  date: "2025-01-10", side: "LONG", entry: 122.00, stop: 118.50, target: 131.00, shares: 71, status: "CLOSED", exit: 130.50, setup: "Pullback",  notes: "Clean retest of 50 EMA" },
@@ -61,56 +60,13 @@ const generateEquityCurve = () => {
   return [{ date: "2025-01-01", equity: CAPITAL, ticker: "START", pnl: 0 }, ...data];
 };
 
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
-const calcTradeMetrics = (trade) => {
-  if (!trade.exit) return { pnl: null, rMultiple: null };
-  const risk = Math.abs(trade.entry - trade.stop) * trade.shares;
-  const pnl = trade.side === "LONG"
-    ? (trade.exit - trade.entry) * trade.shares
-    : (trade.entry - trade.exit) * trade.shares;
-  return { pnl, rMultiple: risk > 0 ? pnl / risk : 0 };
-};
-
-const fmt$ = (n) => n >= 0
-  ? `+$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
-  : `-$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
-
-const fmtR = (r) => r >= 0 ? `+${r.toFixed(2)}R` : `${r.toFixed(2)}R`;
-
-// ─── STAT CARD ────────────────────────────────────────────────────────────────
-const StatCard = ({ label, value, sub, trend, icon: Icon, accent = "cyan" }) => {
-  const accents = {
-    cyan:   "from-emerald-500/10 to-emerald-500/5 border-emerald-500/20 text-emerald-400",
-    green:  "from-emerald-500/10 to-emerald-500/5 border-emerald-500/20 text-emerald-400",
-    purple: "from-violet-500/10 to-violet-500/5 border-violet-500/20 text-violet-400",
-    amber:  "from-amber-500/10 to-amber-500/5 border-amber-500/20 text-amber-400",
-    red:    "from-rose-500/10 to-rose-500/5 border-rose-500/20 text-rose-400",
-  };
-  const cls = accents[accent] || accents.cyan;
-  return (
-    <div className={`bg-gradient-to-br ${cls} border rounded-xl p-4 flex flex-col gap-1 relative overflow-hidden`}>
-      <div className="absolute top-3 right-3 opacity-20">
-        <Icon size={28} />
-      </div>
-      <span className="text-xs font-medium tracking-widest uppercase text-slate-500">{label}</span>
-      <span className="text-2xl font-bold text-slate-100 font-mono">{value}</span>
-      {sub && <span className="text-xs text-slate-500">{sub}</span>}
-      {trend !== undefined && (
-        <span className={`text-xs font-semibold ${trend >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-          {trend >= 0 ? "▲" : "▼"} {Math.abs(trend).toFixed(1)}%
-        </span>
-      )}
-    </div>
-  );
-};
-
 // ─── NAV ──────────────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
-  { id: "dashboard", label: "Dashboard",  icon: LayoutDashboard },
-  { id: "journal",   label: "Journal",    icon: BookOpen },
-  { id: "analytics", label: "Analytics",  icon: BarChart2 },
-  { id: "intel",     label: "Market Intel",icon: Rss },
-  { id: "scanner",   label: "Scanner",    icon: Search },
+  { id: "dashboard", label: "Dashboard",   icon: LayoutDashboard },
+  { id: "journal",   label: "Journal",     icon: BookOpen },
+  { id: "analytics", label: "Analytics",   icon: BarChart2 },
+  { id: "intel",     label: "Market Intel", icon: Rss },
+  { id: "scanner",   label: "Scanner",     icon: Search },
 ];
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
@@ -127,10 +83,10 @@ export default function SwingEdge() {
   const closedTrades = trades.filter(t => t.status === "CLOSED");
   const openTrades   = trades.filter(t => t.status === "OPEN");
 
-  const totalPnL   = closedTrades.reduce((a, t) => a + (calcTradeMetrics(t).pnl || 0), 0);
-  const winRate    = closedTrades.length ? closedTrades.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length / closedTrades.length * 100 : 0;
-  const avgR       = closedTrades.length ? closedTrades.reduce((a, t) => a + (calcTradeMetrics(t).rMultiple || 0), 0) / closedTrades.length : 0;
-  const curEquity  = CAPITAL + totalPnL;
+  const totalPnL  = closedTrades.reduce((a, t) => a + (calcTradeMetrics(t).pnl || 0), 0);
+  const winRate   = closedTrades.length ? closedTrades.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length / closedTrades.length * 100 : 0;
+  const avgR      = closedTrades.length ? closedTrades.reduce((a, t) => a + (calcTradeMetrics(t).rMultiple || 0), 0) / closedTrades.length : 0;
+  const curEquity = CAPITAL + totalPnL;
 
   // Ticker tape
   const TICKERS = ["NVDA +3.2%", "PLTR +5.8%", "META +2.1%", "AVGO +1.9%", "AMD -1.4%", "TSLA -2.4%", "MSTR +6.2%", "SMCI -3.1%"];
@@ -238,425 +194,50 @@ export default function SwingEdge() {
 
       {/* ── CONTENT ── */}
       <main className="flex-1 overflow-auto p-4 md:p-5 space-y-5">
-
-        {/* ══════════════ DASHBOARD ══════════════ */}
         {tab === "dashboard" && (
-          <div className="space-y-5 animate-fade-in">
-            {/* KPI Row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <StatCard label="Account Equity"  value={`$${curEquity.toLocaleString()}`} sub={`Started at $${CAPITAL.toLocaleString()}`} trend={totalPnL/CAPITAL*100} icon={DollarSign} accent="cyan" />
-              <StatCard label="Net P&L (Closed)" value={fmt$(Math.round(totalPnL))} sub={`${closedTrades.length} closed trades`} trend={totalPnL/CAPITAL*100} icon={TrendingUp} accent={totalPnL >= 0 ? "green" : "red"} />
-              <StatCard label="Win Rate" value={`${winRate.toFixed(0)}%`} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length}W / ${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)<0).length}L`} icon={Target} accent="purple" />
-              <StatCard label="Avg R Multiple" value={fmtR(avgR)} sub="Per closed trade" icon={Activity} accent="amber" />
-            </div>
-
-            {/* Mini Equity + Open Positions */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Equity mini */}
-              <div className="md:col-span-2 bg-[#0c1118] border border-white/5 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Equity Curve</span>
-                  <span className="text-xs text-emerald-400 font-mono">{equityCurve.length} data pts</span>
-                </div>
-                <ResponsiveContainer width="100%" height={160}>
-                  <AreaChart data={equityCurve}>
-                    <defs>
-                      <linearGradient id="eqGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
-                        <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" />
-                    <XAxis dataKey="date" tick={{ fontSize: 9, fill: "#475569" }} tickLine={false} axisLine={false} />
-                    <YAxis domain={["auto", "auto"]} tick={{ fontSize: 9, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
-                    <ReferenceLine y={CAPITAL} stroke="#475569" strokeDasharray="4 4" />
-                    <Tooltip contentStyle={{ background: "#0c1118", border: "1px solid #1a3a2e", borderRadius: 8, fontSize: 11 }} formatter={(v) => [`$${v.toLocaleString()}`, "Equity"]} />
-                    <Area type="monotone" dataKey="equity" stroke="#10b981" strokeWidth={2} fill="url(#eqGrad)" dot={{ fill: "#10b981", r: 3 }} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Open trades */}
-              <div className="bg-[#0c1118] border border-white/5 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Open Positions</span>
-                  <span className="text-xs bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/20">{openTrades.length}</span>
-                </div>
-                <div className="space-y-2">
-                  {openTrades.map(t => {
-                    const riskPerSh = Math.abs(t.entry - t.stop);
-                    const exposure = t.shares * t.entry;
-                    return (
-                      <div key={t.id} className="bg-white/3 rounded-lg p-3 border border-white/5">
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-sm text-white font-mono">{t.ticker}</span>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${t.side === "LONG" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"}`}>{t.side}</span>
-                        </div>
-                        <div className="mt-1 grid grid-cols-2 gap-x-3 text-[10px] text-slate-500 font-mono">
-                          <span>Entry <span className="text-slate-300">${t.entry}</span></span>
-                          <span>Stop <span className="text-rose-400">${t.stop}</span></span>
-                          <span>Target <span className="text-emerald-400">${t.target}</span></span>
-                          <span>Shares <span className="text-slate-300">{t.shares}</span></span>
-                        </div>
-                        <div className="mt-1.5 h-1 bg-white/5 rounded-full overflow-hidden">
-                          <div className="h-full bg-gradient-to-r from-emerald-600 to-teal-500 rounded-full" style={{ width: "55%" }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* Recent Closed */}
-            <div className="bg-[#0c1118] border border-white/5 rounded-xl p-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Recent Closed Trades</span>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-slate-600 border-b border-white/5">
-                      {["Ticker","Date","Side","Entry","Exit","Shares","P&L","R Multiple","Setup"].map(h => (
-                        <th key={h} className="pb-2 text-left font-semibold tracking-wider pr-4">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {closedTrades.slice(-5).reverse().map(t => {
-                      const { pnl, rMultiple } = calcTradeMetrics(t);
-                      const win = pnl > 0;
-                      return (
-                        <tr key={t.id} className="border-b border-white/3 hover:bg-white/3 transition-colors">
-                          <td className="py-2 pr-4 font-bold text-white font-mono">{t.ticker}</td>
-                          <td className="py-2 pr-4 text-slate-500">{t.date}</td>
-                          <td className="py-2 pr-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side==="LONG"?"bg-emerald-500/10 text-emerald-400":"bg-rose-500/10 text-rose-400"}`}>{t.side}</span></td>
-                          <td className="py-2 pr-4 font-mono text-slate-300">${t.entry}</td>
-                          <td className="py-2 pr-4 font-mono text-slate-300">${t.exit}</td>
-                          <td className="py-2 pr-4 font-mono text-slate-400">{t.shares}</td>
-                          <td className={`py-2 pr-4 font-bold font-mono ${win ? "text-emerald-400" : "text-rose-400"}`}>{fmt$(Math.round(pnl))}</td>
-                          <td className={`py-2 pr-4 font-bold font-mono ${rMultiple >= 0 ? "text-teal-400" : "text-rose-400"}`}>{fmtR(rMultiple)}</td>
-                          <td className="py-2 pr-4"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">{t.setup}</span></td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+          <Dashboard
+            equityCurve={equityCurve}
+            closedTrades={closedTrades}
+            openTrades={openTrades}
+            totalPnL={totalPnL}
+            winRate={winRate}
+            avgR={avgR}
+            curEquity={curEquity}
+          />
         )}
-
-        {/* ══════════════ JOURNAL ══════════════ */}
         {tab === "journal" && (
-          <div className="space-y-4 animate-fade-in">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-bold text-white">Trade Journal</h2>
-                <p className="text-xs text-slate-600 mt-0.5">{trades.length} total entries · {openTrades.length} open · {closedTrades.length} closed</p>
-              </div>
-              <button onClick={() => setShowForm(true)} className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-500 text-white hover:opacity-90 transition">
-                <Plus size={12} /> Log Trade
-              </button>
-            </div>
-            <div className="overflow-x-auto bg-[#0c1118] border border-white/5 rounded-xl">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-slate-600 border-b border-white/5 text-[10px] tracking-widest uppercase">
-                    {["Ticker","Date","Side","Entry","Stop","Target","Shares","Exit","P&L","R","Setup","Status","Notes"].map(h => (
-                      <th key={h} className="p-3 text-left font-semibold whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...trades].reverse().map(t => {
-                    const { pnl, rMultiple } = calcTradeMetrics(t);
-                    const isOpen = t.status === "OPEN";
-                    const win = !isOpen && pnl > 0;
-                    return (
-                      <tr key={t.id} className="border-b border-white/3 hover:bg-white/3 transition-colors">
-                        <td className="p-3 font-bold text-white font-mono whitespace-nowrap">{t.ticker}</td>
-                        <td className="p-3 text-slate-500 whitespace-nowrap">{t.date}</td>
-                        <td className="p-3"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side==="LONG"?"bg-emerald-500/10 text-emerald-400":"bg-rose-500/10 text-rose-400"}`}>{t.side}</span></td>
-                        <td className="p-3 font-mono text-slate-300">${t.entry}</td>
-                        <td className="p-3 font-mono text-rose-400">${t.stop}</td>
-                        <td className="p-3 font-mono text-emerald-400">${t.target}</td>
-                        <td className="p-3 font-mono text-slate-400">{t.shares}</td>
-                        <td className="p-3 font-mono text-slate-300">{t.exit ? `$${t.exit}` : "–"}</td>
-                        <td className={`p-3 font-bold font-mono ${isOpen ? "text-slate-500" : win ? "text-emerald-400" : "text-rose-400"}`}>
-                          {isOpen ? "–" : fmt$(Math.round(pnl))}
-                        </td>
-                        <td className={`p-3 font-bold font-mono text-xs ${isOpen ? "text-slate-500" : rMultiple >= 0 ? "text-teal-400" : "text-rose-400"}`}>
-                          {isOpen ? "–" : fmtR(rMultiple)}
-                        </td>
-                        <td className="p-3"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 whitespace-nowrap">{t.setup}</span></td>
-                        <td className="p-3"><span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${isOpen ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-slate-500/10 text-slate-500 border border-slate-700"}`}>{t.status}</span></td>
-                        <td className="p-3 text-slate-600 max-w-[140px] truncate" title={t.notes}>{t.notes}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <Journal
+            trades={trades}
+            openTrades={openTrades}
+            closedTrades={closedTrades}
+            setShowForm={setShowForm}
+          />
         )}
-
-        {/* ══════════════ ANALYTICS ══════════════ */}
         {tab === "analytics" && (
-          <div className="space-y-5 animate-fade-in">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <StatCard label="Total Trades"  value={trades.length}     sub="All time"      icon={Layers}    accent="cyan"   />
-              <StatCard label="Win Rate"       value={`${winRate.toFixed(1)}%`} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length} wins`} icon={CheckCircle} accent="green" />
-              <StatCard label="Avg R Multiple" value={fmtR(avgR)}        sub="Closed trades" icon={Activity}  accent="purple" />
-              <StatCard label="Total Return"   value={`${(totalPnL/CAPITAL*100).toFixed(2)}%`} sub={`$${Math.round(Math.abs(totalPnL)).toLocaleString()} P&L`} icon={TrendingUp} accent={totalPnL>=0?"green":"red"} />
-            </div>
-
-            {/* Full Equity Curve */}
-            <div className="bg-[#0c1118] border border-white/5 rounded-xl p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-sm font-bold text-white">Equity Curve</h3>
-                  <p className="text-xs text-slate-600">Account balance over time · starting capital $25,000</p>
-                </div>
-                <span className={`text-sm font-bold font-mono ${totalPnL>=0?"text-emerald-400":"text-rose-400"}`}>{fmt$(Math.round(totalPnL))}</span>
-              </div>
-              <ResponsiveContainer width="100%" height={280}>
-                <AreaChart data={equityCurve} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="eqFull" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#10b981" stopOpacity={0.35} />
-                      <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.05} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} />
-                  <YAxis domain={["auto","auto"]} tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v=>`$${(v/1000).toFixed(1)}k`} />
-                  <ReferenceLine y={CAPITAL} stroke="#475569" strokeDasharray="5 5" label={{ value: "Starting Capital", position: "insideTopRight", fontSize: 9, fill: "#475569" }} />
-                  <Tooltip
-                    contentStyle={{ background: "#0c1118", border: "1px solid #1a3a2e", borderRadius: 10, fontSize: 11 }}
-                    formatter={(v, n, p) => [`$${v.toLocaleString()} (${p.payload.ticker})`, "Equity"]}
-                  />
-                  <Area type="monotone" dataKey="equity" stroke="#10b981" strokeWidth={2.5} fill="url(#eqFull)" dot={{ fill: "#10b981", r: 4, strokeWidth: 0 }} activeDot={{ r: 6, fill: "#10b981" }} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Per-trade P&L bars */}
-            <div className="bg-[#0c1118] border border-white/5 rounded-xl p-5">
-              <h3 className="text-sm font-bold text-white mb-4">P&amp;L by Trade</h3>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={closedTrades.map(t => ({ name: t.ticker, pnl: Math.round(calcTradeMetrics(t).pnl || 0) }))}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v=>`$${v}`} />
-                  <Tooltip contentStyle={{ background: "#0c1118", border: "1px solid #1a3a2e", borderRadius: 10, fontSize: 11 }} formatter={v=>[fmt$(v),"P&L"]} />
-                  <ReferenceLine y={0} stroke="#334155" />
-                  <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
-                    {closedTrades.map((t, i) => {
-                      const { pnl } = calcTradeMetrics(t);
-                      return <Cell key={i} fill={pnl > 0 ? "#10b981" : "#f43f5e"} />;
-                    })}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Setup breakdown */}
-            <div className="bg-[#0c1118] border border-white/5 rounded-xl p-5">
-              <h3 className="text-sm font-bold text-white mb-4">Performance by Setup</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {["Breakout","Pullback","Retest","Breakdown"].map(setup => {
-                  const s = closedTrades.filter(t => t.setup === setup);
-                  const wins = s.filter(t => (calcTradeMetrics(t).pnl||0) > 0).length;
-                  const wr = s.length ? wins/s.length*100 : 0;
-                  const totalR = s.reduce((a,t) => a + (calcTradeMetrics(t).rMultiple||0), 0);
-                  return (
-                    <div key={setup} className="bg-white/3 rounded-xl p-3 border border-white/5">
-                      <div className="text-xs font-semibold text-violet-400 mb-2">{setup}</div>
-                      <div className="font-bold text-white text-lg font-mono">{wr.toFixed(0)}%</div>
-                      <div className="text-[10px] text-slate-500">{s.length} trades · {totalR.toFixed(1)}R total</div>
-                      <div className="mt-2 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all" style={{ width: `${wr}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+          <Analytics
+            trades={trades}
+            closedTrades={closedTrades}
+            equityCurve={equityCurve}
+            totalPnL={totalPnL}
+            winRate={winRate}
+            avgR={avgR}
+          />
         )}
-
-        {/* ══════════════ INTEL ══════════════ */}
         {tab === "intel" && (
-          <div className="space-y-4 animate-fade-in">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Chart placeholder */}
-              <div className="md:col-span-2 bg-[#0c1118] border border-white/5 rounded-xl overflow-hidden" style={{ height: 420 }}>
-                <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
-                  <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">TradingView Chart</span>
-                  <div className="flex gap-2">
-                    {["1D","4H","1H","15m"].map(tf => (
-                      <button key={tf} className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-slate-400 hover:bg-emerald-500/10 hover:text-emerald-400 transition">{tf}</button>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex flex-col items-center justify-center h-[calc(100%-48px)] gap-3 text-slate-700">
-                  <div className="w-14 h-14 rounded-2xl bg-white/3 flex items-center justify-center border border-white/5">
-                    <BarChart2 size={24} className="text-slate-600" />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm font-semibold text-slate-500">TradingView Embed</p>
-                    <p className="text-xs text-slate-700 mt-1">Connect your TradingView account<br />to display live charts here</p>
-                  </div>
-                  <button className="text-xs px-4 py-2 rounded-lg bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/20 text-emerald-400 hover:opacity-80 transition">
-                    Connect TradingView →
-                  </button>
-                </div>
-              </div>
-
-              {/* Watchlist */}
-              <div className="bg-[#0c1118] border border-white/5 rounded-xl p-4" style={{ height: 420, overflowY: "auto" }}>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Watchlist</span>
-                  <Radio size={12} className="text-emerald-400" />
-                </div>
-                <div className="space-y-2">
-                  {SCANNER_DATA.map(s => (
-                    <div key={s.ticker} className="flex items-center justify-between p-2.5 bg-white/3 rounded-lg border border-white/5 hover:border-emerald-500/20 hover:bg-emerald-500/3 transition cursor-pointer">
-                      <div>
-                        <div className="font-bold text-xs text-white font-mono">{s.ticker}</div>
-                        <div className="text-[10px] text-slate-600">{s.setup}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xs font-mono font-bold text-slate-200">${s.price}</div>
-                        <div className={`text-[10px] font-mono font-semibold flex items-center justify-end gap-0.5 ${s.change>=0?"text-emerald-400":"text-rose-400"}`}>
-                          {s.change>=0?<ArrowUpRight size={10}/>:<ArrowDownRight size={10}/>}
-                          {s.change>=0?"+":""}{s.change}%
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* News Feed */}
-            <div className="bg-[#0c1118] border border-white/5 rounded-xl p-4">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Market News</span>
-                  <span className={`w-1.5 h-1.5 rounded-full ${pulse?"bg-emerald-400":"bg-emerald-700"} transition-colors`} />
-                </div>
-                <button className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-emerald-400 transition">
-                  <RefreshCw size={10} /> Refresh
-                </button>
-              </div>
-              <div className="space-y-2">
-                {MOCK_NEWS.map(n => (
-                  <div key={n.id} className="flex items-start gap-3 p-3 bg-white/3 rounded-lg border border-white/5 hover:border-white/10 transition cursor-pointer group">
-                    <div className={`mt-0.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${n.sentiment==="bull"?"bg-emerald-400":n.sentiment==="bear"?"bg-rose-400":"bg-amber-400"}`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-slate-300 group-hover:text-white transition leading-relaxed">{n.headline}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[10px] text-slate-600">{n.source}</span>
-                        <span className="text-[10px] text-slate-700">·</span>
-                        <span className="text-[10px] text-slate-600">{n.time}</span>
-                      </div>
-                    </div>
-                    <span className={`flex-shrink-0 text-[10px] px-2 py-0.5 rounded-full font-mono font-semibold border ${n.tag.length<=4?"bg-violet-500/10 text-violet-400 border-violet-500/20":"bg-amber-500/10 text-amber-400 border-amber-500/20"}`}>{n.tag}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <MarketIntel
+            news={MOCK_NEWS}
+            scannerData={SCANNER_DATA}
+            pulse={pulse}
+          />
         )}
-
-        {/* ══════════════ SCANNER ══════════════ */}
         {tab === "scanner" && (
-          <div className="space-y-4 animate-fade-in">
-            {/* Filters */}
-            <div className="bg-[#0c1118] border border-white/5 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Filter size={13} className="text-emerald-400" />
-                <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Scanner Filters</span>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div>
-                  <label className="text-[10px] text-slate-600 tracking-wider uppercase block mb-1">Ticker</label>
-                  <input value={scanFilter.ticker} onChange={e => setScanFilter(f=>({...f,ticker:e.target.value}))}
-                    placeholder="e.g. NVDA" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-600 focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/20 transition font-mono" />
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-600 tracking-wider uppercase block mb-1">Setup</label>
-                  <select value={scanFilter.setup} onChange={e=>setScanFilter(f=>({...f,setup:e.target.value}))}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:border-emerald-500/50 focus:outline-none transition appearance-none" style={{background:"#0c1118"}}>
-                    {["All","Breakout","Pullback","Retest","Breakdown"].map(s=><option key={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-600 tracking-wider uppercase block mb-1">Min RS Score</label>
-                  <input placeholder="e.g. 80" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-600 focus:border-emerald-500/50 focus:outline-none transition font-mono" />
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-600 tracking-wider uppercase block mb-1">Sector</label>
-                  <select className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:border-emerald-500/50 focus:outline-none transition appearance-none" style={{background:"#0c1118"}}>
-                    {["All","Technology","Semiconductors","AI/Cloud","Fintech"].map(s=><option key={s}>{s}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 mt-3">
-                <button className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-500 text-white hover:opacity-90 transition font-semibold">
-                  <Search size={11} /> Scan
-                </button>
-                <button onClick={()=>setScanFilter({ticker:"",setup:"All",minVol:""})} className="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition">
-                  Clear
-                </button>
-                <span className="ml-auto text-[10px] text-slate-600">{filteredScanner.length} results</span>
-              </div>
-            </div>
-
-            {/* Scanner Results */}
-            <div className="bg-[#0c1118] border border-white/5 rounded-xl overflow-hidden">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-[10px] tracking-widest uppercase text-slate-600 border-b border-white/5">
-                    {["Ticker","Price","Change","Volume","Float","RS Score","Setup","ATR","Action"].map(h=>(
-                      <th key={h} className="p-3 text-left font-semibold whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredScanner.map(s => (
-                    <tr key={s.ticker} className="border-b border-white/3 hover:bg-white/3 transition-colors group">
-                      <td className="p-3 font-bold text-white font-mono">{s.ticker}</td>
-                      <td className="p-3 font-mono text-slate-300">${s.price}</td>
-                      <td className={`p-3 font-bold font-mono ${s.change>=0?"text-emerald-400":"text-rose-400"}`}>
-                        <span className="flex items-center gap-0.5">{s.change>=0?<ArrowUpRight size={11}/>:<ArrowDownRight size={11}/>}{s.change>=0?"+":""}{s.change}%</span>
-                      </td>
-                      <td className="p-3 font-mono text-slate-400">{s.vol}</td>
-                      <td className="p-3 font-mono text-slate-400">{s.float}</td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          <span className={`font-bold font-mono ${s.rs>=90?"text-emerald-400":s.rs>=80?"text-teal-400":s.rs>=70?"text-amber-400":"text-rose-400"}`}>{s.rs}</span>
-                          <div className="w-16 h-1 bg-white/5 rounded-full overflow-hidden">
-                            <div className="h-full rounded-full" style={{ width: `${s.rs}%`, background: s.rs>=90?"#10b981":s.rs>=80?"#14b8a6":s.rs>=70?"#f59e0b":"#f43f5e" }} />
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-3"><span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${s.setup==="Breakout"?"bg-emerald-500/10 text-emerald-400 border-emerald-500/20":s.setup==="Pullback"?"bg-violet-500/10 text-violet-400 border-violet-500/20":s.setup==="Retest"?"bg-amber-500/10 text-amber-400 border-amber-500/20":"bg-rose-500/10 text-rose-400 border-rose-500/20"}`}>{s.setup}</span></td>
-                      <td className="p-3 font-mono text-slate-400">${s.atr}</td>
-                      <td className="p-3">
-                        <button onClick={() => { setForm(f=>({...f, ticker: s.ticker, entry: String(s.price)})); setShowForm(true); }}
-                          className="text-[10px] px-2 py-1 rounded bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/20 text-emerald-400 hover:opacity-80 transition opacity-0 group-hover:opacity-100">
-                          + Log
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <Scanner
+            scanFilter={scanFilter}
+            setScanFilter={setScanFilter}
+            filteredScanner={filteredScanner}
+            setForm={setForm}
+            setShowForm={setShowForm}
+          />
         )}
       </main>
 
