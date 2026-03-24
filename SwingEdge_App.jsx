@@ -118,10 +118,16 @@ export default function SwingEdge() {
   const [tab, setTab] = useState("dashboard");
   const [trades, setTrades] = useState(MOCK_TRADES);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ ticker: "", side: "LONG", entry: "", stop: "", target: "", setup: "Breakout", notes: "" });
+  const [form, setForm] = useState({ ticker: "", side: "LONG", entry: "", stop: "", target: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
   const [scanFilter, setScanFilter] = useState({ ticker: "", setup: "All", minVol: "" });
   const [pulse, setPulse] = useState(false);
   const [tickerIdx, setTickerIdx] = useState(0);
+  const [showCloseForm, setShowCloseForm] = useState(false);
+  const [closingTrade, setClosingTrade] = useState(null);
+  const [closeForm, setCloseForm] = useState({ exit: "", exitReason: "Target Hit", followedPlan: true, lessonLearned: "", maxFavorable: "", maxAdverse: "" });
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [apiKey, setApiKey] = useState(() => { try { return localStorage.getItem("swingEdgeApiKey") || ""; } catch { return ""; } });
 
   const equityCurve = useMemo(() => generateEquityCurve(), [trades]);
   const closedTrades = trades.filter(t => t.status === "CLOSED");
@@ -165,11 +171,61 @@ export default function SwingEdge() {
       entry: entryN, stop: stopN, target: targetN,
       shares: posSize, status: "OPEN", exit: null,
       setup: form.setup, notes: form.notes,
+      marketCondition: form.marketCondition,
+      emotionAtEntry: form.emotionAtEntry,
+      entryQuality: form.entryQuality,
+      tradeImage: form.tradeImagePreview,
+      exitReason: null, followedPlan: null, lessonLearned: null, maxFavorable: null, maxAdverse: null,
     };
     setTrades(prev => [...prev, newTrade]);
-    setForm({ ticker: "", side: "LONG", entry: "", stop: "", target: "", setup: "Breakout", notes: "" });
+    setForm({ ticker: "", side: "LONG", entry: "", stop: "", target: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
+    setAiAnalysis(null);
     setShowForm(false);
     setTab("journal");
+  };
+
+  const handleCloseSubmit = () => {
+    if (!closingTrade || !closeForm.exit) return;
+    setTrades(prev => prev.map(t => t.id === closingTrade.id ? {
+      ...t, status: "CLOSED", exit: parseFloat(closeForm.exit),
+      exitReason: closeForm.exitReason, followedPlan: closeForm.followedPlan,
+      lessonLearned: closeForm.lessonLearned,
+      maxFavorable: parseFloat(closeForm.maxFavorable) || null,
+      maxAdverse: parseFloat(closeForm.maxAdverse) || null,
+    } : t));
+    setShowCloseForm(false);
+    setClosingTrade(null);
+    setCloseForm({ exit: "", exitReason: "Target Hit", followedPlan: true, lessonLearned: "", maxFavorable: "", maxAdverse: "" });
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setForm(f => ({ ...f, tradeImage: file, tradeImagePreview: ev.target.result }));
+    reader.readAsDataURL(file);
+  };
+
+  const analyzeTradeWithAI = async () => {
+    const key = apiKey.trim();
+    if (!key) { setAiAnalysis("⚠️ הכנס Anthropic API Key בשדה למטה לפני הניתוח."); return; }
+    setAiLoading(true); setAiAnalysis(null);
+    const tradeData = `Ticker: ${form.ticker} | Direction: ${form.side} | Entry: ${form.entry} | Stop: ${form.stop} | Target: ${form.target} | Setup: ${form.setup} | Market: ${form.marketCondition} | Emotion: ${form.emotionAtEntry} | Entry Quality: ${form.entryQuality}/5 | R/R: ${rrRatio.toFixed(2)}:1 | Notes: ${form.notes}`;
+    const textPrompt = `You are a professional swing trader coach. Analyze this trade setup and respond concisely:\n\n${tradeData}\n\nProvide:\n1. Entry Strength (1-5)\n2. Stop Logic assessment (1 sentence)\n3. R/R Assessment (is it worth it?)\n4. Final Recommendation: GO / WAIT / SKIP\n\nBe direct and brief.`;
+    const content = form.tradeImagePreview
+      ? [{ type: "image", source: { type: "base64", media_type: "image/jpeg", data: form.tradeImagePreview.split(",")[1] } }, { type: "text", text: textPrompt }]
+      : [{ type: "text", text: textPrompt }];
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+        body: JSON.stringify({ model: "claude-opus-4-6", max_tokens: 400, messages: [{ role: "user", content }] })
+      });
+      const data = await res.json();
+      if (data.error) { setAiAnalysis("שגיאה: " + data.error.message); }
+      else { setAiAnalysis(data.content?.[0]?.text || "No response"); }
+    } catch (e) { setAiAnalysis("שגיאת חיבור: " + e.message); }
+    setAiLoading(false);
   };
 
   const filteredScanner = SCANNER_DATA.filter(s => {
@@ -363,7 +419,7 @@ export default function SwingEdge() {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-slate-600 border-b border-white/5 text-[10px] tracking-widest uppercase">
-                    {["Ticker","Date","Side","Entry","Stop","Target","Shares","Exit","P&L","R","Setup","Status","Notes"].map(h => (
+                    {["Ticker","Date","Side","Entry","Stop","Target","Shares","Exit","P&L","R","Setup","Mkt","Emotion","★","Status","Notes","Action"].map(h => (
                       <th key={h} className="p-3 text-left font-semibold whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -390,8 +446,19 @@ export default function SwingEdge() {
                           {isOpen ? "–" : fmtR(rMultiple)}
                         </td>
                         <td className="p-3"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 whitespace-nowrap">{t.setup}</span></td>
+                        <td className="p-3 text-slate-500 text-[10px] whitespace-nowrap">{t.marketCondition || "–"}</td>
+                        <td className="p-3 text-slate-500 text-[10px] whitespace-nowrap">{t.emotionAtEntry || "–"}</td>
+                        <td className="p-3 text-amber-400 text-xs font-mono">{t.entryQuality ? `${"★".repeat(t.entryQuality)}` : "–"}</td>
                         <td className="p-3"><span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${isOpen ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20" : "bg-slate-500/10 text-slate-500 border border-slate-700"}`}>{t.status}</span></td>
-                        <td className="p-3 text-slate-600 max-w-[140px] truncate" title={t.notes}>{t.notes}</td>
+                        <td className="p-3 text-slate-600 max-w-[140px] truncate" title={t.lessonLearned || t.notes}>{t.lessonLearned ? <span className="text-violet-400/70" title={t.lessonLearned}>💡 {t.lessonLearned}</span> : t.notes}</td>
+                        <td className="p-3">
+                          {isOpen && (
+                            <button onClick={()=>{setClosingTrade(t);setShowCloseForm(true);}}
+                              className="text-[10px] px-2 py-1 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:opacity-80 transition whitespace-nowrap">
+                              Close
+                            </button>
+                          )}
+                        </td>
                       </tr>
                     );
                   })}
@@ -663,7 +730,7 @@ export default function SwingEdge() {
       {/* ── TRADE ENTRY MODAL ── */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg bg-[#0d1b2e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+          <div className="w-full max-w-lg bg-[#0d1b2e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 bg-gradient-to-r from-cyan-500/5 to-violet-500/5">
               <div className="flex items-center gap-2">
@@ -677,7 +744,7 @@ export default function SwingEdge() {
               </button>
             </div>
 
-            <div className="p-5 space-y-4">
+            <div className="p-5 space-y-4 overflow-y-auto">
               {/* Row 1 */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -731,13 +798,13 @@ export default function SwingEdge() {
                 </div>
               )}
 
-              {/* Setup + Notes */}
+              {/* Setup Type + Notes */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Setup</label>
+                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Setup Type</label>
                   <select value={form.setup} onChange={e=>setForm(f=>({...f,setup:e.target.value}))}
                     className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0f1a2e"}}>
-                    {["Breakout","Pullback","Retest","Breakdown","Other"].map(s=><option key={s}>{s}</option>)}
+                    {["Breakout","Pullback","Support Bounce","Resistance Break","Other"].map(s=><option key={s}>{s}</option>)}
                   </select>
                 </div>
                 <div>
@@ -747,11 +814,87 @@ export default function SwingEdge() {
                 </div>
               </div>
 
+              {/* Market Condition + Emotion */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Market Condition</label>
+                  <select value={form.marketCondition} onChange={e=>setForm(f=>({...f,marketCondition:e.target.value}))}
+                    className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0f1a2e"}}>
+                    {["Trending Up","Trending Down","Sideways","Volatile"].map(s=><option key={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Emotion at Entry</label>
+                  <select value={form.emotionAtEntry} onChange={e=>setForm(f=>({...f,emotionAtEntry:e.target.value}))}
+                    className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0f1a2e"}}>
+                    {["Confident","Nervous","FOMO","Neutral"].map(s=><option key={s}>{s}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Entry Quality (stars) + Trade Image */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Entry Quality</label>
+                  <div className="flex items-center gap-1 mt-1">
+                    {[1,2,3,4,5].map(star => (
+                      <button key={star} type="button" onClick={() => setForm(f=>({...f,entryQuality:star}))}
+                        className={`text-xl transition-transform hover:scale-110 ${form.entryQuality >= star ? "text-amber-400" : "text-slate-700"}`}>
+                        ★
+                      </button>
+                    ))}
+                    <span className="text-[10px] text-slate-600 ml-1">{form.entryQuality}/5</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Trade Image</label>
+                  <label className="flex items-center gap-2 cursor-pointer w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-400 hover:border-cyan-500/30 hover:text-cyan-400 transition">
+                    <Eye size={12} />
+                    <span>{form.tradeImage ? form.tradeImage.name : "Upload chart..."}</span>
+                    <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                  </label>
+                </div>
+              </div>
+
+              {/* Image preview */}
+              {form.tradeImagePreview && (
+                <div className="relative rounded-lg overflow-hidden border border-white/10">
+                  <img src={form.tradeImagePreview} alt="Trade chart" className="w-full h-32 object-cover" />
+                  <button onClick={() => setForm(f=>({...f,tradeImage:null,tradeImagePreview:null}))}
+                    className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-slate-300 hover:text-white">
+                    <X size={10} />
+                  </button>
+                </div>
+              )}
+
               {/* RR quality indicator */}
               {entryN > 0 && stopN > 0 && targetN > 0 && (
                 <div className={`flex items-center gap-2 p-2.5 rounded-lg border text-xs ${rrRatio>=2?"bg-emerald-500/5 border-emerald-500/20 text-emerald-400":rrRatio>=1?"bg-amber-500/5 border-amber-500/20 text-amber-400":"bg-rose-500/5 border-rose-500/20 text-rose-400"}`}>
                   {rrRatio>=2?<CheckCircle size={13}/>:<AlertTriangle size={13}/>}
                   <span>{rrRatio>=2?"Great setup — R/R exceeds 2:1 minimum":rrRatio>=1?"Acceptable — consider widening target for better R/R":"Below minimum — avoid setups below 1:1 R/R"}</span>
+                </div>
+              )}
+
+              {/* API Key input */}
+              <div>
+                <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Anthropic API Key (for AI analysis)</label>
+                <input type="password" value={apiKey} onChange={e=>{ setApiKey(e.target.value); try { localStorage.setItem("swingEdgeApiKey", e.target.value); } catch {} }}
+                  placeholder="sk-ant-..." className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-400 placeholder-slate-700 focus:border-violet-500/50 focus:outline-none transition font-mono" />
+              </div>
+
+              {/* AI Analysis button */}
+              <button onClick={analyzeTradeWithAI} disabled={aiLoading}
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-violet-500/20 to-cyan-500/20 border border-violet-500/30 text-violet-300 text-sm font-bold hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-50">
+                {aiLoading ? <><RefreshCw size={13} className="animate-spin" /> מנתח...</> : <><Cpu size={13} /> נתח עסקה 🤖</>}
+              </button>
+
+              {/* AI Analysis result */}
+              {aiAnalysis && (
+                <div className="bg-violet-500/5 border border-violet-500/20 rounded-xl p-3 text-xs text-slate-300 whitespace-pre-wrap leading-relaxed">
+                  <div className="flex items-center gap-1 mb-2 text-violet-400 font-semibold text-[10px] uppercase tracking-wider">
+                    <Cpu size={11} /> AI Analysis
+                  </div>
+                  {aiAnalysis}
                 </div>
               )}
 
@@ -761,7 +904,97 @@ export default function SwingEdge() {
                   className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-white text-sm font-bold hover:opacity-90 transition">
                   Log Trade →
                 </button>
-                <button onClick={()=>setShowForm(false)} className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm hover:text-white hover:border-white/20 transition">
+                <button onClick={()=>{setShowForm(false);setAiAnalysis(null);}} className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm hover:text-white hover:border-white/20 transition">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CLOSE TRADE MODAL ── */}
+      {showCloseForm && closingTrade && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md bg-[#0d1b2e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 bg-gradient-to-r from-rose-500/5 to-violet-500/5">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-rose-400 to-violet-500 flex items-center justify-center">
+                  <X size={12} className="text-white" />
+                </div>
+                <span className="text-sm font-bold text-white">Close Trade — <span className="text-rose-400 font-mono">{closingTrade.ticker}</span></span>
+              </div>
+              <button onClick={()=>{setShowCloseForm(false);setClosingTrade(null);}} className="text-slate-600 hover:text-slate-300 transition">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Trade summary */}
+              <div className="bg-white/3 rounded-xl p-3 border border-white/5 grid grid-cols-3 gap-2 text-center text-[10px]">
+                <div><div className="text-slate-600 uppercase tracking-wider">Entry</div><div className="font-mono font-bold text-slate-300">${closingTrade.entry}</div></div>
+                <div><div className="text-slate-600 uppercase tracking-wider">Stop</div><div className="font-mono font-bold text-rose-400">${closingTrade.stop}</div></div>
+                <div><div className="text-slate-600 uppercase tracking-wider">Target</div><div className="font-mono font-bold text-emerald-400">${closingTrade.target || "–"}</div></div>
+              </div>
+
+              {/* Exit Price + Exit Reason */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Exit Price *</label>
+                  <input value={closeForm.exit} onChange={e=>setCloseForm(f=>({...f,exit:e.target.value}))}
+                    placeholder="0.00" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-rose-500/50 focus:outline-none focus:ring-1 focus:ring-rose-500/20 transition font-mono" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Exit Reason</label>
+                  <select value={closeForm.exitReason} onChange={e=>setCloseForm(f=>({...f,exitReason:e.target.value}))}
+                    className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-rose-500/50 focus:outline-none transition appearance-none" style={{background:"#0f1a2e"}}>
+                    {["Stop Loss","Target Hit","Chart Read","Fear","Other"].map(s=><option key={s}>{s}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* MFE + MAE */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Max Favorable Excursion</label>
+                  <input value={closeForm.maxFavorable} onChange={e=>setCloseForm(f=>({...f,maxFavorable:e.target.value}))}
+                    placeholder="Highest price reached" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-emerald-400 placeholder-slate-600 focus:border-emerald-500/50 focus:outline-none transition font-mono" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Max Adverse Excursion</label>
+                  <input value={closeForm.maxAdverse} onChange={e=>setCloseForm(f=>({...f,maxAdverse:e.target.value}))}
+                    placeholder="Lowest price reached" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-rose-400 placeholder-slate-600 focus:border-rose-500/50 focus:outline-none transition font-mono" />
+                </div>
+              </div>
+
+              {/* Followed Plan */}
+              <div>
+                <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Followed Plan?</label>
+                <div className="flex gap-2">
+                  {[true, false].map(val => (
+                    <button key={String(val)} onClick={()=>setCloseForm(f=>({...f,followedPlan:val}))}
+                      className={`flex-1 py-2 rounded-lg text-xs font-bold transition border ${closeForm.followedPlan===val?(val?"bg-emerald-500/20 text-emerald-400 border-emerald-500/30":"bg-rose-500/20 text-rose-400 border-rose-500/30"):"bg-white/3 text-slate-500 border-white/10 hover:border-white/20"}`}>
+                      {val ? "✓ Yes" : "✗ No"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Lesson Learned */}
+              <div>
+                <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Lesson Learned</label>
+                <input value={closeForm.lessonLearned} onChange={e=>setCloseForm(f=>({...f,lessonLearned:e.target.value}))}
+                  placeholder="One sentence takeaway..." className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-violet-500/50 focus:outline-none transition" />
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-1">
+                <button onClick={handleCloseSubmit}
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-violet-500 text-white text-sm font-bold hover:opacity-90 transition">
+                  Close Trade →
+                </button>
+                <button onClick={()=>{setShowCloseForm(false);setClosingTrade(null);}} className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm hover:text-white hover:border-white/20 transition">
                   Cancel
                 </button>
               </div>
