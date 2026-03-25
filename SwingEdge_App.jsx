@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell
@@ -116,7 +116,15 @@ const NAV_ITEMS = [
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function SwingEdge() {
   const [tab, setTab] = useState("dashboard");
-  const [trades, setTrades] = useState(MOCK_TRADES);
+  const [trades, setTrades] = useState(() => {
+    try {
+      const saved = localStorage.getItem("swingEdgeTrades");
+      return saved ? JSON.parse(saved) : MOCK_TRADES;
+    } catch { return MOCK_TRADES; }
+  });
+  const [chartSymbol, setChartSymbol] = useState("NASDAQ:NVDA");
+  const [chartInterval, setChartInterval] = useState("D");
+  const tvRef = useRef(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ticker: "", side: "LONG", entry: "", stop: "", target: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
   const [scanFilter, setScanFilter] = useState({ ticker: "", setup: "All", minVol: "" });
@@ -128,6 +136,52 @@ export default function SwingEdge() {
   const [aiAnalysis, setAiAnalysis] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [apiKey, setApiKey] = useState(() => { try { return localStorage.getItem("swingEdgeApiKey") || ""; } catch { return ""; } });
+
+  // Persist trades to localStorage
+  useEffect(() => {
+    try { localStorage.setItem("swingEdgeTrades", JSON.stringify(trades)); } catch {}
+  }, [trades]);
+
+  // TradingView widget
+  useEffect(() => {
+    if (tab !== "intel" || !tvRef.current) return;
+    const container = tvRef.current;
+    container.innerHTML = "";
+    const widgetId = "tv_widget_" + Date.now();
+    const inner = document.createElement("div");
+    inner.id = widgetId;
+    inner.style.height = "100%";
+    container.appendChild(inner);
+
+    const intervalMap = { "1D": "D", "4H": "240", "1H": "60", "15m": "15" };
+    const tvInterval = intervalMap[chartInterval] || chartInterval;
+
+    const script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src = "https://s3.tradingview.com/tv.js";
+    script.async = true;
+    script.onload = () => {
+      if (!window.TradingView) return;
+      new window.TradingView.widget({
+        autosize: true,
+        symbol: chartSymbol,
+        interval: tvInterval,
+        timezone: "America/New_York",
+        theme: "dark",
+        style: "1",
+        locale: "en",
+        toolbar_bg: "#0b1120",
+        backgroundColor: "#080c14",
+        enable_publishing: false,
+        allow_symbol_change: true,
+        hide_side_toolbar: false,
+        studies: ["Volume@tv-basicstudies"],
+        container_id: widgetId,
+      });
+    };
+    document.head.appendChild(script);
+    return () => { try { document.head.removeChild(script); } catch {} };
+  }, [tab, chartSymbol, chartInterval]);
 
   const equityCurve = useMemo(() => generateEquityCurve(), [trades]);
   const closedTrades = trades.filter(t => t.status === "CLOSED");
@@ -557,28 +611,29 @@ export default function SwingEdge() {
         {tab === "intel" && (
           <div className="space-y-4 animate-fade-in">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Chart placeholder */}
+              {/* TradingView Chart */}
               <div className="md:col-span-2 bg-[#0b1120] border border-white/5 rounded-xl overflow-hidden" style={{ height: 420 }}>
                 <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
-                  <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">TradingView Chart</span>
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Live Chart</span>
+                    <input
+                      value={chartSymbol}
+                      onChange={e => setChartSymbol(e.target.value.toUpperCase())}
+                      onKeyDown={e => { if (e.key === "Enter") e.target.blur(); }}
+                      className="text-xs font-mono font-bold text-white bg-white/5 border border-white/10 rounded px-2 py-0.5 w-32 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20"
+                      placeholder="NASDAQ:NVDA"
+                    />
+                  </div>
+                  <div className="flex gap-1">
                     {["1D","4H","1H","15m"].map(tf => (
-                      <button key={tf} className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-slate-400 hover:bg-cyan-500/10 hover:text-cyan-400 transition">{tf}</button>
+                      <button key={tf} onClick={() => setChartInterval(tf)}
+                        className={`text-[10px] px-2 py-0.5 rounded transition ${chartInterval === tf ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30" : "bg-white/5 text-slate-400 hover:bg-cyan-500/10 hover:text-cyan-400"}`}>
+                        {tf}
+                      </button>
                     ))}
                   </div>
                 </div>
-                <div className="flex flex-col items-center justify-center h-[calc(100%-48px)] gap-3 text-slate-700">
-                  <div className="w-14 h-14 rounded-2xl bg-white/3 flex items-center justify-center border border-white/5">
-                    <BarChart2 size={24} className="text-slate-600" />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm font-semibold text-slate-500">TradingView Embed</p>
-                    <p className="text-xs text-slate-700 mt-1">Connect your TradingView account<br />to display live charts here</p>
-                  </div>
-                  <button className="text-xs px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500/20 to-violet-500/20 border border-cyan-500/20 text-cyan-400 hover:opacity-80 transition">
-                    Connect TradingView →
-                  </button>
-                </div>
+                <div ref={tvRef} style={{ height: "calc(100% - 48px)" }} />
               </div>
 
               {/* Watchlist */}
@@ -589,7 +644,8 @@ export default function SwingEdge() {
                 </div>
                 <div className="space-y-2">
                   {SCANNER_DATA.map(s => (
-                    <div key={s.ticker} className="flex items-center justify-between p-2.5 bg-white/3 rounded-lg border border-white/5 hover:border-cyan-500/20 hover:bg-cyan-500/3 transition cursor-pointer">
+                    <div key={s.ticker} onClick={() => setChartSymbol(`NASDAQ:${s.ticker}`)}
+                      className={`flex items-center justify-between p-2.5 bg-white/3 rounded-lg border transition cursor-pointer ${chartSymbol === `NASDAQ:${s.ticker}` ? "border-cyan-500/40 bg-cyan-500/5" : "border-white/5 hover:border-cyan-500/20 hover:bg-cyan-500/3"}`}>
                       <div>
                         <div className="font-bold text-xs text-white font-mono">{s.ticker}</div>
                         <div className="text-[10px] text-slate-600">{s.setup}</div>
