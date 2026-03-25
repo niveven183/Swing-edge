@@ -12,19 +12,12 @@ import {
 } from "lucide-react";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
-const CAPITAL = 25000;
+const CAPITAL = 2500;
 const RISK_PCT = 0.01;
 
 const MOCK_TRADES = [
-  { id: 1, ticker: "NVDA", date: "2025-01-06", side: "LONG", entry: 138.50, stop: 134.20, target: 148.00, shares: 59, status: "CLOSED", exit: 147.80, setup: "Breakout", notes: "Strong vol. confirmation" },
-  { id: 2, ticker: "AMD",  date: "2025-01-10", side: "LONG", entry: 122.00, stop: 118.50, target: 131.00, shares: 71, status: "CLOSED", exit: 130.50, setup: "Pullback",  notes: "Clean retest of 50 EMA" },
-  { id: 3, ticker: "SMCI", date: "2025-01-15", side: "LONG", entry: 52.40,  stop: 50.10,  target: 57.50,  shares: 108, status: "CLOSED", exit: 49.80,  setup: "Breakout",  notes: "Stop hit — false break" },
-  { id: 4, ticker: "META", date: "2025-01-22", side: "LONG", entry: 598.00, stop: 585.00, target: 625.00, shares: 19, status: "CLOSED", exit: 624.00, setup: "Retest",    notes: "Support held perfectly" },
-  { id: 5, ticker: "TSLA", date: "2025-02-03", side: "SHORT",entry: 385.00, stop: 395.00, target: 362.00, shares: 25, status: "CLOSED", exit: 363.00, setup: "Breakdown", notes: "Bear flag confirmed" },
-  { id: 6, ticker: "AVGO", date: "2025-02-11", side: "LONG", entry: 215.00, stop: 208.00, target: 232.00, shares: 35, status: "CLOSED", exit: 231.50, setup: "Pullback",  notes: "Fib 0.618 hold" },
-  { id: 7, ticker: "AAPL", date: "2025-02-20", side: "LONG", entry: 225.00, stop: 219.00, target: 238.00, shares: 41, status: "CLOSED", exit: 235.00, setup: "Breakout",  notes: "ATH breakout" },
-  { id: 8, ticker: "PLTR", date: "2025-03-05", side: "LONG", entry: 94.00,  stop: 89.50,  target: 103.50, shares: 55, status: "OPEN",   exit: null,    setup: "Retest",    notes: "AI catalyst" },
-  { id: 9, ticker: "MSTR", date: "2025-03-10", side: "LONG", entry: 318.00, stop: 305.00, target: 348.00, shares: 19, status: "OPEN",   exit: null,    setup: "Breakout",  notes: "BTC correlation" },
+  { id: 1, ticker: "PLTR", date: "2025-03-11", side: "LONG", entry: 147.00, stop: 110.00, target: 221.00, shares: 3, status: "OPEN", exit: null, setup: "Breakout", notes: "Current stop: $148.53 (BE+) · Current: $155.02 · Unrealized: +$24.06" },
+  { id: 2, ticker: "CRCL", date: "2025-03-17", side: "LONG", entry: 125.00, stop: 101.00, target: 173.00, shares: 3, status: "OPEN", exit: null, setup: "Breakout", notes: "Current stop: $120.00 (trailed up) · Current: $136.30 · Unrealized: +$33.90" },
 ];
 
 const MOCK_NEWS = [
@@ -537,7 +530,7 @@ export default function SwingEdge() {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-sm font-bold text-white">Equity Curve</h3>
-                  <p className="text-xs text-slate-600">Account balance over time · starting capital $25,000</p>
+                  <p className="text-xs text-slate-600">Account balance over time · starting capital ${CAPITAL.toLocaleString()}</p>
                 </div>
                 <span className={`text-sm font-bold font-mono ${totalPnL>=0?"text-emerald-400":"text-rose-400"}`}>{fmt$(Math.round(totalPnL))}</span>
               </div>
