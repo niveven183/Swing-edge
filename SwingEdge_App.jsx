@@ -451,7 +451,7 @@ export default function SwingEdge() {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-slate-600 border-b border-white/[0.06] text-[10px] tracking-widest uppercase">
-                    {["Ticker","Date","Side","Entry","Stop","Target","Shares","Exit","P&L","R","Setup","Mkt","Emotion","★","Status","Notes","Action"].map(h => (
+                    {["Ticker","Date","Side","Entry","Stop","Target","Shares","Exit","P&L","R","Setup","Mkt","Emotion","★","Exit Rsn","Plan","Lesson","Status","Action"].map(h => (
                       <th key={h} className="p-3 text-left font-semibold whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -481,8 +481,24 @@ export default function SwingEdge() {
                         <td className="p-3 text-slate-500 text-[10px] whitespace-nowrap">{t.marketCondition || "–"}</td>
                         <td className="p-3 text-slate-500 text-[10px] whitespace-nowrap">{t.emotionAtEntry || "–"}</td>
                         <td className="p-3 text-amber-400 text-xs font-mono">{t.entryQuality ? `${"★".repeat(t.entryQuality)}` : "–"}</td>
+                        <td className="p-3 text-[10px] text-slate-500 whitespace-nowrap">
+                          {t.exitReason
+                            ? <span className="px-2 py-0.5 rounded bg-slate-700/40 text-slate-400 border border-white/[0.06]">{t.exitReason}</span>
+                            : <span className="text-slate-700">–</span>}
+                        </td>
+                        <td className="p-3 text-center">
+                          {t.followedPlan === true  && <span className="text-[#10b981] text-sm font-bold">✓</span>}
+                          {t.followedPlan === false && <span className="text-[#ef4444] text-sm font-bold">✗</span>}
+                          {t.followedPlan == null   && <span className="text-slate-700 text-[10px]">–</span>}
+                        </td>
+                        <td className="p-3 text-slate-500 text-[10px] max-w-[160px] truncate" title={t.lessonLearned || t.notes}>
+                          {t.lessonLearned
+                            ? <span className="text-violet-400/80">💡 {t.lessonLearned}</span>
+                            : t.notes
+                              ? <span className="text-slate-600">{t.notes}</span>
+                              : <span className="text-slate-700">–</span>}
+                        </td>
                         <td className="p-3"><span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${isOpen ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20" : "bg-slate-500/10 text-slate-500 border border-slate-700"}`}>{t.status}</span></td>
-                        <td className="p-3 text-slate-600 max-w-[140px] truncate" title={t.lessonLearned || t.notes}>{t.lessonLearned ? <span className="text-violet-400/70" title={t.lessonLearned}>💡 {t.lessonLearned}</span> : t.notes}</td>
                         <td className="p-3">
                           {isOpen && (
                             <button onClick={()=>{setClosingTrade(t);setShowCloseForm(true);}}
