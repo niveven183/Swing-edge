@@ -4,11 +4,11 @@ import {
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell
 } from "recharts";
 import {
-  LayoutDashboard, BookOpen, BarChart2, Rss, Search,
+  LayoutDashboard, BookOpen, BarChart2, Rss,
   TrendingUp, TrendingDown, AlertTriangle, CheckCircle,
-  Plus, X, ChevronDown, Filter, RefreshCw, Activity,
-  DollarSign, Target, Shield, Zap, ArrowUpRight,
-  ArrowDownRight, Clock, Eye, Layers, Cpu, Radio
+  Plus, X, RefreshCw, Activity,
+  DollarSign, Target, Zap, ArrowUpRight,
+  ArrowDownRight, Eye, Layers, Cpu, Radio
 } from "lucide-react";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -73,23 +73,23 @@ const fmtR = (r) => r >= 0 ? `+${r.toFixed(2)}R` : `${r.toFixed(2)}R`;
 // ─── STAT CARD ────────────────────────────────────────────────────────────────
 const StatCard = ({ label, value, sub, trend, icon: Icon, accent = "cyan" }) => {
   const accents = {
-    cyan:   "from-cyan-500/10 to-cyan-500/5 border-cyan-500/20 text-cyan-400",
-    green:  "from-emerald-500/10 to-emerald-500/5 border-emerald-500/20 text-emerald-400",
-    purple: "from-violet-500/10 to-violet-500/5 border-violet-500/20 text-violet-400",
-    amber:  "from-amber-500/10 to-amber-500/5 border-amber-500/20 text-amber-400",
-    red:    "from-rose-500/10 to-rose-500/5 border-rose-500/20 text-rose-400",
+    cyan:   { border: "border-cyan-500/25", iconColor: "text-cyan-400", bg: "bg-cyan-500/8" },
+    green:  { border: "border-[#10b981]/25", iconColor: "text-[#10b981]", bg: "bg-[#10b981]/8" },
+    purple: { border: "border-violet-500/25", iconColor: "text-violet-400", bg: "bg-violet-500/8" },
+    amber:  { border: "border-amber-500/25", iconColor: "text-amber-400", bg: "bg-amber-500/8" },
+    red:    { border: "border-[#ef4444]/25", iconColor: "text-[#ef4444]", bg: "bg-[#ef4444]/8" },
   };
-  const cls = accents[accent] || accents.cyan;
+  const { border, iconColor, bg } = accents[accent] || accents.cyan;
   return (
-    <div className={`bg-gradient-to-br ${cls} border rounded-xl p-4 flex flex-col gap-1 relative overflow-hidden`}>
-      <div className="absolute top-3 right-3 opacity-20">
-        <Icon size={28} />
+    <div className={`${bg} border ${border} rounded-xl p-4 flex flex-col gap-1 relative overflow-hidden bg-[#0d1424]`}>
+      <div className={`absolute top-3 right-3 opacity-15 ${iconColor}`}>
+        <Icon size={26} />
       </div>
-      <span className="text-xs font-medium tracking-widest uppercase text-slate-500">{label}</span>
-      <span className="text-2xl font-bold text-slate-100 font-mono">{value}</span>
-      {sub && <span className="text-xs text-slate-500">{sub}</span>}
+      <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500">{label}</span>
+      <span className={`text-2xl font-bold font-mono ${iconColor}`}>{value}</span>
+      {sub && <span className="text-xs text-slate-600">{sub}</span>}
       {trend !== undefined && (
-        <span className={`text-xs font-semibold ${trend >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+        <span className={`text-xs font-semibold ${trend >= 0 ? "text-[#10b981]" : "text-[#ef4444]"}`}>
           {trend >= 0 ? "▲" : "▼"} {Math.abs(trend).toFixed(1)}%
         </span>
       )}
@@ -103,7 +103,6 @@ const NAV_ITEMS = [
   { id: "journal",   label: "Journal",    icon: BookOpen },
   { id: "analytics", label: "Analytics",  icon: BarChart2 },
   { id: "intel",     label: "Market Intel",icon: Rss },
-  { id: "scanner",   label: "Scanner",    icon: Search },
 ];
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
@@ -120,7 +119,6 @@ export default function SwingEdge() {
   const tvRef = useRef(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ticker: "", side: "LONG", entry: "", stop: "", target: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
-  const [scanFilter, setScanFilter] = useState({ ticker: "", setup: "All", minVol: "" });
   const [pulse, setPulse] = useState(false);
   const [tickerIdx, setTickerIdx] = useState(0);
   const [showCloseForm, setShowCloseForm] = useState(false);
@@ -163,8 +161,8 @@ export default function SwingEdge() {
         theme: "dark",
         style: "1",
         locale: "en",
-        toolbar_bg: "#0b1120",
-        backgroundColor: "#080c14",
+        toolbar_bg: "#0d1424",
+        backgroundColor: "#0a0f1e",
         enable_publishing: false,
         allow_symbol_change: true,
         hide_side_toolbar: false,
@@ -275,17 +273,12 @@ export default function SwingEdge() {
     setAiLoading(false);
   };
 
-  const filteredScanner = SCANNER_DATA.filter(s => {
-    const tickOk  = !scanFilter.ticker || s.ticker.includes(scanFilter.ticker.toUpperCase());
-    const setupOk = scanFilter.setup === "All" || s.setup === scanFilter.setup;
-    return tickOk && setupOk;
-  });
 
   return (
-    <div className="min-h-screen bg-[#080c14] text-slate-200 font-sans flex flex-col" style={{ fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}>
+    <div className="min-h-screen bg-[#0a0f1e] text-slate-200 font-sans flex flex-col" style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
 
       {/* ── HEADER ── */}
-      <header className="flex items-center justify-between px-5 py-3 border-b border-white/5 bg-[#0b1120]/80 backdrop-blur-md sticky top-0 z-50">
+      <header className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06] bg-[#0d1424]/90 backdrop-blur-md sticky top-0 z-50">
         {/* Logo */}
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-400 to-violet-500 flex items-center justify-center">
@@ -300,7 +293,7 @@ export default function SwingEdge() {
           {TICKERS.map((t, i) => {
             const bull = t.includes("+");
             return (
-              <span key={i} className={`transition-all duration-500 ${i === tickerIdx ? "opacity-100 scale-105" : "opacity-40"} ${bull ? "text-emerald-400" : "text-rose-400"}`}>
+              <span key={i} className={`transition-all duration-500 ${i === tickerIdx ? "opacity-100 scale-105" : "opacity-40"} ${bull ? "text-[#10b981]" : "text-[#ef4444]"}`}>
                 {t}
               </span>
             );
@@ -321,22 +314,17 @@ export default function SwingEdge() {
       </header>
 
       {/* ── NAV ── */}
-      <nav className="flex items-center gap-1 px-4 pt-3 pb-0 border-b border-white/5 overflow-x-auto">
+      <nav className="flex items-center gap-0 px-5 border-b border-white/[0.06] bg-[#0d1424]/60 overflow-x-auto">
         {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
           <button key={id} onClick={() => setTab(id)}
-            className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold tracking-wide rounded-t-lg transition-all whitespace-nowrap
+            className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold tracking-wide transition-all whitespace-nowrap border-b-2
               ${tab === id
-                ? "bg-[#0f1e35] text-cyan-400 border border-white/10 border-b-[#080c14] -mb-px"
-                : "text-slate-500 hover:text-slate-300"}`}>
+                ? "text-white border-cyan-400"
+                : "text-slate-500 border-transparent hover:text-slate-300 hover:border-slate-600"}`}>
             <Icon size={13} />
             {label}
           </button>
         ))}
-        <div className="flex-1" />
-        <button onClick={() => setShowForm(true)}
-          className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-violet-500 text-white hover:opacity-90 transition mb-1">
-          <Plus size={13} /> New Trade
-        </button>
       </nav>
 
       {/* ── CONTENT ── */}
@@ -356,7 +344,7 @@ export default function SwingEdge() {
             {/* Mini Equity + Open Positions */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Equity mini */}
-              <div className="md:col-span-2 bg-[#0b1120] border border-white/5 rounded-xl p-4">
+              <div className="md:col-span-2 bg-[#0d1424] border border-white/[0.06] rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Equity Curve</span>
                   <span className="text-xs text-cyan-400 font-mono">{equityCurve.length} data pts</span>
@@ -373,14 +361,14 @@ export default function SwingEdge() {
                     <XAxis dataKey="date" tick={{ fontSize: 9, fill: "#475569" }} tickLine={false} axisLine={false} />
                     <YAxis domain={["auto", "auto"]} tick={{ fontSize: 9, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
                     <ReferenceLine y={CAPITAL} stroke="#475569" strokeDasharray="4 4" />
-                    <Tooltip contentStyle={{ background: "#0f1e35", border: "1px solid #1e3a5f", borderRadius: 8, fontSize: 11 }} formatter={(v) => [`$${v.toLocaleString()}`, "Equity"]} />
+                    <Tooltip contentStyle={{ background: "#0d1424", border: "1px solid #162032", borderRadius: 8, fontSize: 11 }} formatter={(v) => [`$${v.toLocaleString()}`, "Equity"]} />
                     <Area type="monotone" dataKey="equity" stroke="#06b6d4" strokeWidth={2} fill="url(#eqGrad)" dot={{ fill: "#06b6d4", r: 3 }} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
 
               {/* Open trades */}
-              <div className="bg-[#0b1120] border border-white/5 rounded-xl p-4">
+              <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Open Positions</span>
                   <span className="text-xs bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded-full border border-cyan-500/20">{openTrades.length}</span>
@@ -390,15 +378,15 @@ export default function SwingEdge() {
                     const riskPerSh = Math.abs(t.entry - t.stop);
                     const exposure = t.shares * t.entry;
                     return (
-                      <div key={t.id} className="bg-white/3 rounded-lg p-3 border border-white/5">
+                      <div key={t.id} className="bg-white/3 rounded-lg p-3 border border-white/[0.06]">
                         <div className="flex items-center justify-between">
                           <span className="font-bold text-sm text-white font-mono">{t.ticker}</span>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${t.side === "LONG" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"}`}>{t.side}</span>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${t.side === "LONG" ? "bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20" : "bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20"}`}>{t.side}</span>
                         </div>
                         <div className="mt-1 grid grid-cols-2 gap-x-3 text-[10px] text-slate-500 font-mono">
                           <span>Entry <span className="text-slate-300">${t.entry}</span></span>
-                          <span>Stop <span className="text-rose-400">${t.stop}</span></span>
-                          <span>Target <span className="text-emerald-400">${t.target}</span></span>
+                          <span>Stop <span className="text-[#ef4444]">${t.stop}</span></span>
+                          <span>Target <span className="text-[#10b981]">${t.target}</span></span>
                           <span>Shares <span className="text-slate-300">{t.shares}</span></span>
                         </div>
                         <div className="mt-1.5 h-1 bg-white/5 rounded-full overflow-hidden">
@@ -412,14 +400,14 @@ export default function SwingEdge() {
             </div>
 
             {/* Recent Closed */}
-            <div className="bg-[#0b1120] border border-white/5 rounded-xl p-4">
+            <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Recent Closed Trades</span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="text-slate-600 border-b border-white/5">
+                    <tr className="text-slate-600 border-b border-white/[0.06]">
                       {["Ticker","Date","Side","Entry","Exit","Shares","P&L","R Multiple","Setup"].map(h => (
                         <th key={h} className="pb-2 text-left font-semibold tracking-wider pr-4">{h}</th>
                       ))}
@@ -430,15 +418,15 @@ export default function SwingEdge() {
                       const { pnl, rMultiple } = calcTradeMetrics(t);
                       const win = pnl > 0;
                       return (
-                        <tr key={t.id} className="border-b border-white/3 hover:bg-white/3 transition-colors">
+                        <tr key={t.id} className="border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors">
                           <td className="py-2 pr-4 font-bold text-white font-mono">{t.ticker}</td>
                           <td className="py-2 pr-4 text-slate-500">{t.date}</td>
-                          <td className="py-2 pr-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side==="LONG"?"bg-emerald-500/10 text-emerald-400":"bg-rose-500/10 text-rose-400"}`}>{t.side}</span></td>
+                          <td className="py-2 pr-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side==="LONG"?"bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20":"bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20"}`}>{t.side}</span></td>
                           <td className="py-2 pr-4 font-mono text-slate-300">${t.entry}</td>
                           <td className="py-2 pr-4 font-mono text-slate-300">${t.exit}</td>
                           <td className="py-2 pr-4 font-mono text-slate-400">{t.shares}</td>
-                          <td className={`py-2 pr-4 font-bold font-mono ${win ? "text-emerald-400" : "text-rose-400"}`}>{fmt$(Math.round(pnl))}</td>
-                          <td className={`py-2 pr-4 font-bold font-mono ${rMultiple >= 0 ? "text-cyan-400" : "text-rose-400"}`}>{fmtR(rMultiple)}</td>
+                          <td className={`py-2 pr-4 font-bold font-mono ${win ? "text-[#10b981]" : "text-[#ef4444]"}`}>{fmt$(Math.round(pnl))}</td>
+                          <td className={`py-2 pr-4 font-bold font-mono ${rMultiple >= 0 ? "text-cyan-400" : "text-[#ef4444]"}`}>{fmtR(rMultiple)}</td>
                           <td className="py-2 pr-4"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">{t.setup}</span></td>
                         </tr>
                       );
@@ -458,14 +446,11 @@ export default function SwingEdge() {
                 <h2 className="text-sm font-bold text-white">Trade Journal</h2>
                 <p className="text-xs text-slate-600 mt-0.5">{trades.length} total entries · {openTrades.length} open · {closedTrades.length} closed</p>
               </div>
-              <button onClick={() => setShowForm(true)} className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-violet-500 text-white hover:opacity-90 transition">
-                <Plus size={12} /> Log Trade
-              </button>
             </div>
-            <div className="overflow-x-auto bg-[#0b1120] border border-white/5 rounded-xl">
+            <div className="overflow-x-auto bg-[#0d1424] border border-white/[0.06] rounded-xl">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-slate-600 border-b border-white/5 text-[10px] tracking-widest uppercase">
+                  <tr className="text-slate-600 border-b border-white/[0.06] text-[10px] tracking-widest uppercase">
                     {["Ticker","Date","Side","Entry","Stop","Target","Shares","Exit","P&L","R","Setup","Mkt","Emotion","★","Status","Notes","Action"].map(h => (
                       <th key={h} className="p-3 text-left font-semibold whitespace-nowrap">{h}</th>
                     ))}
@@ -477,19 +462,19 @@ export default function SwingEdge() {
                     const isOpen = t.status === "OPEN";
                     const win = !isOpen && pnl > 0;
                     return (
-                      <tr key={t.id} className="border-b border-white/3 hover:bg-white/3 transition-colors">
+                      <tr key={t.id} className={`border-b border-white/[0.04] transition-colors ${!isOpen && win ? "hover:bg-[#10b981]/[0.04]" : !isOpen ? "hover:bg-[#ef4444]/[0.04]" : "hover:bg-white/[0.03]"}`}>
                         <td className="p-3 font-bold text-white font-mono whitespace-nowrap">{t.ticker}</td>
                         <td className="p-3 text-slate-500 whitespace-nowrap">{t.date}</td>
-                        <td className="p-3"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side==="LONG"?"bg-emerald-500/10 text-emerald-400":"bg-rose-500/10 text-rose-400"}`}>{t.side}</span></td>
+                        <td className="p-3"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side==="LONG"?"bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20":"bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20"}`}>{t.side}</span></td>
                         <td className="p-3 font-mono text-slate-300">${t.entry}</td>
-                        <td className="p-3 font-mono text-rose-400">${t.stop}</td>
-                        <td className="p-3 font-mono text-emerald-400">${t.target}</td>
+                        <td className="p-3 font-mono text-[#ef4444]">${t.stop}</td>
+                        <td className="p-3 font-mono text-[#10b981]">${t.target}</td>
                         <td className="p-3 font-mono text-slate-400">{t.shares}</td>
                         <td className="p-3 font-mono text-slate-300">{t.exit ? `$${t.exit}` : "–"}</td>
-                        <td className={`p-3 font-bold font-mono ${isOpen ? "text-slate-500" : win ? "text-emerald-400" : "text-rose-400"}`}>
+                        <td className={`p-3 font-bold font-mono ${isOpen ? "text-slate-500" : win ? "text-[#10b981]" : "text-[#ef4444]"}`}>
                           {isOpen ? "–" : fmt$(Math.round(pnl))}
                         </td>
-                        <td className={`p-3 font-bold font-mono text-xs ${isOpen ? "text-slate-500" : rMultiple >= 0 ? "text-cyan-400" : "text-rose-400"}`}>
+                        <td className={`p-3 font-bold font-mono text-xs ${isOpen ? "text-slate-500" : rMultiple >= 0 ? "text-cyan-400" : "text-[#ef4444]"}`}>
                           {isOpen ? "–" : fmtR(rMultiple)}
                         </td>
                         <td className="p-3"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 whitespace-nowrap">{t.setup}</span></td>
@@ -501,7 +486,7 @@ export default function SwingEdge() {
                         <td className="p-3">
                           {isOpen && (
                             <button onClick={()=>{setClosingTrade(t);setShowCloseForm(true);}}
-                              className="text-[10px] px-2 py-1 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:opacity-80 transition whitespace-nowrap">
+                              className="text-[10px] px-2 py-1 rounded bg-[#ef4444]/10 border border-[#ef4444]/20 text-[#ef4444] hover:opacity-80 transition whitespace-nowrap">
                               Close
                             </button>
                           )}
@@ -526,13 +511,13 @@ export default function SwingEdge() {
             </div>
 
             {/* Full Equity Curve */}
-            <div className="bg-[#0b1120] border border-white/5 rounded-xl p-5">
+            <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-sm font-bold text-white">Equity Curve</h3>
                   <p className="text-xs text-slate-600">Account balance over time · starting capital ${CAPITAL.toLocaleString()}</p>
                 </div>
-                <span className={`text-sm font-bold font-mono ${totalPnL>=0?"text-emerald-400":"text-rose-400"}`}>{fmt$(Math.round(totalPnL))}</span>
+                <span className={`text-sm font-bold font-mono ${totalPnL>=0?"text-[#10b981]":"text-[#ef4444]"}`}>{fmt$(Math.round(totalPnL))}</span>
               </div>
               <ResponsiveContainer width="100%" height={280}>
                 <AreaChart data={equityCurve} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
@@ -547,7 +532,7 @@ export default function SwingEdge() {
                   <YAxis domain={["auto","auto"]} tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v=>`$${(v/1000).toFixed(1)}k`} />
                   <ReferenceLine y={CAPITAL} stroke="#475569" strokeDasharray="5 5" label={{ value: "Starting Capital", position: "insideTopRight", fontSize: 9, fill: "#475569" }} />
                   <Tooltip
-                    contentStyle={{ background: "#0d1b2e", border: "1px solid #1e3a5f", borderRadius: 10, fontSize: 11 }}
+                    contentStyle={{ background: "#0d1424", border: "1px solid #162032", borderRadius: 10, fontSize: 11 }}
                     formatter={(v, n, p) => [`$${v.toLocaleString()} (${p.payload.ticker})`, "Equity"]}
                   />
                   <Area type="monotone" dataKey="equity" stroke="#06b6d4" strokeWidth={2.5} fill="url(#eqFull)" dot={{ fill: "#06b6d4", r: 4, strokeWidth: 0 }} activeDot={{ r: 6, fill: "#06b6d4" }} />
@@ -556,14 +541,14 @@ export default function SwingEdge() {
             </div>
 
             {/* Per-trade P&L bars */}
-            <div className="bg-[#0b1120] border border-white/5 rounded-xl p-5">
+            <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5">
               <h3 className="text-sm font-bold text-white mb-4">P&amp;L by Trade</h3>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={closedTrades.map(t => ({ name: t.ticker, pnl: Math.round(calcTradeMetrics(t).pnl || 0) }))}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
                   <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v=>`$${v}`} />
-                  <Tooltip contentStyle={{ background: "#0d1b2e", border: "1px solid #1e3a5f", borderRadius: 10, fontSize: 11 }} formatter={v=>[fmt$(v),"P&L"]} />
+                  <Tooltip contentStyle={{ background: "#0d1424", border: "1px solid #162032", borderRadius: 10, fontSize: 11 }} formatter={v=>[fmt$(v),"P&L"]} />
                   <ReferenceLine y={0} stroke="#334155" />
                   <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
                     {closedTrades.map((t, i) => {
@@ -576,7 +561,7 @@ export default function SwingEdge() {
             </div>
 
             {/* Setup breakdown */}
-            <div className="bg-[#0b1120] border border-white/5 rounded-xl p-5">
+            <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5">
               <h3 className="text-sm font-bold text-white mb-4">Performance by Setup</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {["Breakout","Pullback","Retest","Breakdown"].map(setup => {
@@ -585,7 +570,7 @@ export default function SwingEdge() {
                   const wr = s.length ? wins/s.length*100 : 0;
                   const totalR = s.reduce((a,t) => a + (calcTradeMetrics(t).rMultiple||0), 0);
                   return (
-                    <div key={setup} className="bg-white/3 rounded-xl p-3 border border-white/5">
+                    <div key={setup} className="bg-white/3 rounded-xl p-3 border border-white/[0.06]">
                       <div className="text-xs font-semibold text-violet-400 mb-2">{setup}</div>
                       <div className="font-bold text-white text-lg font-mono">{wr.toFixed(0)}%</div>
                       <div className="text-[10px] text-slate-500">{s.length} trades · {totalR.toFixed(1)}R total</div>
@@ -605,8 +590,8 @@ export default function SwingEdge() {
           <div className="space-y-4 animate-fade-in">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* TradingView Chart */}
-              <div className="md:col-span-2 bg-[#0b1120] border border-white/5 rounded-xl overflow-hidden" style={{ height: 420 }}>
-                <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+              <div className="md:col-span-2 bg-[#0d1424] border border-white/[0.06] rounded-xl overflow-hidden" style={{ height: 420 }}>
+                <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Live Chart</span>
                     <input
@@ -630,7 +615,7 @@ export default function SwingEdge() {
               </div>
 
               {/* Watchlist */}
-              <div className="bg-[#0b1120] border border-white/5 rounded-xl p-4" style={{ height: 420, overflowY: "auto" }}>
+              <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-4" style={{ height: 420, overflowY: "auto" }}>
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Watchlist</span>
                   <Radio size={12} className="text-cyan-400" />
@@ -638,14 +623,14 @@ export default function SwingEdge() {
                 <div className="space-y-2">
                   {SCANNER_DATA.map(s => (
                     <div key={s.ticker} onClick={() => setChartSymbol(`NASDAQ:${s.ticker}`)}
-                      className={`flex items-center justify-between p-2.5 bg-white/3 rounded-lg border transition cursor-pointer ${chartSymbol === `NASDAQ:${s.ticker}` ? "border-cyan-500/40 bg-cyan-500/5" : "border-white/5 hover:border-cyan-500/20 hover:bg-cyan-500/3"}`}>
+                      className={`flex items-center justify-between p-2.5 bg-white/3 rounded-lg border transition cursor-pointer ${chartSymbol === `NASDAQ:${s.ticker}` ? "border-cyan-500/40 bg-cyan-500/5" : "border-white/[0.06] hover:border-cyan-500/20 hover:bg-cyan-500/3"}`}>
                       <div>
                         <div className="font-bold text-xs text-white font-mono">{s.ticker}</div>
                         <div className="text-[10px] text-slate-600">{s.setup}</div>
                       </div>
                       <div className="text-right">
                         <div className="text-xs font-mono font-bold text-slate-200">${s.price}</div>
-                        <div className={`text-[10px] font-mono font-semibold flex items-center justify-end gap-0.5 ${s.change>=0?"text-emerald-400":"text-rose-400"}`}>
+                        <div className={`text-[10px] font-mono font-semibold flex items-center justify-end gap-0.5 ${s.change>=0?"text-[#10b981]":"text-[#ef4444]"}`}>
                           {s.change>=0?<ArrowUpRight size={10}/>:<ArrowDownRight size={10}/>}
                           {s.change>=0?"+":""}{s.change}%
                         </div>
@@ -657,7 +642,7 @@ export default function SwingEdge() {
             </div>
 
             {/* News Feed */}
-            <div className="bg-[#0b1120] border border-white/5 rounded-xl p-4">
+            <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-4">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Market News</span>
@@ -669,7 +654,7 @@ export default function SwingEdge() {
               </div>
               <div className="space-y-2">
                 {MOCK_NEWS.map(n => (
-                  <div key={n.id} className="flex items-start gap-3 p-3 bg-white/3 rounded-lg border border-white/5 hover:border-white/10 transition cursor-pointer group">
+                  <div key={n.id} className="flex items-start gap-3 p-3 bg-white/3 rounded-lg border border-white/[0.06] hover:border-white/10 transition cursor-pointer group">
                     <div className={`mt-0.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${n.sentiment==="bull"?"bg-emerald-400":n.sentiment==="bear"?"bg-rose-400":"bg-amber-400"}`} />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-slate-300 group-hover:text-white transition leading-relaxed">{n.headline}</p>
@@ -687,101 +672,14 @@ export default function SwingEdge() {
           </div>
         )}
 
-        {/* ══════════════ SCANNER ══════════════ */}
-        {tab === "scanner" && (
-          <div className="space-y-4 animate-fade-in">
-            {/* Filters */}
-            <div className="bg-[#0b1120] border border-white/5 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Filter size={13} className="text-cyan-400" />
-                <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Scanner Filters</span>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div>
-                  <label className="text-[10px] text-slate-600 tracking-wider uppercase block mb-1">Ticker</label>
-                  <input value={scanFilter.ticker} onChange={e => setScanFilter(f=>({...f,ticker:e.target.value}))}
-                    placeholder="e.g. NVDA" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono" />
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-600 tracking-wider uppercase block mb-1">Setup</label>
-                  <select value={scanFilter.setup} onChange={e=>setScanFilter(f=>({...f,setup:e.target.value}))}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0f1a2e"}}>
-                    {["All","Breakout","Pullback","Retest","Breakdown"].map(s=><option key={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-600 tracking-wider uppercase block mb-1">Min RS Score</label>
-                  <input placeholder="e.g. 80" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none transition font-mono" />
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-600 tracking-wider uppercase block mb-1">Sector</label>
-                  <select className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0f1a2e"}}>
-                    {["All","Technology","Semiconductors","AI/Cloud","Fintech"].map(s=><option key={s}>{s}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 mt-3">
-                <button className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-violet-500 text-white hover:opacity-90 transition font-semibold">
-                  <Search size={11} /> Scan
-                </button>
-                <button onClick={()=>setScanFilter({ticker:"",setup:"All",minVol:""})} className="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition">
-                  Clear
-                </button>
-                <span className="ml-auto text-[10px] text-slate-600">{filteredScanner.length} results</span>
-              </div>
-            </div>
-
-            {/* Scanner Results */}
-            <div className="bg-[#0b1120] border border-white/5 rounded-xl overflow-hidden">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-[10px] tracking-widest uppercase text-slate-600 border-b border-white/5">
-                    {["Ticker","Price","Change","Volume","Float","RS Score","Setup","ATR","Action"].map(h=>(
-                      <th key={h} className="p-3 text-left font-semibold whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredScanner.map(s => (
-                    <tr key={s.ticker} className="border-b border-white/3 hover:bg-white/3 transition-colors group">
-                      <td className="p-3 font-bold text-white font-mono">{s.ticker}</td>
-                      <td className="p-3 font-mono text-slate-300">${s.price}</td>
-                      <td className={`p-3 font-bold font-mono ${s.change>=0?"text-emerald-400":"text-rose-400"}`}>
-                        <span className="flex items-center gap-0.5">{s.change>=0?<ArrowUpRight size={11}/>:<ArrowDownRight size={11}/>}{s.change>=0?"+":""}{s.change}%</span>
-                      </td>
-                      <td className="p-3 font-mono text-slate-400">{s.vol}</td>
-                      <td className="p-3 font-mono text-slate-400">{s.float}</td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          <span className={`font-bold font-mono ${s.rs>=90?"text-cyan-400":s.rs>=80?"text-violet-400":s.rs>=70?"text-amber-400":"text-rose-400"}`}>{s.rs}</span>
-                          <div className="w-16 h-1 bg-white/5 rounded-full overflow-hidden">
-                            <div className="h-full rounded-full" style={{ width: `${s.rs}%`, background: s.rs>=90?"#06b6d4":s.rs>=80?"#8b5cf6":s.rs>=70?"#f59e0b":"#f43f5e" }} />
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-3"><span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${s.setup==="Breakout"?"bg-cyan-500/10 text-cyan-400 border-cyan-500/20":s.setup==="Pullback"?"bg-violet-500/10 text-violet-400 border-violet-500/20":s.setup==="Retest"?"bg-amber-500/10 text-amber-400 border-amber-500/20":"bg-rose-500/10 text-rose-400 border-rose-500/20"}`}>{s.setup}</span></td>
-                      <td className="p-3 font-mono text-slate-400">${s.atr}</td>
-                      <td className="p-3">
-                        <button onClick={() => { setForm(f=>({...f, ticker: s.ticker, entry: String(s.price)})); setShowForm(true); }}
-                          className="text-[10px] px-2 py-1 rounded bg-gradient-to-r from-cyan-500/20 to-violet-500/20 border border-cyan-500/20 text-cyan-400 hover:opacity-80 transition opacity-0 group-hover:opacity-100">
-                          + Log
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
       </main>
 
       {/* ── TRADE ENTRY MODAL ── */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg bg-[#0d1b2e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+          <div className="w-full max-w-lg bg-[#0d1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 bg-gradient-to-r from-cyan-500/5 to-violet-500/5">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06] bg-gradient-to-r from-cyan-500/5 to-violet-500/5">
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-cyan-400 to-violet-500 flex items-center justify-center">
                   <Plus size={12} className="text-white" />
@@ -806,7 +704,7 @@ export default function SwingEdge() {
                   <div className="flex gap-2">
                     {["LONG","SHORT"].map(s=>(
                       <button key={s} onClick={()=>setForm(f=>({...f,side:s}))}
-                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition border ${form.side===s?(s==="LONG"?"bg-emerald-500/20 text-emerald-400 border-emerald-500/30":"bg-rose-500/20 text-rose-400 border-rose-500/30"):"bg-white/3 text-slate-500 border-white/10 hover:border-white/20"}`}>
+                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition border ${form.side===s?(s==="LONG"?"bg-[#10b981]/20 text-[#10b981] border-[#10b981]/30":"bg-[#ef4444]/20 text-[#ef4444] border-[#ef4444]/30"):"bg-white/3 text-slate-500 border-white/10 hover:border-white/20"}`}>
                         {s==="LONG"?<span className="flex items-center justify-center gap-1"><TrendingUp size={11}/>{s}</span>:<span className="flex items-center justify-center gap-1"><TrendingDown size={11}/>{s}</span>}
                       </button>
                     ))}
@@ -816,7 +714,7 @@ export default function SwingEdge() {
 
               {/* Prices */}
               <div className="grid grid-cols-3 gap-3">
-                {[["Entry *","entry","text-white"],["Stop Loss *","stop","text-rose-400"],["Target","target","text-emerald-400"]].map(([label,key,cls])=>(
+                {[["Entry *","entry","text-white"],["Stop Loss *","stop","text-[#ef4444]"],["Target","target","text-[#10b981]"]].map(([label,key,cls])=>(
                   <div key={key}>
                     <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{label}</label>
                     <input value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))}
@@ -827,7 +725,7 @@ export default function SwingEdge() {
 
               {/* Calculated metrics */}
               {entryN > 0 && stopN > 0 && (
-                <div className="grid grid-cols-4 gap-2 bg-white/3 rounded-xl p-3 border border-white/5">
+                <div className="grid grid-cols-4 gap-2 bg-white/3 rounded-xl p-3 border border-white/[0.06]">
                   <div className="text-center">
                     <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">Shares</div>
                     <div className="text-sm font-bold font-mono text-cyan-400">{posSize}</div>
@@ -838,11 +736,11 @@ export default function SwingEdge() {
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">Max Risk</div>
-                    <div className="text-sm font-bold font-mono text-rose-400">${Math.round(potLoss).toLocaleString()}</div>
+                    <div className="text-sm font-bold font-mono text-[#ef4444]">${Math.round(potLoss).toLocaleString()}</div>
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">R/R Ratio</div>
-                    <div className={`text-sm font-bold font-mono ${rrRatio>=2?"text-emerald-400":rrRatio>=1?"text-amber-400":"text-rose-400"}`}>{rrRatio.toFixed(2)}:1</div>
+                    <div className={`text-sm font-bold font-mono ${rrRatio>=2?"text-[#10b981]":rrRatio>=1?"text-amber-400":"text-[#ef4444]"}`}>{rrRatio.toFixed(2)}:1</div>
                   </div>
                 </div>
               )}
@@ -852,7 +750,7 @@ export default function SwingEdge() {
                 <div>
                   <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Setup Type</label>
                   <select value={form.setup} onChange={e=>setForm(f=>({...f,setup:e.target.value}))}
-                    className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0f1a2e"}}>
+                    className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
                     {["Breakout","Pullback","Support Bounce","Resistance Break","Other"].map(s=><option key={s}>{s}</option>)}
                   </select>
                 </div>
@@ -868,14 +766,14 @@ export default function SwingEdge() {
                 <div>
                   <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Market Condition</label>
                   <select value={form.marketCondition} onChange={e=>setForm(f=>({...f,marketCondition:e.target.value}))}
-                    className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0f1a2e"}}>
+                    className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
                     {["Trending Up","Trending Down","Sideways","Volatile"].map(s=><option key={s}>{s}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Emotion at Entry</label>
                   <select value={form.emotionAtEntry} onChange={e=>setForm(f=>({...f,emotionAtEntry:e.target.value}))}
-                    className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0f1a2e"}}>
+                    className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
                     {["Confident","Nervous","FOMO","Neutral"].map(s=><option key={s}>{s}</option>)}
                   </select>
                 </div>
@@ -918,7 +816,7 @@ export default function SwingEdge() {
 
               {/* RR quality indicator */}
               {entryN > 0 && stopN > 0 && targetN > 0 && (
-                <div className={`flex items-center gap-2 p-2.5 rounded-lg border text-xs ${rrRatio>=2?"bg-emerald-500/5 border-emerald-500/20 text-emerald-400":rrRatio>=1?"bg-amber-500/5 border-amber-500/20 text-amber-400":"bg-rose-500/5 border-rose-500/20 text-rose-400"}`}>
+                <div className={`flex items-center gap-2 p-2.5 rounded-lg border text-xs ${rrRatio>=2?"bg-emerald-500/5 border-emerald-500/20 text-[#10b981]":rrRatio>=1?"bg-amber-500/5 border-amber-500/20 text-amber-400":"bg-[#ef4444]/5 border-[#ef4444]/20 text-[#ef4444]"}`}>
                   {rrRatio>=2?<CheckCircle size={13}/>:<AlertTriangle size={13}/>}
                   <span>{rrRatio>=2?"Great setup — R/R exceeds 2:1 minimum":rrRatio>=1?"Acceptable — consider widening target for better R/R":"Below minimum — avoid setups below 1:1 R/R"}</span>
                 </div>
@@ -965,14 +863,14 @@ export default function SwingEdge() {
       {/* ── CLOSE TRADE MODAL ── */}
       {showCloseForm && closingTrade && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md bg-[#0d1b2e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+          <div className="w-full max-w-md bg-[#0d1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 bg-gradient-to-r from-rose-500/5 to-violet-500/5">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06] bg-gradient-to-r from-rose-500/5 to-violet-500/5">
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-rose-400 to-violet-500 flex items-center justify-center">
                   <X size={12} className="text-white" />
                 </div>
-                <span className="text-sm font-bold text-white">Close Trade — <span className="text-rose-400 font-mono">{closingTrade.ticker}</span></span>
+                <span className="text-sm font-bold text-white">Close Trade — <span className="text-[#ef4444] font-mono">{closingTrade.ticker}</span></span>
               </div>
               <button onClick={()=>{setShowCloseForm(false);setClosingTrade(null);}} className="text-slate-600 hover:text-slate-300 transition">
                 <X size={16} />
@@ -981,10 +879,10 @@ export default function SwingEdge() {
 
             <div className="p-5 space-y-4">
               {/* Trade summary */}
-              <div className="bg-white/3 rounded-xl p-3 border border-white/5 grid grid-cols-3 gap-2 text-center text-[10px]">
+              <div className="bg-white/3 rounded-xl p-3 border border-white/[0.06] grid grid-cols-3 gap-2 text-center text-[10px]">
                 <div><div className="text-slate-600 uppercase tracking-wider">Entry</div><div className="font-mono font-bold text-slate-300">${closingTrade.entry}</div></div>
-                <div><div className="text-slate-600 uppercase tracking-wider">Stop</div><div className="font-mono font-bold text-rose-400">${closingTrade.stop}</div></div>
-                <div><div className="text-slate-600 uppercase tracking-wider">Target</div><div className="font-mono font-bold text-emerald-400">${closingTrade.target || "–"}</div></div>
+                <div><div className="text-slate-600 uppercase tracking-wider">Stop</div><div className="font-mono font-bold text-[#ef4444]">${closingTrade.stop}</div></div>
+                <div><div className="text-slate-600 uppercase tracking-wider">Target</div><div className="font-mono font-bold text-[#10b981]">${closingTrade.target || "–"}</div></div>
               </div>
 
               {/* Exit Price + Exit Reason */}
@@ -997,7 +895,7 @@ export default function SwingEdge() {
                 <div>
                   <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Exit Reason</label>
                   <select value={closeForm.exitReason} onChange={e=>setCloseForm(f=>({...f,exitReason:e.target.value}))}
-                    className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-rose-500/50 focus:outline-none transition appearance-none" style={{background:"#0f1a2e"}}>
+                    className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-rose-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
                     {["Stop Loss","Target Hit","Chart Read","Fear","Other"].map(s=><option key={s}>{s}</option>)}
                   </select>
                 </div>
@@ -1008,12 +906,12 @@ export default function SwingEdge() {
                 <div>
                   <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Max Favorable Excursion</label>
                   <input value={closeForm.maxFavorable} onChange={e=>setCloseForm(f=>({...f,maxFavorable:e.target.value}))}
-                    placeholder="Highest price reached" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-emerald-400 placeholder-slate-600 focus:border-emerald-500/50 focus:outline-none transition font-mono" />
+                    placeholder="Highest price reached" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-[#10b981] placeholder-slate-600 focus:border-emerald-500/50 focus:outline-none transition font-mono" />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Max Adverse Excursion</label>
                   <input value={closeForm.maxAdverse} onChange={e=>setCloseForm(f=>({...f,maxAdverse:e.target.value}))}
-                    placeholder="Lowest price reached" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-rose-400 placeholder-slate-600 focus:border-rose-500/50 focus:outline-none transition font-mono" />
+                    placeholder="Lowest price reached" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-[#ef4444] placeholder-slate-600 focus:border-rose-500/50 focus:outline-none transition font-mono" />
                 </div>
               </div>
 
@@ -1023,7 +921,7 @@ export default function SwingEdge() {
                 <div className="flex gap-2">
                   {[true, false].map(val => (
                     <button key={String(val)} onClick={()=>setCloseForm(f=>({...f,followedPlan:val}))}
-                      className={`flex-1 py-2 rounded-lg text-xs font-bold transition border ${closeForm.followedPlan===val?(val?"bg-emerald-500/20 text-emerald-400 border-emerald-500/30":"bg-rose-500/20 text-rose-400 border-rose-500/30"):"bg-white/3 text-slate-500 border-white/10 hover:border-white/20"}`}>
+                      className={`flex-1 py-2 rounded-lg text-xs font-bold transition border ${closeForm.followedPlan===val?(val?"bg-[#10b981]/20 text-[#10b981] border-[#10b981]/30":"bg-[#ef4444]/20 text-[#ef4444] border-[#ef4444]/30"):"bg-white/3 text-slate-500 border-white/10 hover:border-white/20"}`}>
                       {val ? "✓ Yes" : "✗ No"}
                     </button>
                   ))}
@@ -1052,8 +950,17 @@ export default function SwingEdge() {
         </div>
       )}
 
+      {/* ── FLOATING NEW TRADE BUTTON ── */}
+      <button
+        onClick={() => setShowForm(true)}
+        className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-violet-500 text-white shadow-2xl shadow-cyan-500/25 flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
+        title="New Trade"
+      >
+        <Plus size={24} />
+      </button>
+
       {/* ── FOOTER STATUS BAR ── */}
-      <footer className="flex items-center justify-between px-5 py-2 border-t border-white/5 bg-[#080c14] text-[10px] text-slate-700 font-mono">
+      <footer className="flex items-center justify-between px-5 py-2 border-t border-white/[0.06] bg-[#0a0f1e] text-[10px] text-slate-700 font-mono">
         <div className="flex items-center gap-4">
           <span className="flex items-center gap-1"><span className={`w-1.5 h-1.5 rounded-full ${pulse?"bg-emerald-500":"bg-emerald-800"} transition-colors`}/> Market Open</span>
           <span>Capital: $25,000</span>
