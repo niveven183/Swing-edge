@@ -70,6 +70,37 @@ const fmt$ = (n) => n >= 0
 
 const fmtR = (r) => r >= 0 ? `+${r.toFixed(2)}R` : `${r.toFixed(2)}R`;
 
+// ─── NEWS HELPERS ─────────────────────────────────────────────────────────────
+const QUICK_TICKERS = ["NVDA", "PLTR", "TSLA", "META", "MSTR"];
+
+const NEWS_RSS_FEEDS = [
+  "https://feeds.finance.yahoo.com/rss/2.0/headline?s=NVDA,PLTR,TSLA,META,MSTR&region=US&lang=en-US",
+  "https://finance.yahoo.com/rss/topfinstories",
+];
+const RSS2JSON = "https://api.rss2json.com/v1/api.json";
+
+const fmtTimeAgo = (dateStr) => {
+  if (!dateStr) return "recently";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+};
+
+const detectSentiment = (text) => {
+  if (/surge|jump|gain|rally|rise|beat|record|upgrade|bull|growth|profit|above|strong/i.test(text)) return "bull";
+  if (/fall|drop|decline|crash|miss|lose|cut|downgrade|bear|loss|below|weak|warn/i.test(text)) return "bear";
+  return "neutral";
+};
+
+const extractTag = (title) => {
+  const m = title.match(/\b(NVDA|PLTR|TSLA|META|MSTR|AAPL|MSFT|AMD|AMZN|GOOGL|SPY|QQQ|BTC|ETH)\b/);
+  return m ? m[0] : "MARKET";
+};
+
 // ─── STAT CARD ────────────────────────────────────────────────────────────────
 const StatCard = ({ label, value, sub, trend, icon: Icon, accent = "cyan" }) => {
   const accents = {
@@ -127,6 +158,9 @@ export default function SwingEdge() {
   const [aiAnalysis, setAiAnalysis] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [apiKey, setApiKey] = useState(() => { try { return localStorage.getItem("swingEdgeApiKey") || ""; } catch { return ""; } });
+  const [liveNews, setLiveNews] = useState([]);
+  const [newsLoading, setNewsLoading] = useState(false);
+  const [newsLastUpdated, setNewsLastUpdated] = useState(null);
 
   // Persist trades to localStorage
   useEffect(() => {
@@ -173,6 +207,45 @@ export default function SwingEdge() {
     document.head.appendChild(script);
     return () => { try { document.head.removeChild(script); } catch {} };
   }, [tab, chartSymbol, chartInterval]);
+
+  // News fetch
+  const fetchNews = useCallback(async () => {
+    setNewsLoading(true);
+    try {
+      const results = await Promise.allSettled(
+        NEWS_RSS_FEEDS.map(feed =>
+          fetch(`${RSS2JSON}?rss_url=${encodeURIComponent(feed)}&count=10`)
+            .then(r => r.json())
+        )
+      );
+      const allItems = results.flatMap(r => r.status === "fulfilled" ? (r.value.items || []) : []);
+      const seen = new Set();
+      const mapped = allItems
+        .filter(item => { if (!item.title || seen.has(item.title)) return false; seen.add(item.title); return true; })
+        .slice(0, 12)
+        .map((item, i) => ({
+          id: item.guid || String(i),
+          title: item.title?.trim(),
+          summary: (item.description || "").replace(/<[^>]*>/g, "").slice(0, 160).trim(),
+          image: item.thumbnail || item.enclosure?.link || null,
+          source: item.author || (item.link ? new URL(item.link).hostname.replace("www.", "") : "Finance"),
+          pubDate: item.pubDate,
+          time: fmtTimeAgo(item.pubDate),
+          link: item.link || "#",
+          sentiment: detectSentiment(item.title || ""),
+          tag: extractTag(item.title || ""),
+        }));
+      if (mapped.length > 0) { setLiveNews(mapped); setNewsLastUpdated(new Date()); }
+    } catch (e) { console.warn("News fetch failed:", e); }
+    setNewsLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (tab !== "intel") return;
+    if (liveNews.length === 0) fetchNews();
+    const interval = setInterval(fetchNews, 15 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [tab, fetchNews, liveNews.length]);
 
   const equityCurve = useMemo(() => generateEquityCurve(), [trades]);
   const closedTrades = trades.filter(t => t.status === "CLOSED");
@@ -604,9 +677,28 @@ export default function SwingEdge() {
         {/* ══════════════ INTEL ══════════════ */}
         {tab === "intel" && (
           <div className="space-y-4 animate-fade-in">
+
+            {/* Quick Ticker Buttons */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-semibold tracking-widest uppercase text-slate-600 mr-1">Quick Jump:</span>
+              {QUICK_TICKERS.map(tk => {
+                const active = chartSymbol === `NASDAQ:${tk}`;
+                return (
+                  <button key={tk} onClick={() => setChartSymbol(`NASDAQ:${tk}`)}
+                    className={`text-xs font-mono font-bold px-3 py-1.5 rounded-lg border transition ${
+                      active
+                        ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40"
+                        : "bg-white/3 text-slate-400 border-white/[0.06] hover:bg-cyan-500/10 hover:text-cyan-400 hover:border-cyan-500/20"
+                    }`}>
+                    {tk}
+                  </button>
+                );
+              })}
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* TradingView Chart */}
-              <div className="md:col-span-2 bg-[#0d1424] border border-white/[0.06] rounded-xl overflow-hidden" style={{ height: 420 }}>
+              <div className="md:col-span-2 bg-[#0d1424] border border-white/[0.06] rounded-xl overflow-hidden" style={{ height: 440 }}>
                 <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Live Chart</span>
@@ -631,7 +723,7 @@ export default function SwingEdge() {
               </div>
 
               {/* Watchlist */}
-              <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-4" style={{ height: 420, overflowY: "auto" }}>
+              <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-4" style={{ height: 440, overflowY: "auto" }}>
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Watchlist</span>
                   <Radio size={12} className="text-cyan-400" />
@@ -657,33 +749,93 @@ export default function SwingEdge() {
               </div>
             </div>
 
-            {/* News Feed */}
+            {/* News Feed — 2-column cards */}
             <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-4">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Market News</span>
                   <span className={`w-1.5 h-1.5 rounded-full ${pulse?"bg-emerald-400":"bg-emerald-700"} transition-colors`} />
+                  {newsLastUpdated && (
+                    <span className="text-[10px] text-slate-700">Updated {fmtTimeAgo(newsLastUpdated)}</span>
+                  )}
                 </div>
-                <button className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-cyan-400 transition">
-                  <RefreshCw size={10} /> Refresh
+                <button onClick={fetchNews} disabled={newsLoading}
+                  className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-cyan-400 transition disabled:opacity-40">
+                  <RefreshCw size={10} className={newsLoading ? "animate-spin" : ""} />
+                  {newsLoading ? "Loading…" : "Refresh"}
                 </button>
               </div>
-              <div className="space-y-2">
-                {MOCK_NEWS.map(n => (
-                  <div key={n.id} className="flex items-start gap-3 p-3 bg-white/3 rounded-lg border border-white/[0.06] hover:border-white/10 transition cursor-pointer group">
-                    <div className={`mt-0.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${n.sentiment==="bull"?"bg-emerald-400":n.sentiment==="bear"?"bg-rose-400":"bg-amber-400"}`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-slate-300 group-hover:text-white transition leading-relaxed">{n.headline}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[10px] text-slate-600">{n.source}</span>
-                        <span className="text-[10px] text-slate-700">·</span>
-                        <span className="text-[10px] text-slate-600">{n.time}</span>
+
+              {/* Loading skeleton */}
+              {newsLoading && liveNews.length === 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="flex gap-3 p-3 bg-white/3 rounded-xl border border-white/[0.06] animate-pulse">
+                      <div className="w-20 h-16 rounded-lg bg-white/5 flex-shrink-0" />
+                      <div className="flex-1 space-y-2 pt-1">
+                        <div className="h-2.5 bg-white/5 rounded w-full" />
+                        <div className="h-2.5 bg-white/5 rounded w-4/5" />
+                        <div className="h-2 bg-white/5 rounded w-1/2 mt-2" />
                       </div>
                     </div>
-                    <span className={`flex-shrink-0 text-[10px] px-2 py-0.5 rounded-full font-mono font-semibold border ${n.tag.length<=4?"bg-violet-500/10 text-violet-400 border-violet-500/20":"bg-amber-500/10 text-amber-400 border-amber-500/20"}`}>{n.tag}</span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
+
+              {/* News grid */}
+              {!newsLoading || liveNews.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {(liveNews.length > 0 ? liveNews : MOCK_NEWS.map(n => ({
+                    id: n.id,
+                    title: n.headline,
+                    summary: "",
+                    image: null,
+                    source: n.source,
+                    time: n.time,
+                    link: "#",
+                    sentiment: n.sentiment,
+                    tag: n.tag,
+                  }))).map(n => (
+                    <a key={n.id} href={n.link} target="_blank" rel="noopener noreferrer"
+                      className="flex gap-3 p-3 bg-white/3 rounded-xl border border-white/[0.06] hover:border-cyan-500/20 hover:bg-cyan-500/[0.03] transition group cursor-pointer no-underline">
+                      {/* Image */}
+                      <div className="w-20 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-white/5">
+                        {n.image ? (
+                          <img src={n.image} alt="" className="w-full h-full object-cover"
+                            onError={e => { e.currentTarget.style.display = "none"; e.currentTarget.parentElement.classList.add("flex","items-center","justify-center"); }} />
+                        ) : (
+                          <div className={`w-full h-full flex items-center justify-center text-[10px] font-mono font-bold tracking-wider
+                            ${n.sentiment==="bull" ? "bg-emerald-500/10 text-emerald-500" : n.sentiment==="bear" ? "bg-rose-500/10 text-rose-500" : "bg-amber-500/10 text-amber-500"}`}>
+                            {n.tag}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0 flex flex-col justify-between">
+                        <div>
+                          <p className="text-xs font-semibold text-slate-200 group-hover:text-white transition leading-snug line-clamp-2 mb-1">{n.title}</p>
+                          {n.summary && (
+                            <p className="text-[10px] text-slate-600 leading-relaxed line-clamp-2">{n.summary}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between mt-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`w-1 h-1 rounded-full flex-shrink-0 ${n.sentiment==="bull"?"bg-emerald-400":n.sentiment==="bear"?"bg-rose-400":"bg-amber-400"}`} />
+                            <span className="text-[10px] text-slate-500 truncate max-w-[80px]">{n.source}</span>
+                            <span className="text-[10px] text-slate-700">·</span>
+                            <span className="text-[10px] text-slate-600">{n.time}</span>
+                          </div>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-mono font-semibold border flex-shrink-0
+                            ${(n.tag||"").length <= 4 ? "bg-violet-500/10 text-violet-400 border-violet-500/20" : "bg-amber-500/10 text-amber-400 border-amber-500/20"}`}>
+                            {n.tag}
+                          </span>
+                        </div>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </div>
         )}
