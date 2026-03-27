@@ -170,6 +170,11 @@ export default function SwingEdge() {
   const [analyzerResult, setAnalyzerResult] = useState(null);
   const [analyzerLoading, setAnalyzerLoading] = useState(false);
 
+  // Live prices state
+  const [livePrices, setLivePrices] = useState({});
+  const [pricesLoading, setPricesLoading] = useState(false);
+  const [pricesLastUpdated, setPricesLastUpdated] = useState(null);
+
   // Persist trades to localStorage
   useEffect(() => {
     try { localStorage.setItem("swingEdgeTrades", JSON.stringify(trades)); } catch {}
@@ -254,6 +259,34 @@ export default function SwingEdge() {
     const interval = setInterval(fetchNews, 15 * 60 * 1000);
     return () => clearInterval(interval);
   }, [tab, fetchNews, liveNews.length]);
+
+  // Fetch live prices from Yahoo Finance (via CORS proxy)
+  const fetchLivePrices = useCallback(async () => {
+    const tickers = [...new Set(trades.filter(t => t.status === "OPEN").map(t => t.ticker))];
+    if (tickers.length === 0) return;
+    setPricesLoading(true);
+    try {
+      const symbols = tickers.join(",");
+      const yahooUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols}&fields=regularMarketPrice`;
+      const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`);
+      const data = await res.json();
+      const result = data?.quoteResponse?.result || [];
+      const prices = {};
+      result.forEach(q => { if (q.regularMarketPrice) prices[q.symbol] = q.regularMarketPrice; });
+      if (Object.keys(prices).length > 0) {
+        setLivePrices(prev => ({ ...prev, ...prices }));
+        setPricesLastUpdated(new Date());
+      }
+    } catch (e) { console.warn("Live prices fetch failed:", e); }
+    setPricesLoading(false);
+  }, [trades]);
+
+  useEffect(() => {
+    if (tab !== "journal") return;
+    fetchLivePrices();
+    const interval = setInterval(fetchLivePrices, 60000);
+    return () => clearInterval(interval);
+  }, [tab, fetchLivePrices]);
 
   const equityCurve = useMemo(() => generateEquityCurve(), [trades]);
   const closedTrades = trades.filter(t => t.status === "CLOSED");
@@ -585,13 +618,27 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                 <h2 className="text-sm font-bold text-white">Trade Journal</h2>
                 <p className="text-xs text-slate-600 mt-0.5">{trades.length} total entries · {openTrades.length} open · {closedTrades.length} closed</p>
               </div>
+              {openTrades.length > 0 && (
+                <div className="flex items-center gap-2">
+                  {pricesLastUpdated && (
+                    <span className="text-[10px] text-slate-700 font-mono">
+                      עודכן {fmtTimeAgo(pricesLastUpdated)}
+                    </span>
+                  )}
+                  <button onClick={fetchLivePrices} disabled={pricesLoading}
+                    className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-cyan-400 transition disabled:opacity-40 border border-white/[0.06] rounded-lg px-2 py-1">
+                    <RefreshCw size={10} className={pricesLoading ? "animate-spin" : ""} />
+                    {pricesLoading ? "טוען…" : "רענן מחירים"}
+                  </button>
+                </div>
+              )}
             </div>
             <div className="overflow-x-auto bg-[#0d1424] border border-white/[0.06] rounded-xl">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-slate-600 border-b border-white/[0.06] text-[10px] tracking-widest uppercase">
-                    {["Ticker","Date","Side","Entry","Stop","Target","Shares","Exit","P&L","R","Setup","Mkt","Emotion","★","Exit Rsn","Plan","Lesson","Status","Action"].map(h => (
-                      <th key={h} className="p-3 text-left font-semibold whitespace-nowrap">{h}</th>
+                    {["Ticker","Date","Side","Entry","Stop","Target","Shares","מחיר נוכחי","P&L חי","Exit","P&L","R","Setup","Mkt","Emotion","★","Exit Rsn","Plan","Lesson","Status","Action"].map(h => (
+                      <th key={h} className={`p-3 text-left font-semibold whitespace-nowrap ${h==="מחיר נוכחי"||h==="P&L חי" ? "text-cyan-600" : ""}`}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -609,6 +656,25 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                         <td className="p-3 font-mono text-[#ef4444]">${t.stop}</td>
                         <td className="p-3 font-mono text-[#10b981]">${t.target}</td>
                         <td className="p-3 font-mono text-slate-400">{t.shares}</td>
+                        {/* מחיר נוכחי */}
+                        <td className="p-3 font-mono text-xs whitespace-nowrap">
+                          {isOpen ? (
+                            livePrices[t.ticker]
+                              ? <span className="text-slate-200 font-bold">${livePrices[t.ticker].toFixed(2)}</span>
+                              : pricesLoading
+                                ? <span className="text-slate-600 animate-pulse text-[10px]">טוען…</span>
+                                : <span className="text-slate-700">–</span>
+                          ) : <span className="text-slate-700">–</span>}
+                        </td>
+                        {/* P&L חי */}
+                        <td className="p-3 font-bold font-mono text-xs whitespace-nowrap">
+                          {isOpen && livePrices[t.ticker] ? (() => {
+                            const lp = t.side === "LONG"
+                              ? (livePrices[t.ticker] - t.entry) * t.shares
+                              : (t.entry - livePrices[t.ticker]) * t.shares;
+                            return <span className={lp >= 0 ? "text-[#10b981]" : "text-[#ef4444]"}>{fmt$(Math.round(lp))}</span>;
+                          })() : <span className="text-slate-700">–</span>}
+                        </td>
                         <td className="p-3 font-mono text-slate-300">{t.exit ? `$${t.exit}` : "–"}</td>
                         <td className={`p-3 font-bold font-mono ${isOpen ? "text-slate-500" : win ? "text-[#10b981]" : "text-[#ef4444]"}`}>
                           {isOpen ? "–" : fmt$(Math.round(pnl))}
