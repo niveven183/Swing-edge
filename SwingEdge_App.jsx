@@ -8,7 +8,8 @@ import {
   TrendingUp, TrendingDown, AlertTriangle, CheckCircle,
   Plus, X, RefreshCw, Activity,
   DollarSign, Target, Zap, ArrowUpRight,
-  ArrowDownRight, Eye, Layers, Cpu, Radio, FlaskConical
+  ArrowDownRight, Eye, Layers, Cpu, Radio, FlaskConical,
+  Calculator, Copy, Percent, Hash
 } from "lucide-react";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -133,6 +134,7 @@ const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard",      icon: LayoutDashboard },
   { id: "journal",   label: "Journal",        icon: BookOpen },
   { id: "analyzer",  label: "Trade Analyzer", icon: FlaskConical },
+  { id: "position",  label: "Position Calc",  icon: Calculator },
   { id: "analytics", label: "Analytics",      icon: BarChart2 },
   { id: "intel",     label: "Market Intel",   icon: Rss },
 ];
@@ -169,6 +171,10 @@ export default function SwingEdge() {
   const [analyzerImagePreview, setAnalyzerImagePreview] = useState(null);
   const [analyzerResult, setAnalyzerResult] = useState(null);
   const [analyzerLoading, setAnalyzerLoading] = useState(false);
+
+  // Position Calculator state
+  const [posCalc, setPosCalc] = useState({ capital: "", risk: "1", entry: "", stop: "" });
+  const [posCopied, setPosCopied] = useState(false);
 
   // Live prices state
   const [livePrices, setLivePrices] = useState({});
@@ -898,6 +904,166 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
             )}
           </div>
         )}
+
+        {/* ══════════════ POSITION CALCULATOR ══════════════ */}
+        {tab === "position" && (() => {
+          const capN   = parseFloat(posCalc.capital) || 0;
+          const riskN  = parseFloat(posCalc.risk)    || 0;
+          const entN   = parseFloat(posCalc.entry)   || 0;
+          const stopN  = parseFloat(posCalc.stop)    || 0;
+
+          const riskDollars   = capN * (riskN / 100);
+          const riskPerShare  = entN > 0 && stopN > 0 ? Math.abs(entN - stopN) : 0;
+          const shares        = riskPerShare > 0 ? Math.floor(riskDollars / riskPerShare) : 0;
+          const posValue      = shares * entN;
+          const portPct       = capN > 0 ? (posValue / capN) * 100 : 0;
+
+          const hasResult = capN > 0 && entN > 0 && stopN > 0 && riskPerShare > 0;
+
+          const handleCopyToForm = () => {
+            setForm(f => ({
+              ...f,
+              entry: posCalc.entry,
+              stop:  posCalc.stop,
+              shares: String(shares),
+            }));
+            setShowForm(true);
+            setPosCopied(true);
+            setTimeout(() => setPosCopied(false), 2000);
+          };
+
+          return (
+            <div className="space-y-5 animate-fade-in max-w-2xl mx-auto">
+              <div>
+                <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Calculator size={15} className="text-cyan-400" /> Position Calculator
+                </h2>
+                <p className="text-xs text-slate-600 mt-0.5">חשב גודל פוזיציה אופטימלי לפי ניהול סיכונים</p>
+              </div>
+
+              {/* Inputs */}
+              <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5 space-y-4">
+                <span className="text-[10px] font-semibold tracking-widest uppercase text-slate-500">פרמטרי סיכון</span>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1 flex items-center gap-1">
+                      <DollarSign size={10} /> הון תיק ($)
+                    </label>
+                    <input
+                      value={posCalc.capital}
+                      onChange={e => setPosCalc(f => ({ ...f, capital: e.target.value }))}
+                      placeholder="25000"
+                      type="number"
+                      min="0"
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1 flex items-center gap-1">
+                      <Percent size={10} /> אחוז סיכון (%)
+                    </label>
+                    <input
+                      value={posCalc.risk}
+                      onChange={e => setPosCalc(f => ({ ...f, risk: e.target.value }))}
+                      placeholder="1"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1 flex items-center gap-1">
+                      <ArrowUpRight size={10} className="text-[#10b981]" /> מחיר כניסה
+                    </label>
+                    <input
+                      value={posCalc.entry}
+                      onChange={e => setPosCalc(f => ({ ...f, entry: e.target.value }))}
+                      placeholder="150.00"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className="w-full bg-white/5 border border-[#10b981]/20 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-[#10b981]/50 focus:outline-none focus:ring-1 focus:ring-[#10b981]/20 transition font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1 flex items-center gap-1">
+                      <ArrowDownRight size={10} className="text-[#ef4444]" /> מחיר סטופ לוס
+                    </label>
+                    <input
+                      value={posCalc.stop}
+                      onChange={e => setPosCalc(f => ({ ...f, stop: e.target.value }))}
+                      placeholder="145.00"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className="w-full bg-white/5 border border-[#ef4444]/20 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-[#ef4444]/50 focus:outline-none focus:ring-1 focus:ring-[#ef4444]/20 transition font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Results */}
+              {hasResult ? (
+                <div className="space-y-3">
+                  <span className="text-[10px] font-semibold tracking-widest uppercase text-slate-500">תוצאות חישוב</span>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-[#0d1424] border border-cyan-500/25 rounded-xl p-4 flex flex-col gap-1">
+                      <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase tracking-widest">
+                        <Hash size={10} className="text-cyan-400" /> כמות מניות
+                      </div>
+                      <div className="text-2xl font-bold font-mono text-cyan-400">{shares.toLocaleString()}</div>
+                      <div className="text-xs text-slate-600">shares to buy</div>
+                    </div>
+
+                    <div className="bg-[#0d1424] border border-[#ef4444]/25 rounded-xl p-4 flex flex-col gap-1">
+                      <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase tracking-widest">
+                        <AlertTriangle size={10} className="text-[#ef4444]" /> סיכון בדולרים
+                      </div>
+                      <div className="text-2xl font-bold font-mono text-[#ef4444]">${riskDollars.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                      <div className="text-xs text-slate-600">{riskN}% of capital</div>
+                    </div>
+
+                    <div className="bg-[#0d1424] border border-[#10b981]/25 rounded-xl p-4 flex flex-col gap-1">
+                      <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase tracking-widest">
+                        <DollarSign size={10} className="text-[#10b981]" /> גודל פוזיציה
+                      </div>
+                      <div className="text-2xl font-bold font-mono text-[#10b981]">${posValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                      <div className="text-xs text-slate-600">{shares} × ${entN.toFixed(2)}</div>
+                    </div>
+
+                    <div className="bg-[#0d1424] border border-violet-500/25 rounded-xl p-4 flex flex-col gap-1">
+                      <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase tracking-widest">
+                        <Percent size={10} className="text-violet-400" /> אחוז מהתיק
+                      </div>
+                      <div className="text-2xl font-bold font-mono text-violet-400">{portPct.toFixed(1)}%</div>
+                      <div className="text-xs text-slate-600">of ${capN.toLocaleString()} portfolio</div>
+                    </div>
+                  </div>
+
+                  {/* Copy to trade form button */}
+                  <button
+                    onClick={handleCopyToForm}
+                    className="w-full mt-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500/50"
+                  >
+                    <Copy size={14} />
+                    {posCopied ? "✓ הועתק לטופס עסקה!" : "העתק לטופס עסקה"}
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-8 text-center">
+                  <Calculator size={32} className="text-slate-700 mx-auto mb-3" />
+                  <p className="text-sm text-slate-600">הכנס הון תיק, מחיר כניסה וסטופ לוס לחישוב אוטומטי</p>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* ══════════════ ANALYTICS ══════════════ */}
         {tab === "analytics" && (
