@@ -8,7 +8,7 @@ import {
   TrendingUp, TrendingDown, AlertTriangle, CheckCircle,
   Plus, X, RefreshCw, Activity,
   DollarSign, Target, Zap, ArrowUpRight,
-  ArrowDownRight, Eye, Layers, Cpu, Radio
+  ArrowDownRight, Eye, Layers, Cpu, Radio, FlaskConical
 } from "lucide-react";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -130,10 +130,11 @@ const StatCard = ({ label, value, sub, trend, icon: Icon, accent = "cyan" }) => 
 
 // ─── NAV ──────────────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
-  { id: "dashboard", label: "Dashboard",  icon: LayoutDashboard },
-  { id: "journal",   label: "Journal",    icon: BookOpen },
-  { id: "analytics", label: "Analytics",  icon: BarChart2 },
-  { id: "intel",     label: "Market Intel",icon: Rss },
+  { id: "dashboard", label: "Dashboard",      icon: LayoutDashboard },
+  { id: "journal",   label: "Journal",        icon: BookOpen },
+  { id: "analyzer",  label: "Trade Analyzer", icon: FlaskConical },
+  { id: "analytics", label: "Analytics",      icon: BarChart2 },
+  { id: "intel",     label: "Market Intel",   icon: Rss },
 ];
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
@@ -161,6 +162,13 @@ export default function SwingEdge() {
   const [liveNews, setLiveNews] = useState([]);
   const [newsLoading, setNewsLoading] = useState(false);
   const [newsLastUpdated, setNewsLastUpdated] = useState(null);
+
+  // Trade Analyzer state
+  const [analyzerForm, setAnalyzerForm] = useState({ ticker: "", entry: "", stop: "", target: "", shares: "" });
+  const [analyzerImage, setAnalyzerImage] = useState(null);
+  const [analyzerImagePreview, setAnalyzerImagePreview] = useState(null);
+  const [analyzerResult, setAnalyzerResult] = useState(null);
+  const [analyzerLoading, setAnalyzerLoading] = useState(false);
 
   // Persist trades to localStorage
   useEffect(() => {
@@ -279,6 +287,17 @@ export default function SwingEdge() {
   const potLoss      = posSize * riskPerShare;
   const rrRatio      = potLoss > 0 ? potGain / potLoss : 0;
 
+  // Analyzer computed values
+  const azEntry  = parseFloat(analyzerForm.entry)  || 0;
+  const azStop   = parseFloat(analyzerForm.stop)   || 0;
+  const azTarget = parseFloat(analyzerForm.target) || 0;
+  const azShares = parseFloat(analyzerForm.shares) || 0;
+  const azRiskPerShare = azEntry > 0 && azStop > 0 ? Math.abs(azEntry - azStop) : 0;
+  const azDollarRisk   = azRiskPerShare * azShares;
+  const azPortfolioRisk = CAPITAL > 0 ? (azDollarRisk / CAPITAL) * 100 : 0;
+  const azPotGain  = azShares * Math.abs(azTarget - azEntry);
+  const azRRRatio  = azDollarRisk > 0 ? azPotGain / azDollarRisk : 0;
+
   const handleSubmit = () => {
     if (!form.ticker || !entryN || !stopN) return;
     const newTrade = {
@@ -346,6 +365,53 @@ export default function SwingEdge() {
     setAiLoading(false);
   };
 
+  const handleAnalyzerImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => { setAnalyzerImage(file); setAnalyzerImagePreview(ev.target.result); };
+    reader.readAsDataURL(file);
+  };
+
+  const analyzeTradeStandalone = async () => {
+    const key = apiKey.trim();
+    if (!key) { setAnalyzerResult({ error: "⚠️ הכנס Anthropic API Key — שמור אותו בשדה ה-API Key בחלון Log New Trade." }); return; }
+    if (!analyzerForm.ticker || !azEntry || !azStop) { setAnalyzerResult({ error: "⚠️ מלא לפחות: Ticker, Entry ו-Stop Loss." }); return; }
+    setAnalyzerLoading(true); setAnalyzerResult(null);
+    const tradeData = `Ticker: ${analyzerForm.ticker} | Entry: ${azEntry} | Stop: ${azStop} | Target: ${azTarget || "N/A"} | Shares: ${azShares || "N/A"} | Dollar Risk: $${azDollarRisk.toFixed(2)} | Portfolio Risk: ${azPortfolioRisk.toFixed(2)}% | R/R: ${azRRRatio.toFixed(2)}:1`;
+    const prompt = `You are a professional swing trader coach. Analyze this trade setup concisely.
+
+Trade: ${tradeData}
+
+Respond ONLY in this exact JSON format (no markdown, no extra text):
+{
+  "entry_score": <number 1-5>,
+  "stop_logic": "<one sentence assessment of the stop placement>",
+  "rr_assessment": "<one sentence — is the R/R worth it?>",
+  "recommendation": "<GO|WAIT|SKIP>",
+  "explanation": "<2-3 sentences max explaining the recommendation>"
+}`;
+    const content = analyzerImagePreview
+      ? [{ type: "image", source: { type: "base64", media_type: "image/jpeg", data: analyzerImagePreview.split(",")[1] } }, { type: "text", text: prompt }]
+      : [{ type: "text", text: prompt }];
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+        body: JSON.stringify({ model: "claude-opus-4-6", max_tokens: 500, messages: [{ role: "user", content }] })
+      });
+      const data = await res.json();
+      if (data.error) { setAnalyzerResult({ error: "שגיאה: " + data.error.message }); }
+      else {
+        const raw = data.content?.[0]?.text || "{}";
+        try {
+          const parsed = JSON.parse(raw.replace(/```json\n?|\n?```/g, "").trim());
+          setAnalyzerResult(parsed);
+        } catch { setAnalyzerResult({ raw }); }
+      }
+    } catch (e) { setAnalyzerResult({ error: "שגיאת חיבור: " + e.message }); }
+    setAnalyzerLoading(false);
+  };
 
   return (
     <div className="min-h-screen bg-[#0a0f1e] text-slate-200 font-sans flex flex-col" style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
@@ -586,6 +652,184 @@ export default function SwingEdge() {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* ══════════════ TRADE ANALYZER ══════════════ */}
+        {tab === "analyzer" && (
+          <div className="space-y-5 animate-fade-in max-w-3xl mx-auto">
+            <div>
+              <h2 className="text-sm font-bold text-white flex items-center gap-2"><FlaskConical size={15} className="text-violet-400" /> Trade Analyzer</h2>
+              <p className="text-xs text-slate-600 mt-0.5">הכנס נתוני עסקה, העלה תמונה מ-TradingView וקבל ניתוח AI מיידי</p>
+            </div>
+
+            {/* Input Fields */}
+            <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5 space-y-4">
+              <span className="text-[10px] font-semibold tracking-widest uppercase text-slate-500">פרטי העסקה</span>
+
+              {/* Row 1: Ticker + Shares */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Ticker *</label>
+                  <input value={analyzerForm.ticker} onChange={e => setAnalyzerForm(f => ({ ...f, ticker: e.target.value.toUpperCase() }))}
+                    placeholder="NVDA" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono font-bold tracking-wider" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">כמות מניות</label>
+                  <input value={analyzerForm.shares} onChange={e => setAnalyzerForm(f => ({ ...f, shares: e.target.value }))}
+                    placeholder="10" type="number" min="0" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono" />
+                </div>
+              </div>
+
+              {/* Row 2: Entry / Stop / Target */}
+              <div className="grid grid-cols-3 gap-3">
+                {[["מחיר כניסה *", "entry", "text-white"], ["סטופ לוס *", "stop", "text-[#ef4444]"], ["יעד", "target", "text-[#10b981]"]].map(([label, key, cls]) => (
+                  <div key={key}>
+                    <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{label}</label>
+                    <input value={analyzerForm[key]} onChange={e => setAnalyzerForm(f => ({ ...f, [key]: e.target.value }))}
+                      placeholder="0.00" className={`w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono ${cls}`} />
+                  </div>
+                ))}
+              </div>
+
+              {/* Auto Calculations */}
+              {azEntry > 0 && azStop > 0 && (
+                <div className="grid grid-cols-3 gap-3 bg-white/3 rounded-xl p-3 border border-white/[0.06]">
+                  <div className="text-center">
+                    <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">R/R Ratio</div>
+                    <div className={`text-base font-bold font-mono ${azRRRatio >= 2 ? "text-[#10b981]" : azRRRatio >= 1 ? "text-amber-400" : "text-[#ef4444]"}`}>
+                      {azTarget > 0 ? `${azRRRatio.toFixed(2)}:1` : "–"}
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">סיכון בדולרים</div>
+                    <div className="text-base font-bold font-mono text-[#ef4444]">
+                      {azShares > 0 ? `$${azDollarRisk.toFixed(2)}` : "–"}
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">סיכון מהתיק</div>
+                    <div className={`text-base font-bold font-mono ${azPortfolioRisk > 2 ? "text-[#ef4444]" : azPortfolioRisk > 1 ? "text-amber-400" : "text-[#10b981]"}`}>
+                      {azShares > 0 ? `${azPortfolioRisk.toFixed(2)}%` : "–"}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* R/R quality badge */}
+              {azEntry > 0 && azStop > 0 && azTarget > 0 && (
+                <div className={`flex items-center gap-2 p-2.5 rounded-lg border text-xs ${azRRRatio >= 2 ? "bg-emerald-500/5 border-emerald-500/20 text-[#10b981]" : azRRRatio >= 1 ? "bg-amber-500/5 border-amber-500/20 text-amber-400" : "bg-[#ef4444]/5 border-[#ef4444]/20 text-[#ef4444]"}`}>
+                  {azRRRatio >= 2 ? <CheckCircle size={13} /> : <AlertTriangle size={13} />}
+                  <span>{azRRRatio >= 2 ? "R/R מצוין — עובר סף מינימום 2:1" : azRRRatio >= 1 ? "R/R סביר — שקול להרחיב יעד" : "R/R נמוך — הימנע מעסקאות מתחת ל-1:1"}</span>
+                </div>
+              )}
+
+              {/* Image Upload */}
+              <div>
+                <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">תמונה מ-TradingView</label>
+                <label className="flex items-center gap-2 cursor-pointer w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-400 hover:border-cyan-500/30 hover:text-cyan-400 transition">
+                  <Eye size={12} />
+                  <span>{analyzerImage ? analyzerImage.name : "העלה צילום מסך של גרף..."}</span>
+                  <input type="file" accept="image/*" onChange={handleAnalyzerImageUpload} className="hidden" />
+                </label>
+              </div>
+              {analyzerImagePreview && (
+                <div className="relative rounded-lg overflow-hidden border border-white/10">
+                  <img src={analyzerImagePreview} alt="Trade chart" className="w-full h-40 object-cover" />
+                  <button onClick={() => { setAnalyzerImage(null); setAnalyzerImagePreview(null); }}
+                    className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-slate-300 hover:text-white">
+                    <X size={11} />
+                  </button>
+                </div>
+              )}
+
+              {/* API Key */}
+              <div>
+                <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Anthropic API Key</label>
+                <input type="password" value={apiKey} onChange={e => { setApiKey(e.target.value); try { localStorage.setItem("swingEdgeApiKey", e.target.value); } catch {} }}
+                  placeholder="sk-ant-..." className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-400 placeholder-slate-700 focus:border-violet-500/50 focus:outline-none transition font-mono" />
+              </div>
+
+              {/* Analyze button */}
+              <button onClick={analyzeTradeStandalone} disabled={analyzerLoading}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-500/25 to-cyan-500/25 border border-violet-500/35 text-violet-200 text-sm font-bold hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-50">
+                {analyzerLoading ? <><RefreshCw size={14} className="animate-spin" /> מנתח...</> : <><Cpu size={14} /> נתח עסקה 🤖</>}
+              </button>
+            </div>
+
+            {/* Analysis Result */}
+            {analyzerResult && (
+              <div className="bg-[#0d1424] border border-violet-500/25 rounded-xl p-5 space-y-4">
+                <div className="flex items-center gap-2 text-violet-400 font-semibold text-xs uppercase tracking-wider">
+                  <Cpu size={13} /> תוצאת הניתוח
+                </div>
+
+                {analyzerResult.error ? (
+                  <div className="text-xs text-[#ef4444] bg-[#ef4444]/5 border border-[#ef4444]/20 rounded-lg p-3">{analyzerResult.error}</div>
+                ) : analyzerResult.raw ? (
+                  <div className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed">{analyzerResult.raw}</div>
+                ) : (
+                  <div className="space-y-3">
+                    {/* Recommendation banner */}
+                    {analyzerResult.recommendation && (
+                      <div className={`flex items-center justify-between p-4 rounded-xl border ${
+                        analyzerResult.recommendation === "GO"   ? "bg-emerald-500/8 border-emerald-500/30" :
+                        analyzerResult.recommendation === "WAIT" ? "bg-amber-500/8 border-amber-500/30" :
+                                                                    "bg-[#ef4444]/8 border-[#ef4444]/30"}`}>
+                        <div>
+                          <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">המלצה</div>
+                          <div className={`text-2xl font-bold font-mono ${
+                            analyzerResult.recommendation === "GO"   ? "text-[#10b981]" :
+                            analyzerResult.recommendation === "WAIT" ? "text-amber-400" :
+                                                                        "text-[#ef4444]"}`}>
+                            {analyzerResult.recommendation === "GO"   ? "GO ✅" :
+                             analyzerResult.recommendation === "WAIT" ? "WAIT ⚠️" :
+                                                                         "SKIP ❌"}
+                          </div>
+                        </div>
+                        {analyzerResult.entry_score && (
+                          <div className="text-right">
+                            <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">ציון כניסה</div>
+                            <div className="text-amber-400 font-mono font-bold text-xl">
+                              {"★".repeat(analyzerResult.entry_score)}{"☆".repeat(5 - analyzerResult.entry_score)}
+                            </div>
+                            <div className="text-[10px] text-slate-500">{analyzerResult.entry_score}/5</div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Detail cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {analyzerResult.stop_logic && (
+                        <div className="bg-white/3 rounded-xl p-3 border border-white/[0.06]">
+                          <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+                            <Target size={10} /> סטופ לוס
+                          </div>
+                          <p className="text-xs text-slate-300 leading-relaxed">{analyzerResult.stop_logic}</p>
+                        </div>
+                      )}
+                      {analyzerResult.rr_assessment && (
+                        <div className="bg-white/3 rounded-xl p-3 border border-white/[0.06]">
+                          <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+                            <Activity size={10} /> R/R
+                          </div>
+                          <p className="text-xs text-slate-300 leading-relaxed">{analyzerResult.rr_assessment}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Explanation */}
+                    {analyzerResult.explanation && (
+                      <div className="bg-violet-500/5 border border-violet-500/15 rounded-xl p-3">
+                        <div className="text-[10px] text-violet-400 uppercase tracking-widest mb-1.5">הסבר</div>
+                        <p className="text-xs text-slate-300 leading-relaxed">{analyzerResult.explanation}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
