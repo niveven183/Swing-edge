@@ -613,6 +613,162 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                 </table>
               </div>
             </div>
+
+            {/* ══ RISK DASHBOARD ══ */}
+            {(() => {
+              const MAX_RISK_PCT = 3; // % of capital — adjustable
+              const maxRiskDollar = CAPITAL * (MAX_RISK_PCT / 100);
+
+              const openRisks = openTrades.map(t => {
+                const riskDollar = Math.abs(t.entry - t.stop) * t.shares;
+                const riskPct = CAPITAL > 0 ? (riskDollar / CAPITAL) * 100 : 0;
+                const rrRatio = t.target && Math.abs(t.entry - t.stop) > 0
+                  ? Math.abs(t.target - t.entry) / Math.abs(t.entry - t.stop)
+                  : null;
+                return { ...t, riskDollar, riskPct, rrRatio };
+              });
+
+              const totalRiskDollar = openRisks.reduce((s, t) => s + t.riskDollar, 0);
+              const totalRiskPct = CAPITAL > 0 ? (totalRiskDollar / CAPITAL) * 100 : 0;
+              const usedPct = Math.min((totalRiskPct / MAX_RISK_PCT) * 100, 100);
+              const isOverLimit = totalRiskPct > MAX_RISK_PCT;
+              const isWarning = totalRiskPct > MAX_RISK_PCT * 0.7;
+
+              const meterColor = isOverLimit
+                ? { bar: "bg-[#ef4444]", text: "text-[#ef4444]", border: "border-[#ef4444]/30", bg: "bg-[#ef4444]/8" }
+                : isWarning
+                ? { bar: "bg-amber-400", text: "text-amber-400", border: "border-amber-400/30", bg: "bg-amber-400/8" }
+                : { bar: "bg-[#10b981]", text: "text-[#10b981]", border: "border-[#10b981]/30", bg: "bg-[#10b981]/8" };
+
+              return (
+                <div className="space-y-4">
+                  {/* Alert banner */}
+                  {isOverLimit && (
+                    <div className="flex items-center gap-3 bg-[#ef4444]/10 border border-[#ef4444]/30 rounded-xl px-4 py-3">
+                      <AlertTriangle size={15} className="text-[#ef4444] shrink-0" />
+                      <span className="text-xs text-[#ef4444] font-semibold">
+                        אזהרה: סיכון כולל פתוח ({totalRiskPct.toFixed(2)}%) חורג ממגבלת {MAX_RISK_PCT}% — שקול לצמצם פוזיציות
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Section header */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Risk Dashboard</span>
+                    <div className="flex-1 h-px bg-white/[0.05]" />
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold font-mono ${meterColor.text} ${meterColor.border} ${meterColor.bg}`}>
+                      {isOverLimit ? "OVER LIMIT" : isWarning ? "CAUTION" : "SAFE"}
+                    </span>
+                  </div>
+
+                  {/* KPI cards + meter */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Total open risk */}
+                    <div className={`bg-[#0d1424] border rounded-xl p-4 ${meterColor.border}`}>
+                      <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 block mb-1">סיכון כולל פתוח</span>
+                      <span className={`text-2xl font-bold font-mono ${meterColor.text}`}>{totalRiskPct.toFixed(2)}%</span>
+                      <span className="text-xs text-slate-500 block mt-0.5 font-mono">${totalRiskDollar.toFixed(2)}</span>
+                      <span className="text-[10px] text-slate-600 mt-1 block">{openTrades.length} עסקאות פתוחות</span>
+                    </div>
+
+                    {/* Max allowed risk */}
+                    <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-4">
+                      <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 block mb-1">מקסימום סיכון מותר</span>
+                      <span className="text-2xl font-bold font-mono text-violet-400">{MAX_RISK_PCT.toFixed(1)}%</span>
+                      <span className="text-xs text-slate-500 block mt-0.5 font-mono">${maxRiskDollar.toFixed(2)}</span>
+                      <span className="text-[10px] text-slate-600 mt-1 block">מתוך ${CAPITAL.toLocaleString()} הון</span>
+                    </div>
+
+                    {/* Visual risk meter */}
+                    <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-4">
+                      <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 block mb-3">מד סיכון</span>
+                      <div className="relative">
+                        {/* Meter bar background */}
+                        <div className="h-4 bg-white/[0.06] rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-700 ${meterColor.bar}`}
+                            style={{ width: `${usedPct}%` }}
+                          />
+                        </div>
+                        {/* Zone markers */}
+                        <div className="flex justify-between mt-1.5 text-[9px] text-slate-600 font-mono">
+                          <span>0%</span>
+                          <span className="text-amber-600/80">70%</span>
+                          <span className="text-[#ef4444]/80">100% ({MAX_RISK_PCT}%)</span>
+                        </div>
+                        {/* Zone lines */}
+                        <div className="absolute top-0 left-0 w-full h-4 pointer-events-none">
+                          <div className="absolute h-full w-px bg-amber-500/30" style={{ left: "70%" }} />
+                        </div>
+                      </div>
+                      <div className="mt-2 flex items-baseline gap-1">
+                        <span className={`text-lg font-bold font-mono ${meterColor.text}`}>{usedPct.toFixed(0)}%</span>
+                        <span className="text-[10px] text-slate-600">מהמגבלה</span>
+                        <span className="ml-auto text-[10px] text-slate-500 font-mono">
+                          נותר: ${Math.max(maxRiskDollar - totalRiskDollar, 0).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Per-trade risk table */}
+                  {openRisks.length > 0 && (
+                    <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-4">
+                      <span className="text-xs font-semibold tracking-widest uppercase text-slate-500 block mb-3">סיכון לכל עסקה פתוחה</span>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="text-slate-600 border-b border-white/[0.06]">
+                              {["Ticker", "Side", "Entry", "Stop", "Shares", "Risk $", "Risk %", "R/R", "Bar"].map(h => (
+                                <th key={h} className="pb-2 text-left font-semibold tracking-wider pr-4 whitespace-nowrap">{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {openRisks.map(t => {
+                              const rowColor = t.riskPct > MAX_RISK_PCT
+                                ? "text-[#ef4444]"
+                                : t.riskPct > MAX_RISK_PCT * 0.5
+                                ? "text-amber-400"
+                                : "text-[#10b981]";
+                              const barColor = t.riskPct > MAX_RISK_PCT
+                                ? "bg-[#ef4444]"
+                                : t.riskPct > MAX_RISK_PCT * 0.5
+                                ? "bg-amber-400"
+                                : "bg-[#10b981]";
+                              const barWidth = Math.min((t.riskPct / MAX_RISK_PCT) * 100, 100);
+                              return (
+                                <tr key={t.id} className="border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors">
+                                  <td className="py-2 pr-4 font-bold text-white font-mono">{t.ticker}</td>
+                                  <td className="py-2 pr-4">
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side === "LONG" ? "bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20" : "bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20"}`}>
+                                      {t.side}
+                                    </span>
+                                  </td>
+                                  <td className="py-2 pr-4 font-mono text-slate-300">${t.entry}</td>
+                                  <td className="py-2 pr-4 font-mono text-[#ef4444]">${t.stop}</td>
+                                  <td className="py-2 pr-4 font-mono text-slate-400">{t.shares}</td>
+                                  <td className={`py-2 pr-4 font-bold font-mono ${rowColor}`}>${t.riskDollar.toFixed(2)}</td>
+                                  <td className={`py-2 pr-4 font-bold font-mono ${rowColor}`}>{t.riskPct.toFixed(2)}%</td>
+                                  <td className="py-2 pr-4 font-mono text-slate-400">
+                                    {t.rrRatio !== null ? `${t.rrRatio.toFixed(2)}:1` : "—"}
+                                  </td>
+                                  <td className="py-2 pr-4 w-24">
+                                    <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden w-20">
+                                      <div className={`h-full rounded-full ${barColor}`} style={{ width: `${barWidth}%` }} />
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
 
