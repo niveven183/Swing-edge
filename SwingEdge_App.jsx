@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import OnboardingScreen from "./src/components/OnboardingScreen.jsx";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell
@@ -141,6 +142,24 @@ const NAV_ITEMS = [
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function SwingEdge() {
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    try {
+      const saved = localStorage.getItem("swingEdgeOnboarding");
+      return !saved;
+    } catch { return true; }
+  });
+  const [userProfile, setUserProfile] = useState(() => {
+    try {
+      const saved = localStorage.getItem("swingEdgeOnboarding");
+      return saved ? JSON.parse(saved).profile : null;
+    } catch { return null; }
+  });
+
+  const handleOnboardingComplete = (profile) => {
+    setUserProfile(profile);
+    setShowOnboarding(false);
+  };
+
   const [tab, setTab] = useState("dashboard");
   const [trades, setTrades] = useState(() => {
     try {
@@ -451,6 +470,10 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
     } catch (e) { setAnalyzerResult({ error: "שגיאת חיבור: " + e.message }); }
     setAnalyzerLoading(false);
   };
+
+  if (showOnboarding) {
+    return <OnboardingScreen onComplete={handleOnboardingComplete} />;
+  }
 
   return (
     <div className="min-h-screen bg-[#0a0f1e] text-slate-200 font-sans flex flex-col" style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
