@@ -11,12 +11,22 @@ import {
   DollarSign, Target, Zap, ArrowUpRight,
   ArrowDownRight, Eye, Layers, Cpu, Radio, FlaskConical,
   Calculator, Copy, Percent, Hash,
-  Settings, BookMarked, Thermometer, Trash2
+  Settings, BookMarked, Thermometer, Trash2, User
 } from "lucide-react";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
-const CAPITAL = 2500;
 const RISK_PCT = 0.01;
+
+const SECTOR_ETFS = [
+  { symbol: "XLE", name: "Energy" },
+  { symbol: "XLK", name: "Technology" },
+  { symbol: "BTC-USD", name: "Crypto" },
+  { symbol: "XLF", name: "Financials" },
+  { symbol: "XLV", name: "Healthcare" },
+  { symbol: "XLY", name: "Consumer" },
+  { symbol: "XLI", name: "Industrials" },
+  { symbol: "XLU", name: "Utilities" },
+];
 
 const MOCK_TRADES = [
   { id: 1, ticker: "PLTR", date: "2025-03-11", side: "LONG", entry: 147.00, stop: 110.00, target: 221.00, shares: 3, status: "OPEN", exit: null, setup: "Breakout", notes: "Current stop: $148.53 (BE+) · Current: $155.02 · Unrealized: +$24.06" },
@@ -44,8 +54,8 @@ const SCANNER_DATA = [
 ];
 
 // ─── EQUITY CURVE GENERATION ─────────────────────────────────────────────────
-const generateEquityCurve = () => {
-  let balance = CAPITAL;
+const generateEquityCurve = (cap) => {
+  let balance = cap;
   const data = [];
   MOCK_TRADES.filter(t => t.status === "CLOSED").forEach(t => {
     const pnl = t.side === "LONG"
@@ -54,7 +64,7 @@ const generateEquityCurve = () => {
     balance += pnl;
     data.push({ date: t.date, equity: Math.round(balance), ticker: t.ticker, pnl: Math.round(pnl) });
   });
-  return [{ date: "2025-01-01", equity: CAPITAL, ticker: "START", pnl: 0 }, ...data];
+  return [{ date: "2025-01-01", equity: cap, ticker: "START", pnl: 0 }, ...data];
 };
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -162,6 +172,17 @@ export default function SwingEdge() {
     setShowOnboarding(false);
   };
 
+  const [capital, setCapital] = useState(() => {
+    try { return parseFloat(localStorage.getItem("swingEdgeCapital")) || 2500; } catch { return 2500; }
+  });
+  const [capitalInput, setCapitalInput] = useState("");
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const profileRef = useRef(null);
+
+  const [sectorData, setSectorData] = useState([]);
+  const [sectorLoading, setSectorLoading] = useState(false);
+  const [sectorLastUpdated, setSectorLastUpdated] = useState(null);
+
   const [tab, setTab] = useState("dashboard");
   const [trades, setTrades] = useState(() => {
     try {
@@ -259,6 +280,65 @@ export default function SwingEdge() {
     return () => { try { document.head.removeChild(script); } catch {} };
   }, [tab, chartSymbol, chartInterval]);
 
+  // Close profile dropdown on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (profileRef.current && !profileRef.current.contains(e.target)) {
+        setShowProfileDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Sector data fetch
+  const fetchSectorData = useCallback(async () => {
+    setSectorLoading(true);
+    try {
+      const results = await Promise.allSettled(
+        SECTOR_ETFS.map(s =>
+          fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(
+            `https://query1.finance.yahoo.com/v8/finance/chart/${s.symbol}?range=1mo&interval=1d`
+          )}`)
+            .then(r => r.json())
+            .then(data => {
+              const result = data?.chart?.result?.[0];
+              if (!result) return null;
+              const closes = (result.indicators?.quote?.[0]?.close || []).filter(c => c !== null && c !== undefined);
+              if (closes.length < 2) return null;
+              const last = closes[closes.length - 1];
+              const prevDay = closes[closes.length - 2];
+              const weekAgo = closes[Math.max(0, closes.length - 6)];
+              const monthAgo = closes[0];
+              return {
+                symbol: s.symbol,
+                name: s.name,
+                price: last,
+                dayChange: ((last / prevDay) - 1) * 100,
+                weekChange: ((last / weekAgo) - 1) * 100,
+                monthChange: ((last / monthAgo) - 1) * 100,
+              };
+            })
+        )
+      );
+      const fetched = results
+        .filter(r => r.status === "fulfilled" && r.value !== null)
+        .map(r => r.value);
+      if (fetched.length > 0) {
+        setSectorData(fetched);
+        setSectorLastUpdated(new Date());
+      }
+    } catch (e) { console.warn("Sector data fetch failed:", e); }
+    setSectorLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (tab !== "intel") return;
+    if (sectorData.length === 0) fetchSectorData();
+    const interval = setInterval(fetchSectorData, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [tab, fetchSectorData, sectorData.length]);
+
   // News fetch
   const fetchNews = useCallback(async () => {
     setNewsLoading(true);
@@ -326,14 +406,14 @@ export default function SwingEdge() {
     return () => clearInterval(interval);
   }, [tab, fetchLivePrices]);
 
-  const equityCurve = useMemo(() => generateEquityCurve(), [trades]);
+  const equityCurve = useMemo(() => generateEquityCurve(capital), [trades, capital]);
   const closedTrades = trades.filter(t => t.status === "CLOSED");
   const openTrades   = trades.filter(t => t.status === "OPEN");
 
   const totalPnL   = closedTrades.reduce((a, t) => a + (calcTradeMetrics(t).pnl || 0), 0);
   const winRate    = closedTrades.length ? closedTrades.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length / closedTrades.length * 100 : 0;
   const avgR       = closedTrades.length ? closedTrades.reduce((a, t) => a + (calcTradeMetrics(t).rMultiple || 0), 0) / closedTrades.length : 0;
-  const curEquity  = CAPITAL + totalPnL;
+  const curEquity  = capital + totalPnL;
 
   // Ticker tape
   const TICKERS = ["NVDA +3.2%", "PLTR +5.8%", "META +2.1%", "AVGO +1.9%", "AMD -1.4%", "TSLA -2.4%", "MSTR +6.2%", "SMCI -3.1%"];
@@ -352,7 +432,7 @@ export default function SwingEdge() {
   const stopN   = parseFloat(form.stop)   || 0;
   const targetN = parseFloat(form.target) || 0;
   const riskPerShare = Math.abs(entryN - stopN);
-  const posSize      = riskPerShare > 0 ? Math.floor((CAPITAL * RISK_PCT) / riskPerShare) : 0;
+  const posSize      = riskPerShare > 0 ? Math.floor((capital * RISK_PCT) / riskPerShare) : 0;
   const posValue     = posSize * entryN;
   const potGain      = posSize * Math.abs(targetN - entryN);
   const potLoss      = posSize * riskPerShare;
@@ -365,7 +445,7 @@ export default function SwingEdge() {
   const azShares = parseFloat(analyzerForm.shares) || 0;
   const azRiskPerShare = azEntry > 0 && azStop > 0 ? Math.abs(azEntry - azStop) : 0;
   const azDollarRisk   = azRiskPerShare * azShares;
-  const azPortfolioRisk = CAPITAL > 0 ? (azDollarRisk / CAPITAL) * 100 : 0;
+  const azPortfolioRisk = capital > 0 ? (azDollarRisk / capital) * 100 : 0;
   const azPotGain  = azShares * Math.abs(azTarget - azEntry);
   const azRRRatio  = azDollarRisk > 0 ? azPotGain / azDollarRisk : 0;
 
@@ -514,7 +594,7 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
           })}
         </div>
 
-        {/* Status */}
+        {/* Status + Profile */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
             <span className={`w-2 h-2 rounded-full ${pulse ? "bg-emerald-400" : "bg-emerald-600"} transition-colors`} />
@@ -523,6 +603,27 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
           <div className="text-right hidden sm:block">
             <div className="text-xs text-slate-500">Account</div>
             <div className="text-sm font-bold font-mono text-cyan-400">${curEquity.toLocaleString("en-US", { minimumFractionDigits: 2 })}</div>
+          </div>
+          {/* Profile dropdown */}
+          <div className="relative" ref={profileRef}>
+            <button onClick={() => setShowProfileDropdown(v => !v)}
+              className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500/20 to-violet-500/20 border border-cyan-500/30 flex items-center justify-center hover:border-cyan-500/60 transition">
+              <User size={15} className="text-cyan-400" />
+            </button>
+            {showProfileDropdown && (
+              <div className="absolute right-0 top-10 w-56 bg-[#0d1424] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden">
+                <div className="px-4 py-3 border-b border-white/[0.06] bg-gradient-to-r from-cyan-500/5 to-violet-500/5">
+                  <p className="text-xs font-bold text-white">{userProfile?.name || "Trader"}</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5 font-mono">${capital.toLocaleString()} portfolio</p>
+                </div>
+                <div className="p-2">
+                  <button onClick={() => { setTab("settings"); setShowProfileDropdown(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-300 hover:bg-white/5 hover:text-white transition text-left">
+                    <Settings size={13} className="text-cyan-400" /> Profile &amp; Settings
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -549,8 +650,8 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
           <div className="space-y-5 animate-fade-in">
             {/* KPI Row */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <StatCard label="Account Equity"  value={`$${curEquity.toLocaleString()}`} sub={`Started at $${CAPITAL.toLocaleString()}`} trend={totalPnL/CAPITAL*100} icon={DollarSign} accent="cyan" />
-              <StatCard label="Net P&L (Closed)" value={fmt$(Math.round(totalPnL))} sub={`${closedTrades.length} closed trades`} trend={totalPnL/CAPITAL*100} icon={TrendingUp} accent={totalPnL >= 0 ? "green" : "red"} />
+              <StatCard label="Account Equity"  value={`$${curEquity.toLocaleString()}`} sub={`Started at $${capital.toLocaleString()}`} trend={totalPnL/capital*100} icon={DollarSign} accent="cyan" />
+              <StatCard label="Net P&L (Closed)" value={fmt$(Math.round(totalPnL))} sub={`${closedTrades.length} closed trades`} trend={totalPnL/capital*100} icon={TrendingUp} accent={totalPnL >= 0 ? "green" : "red"} />
               <StatCard label="Win Rate" value={`${winRate.toFixed(0)}%`} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length}W / ${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)<0).length}L`} icon={Target} accent="purple" />
               <StatCard label="Avg R Multiple" value={fmtR(avgR)} sub="Per closed trade" icon={Activity} accent="amber" />
             </div>
@@ -574,7 +675,7 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                     <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" />
                     <XAxis dataKey="date" tick={{ fontSize: 9, fill: "#475569" }} tickLine={false} axisLine={false} />
                     <YAxis domain={["auto", "auto"]} tick={{ fontSize: 9, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
-                    <ReferenceLine y={CAPITAL} stroke="#475569" strokeDasharray="4 4" />
+                    <ReferenceLine y={capital} stroke="#475569" strokeDasharray="4 4" />
                     <Tooltip contentStyle={{ background: "#0d1424", border: "1px solid #162032", borderRadius: 8, fontSize: 11 }} formatter={(v) => [`$${v.toLocaleString()}`, "Equity"]} />
                     <Area type="monotone" dataKey="equity" stroke="#06b6d4" strokeWidth={2} fill="url(#eqGrad)" dot={{ fill: "#06b6d4", r: 3 }} />
                   </AreaChart>
@@ -653,11 +754,11 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
             {/* ══ RISK DASHBOARD ══ */}
             {(() => {
               const MAX_RISK_PCT = 3; // % of capital — adjustable
-              const maxRiskDollar = CAPITAL * (MAX_RISK_PCT / 100);
+              const maxRiskDollar = capital * (MAX_RISK_PCT / 100);
 
               const openRisks = openTrades.map(t => {
                 const riskDollar = Math.abs(t.entry - t.stop) * t.shares;
-                const riskPct = CAPITAL > 0 ? (riskDollar / CAPITAL) * 100 : 0;
+                const riskPct = capital > 0 ? (riskDollar / capital) * 100 : 0;
                 const rrRatio = t.target && Math.abs(t.entry - t.stop) > 0
                   ? Math.abs(t.target - t.entry) / Math.abs(t.entry - t.stop)
                   : null;
@@ -665,7 +766,7 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
               });
 
               const totalRiskDollar = openRisks.reduce((s, t) => s + t.riskDollar, 0);
-              const totalRiskPct = CAPITAL > 0 ? (totalRiskDollar / CAPITAL) * 100 : 0;
+              const totalRiskPct = capital > 0 ? (totalRiskDollar / capital) * 100 : 0;
               const usedPct = Math.min((totalRiskPct / MAX_RISK_PCT) * 100, 100);
               const isOverLimit = totalRiskPct > MAX_RISK_PCT;
               const isWarning = totalRiskPct > MAX_RISK_PCT * 0.7;
@@ -712,7 +813,7 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                       <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 block mb-1">מקסימום סיכון מותר</span>
                       <span className="text-2xl font-bold font-mono text-violet-400">{MAX_RISK_PCT.toFixed(1)}%</span>
                       <span className="text-xs text-slate-500 block mt-0.5 font-mono">${maxRiskDollar.toFixed(2)}</span>
-                      <span className="text-[10px] text-slate-600 mt-1 block">מתוך ${CAPITAL.toLocaleString()} הון</span>
+                      <span className="text-[10px] text-slate-600 mt-1 block">מתוך ${capital.toLocaleString()} הון</span>
                     </div>
 
                     {/* Visual risk meter */}
@@ -1264,7 +1365,7 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
               <StatCard label="Total Trades"  value={trades.length}     sub="All time"      icon={Layers}    accent="cyan"   />
               <StatCard label="Win Rate"       value={`${winRate.toFixed(1)}%`} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length} wins`} icon={CheckCircle} accent="green" />
               <StatCard label="Avg R Multiple" value={fmtR(avgR)}        sub="Closed trades" icon={Activity}  accent="purple" />
-              <StatCard label="Total Return"   value={`${(totalPnL/CAPITAL*100).toFixed(2)}%`} sub={`$${Math.round(Math.abs(totalPnL)).toLocaleString()} P&L`} icon={TrendingUp} accent={totalPnL>=0?"green":"red"} />
+              <StatCard label="Total Return"   value={`${(totalPnL/capital*100).toFixed(2)}%`} sub={`$${Math.round(Math.abs(totalPnL)).toLocaleString()} P&L`} icon={TrendingUp} accent={totalPnL>=0?"green":"red"} />
             </div>
 
             {/* Full Equity Curve */}
@@ -1272,7 +1373,7 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-sm font-bold text-white">Equity Curve</h3>
-                  <p className="text-xs text-slate-600">Account balance over time · starting capital ${CAPITAL.toLocaleString()}</p>
+                  <p className="text-xs text-slate-600">Account balance over time · starting capital ${capital.toLocaleString()}</p>
                 </div>
                 <span className={`text-sm font-bold font-mono ${totalPnL>=0?"text-[#10b981]":"text-[#ef4444]"}`}>{fmt$(Math.round(totalPnL))}</span>
               </div>
@@ -1287,7 +1388,7 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                   <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
                   <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} />
                   <YAxis domain={["auto","auto"]} tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v=>`$${(v/1000).toFixed(1)}k`} />
-                  <ReferenceLine y={CAPITAL} stroke="#475569" strokeDasharray="5 5" label={{ value: "Starting Capital", position: "insideTopRight", fontSize: 9, fill: "#475569" }} />
+                  <ReferenceLine y={capital} stroke="#475569" strokeDasharray="5 5" label={{ value: "Starting Capital", position: "insideTopRight", fontSize: 9, fill: "#475569" }} />
                   <Tooltip
                     contentStyle={{ background: "#0d1424", border: "1px solid #162032", borderRadius: 10, fontSize: 11 }}
                     formatter={(v, n, p) => [`$${v.toLocaleString()} (${p.payload.ticker})`, "Equity"]}
@@ -1666,6 +1767,118 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                 </div>
               ) : null}
             </div>
+
+            {/* ── SECTOR TRENDS ── */}
+            <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Sector Trends</span>
+                  <span className={`w-1.5 h-1.5 rounded-full ${pulse ? "bg-emerald-400" : "bg-emerald-700"} transition-colors`} />
+                  {sectorLastUpdated && (
+                    <span className="text-[10px] text-slate-700">Updated {fmtTimeAgo(sectorLastUpdated)}</span>
+                  )}
+                </div>
+                <button onClick={fetchSectorData} disabled={sectorLoading}
+                  className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-cyan-400 transition disabled:opacity-40">
+                  <RefreshCw size={10} className={sectorLoading ? "animate-spin" : ""} />
+                  {sectorLoading ? "Loading…" : "Refresh"}
+                </button>
+              </div>
+
+              {/* Loading skeleton */}
+              {sectorLoading && sectorData.length === 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {[...Array(8)].map((_, i) => (
+                    <div key={i} className="h-20 bg-white/3 rounded-xl border border-white/[0.06] animate-pulse" />
+                  ))}
+                </div>
+              )}
+
+              {sectorData.length > 0 && (() => {
+                const sorted = [...sectorData].sort((a, b) => b.dayChange - a.dayChange);
+                const hot = sorted.filter(s => s.dayChange > 0);
+                const declining = sorted.filter(s => s.dayChange <= 0).reverse();
+
+                const SectorCard = ({ s }) => (
+                  <div className={`rounded-xl border p-3 ${s.dayChange >= 0 ? "bg-[#10b981]/5 border-[#10b981]/15" : "bg-[#ef4444]/5 border-[#ef4444]/15"}`}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-bold text-white">{s.name}</span>
+                      <span className={`text-[10px] font-mono font-bold ${s.dayChange >= 0 ? "text-[#10b981]" : "text-[#ef4444]"}`}>
+                        {s.dayChange >= 0 ? "+" : ""}{s.dayChange.toFixed(2)}%
+                      </span>
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400 mb-1.5">${s.price.toFixed(2)}</div>
+                    <div className="flex gap-2 text-[9px] font-mono">
+                      <span className={`px-1.5 py-0.5 rounded ${s.weekChange >= 0 ? "bg-[#10b981]/10 text-[#10b981]" : "bg-[#ef4444]/10 text-[#ef4444]"}`}>
+                        7d {s.weekChange >= 0 ? "+" : ""}{s.weekChange.toFixed(1)}%
+                      </span>
+                      <span className={`px-1.5 py-0.5 rounded ${s.monthChange >= 0 ? "bg-[#10b981]/10 text-[#10b981]" : "bg-[#ef4444]/10 text-[#ef4444]"}`}>
+                        1m {s.monthChange >= 0 ? "+" : ""}{s.monthChange.toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
+                );
+
+                return (
+                  <div className="space-y-4">
+                    {/* Comparison bar chart */}
+                    <div>
+                      <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-600 mb-2">Daily % Change — All Sectors</p>
+                      <ResponsiveContainer width="100%" height={120}>
+                        <BarChart data={sorted} margin={{ top: 4, right: 4, left: 0, bottom: 4 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" vertical={false} />
+                          <XAxis dataKey="name" tick={{ fontSize: 9, fill: "#64748b" }} tickLine={false} axisLine={false} />
+                          <YAxis tick={{ fontSize: 9, fill: "#64748b" }} tickLine={false} axisLine={false} tickFormatter={v => `${v.toFixed(1)}%`} />
+                          <ReferenceLine y={0} stroke="#334155" strokeWidth={1} />
+                          <Tooltip
+                            contentStyle={{ background: "#0d1424", border: "1px solid #1e293b", borderRadius: 8, fontSize: 11 }}
+                            formatter={(v) => [`${v.toFixed(2)}%`, "Daily Change"]}
+                          />
+                          <Bar dataKey="dayChange" radius={[3, 3, 0, 0]}>
+                            {sorted.map((s, i) => (
+                              <Cell key={i} fill={s.dayChange >= 0 ? "#10b981" : "#ef4444"} fillOpacity={0.8} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Hot sectors */}
+                    {hot.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <TrendingUp size={12} className="text-[#10b981]" />
+                          <span className="text-[10px] font-bold tracking-widest uppercase text-[#10b981]">Hot Now</span>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                          {hot.map(s => <SectorCard key={s.symbol} s={s} />)}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Declining sectors */}
+                    {declining.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <TrendingDown size={12} className="text-[#ef4444]" />
+                          <span className="text-[10px] font-bold tracking-widest uppercase text-[#ef4444]">Declining Now</span>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                          {declining.map(s => <SectorCard key={s.symbol} s={s} />)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {!sectorLoading && sectorData.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-8 gap-2 text-slate-600">
+                  <BarChart2 size={24} />
+                  <p className="text-xs">No sector data — click Refresh to load</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -1735,6 +1948,39 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
               <div>
                 <h2 className="text-sm font-bold text-white flex items-center gap-2"><Settings size={15} className="text-cyan-400" /> Settings</h2>
                 <p className="text-xs text-slate-600 mt-0.5">Playbook אישי וניטור משמעת מסחר</p>
+              </div>
+
+              {/* ── PORTFOLIO CAPITAL ── */}
+              <div className="bg-[#0d1424] border border-cyan-500/20 rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <DollarSign size={16} className="text-cyan-400" />
+                  <h3 className="text-sm font-bold text-white">הון תיק</h3>
+                </div>
+                <p className="text-xs text-slate-500 mb-3">עדכן את ההון המדויק של תיק ההשקעות שלך. הערך ישפיע על חישובי גודל פוזיציה, סיכון ותשואה באפליקציה.</p>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={capitalInput}
+                    onChange={e => setCapitalInput(e.target.value)}
+                    placeholder={`${capital.toLocaleString()}`}
+                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono"
+                  />
+                  <button
+                    onClick={() => {
+                      const val = parseFloat(capitalInput);
+                      if (val > 0) {
+                        setCapital(val);
+                        setCapitalInput("");
+                        try { localStorage.setItem("swingEdgeCapital", String(val)); } catch {}
+                      }
+                    }}
+                    className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500/20 to-violet-500/20 border border-cyan-500/30 text-cyan-400 text-xs font-bold hover:opacity-90 transition whitespace-nowrap">
+                    עדכן הון
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-600 mt-2">
+                  הון נוכחי: <span className="text-cyan-400 font-mono font-bold">${capital.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                </p>
               </div>
 
               {/* ── TILTMETER ── */}
