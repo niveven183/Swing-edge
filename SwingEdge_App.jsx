@@ -29,10 +29,7 @@ const SECTOR_ETFS = [
   { symbol: "XLU", name: "Utilities" },
 ];
 
-const MOCK_TRADES = [
-  { id: 1, ticker: "PLTR", date: "2025-03-11", side: "LONG", entry: 147.00, stop: 110.00, target: 221.00, shares: 3, status: "OPEN", exit: null, setup: "Breakout", notes: "Current stop: $148.53 (BE+) · Current: $155.02 · Unrealized: +$24.06" },
-  { id: 2, ticker: "CRCL", date: "2025-03-17", side: "LONG", entry: 125.00, stop: 101.00, target: 173.00, shares: 3, status: "OPEN", exit: null, setup: "Breakout", notes: "Current stop: $120.00 (trailed up) · Current: $136.30 · Unrealized: +$33.90" },
-];
+const MOCK_TRADES = [];
 
 const MOCK_NEWS = [
   { id: 1, source: "Reuters",      time: "2m ago",  headline: "Fed signals patience on rate cuts amid sticky inflation data", tag: "MACRO",  sentiment: "neutral" },
@@ -55,10 +52,10 @@ const SCANNER_DATA = [
 ];
 
 // ─── EQUITY CURVE GENERATION ─────────────────────────────────────────────────
-const generateEquityCurve = (cap) => {
+const generateEquityCurve = (cap, trades = []) => {
   let balance = cap;
   const data = [];
-  MOCK_TRADES.filter(t => t.status === "CLOSED").forEach(t => {
+  trades.filter(t => t.status === "CLOSED").forEach(t => {
     const pnl = t.side === "LONG"
       ? (t.exit - t.entry) * t.shares
       : (t.entry - t.exit) * t.shares;
@@ -377,7 +374,6 @@ const NAV_ITEMS = [
   { id: "position",  label: "Position Calc",  icon: Calculator },
   { id: "analytics", label: "Analytics",      icon: BarChart2 },
   { id: "intel",     label: "Market Intel",   icon: Rss },
-  { id: "settings",  label: "Settings",       icon: Settings },
 ];
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
@@ -462,10 +458,45 @@ export default function SwingEdge() {
   const [pricesLoading, setPricesLoading] = useState(false);
   const [pricesLastUpdated, setPricesLastUpdated] = useState(null);
 
+  // Light/Dark mode
+  const [lightMode, setLightMode] = useState(() => {
+    try { return localStorage.getItem("swingEdgeLightMode") === "true"; } catch { return false; }
+  });
+
+  // Edit trade state
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editingTrade, setEditingTrade] = useState(null);
+  const [editForm, setEditForm] = useState({
+    ticker: "", side: "LONG", entry: "", stop: "", target: "", shares: "",
+    setup: "Breakout", notes: "", marketCondition: "Trending Up",
+    emotionAtEntry: "Neutral", entryQuality: 3, status: "OPEN",
+    exit: "", exitReason: "Target Hit", followedPlan: null, lessonLearned: "",
+    maxFavorable: "", maxAdverse: "",
+  });
+
+  // Watchlist state
+  const DEFAULT_WATCHLIST = [
+    ...SCANNER_DATA.map(s => ({ ticker: s.ticker, price: s.price, change: s.change, setup: s.setup, chartSym: `NASDAQ:${s.ticker}` })),
+    { ticker: "BTC", price: null, change: null, setup: "Crypto", chartSym: "BINANCE:BTCUSDT" },
+    { ticker: "ETH", price: null, change: null, setup: "Crypto", chartSym: "BINANCE:ETHUSDT" },
+  ];
+  const [watchlistItems, setWatchlistItems] = useState(() => {
+    try {
+      const saved = localStorage.getItem("swingEdgeWatchlist");
+      return saved ? JSON.parse(saved) : DEFAULT_WATCHLIST;
+    } catch { return DEFAULT_WATCHLIST; }
+  });
+  const [watchlistInput, setWatchlistInput] = useState("");
+
   // Persist trades to localStorage
   useEffect(() => {
     try { localStorage.setItem("swingEdgeTrades", JSON.stringify(trades)); } catch {}
   }, [trades]);
+
+  // Persist watchlist to localStorage
+  useEffect(() => {
+    try { localStorage.setItem("swingEdgeWatchlist", JSON.stringify(watchlistItems)); } catch {}
+  }, [watchlistItems]);
 
   // TradingView widget
   useEffect(() => {
@@ -634,7 +665,7 @@ export default function SwingEdge() {
     return () => clearInterval(interval);
   }, [tab, fetchLivePrices]);
 
-  const equityCurve = useMemo(() => generateEquityCurve(capital), [trades, capital]);
+  const equityCurve = useMemo(() => generateEquityCurve(capital, trades), [trades, capital]);
   const closedTrades = trades.filter(t => t.status === "CLOSED");
   const openTrades   = trades.filter(t => t.status === "OPEN");
 
@@ -712,6 +743,91 @@ export default function SwingEdge() {
     setShowCloseForm(false);
     setClosingTrade(null);
     setCloseForm({ exit: "", exitReason: "Target Hit", followedPlan: true, lessonLearned: "", maxFavorable: "", maxAdverse: "" });
+  };
+
+  const handleDeleteTrade = (tradeId) => {
+    if (window.confirm("האם למחוק עסקה זו? פעולה זו לא ניתנת לביטול.")) {
+      setTrades(prev => prev.filter(t => t.id !== tradeId));
+    }
+  };
+
+  const handleEditOpen = (trade) => {
+    setEditingTrade(trade);
+    setEditForm({
+      ticker: trade.ticker,
+      side: trade.side,
+      entry: String(trade.entry),
+      stop: String(trade.stop),
+      target: String(trade.target || ""),
+      shares: String(trade.shares),
+      setup: trade.setup || "Breakout",
+      notes: trade.notes || "",
+      marketCondition: trade.marketCondition || "Trending Up",
+      emotionAtEntry: trade.emotionAtEntry || "Neutral",
+      entryQuality: trade.entryQuality || 3,
+      status: trade.status,
+      exit: trade.exit != null ? String(trade.exit) : "",
+      exitReason: trade.exitReason || "Target Hit",
+      followedPlan: trade.followedPlan,
+      lessonLearned: trade.lessonLearned || "",
+      maxFavorable: trade.maxFavorable != null ? String(trade.maxFavorable) : "",
+      maxAdverse: trade.maxAdverse != null ? String(trade.maxAdverse) : "",
+    });
+    setShowEditForm(true);
+  };
+
+  const handleEditSubmit = () => {
+    if (!editingTrade) return;
+    const exitVal = parseFloat(editForm.exit) || null;
+    const updated = {
+      ...editingTrade,
+      ticker: editForm.ticker.toUpperCase(),
+      side: editForm.side,
+      entry: parseFloat(editForm.entry) || editingTrade.entry,
+      stop: parseFloat(editForm.stop) || editingTrade.stop,
+      target: parseFloat(editForm.target) || null,
+      shares: parseInt(editForm.shares) || editingTrade.shares,
+      setup: editForm.setup,
+      notes: editForm.notes,
+      marketCondition: editForm.marketCondition,
+      emotionAtEntry: editForm.emotionAtEntry,
+      entryQuality: editForm.entryQuality,
+      status: exitVal != null ? "CLOSED" : editForm.status,
+      exit: exitVal,
+      exitReason: editForm.exitReason,
+      followedPlan: editForm.followedPlan,
+      lessonLearned: editForm.lessonLearned,
+      maxFavorable: parseFloat(editForm.maxFavorable) || null,
+      maxAdverse: parseFloat(editForm.maxAdverse) || null,
+    };
+    setTrades(prev => prev.map(t => t.id === editingTrade.id ? updated : t));
+    setShowEditForm(false);
+    setEditingTrade(null);
+  };
+
+  const handleAddWatchlistTicker = () => {
+    const t = watchlistInput.trim().toUpperCase();
+    if (!t || watchlistItems.find(i => i.ticker === t)) { setWatchlistInput(""); return; }
+    const cryptoMap = { BTC: "BINANCE:BTCUSDT", ETH: "BINANCE:ETHUSDT" };
+    const newItem = { ticker: t, price: null, change: null, setup: "Custom", chartSym: cryptoMap[t] || `NASDAQ:${t}` };
+    const updated = [...watchlistItems, newItem];
+    setWatchlistItems(updated);
+    try { localStorage.setItem("swingEdgeWatchlist", JSON.stringify(updated)); } catch {}
+    setWatchlistInput("");
+  };
+
+  const handleDeleteWatchlistTicker = (ticker) => {
+    const updated = watchlistItems.filter(i => i.ticker !== ticker);
+    setWatchlistItems(updated);
+    try { localStorage.setItem("swingEdgeWatchlist", JSON.stringify(updated)); } catch {}
+  };
+
+  const toggleLightMode = () => {
+    setLightMode(v => {
+      const next = !v;
+      try { localStorage.setItem("swingEdgeLightMode", String(next)); } catch {}
+      return next;
+    });
   };
 
   const handleImageUpload = (e) => {
@@ -797,7 +913,7 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0f1e] text-slate-200 font-sans flex flex-col" style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
+    <div className="min-h-screen bg-[#0a0f1e] text-slate-200 font-sans flex flex-col" data-theme={lightMode ? "light" : "dark"} style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
 
       {/* ── HEADER ── */}
       <header className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06] bg-[#0d1424]/90 backdrop-blur-md sticky top-0 z-50">
@@ -844,10 +960,15 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                   <p className="text-xs font-bold text-white">{userProfile?.name || "Trader"}</p>
                   <p className="text-[10px] text-slate-500 mt-0.5 font-mono">${capital.toLocaleString()} portfolio</p>
                 </div>
-                <div className="p-2">
+                <div className="p-2 space-y-1">
                   <button onClick={() => { setTab("settings"); setShowProfileDropdown(false); }}
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-300 hover:bg-white/5 hover:text-white transition text-left">
                     <Settings size={13} className="text-cyan-400" /> Profile &amp; Settings
+                  </button>
+                  <button onClick={() => { toggleLightMode(); setShowProfileDropdown(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-300 hover:bg-white/5 hover:text-white transition text-left">
+                    <span className="text-sm">{lightMode ? "🌙" : "☀️"}</span>
+                    {lightMode ? "Dark Mode" : "Light Mode"}
                   </button>
                 </div>
               </div>
@@ -1232,12 +1353,20 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                         </td>
                         <td className="p-3"><span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${isOpen ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20" : "bg-slate-500/10 text-slate-500 border border-slate-700"}`}>{t.status}</span></td>
                         <td className="p-3">
-                          {isOpen && (
-                            <button onClick={()=>{setClosingTrade(t);setShowCloseForm(true);}}
-                              className="text-[10px] px-2 py-1 rounded bg-[#ef4444]/10 border border-[#ef4444]/20 text-[#ef4444] hover:opacity-80 transition whitespace-nowrap">
-                              Close
-                            </button>
-                          )}
+                          <div className="flex items-center gap-1 whitespace-nowrap">
+                            {isOpen && (
+                              <button onClick={()=>{setClosingTrade(t);setShowCloseForm(true);}}
+                                className="text-[10px] px-2 py-1 rounded bg-[#ef4444]/10 border border-[#ef4444]/20 text-[#ef4444] hover:opacity-80 transition">
+                                Close
+                              </button>
+                            )}
+                            <button onClick={() => handleEditOpen(t)}
+                              className="text-[10px] px-1.5 py-1 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 hover:opacity-80 transition"
+                              title="עריכה">✏️</button>
+                            <button onClick={() => handleDeleteTrade(t.id)}
+                              className="text-[10px] px-1.5 py-1 rounded bg-slate-500/10 border border-slate-500/20 text-slate-400 hover:text-red-400 hover:border-red-500/30 transition"
+                              title="מחיקה">🗑️</button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1839,16 +1968,16 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
             {/* Quick Ticker Buttons */}
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[10px] font-semibold tracking-widest uppercase text-slate-600 mr-1">Quick Jump:</span>
-              {QUICK_TICKERS.map(tk => {
-                const active = chartSymbol === `NASDAQ:${tk}`;
+              {watchlistItems.slice(0, 7).map(item => {
+                const active = chartSymbol === item.chartSym;
                 return (
-                  <button key={tk} onClick={() => setChartSymbol(`NASDAQ:${tk}`)}
+                  <button key={item.ticker} onClick={() => setChartSymbol(item.chartSym)}
                     className={`text-xs font-mono font-bold px-3 py-1.5 rounded-lg border transition ${
                       active
                         ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40"
                         : "bg-white/3 text-slate-400 border-white/[0.06] hover:bg-cyan-500/10 hover:text-cyan-400 hover:border-cyan-500/20"
                     }`}>
-                    {tk}
+                    {item.ticker}
                   </button>
                 );
               })}
@@ -1881,28 +2010,58 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
               </div>
 
               {/* Watchlist */}
-              <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-4" style={{ height: 440, overflowY: "auto" }}>
+              <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-4 flex flex-col" style={{ height: 440 }}>
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Watchlist</span>
                   <Radio size={12} className="text-cyan-400" />
                 </div>
-                <div className="space-y-2">
-                  {SCANNER_DATA.map(s => (
-                    <div key={s.ticker} onClick={() => setChartSymbol(`NASDAQ:${s.ticker}`)}
-                      className={`flex items-center justify-between p-2.5 bg-white/3 rounded-lg border transition cursor-pointer ${chartSymbol === `NASDAQ:${s.ticker}` ? "border-cyan-500/40 bg-cyan-500/5" : "border-white/[0.06] hover:border-cyan-500/20 hover:bg-cyan-500/3"}`}>
-                      <div>
+                {/* Add ticker input */}
+                <div className="flex gap-1.5 mb-3">
+                  <input
+                    value={watchlistInput}
+                    onChange={e => setWatchlistInput(e.target.value.toUpperCase())}
+                    onKeyDown={e => { if (e.key === "Enter") handleAddWatchlistTicker(); }}
+                    placeholder="הוסף טיקר... (TSLA)"
+                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none font-mono"
+                  />
+                  <button onClick={handleAddWatchlistTicker}
+                    className="px-2.5 py-1.5 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 text-xs font-bold hover:bg-cyan-500/25 transition">
+                    <Plus size={12} />
+                  </button>
+                </div>
+                <div className="space-y-2 overflow-y-auto flex-1">
+                  {watchlistItems.map(s => (
+                    <div key={s.ticker}
+                      className={`flex items-center justify-between p-2.5 bg-white/3 rounded-lg border transition group ${chartSymbol === s.chartSym ? "border-cyan-500/40 bg-cyan-500/5" : "border-white/[0.06] hover:border-cyan-500/20 hover:bg-cyan-500/3"}`}>
+                      <div className="flex-1 cursor-pointer" onClick={() => setChartSymbol(s.chartSym)}>
                         <div className="font-bold text-xs text-white font-mono">{s.ticker}</div>
                         <div className="text-[10px] text-slate-600">{s.setup}</div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-xs font-mono font-bold text-slate-200">${s.price}</div>
-                        <div className={`text-[10px] font-mono font-semibold flex items-center justify-end gap-0.5 ${s.change>=0?"text-[#10b981]":"text-[#ef4444]"}`}>
-                          {s.change>=0?<ArrowUpRight size={10}/>:<ArrowDownRight size={10}/>}
-                          {s.change>=0?"+":""}{s.change}%
-                        </div>
+                      <div className="text-right flex items-center gap-2">
+                        {s.price != null ? (
+                          <div>
+                            <div className="text-xs font-mono font-bold text-slate-200">${s.price}</div>
+                            <div className={`text-[10px] font-mono font-semibold flex items-center justify-end gap-0.5 ${(s.change||0)>=0?"text-[#10b981]":"text-[#ef4444]"}`}>
+                              {(s.change||0)>=0?<ArrowUpRight size={10}/>:<ArrowDownRight size={10}/>}
+                              {(s.change||0)>=0?"+":""}{(s.change||0)}%
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-slate-600 font-mono">—</div>
+                        )}
+                        <button onClick={() => handleDeleteWatchlistTicker(s.ticker)}
+                          className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-400 transition p-0.5 rounded"
+                          title="הסר מהרשימה">
+                          <X size={10} />
+                        </button>
                       </div>
                     </div>
                   ))}
+                  {watchlistItems.length === 0 && (
+                    <div className="text-center py-6 text-slate-700 text-xs">
+                      <p>הרשימה ריקה — הוסף טיקרים למעלה</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -2732,6 +2891,152 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
         </div>
       )}
 
+      {/* ── EDIT TRADE MODAL ── */}
+      {showEditForm && editingTrade && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg bg-[#0d1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06] bg-gradient-to-r from-cyan-500/5 to-violet-500/5">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-white">✏️ עריכת עסקה — <span className="text-cyan-400 font-mono">{editingTrade.ticker}</span></span>
+              </div>
+              <button onClick={() => { setShowEditForm(false); setEditingTrade(null); }} className="text-slate-600 hover:text-slate-300 transition">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-5 space-y-4 overflow-y-auto">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Ticker</label>
+                  <input value={editForm.ticker} onChange={e => setEditForm(f => ({ ...f, ticker: e.target.value.toUpperCase() }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none transition font-mono font-bold" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Direction</label>
+                  <div className="flex gap-2">
+                    {["LONG","SHORT"].map(s => (
+                      <button key={s} onClick={() => setEditForm(f => ({ ...f, side: s }))}
+                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition border ${editForm.side===s?(s==="LONG"?"bg-[#10b981]/20 text-[#10b981] border-[#10b981]/30":"bg-[#ef4444]/20 text-[#ef4444] border-[#ef4444]/30"):"bg-white/3 text-slate-500 border-white/10 hover:border-white/20"}`}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                {[["Entry","entry","text-white"],["Stop Loss","stop","text-[#ef4444]"],["Target","target","text-[#10b981]"]].map(([label,key,cls]) => (
+                  <div key={key}>
+                    <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{label}</label>
+                    <input value={editForm[key]} onChange={e => setEditForm(f => ({ ...f, [key]: e.target.value }))}
+                      placeholder="0.00" className={`w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none transition font-mono ${cls}`} />
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Shares</label>
+                  <input value={editForm.shares} onChange={e => setEditForm(f => ({ ...f, shares: e.target.value }))} type="number" min="0"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none transition font-mono" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Setup Type</label>
+                  <select value={editForm.setup} onChange={e => setEditForm(f => ({ ...f, setup: e.target.value }))}
+                    className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
+                    {["Breakout","Pullback","Support Bounce","Resistance Break","Other"].map(s => <option key={s}>{s}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Market Condition</label>
+                  <select value={editForm.marketCondition} onChange={e => setEditForm(f => ({ ...f, marketCondition: e.target.value }))}
+                    className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
+                    {["Trending Up","Trending Down","Sideways","Volatile"].map(s => <option key={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Emotion at Entry</label>
+                  <select value={editForm.emotionAtEntry} onChange={e => setEditForm(f => ({ ...f, emotionAtEntry: e.target.value }))}
+                    className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
+                    {["Confident","Nervous","FOMO","Neutral"].map(s => <option key={s}>{s}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Entry Quality</label>
+                <div className="flex items-center gap-1 mt-1">
+                  {[1,2,3,4,5].map(star => (
+                    <button key={star} type="button" onClick={() => setEditForm(f => ({ ...f, entryQuality: star }))}
+                      className={`text-xl transition-transform hover:scale-110 ${editForm.entryQuality >= star ? "text-amber-400" : "text-slate-700"}`}>★</button>
+                  ))}
+                  <span className="text-[10px] text-slate-600 ml-1">{editForm.entryQuality}/5</span>
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Notes</label>
+                <input value={editForm.notes} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))}
+                  placeholder="Trade thesis..." className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none transition" />
+              </div>
+              {/* Exit fields */}
+              <div className="border-t border-white/[0.06] pt-4">
+                <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-3">שדות סגירה (אם נסגרה)</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Exit Price</label>
+                    <input value={editForm.exit} onChange={e => setEditForm(f => ({ ...f, exit: e.target.value }))}
+                      placeholder="0.00" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-[#10b981] placeholder-slate-600 focus:border-emerald-500/50 focus:outline-none transition font-mono" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Exit Reason</label>
+                    <select value={editForm.exitReason} onChange={e => setEditForm(f => ({ ...f, exitReason: e.target.value }))}
+                      className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
+                      {["Stop Loss","Target Hit","Chart Read","Fear","Other"].map(s => <option key={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                  <div>
+                    <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">MFE</label>
+                    <input value={editForm.maxFavorable} onChange={e => setEditForm(f => ({ ...f, maxFavorable: e.target.value }))}
+                      placeholder="Highest price" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-[#10b981] placeholder-slate-600 focus:outline-none transition font-mono" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">MAE</label>
+                    <input value={editForm.maxAdverse} onChange={e => setEditForm(f => ({ ...f, maxAdverse: e.target.value }))}
+                      placeholder="Lowest price" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-[#ef4444] placeholder-slate-600 focus:outline-none transition font-mono" />
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Followed Plan?</label>
+                  <div className="flex gap-2">
+                    {[true, false].map(val => (
+                      <button key={String(val)} onClick={() => setEditForm(f => ({ ...f, followedPlan: val }))}
+                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition border ${editForm.followedPlan===val?(val?"bg-[#10b981]/20 text-[#10b981] border-[#10b981]/30":"bg-[#ef4444]/20 text-[#ef4444] border-[#ef4444]/30"):"bg-white/3 text-slate-500 border-white/10 hover:border-white/20"}`}>
+                        {val ? "✓ Yes" : "✗ No"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Lesson Learned</label>
+                  <input value={editForm.lessonLearned} onChange={e => setEditForm(f => ({ ...f, lessonLearned: e.target.value }))}
+                    placeholder="One sentence takeaway..." className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-violet-500/50 focus:outline-none transition" />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button onClick={handleEditSubmit}
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-white text-sm font-bold hover:opacity-90 transition">
+                  שמור שינויים →
+                </button>
+                <button onClick={() => { setShowEditForm(false); setEditingTrade(null); }}
+                  className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm hover:text-white hover:border-white/20 transition">
+                  ביטול
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── FLOATING NEW TRADE BUTTON ── */}
       <button
         onClick={() => setShowForm(true)}
@@ -2745,7 +3050,7 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
       <footer className="flex items-center justify-between px-5 py-2 border-t border-white/[0.06] bg-[#0a0f1e] text-[10px] text-slate-700 font-mono">
         <div className="flex items-center gap-4">
           <span className="flex items-center gap-1"><span className={`w-1.5 h-1.5 rounded-full ${pulse?"bg-emerald-500":"bg-emerald-800"} transition-colors`}/> Market Open</span>
-          <span>Capital: $25,000</span>
+          <span>Capital: ${capital.toLocaleString()}</span>
           <span>Risk/Trade: 1%</span>
         </div>
         <div className="flex items-center gap-4">
