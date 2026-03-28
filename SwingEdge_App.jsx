@@ -10,7 +10,8 @@ import {
   Plus, X, RefreshCw, Activity,
   DollarSign, Target, Zap, ArrowUpRight,
   ArrowDownRight, Eye, Layers, Cpu, Radio, FlaskConical,
-  Calculator, Copy, Percent, Hash
+  Calculator, Copy, Percent, Hash,
+  Settings, BookMarked, Thermometer, Trash2
 } from "lucide-react";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -138,6 +139,7 @@ const NAV_ITEMS = [
   { id: "position",  label: "Position Calc",  icon: Calculator },
   { id: "analytics", label: "Analytics",      icon: BarChart2 },
   { id: "intel",     label: "Market Intel",   icon: Rss },
+  { id: "settings",  label: "Settings",       icon: Settings },
 ];
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
@@ -197,6 +199,17 @@ export default function SwingEdge() {
 
   // Live prices state
   const [livePrices, setLivePrices] = useState({});
+
+  // Personal Playbook state
+  const [playbookSetups, setPlaybookSetups] = useState(() => {
+    try {
+      const saved = localStorage.getItem("swingEdgePlaybook");
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const [playbookForm, setPlaybookForm] = useState({ name: "", description: "", imagePreview: null });
+  const [showPlaybookForm, setShowPlaybookForm] = useState(false);
+  const [editingSetupId, setEditingSetupId] = useState(null);
   const [pricesLoading, setPricesLoading] = useState(false);
   const [pricesLastUpdated, setPricesLastUpdated] = useState(null);
 
@@ -1655,6 +1668,259 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
             </div>
           </div>
         )}
+
+        {/* ══════════════ SETTINGS ══════════════ */}
+        {tab === "settings" && (() => {
+          // ── Tiltmeter: count "Followed Plan = No" this month ──
+          const now = new Date();
+          const thisMonth = now.getMonth();
+          const thisYear = now.getFullYear();
+          const tiltCount = trades.filter(t => {
+            if (t.followedPlan !== false) return false;
+            const d = new Date(t.date + "T12:00:00");
+            return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
+          }).length;
+          const tiltLevel = tiltCount === 0 ? "safe" : tiltCount <= 2 ? "safe" : tiltCount === 3 ? "warning" : "danger";
+          const tiltColor = tiltLevel === "safe" ? "#10b981" : tiltLevel === "warning" ? "#f59e0b" : "#ef4444";
+          const tiltBg = tiltLevel === "safe" ? "border-emerald-500/25 bg-emerald-500/5" : tiltLevel === "warning" ? "border-amber-500/25 bg-amber-500/5" : "border-red-500/25 bg-red-500/5";
+          const tiltPct = Math.min(tiltCount / 6 * 100, 100);
+
+          // ── Playbook: calculate success rate per setup from journal ──
+          const calcSetupSuccess = (setupName) => {
+            const matched = trades.filter(t => t.setup === setupName && t.status === "CLOSED");
+            if (matched.length === 0) return null;
+            const wins = matched.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length;
+            return { rate: Math.round(wins / matched.length * 100), count: matched.length };
+          };
+
+          const savePlaybook = (updated) => {
+            setPlaybookSetups(updated);
+            try { localStorage.setItem("swingEdgePlaybook", JSON.stringify(updated)); } catch {}
+          };
+
+          const handlePlaybookSubmit = () => {
+            if (!playbookForm.name.trim()) return;
+            if (editingSetupId !== null) {
+              const updated = playbookSetups.map(s => s.id === editingSetupId ? { ...s, name: playbookForm.name, description: playbookForm.description, imagePreview: playbookForm.imagePreview } : s);
+              savePlaybook(updated);
+            } else {
+              const newSetup = { id: Date.now(), name: playbookForm.name, description: playbookForm.description, imagePreview: playbookForm.imagePreview };
+              savePlaybook([...playbookSetups, newSetup]);
+            }
+            setPlaybookForm({ name: "", description: "", imagePreview: null });
+            setShowPlaybookForm(false);
+            setEditingSetupId(null);
+          };
+
+          const handlePlaybookImageUpload = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => setPlaybookForm(f => ({ ...f, imagePreview: ev.target.result }));
+            reader.readAsDataURL(file);
+          };
+
+          const startEdit = (setup) => {
+            setPlaybookForm({ name: setup.name, description: setup.description, imagePreview: setup.imagePreview });
+            setEditingSetupId(setup.id);
+            setShowPlaybookForm(true);
+          };
+
+          const deleteSetup = (id) => {
+            savePlaybook(playbookSetups.filter(s => s.id !== id));
+          };
+
+          return (
+            <div className="space-y-6 animate-fade-in max-w-3xl mx-auto">
+              <div>
+                <h2 className="text-sm font-bold text-white flex items-center gap-2"><Settings size={15} className="text-cyan-400" /> Settings</h2>
+                <p className="text-xs text-slate-600 mt-0.5">Playbook אישי וניטור משמעת מסחר</p>
+              </div>
+
+              {/* ── TILTMETER ── */}
+              <div className={`bg-[#0d1424] border rounded-xl p-5 ${tiltBg}`}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Thermometer size={16} style={{ color: tiltColor }} />
+                    <h3 className="text-sm font-bold text-white">Tiltmeter — החודש</h3>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-semibold border"
+                    style={{ color: tiltColor, borderColor: tiltColor + "40", background: tiltColor + "15" }}>
+                    {tiltLevel === "safe" ? "UNDER CONTROL" : tiltLevel === "warning" ? "⚠ WATCH OUT" : "🔴 TILTING"}
+                  </span>
+                </div>
+
+                {/* Visual gauge */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs text-slate-500">Followed Plan = No החודש</span>
+                    <span className="text-2xl font-bold font-mono" style={{ color: tiltColor }}>{tiltCount}</span>
+                  </div>
+                  <div className="h-3 bg-white/5 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-700"
+                      style={{ width: `${tiltPct}%`, background: `linear-gradient(to right, #10b981, ${tiltColor})` }} />
+                  </div>
+                  <div className="flex justify-between mt-1 text-[10px] text-slate-700 font-mono">
+                    <span>0</span>
+                    <span className="text-amber-600">⚠ 3</span>
+                    <span className="text-red-600">🔴 6+</span>
+                  </div>
+                </div>
+
+                {/* Segments row */}
+                <div className="flex gap-1.5 mb-4">
+                  {[1,2,3,4,5,6].map(i => {
+                    const filled = i <= tiltCount;
+                    const segColor = i <= 2 ? "#10b981" : i <= 3 ? "#f59e0b" : "#ef4444";
+                    return (
+                      <div key={i} className="flex-1 h-4 rounded"
+                        style={{ background: filled ? segColor : segColor + "20", border: `1px solid ${segColor}40` }} />
+                    );
+                  })}
+                </div>
+
+                {/* Warning banner */}
+                {tiltCount > 3 && (
+                  <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                    <AlertTriangle size={14} className="text-red-400 flex-shrink-0" />
+                    <span className="text-xs text-red-300">
+                      אזהרה: חרגת 3 פעמים מהתוכנית החודש. שקול להפחית סייז עסקה ולחזור לבסיס.
+                    </span>
+                  </div>
+                )}
+                {tiltCount === 3 && (
+                  <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+                    <AlertTriangle size={14} className="text-amber-400 flex-shrink-0" />
+                    <span className="text-xs text-amber-300">
+                      התראה: הגעת ל-3 חריגות מהתוכנית החודש. עוד אחת — תפנה לאזור האדום.
+                    </span>
+                  </div>
+                )}
+                {tiltCount === 0 && (
+                  <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3">
+                    <CheckCircle size={14} className="text-emerald-400 flex-shrink-0" />
+                    <span className="text-xs text-emerald-300">מצוין! עקבת אחר התוכנית בכל עסקאות החודש.</span>
+                  </div>
+                )}
+
+                <p className="text-[10px] text-slate-700 mt-3">* מחושב מעסקאות סגורות בחודש הנוכחי שסומנו כ-Followed Plan = No</p>
+              </div>
+
+              {/* ── PERSONAL PLAYBOOK ── */}
+              <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <BookMarked size={16} className="text-violet-400" />
+                    <h3 className="text-sm font-bold text-white">Personal Playbook</h3>
+                  </div>
+                  <button onClick={() => { setPlaybookForm({ name: "", description: "", imagePreview: null }); setEditingSetupId(null); setShowPlaybookForm(v => !v); }}
+                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/30 text-violet-400 hover:opacity-90 transition">
+                    <Plus size={11} /> הוסף סטאפ
+                  </button>
+                </div>
+
+                {/* Add/Edit Form */}
+                {showPlaybookForm && (
+                  <div className="mb-5 bg-white/3 border border-white/10 rounded-xl p-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">שם הסטאפ *</label>
+                        <input value={playbookForm.name} onChange={e => setPlaybookForm(f => ({ ...f, name: e.target.value }))}
+                          placeholder="Breakout, Pullback…" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-violet-500/50 focus:outline-none transition" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">תמונה (אופציונלי)</label>
+                        <label className="flex items-center gap-2 cursor-pointer w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-400 hover:border-violet-500/30 transition">
+                          <Eye size={12} />
+                          <span>{playbookForm.imagePreview ? "תמונה נטענה ✓" : "העלה תמונה..."}</span>
+                          <input type="file" accept="image/*" onChange={handlePlaybookImageUpload} className="hidden" />
+                        </label>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">תיאור</label>
+                      <textarea value={playbookForm.description} onChange={e => setPlaybookForm(f => ({ ...f, description: e.target.value }))}
+                        placeholder="תנאי כניסה, תנאי יציאה, הערות…" rows={2}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-violet-500/50 focus:outline-none transition resize-none" />
+                    </div>
+                    {playbookForm.imagePreview && (
+                      <div className="relative rounded-lg overflow-hidden border border-white/10 h-24">
+                        <img src={playbookForm.imagePreview} alt="Setup" className="w-full h-full object-cover" />
+                        <button onClick={() => setPlaybookForm(f => ({ ...f, imagePreview: null }))}
+                          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-slate-300 hover:text-white">
+                          <X size={10} />
+                        </button>
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <button onClick={handlePlaybookSubmit}
+                        className="flex-1 py-2 rounded-lg bg-gradient-to-r from-violet-500 to-cyan-500 text-white text-xs font-bold hover:opacity-90 transition">
+                        {editingSetupId !== null ? "עדכן סטאפ" : "שמור סטאפ"}
+                      </button>
+                      <button onClick={() => { setShowPlaybookForm(false); setEditingSetupId(null); }}
+                        className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-slate-400 text-xs hover:border-white/20 transition">
+                        ביטול
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Playbook list */}
+                {playbookSetups.length === 0 ? (
+                  <div className="text-center py-8 text-slate-600 text-xs">
+                    <BookMarked size={28} className="mx-auto mb-2 opacity-20" />
+                    <p>אין סטאפים עדיין — לחץ "הוסף סטאפ" כדי להתחיל</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {playbookSetups.map(setup => {
+                      const stats = calcSetupSuccess(setup.name);
+                      const successColor = stats === null ? "#475569" : stats.rate >= 60 ? "#10b981" : stats.rate >= 40 ? "#f59e0b" : "#ef4444";
+                      return (
+                        <div key={setup.id} className="bg-white/3 border border-white/[0.06] rounded-xl overflow-hidden hover:border-violet-500/20 transition">
+                          {setup.imagePreview && (
+                            <div className="h-28 overflow-hidden">
+                              <img src={setup.imagePreview} alt={setup.name} className="w-full h-full object-cover" />
+                            </div>
+                          )}
+                          <div className="p-3">
+                            <div className="flex items-start justify-between gap-2 mb-1.5">
+                              <span className="text-sm font-bold text-white">{setup.name}</span>
+                              <div className="flex gap-1">
+                                <button onClick={() => startEdit(setup)}
+                                  className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-slate-500 hover:text-cyan-400 hover:border-cyan-500/20 transition">
+                                  ✎
+                                </button>
+                                <button onClick={() => deleteSetup(setup.id)}
+                                  className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-slate-500 hover:text-red-400 hover:border-red-500/20 transition">
+                                  <Trash2 size={10} />
+                                </button>
+                              </div>
+                            </div>
+                            {setup.description && (
+                              <p className="text-[11px] text-slate-500 mb-2 leading-relaxed">{setup.description}</p>
+                            )}
+                            {/* Auto success rate from journal */}
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                <div className="h-full rounded-full transition-all"
+                                  style={{ width: stats ? `${stats.rate}%` : "0%", background: successColor }} />
+                              </div>
+                              <span className="text-[10px] font-mono font-bold whitespace-nowrap" style={{ color: successColor }}>
+                                {stats ? `${stats.rate}% (${stats.count} עסקאות)` : "אין נתונים ביומן"}
+                              </span>
+                            </div>
+                            <p className="text-[9px] text-slate-700 mt-1">אחוז הצלחה מחושב אוטומטית מהיומן</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
       </main>
 
