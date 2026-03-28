@@ -1303,6 +1303,167 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                 })}
               </div>
             </div>
+
+            {/* ── P&L by Day of Week ── */}
+            {(() => {
+              const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+              const dayMap = {};
+              closedTrades.forEach(t => {
+                const d = new Date(t.date + "T12:00:00").getDay();
+                const name = DAY_NAMES[d];
+                if (!dayMap[name]) dayMap[name] = { pnl: 0, count: 0 };
+                dayMap[name].pnl += calcTradeMetrics(t).pnl || 0;
+                dayMap[name].count += 1;
+              });
+              const data = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday"].map(day => ({
+                day: day.slice(0, 3),
+                fullDay: day,
+                pnl: Math.round(dayMap[day]?.pnl || 0),
+                count: dayMap[day]?.count || 0,
+              }));
+              return (
+                <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5">
+                  <h3 className="text-sm font-bold text-white mb-1">P&amp;L by Day of Week</h3>
+                  <p className="text-xs text-slate-600 mb-4">Total profit/loss per trading day</p>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
+                      <XAxis dataKey="day" tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} />
+                      <YAxis tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
+                      <Tooltip
+                        contentStyle={{ background: "#0d1424", border: "1px solid #162032", borderRadius: 10, fontSize: 11 }}
+                        formatter={(v, n, p) => [`${fmt$(v)} · ${p.payload.count} trade${p.payload.count !== 1 ? "s" : ""}`, "P&L"]}
+                        labelFormatter={l => `${["Sun","Mon","Tue","Wed","Thu","Fri"].includes(l) ? ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday"][["Sun","Mon","Tue","Wed","Thu","Fri"].indexOf(l)] : l}`}
+                      />
+                      <ReferenceLine y={0} stroke="#334155" />
+                      <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
+                        {data.map((d, i) => (
+                          <Cell key={i} fill={d.pnl >= 0 ? "#10b981" : "#f43f5e"} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              );
+            })()}
+
+            {/* ── Win Rate by Setup Bar Chart ── */}
+            {(() => {
+              const SETUPS = ["Breakout","Pullback","Retest","Breakdown"];
+              const data = SETUPS.map(setup => {
+                const s = closedTrades.filter(t => t.setup === setup);
+                const wins = s.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length;
+                const wr = s.length ? Math.round(wins / s.length * 100) : 0;
+                return { setup, winRate: wr, count: s.length };
+              });
+              return (
+                <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5">
+                  <h3 className="text-sm font-bold text-white mb-1">Win Rate by Setup</h3>
+                  <p className="text-xs text-slate-600 mb-4">Success percentage per setup type</p>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
+                      <XAxis dataKey="setup" tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} />
+                      <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`} />
+                      <Tooltip
+                        contentStyle={{ background: "#0d1424", border: "1px solid #162032", borderRadius: 10, fontSize: 11 }}
+                        formatter={(v, n, p) => [`${v}% · ${p.payload.count} trade${p.payload.count !== 1 ? "s" : ""}`, "Win Rate"]}
+                      />
+                      <ReferenceLine y={50} stroke="#475569" strokeDasharray="4 4" label={{ value: "50%", position: "insideTopRight", fontSize: 9, fill: "#475569" }} />
+                      <Bar dataKey="winRate" radius={[4, 4, 0, 0]}>
+                        {data.map((d, i) => (
+                          <Cell key={i} fill={d.winRate >= 50 ? "#8b5cf6" : "#64748b"} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              );
+            })()}
+
+            {/* ── Insight Cards: Best Day / Best Setup / Best Emotion ── */}
+            {(() => {
+              const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+              // Best Day
+              const dayMap = {};
+              closedTrades.forEach(t => {
+                const d = new Date(t.date + "T12:00:00").getDay();
+                const name = DAY_NAMES[d];
+                if (!dayMap[name]) dayMap[name] = { pnl: 0, count: 0 };
+                dayMap[name].pnl += calcTradeMetrics(t).pnl || 0;
+                dayMap[name].count += 1;
+              });
+              const bestDayEntry = Object.entries(dayMap).sort((a, b) => b[1].pnl - a[1].pnl)[0];
+
+              // Best Setup
+              const SETUPS = ["Breakout","Pullback","Retest","Breakdown"];
+              const setupStats = SETUPS.map(setup => {
+                const s = closedTrades.filter(t => t.setup === setup);
+                const wins = s.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length;
+                const wr = s.length ? wins / s.length * 100 : 0;
+                return { setup, winRate: wr, count: s.length };
+              }).filter(s => s.count > 0).sort((a, b) => b.winRate - a.winRate);
+              const bestSetup = setupStats[0];
+
+              // Best Emotion
+              const EMOTIONS = ["Confident","Nervous","FOMO","Neutral"];
+              const emotionStats = EMOTIONS.map(em => {
+                const e = closedTrades.filter(t => t.emotionAtEntry === em);
+                const wins = e.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length;
+                const wr = e.length ? wins / e.length * 100 : 0;
+                return { emotion: em, winRate: wr, count: e.length };
+              }).filter(e => e.count > 0).sort((a, b) => b.winRate - a.winRate);
+              const bestEmotion = emotionStats[0];
+
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {/* Best Day */}
+                  <div className="bg-[#0d1424] border border-emerald-500/20 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-xs font-semibold tracking-widest uppercase text-emerald-400">Best Day</span>
+                    </div>
+                    {bestDayEntry ? (
+                      <>
+                        <div className="text-2xl font-bold text-white font-mono">{bestDayEntry[0]}</div>
+                        <div className="text-xs text-slate-500 mt-1">{fmt$(Math.round(bestDayEntry[1].pnl))} · {bestDayEntry[1].count} trade{bestDayEntry[1].count !== 1 ? "s" : ""}</div>
+                      </>
+                    ) : (
+                      <div className="text-sm text-slate-600">Log closed trades to see insights</div>
+                    )}
+                  </div>
+
+                  {/* Best Setup */}
+                  <div className="bg-[#0d1424] border border-violet-500/20 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-xs font-semibold tracking-widest uppercase text-violet-400">Best Setup</span>
+                    </div>
+                    {bestSetup ? (
+                      <>
+                        <div className="text-2xl font-bold text-white font-mono">{bestSetup.setup}</div>
+                        <div className="text-xs text-slate-500 mt-1">{bestSetup.winRate.toFixed(0)}% win rate · {bestSetup.count} trade{bestSetup.count !== 1 ? "s" : ""}</div>
+                      </>
+                    ) : (
+                      <div className="text-sm text-slate-600">Log closed trades to see insights</div>
+                    )}
+                  </div>
+
+                  {/* Best Emotion */}
+                  <div className="bg-[#0d1424] border border-amber-500/20 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-xs font-semibold tracking-widest uppercase text-amber-400">Best Emotion</span>
+                    </div>
+                    {bestEmotion ? (
+                      <>
+                        <div className="text-2xl font-bold text-white font-mono">{bestEmotion.emotion}</div>
+                        <div className="text-xs text-slate-500 mt-1">{bestEmotion.winRate.toFixed(0)}% win rate · {bestEmotion.count} trade{bestEmotion.count !== 1 ? "s" : ""}</div>
+                      </>
+                    ) : (
+                      <div className="text-sm text-slate-600">Log closed trades to see insights</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 
