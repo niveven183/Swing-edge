@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import OnboardingScreen from "./src/components/OnboardingScreen.jsx";
+import TickerLogo from "./src/components/TickerLogo.jsx";
+import { createT } from "./src/i18n.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell
@@ -10,9 +12,9 @@ import {
   Plus, X, RefreshCw, Activity,
   DollarSign, Target, Zap, ArrowUpRight,
   ArrowDownRight, Eye, Layers, Cpu, Radio, FlaskConical,
-  Calculator, Copy, Percent, Hash,
+  Calculator, Copy, Percent, Hash, Search, Globe,
   Settings, BookMarked, Thermometer, Trash2, User,
-  Download, FileText
+  Download, FileText, Lightbulb
 } from "lucide-react";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -439,11 +441,20 @@ export default function SwingEdge() {
   const [analyzerLoading, setAnalyzerLoading] = useState(false);
 
   // Position Calculator state
-  const [posCalc, setPosCalc] = useState({ capital: "", risk: "1", entry: "", stop: "" });
+  const [posCalc, setPosCalc] = useState({ capital: "", risk: "1", entry: "", stop: "", ticker: "" });
   const [posCopied, setPosCopied] = useState(false);
+
+  // Watchlist search autocomplete state
+  const [watchlistSearchResults, setWatchlistSearchResults] = useState([]);
+  const [watchlistSearchLoading, setWatchlistSearchLoading] = useState(false);
+  const watchlistSearchRef = useRef(null);
+
+  // Journal lessons state
+  const [journalLessons, setJournalLessons] = useState([]);
 
   // Live prices state
   const [livePrices, setLivePrices] = useState({});
+  const [livePriceChanges, setLivePriceChanges] = useState({});
 
   // Personal Playbook state
   const [playbookSetups, setPlaybookSetups] = useState(() => {
@@ -457,6 +468,12 @@ export default function SwingEdge() {
   const [editingSetupId, setEditingSetupId] = useState(null);
   const [pricesLoading, setPricesLoading] = useState(false);
   const [pricesLastUpdated, setPricesLastUpdated] = useState(null);
+
+  // Language state
+  const [lang, setLang] = useState(() => {
+    try { return localStorage.getItem("swingEdgeLang") || "he"; } catch { return "he"; }
+  });
+  const t = useMemo(() => createT(lang), [lang]);
 
   // Light/Dark mode
   const [lightMode, setLightMode] = useState(() => {
@@ -637,33 +654,76 @@ export default function SwingEdge() {
     return () => clearInterval(interval);
   }, [tab, fetchNews, liveNews.length]);
 
-  // Fetch live prices from Yahoo Finance (via CORS proxy)
+  // Fetch live prices from Yahoo Finance (via CORS proxy) — for ALL tickers
   const fetchLivePrices = useCallback(async () => {
-    const tickers = [...new Set(trades.filter(t => t.status === "OPEN").map(t => t.ticker))];
-    if (tickers.length === 0) return;
+    const openTickers = trades.filter(t => t.status === "OPEN").map(t => t.ticker);
+    const watchTickers = watchlistItems.map(w => {
+      if (w.ticker === "BTC") return "BTC-USD";
+      if (w.ticker === "ETH") return "ETH-USD";
+      return w.ticker;
+    });
+    const allTickers = [...new Set([...openTickers, ...watchTickers])];
+    if (allTickers.length === 0) return;
     setPricesLoading(true);
     try {
-      const symbols = tickers.join(",");
-      const yahooUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols}&fields=regularMarketPrice`;
-      const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`);
-      const data = await res.json();
-      const result = data?.quoteResponse?.result || [];
-      const prices = {};
-      result.forEach(q => { if (q.regularMarketPrice) prices[q.symbol] = q.regularMarketPrice; });
-      if (Object.keys(prices).length > 0) {
-        setLivePrices(prev => ({ ...prev, ...prices }));
+      // Fetch in batches of 10 to avoid URL length issues
+      const batches = [];
+      for (let i = 0; i < allTickers.length; i += 10) {
+        batches.push(allTickers.slice(i, i + 10));
+      }
+      const allPrices = {};
+      const allChanges = {};
+      await Promise.allSettled(batches.map(async (batch) => {
+        const symbols = batch.join(",");
+        const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${batch[0]}?range=1d&interval=1d`;
+        // Use individual chart requests for reliability
+        await Promise.allSettled(batch.map(async (sym) => {
+          try {
+            const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=2d&interval=1d`;
+            const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
+            const data = await res.json();
+            const result = data?.chart?.result?.[0];
+            if (result) {
+              const closes = (result.indicators?.quote?.[0]?.close || []).filter(c => c != null);
+              if (closes.length > 0) {
+                const last = closes[closes.length - 1];
+                const prev = closes.length > 1 ? closes[closes.length - 2] : last;
+                const changePct = prev > 0 ? ((last / prev) - 1) * 100 : 0;
+                allPrices[sym] = last;
+                allChanges[sym] = changePct;
+                // Also map BTC-USD/ETH-USD to BTC/ETH
+                if (sym === "BTC-USD") { allPrices["BTC"] = last; allChanges["BTC"] = changePct; }
+                if (sym === "ETH-USD") { allPrices["ETH"] = last; allChanges["ETH"] = changePct; }
+              }
+            }
+          } catch {}
+        }));
+      }));
+      if (Object.keys(allPrices).length > 0) {
+        setLivePrices(prev => ({ ...prev, ...allPrices }));
+        setLivePriceChanges(prev => ({ ...prev, ...allChanges }));
         setPricesLastUpdated(new Date());
+        // Update watchlist items with live data
+        setWatchlistItems(prev => prev.map(w => {
+          const sym = w.ticker === "BTC" ? "BTC-USD" : w.ticker === "ETH" ? "ETH-USD" : w.ticker;
+          const price = allPrices[sym] || allPrices[w.ticker];
+          const change = allChanges[sym] || allChanges[w.ticker];
+          if (price != null) {
+            return { ...w, price: Math.round(price * 100) / 100, change: change != null ? Math.round(change * 100) / 100 : w.change };
+          }
+          return w;
+        }));
       }
     } catch (e) { console.warn("Live prices fetch failed:", e); }
     setPricesLoading(false);
-  }, [trades]);
+  }, [trades, watchlistItems]);
 
+  // Fetch live prices globally — on mount and every 60 seconds
   useEffect(() => {
-    if (tab !== "journal") return;
     fetchLivePrices();
     const interval = setInterval(fetchLivePrices, 60000);
     return () => clearInterval(interval);
-  }, [tab, fetchLivePrices]);
+  }, [fetchLivePrices]);
 
   const equityCurve = useMemo(() => generateEquityCurve(capital, trades), [trades, capital]);
   const closedTrades = trades.filter(t => t.status === "CLOSED");
@@ -672,14 +732,63 @@ export default function SwingEdge() {
   const totalPnL   = closedTrades.reduce((a, t) => a + (calcTradeMetrics(t).pnl || 0), 0);
   const winRate    = closedTrades.length ? closedTrades.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length / closedTrades.length * 100 : 0;
   const avgR       = closedTrades.length ? closedTrades.reduce((a, t) => a + (calcTradeMetrics(t).rMultiple || 0), 0) / closedTrades.length : 0;
-  const curEquity  = capital + totalPnL;
 
-  // Ticker tape
-  const TICKERS = ["NVDA +3.2%", "PLTR +5.8%", "META +2.1%", "AVGO +1.9%", "AMD -1.4%", "TSLA -2.4%", "MSTR +6.2%", "SMCI -3.1%"];
+  // Open P&L from live prices
+  const openPnL = useMemo(() => {
+    return openTrades.reduce((sum, t) => {
+      const lp = livePrices[t.ticker];
+      if (!lp) return sum;
+      const pnl = t.side === "LONG"
+        ? (lp - t.entry) * t.shares
+        : (t.entry - lp) * t.shares;
+      return sum + pnl;
+    }, 0);
+  }, [openTrades, livePrices]);
+
+  // Total equity = base capital + closed P&L + open P&L (live)
+  const curEquity  = capital + totalPnL + openPnL;
+
+  // Generate journal lessons from closed trades
   useEffect(() => {
-    const t = setInterval(() => setTickerIdx(i => (i + 1) % TICKERS.length), 2000);
+    const lessons = closedTrades
+      .filter(t => t.lessonLearned && t.lessonLearned.trim())
+      .slice(-20)
+      .reverse();
+    if (lessons.length === 0) { setJournalLessons([]); return; }
+
+    // Generate 3 summarized lessons from patterns
+    const allLessons = lessons.map(t => t.lessonLearned);
+    const winLessons = lessons.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).map(t => t.lessonLearned);
+    const lossLessons = lessons.filter(t => (calcTradeMetrics(t).pnl || 0) < 0).map(t => t.lessonLearned);
+
+    const insights = [];
+    if (winLessons.length > 0) {
+      insights.push(winLessons[0]);
+    }
+    if (lossLessons.length > 0) {
+      insights.push(lossLessons[0]);
+    }
+    if (allLessons.length > 2) {
+      insights.push(allLessons[2]);
+    } else if (allLessons.length > 0 && insights.length < 3) {
+      insights.push(allLessons[allLessons.length - 1]);
+    }
+    setJournalLessons([...new Set(insights)].slice(0, 3));
+  }, [closedTrades]);
+
+  // Ticker tape — uses live watchlist data
+  const TICKERS = useMemo(() => {
+    return watchlistItems.slice(0, 8).map(w => {
+      const price = livePrices[w.ticker] || livePrices[w.ticker === "BTC" ? "BTC-USD" : w.ticker === "ETH" ? "ETH-USD" : w.ticker];
+      const change = livePriceChanges[w.ticker] || livePriceChanges[w.ticker === "BTC" ? "BTC-USD" : w.ticker === "ETH" ? "ETH-USD" : w.ticker] || w.change;
+      const changeFmt = change != null ? (change >= 0 ? `+${change.toFixed(1)}%` : `${change.toFixed(1)}%`) : (w.change != null ? `${w.change >= 0 ? "+" : ""}${w.change}%` : "");
+      return { ticker: w.ticker, display: `${w.ticker} ${changeFmt}`, bull: (change ?? w.change ?? 0) >= 0 };
+    });
+  }, [watchlistItems, livePrices, livePriceChanges]);
+  useEffect(() => {
+    const t = setInterval(() => setTickerIdx(i => (i + 1) % Math.max(TICKERS.length, 1)), 2000);
     return () => clearInterval(t);
-  }, []);
+  }, [TICKERS.length]);
 
   useEffect(() => {
     const t = setInterval(() => setPulse(p => !p), 1500);
@@ -746,7 +855,7 @@ export default function SwingEdge() {
   };
 
   const handleDeleteTrade = (tradeId) => {
-    if (window.confirm("האם למחוק עסקה זו? פעולה זו לא ניתנת לביטול.")) {
+    if (window.confirm(t("journal.deleteTrade"))) {
       setTrades(prev => prev.filter(t => t.id !== tradeId));
     }
   };
@@ -829,6 +938,63 @@ export default function SwingEdge() {
       return next;
     });
   };
+
+  const handleLanguageChange = (newLang) => {
+    setLang(newLang);
+    try { localStorage.setItem("swingEdgeLang", newLang); } catch {}
+  };
+
+  // Watchlist search with autocomplete via Yahoo Finance
+  const searchTickers = useCallback(async (query) => {
+    if (!query || query.length < 1) { setWatchlistSearchResults([]); return; }
+    setWatchlistSearchLoading(true);
+    try {
+      const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=6&newsCount=0`;
+      const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
+      const data = await res.json();
+      const quotes = (data?.quotes || []).filter(q => q.quoteType === "EQUITY" || q.quoteType === "CRYPTOCURRENCY" || q.quoteType === "ETF").slice(0, 6);
+      setWatchlistSearchResults(quotes.map(q => ({
+        symbol: q.symbol,
+        name: q.shortname || q.longname || q.symbol,
+        type: q.quoteType,
+        exchange: q.exchDisp || q.exchange || "",
+      })));
+    } catch { setWatchlistSearchResults([]); }
+    setWatchlistSearchLoading(false);
+  }, []);
+
+  // Debounced search
+  const watchlistSearchTimeout = useRef(null);
+  const handleWatchlistSearchInput = (val) => {
+    setWatchlistInput(val.toUpperCase());
+    if (watchlistSearchTimeout.current) clearTimeout(watchlistSearchTimeout.current);
+    watchlistSearchTimeout.current = setTimeout(() => searchTickers(val), 300);
+  };
+
+  const handleAddFromSearch = (result) => {
+    const ticker = result.symbol.replace("-USD", "");
+    if (watchlistItems.find(i => i.ticker === ticker)) { setWatchlistInput(""); setWatchlistSearchResults([]); return; }
+    const cryptoMap = { BTC: "BINANCE:BTCUSDT", ETH: "BINANCE:ETHUSDT" };
+    const newItem = { ticker, price: null, change: null, setup: result.type === "CRYPTOCURRENCY" ? "Crypto" : "Custom", chartSym: cryptoMap[ticker] || `NASDAQ:${ticker}` };
+    const updated = [...watchlistItems, newItem];
+    setWatchlistItems(updated);
+    try { localStorage.setItem("swingEdgeWatchlist", JSON.stringify(updated)); } catch {}
+    setWatchlistInput("");
+    setWatchlistSearchResults([]);
+    // Trigger price fetch for the new ticker
+    setTimeout(fetchLivePrices, 500);
+  };
+
+  // Close watchlist search dropdown on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (watchlistSearchRef.current && !watchlistSearchRef.current.contains(e.target)) {
+        setWatchlistSearchResults([]);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
@@ -926,26 +1092,24 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
           <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-500 border border-cyan-500/20 tracking-widest uppercase">Pro</span>
         </div>
 
-        {/* Ticker Tape */}
+        {/* Ticker Tape — live from watchlist */}
         <div className="hidden md:flex items-center gap-4 text-xs font-mono">
-          {TICKERS.map((t, i) => {
-            const bull = t.includes("+");
-            return (
-              <span key={i} className={`transition-all duration-500 ${i === tickerIdx ? "opacity-100 scale-105" : "opacity-40"} ${bull ? "text-[#10b981]" : "text-[#ef4444]"}`}>
-                {t}
-              </span>
-            );
-          })}
+          {TICKERS.map((tk, i) => (
+            <span key={i} className={`transition-all duration-500 flex items-center gap-1.5 ${i === tickerIdx ? "opacity-100 scale-105" : "opacity-40"} ${tk.bull ? "text-[#10b981]" : "text-[#ef4444]"}`}>
+              <TickerLogo ticker={tk.ticker} size={16} />
+              {tk.display}
+            </span>
+          ))}
         </div>
 
         {/* Status + Profile */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
             <span className={`w-2 h-2 rounded-full ${pulse ? "bg-emerald-400" : "bg-emerald-600"} transition-colors`} />
-            <span className="text-[10px] text-slate-500 tracking-wider">LIVE</span>
+            <span className="text-[10px] text-slate-500 tracking-wider">{t("header.live")}</span>
           </div>
           <div className="text-right hidden sm:block">
-            <div className="text-xs text-slate-500">Account</div>
+            <div className="text-xs text-slate-500">{t("header.account")}</div>
             <div className="text-sm font-bold font-mono text-cyan-400">${curEquity.toLocaleString("en-US", { minimumFractionDigits: 2 })}</div>
           </div>
           {/* Profile dropdown */}
@@ -958,17 +1122,17 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
               <div className="absolute right-0 top-10 w-56 bg-[#0d1424] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden">
                 <div className="px-4 py-3 border-b border-white/[0.06] bg-gradient-to-r from-cyan-500/5 to-violet-500/5">
                   <p className="text-xs font-bold text-white">{userProfile?.name || "Trader"}</p>
-                  <p className="text-[10px] text-slate-500 mt-0.5 font-mono">${capital.toLocaleString()} portfolio</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5 font-mono">${capital.toLocaleString()} {t("settings.portfolio")}</p>
                 </div>
                 <div className="p-2 space-y-1">
                   <button onClick={() => { setTab("settings"); setShowProfileDropdown(false); }}
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-300 hover:bg-white/5 hover:text-white transition text-left">
-                    <Settings size={13} className="text-cyan-400" /> Profile &amp; Settings
+                    <Settings size={13} className="text-cyan-400" /> {t("settings.profileSettings")}
                   </button>
                   <button onClick={() => { toggleLightMode(); setShowProfileDropdown(false); }}
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-300 hover:bg-white/5 hover:text-white transition text-left">
                     <span className="text-sm">{lightMode ? "🌙" : "☀️"}</span>
-                    {lightMode ? "Dark Mode" : "Light Mode"}
+                    {lightMode ? t("settings.darkMode") : t("settings.lightMode")}
                   </button>
                 </div>
               </div>
@@ -979,16 +1143,19 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
 
       {/* ── NAV ── */}
       <nav className="flex items-center gap-0 px-5 border-b border-white/[0.06] bg-[#0d1424]/60 overflow-x-auto">
-        {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
-          <button key={id} onClick={() => setTab(id)}
-            className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold tracking-wide transition-all whitespace-nowrap border-b-2
-              ${tab === id
-                ? "text-white border-cyan-400"
-                : "text-slate-500 border-transparent hover:text-slate-300 hover:border-slate-600"}`}>
-            <Icon size={13} />
-            {label}
-          </button>
-        ))}
+        {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
+          const translatedLabel = t(`nav.${id}`) !== `nav.${id}` ? t(`nav.${id}`) : label;
+          return (
+            <button key={id} onClick={() => setTab(id)}
+              className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold tracking-wide transition-all whitespace-nowrap border-b-2
+                ${tab === id
+                  ? "text-white border-cyan-400"
+                  : "text-slate-500 border-transparent hover:text-slate-300 hover:border-slate-600"}`}>
+              <Icon size={13} />
+              {translatedLabel}
+            </button>
+          );
+        })}
       </nav>
 
       {/* ── CONTENT ── */}
@@ -999,19 +1166,34 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
           <div className="space-y-5 animate-fade-in">
             {/* KPI Row */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <StatCard label="Account Equity"  value={`$${curEquity.toLocaleString()}`} sub={`Started at $${capital.toLocaleString()}`} trend={totalPnL/capital*100} icon={DollarSign} accent="cyan" />
-              <StatCard label="Net P&L (Closed)" value={fmt$(Math.round(totalPnL))} sub={`${closedTrades.length} closed trades`} trend={totalPnL/capital*100} icon={TrendingUp} accent={totalPnL >= 0 ? "green" : "red"} />
-              <StatCard label="Win Rate" value={`${winRate.toFixed(0)}%`} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length}W / ${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)<0).length}L`} icon={Target} accent="purple" />
-              <StatCard label="Avg R Multiple" value={fmtR(avgR)} sub="Per closed trade" icon={Activity} accent="amber" />
+              <StatCard label={t("dash.accountEquity")}  value={`$${curEquity.toLocaleString()}`} sub={`${t("dash.startedAt")} $${capital.toLocaleString()}`} trend={(totalPnL+openPnL)/capital*100} icon={DollarSign} accent="cyan" />
+              <StatCard label={t("dash.netPnl")} value={fmt$(Math.round(totalPnL))} sub={`${closedTrades.length} ${t("dash.closedTrades")}`} trend={totalPnL/capital*100} icon={TrendingUp} accent={totalPnL >= 0 ? "green" : "red"} />
+              <StatCard label={t("dash.winRate")} value={`${winRate.toFixed(0)}%`} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length}W / ${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)<0).length}L`} icon={Target} accent="purple" />
+              <StatCard label={t("dash.avgR")} value={fmtR(avgR)} sub={t("dash.perClosedTrade")} icon={Activity} accent="amber" />
             </div>
+
+            {/* Open P&L banner */}
+            {openTrades.length > 0 && (
+              <div className={`flex items-center justify-between p-3 rounded-xl border ${openPnL >= 0 ? "bg-[#10b981]/5 border-[#10b981]/20" : "bg-[#ef4444]/5 border-[#ef4444]/20"}`}>
+                <div className="flex items-center gap-2">
+                  <Activity size={14} className={openPnL >= 0 ? "text-[#10b981]" : "text-[#ef4444]"} />
+                  <span className="text-xs text-slate-400">{t("dash.openPnl")}</span>
+                  <span className={`text-sm font-bold font-mono ${openPnL >= 0 ? "text-[#10b981]" : "text-[#ef4444]"}`}>{fmt$(Math.round(openPnL))}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400">{t("dash.totalEquity")}</span>
+                  <span className="text-sm font-bold font-mono text-cyan-400">${curEquity.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                </div>
+              </div>
+            )}
 
             {/* Mini Equity + Open Positions */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Equity mini */}
               <div className="md:col-span-2 bg-[#0d1424] border border-white/[0.06] rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Equity Curve</span>
-                  <span className="text-xs text-cyan-400 font-mono">{equityCurve.length} data pts</span>
+                  <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">{t("dash.equityCurve")}</span>
+                  <span className="text-xs text-cyan-400 font-mono">{equityCurve.length} {t("dash.dataPts")}</span>
                 </div>
                 <ResponsiveContainer width="100%" height={160}>
                   <AreaChart data={equityCurve}>
@@ -1034,27 +1216,40 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
               {/* Open trades */}
               <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Open Positions</span>
+                  <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">{t("dash.openPositions")}</span>
                   <span className="text-xs bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded-full border border-cyan-500/20">{openTrades.length}</span>
                 </div>
                 <div className="space-y-2">
-                  {openTrades.map(t => {
-                    const riskPerSh = Math.abs(t.entry - t.stop);
-                    const exposure = t.shares * t.entry;
+                  {openTrades.map(tr => {
+                    const lp = livePrices[tr.ticker];
+                    const unrealizedPnl = lp ? (tr.side === "LONG" ? (lp - tr.entry) * tr.shares : (tr.entry - lp) * tr.shares) : null;
+                    const progressPct = lp && tr.target ? Math.min(Math.max(
+                      tr.side === "LONG"
+                        ? ((lp - tr.entry) / (tr.target - tr.entry)) * 100
+                        : ((tr.entry - lp) / (tr.entry - tr.target)) * 100
+                    , 0), 100) : 50;
                     return (
-                      <div key={t.id} className="bg-white/3 rounded-lg p-3 border border-white/[0.06]">
+                      <div key={tr.id} className="bg-white/3 rounded-lg p-3 border border-white/[0.06]">
                         <div className="flex items-center justify-between">
-                          <span className="font-bold text-sm text-white font-mono">{t.ticker}</span>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${t.side === "LONG" ? "bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20" : "bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20"}`}>{t.side}</span>
+                          <div className="flex items-center gap-2">
+                            <TickerLogo ticker={tr.ticker} size={20} />
+                            <span className="font-bold text-sm text-white font-mono">{tr.ticker}</span>
+                          </div>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${tr.side === "LONG" ? "bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20" : "bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20"}`}>{tr.side}</span>
                         </div>
                         <div className="mt-1 grid grid-cols-2 gap-x-3 text-[10px] text-slate-500 font-mono">
-                          <span>Entry <span className="text-slate-300">${t.entry}</span></span>
-                          <span>Stop <span className="text-[#ef4444]">${t.stop}</span></span>
-                          <span>Target <span className="text-[#10b981]">${t.target}</span></span>
-                          <span>Shares <span className="text-slate-300">{t.shares}</span></span>
+                          <span>Entry <span className="text-slate-300">${tr.entry}</span></span>
+                          <span>Stop <span className="text-[#ef4444]">${tr.stop}</span></span>
+                          <span>{t("dash.currentPrice")} {lp ? <span className="text-cyan-400 font-bold">${lp.toFixed(2)}</span> : <span className="text-slate-600">–</span>}</span>
+                          <span>{t("th.shares")} <span className="text-slate-300">{tr.shares}</span></span>
                         </div>
+                        {unrealizedPnl != null && (
+                          <div className={`mt-1 text-[10px] font-mono font-bold ${unrealizedPnl >= 0 ? "text-[#10b981]" : "text-[#ef4444]"}`}>
+                            P&L: {fmt$(Math.round(unrealizedPnl))}
+                          </div>
+                        )}
                         <div className="mt-1.5 h-1 bg-white/5 rounded-full overflow-hidden">
-                          <div className="h-full bg-gradient-to-r from-cyan-500 to-violet-500 rounded-full" style={{ width: "55%" }} />
+                          <div className={`h-full rounded-full ${unrealizedPnl != null && unrealizedPnl >= 0 ? "bg-gradient-to-r from-cyan-500 to-[#10b981]" : "bg-gradient-to-r from-cyan-500 to-violet-500"}`} style={{ width: `${progressPct}%` }} />
                         </div>
                       </div>
                     );
@@ -1066,32 +1261,32 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
             {/* Recent Closed */}
             <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Recent Closed Trades</span>
+                <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">{t("dash.recentClosed")}</span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="text-slate-600 border-b border-white/[0.06]">
-                      {["Ticker","Date","Side","Entry","Exit","Shares","P&L","R Multiple","Setup"].map(h => (
+                      {[t("th.ticker"),t("th.date"),t("th.side"),t("th.entry"),t("th.exit"),t("th.shares"),t("th.pnl"),"R",t("th.setup")].map(h => (
                         <th key={h} className="pb-2 text-left font-semibold tracking-wider pr-4">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {closedTrades.slice(-5).reverse().map(t => {
-                      const { pnl, rMultiple } = calcTradeMetrics(t);
+                    {closedTrades.slice(-5).reverse().map(tr => {
+                      const { pnl, rMultiple } = calcTradeMetrics(tr);
                       const win = pnl > 0;
                       return (
-                        <tr key={t.id} className="border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors">
-                          <td className="py-2 pr-4 font-bold text-white font-mono">{t.ticker}</td>
-                          <td className="py-2 pr-4 text-slate-500">{t.date}</td>
-                          <td className="py-2 pr-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side==="LONG"?"bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20":"bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20"}`}>{t.side}</span></td>
-                          <td className="py-2 pr-4 font-mono text-slate-300">${t.entry}</td>
-                          <td className="py-2 pr-4 font-mono text-slate-300">${t.exit}</td>
-                          <td className="py-2 pr-4 font-mono text-slate-400">{t.shares}</td>
+                        <tr key={tr.id} className="border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors">
+                          <td className="py-2 pr-4 font-bold text-white font-mono"><div className="flex items-center gap-1.5"><TickerLogo ticker={tr.ticker} size={16} />{tr.ticker}</div></td>
+                          <td className="py-2 pr-4 text-slate-500">{tr.date}</td>
+                          <td className="py-2 pr-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${tr.side==="LONG"?"bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20":"bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20"}`}>{tr.side}</span></td>
+                          <td className="py-2 pr-4 font-mono text-slate-300">${tr.entry}</td>
+                          <td className="py-2 pr-4 font-mono text-slate-300">${tr.exit}</td>
+                          <td className="py-2 pr-4 font-mono text-slate-400">{tr.shares}</td>
                           <td className={`py-2 pr-4 font-bold font-mono ${win ? "text-[#10b981]" : "text-[#ef4444]"}`}>{fmt$(Math.round(pnl))}</td>
                           <td className={`py-2 pr-4 font-bold font-mono ${rMultiple >= 0 ? "text-cyan-400" : "text-[#ef4444]"}`}>{fmtR(rMultiple)}</td>
-                          <td className="py-2 pr-4"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">{t.setup}</span></td>
+                          <td className="py-2 pr-4"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">{tr.setup}</span></td>
                         </tr>
                       );
                     })}
@@ -1261,111 +1456,131 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
         {/* ══════════════ JOURNAL ══════════════ */}
         {tab === "journal" && (
           <div className="space-y-4 animate-fade-in">
+            {/* Lessons Section */}
+            {journalLessons.length > 0 && (
+              <div className="bg-gradient-to-r from-violet-500/5 to-cyan-500/5 border border-violet-500/20 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Lightbulb size={14} className="text-amber-400" />
+                  <span className="text-xs font-semibold tracking-widest uppercase text-violet-400">{t("lessons.title")}</span>
+                </div>
+                <div className="space-y-2">
+                  {journalLessons.map((lesson, i) => (
+                    <div key={i} className="flex items-start gap-2 text-xs text-slate-300 leading-relaxed">
+                      <span className="text-amber-400 flex-shrink-0 mt-0.5">💡</span>
+                      <span>{lesson}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {journalLessons.length === 0 && closedTrades.length > 0 && (
+              <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-4 text-center">
+                <Lightbulb size={20} className="text-slate-700 mx-auto mb-2" />
+                <p className="text-xs text-slate-600">{t("lessons.noTrades")}</p>
+              </div>
+            )}
+
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-bold text-white">Trade Journal</h2>
-                <p className="text-xs text-slate-600 mt-0.5">{trades.length} total entries · {openTrades.length} open · {closedTrades.length} closed</p>
+                <h2 className="text-sm font-bold text-white">{t("journal.title")}</h2>
+                <p className="text-xs text-slate-600 mt-0.5">{trades.length} {t("journal.totalEntries")} · {openTrades.length} {t("journal.open")} · {closedTrades.length} {t("journal.closed")}</p>
               </div>
-              {openTrades.length > 0 && (
-                <div className="flex items-center gap-2">
-                  {pricesLastUpdated && (
-                    <span className="text-[10px] text-slate-700 font-mono">
-                      עודכן {fmtTimeAgo(pricesLastUpdated)}
-                    </span>
-                  )}
-                  <button onClick={fetchLivePrices} disabled={pricesLoading}
-                    className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-cyan-400 transition disabled:opacity-40 border border-white/[0.06] rounded-lg px-2 py-1">
-                    <RefreshCw size={10} className={pricesLoading ? "animate-spin" : ""} />
-                    {pricesLoading ? "טוען…" : "רענן מחירים"}
-                  </button>
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                {pricesLastUpdated && (
+                  <span className="text-[10px] text-slate-700 font-mono">
+                    {t("journal.updated")} {fmtTimeAgo(pricesLastUpdated)}
+                  </span>
+                )}
+                <button onClick={fetchLivePrices} disabled={pricesLoading}
+                  className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-cyan-400 transition disabled:opacity-40 border border-white/[0.06] rounded-lg px-2 py-1">
+                  <RefreshCw size={10} className={pricesLoading ? "animate-spin" : ""} />
+                  {pricesLoading ? t("journal.loading") : t("journal.refreshPrices")}
+                </button>
+              </div>
             </div>
             <div className="overflow-x-auto bg-[#0d1424] border border-white/[0.06] rounded-xl">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-slate-600 border-b border-white/[0.06] text-[10px] tracking-widest uppercase">
-                    {["Ticker","Date","Side","Entry","Stop","Target","Shares","מחיר נוכחי","P&L חי","Exit","P&L","R","Setup","Mkt","Emotion","★","Exit Rsn","Plan","Lesson","Status","Action"].map(h => (
-                      <th key={h} className={`p-3 text-left font-semibold whitespace-nowrap ${h==="מחיר נוכחי"||h==="P&L חי" ? "text-cyan-600" : ""}`}>{h}</th>
+                    {[t("th.ticker"),t("th.date"),t("th.side"),t("th.entry"),t("th.stop"),t("th.target"),t("th.shares"),t("journal.currentPrice"),t("journal.livePnl"),t("th.exit"),t("th.pnl"),t("th.r"),t("th.setup"),t("th.mkt"),t("th.emotion"),t("th.quality"),t("th.exitRsn"),t("th.plan"),t("th.lesson"),t("th.status"),t("th.action")].map((h,i) => (
+                      <th key={i} className={`p-3 text-left font-semibold whitespace-nowrap ${i===7||i===8 ? "text-cyan-600" : ""}`}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {[...trades].reverse().map(t => {
-                    const { pnl, rMultiple } = calcTradeMetrics(t);
-                    const isOpen = t.status === "OPEN";
+                  {[...trades].reverse().map(tr => {
+                    const { pnl, rMultiple } = calcTradeMetrics(tr);
+                    const isOpen = tr.status === "OPEN";
                     const win = !isOpen && pnl > 0;
                     return (
-                      <tr key={t.id} className={`border-b border-white/[0.04] transition-colors ${!isOpen && win ? "hover:bg-[#10b981]/[0.04]" : !isOpen ? "hover:bg-[#ef4444]/[0.04]" : "hover:bg-white/[0.03]"}`}>
-                        <td className="p-3 font-bold text-white font-mono whitespace-nowrap">{t.ticker}</td>
-                        <td className="p-3 text-slate-500 whitespace-nowrap">{t.date}</td>
-                        <td className="p-3"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side==="LONG"?"bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20":"bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20"}`}>{t.side}</span></td>
-                        <td className="p-3 font-mono text-slate-300">${t.entry}</td>
-                        <td className="p-3 font-mono text-[#ef4444]">${t.stop}</td>
-                        <td className="p-3 font-mono text-[#10b981]">${t.target}</td>
-                        <td className="p-3 font-mono text-slate-400">{t.shares}</td>
-                        {/* מחיר נוכחי */}
+                      <tr key={tr.id} className={`border-b border-white/[0.04] transition-colors ${!isOpen && win ? "hover:bg-[#10b981]/[0.04]" : !isOpen ? "hover:bg-[#ef4444]/[0.04]" : "hover:bg-white/[0.03]"}`}>
+                        <td className="p-3 font-bold text-white font-mono whitespace-nowrap"><div className="flex items-center gap-1.5"><TickerLogo ticker={tr.ticker} size={16} />{tr.ticker}</div></td>
+                        <td className="p-3 text-slate-500 whitespace-nowrap">{tr.date}</td>
+                        <td className="p-3"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${tr.side==="LONG"?"bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20":"bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20"}`}>{tr.side}</span></td>
+                        <td className="p-3 font-mono text-slate-300">${tr.entry}</td>
+                        <td className="p-3 font-mono text-[#ef4444]">${tr.stop}</td>
+                        <td className="p-3 font-mono text-[#10b981]">${tr.target}</td>
+                        <td className="p-3 font-mono text-slate-400">{tr.shares}</td>
                         <td className="p-3 font-mono text-xs whitespace-nowrap">
                           {isOpen ? (
-                            livePrices[t.ticker]
-                              ? <span className="text-slate-200 font-bold">${livePrices[t.ticker].toFixed(2)}</span>
+                            livePrices[tr.ticker]
+                              ? <span className="text-slate-200 font-bold">${livePrices[tr.ticker].toFixed(2)}</span>
                               : pricesLoading
-                                ? <span className="text-slate-600 animate-pulse text-[10px]">טוען…</span>
+                                ? <span className="text-slate-600 animate-pulse text-[10px]">{t("common.loading")}</span>
                                 : <span className="text-slate-700">–</span>
                           ) : <span className="text-slate-700">–</span>}
                         </td>
-                        {/* P&L חי */}
                         <td className="p-3 font-bold font-mono text-xs whitespace-nowrap">
-                          {isOpen && livePrices[t.ticker] ? (() => {
-                            const lp = t.side === "LONG"
-                              ? (livePrices[t.ticker] - t.entry) * t.shares
-                              : (t.entry - livePrices[t.ticker]) * t.shares;
+                          {isOpen && livePrices[tr.ticker] ? (() => {
+                            const lp = tr.side === "LONG"
+                              ? (livePrices[tr.ticker] - tr.entry) * tr.shares
+                              : (tr.entry - livePrices[tr.ticker]) * tr.shares;
                             return <span className={lp >= 0 ? "text-[#10b981]" : "text-[#ef4444]"}>{fmt$(Math.round(lp))}</span>;
                           })() : <span className="text-slate-700">–</span>}
                         </td>
-                        <td className="p-3 font-mono text-slate-300">{t.exit ? `$${t.exit}` : "–"}</td>
+                        <td className="p-3 font-mono text-slate-300">{tr.exit ? `$${tr.exit}` : "–"}</td>
                         <td className={`p-3 font-bold font-mono ${isOpen ? "text-slate-500" : win ? "text-[#10b981]" : "text-[#ef4444]"}`}>
                           {isOpen ? "–" : fmt$(Math.round(pnl))}
                         </td>
                         <td className={`p-3 font-bold font-mono text-xs ${isOpen ? "text-slate-500" : rMultiple >= 0 ? "text-cyan-400" : "text-[#ef4444]"}`}>
                           {isOpen ? "–" : fmtR(rMultiple)}
                         </td>
-                        <td className="p-3"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 whitespace-nowrap">{t.setup}</span></td>
-                        <td className="p-3 text-slate-500 text-[10px] whitespace-nowrap">{t.marketCondition || "–"}</td>
-                        <td className="p-3 text-slate-500 text-[10px] whitespace-nowrap">{t.emotionAtEntry || "–"}</td>
-                        <td className="p-3 text-amber-400 text-xs font-mono">{t.entryQuality ? `${"★".repeat(t.entryQuality)}` : "–"}</td>
+                        <td className="p-3"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 whitespace-nowrap">{tr.setup}</span></td>
+                        <td className="p-3 text-slate-500 text-[10px] whitespace-nowrap">{tr.marketCondition || "–"}</td>
+                        <td className="p-3 text-slate-500 text-[10px] whitespace-nowrap">{tr.emotionAtEntry || "–"}</td>
+                        <td className="p-3 text-amber-400 text-xs font-mono">{tr.entryQuality ? `${"★".repeat(tr.entryQuality)}` : "–"}</td>
                         <td className="p-3 text-[10px] text-slate-500 whitespace-nowrap">
-                          {t.exitReason
-                            ? <span className="px-2 py-0.5 rounded bg-slate-700/40 text-slate-400 border border-white/[0.06]">{t.exitReason}</span>
+                          {tr.exitReason
+                            ? <span className="px-2 py-0.5 rounded bg-slate-700/40 text-slate-400 border border-white/[0.06]">{tr.exitReason}</span>
                             : <span className="text-slate-700">–</span>}
                         </td>
                         <td className="p-3 text-center">
-                          {t.followedPlan === true  && <span className="text-[#10b981] text-sm font-bold">✓</span>}
-                          {t.followedPlan === false && <span className="text-[#ef4444] text-sm font-bold">✗</span>}
-                          {t.followedPlan == null   && <span className="text-slate-700 text-[10px]">–</span>}
+                          {tr.followedPlan === true  && <span className="text-[#10b981] text-sm font-bold">✓</span>}
+                          {tr.followedPlan === false && <span className="text-[#ef4444] text-sm font-bold">✗</span>}
+                          {tr.followedPlan == null   && <span className="text-slate-700 text-[10px]">–</span>}
                         </td>
-                        <td className="p-3 text-slate-500 text-[10px] max-w-[160px] truncate" title={t.lessonLearned || t.notes}>
-                          {t.lessonLearned
-                            ? <span className="text-violet-400/80">💡 {t.lessonLearned}</span>
-                            : t.notes
-                              ? <span className="text-slate-600">{t.notes}</span>
+                        <td className="p-3 text-slate-500 text-[10px] max-w-[160px] truncate" title={tr.lessonLearned || tr.notes}>
+                          {tr.lessonLearned
+                            ? <span className="text-violet-400/80">💡 {tr.lessonLearned}</span>
+                            : tr.notes
+                              ? <span className="text-slate-600">{tr.notes}</span>
                               : <span className="text-slate-700">–</span>}
                         </td>
-                        <td className="p-3"><span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${isOpen ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20" : "bg-slate-500/10 text-slate-500 border border-slate-700"}`}>{t.status}</span></td>
+                        <td className="p-3"><span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${isOpen ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20" : "bg-slate-500/10 text-slate-500 border border-slate-700"}`}>{tr.status}</span></td>
                         <td className="p-3">
                           <div className="flex items-center gap-1 whitespace-nowrap">
                             {isOpen && (
-                              <button onClick={()=>{setClosingTrade(t);setShowCloseForm(true);}}
+                              <button onClick={()=>{setClosingTrade(tr);setShowCloseForm(true);}}
                                 className="text-[10px] px-2 py-1 rounded bg-[#ef4444]/10 border border-[#ef4444]/20 text-[#ef4444] hover:opacity-80 transition">
                                 Close
                               </button>
                             )}
-                            <button onClick={() => handleEditOpen(t)}
+                            <button onClick={() => handleEditOpen(tr)}
                               className="text-[10px] px-1.5 py-1 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 hover:opacity-80 transition"
-                              title="עריכה">✏️</button>
-                            <button onClick={() => handleDeleteTrade(t.id)}
+                              title={t("common.edit")}>✏️</button>
+                            <button onClick={() => handleDeleteTrade(tr.id)}
                               className="text-[10px] px-1.5 py-1 rounded bg-slate-500/10 border border-slate-500/20 text-slate-400 hover:text-red-400 hover:border-red-500/30 transition"
-                              title="מחיקה">🗑️</button>
+                              title={t("common.delete")}>🗑️</button>
                           </div>
                         </td>
                       </tr>
@@ -1381,8 +1596,8 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
         {tab === "analyzer" && (
           <div className="space-y-5 animate-fade-in max-w-3xl mx-auto">
             <div>
-              <h2 className="text-sm font-bold text-white flex items-center gap-2"><FlaskConical size={15} className="text-violet-400" /> Trade Analyzer</h2>
-              <p className="text-xs text-slate-600 mt-0.5">הכנס נתוני עסקה, העלה תמונה מ-TradingView וקבל ניתוח AI מיידי</p>
+              <h2 className="text-sm font-bold text-white flex items-center gap-2"><FlaskConical size={15} className="text-violet-400" /> {t("analyzer.title")}</h2>
+              <p className="text-xs text-slate-600 mt-0.5">{t("analyzer.desc")}</p>
             </div>
 
             {/* Input Fields */}
@@ -1557,7 +1772,9 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
 
         {/* ══════════════ POSITION CALCULATOR ══════════════ */}
         {tab === "position" && (() => {
-          const capN   = parseFloat(posCalc.capital) || 0;
+          // Auto-load capital from settings if empty
+          const effectiveCapital = posCalc.capital || String(curEquity > 0 ? Math.round(curEquity) : capital);
+          const capN   = parseFloat(effectiveCapital) || 0;
           const riskN  = parseFloat(posCalc.risk)    || 0;
           const entN   = parseFloat(posCalc.entry)   || 0;
           const stopN  = parseFloat(posCalc.stop)    || 0;
@@ -1569,6 +1786,16 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
           const portPct       = capN > 0 ? (posValue / capN) * 100 : 0;
 
           const hasResult = capN > 0 && entN > 0 && stopN > 0 && riskPerShare > 0;
+
+          // Auto-load live price when ticker changes
+          const handlePosTickerChange = (val) => {
+            setPosCalc(f => ({ ...f, ticker: val.toUpperCase() }));
+            const sym = val.toUpperCase();
+            const lp = livePrices[sym] || livePrices[sym === "BTC" ? "BTC-USD" : sym === "ETH" ? "ETH-USD" : sym];
+            if (lp) {
+              setPosCalc(f => ({ ...f, ticker: sym, entry: String(lp.toFixed(2)) }));
+            }
+          };
 
           const handleCopyToForm = () => {
             setForm(f => ({
@@ -1586,32 +1813,53 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
             <div className="space-y-5 animate-fade-in max-w-2xl mx-auto">
               <div>
                 <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Calculator size={15} className="text-cyan-400" /> Position Calculator
+                  <Calculator size={15} className="text-cyan-400" /> {t("pos.title")}
                 </h2>
-                <p className="text-xs text-slate-600 mt-0.5">חשב גודל פוזיציה אופטימלי לפי ניהול סיכונים</p>
+                <p className="text-xs text-slate-600 mt-0.5">{t("pos.desc")}</p>
               </div>
 
               {/* Inputs */}
               <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5 space-y-4">
-                <span className="text-[10px] font-semibold tracking-widest uppercase text-slate-500">פרמטרי סיכון</span>
+                <span className="text-[10px] font-semibold tracking-widest uppercase text-slate-500">{t("pos.riskParams")}</span>
+
+                {/* Ticker for live price */}
+                <div>
+                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1 flex items-center gap-1">
+                    <Search size={10} /> {t("pos.tickerForPrice")}
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      value={posCalc.ticker}
+                      onChange={e => handlePosTickerChange(e.target.value)}
+                      placeholder="NVDA"
+                      className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono font-bold"
+                    />
+                    {posCalc.ticker && livePrices[posCalc.ticker] && (
+                      <span className="flex items-center text-[10px] text-cyan-400 font-mono px-2">
+                        ${livePrices[posCalc.ticker].toFixed(2)} — {t("pos.livePrice")}
+                      </span>
+                    )}
+                  </div>
+                </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1 flex items-center gap-1">
-                      <DollarSign size={10} /> הון תיק ($)
+                      <DollarSign size={10} /> {t("pos.portfolioCapital")}
                     </label>
                     <input
                       value={posCalc.capital}
                       onChange={e => setPosCalc(f => ({ ...f, capital: e.target.value }))}
-                      placeholder="25000"
+                      placeholder={String(Math.round(curEquity > 0 ? curEquity : capital))}
                       type="number"
                       min="0"
                       className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono"
                     />
+                    <p className="text-[9px] text-cyan-600 mt-0.5">{t("pos.autoLoaded")}: ${Math.round(curEquity > 0 ? curEquity : capital).toLocaleString()}</p>
                   </div>
                   <div>
                     <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1 flex items-center gap-1">
-                      <Percent size={10} /> אחוז סיכון (%)
+                      <Percent size={10} /> {t("pos.riskPercent")}
                     </label>
                     <input
                       value={posCalc.risk}
@@ -1629,7 +1877,7 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1 flex items-center gap-1">
-                      <ArrowUpRight size={10} className="text-[#10b981]" /> מחיר כניסה
+                      <ArrowUpRight size={10} className="text-[#10b981]" /> {t("pos.entryPrice")}
                     </label>
                     <input
                       value={posCalc.entry}
@@ -1643,7 +1891,7 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                   </div>
                   <div>
                     <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1 flex items-center gap-1">
-                      <ArrowDownRight size={10} className="text-[#ef4444]" /> מחיר סטופ לוס
+                      <ArrowDownRight size={10} className="text-[#ef4444]" /> {t("pos.stopPrice")}
                     </label>
                     <input
                       value={posCalc.stop}
@@ -2012,38 +2260,64 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
               {/* Watchlist */}
               <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-4 flex flex-col" style={{ height: 440 }}>
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Watchlist</span>
+                  <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">{t("intel.watchlist")}</span>
                   <Radio size={12} className="text-cyan-400" />
                 </div>
-                {/* Add ticker input */}
-                <div className="flex gap-1.5 mb-3">
-                  <input
-                    value={watchlistInput}
-                    onChange={e => setWatchlistInput(e.target.value.toUpperCase())}
-                    onKeyDown={e => { if (e.key === "Enter") handleAddWatchlistTicker(); }}
-                    placeholder="הוסף טיקר... (TSLA)"
-                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none font-mono"
-                  />
-                  <button onClick={handleAddWatchlistTicker}
-                    className="px-2.5 py-1.5 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 text-xs font-bold hover:bg-cyan-500/25 transition">
-                    <Plus size={12} />
-                  </button>
+                {/* Add ticker input with autocomplete */}
+                <div className="relative mb-3" ref={watchlistSearchRef}>
+                  <div className="flex gap-1.5">
+                    <input
+                      value={watchlistInput}
+                      onChange={e => handleWatchlistSearchInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") { if (watchlistSearchResults.length > 0) handleAddFromSearch(watchlistSearchResults[0]); else handleAddWatchlistTicker(); } }}
+                      placeholder={t("intel.searchTicker")}
+                      className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none font-mono"
+                    />
+                    <button onClick={handleAddWatchlistTicker}
+                      className="px-2.5 py-1.5 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 text-xs font-bold hover:bg-cyan-500/25 transition">
+                      <Plus size={12} />
+                    </button>
+                  </div>
+                  {/* Autocomplete dropdown */}
+                  {watchlistSearchResults.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-[#0d1424] border border-white/10 rounded-xl shadow-2xl z-30 overflow-hidden">
+                      {watchlistSearchResults.map(r => (
+                        <button key={r.symbol} onClick={() => handleAddFromSearch(r)}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-cyan-500/10 transition border-b border-white/[0.04] last:border-0">
+                          <TickerLogo ticker={r.symbol.replace("-USD", "")} size={20} />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-bold text-white font-mono">{r.symbol}</div>
+                            <div className="text-[10px] text-slate-500 truncate">{r.name}</div>
+                          </div>
+                          <span className="text-[9px] text-slate-600 flex-shrink-0">{r.exchange}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {watchlistSearchLoading && watchlistInput && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-[#0d1424] border border-white/10 rounded-xl p-3 text-center">
+                      <RefreshCw size={12} className="animate-spin text-cyan-400 mx-auto" />
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2 overflow-y-auto flex-1">
                   {watchlistItems.map(s => (
                     <div key={s.ticker}
                       className={`flex items-center justify-between p-2.5 bg-white/3 rounded-lg border transition group ${chartSymbol === s.chartSym ? "border-cyan-500/40 bg-cyan-500/5" : "border-white/[0.06] hover:border-cyan-500/20 hover:bg-cyan-500/3"}`}>
-                      <div className="flex-1 cursor-pointer" onClick={() => setChartSymbol(s.chartSym)}>
-                        <div className="font-bold text-xs text-white font-mono">{s.ticker}</div>
-                        <div className="text-[10px] text-slate-600">{s.setup}</div>
+                      <div className="flex-1 cursor-pointer flex items-center gap-2" onClick={() => setChartSymbol(s.chartSym)}>
+                        <TickerLogo ticker={s.ticker} size={22} />
+                        <div>
+                          <div className="font-bold text-xs text-white font-mono">{s.ticker}</div>
+                          <div className="text-[10px] text-slate-600">{s.setup}</div>
+                        </div>
                       </div>
                       <div className="text-right flex items-center gap-2">
                         {s.price != null ? (
                           <div>
-                            <div className="text-xs font-mono font-bold text-slate-200">${s.price}</div>
+                            <div className="text-xs font-mono font-bold text-slate-200">${typeof s.price === 'number' ? s.price.toFixed(2) : s.price}</div>
                             <div className={`text-[10px] font-mono font-semibold flex items-center justify-end gap-0.5 ${(s.change||0)>=0?"text-[#10b981]":"text-[#ef4444]"}`}>
                               {(s.change||0)>=0?<ArrowUpRight size={10}/>:<ArrowDownRight size={10}/>}
-                              {(s.change||0)>=0?"+":""}{(s.change||0)}%
+                              {(s.change||0)>=0?"+":""}{typeof s.change === 'number' ? s.change.toFixed(1) : s.change}%
                             </div>
                           </div>
                         ) : (
@@ -2051,7 +2325,7 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                         )}
                         <button onClick={() => handleDeleteWatchlistTicker(s.ticker)}
                           className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-400 transition p-0.5 rounded"
-                          title="הסר מהרשימה">
+                          title={t("intel.removeFromList")}>
                           <X size={10} />
                         </button>
                       </div>
@@ -2059,7 +2333,7 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                   ))}
                   {watchlistItems.length === 0 && (
                     <div className="text-center py-6 text-slate-700 text-xs">
-                      <p>הרשימה ריקה — הוסף טיקרים למעלה</p>
+                      <p>{t("intel.emptyList")}</p>
                     </div>
                   )}
                 </div>
@@ -2333,17 +2607,38 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
           return (
             <div className="space-y-6 animate-fade-in max-w-3xl mx-auto">
               <div>
-                <h2 className="text-sm font-bold text-white flex items-center gap-2"><Settings size={15} className="text-cyan-400" /> Settings</h2>
-                <p className="text-xs text-slate-600 mt-0.5">Playbook אישי וניטור משמעת מסחר</p>
+                <h2 className="text-sm font-bold text-white flex items-center gap-2"><Settings size={15} className="text-cyan-400" /> {t("settings.title")}</h2>
+                <p className="text-xs text-slate-600 mt-0.5">{t("settings.desc")}</p>
+              </div>
+
+              {/* ── LANGUAGE SELECTION ── */}
+              <div className="bg-[#0d1424] border border-violet-500/20 rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <Globe size={16} className="text-violet-400" />
+                  <h3 className="text-sm font-bold text-white">{t("settings.language")}</h3>
+                </div>
+                <p className="text-xs text-slate-500 mb-3">{t("settings.languageDesc")}</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleLanguageChange("he")}
+                    className={`flex-1 py-3 rounded-xl text-sm font-bold transition border ${lang === "he" ? "bg-violet-500/20 text-violet-300 border-violet-500/40" : "bg-white/3 text-slate-500 border-white/10 hover:border-white/20"}`}>
+                    🇮🇱 עברית
+                  </button>
+                  <button
+                    onClick={() => handleLanguageChange("en")}
+                    className={`flex-1 py-3 rounded-xl text-sm font-bold transition border ${lang === "en" ? "bg-violet-500/20 text-violet-300 border-violet-500/40" : "bg-white/3 text-slate-500 border-white/10 hover:border-white/20"}`}>
+                    🇺🇸 English
+                  </button>
+                </div>
               </div>
 
               {/* ── PORTFOLIO CAPITAL ── */}
               <div className="bg-[#0d1424] border border-cyan-500/20 rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-4">
                   <DollarSign size={16} className="text-cyan-400" />
-                  <h3 className="text-sm font-bold text-white">הון תיק</h3>
+                  <h3 className="text-sm font-bold text-white">{t("settings.portfolioCapital")}</h3>
                 </div>
-                <p className="text-xs text-slate-500 mb-3">עדכן את ההון המדויק של תיק ההשקעות שלך. הערך ישפיע על חישובי גודל פוזיציה, סיכון ותשואה באפליקציה.</p>
+                <p className="text-xs text-slate-500 mb-3">{t("settings.capitalDesc")}</p>
                 <div className="flex gap-2">
                   <input
                     type="number"
@@ -2362,11 +2657,14 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                       }
                     }}
                     className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500/20 to-violet-500/20 border border-cyan-500/30 text-cyan-400 text-xs font-bold hover:opacity-90 transition whitespace-nowrap">
-                    עדכן הון
+                    {t("settings.updateCapital")}
                   </button>
                 </div>
                 <p className="text-[10px] text-slate-600 mt-2">
-                  הון נוכחי: <span className="text-cyan-400 font-mono font-bold">${capital.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                  {t("settings.currentCapital")}: <span className="text-cyan-400 font-mono font-bold">${capital.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                </p>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  {t("settings.liveEquity")}: <span className="text-[#10b981] font-mono font-bold">${curEquity.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
                 </p>
               </div>
 
@@ -3049,14 +3347,14 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
       {/* ── FOOTER STATUS BAR ── */}
       <footer className="flex items-center justify-between px-5 py-2 border-t border-white/[0.06] bg-[#0a0f1e] text-[10px] text-slate-700 font-mono">
         <div className="flex items-center gap-4">
-          <span className="flex items-center gap-1"><span className={`w-1.5 h-1.5 rounded-full ${pulse?"bg-emerald-500":"bg-emerald-800"} transition-colors`}/> Market Open</span>
-          <span>Capital: ${capital.toLocaleString()}</span>
-          <span>Risk/Trade: 1%</span>
+          <span className="flex items-center gap-1"><span className={`w-1.5 h-1.5 rounded-full ${pulse?"bg-emerald-500":"bg-emerald-800"} transition-colors`}/> {t("header.marketOpen")}</span>
+          <span>{t("dash.totalEquity")}: <span className="text-cyan-500">${curEquity.toLocaleString()}</span></span>
+          <span>{t("header.riskPerTrade")}</span>
         </div>
         <div className="flex items-center gap-4">
-          <span>Trades: {trades.length}</span>
-          <span>Open: {openTrades.length}</span>
-          <span>SwingEdge Pro v1.0</span>
+          <span>{t("header.trades")}: {trades.length}</span>
+          <span>{t("header.open")}: {openTrades.length}</span>
+          <span>SwingEdge Pro v2.0</span>
         </div>
       </footer>
     </div>
