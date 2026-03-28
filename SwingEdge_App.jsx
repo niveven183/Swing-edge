@@ -11,7 +11,8 @@ import {
   DollarSign, Target, Zap, ArrowUpRight,
   ArrowDownRight, Eye, Layers, Cpu, Radio, FlaskConical,
   Calculator, Copy, Percent, Hash,
-  Settings, BookMarked, Thermometer, Trash2, User
+  Settings, BookMarked, Thermometer, Trash2, User,
+  Download, FileText
 } from "lucide-react";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -82,6 +83,233 @@ const fmt$ = (n) => n >= 0
   : `-$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
 const fmtR = (r) => r >= 0 ? `+${r.toFixed(2)}R` : `${r.toFixed(2)}R`;
+
+// ─── EXPORT HELPERS ───────────────────────────────────────────────────────────
+const exportTradesCSV = (trades) => {
+  const headers = ["ID","Ticker","Date","Side","Entry","Stop","Target","Shares","Status","Exit","Setup","Notes","Market Condition","Emotion at Entry","Entry Quality","Exit Reason","Followed Plan","Lesson Learned","Max Favorable","Max Adverse","P&L","R-Multiple"];
+  const rows = trades.map(t => {
+    const m = calcTradeMetrics(t);
+    return [
+      t.id, t.ticker, t.date, t.side,
+      t.entry, t.stop, t.target ?? "", t.shares,
+      t.status, t.exit ?? "",
+      t.setup ?? "", `"${(t.notes ?? "").replace(/"/g, '""')}"`,
+      t.marketCondition ?? "", t.emotionAtEntry ?? "", t.entryQuality ?? "",
+      t.exitReason ?? "", t.followedPlan != null ? (t.followedPlan ? "Yes" : "No") : "",
+      `"${(t.lessonLearned ?? "").replace(/"/g, '""')}"`,
+      t.maxFavorable ?? "", t.maxAdverse ?? "",
+      m.pnl != null ? m.pnl.toFixed(2) : "",
+      m.rMultiple != null ? m.rMultiple.toFixed(2) : "",
+    ].join(",");
+  });
+  const csv = [headers.join(","), ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `SwingEdge_Journal_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+const exportMonthlyPDF = (trades, capital) => {
+  const now = new Date();
+  const monthName = now.toLocaleString("en-US", { month: "long" });
+  const year = now.getFullYear();
+  const thisMonth = now.getMonth();
+  const thisYear = now.getFullYear();
+
+  const allClosed = trades.filter(t => t.status === "CLOSED");
+  const monthClosed = allClosed.filter(t => {
+    const d = new Date(t.date + "T12:00:00");
+    return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
+  });
+
+  const totalPnL = allClosed.reduce((a, t) => a + (calcTradeMetrics(t).pnl || 0), 0);
+  const monthPnL = monthClosed.reduce((a, t) => a + (calcTradeMetrics(t).pnl || 0), 0);
+  const winRate = allClosed.length ? (allClosed.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length / allClosed.length * 100).toFixed(1) : "0.0";
+  const monthWinRate = monthClosed.length ? (monthClosed.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length / monthClosed.length * 100).toFixed(1) : "0.0";
+  const avgR = allClosed.length ? (allClosed.reduce((a, t) => a + (calcTradeMetrics(t).rMultiple || 0), 0) / allClosed.length).toFixed(2) : "0.00";
+  const curEquity = capital + totalPnL;
+
+  // Build equity curve points from all closed trades
+  let runBalance = capital;
+  const equityPoints = allClosed.map(t => {
+    const pnl = calcTradeMetrics(t).pnl || 0;
+    runBalance += pnl;
+    return { date: t.date, ticker: t.ticker, equity: Math.round(runBalance) };
+  });
+
+  // Lessons from this month
+  const lessons = monthClosed.filter(t => t.lessonLearned && t.lessonLearned.trim()).map(t => ({ ticker: t.ticker, lesson: t.lessonLearned }));
+
+  const pnlColor = (v) => v >= 0 ? "#10b981" : "#ef4444";
+  const fmtDollar = (v) => v >= 0 ? `+$${Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: 2 })}` : `-$${Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+
+  // Build equity chart SVG
+  const maxEq = Math.max(...equityPoints.map(p => p.equity), curEquity);
+  const minEq = Math.min(...equityPoints.map(p => p.equity), capital);
+  const chartW = 600, chartH = 150;
+  const pts = [{ equity: capital }, ...equityPoints];
+  const toX = (i) => (i / (pts.length - 1 || 1)) * chartW;
+  const toY = (eq) => chartH - ((eq - minEq) / ((maxEq - minEq) || 1)) * chartH;
+  const pathD = pts.map((p, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(p.equity).toFixed(1)}`).join(" ");
+  const areaD = `${pathD} L${chartW},${chartH} L0,${chartH} Z`;
+
+  const tradeRows = [...monthClosed].reverse().map(t => {
+    const m = calcTradeMetrics(t);
+    const pnl = m.pnl != null ? m.pnl : 0;
+    const r = m.rMultiple != null ? m.rMultiple : 0;
+    return `
+      <tr>
+        <td>${t.date}</td>
+        <td><strong>${t.ticker}</strong></td>
+        <td>${t.side}</td>
+        <td>${t.setup ?? "-"}</td>
+        <td>$${t.entry}</td>
+        <td>${t.exit != null ? "$" + t.exit : "-"}</td>
+        <td style="color:${pnlColor(pnl)};font-weight:600">${fmtDollar(pnl)}</td>
+        <td style="color:${pnlColor(r)};font-weight:600">${r >= 0 ? "+" : ""}${r.toFixed(2)}R</td>
+        <td>${t.followedPlan != null ? (t.followedPlan ? "✓" : "✗") : "-"}</td>
+      </tr>`;
+  }).join("");
+
+  const lessonRows = lessons.length
+    ? lessons.map(l => `<li><strong>${l.ticker}</strong>: ${l.lesson}</li>`).join("")
+    : "<li>No lessons recorded this month.</li>";
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>SwingEdge — ${monthName} ${year} Performance Report</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: 'Inter', Arial, sans-serif; background:#fff; color:#111; padding:40px 48px; font-size:13px; }
+  h1 { font-size:22px; font-weight:700; color:#0f172a; margin-bottom:4px; }
+  .subtitle { color:#64748b; font-size:12px; margin-bottom:32px; }
+  .section { margin-bottom:28px; }
+  .section-title { font-size:13px; font-weight:700; color:#0f172a; letter-spacing:.06em; text-transform:uppercase; margin-bottom:12px; padding-bottom:6px; border-bottom:1.5px solid #e2e8f0; }
+  .kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+  .kpi { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px 16px; }
+  .kpi-label { font-size:10px; color:#64748b; text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px; }
+  .kpi-value { font-size:20px; font-weight:700; font-family:monospace; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th { background:#f1f5f9; text-align:left; padding:7px 10px; font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:#475569; font-weight:600; }
+  td { padding:7px 10px; border-bottom:1px solid #f1f5f9; }
+  tr:last-child td { border-bottom:none; }
+  .chart-wrap { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:16px; }
+  svg { display:block; width:100%; }
+  .lessons { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:16px; }
+  .lessons li { margin-bottom:6px; line-height:1.5; }
+  .footer { margin-top:40px; font-size:10px; color:#94a3b8; text-align:center; border-top:1px solid #e2e8f0; padding-top:12px; }
+  @media print {
+    body { padding:20px 28px; }
+    button { display:none; }
+  }
+</style>
+</head>
+<body>
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px">
+  <div>
+    <h1>SwingEdge — Performance Report</h1>
+    <div class="subtitle">${monthName} ${year} &nbsp;·&nbsp; Generated ${now.toLocaleDateString("en-US",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</div>
+  </div>
+  <button onclick="window.print()" style="padding:8px 18px;background:#0ea5e9;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:12px;cursor:pointer">Save as PDF</button>
+</div>
+
+<div class="section">
+  <div class="section-title">KPI Summary</div>
+  <div class="kpis">
+    <div class="kpi">
+      <div class="kpi-label">Portfolio Equity</div>
+      <div class="kpi-value" style="color:#0f172a">$${curEquity.toLocaleString("en-US",{minimumFractionDigits:2})}</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Net P&amp;L (All Time)</div>
+      <div class="kpi-value" style="color:${pnlColor(totalPnL)}">${fmtDollar(totalPnL)}</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">${monthName} P&amp;L</div>
+      <div class="kpi-value" style="color:${pnlColor(monthPnL)}">${fmtDollar(monthPnL)}</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Win Rate (All Time)</div>
+      <div class="kpi-value" style="color:#0f172a">${winRate}%</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">${monthName} Win Rate</div>
+      <div class="kpi-value" style="color:#0f172a">${monthWinRate}%</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Avg R-Multiple</div>
+      <div class="kpi-value" style="color:${avgR >= 0 ? "#10b981" : "#ef4444"}">${avgR >= 0 ? "+" : ""}${avgR}R</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Closed Trades</div>
+      <div class="kpi-value" style="color:#0f172a">${allClosed.length}</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">${monthName} Trades</div>
+      <div class="kpi-value" style="color:#0f172a">${monthClosed.length}</div>
+    </div>
+  </div>
+</div>
+
+${equityPoints.length > 0 ? `
+<div class="section">
+  <div class="section-title">Equity Curve</div>
+  <div class="chart-wrap">
+    <svg viewBox="0 0 ${chartW} ${chartH}" preserveAspectRatio="none" style="height:150px">
+      <defs>
+        <linearGradient id="eqGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#10b981" stop-opacity="0.3"/>
+          <stop offset="100%" stop-color="#10b981" stop-opacity="0.02"/>
+        </linearGradient>
+      </defs>
+      <path d="${areaD}" fill="url(#eqGrad)" />
+      <path d="${pathD}" fill="none" stroke="#10b981" stroke-width="2" stroke-linejoin="round"/>
+    </svg>
+    <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:10px;color:#94a3b8;font-family:monospace">
+      <span>Start: $${capital.toLocaleString()}</span>
+      <span>Current: $${curEquity.toLocaleString("en-US",{minimumFractionDigits:2})}</span>
+    </div>
+  </div>
+</div>` : ""}
+
+<div class="section">
+  <div class="section-title">${monthName} Trade Log</div>
+  ${monthClosed.length === 0
+    ? `<p style="color:#94a3b8;font-size:12px">No closed trades this month.</p>`
+    : `<table>
+        <thead><tr>
+          <th>Date</th><th>Ticker</th><th>Side</th><th>Setup</th>
+          <th>Entry</th><th>Exit</th><th>P&amp;L</th><th>R-Mult</th><th>Plan?</th>
+        </tr></thead>
+        <tbody>${tradeRows}</tbody>
+      </table>`}
+</div>
+
+<div class="section">
+  <div class="section-title">Lessons Learned</div>
+  <div class="lessons">
+    <ul style="padding-left:18px;line-height:1.6">
+      ${lessonRows}
+    </ul>
+  </div>
+</div>
+
+<div class="footer">SwingEdge Trading Journal &nbsp;·&nbsp; ${monthName} ${year} Performance Report &nbsp;·&nbsp; Confidential</div>
+</body>
+</html>`;
+
+  const win = window.open("", "_blank");
+  if (win) {
+    win.document.write(html);
+    win.document.close();
+  }
+};
 
 // ─── NEWS HELPERS ─────────────────────────────────────────────────────────────
 const QUICK_TICKERS = ["NVDA", "PLTR", "TSLA", "META", "MSTR"];
@@ -2164,6 +2392,64 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                   </div>
                 )}
               </div>
+
+              {/* ── DATA EXPORT ── */}
+              <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <Download size={16} className="text-emerald-400" />
+                  <h3 className="text-sm font-bold text-white">ייצוא נתונים</h3>
+                </div>
+                <p className="text-xs text-slate-500 mb-5">ייצא את יומן המסחר שלך או צור דוח ביצועים חודשי מפורט.</p>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {/* CSV Export */}
+                  <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                        <Download size={14} className="text-emerald-400" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-white">יומן מסחר — CSV</div>
+                        <div className="text-[10px] text-slate-600">{trades.length} עסקאות</div>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
+                      כל העסקאות כולל Entry, Stop, Target, P&L, R-Multiple, רגש, לקחים ועוד.
+                    </p>
+                    <button
+                      onClick={() => exportTradesCSV(trades)}
+                      className="w-full py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 transition flex items-center justify-center gap-1.5">
+                      <Download size={12} /> הורד CSV
+                    </button>
+                  </div>
+
+                  {/* PDF Report */}
+                  <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center flex-shrink-0">
+                        <FileText size={14} className="text-cyan-400" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-white">דוח ביצועים חודשי — PDF</div>
+                        <div className="text-[10px] text-slate-600">{new Date().toLocaleString("en-US",{month:"long",year:"numeric"})}</div>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
+                      KPIs, גרף עקומת הון, טבלת עסקאות חודשית ולקחים שנרשמו.
+                    </p>
+                    <button
+                      onClick={() => exportMonthlyPDF(trades, capital)}
+                      className="w-full py-2 rounded-lg bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 text-xs font-bold hover:bg-cyan-500/20 transition flex items-center justify-center gap-1.5">
+                      <FileText size={12} /> צור דוח PDF
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-[10px] text-slate-700 mt-3">
+                  * דוח ה-PDF נפתח בטאב חדש — לחץ על "Save as PDF" בתוך הדוח כדי לשמור.
+                </p>
+              </div>
+
             </div>
           );
         })()}
