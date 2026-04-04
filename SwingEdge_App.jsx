@@ -12,8 +12,10 @@ import {
   ArrowDownRight, Eye, Layers, Cpu, Radio, FlaskConical,
   Calculator, Copy, Percent, Hash,
   Settings, BookMarked, Thermometer, Trash2, User,
-  Download, FileText
+  Download, FileText, Bell, Flame, Globe
 } from "lucide-react";
+import { getTranslations } from "./src/i18n.js";
+import { fetchPrices, fmtVolume, fmtMarketCap, searchTickers } from "./src/priceService.js";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const RISK_PCT = 0.01;
@@ -339,6 +341,114 @@ const extractTag = (title) => {
   return m ? m[0] : "MARKET";
 };
 
+// ─── TICKER LOGO ─────────────────────────────────────────────────────────────
+const TickerLogo = ({ ticker, size = 20, className = "" }) => {
+  const [imgError, setImgError] = useState(false);
+  const cleanTicker = (ticker || "").replace("-USD", "").toUpperCase();
+  if (imgError || !cleanTicker) {
+    return (
+      <div className={`rounded-full bg-gradient-to-br from-cyan-500/20 to-violet-500/20 border border-white/10 flex items-center justify-center text-[8px] font-bold text-cyan-400 font-mono flex-shrink-0 ${className}`}
+        style={{ width: size, height: size }}>
+        {cleanTicker.slice(0, 2)}
+      </div>
+    );
+  }
+  return (
+    <img
+      src={`https://financialmodelingprep.com/image-stock/${cleanTicker}.png`}
+      alt={cleanTicker}
+      className={`rounded-full bg-white/5 object-cover flex-shrink-0 ${className}`}
+      style={{ width: size, height: size }}
+      onError={() => setImgError(true)}
+    />
+  );
+};
+
+// ─── SMART LESSONS GENERATOR ─────────────────────────────────────────────────
+const generateSmartLessons = (closedTrades, calcFn) => {
+  if (closedTrades.length < 2) return [];
+  const lessons = [];
+
+  // Analyze patterns
+  const winners = closedTrades.filter(t => (calcFn(t).pnl || 0) > 0);
+  const losers = closedTrades.filter(t => (calcFn(t).pnl || 0) < 0);
+  const followedPlanLosers = losers.filter(t => t.followedPlan === false);
+  const fomoTrades = closedTrades.filter(t => t.emotionAtEntry === "FOMO");
+  const fomoLosers = fomoTrades.filter(t => (calcFn(t).pnl || 0) < 0);
+
+  // Best setup
+  const setupMap = {};
+  closedTrades.forEach(t => {
+    if (!setupMap[t.setup]) setupMap[t.setup] = { wins: 0, losses: 0, totalPnl: 0 };
+    const pnl = calcFn(t).pnl || 0;
+    if (pnl > 0) setupMap[t.setup].wins++;
+    else setupMap[t.setup].losses++;
+    setupMap[t.setup].totalPnl += pnl;
+  });
+  const bestSetup = Object.entries(setupMap).sort((a, b) => {
+    const wrA = a[1].wins / (a[1].wins + a[1].losses);
+    const wrB = b[1].wins / (b[1].wins + b[1].losses);
+    return wrB - wrA;
+  })[0];
+
+  if (bestSetup && bestSetup[1].wins + bestSetup[1].losses >= 2) {
+    const wr = Math.round(bestSetup[1].wins / (bestSetup[1].wins + bestSetup[1].losses) * 100);
+    lessons.push({
+      type: "strength",
+      title: `${bestSetup[0]} is your best setup`,
+      detail: `${wr}% win rate across ${bestSetup[1].wins + bestSetup[1].losses} trades. Focus more on this pattern.`,
+      action: `Look for more ${bestSetup[0]} setups and increase position size when confidence is high.`,
+    });
+  }
+
+  if (followedPlanLosers.length >= 2) {
+    lessons.push({
+      type: "warning",
+      title: "Plan deviation costs you money",
+      detail: `${followedPlanLosers.length} losses came from not following your trading plan.`,
+      action: "Before every trade, write down your plan. After entry, follow it mechanically.",
+    });
+  }
+
+  if (fomoTrades.length >= 2 && fomoLosers.length > 0) {
+    const fomoLossRate = Math.round(fomoLosers.length / fomoTrades.length * 100);
+    lessons.push({
+      type: "warning",
+      title: "FOMO trades are hurting you",
+      detail: `${fomoLossRate}% of your FOMO entries resulted in losses.`,
+      action: "When you feel FOMO, wait 15 minutes. If the setup still looks good, enter with smaller size.",
+    });
+  }
+
+  // Average winner vs average loser
+  if (winners.length > 0 && losers.length > 0) {
+    const avgWin = winners.reduce((s, t) => s + (calcFn(t).pnl || 0), 0) / winners.length;
+    const avgLoss = Math.abs(losers.reduce((s, t) => s + (calcFn(t).pnl || 0), 0) / losers.length);
+    if (avgLoss > avgWin * 1.5) {
+      lessons.push({
+        type: "insight",
+        title: "Your losses are bigger than your wins",
+        detail: `Average win: $${Math.round(avgWin)} vs average loss: $${Math.round(avgLoss)}.`,
+        action: "Tighten your stop losses or widen your targets. Aim for at least 2:1 R/R.",
+      });
+    }
+  }
+
+  // Recent trades lesson from user's own notes
+  const recentLessons = closedTrades.filter(t => t.lessonLearned && t.lessonLearned.trim()).slice(-3);
+  if (recentLessons.length > 0 && lessons.length < 3) {
+    const latest = recentLessons[recentLessons.length - 1];
+    lessons.push({
+      type: "personal",
+      title: `Your latest insight (${latest.ticker})`,
+      detail: latest.lessonLearned,
+      action: "Review this before your next trade to avoid repeating the same mistake.",
+    });
+  }
+
+  return lessons.slice(0, 3);
+};
+
 // ─── STAT CARD ────────────────────────────────────────────────────────────────
 const StatCard = ({ label, value, sub, trend, icon: Icon, accent = "cyan" }) => {
   const accents = {
@@ -367,13 +477,13 @@ const StatCard = ({ label, value, sub, trend, icon: Icon, accent = "cyan" }) => 
 };
 
 // ─── NAV ──────────────────────────────────────────────────────────────────────
-const NAV_ITEMS = [
-  { id: "dashboard", label: "Dashboard",      icon: LayoutDashboard },
-  { id: "journal",   label: "Journal",        icon: BookOpen },
-  { id: "analyzer",  label: "Trade Analyzer", icon: FlaskConical },
-  { id: "position",  label: "Position Calc",  icon: Calculator },
-  { id: "analytics", label: "Analytics",      icon: BarChart2 },
-  { id: "intel",     label: "Market Intel",   icon: Rss },
+const NAV_KEYS = [
+  { id: "dashboard", key: "dashboard",      icon: LayoutDashboard },
+  { id: "journal",   key: "journal",        icon: BookOpen },
+  { id: "analyzer",  key: "tradeAnalyzer",  icon: FlaskConical },
+  { id: "position",  key: "positionCalc",   icon: Calculator },
+  { id: "analytics", key: "analytics",      icon: BarChart2 },
+  { id: "intel",     key: "marketIntel",    icon: Rss },
 ];
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
@@ -439,11 +549,37 @@ export default function SwingEdge() {
   const [analyzerLoading, setAnalyzerLoading] = useState(false);
 
   // Position Calculator state
-  const [posCalc, setPosCalc] = useState({ capital: "", risk: "1", entry: "", stop: "" });
+  const [posCalc, setPosCalc] = useState({ capital: "", risk: "1", entry: "", stop: "", ticker: "" });
   const [posCopied, setPosCopied] = useState(false);
 
-  // Live prices state
+  // Language state
+  const [lang, setLang] = useState(() => {
+    try { return localStorage.getItem("swingEdgeLang") || "he"; } catch { return "he"; }
+  });
+  const t = useMemo(() => getTranslations(lang), [lang]);
+  const isRTL = lang === "he";
+
+  // Live prices state (global - used everywhere)
   const [livePrices, setLivePrices] = useState({});
+
+  // Price alerts state
+  const [priceAlerts, setPriceAlerts] = useState(() => {
+    try {
+      const saved = localStorage.getItem("swingEdgePriceAlerts");
+      return saved ? JSON.parse(saved) : {};
+    } catch { return {}; }
+  });
+  const [alertNotification, setAlertNotification] = useState(null);
+  const [showAlertInput, setShowAlertInput] = useState(null);
+  const [alertInputValue, setAlertInputValue] = useState("");
+
+  // Watchlist search state
+  const [watchlistSearchResults, setWatchlistSearchResults] = useState([]);
+  const [watchlistSearching, setWatchlistSearching] = useState(false);
+  const watchlistSearchTimeout = useRef(null);
+
+  // Watchlist sort state
+  const [watchlistSortBy, setWatchlistSortBy] = useState("ticker");
 
   // Personal Playbook state
   const [playbookSetups, setPlaybookSetups] = useState(() => {
@@ -637,33 +773,64 @@ export default function SwingEdge() {
     return () => clearInterval(interval);
   }, [tab, fetchNews, liveNews.length]);
 
-  // Fetch live prices from Yahoo Finance (via CORS proxy)
+  // Persist price alerts
+  useEffect(() => {
+    try { localStorage.setItem("swingEdgePriceAlerts", JSON.stringify(priceAlerts)); } catch {}
+  }, [priceAlerts]);
+
+  // Persist language
+  useEffect(() => {
+    try { localStorage.setItem("swingEdgeLang", lang); } catch {}
+  }, [lang]);
+
+  // Global live price fetching - fetches for ALL tickers (watchlist + open trades)
   const fetchLivePrices = useCallback(async () => {
-    const tickers = [...new Set(trades.filter(t => t.status === "OPEN").map(t => t.ticker))];
-    if (tickers.length === 0) return;
+    const openTickers = trades.filter(t => t.status === "OPEN").map(t => t.ticker);
+    const watchTickers = watchlistItems.map(w => w.ticker);
+    const allTickers = [...new Set([...openTickers, ...watchTickers])];
+    if (allTickers.length === 0) return;
     setPricesLoading(true);
     try {
-      const symbols = tickers.join(",");
-      const yahooUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols}&fields=regularMarketPrice`;
-      const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`);
-      const data = await res.json();
-      const result = data?.quoteResponse?.result || [];
-      const prices = {};
-      result.forEach(q => { if (q.regularMarketPrice) prices[q.symbol] = q.regularMarketPrice; });
-      if (Object.keys(prices).length > 0) {
-        setLivePrices(prev => ({ ...prev, ...prices }));
+      const priceData = await fetchPrices(allTickers);
+      if (Object.keys(priceData).length > 0) {
+        setLivePrices(prev => ({ ...prev, ...priceData }));
         setPricesLastUpdated(new Date());
+
+        // Check price alerts
+        Object.entries(priceAlerts).forEach(([ticker, targetPrice]) => {
+          const current = priceData[ticker]?.price;
+          if (current && targetPrice) {
+            if (current >= targetPrice) {
+              setAlertNotification({ ticker, price: current, target: targetPrice });
+              setPriceAlerts(prev => { const next = { ...prev }; delete next[ticker]; return next; });
+              setTimeout(() => setAlertNotification(null), 8000);
+            }
+          }
+        });
       }
     } catch (e) { console.warn("Live prices fetch failed:", e); }
     setPricesLoading(false);
-  }, [trades]);
+  }, [trades, watchlistItems, priceAlerts]);
 
+  // Fetch prices globally on mount and every 60 seconds
   useEffect(() => {
-    if (tab !== "journal") return;
     fetchLivePrices();
     const interval = setInterval(fetchLivePrices, 60000);
     return () => clearInterval(interval);
-  }, [tab, fetchLivePrices]);
+  }, [fetchLivePrices]);
+
+  // Watchlist search handler
+  const handleWatchlistSearch = useCallback((query) => {
+    setWatchlistInput(query.toUpperCase());
+    if (watchlistSearchTimeout.current) clearTimeout(watchlistSearchTimeout.current);
+    if (query.length < 1) { setWatchlistSearchResults([]); return; }
+    setWatchlistSearching(true);
+    watchlistSearchTimeout.current = setTimeout(async () => {
+      const results = await searchTickers(query);
+      setWatchlistSearchResults(results);
+      setWatchlistSearching(false);
+    }, 300);
+  }, []);
 
   const equityCurve = useMemo(() => generateEquityCurve(capital, trades), [trades, capital]);
   const closedTrades = trades.filter(t => t.status === "CLOSED");
@@ -672,14 +839,66 @@ export default function SwingEdge() {
   const totalPnL   = closedTrades.reduce((a, t) => a + (calcTradeMetrics(t).pnl || 0), 0);
   const winRate    = closedTrades.length ? closedTrades.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length / closedTrades.length * 100 : 0;
   const avgR       = closedTrades.length ? closedTrades.reduce((a, t) => a + (calcTradeMetrics(t).rMultiple || 0), 0) / closedTrades.length : 0;
-  const curEquity  = capital + totalPnL;
 
-  // Ticker tape
-  const TICKERS = ["NVDA +3.2%", "PLTR +5.8%", "META +2.1%", "AVGO +1.9%", "AMD -1.4%", "TSLA -2.4%", "MSTR +6.2%", "SMCI -3.1%"];
+  // Central Capital Engine: capital + closed P&L + live open P&L
+  const openPnL = useMemo(() => {
+    return openTrades.reduce((sum, t) => {
+      const lp = livePrices[t.ticker];
+      if (!lp) return sum;
+      const pnl = t.side === "LONG"
+        ? (lp.price - t.entry) * t.shares
+        : (t.entry - lp.price) * t.shares;
+      return sum + pnl;
+    }, 0);
+  }, [openTrades, livePrices]);
+
+  const curEquity = capital + totalPnL + openPnL;
+
+  // Daily P&L calculation
+  const dailyPnL = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const todayClosed = closedTrades.filter(t => t.date === today);
+    const closedToday = todayClosed.reduce((s, t) => s + (calcTradeMetrics(t).pnl || 0), 0);
+    // Open P&L change today (approximation using current live prices)
+    return closedToday + openPnL;
+  }, [closedTrades, openPnL]);
+
+  // Win Streak Counter
+  const { currentStreak, bestStreak } = useMemo(() => {
+    let current = 0;
+    let best = 0;
+    const sorted = [...closedTrades].sort((a, b) => a.date.localeCompare(b.date));
+    for (const t of sorted) {
+      const pnl = calcTradeMetrics(t).pnl || 0;
+      if (pnl > 0) {
+        current++;
+        if (current > best) best = current;
+      } else {
+        current = 0;
+      }
+    }
+    return { currentStreak: current, bestStreak: best };
+  }, [closedTrades]);
+
+  // Smart lessons
+  const smartLessons = useMemo(() => generateSmartLessons(closedTrades, calcTradeMetrics), [closedTrades]);
+
+  // Ticker tape from watchlist with live prices
+  const tickerTapeItems = useMemo(() => {
+    return watchlistItems.slice(0, 10).map(w => {
+      const lp = livePrices[w.ticker];
+      return {
+        ticker: w.ticker,
+        changePct: lp ? lp.changePct : (w.change || 0),
+        price: lp ? lp.price : w.price,
+      };
+    });
+  }, [watchlistItems, livePrices]);
+
   useEffect(() => {
-    const t = setInterval(() => setTickerIdx(i => (i + 1) % TICKERS.length), 2000);
+    const t = setInterval(() => setTickerIdx(i => (i + 1) % Math.max(tickerTapeItems.length, 1)), 2000);
     return () => clearInterval(t);
-  }, []);
+  }, [tickerTapeItems.length]);
 
   useEffect(() => {
     const t = setInterval(() => setPulse(p => !p), 1500);
@@ -913,7 +1132,23 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0f1e] text-slate-200 font-sans flex flex-col" data-theme={lightMode ? "light" : "dark"} style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
+    <div className="min-h-screen bg-[#0a0f1e] text-slate-200 font-sans flex flex-col" data-theme={lightMode ? "light" : "dark"} dir={isRTL ? "rtl" : "ltr"} style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
+
+      {/* ── PRICE ALERT NOTIFICATION ── */}
+      {alertNotification && (
+        <div className="fixed top-20 right-6 z-[60] animate-bounce bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 rounded-xl p-4 shadow-2xl max-w-xs">
+          <div className="flex items-center gap-2 mb-1">
+            <Bell size={16} className="text-amber-400" />
+            <span className="text-sm font-bold text-amber-300">{t.alertTriggered}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <TickerLogo ticker={alertNotification.ticker} size={20} />
+            <span className="font-mono font-bold text-white">{alertNotification.ticker}</span>
+            <span className="text-xs text-slate-400">reached ${alertNotification.price.toFixed(2)}</span>
+          </div>
+          <button onClick={() => setAlertNotification(null)} className="absolute top-2 right-2 text-slate-500 hover:text-white"><X size={12} /></button>
+        </div>
+      )}
 
       {/* ── HEADER ── */}
       <header className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06] bg-[#0d1424]/90 backdrop-blur-md sticky top-0 z-50">
@@ -926,16 +1161,18 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
           <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-500 border border-cyan-500/20 tracking-widest uppercase">Pro</span>
         </div>
 
-        {/* Ticker Tape */}
-        <div className="hidden md:flex items-center gap-4 text-xs font-mono">
-          {TICKERS.map((t, i) => {
-            const bull = t.includes("+");
+        {/* Ticker Tape - Live from watchlist */}
+        <div className="hidden md:flex items-center gap-3 text-xs font-mono">
+          {tickerTapeItems.map((item, i) => {
+            const bull = (item.changePct || 0) >= 0;
             return (
-              <span key={i} className={`transition-all duration-500 ${i === tickerIdx ? "opacity-100 scale-105" : "opacity-40"} ${bull ? "text-[#10b981]" : "text-[#ef4444]"}`}>
-                {t}
+              <span key={item.ticker} className={`flex items-center gap-1 transition-all duration-500 ${i === tickerIdx ? "opacity-100 scale-105" : "opacity-40"} ${bull ? "text-[#10b981]" : "text-[#ef4444]"}`}>
+                <TickerLogo ticker={item.ticker} size={14} />
+                {item.ticker} {bull ? "+" : ""}{(item.changePct || 0).toFixed(1)}%
               </span>
             );
           })}
+          {pricesLoading && <RefreshCw size={10} className="animate-spin text-slate-600" />}
         </div>
 
         {/* Status + Profile */}
@@ -963,7 +1200,7 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                 <div className="p-2 space-y-1">
                   <button onClick={() => { setTab("settings"); setShowProfileDropdown(false); }}
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-300 hover:bg-white/5 hover:text-white transition text-left">
-                    <Settings size={13} className="text-cyan-400" /> Profile &amp; Settings
+                    <Settings size={13} className="text-cyan-400" /> {t.profileAndSettings}
                   </button>
                   <button onClick={() => { toggleLightMode(); setShowProfileDropdown(false); }}
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-300 hover:bg-white/5 hover:text-white transition text-left">
@@ -979,14 +1216,14 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
 
       {/* ── NAV ── */}
       <nav className="flex items-center gap-0 px-5 border-b border-white/[0.06] bg-[#0d1424]/60 overflow-x-auto">
-        {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+        {NAV_KEYS.map(({ id, key, icon: Icon }) => (
           <button key={id} onClick={() => setTab(id)}
             className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold tracking-wide transition-all whitespace-nowrap border-b-2
               ${tab === id
                 ? "text-white border-cyan-400"
                 : "text-slate-500 border-transparent hover:text-slate-300 hover:border-slate-600"}`}>
             <Icon size={13} />
-            {label}
+            {t[key]}
           </button>
         ))}
       </nav>
@@ -998,11 +1235,13 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
         {tab === "dashboard" && (
           <div className="space-y-5 animate-fade-in">
             {/* KPI Row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <StatCard label="Account Equity"  value={`$${curEquity.toLocaleString()}`} sub={`Started at $${capital.toLocaleString()}`} trend={totalPnL/capital*100} icon={DollarSign} accent="cyan" />
-              <StatCard label="Net P&L (Closed)" value={fmt$(Math.round(totalPnL))} sub={`${closedTrades.length} closed trades`} trend={totalPnL/capital*100} icon={TrendingUp} accent={totalPnL >= 0 ? "green" : "red"} />
-              <StatCard label="Win Rate" value={`${winRate.toFixed(0)}%`} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length}W / ${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)<0).length}L`} icon={Target} accent="purple" />
-              <StatCard label="Avg R Multiple" value={fmtR(avgR)} sub="Per closed trade" icon={Activity} accent="amber" />
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              <StatCard label={t.accountEquity}  value={`$${curEquity.toLocaleString("en-US", {minimumFractionDigits:0})}`} sub={`${t.startedAt} $${capital.toLocaleString()}`} trend={totalPnL/capital*100} icon={DollarSign} accent="cyan" />
+              <StatCard label={t.netPnlClosed} value={fmt$(Math.round(totalPnL))} sub={`${closedTrades.length} ${t.closedTrades}`} trend={totalPnL/capital*100} icon={TrendingUp} accent={totalPnL >= 0 ? "green" : "red"} />
+              <StatCard label={t.winRate} value={`${winRate.toFixed(0)}%`} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length}W / ${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)<0).length}L`} icon={Target} accent="purple" />
+              <StatCard label={t.avgRMultiple} value={fmtR(avgR)} sub={t.perClosedTrade} icon={Activity} accent="amber" />
+              <StatCard label={t.dailyPnl} value={fmt$(Math.round(dailyPnL))} sub={t.todayTrades} icon={DollarSign} accent={dailyPnL >= 0 ? "green" : "red"} />
+              <StatCard label={t.streakCounter} value={<span className="flex items-center gap-1">{currentStreak > 0 && <Flame size={18} className="text-orange-400" />}{currentStreak}</span>} sub={`${t.bestStreak}: ${bestStreak}`} icon={Zap} accent={currentStreak >= 3 ? "green" : "amber"} />
             </div>
 
             {/* Mini Equity + Open Positions */}
@@ -1034,31 +1273,66 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
               {/* Open trades */}
               <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Open Positions</span>
+                  <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">{t.openPositions}</span>
                   <span className="text-xs bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded-full border border-cyan-500/20">{openTrades.length}</span>
                 </div>
                 <div className="space-y-2">
-                  {openTrades.map(t => {
-                    const riskPerSh = Math.abs(t.entry - t.stop);
-                    const exposure = t.shares * t.entry;
+                  {openTrades.map(tr => {
+                    const lp = livePrices[tr.ticker];
+                    const currentPrice = lp?.price;
+                    const livePnl = currentPrice
+                      ? (tr.side === "LONG" ? (currentPrice - tr.entry) * tr.shares : (tr.entry - currentPrice) * tr.shares)
+                      : null;
+                    const livePnlPct = currentPrice && tr.entry
+                      ? (tr.side === "LONG" ? ((currentPrice / tr.entry) - 1) * 100 : ((tr.entry / currentPrice) - 1) * 100)
+                      : null;
                     return (
-                      <div key={t.id} className="bg-white/3 rounded-lg p-3 border border-white/[0.06]">
+                      <div key={tr.id} className="bg-white/3 rounded-lg p-3 border border-white/[0.06]">
                         <div className="flex items-center justify-between">
-                          <span className="font-bold text-sm text-white font-mono">{t.ticker}</span>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${t.side === "LONG" ? "bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20" : "bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20"}`}>{t.side}</span>
+                          <div className="flex items-center gap-1.5">
+                            <TickerLogo ticker={tr.ticker} size={18} />
+                            <span className="font-bold text-sm text-white font-mono">{tr.ticker}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${tr.side === "LONG" ? "bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20" : "bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20"}`}>{tr.side}</span>
+                            <button onClick={() => { setShowAlertInput(showAlertInput === tr.id ? null : tr.id); setAlertInputValue(priceAlerts[tr.ticker] ? String(priceAlerts[tr.ticker]) : ""); }}
+                              className={`text-[10px] p-0.5 rounded ${priceAlerts[tr.ticker] ? "text-amber-400" : "text-slate-600 hover:text-amber-400"} transition`}
+                              title={t.priceAlert}>
+                              <Bell size={12} />
+                            </button>
+                          </div>
                         </div>
+                        {showAlertInput === tr.id && (
+                          <div className="mt-1.5 flex gap-1">
+                            <input type="number" step="0.01" value={alertInputValue} onChange={e => setAlertInputValue(e.target.value)}
+                              placeholder={t.setTargetPrice} className="flex-1 bg-white/5 border border-amber-500/20 rounded px-2 py-0.5 text-[10px] text-white font-mono focus:outline-none" />
+                            <button onClick={() => { const v = parseFloat(alertInputValue); if (v > 0) { setPriceAlerts(prev => ({...prev, [tr.ticker]: v})); setShowAlertInput(null); } }}
+                              className="text-[9px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30">OK</button>
+                          </div>
+                        )}
+                        {priceAlerts[tr.ticker] && showAlertInput !== tr.id && (
+                          <div className="mt-1 text-[9px] text-amber-500/70 font-mono flex items-center gap-1">
+                            <Bell size={8} /> Alert @ ${priceAlerts[tr.ticker]}
+                          </div>
+                        )}
                         <div className="mt-1 grid grid-cols-2 gap-x-3 text-[10px] text-slate-500 font-mono">
-                          <span>Entry <span className="text-slate-300">${t.entry}</span></span>
-                          <span>Stop <span className="text-[#ef4444]">${t.stop}</span></span>
-                          <span>Target <span className="text-[#10b981]">${t.target}</span></span>
-                          <span>Shares <span className="text-slate-300">{t.shares}</span></span>
+                          <span>Entry <span className="text-slate-300">${tr.entry}</span></span>
+                          <span>Now <span className={currentPrice ? "text-cyan-300 font-bold" : "text-slate-600"}>{currentPrice ? `$${currentPrice.toFixed(2)}` : "..."}</span></span>
+                          <span>Stop <span className="text-[#ef4444]">${tr.stop}</span></span>
+                          <span>P&L <span className={livePnl !== null ? (livePnl >= 0 ? "text-[#10b981] font-bold" : "text-[#ef4444] font-bold") : "text-slate-600"}>{livePnl !== null ? fmt$(Math.round(livePnl)) : "..."}</span></span>
                         </div>
-                        <div className="mt-1.5 h-1 bg-white/5 rounded-full overflow-hidden">
-                          <div className="h-full bg-gradient-to-r from-cyan-500 to-violet-500 rounded-full" style={{ width: "55%" }} />
-                        </div>
+                        {livePnlPct !== null && (
+                          <div className="mt-1.5 h-1 bg-white/5 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full transition-all ${livePnl >= 0 ? "bg-gradient-to-r from-[#10b981] to-cyan-500" : "bg-gradient-to-r from-[#ef4444] to-rose-500"}`}
+                              style={{ width: `${Math.min(Math.abs(livePnlPct) * 10, 100)}%` }} />
+                          </div>
+                        )}
                       </div>
                     );
                   })}
+                  {openTrades.length === 0 && (
+                    <div className="text-center py-4 text-slate-700 text-xs">No open positions</div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1083,7 +1357,7 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                       const win = pnl > 0;
                       return (
                         <tr key={t.id} className="border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors">
-                          <td className="py-2 pr-4 font-bold text-white font-mono">{t.ticker}</td>
+                          <td className="py-2 pr-4 font-bold text-white font-mono"><div className="flex items-center gap-1.5"><TickerLogo ticker={t.ticker} size={16} />{t.ticker}</div></td>
                           <td className="py-2 pr-4 text-slate-500">{t.date}</td>
                           <td className="py-2 pr-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side==="LONG"?"bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20":"bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20"}`}>{t.side}</span></td>
                           <td className="py-2 pr-4 font-mono text-slate-300">${t.entry}</td>
@@ -1261,10 +1535,52 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
         {/* ══════════════ JOURNAL ══════════════ */}
         {tab === "journal" && (
           <div className="space-y-4 animate-fade-in">
+            {/* Smart Lessons Section */}
+            {smartLessons.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold tracking-widest uppercase text-violet-400">{t.smartLessons}</span>
+                  <div className="flex-1 h-px bg-white/[0.05]" />
+                  <span className="text-[10px] text-slate-600">{t.lessonsSubtitle}</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {smartLessons.map((lesson, i) => (
+                    <div key={i} className={`bg-[#0d1424] border rounded-xl p-4 ${
+                      lesson.type === "strength" ? "border-[#10b981]/25" :
+                      lesson.type === "warning" ? "border-amber-500/25" :
+                      lesson.type === "insight" ? "border-cyan-500/25" :
+                      "border-violet-500/25"
+                    }`}>
+                      <div className="flex items-start gap-2 mb-2">
+                        <span className="text-lg">💡</span>
+                        <div>
+                          <h4 className="text-xs font-bold text-white">{lesson.title}</h4>
+                          <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">{lesson.detail}</p>
+                        </div>
+                      </div>
+                      <div className={`text-[10px] p-2 rounded-lg mt-2 ${
+                        lesson.type === "strength" ? "bg-[#10b981]/5 text-[#10b981]" :
+                        lesson.type === "warning" ? "bg-amber-500/5 text-amber-400" :
+                        lesson.type === "insight" ? "bg-cyan-500/5 text-cyan-400" :
+                        "bg-violet-500/5 text-violet-400"
+                      }`}>
+                        <span className="font-semibold">→</span> {lesson.action}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {smartLessons.length === 0 && closedTrades.length < 2 && (
+              <div className="bg-[#0d1424] border border-violet-500/15 rounded-xl p-4 text-center">
+                <span className="text-xs text-slate-600">{t.noLessonsYet}</span>
+              </div>
+            )}
+
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-bold text-white">Trade Journal</h2>
-                <p className="text-xs text-slate-600 mt-0.5">{trades.length} total entries · {openTrades.length} open · {closedTrades.length} closed</p>
+                <h2 className="text-sm font-bold text-white">{t.tradeJournal}</h2>
+                <p className="text-xs text-slate-600 mt-0.5">{trades.length} {t.totalEntries} · {openTrades.length} {t.open} · {closedTrades.length} {t.closed}</p>
               </div>
               {openTrades.length > 0 && (
                 <div className="flex items-center gap-2">
@@ -1297,29 +1613,29 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                     const win = !isOpen && pnl > 0;
                     return (
                       <tr key={t.id} className={`border-b border-white/[0.04] transition-colors ${!isOpen && win ? "hover:bg-[#10b981]/[0.04]" : !isOpen ? "hover:bg-[#ef4444]/[0.04]" : "hover:bg-white/[0.03]"}`}>
-                        <td className="p-3 font-bold text-white font-mono whitespace-nowrap">{t.ticker}</td>
+                        <td className="p-3 font-bold text-white font-mono whitespace-nowrap"><div className="flex items-center gap-1.5"><TickerLogo ticker={t.ticker} size={16} />{t.ticker}</div></td>
                         <td className="p-3 text-slate-500 whitespace-nowrap">{t.date}</td>
                         <td className="p-3"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side==="LONG"?"bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20":"bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20"}`}>{t.side}</span></td>
                         <td className="p-3 font-mono text-slate-300">${t.entry}</td>
                         <td className="p-3 font-mono text-[#ef4444]">${t.stop}</td>
                         <td className="p-3 font-mono text-[#10b981]">${t.target}</td>
                         <td className="p-3 font-mono text-slate-400">{t.shares}</td>
-                        {/* מחיר נוכחי */}
+                        {/* Current Price */}
                         <td className="p-3 font-mono text-xs whitespace-nowrap">
                           {isOpen ? (
-                            livePrices[t.ticker]
-                              ? <span className="text-slate-200 font-bold">${livePrices[t.ticker].toFixed(2)}</span>
+                            livePrices[t.ticker]?.price
+                              ? <span className="text-slate-200 font-bold">${livePrices[t.ticker].price.toFixed(2)}</span>
                               : pricesLoading
-                                ? <span className="text-slate-600 animate-pulse text-[10px]">טוען…</span>
+                                ? <span className="text-slate-600 animate-pulse text-[10px]"><RefreshCw size={8} className="inline animate-spin" /></span>
                                 : <span className="text-slate-700">–</span>
                           ) : <span className="text-slate-700">–</span>}
                         </td>
-                        {/* P&L חי */}
+                        {/* Live P&L */}
                         <td className="p-3 font-bold font-mono text-xs whitespace-nowrap">
-                          {isOpen && livePrices[t.ticker] ? (() => {
+                          {isOpen && livePrices[t.ticker]?.price ? (() => {
                             const lp = t.side === "LONG"
-                              ? (livePrices[t.ticker] - t.entry) * t.shares
-                              : (t.entry - livePrices[t.ticker]) * t.shares;
+                              ? (livePrices[t.ticker].price - t.entry) * t.shares
+                              : (t.entry - livePrices[t.ticker].price) * t.shares;
                             return <span className={lp >= 0 ? "text-[#10b981]" : "text-[#ef4444]"}>{fmt$(Math.round(lp))}</span>;
                           })() : <span className="text-slate-700">–</span>}
                         </td>
@@ -1557,7 +1873,7 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
 
         {/* ══════════════ POSITION CALCULATOR ══════════════ */}
         {tab === "position" && (() => {
-          const capN   = parseFloat(posCalc.capital) || 0;
+          const capN   = parseFloat(posCalc.capital) || capital;
           const riskN  = parseFloat(posCalc.risk)    || 0;
           const entN   = parseFloat(posCalc.entry)   || 0;
           const stopN  = parseFloat(posCalc.stop)    || 0;
@@ -1573,6 +1889,7 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
           const handleCopyToForm = () => {
             setForm(f => ({
               ...f,
+              ticker: posCalc.ticker || f.ticker,
               entry: posCalc.entry,
               stop:  posCalc.stop,
               shares: String(shares),
@@ -1582,36 +1899,70 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
             setTimeout(() => setPosCopied(false), 2000);
           };
 
+          // Auto-load live price when ticker changes
+          const tickerPrice = posCalc.ticker ? livePrices[posCalc.ticker.toUpperCase()]?.price : null;
+
           return (
             <div className="space-y-5 animate-fade-in max-w-2xl mx-auto">
               <div>
                 <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Calculator size={15} className="text-cyan-400" /> Position Calculator
+                  <Calculator size={15} className="text-cyan-400" /> {t.positionCalculator}
                 </h2>
-                <p className="text-xs text-slate-600 mt-0.5">חשב גודל פוזיציה אופטימלי לפי ניהול סיכונים</p>
+                <p className="text-xs text-slate-600 mt-0.5">{t.posCalcSubtitle}</p>
               </div>
 
               {/* Inputs */}
               <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5 space-y-4">
-                <span className="text-[10px] font-semibold tracking-widest uppercase text-slate-500">פרמטרי סיכון</span>
+                <span className="text-[10px] font-semibold tracking-widest uppercase text-slate-500">{t.riskParams}</span>
+
+                {/* Ticker field for auto price loading */}
+                <div>
+                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{t.ticker}</label>
+                  <div className="flex gap-2">
+                    <input
+                      value={posCalc.ticker}
+                      onChange={e => {
+                        const tk = e.target.value.toUpperCase();
+                        setPosCalc(f => ({ ...f, ticker: tk }));
+                        // Auto-load live price
+                        const lp = livePrices[tk]?.price;
+                        if (lp && !posCalc.entry) {
+                          setPosCalc(f => ({ ...f, ticker: tk, entry: String(lp) }));
+                        }
+                      }}
+                      placeholder="NVDA"
+                      className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none transition font-mono font-bold tracking-wider"
+                    />
+                    {tickerPrice && (
+                      <button onClick={() => setPosCalc(f => ({ ...f, entry: String(tickerPrice) }))}
+                        className="text-[10px] px-3 py-2 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-mono hover:bg-cyan-500/20 transition whitespace-nowrap">
+                        ${tickerPrice.toFixed(2)} →
+                      </button>
+                    )}
+                  </div>
+                  {posCalc.ticker && !tickerPrice && pricesLoading && (
+                    <span className="text-[9px] text-slate-600 mt-1 block">{t.loadingPrice}</span>
+                  )}
+                </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1 flex items-center gap-1">
-                      <DollarSign size={10} /> הון תיק ($)
+                      <DollarSign size={10} /> {t.portfolioCapital}
                     </label>
                     <input
-                      value={posCalc.capital}
+                      value={posCalc.capital || ""}
                       onChange={e => setPosCalc(f => ({ ...f, capital: e.target.value }))}
-                      placeholder="25000"
+                      placeholder={String(capital)}
                       type="number"
                       min="0"
                       className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono"
                     />
+                    <span className="text-[9px] text-slate-700 mt-0.5 block font-mono">Auto: ${capital.toLocaleString()}</span>
                   </div>
                   <div>
                     <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1 flex items-center gap-1">
-                      <Percent size={10} /> אחוז סיכון (%)
+                      <Percent size={10} /> {t.riskPercent}
                     </label>
                     <input
                       value={posCalc.risk}
@@ -1629,7 +1980,7 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1 flex items-center gap-1">
-                      <ArrowUpRight size={10} className="text-[#10b981]" /> מחיר כניסה
+                      <ArrowUpRight size={10} className="text-[#10b981]" /> {t.entryPrice}
                     </label>
                     <input
                       value={posCalc.entry}
@@ -1643,7 +1994,7 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                   </div>
                   <div>
                     <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1 flex items-center gap-1">
-                      <ArrowDownRight size={10} className="text-[#ef4444]" /> מחיר סטופ לוס
+                      <ArrowDownRight size={10} className="text-[#ef4444]" /> {t.stopLossPrice}
                     </label>
                     <input
                       value={posCalc.stop}
@@ -2012,54 +2363,109 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
               {/* Watchlist */}
               <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-4 flex flex-col" style={{ height: 440 }}>
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Watchlist</span>
-                  <Radio size={12} className="text-cyan-400" />
+                  <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">{t.watchlist}</span>
+                  <div className="flex items-center gap-2">
+                    {pricesLoading && <RefreshCw size={10} className="animate-spin text-cyan-400" />}
+                    <Radio size={12} className="text-cyan-400" />
+                  </div>
                 </div>
-                {/* Add ticker input */}
-                <div className="flex gap-1.5 mb-3">
-                  <input
-                    value={watchlistInput}
-                    onChange={e => setWatchlistInput(e.target.value.toUpperCase())}
-                    onKeyDown={e => { if (e.key === "Enter") handleAddWatchlistTicker(); }}
-                    placeholder="הוסף טיקר... (TSLA)"
-                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none font-mono"
-                  />
-                  <button onClick={handleAddWatchlistTicker}
-                    className="px-2.5 py-1.5 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 text-xs font-bold hover:bg-cyan-500/25 transition">
-                    <Plus size={12} />
-                  </button>
-                </div>
-                <div className="space-y-2 overflow-y-auto flex-1">
-                  {watchlistItems.map(s => (
-                    <div key={s.ticker}
-                      className={`flex items-center justify-between p-2.5 bg-white/3 rounded-lg border transition group ${chartSymbol === s.chartSym ? "border-cyan-500/40 bg-cyan-500/5" : "border-white/[0.06] hover:border-cyan-500/20 hover:bg-cyan-500/3"}`}>
-                      <div className="flex-1 cursor-pointer" onClick={() => setChartSymbol(s.chartSym)}>
-                        <div className="font-bold text-xs text-white font-mono">{s.ticker}</div>
-                        <div className="text-[10px] text-slate-600">{s.setup}</div>
-                      </div>
-                      <div className="text-right flex items-center gap-2">
-                        {s.price != null ? (
-                          <div>
-                            <div className="text-xs font-mono font-bold text-slate-200">${s.price}</div>
-                            <div className={`text-[10px] font-mono font-semibold flex items-center justify-end gap-0.5 ${(s.change||0)>=0?"text-[#10b981]":"text-[#ef4444]"}`}>
-                              {(s.change||0)>=0?<ArrowUpRight size={10}/>:<ArrowDownRight size={10}/>}
-                              {(s.change||0)>=0?"+":""}{(s.change||0)}%
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-[10px] text-slate-600 font-mono">—</div>
-                        )}
-                        <button onClick={() => handleDeleteWatchlistTicker(s.ticker)}
-                          className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-400 transition p-0.5 rounded"
-                          title="הסר מהרשימה">
-                          <X size={10} />
+                {/* Add ticker input with autocomplete */}
+                <div className="relative mb-3">
+                  <div className="flex gap-1.5">
+                    <input
+                      value={watchlistInput}
+                      onChange={e => handleWatchlistSearch(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") { handleAddWatchlistTicker(); setWatchlistSearchResults([]); } }}
+                      placeholder={t.addTicker}
+                      className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none font-mono"
+                    />
+                    <button onClick={() => { handleAddWatchlistTicker(); setWatchlistSearchResults([]); }}
+                      className="px-2.5 py-1.5 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 text-xs font-bold hover:bg-cyan-500/25 transition">
+                      <Plus size={12} />
+                    </button>
+                  </div>
+                  {/* Search autocomplete dropdown */}
+                  {watchlistSearchResults.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-[#0d1424] border border-white/10 rounded-lg shadow-2xl z-20 max-h-40 overflow-y-auto">
+                      {watchlistSearchResults.map(r => (
+                        <button key={r.symbol} onClick={() => {
+                          setWatchlistInput(r.symbol);
+                          const item = { ticker: r.symbol, price: null, change: null, setup: r.type === "CRYPTOCURRENCY" ? "Crypto" : "Custom", chartSym: r.type === "CRYPTOCURRENCY" ? `BINANCE:${r.symbol}USDT` : `NASDAQ:${r.symbol}` };
+                          if (!watchlistItems.find(i => i.ticker === r.symbol)) {
+                            const updated = [...watchlistItems, item];
+                            setWatchlistItems(updated);
+                            try { localStorage.setItem("swingEdgeWatchlist", JSON.stringify(updated)); } catch {}
+                          }
+                          setWatchlistSearchResults([]);
+                          setWatchlistInput("");
+                        }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/5 transition text-left">
+                          <TickerLogo ticker={r.symbol} size={16} />
+                          <span className="font-mono font-bold text-white">{r.symbol}</span>
+                          <span className="text-slate-500 truncate flex-1">{r.name}</span>
+                          <span className="text-[9px] text-slate-600">{r.exchange}</span>
                         </button>
-                      </div>
+                      ))}
                     </div>
+                  )}
+                </div>
+
+                {/* Sort controls */}
+                <div className="flex items-center gap-1 mb-2">
+                  <span className="text-[9px] text-slate-600">{t.sortBy}:</span>
+                  {[["ticker","A-Z"],["changePct","%"],["price","$"]].map(([key, label]) => (
+                    <button key={key} onClick={() => setWatchlistSortBy(key)}
+                      className={`text-[9px] px-1.5 py-0.5 rounded ${watchlistSortBy === key ? "bg-cyan-500/20 text-cyan-400" : "text-slate-600 hover:text-slate-400"} transition`}>
+                      {label}
+                    </button>
                   ))}
+                </div>
+
+                <div className="space-y-1.5 overflow-y-auto flex-1">
+                  {[...watchlistItems].sort((a, b) => {
+                    const lpA = livePrices[a.ticker] || {};
+                    const lpB = livePrices[b.ticker] || {};
+                    if (watchlistSortBy === "changePct") return (lpB.changePct || 0) - (lpA.changePct || 0);
+                    if (watchlistSortBy === "price") return (lpB.price || 0) - (lpA.price || 0);
+                    return a.ticker.localeCompare(b.ticker);
+                  }).map(s => {
+                    const lp = livePrices[s.ticker];
+                    const price = lp?.price ?? s.price;
+                    const changePct = lp?.changePct ?? s.change ?? 0;
+                    return (
+                      <div key={s.ticker}
+                        className={`flex items-center justify-between p-2 bg-white/3 rounded-lg border transition group ${chartSymbol === s.chartSym ? "border-cyan-500/40 bg-cyan-500/5" : "border-white/[0.06] hover:border-cyan-500/20 hover:bg-cyan-500/3"}`}>
+                        <div className="flex items-center gap-1.5 flex-1 cursor-pointer" onClick={() => setChartSymbol(s.chartSym)}>
+                          <TickerLogo ticker={s.ticker} size={18} />
+                          <div>
+                            <div className="font-bold text-[11px] text-white font-mono">{s.ticker}</div>
+                            {lp?.volume ? <div className="text-[8px] text-slate-700 font-mono">Vol: {fmtVolume(lp.volume)}</div> : null}
+                          </div>
+                        </div>
+                        <div className="text-right flex items-center gap-1.5">
+                          {price != null ? (
+                            <div>
+                              <div className="text-[11px] font-mono font-bold text-slate-200">${typeof price === 'number' ? price.toFixed(2) : price}</div>
+                              <div className={`text-[9px] font-mono font-semibold flex items-center justify-end gap-0.5 ${changePct>=0?"text-[#10b981]":"text-[#ef4444]"}`}>
+                                {changePct>=0?<ArrowUpRight size={8}/>:<ArrowDownRight size={8}/>}
+                                {changePct>=0?"+":""}{typeof changePct === 'number' ? changePct.toFixed(2) : changePct}%
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-[10px] text-slate-600 font-mono">{pricesLoading ? <RefreshCw size={8} className="animate-spin" /> : "—"}</div>
+                          )}
+                          <button onClick={() => handleDeleteWatchlistTicker(s.ticker)}
+                            className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-400 transition p-0.5 rounded"
+                            title={t.removeFromList}>
+                            <X size={10} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                   {watchlistItems.length === 0 && (
                     <div className="text-center py-6 text-slate-700 text-xs">
-                      <p>הרשימה ריקה — הוסף טיקרים למעלה</p>
+                      <p>{t.listEmpty}</p>
                     </div>
                   )}
                 </div>
@@ -2333,8 +2739,27 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
           return (
             <div className="space-y-6 animate-fade-in max-w-3xl mx-auto">
               <div>
-                <h2 className="text-sm font-bold text-white flex items-center gap-2"><Settings size={15} className="text-cyan-400" /> Settings</h2>
-                <p className="text-xs text-slate-600 mt-0.5">Playbook אישי וניטור משמעת מסחר</p>
+                <h2 className="text-sm font-bold text-white flex items-center gap-2"><Settings size={15} className="text-cyan-400" /> {t.settings}</h2>
+                <p className="text-xs text-slate-600 mt-0.5">{t.playbookAndDiscipline}</p>
+              </div>
+
+              {/* ── LANGUAGE SELECTOR ── */}
+              <div className="bg-[#0d1424] border border-violet-500/20 rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <Globe size={16} className="text-violet-400" />
+                  <h3 className="text-sm font-bold text-white">{t.language}</h3>
+                </div>
+                <p className="text-xs text-slate-500 mb-3">{t.languageDesc}</p>
+                <div className="flex gap-2">
+                  <button onClick={() => setLang("he")}
+                    className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition border ${lang === "he" ? "bg-violet-500/20 text-violet-300 border-violet-500/30" : "bg-white/3 text-slate-500 border-white/10 hover:border-white/20"}`}>
+                    🇮🇱 {t.hebrew}
+                  </button>
+                  <button onClick={() => setLang("en")}
+                    className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition border ${lang === "en" ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/30" : "bg-white/3 text-slate-500 border-white/10 hover:border-white/20"}`}>
+                    🇺🇸 {t.english}
+                  </button>
+                </div>
               </div>
 
               {/* ── PORTFOLIO CAPITAL ── */}
@@ -3049,14 +3474,14 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
       {/* ── FOOTER STATUS BAR ── */}
       <footer className="flex items-center justify-between px-5 py-2 border-t border-white/[0.06] bg-[#0a0f1e] text-[10px] text-slate-700 font-mono">
         <div className="flex items-center gap-4">
-          <span className="flex items-center gap-1"><span className={`w-1.5 h-1.5 rounded-full ${pulse?"bg-emerald-500":"bg-emerald-800"} transition-colors`}/> Market Open</span>
-          <span>Capital: ${capital.toLocaleString()}</span>
-          <span>Risk/Trade: 1%</span>
+          <span className="flex items-center gap-1"><span className={`w-1.5 h-1.5 rounded-full ${pulse?"bg-emerald-500":"bg-emerald-800"} transition-colors`}/> {t.marketOpen}</span>
+          <span>{t.capital}: ${curEquity.toLocaleString("en-US", {minimumFractionDigits: 2})}</span>
+          <span>{t.riskPerTradeFooter}</span>
         </div>
         <div className="flex items-center gap-4">
-          <span>Trades: {trades.length}</span>
-          <span>Open: {openTrades.length}</span>
-          <span>SwingEdge Pro v1.0</span>
+          <span>{t.trades}: {trades.length}</span>
+          <span>{t.open}: {openTrades.length}</span>
+          <span>SwingEdge Pro v2.0</span>
         </div>
       </footer>
     </div>
