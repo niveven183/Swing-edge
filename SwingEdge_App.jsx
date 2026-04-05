@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import OnboardingScreen from "./src/components/OnboardingScreen.jsx";
-import html2canvas from "html2canvas";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell
@@ -15,8 +14,9 @@ import {
   Settings, BookMarked, Thermometer, Trash2, User,
   Download, FileText, Bell, Flame, Globe
 } from "lucide-react";
-import { getTranslations } from "./src/i18n.js";
+import { getTranslations, LANGUAGES, isRTLLang } from "./src/i18n.js";
 import { fetchPrices, fmtVolume, fmtMarketCap, searchTickers } from "./src/priceService.js";
+import { analyzeTradeLocal, analyzeTradeLocalText } from "./src/localAI.js";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const RISK_PCT = 0.01;
@@ -34,13 +34,20 @@ const SECTOR_ETFS = [
 
 const MOCK_TRADES = [];
 
-const MOCK_NEWS = [
-  { id: 1, source: "Reuters",      time: "2m ago",  headline: "Fed signals patience on rate cuts amid sticky inflation data", tag: "MACRO",  sentiment: "neutral" },
-  { id: 2, source: "Bloomberg",    time: "14m ago", headline: "NVIDIA posts record data center revenue, raises FY26 outlook", tag: "NVDA",   sentiment: "bull" },
-  { id: 3, source: "WSJ",          time: "31m ago", headline: "Semiconductor export restrictions tighten — SMCI, AMD in focus", tag: "SEMI",   sentiment: "bear" },
-  { id: 4, source: "CNBC",         time: "1h ago",  headline: "Meta AI investment accelerates — $65B capex plan confirmed", tag: "META",   sentiment: "bull" },
-  { id: 5, source: "MarketWatch",  time: "2h ago",  headline: "Options market pricing 8% move in TSLA on earnings Thursday", tag: "TSLA",   sentiment: "neutral" },
-  { id: 6, source: "Seeking Alpha",time: "3h ago",  headline: "Palantir secures $480M DoD contract — analyst upgrades follow", tag: "PLTR",   sentiment: "bull" },
+const POPULAR_TICKERS = [
+  { symbol: "NVDA", name: "NVIDIA Corporation", exchange: "NASDAQ", type: "EQUITY" },
+  { symbol: "AAPL", name: "Apple Inc.", exchange: "NASDAQ", type: "EQUITY" },
+  { symbol: "MSFT", name: "Microsoft Corporation", exchange: "NASDAQ", type: "EQUITY" },
+  { symbol: "TSLA", name: "Tesla, Inc.", exchange: "NASDAQ", type: "EQUITY" },
+  { symbol: "AMZN", name: "Amazon.com, Inc.", exchange: "NASDAQ", type: "EQUITY" },
+  { symbol: "GOOGL", name: "Alphabet Inc.", exchange: "NASDAQ", type: "EQUITY" },
+  { symbol: "META", name: "Meta Platforms, Inc.", exchange: "NASDAQ", type: "EQUITY" },
+  { symbol: "AMD", name: "Advanced Micro Devices", exchange: "NASDAQ", type: "EQUITY" },
+  { symbol: "PLTR", name: "Palantir Technologies", exchange: "NASDAQ", type: "EQUITY" },
+  { symbol: "SPY", name: "SPDR S&P 500 ETF", exchange: "NYSE", type: "ETF" },
+  { symbol: "QQQ", name: "Invesco QQQ Trust", exchange: "NASDAQ", type: "ETF" },
+  { symbol: "BTC-USD", name: "Bitcoin", exchange: "CCC", type: "CRYPTOCURRENCY" },
+  { symbol: "ETH-USD", name: "Ethereum", exchange: "CCC", type: "CRYPTOCURRENCY" },
 ];
 
 const SCANNER_DATA = [
@@ -311,15 +318,7 @@ ${equityPoints.length > 0 ? `
   }
 };
 
-// ─── NEWS HELPERS ─────────────────────────────────────────────────────────────
-const QUICK_TICKERS = ["NVDA", "PLTR", "TSLA", "META", "MSTR"];
-
-const NEWS_RSS_FEEDS = [
-  "https://feeds.finance.yahoo.com/rss/2.0/headline?s=NVDA,PLTR,TSLA,META,MSTR&region=US&lang=en-US",
-  "https://finance.yahoo.com/rss/topfinstories",
-];
-const RSS2JSON = "https://api.rss2json.com/v1/api.json";
-
+// ─── TIME HELPERS ─────────────────────────────────────────────────────────────
 const fmtTimeAgo = (dateStr) => {
   if (!dateStr) return "recently";
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -329,17 +328,6 @@ const fmtTimeAgo = (dateStr) => {
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h ago`;
   return `${Math.floor(hours / 24)}d ago`;
-};
-
-const detectSentiment = (text) => {
-  if (/surge|jump|gain|rally|rise|beat|record|upgrade|bull|growth|profit|above|strong/i.test(text)) return "bull";
-  if (/fall|drop|decline|crash|miss|lose|cut|downgrade|bear|loss|below|weak|warn/i.test(text)) return "bear";
-  return "neutral";
-};
-
-const extractTag = (title) => {
-  const m = title.match(/\b(NVDA|PLTR|TSLA|META|MSTR|AAPL|MSFT|AMD|AMZN|GOOGL|SPY|QQQ|BTC|ETH)\b/);
-  return m ? m[0] : "MARKET";
 };
 
 // ─── TICKER LOGO ─────────────────────────────────────────────────────────────
@@ -537,10 +525,6 @@ export default function SwingEdge() {
   const [closeForm, setCloseForm] = useState({ exit: "", exitReason: "Target Hit", followedPlan: true, lessonLearned: "", maxFavorable: "", maxAdverse: "" });
   const [aiAnalysis, setAiAnalysis] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
-  const [apiKey, setApiKey] = useState(() => { try { return localStorage.getItem("swingEdgeApiKey") || ""; } catch { return ""; } });
-  const [liveNews, setLiveNews] = useState([]);
-  const [newsLoading, setNewsLoading] = useState(false);
-  const [newsLastUpdated, setNewsLastUpdated] = useState(null);
 
   // Trade Analyzer state
   const [analyzerForm, setAnalyzerForm] = useState({ ticker: "", entry: "", stop: "", target: "", shares: "" });
@@ -562,7 +546,7 @@ export default function SwingEdge() {
     try { return localStorage.getItem("swingEdgeLang") || "he"; } catch { return "he"; }
   });
   const t = useMemo(() => getTranslations(lang), [lang]);
-  const isRTL = lang === "he";
+  const isRTL = isRTLLang(lang);
 
   // Live prices state (global - used everywhere)
   const [livePrices, setLivePrices] = useState({});
@@ -739,45 +723,6 @@ export default function SwingEdge() {
     return () => clearInterval(interval);
   }, [tab, fetchSectorData, sectorData.length]);
 
-  // News fetch
-  const fetchNews = useCallback(async () => {
-    setNewsLoading(true);
-    try {
-      const results = await Promise.allSettled(
-        NEWS_RSS_FEEDS.map(feed =>
-          fetch(`${RSS2JSON}?rss_url=${encodeURIComponent(feed)}&count=10`)
-            .then(r => r.json())
-        )
-      );
-      const allItems = results.flatMap(r => r.status === "fulfilled" ? (r.value.items || []) : []);
-      const seen = new Set();
-      const mapped = allItems
-        .filter(item => { if (!item.title || seen.has(item.title)) return false; seen.add(item.title); return true; })
-        .slice(0, 12)
-        .map((item, i) => ({
-          id: item.guid || String(i),
-          title: item.title?.trim(),
-          summary: (item.description || "").replace(/<[^>]*>/g, "").slice(0, 160).trim(),
-          image: item.thumbnail || item.enclosure?.link || null,
-          source: item.author || (item.link ? new URL(item.link).hostname.replace("www.", "") : "Finance"),
-          pubDate: item.pubDate,
-          time: fmtTimeAgo(item.pubDate),
-          link: item.link || "#",
-          sentiment: detectSentiment(item.title || ""),
-          tag: extractTag(item.title || ""),
-        }));
-      if (mapped.length > 0) { setLiveNews(mapped); setNewsLastUpdated(new Date()); }
-    } catch (e) { console.warn("News fetch failed:", e); }
-    setNewsLoading(false);
-  }, []);
-
-  useEffect(() => {
-    if (tab !== "intel") return;
-    if (liveNews.length === 0) fetchNews();
-    const interval = setInterval(fetchNews, 15 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [tab, fetchNews, liveNews.length]);
-
   // Persist price alerts
   useEffect(() => {
     try { localStorage.setItem("swingEdgePriceAlerts", JSON.stringify(priceAlerts)); } catch {}
@@ -788,11 +733,12 @@ export default function SwingEdge() {
     try { localStorage.setItem("swingEdgeLang", lang); } catch {}
   }, [lang]);
 
-  // Global live price fetching - fetches for ALL tickers (watchlist + open trades)
+  // Global live price fetching - fetches for ALL tickers (watchlist + open trades + popular)
   const fetchLivePrices = useCallback(async () => {
     const openTickers = trades.filter(t => t.status === "OPEN").map(t => t.ticker);
     const watchTickers = watchlistItems.map(w => w.ticker);
-    const allTickers = [...new Set([...openTickers, ...watchTickers])];
+    const popularTickers = POPULAR_TICKERS.map(p => p.symbol.replace("-USD", ""));
+    const allTickers = [...new Set([...openTickers, ...watchTickers, ...popularTickers])];
     if (allTickers.length === 0) return;
     setPricesLoading(true);
     try {
@@ -828,14 +774,20 @@ export default function SwingEdge() {
   const handleWatchlistSearch = useCallback((query) => {
     setWatchlistInput(query.toUpperCase());
     if (watchlistSearchTimeout.current) clearTimeout(watchlistSearchTimeout.current);
-    if (query.length < 1) { setWatchlistSearchResults([]); return; }
+    if (query.length < 1) { setWatchlistSearchResults(POPULAR_TICKERS); return; }
     setWatchlistSearching(true);
     watchlistSearchTimeout.current = setTimeout(async () => {
       const results = await searchTickers(query);
-      setWatchlistSearchResults(results);
+      setWatchlistSearchResults(results.length > 0 ? results : POPULAR_TICKERS);
       setWatchlistSearching(false);
     }, 300);
   }, []);
+
+  const handleWatchlistFocus = useCallback(() => {
+    if (!watchlistInput) {
+      setWatchlistSearchResults(POPULAR_TICKERS);
+    }
+  }, [watchlistInput]);
 
   const equityCurve = useMemo(() => generateEquityCurve(capital, trades), [trades, capital]);
   const closedTrades = trades.filter(t => t.status === "CLOSED");
@@ -1062,25 +1014,17 @@ export default function SwingEdge() {
     reader.readAsDataURL(file);
   };
 
-  const analyzeTradeWithAI = async () => {
-    const key = apiKey.trim();
-    if (!key) { setAiAnalysis("⚠️ הכנס Anthropic API Key בשדה למטה לפני הניתוח."); return; }
+  const analyzeTradeWithAI = () => {
     setAiLoading(true); setAiAnalysis(null);
-    const tradeData = `Ticker: ${form.ticker} | Direction: ${form.side} | Entry: ${form.entry} | Stop: ${form.stop} | Target: ${form.target} | Setup: ${form.setup} | Market: ${form.marketCondition} | Emotion: ${form.emotionAtEntry} | Entry Quality: ${form.entryQuality}/5 | R/R: ${rrRatio.toFixed(2)}:1 | Notes: ${form.notes}`;
-    const textPrompt = `You are a professional swing trader coach. Analyze this trade setup and respond concisely:\n\n${tradeData}\n\nProvide:\n1. Entry Strength (1-5)\n2. Stop Logic assessment (1 sentence)\n3. R/R Assessment (is it worth it?)\n4. Final Recommendation: GO / WAIT / SKIP\n\nBe direct and brief.`;
-    const content = form.tradeImagePreview
-      ? [{ type: "image", source: { type: "base64", media_type: "image/jpeg", data: form.tradeImagePreview.split(",")[1] } }, { type: "text", text: textPrompt }]
-      : [{ type: "text", text: textPrompt }];
-    try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-        body: JSON.stringify({ model: "claude-opus-4-6", max_tokens: 400, messages: [{ role: "user", content }] })
-      });
-      const data = await res.json();
-      if (data.error) { setAiAnalysis("שגיאה: " + data.error.message); }
-      else { setAiAnalysis(data.content?.[0]?.text || "No response"); }
-    } catch (e) { setAiAnalysis("שגיאת חיבור: " + e.message); }
+    const text = analyzeTradeLocalText({
+      entry: form.entry,
+      stop: form.stop,
+      target: form.target,
+      side: form.side,
+      capital,
+      shares: posSize,
+    });
+    setAiAnalysis(text);
     setAiLoading(false);
   };
 
@@ -1092,140 +1036,57 @@ export default function SwingEdge() {
     reader.readAsDataURL(file);
   };
 
-  const analyzeTradeStandalone = async () => {
-    const key = apiKey.trim();
-    if (!key) { setAnalyzerResult({ error: "⚠️ הכנס Anthropic API Key — שמור אותו בשדה ה-API Key בחלון Log New Trade." }); return; }
-    if (!analyzerForm.ticker || !azEntry || !azStop) { setAnalyzerResult({ error: "⚠️ מלא לפחות: Ticker, Entry ו-Stop Loss." }); return; }
+  const analyzeTradeStandalone = () => {
+    if (!analyzerForm.ticker || !azEntry || !azStop) {
+      setAnalyzerResult({ error: "⚠️ Fill at least: Ticker, Entry and Stop Loss." });
+      return;
+    }
     setAnalyzerLoading(true); setAnalyzerResult(null);
-    const tradeData = `Ticker: ${analyzerForm.ticker} | Entry: ${azEntry} | Stop: ${azStop} | Target: ${azTarget || "N/A"} | Shares: ${azShares || "N/A"} | Dollar Risk: $${azDollarRisk.toFixed(2)} | Portfolio Risk: ${azPortfolioRisk.toFixed(2)}% | R/R: ${azRRRatio.toFixed(2)}:1`;
-    const prompt = `You are a professional swing trader coach. Analyze this trade setup concisely.
-
-Trade: ${tradeData}
-
-Respond ONLY in this exact JSON format (no markdown, no extra text):
-{
-  "entry_score": <number 1-5>,
-  "stop_logic": "<one sentence assessment of the stop placement>",
-  "rr_assessment": "<one sentence — is the R/R worth it?>",
-  "recommendation": "<GO|WAIT|SKIP>",
-  "explanation": "<2-3 sentences max explaining the recommendation>"
-}`;
-    const content = analyzerImagePreview
-      ? [{ type: "image", source: { type: "base64", media_type: "image/jpeg", data: analyzerImagePreview.split(",")[1] } }, { type: "text", text: prompt }]
-      : [{ type: "text", text: prompt }];
-    try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-        body: JSON.stringify({ model: "claude-opus-4-6", max_tokens: 500, messages: [{ role: "user", content }] })
-      });
-      const data = await res.json();
-      if (data.error) { setAnalyzerResult({ error: "שגיאה: " + data.error.message }); }
-      else {
-        const raw = data.content?.[0]?.text || "{}";
-        try {
-          const parsed = JSON.parse(raw.replace(/```json\n?|\n?```/g, "").trim());
-          setAnalyzerResult(parsed);
-        } catch { setAnalyzerResult({ raw }); }
-      }
-    } catch (e) { setAnalyzerResult({ error: "שגיאת חיבור: " + e.message }); }
+    const result = analyzeTradeLocal({
+      entry: azEntry,
+      stop: azStop,
+      target: azTarget,
+      side: "LONG",
+      capital,
+      shares: azShares,
+    });
+    setAnalyzerResult(result);
     setAnalyzerLoading(false);
   };
 
-  // ─── CHART AI EXTRACTION (Screenshot → Anthropic → Extract trade data) ─────
-  const handleChartAiExtract = async (target) => {
-    const key = apiKey.trim();
-    if (!key) {
-      alert("⚠️ הכנס Anthropic API Key בהגדרות (בטופס Log New Trade) לפני השימוש.");
-      return;
+  // ─── CHART QUICK ACTIONS (Populate forms with chart symbol + live price) ───
+  const handleChartAiExtract = (target) => {
+    // Extract ticker from chartSymbol (e.g. "NASDAQ:NVDA" → "NVDA", "BINANCE:BTCUSDT" → "BTC")
+    let ticker = chartSymbol.includes(":") ? chartSymbol.split(":")[1] : chartSymbol;
+    // Clean crypto pairs
+    ticker = ticker.replace(/USDT$|USD$/, "") || ticker;
+    const tickerUpper = ticker.toUpperCase();
+
+    // Try both ticker variants for live price lookup
+    const livePrice =
+      livePrices[tickerUpper]?.price ??
+      livePrices[`${tickerUpper}-USD`]?.price ??
+      null;
+    const entryStr = livePrice != null ? String(livePrice.toFixed(2)) : "";
+
+    if (target === "position") {
+      setPosCalc(f => ({
+        ...f,
+        ticker: tickerUpper,
+        entry: entryStr || f.entry,
+      }));
+      setTab("position");
+    } else if (target === "journal") {
+      setForm(f => ({
+        ...f,
+        ticker: tickerUpper,
+        side: "LONG",
+        entry: entryStr,
+        stop: "",
+        target: "",
+      }));
+      setShowForm(true);
     }
-    if (!tvRef.current) return;
-
-    setChartAiLoading(true);
-    setChartAiTarget(target);
-
-    try {
-      // Capture the TradingView chart container as an image
-      const canvas = await html2canvas(tvRef.current, {
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: "#0a0f1e",
-        scale: 1,
-      });
-      const base64 = canvas.toDataURL("image/png").split(",")[1];
-
-      // Send to Anthropic API for extraction
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": key,
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 300,
-          messages: [{
-            role: "user",
-            content: [
-              { type: "image", source: { type: "base64", media_type: "image/png", data: base64 } },
-              { type: "text", text: "זהה מהגרף: מחיר כניסה, Stop Loss, Take Profit מכלי Long/Short Position. החזר JSON בלבד: {\"entry\": number, \"stopLoss\": number, \"takeProfit\": number, \"direction\": \"LONG\" | \"SHORT\"}. אם אינך יכול לזהות ערך מסוים, השתמש ב-null. אל תוסיף שום טקסט מלבד ה-JSON." }
-            ]
-          }]
-        })
-      });
-
-      const data = await res.json();
-      if (data.error) {
-        alert("שגיאת AI: " + data.error.message);
-        setChartAiLoading(false);
-        setChartAiTarget(null);
-        return;
-      }
-
-      const rawText = data.content?.[0]?.text || "{}";
-      let parsed;
-      try {
-        parsed = JSON.parse(rawText.replace(/```json\n?|\n?```/g, "").trim());
-      } catch {
-        alert("לא הצלחתי לחלץ נתונים מהגרף. נסה לסמן Long/Short Position Tool על הגרף ולנסות שוב.");
-        setChartAiLoading(false);
-        setChartAiTarget(null);
-        return;
-      }
-
-      const { entry, stopLoss, takeProfit, direction } = parsed;
-
-      if (target === "position") {
-        // Navigate to Position Calculator with extracted data
-        const ticker = chartSymbol.includes(":") ? chartSymbol.split(":")[1] : chartSymbol;
-        setPosCalc(f => ({
-          ...f,
-          ticker: ticker,
-          entry: entry != null ? String(entry) : f.entry,
-          stop: stopLoss != null ? String(stopLoss) : f.stop,
-        }));
-        setTab("position");
-      } else if (target === "journal") {
-        // Open trade form with extracted data
-        const ticker = chartSymbol.includes(":") ? chartSymbol.split(":")[1] : chartSymbol;
-        setForm(f => ({
-          ...f,
-          ticker: ticker,
-          side: direction || "LONG",
-          entry: entry != null ? String(entry) : "",
-          stop: stopLoss != null ? String(stopLoss) : "",
-          target: takeProfit != null ? String(takeProfit) : "",
-        }));
-        setShowForm(true);
-      }
-    } catch (e) {
-      alert("שגיאה בצילום/ניתוח הגרף: " + e.message);
-    }
-
-    setChartAiLoading(false);
-    setChartAiTarget(null);
   };
 
   if (showOnboarding) {
@@ -1252,7 +1113,7 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
       )}
 
       {/* ── HEADER ── */}
-      <header className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06] bg-[#0d1424]/90 backdrop-blur-md sticky top-0 z-50">
+      <header dir="ltr" className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06] bg-[#0d1424]/90 backdrop-blur-md sticky top-0 z-50">
         {/* Logo */}
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-400 to-violet-500 flex items-center justify-center">
@@ -1278,9 +1139,17 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
 
         {/* Status + Profile */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5">
+          <div
+            className="flex items-center gap-1.5"
+            title={pricesLastUpdated ? `${t.lastUpdated}: ${pricesLastUpdated.toLocaleTimeString()}` : t.live}
+          >
             <span className={`w-2 h-2 rounded-full ${pulse ? "bg-emerald-400" : "bg-emerald-600"} transition-colors`} />
-            <span className="text-[10px] text-slate-500 tracking-wider">LIVE</span>
+            <span className="text-[10px] text-emerald-400 font-bold tracking-wider">● LIVE</span>
+            {pricesLastUpdated && (
+              <span className="text-[9px] text-slate-600 font-mono hidden md:inline">
+                {pricesLastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+              </span>
+            )}
           </div>
           <div className="text-right hidden sm:block">
             <div className="text-xs text-slate-500">Account</div>
@@ -1799,7 +1668,7 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
           <div className="space-y-5 animate-fade-in max-w-3xl mx-auto">
             <div>
               <h2 className="text-sm font-bold text-white flex items-center gap-2"><FlaskConical size={15} className="text-violet-400" /> Trade Analyzer</h2>
-              <p className="text-xs text-slate-600 mt-0.5">הכנס נתוני עסקה, העלה תמונה מ-TradingView וקבל ניתוח AI מיידי</p>
+              <p className="text-xs text-slate-600 mt-0.5">Enter trade data to get an instant rule-based analysis (no API key required).</p>
             </div>
 
             {/* Input Fields */}
@@ -1882,17 +1751,10 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                 </div>
               )}
 
-              {/* API Key */}
-              <div>
-                <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Anthropic API Key</label>
-                <input type="password" value={apiKey} onChange={e => { setApiKey(e.target.value); try { localStorage.setItem("swingEdgeApiKey", e.target.value); } catch {} }}
-                  placeholder="sk-ant-..." className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-400 placeholder-slate-700 focus:border-violet-500/50 focus:outline-none transition font-mono" />
-              </div>
-
               {/* Analyze button */}
               <button onClick={analyzeTradeStandalone} disabled={analyzerLoading}
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-500/25 to-cyan-500/25 border border-violet-500/35 text-violet-200 text-sm font-bold hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-50">
-                {analyzerLoading ? <><RefreshCw size={14} className="animate-spin" /> מנתח...</> : <><Cpu size={14} /> נתח עסקה 🤖</>}
+                {analyzerLoading ? <><RefreshCw size={14} className="animate-spin" /> {t.analyzing}</> : <><Cpu size={14} /> {t.analyzeTrade}</>}
               </button>
             </div>
 
@@ -2502,6 +2364,7 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                     <input
                       value={watchlistInput}
                       onChange={e => handleWatchlistSearch(e.target.value)}
+                      onFocus={handleWatchlistFocus}
                       onKeyDown={e => { if (e.key === "Enter") { handleAddWatchlistTicker(); setWatchlistSearchResults([]); } }}
                       placeholder={t.addTicker}
                       className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none font-mono"
@@ -2513,26 +2376,52 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                   </div>
                   {/* Search autocomplete dropdown */}
                   {watchlistSearchResults.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-[#0d1424] border border-white/10 rounded-lg shadow-2xl z-20 max-h-40 overflow-y-auto">
-                      {watchlistSearchResults.map(r => (
-                        <button key={r.symbol} onClick={() => {
-                          setWatchlistInput(r.symbol);
-                          const item = { ticker: r.symbol, price: null, change: null, setup: r.type === "CRYPTOCURRENCY" ? "Crypto" : "Custom", chartSym: r.type === "CRYPTOCURRENCY" ? `BINANCE:${r.symbol}USDT` : `NASDAQ:${r.symbol}` };
-                          if (!watchlistItems.find(i => i.ticker === r.symbol)) {
-                            const updated = [...watchlistItems, item];
-                            setWatchlistItems(updated);
-                            try { localStorage.setItem("swingEdgeWatchlist", JSON.stringify(updated)); } catch {}
-                          }
-                          setWatchlistSearchResults([]);
-                          setWatchlistInput("");
-                        }}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/5 transition text-left">
-                          <TickerLogo ticker={r.symbol} size={16} />
-                          <span className="font-mono font-bold text-white">{r.symbol}</span>
-                          <span className="text-slate-500 truncate flex-1">{r.name}</span>
-                          <span className="text-[9px] text-slate-600">{r.exchange}</span>
-                        </button>
-                      ))}
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-[#0d1424] border border-white/10 rounded-lg shadow-2xl z-20 max-h-64 overflow-y-auto">
+                      {!watchlistInput && (
+                        <div className="px-3 py-1.5 text-[9px] text-slate-600 uppercase tracking-widest border-b border-white/[0.06] bg-white/3">
+                          {t.popularTickers}
+                        </div>
+                      )}
+                      {watchlistSearchResults.map(r => {
+                        const cleanSym = r.symbol.replace("-USD", "");
+                        const lp = livePrices[cleanSym] || livePrices[r.symbol];
+                        const isCrypto = r.type === "CRYPTOCURRENCY";
+                        const chartSym = isCrypto
+                          ? `BINANCE:${cleanSym}USDT`
+                          : r.type === "INDEX" ? r.symbol
+                          : r.type === "CURRENCY" || r.type === "FUTURE" ? r.symbol
+                          : `NASDAQ:${r.symbol}`;
+                        const setup = isCrypto ? "Crypto" : r.type === "INDEX" ? "Index" : r.type === "ETF" ? "ETF" : r.type === "CURRENCY" ? "Forex" : r.type === "FUTURE" ? "Future" : "Custom";
+                        return (
+                          <button key={r.symbol + r.exchange} onClick={() => {
+                            const tickerKey = isCrypto ? cleanSym : r.symbol;
+                            const item = { ticker: tickerKey, price: null, change: null, setup, chartSym };
+                            if (!watchlistItems.find(i => i.ticker === tickerKey)) {
+                              const updated = [...watchlistItems, item];
+                              setWatchlistItems(updated);
+                              try { localStorage.setItem("swingEdgeWatchlist", JSON.stringify(updated)); } catch {}
+                            }
+                            setWatchlistSearchResults([]);
+                            setWatchlistInput("");
+                          }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/5 transition text-left">
+                            <TickerLogo ticker={cleanSym} size={16} />
+                            <div className="flex flex-col flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono font-bold text-white">{r.symbol}</span>
+                                <span className="text-[8px] px-1 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">{r.type}</span>
+                              </div>
+                              <span className="text-[10px] text-slate-500 truncate">{r.name}</span>
+                            </div>
+                            <div className="text-right flex flex-col items-end">
+                              {lp?.price != null && (
+                                <span className="font-mono text-[10px] text-slate-300">${lp.price.toFixed(2)}</span>
+                              )}
+                              <span className="text-[9px] text-slate-600">{r.exchange}</span>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -2597,95 +2486,6 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                   )}
                 </div>
               </div>
-            </div>
-
-            {/* News Feed — 2-column cards */}
-            <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-4">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Market News</span>
-                  <span className={`w-1.5 h-1.5 rounded-full ${pulse?"bg-emerald-400":"bg-emerald-700"} transition-colors`} />
-                  {newsLastUpdated && (
-                    <span className="text-[10px] text-slate-700">Updated {fmtTimeAgo(newsLastUpdated)}</span>
-                  )}
-                </div>
-                <button onClick={fetchNews} disabled={newsLoading}
-                  className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-cyan-400 transition disabled:opacity-40">
-                  <RefreshCw size={10} className={newsLoading ? "animate-spin" : ""} />
-                  {newsLoading ? "Loading…" : "Refresh"}
-                </button>
-              </div>
-
-              {/* Loading skeleton */}
-              {newsLoading && liveNews.length === 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {[...Array(6)].map((_, i) => (
-                    <div key={i} className="flex gap-3 p-3 bg-white/3 rounded-xl border border-white/[0.06] animate-pulse">
-                      <div className="w-20 h-16 rounded-lg bg-white/5 flex-shrink-0" />
-                      <div className="flex-1 space-y-2 pt-1">
-                        <div className="h-2.5 bg-white/5 rounded w-full" />
-                        <div className="h-2.5 bg-white/5 rounded w-4/5" />
-                        <div className="h-2 bg-white/5 rounded w-1/2 mt-2" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* News grid */}
-              {!newsLoading || liveNews.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {(liveNews.length > 0 ? liveNews : MOCK_NEWS.map(n => ({
-                    id: n.id,
-                    title: n.headline,
-                    summary: "",
-                    image: null,
-                    source: n.source,
-                    time: n.time,
-                    link: "#",
-                    sentiment: n.sentiment,
-                    tag: n.tag,
-                  }))).map(n => (
-                    <a key={n.id} href={n.link} target="_blank" rel="noopener noreferrer"
-                      className="flex gap-3 p-3 bg-white/3 rounded-xl border border-white/[0.06] hover:border-cyan-500/20 hover:bg-cyan-500/[0.03] transition group cursor-pointer no-underline">
-                      {/* Image */}
-                      <div className="w-20 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-white/5">
-                        {n.image ? (
-                          <img src={n.image} alt="" className="w-full h-full object-cover"
-                            onError={e => { e.currentTarget.style.display = "none"; e.currentTarget.parentElement.classList.add("flex","items-center","justify-center"); }} />
-                        ) : (
-                          <div className={`w-full h-full flex items-center justify-center text-[10px] font-mono font-bold tracking-wider
-                            ${n.sentiment==="bull" ? "bg-emerald-500/10 text-emerald-500" : n.sentiment==="bear" ? "bg-rose-500/10 text-rose-500" : "bg-amber-500/10 text-amber-500"}`}>
-                            {n.tag}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Content */}
-                      <div className="flex-1 min-w-0 flex flex-col justify-between">
-                        <div>
-                          <p className="text-xs font-semibold text-slate-200 group-hover:text-white transition leading-snug line-clamp-2 mb-1">{n.title}</p>
-                          {n.summary && (
-                            <p className="text-[10px] text-slate-600 leading-relaxed line-clamp-2">{n.summary}</p>
-                          )}
-                        </div>
-                        <div className="flex items-center justify-between mt-1.5">
-                          <div className="flex items-center gap-1.5">
-                            <span className={`w-1 h-1 rounded-full flex-shrink-0 ${n.sentiment==="bull"?"bg-emerald-400":n.sentiment==="bear"?"bg-rose-400":"bg-amber-400"}`} />
-                            <span className="text-[10px] text-slate-500 truncate max-w-[80px]">{n.source}</span>
-                            <span className="text-[10px] text-slate-700">·</span>
-                            <span className="text-[10px] text-slate-600">{n.time}</span>
-                          </div>
-                          <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-mono font-semibold border flex-shrink-0
-                            ${(n.tag||"").length <= 4 ? "bg-violet-500/10 text-violet-400 border-violet-500/20" : "bg-amber-500/10 text-amber-400 border-amber-500/20"}`}>
-                            {n.tag}
-                          </span>
-                        </div>
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              ) : null}
             </div>
 
             {/* ── SECTOR TRENDS ── */}
@@ -2877,16 +2677,19 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                   <h3 className="text-sm font-bold text-white">{t.language}</h3>
                 </div>
                 <p className="text-xs text-slate-500 mb-3">{t.languageDesc}</p>
-                <div className="flex gap-2">
-                  <button onClick={() => setLang("he")}
-                    className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition border ${lang === "he" ? "bg-violet-500/20 text-violet-300 border-violet-500/30" : "bg-white/3 text-slate-500 border-white/10 hover:border-white/20"}`}>
-                    🇮🇱 {t.hebrew}
-                  </button>
-                  <button onClick={() => setLang("en")}
-                    className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition border ${lang === "en" ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/30" : "bg-white/3 text-slate-500 border-white/10 hover:border-white/20"}`}>
-                    🇺🇸 {t.english}
-                  </button>
-                </div>
+                <select
+                  value={lang}
+                  onChange={e => setLang(e.target.value)}
+                  dir="ltr"
+                  className="w-full border border-violet-500/30 rounded-lg px-3 py-2.5 text-sm text-white focus:border-violet-500/60 focus:outline-none transition font-semibold"
+                  style={{ background: "#0d1424" }}
+                >
+                  {LANGUAGES.map(l => (
+                    <option key={l.code} value={l.code}>
+                      {l.nativeName} — {l.name}{l.rtl ? " (RTL)" : ""}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* ── PORTFOLIO CAPITAL ── */}
@@ -3315,24 +3118,17 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                 </div>
               )}
 
-              {/* API Key input */}
-              <div>
-                <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Anthropic API Key (for AI analysis)</label>
-                <input type="password" value={apiKey} onChange={e=>{ setApiKey(e.target.value); try { localStorage.setItem("swingEdgeApiKey", e.target.value); } catch {} }}
-                  placeholder="sk-ant-..." className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-400 placeholder-slate-700 focus:border-violet-500/50 focus:outline-none transition font-mono" />
-              </div>
-
-              {/* AI Analysis button */}
+              {/* Local Analysis button */}
               <button onClick={analyzeTradeWithAI} disabled={aiLoading}
                 className="w-full py-2.5 rounded-xl bg-gradient-to-r from-violet-500/20 to-cyan-500/20 border border-violet-500/30 text-violet-300 text-sm font-bold hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-50">
-                {aiLoading ? <><RefreshCw size={13} className="animate-spin" /> מנתח...</> : <><Cpu size={13} /> נתח עסקה 🤖</>}
+                {aiLoading ? <><RefreshCw size={13} className="animate-spin" /> {t.analyzing}</> : <><Cpu size={13} /> {t.analyzeTrade}</>}
               </button>
 
-              {/* AI Analysis result */}
+              {/* Local Analysis result */}
               {aiAnalysis && (
                 <div className="bg-violet-500/5 border border-violet-500/20 rounded-xl p-3 text-xs text-slate-300 whitespace-pre-wrap leading-relaxed">
                   <div className="flex items-center gap-1 mb-2 text-violet-400 font-semibold text-[10px] uppercase tracking-wider">
-                    <Cpu size={11} /> AI Analysis
+                    <Cpu size={11} /> {t.localAnalysis}
                   </div>
                   {aiAnalysis}
                 </div>
