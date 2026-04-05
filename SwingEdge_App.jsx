@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import OnboardingScreen from "./src/components/OnboardingScreen.jsx";
+import html2canvas from "html2canvas";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell
@@ -547,6 +548,10 @@ export default function SwingEdge() {
   const [analyzerImagePreview, setAnalyzerImagePreview] = useState(null);
   const [analyzerResult, setAnalyzerResult] = useState(null);
   const [analyzerLoading, setAnalyzerLoading] = useState(false);
+
+  // Chart AI extraction state
+  const [chartAiLoading, setChartAiLoading] = useState(false);
+  const [chartAiTarget, setChartAiTarget] = useState(null); // "position" | "journal"
 
   // Position Calculator state
   const [posCalc, setPosCalc] = useState({ capital: "", risk: "1", entry: "", stop: "", ticker: "" });
@@ -1125,6 +1130,102 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
       }
     } catch (e) { setAnalyzerResult({ error: "שגיאת חיבור: " + e.message }); }
     setAnalyzerLoading(false);
+  };
+
+  // ─── CHART AI EXTRACTION (Screenshot → Anthropic → Extract trade data) ─────
+  const handleChartAiExtract = async (target) => {
+    const key = apiKey.trim();
+    if (!key) {
+      alert("⚠️ הכנס Anthropic API Key בהגדרות (בטופס Log New Trade) לפני השימוש.");
+      return;
+    }
+    if (!tvRef.current) return;
+
+    setChartAiLoading(true);
+    setChartAiTarget(target);
+
+    try {
+      // Capture the TradingView chart container as an image
+      const canvas = await html2canvas(tvRef.current, {
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: "#0a0f1e",
+        scale: 1,
+      });
+      const base64 = canvas.toDataURL("image/png").split(",")[1];
+
+      // Send to Anthropic API for extraction
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": key,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 300,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "image", source: { type: "base64", media_type: "image/png", data: base64 } },
+              { type: "text", text: "זהה מהגרף: מחיר כניסה, Stop Loss, Take Profit מכלי Long/Short Position. החזר JSON בלבד: {\"entry\": number, \"stopLoss\": number, \"takeProfit\": number, \"direction\": \"LONG\" | \"SHORT\"}. אם אינך יכול לזהות ערך מסוים, השתמש ב-null. אל תוסיף שום טקסט מלבד ה-JSON." }
+            ]
+          }]
+        })
+      });
+
+      const data = await res.json();
+      if (data.error) {
+        alert("שגיאת AI: " + data.error.message);
+        setChartAiLoading(false);
+        setChartAiTarget(null);
+        return;
+      }
+
+      const rawText = data.content?.[0]?.text || "{}";
+      let parsed;
+      try {
+        parsed = JSON.parse(rawText.replace(/```json\n?|\n?```/g, "").trim());
+      } catch {
+        alert("לא הצלחתי לחלץ נתונים מהגרף. נסה לסמן Long/Short Position Tool על הגרף ולנסות שוב.");
+        setChartAiLoading(false);
+        setChartAiTarget(null);
+        return;
+      }
+
+      const { entry, stopLoss, takeProfit, direction } = parsed;
+
+      if (target === "position") {
+        // Navigate to Position Calculator with extracted data
+        const ticker = chartSymbol.includes(":") ? chartSymbol.split(":")[1] : chartSymbol;
+        setPosCalc(f => ({
+          ...f,
+          ticker: ticker,
+          entry: entry != null ? String(entry) : f.entry,
+          stop: stopLoss != null ? String(stopLoss) : f.stop,
+        }));
+        setTab("position");
+      } else if (target === "journal") {
+        // Open trade form with extracted data
+        const ticker = chartSymbol.includes(":") ? chartSymbol.split(":")[1] : chartSymbol;
+        setForm(f => ({
+          ...f,
+          ticker: ticker,
+          side: direction || "LONG",
+          entry: entry != null ? String(entry) : "",
+          stop: stopLoss != null ? String(stopLoss) : "",
+          target: takeProfit != null ? String(takeProfit) : "",
+        }));
+        setShowForm(true);
+      }
+    } catch (e) {
+      alert("שגיאה בצילום/ניתוח הגרף: " + e.message);
+    }
+
+    setChartAiLoading(false);
+    setChartAiTarget(null);
   };
 
   if (showOnboarding) {
@@ -2336,7 +2437,7 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* TradingView Chart */}
-              <div className="md:col-span-2 bg-[#0d1424] border border-white/[0.06] rounded-xl overflow-hidden" style={{ height: 440 }}>
+              <div className="md:col-span-2 bg-[#0d1424] border border-white/[0.06] rounded-xl overflow-hidden relative" style={{ height: 440 }}>
                 <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Live Chart</span>
@@ -2358,6 +2459,32 @@ Respond ONLY in this exact JSON format (no markdown, no extra text):
                   </div>
                 </div>
                 <div ref={tvRef} style={{ height: "calc(100% - 48px)" }} />
+
+                {/* ── Floating AI Trade Buttons ── */}
+                <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-2">
+                  <button
+                    onClick={() => handleChartAiExtract("position")}
+                    disabled={chartAiLoading}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-xl backdrop-blur-md bg-gradient-to-r from-cyan-500/20 to-violet-500/20 border border-cyan-500/40 text-cyan-300 hover:from-cyan-500/30 hover:to-violet-500/30 hover:border-cyan-400/60 hover:text-white disabled:opacity-50"
+                  >
+                    {chartAiLoading && chartAiTarget === "position" ? (
+                      <><RefreshCw size={13} className="animate-spin" /> מחשב...</>
+                    ) : (
+                      <><Calculator size={13} /> חשב פוזיציה</>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleChartAiExtract("journal")}
+                    disabled={chartAiLoading}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-xl backdrop-blur-md bg-gradient-to-r from-violet-500/20 to-rose-500/20 border border-violet-500/40 text-violet-300 hover:from-violet-500/30 hover:to-rose-500/30 hover:border-violet-400/60 hover:text-white disabled:opacity-50"
+                  >
+                    {chartAiLoading && chartAiTarget === "journal" ? (
+                      <><RefreshCw size={13} className="animate-spin" /> מעבד...</>
+                    ) : (
+                      <><BookOpen size={13} /> הוסף ליומן</>
+                    )}
+                  </button>
+                </div>
               </div>
 
               {/* Watchlist */}
