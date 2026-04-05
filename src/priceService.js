@@ -102,13 +102,14 @@ export const searchTickers = async (query) => {
     const proxyUrl = `${CORS_PROXY}${encodeURIComponent(url)}`;
     const res = await fetch(proxyUrl);
     const data = await res.json();
+    const SUPPORTED = new Set(["EQUITY", "ETF", "CRYPTOCURRENCY", "INDEX", "CURRENCY", "FUTURE", "MUTUALFUND"]);
     return (data?.quotes || [])
-      .filter((q) => q.quoteType === "EQUITY" || q.quoteType === "ETF" || q.quoteType === "CRYPTOCURRENCY")
+      .filter((q) => SUPPORTED.has(q.quoteType))
       .map((q) => ({
         symbol: q.symbol,
         name: q.shortname || q.longname || q.symbol,
         type: q.quoteType,
-        exchange: q.exchange,
+        exchange: q.exchange || q.quoteType,
       }));
   } catch {
     return [];
