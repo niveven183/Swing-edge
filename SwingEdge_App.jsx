@@ -450,7 +450,7 @@ const StatCard = ({ label, value, sub, trend, icon: Icon, accent = "cyan" }) => 
   const { border, iconColor, bg } = accents[accent] || accents.cyan;
   return (
     <div className={`${bg} border ${border} rounded-xl p-4 flex flex-col gap-1 relative overflow-hidden bg-[#0d1424]`}>
-      <div className={`absolute top-3 right-3 opacity-15 ${iconColor}`}>
+      <div className={`absolute top-3 right-3 rtl:right-auto rtl:left-3 opacity-15 ${iconColor}`}>
         <Icon size={26} />
       </div>
       <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500">{label}</span>
@@ -739,11 +739,13 @@ export default function SwingEdge() {
     const watchTickers = watchlistItems.map(w => w.ticker);
     const popularTickers = POPULAR_TICKERS.map(p => p.symbol.replace("-USD", ""));
     const allTickers = [...new Set([...openTickers, ...watchTickers, ...popularTickers])];
-    if (allTickers.length === 0) return;
+    if (allTickers.length === 0) return true;
     setPricesLoading(true);
+    let ok = false;
     try {
       const priceData = await fetchPrices(allTickers);
       if (Object.keys(priceData).length > 0) {
+        ok = true;
         setLivePrices(prev => ({ ...prev, ...priceData }));
         setPricesLastUpdated(new Date());
 
@@ -761,16 +763,33 @@ export default function SwingEdge() {
       }
     } catch (e) { console.warn("Live prices fetch failed:", e); }
     setPricesLoading(false);
+    return ok;
   }, [trades, watchlistItems, priceAlerts]);
 
-  // Fetch prices globally on mount and every 60 seconds
+  // Fetch prices globally on mount and every 60 seconds.
+  // On failure, retry once after 10 seconds.
   useEffect(() => {
-    fetchLivePrices();
-    const interval = setInterval(fetchLivePrices, 60000);
-    return () => clearInterval(interval);
+    let cancelled = false;
+    let retryTimer = null;
+
+    const run = async () => {
+      const ok = await fetchLivePrices();
+      if (cancelled) return;
+      if (!ok) {
+        retryTimer = setTimeout(() => { if (!cancelled) run(); }, 10000);
+      }
+    };
+
+    run();
+    const interval = setInterval(run, 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, [fetchLivePrices]);
 
-  // Watchlist search handler
+  // Watchlist search handler — dynamic Yahoo Finance search with live prices
   const handleWatchlistSearch = useCallback((query) => {
     setWatchlistInput(query.toUpperCase());
     if (watchlistSearchTimeout.current) clearTimeout(watchlistSearchTimeout.current);
@@ -778,8 +797,18 @@ export default function SwingEdge() {
     setWatchlistSearching(true);
     watchlistSearchTimeout.current = setTimeout(async () => {
       const results = await searchTickers(query);
-      setWatchlistSearchResults(results.length > 0 ? results : POPULAR_TICKERS);
+      const final = results.length > 0 ? results : POPULAR_TICKERS;
+      setWatchlistSearchResults(final);
       setWatchlistSearching(false);
+      // Pre-fetch prices for the first few results so each row can show its price
+      const topSyms = final.slice(0, 8).map(r => r.symbol.replace("-USD", ""));
+      if (topSyms.length > 0) {
+        fetchPrices(topSyms).then(priceData => {
+          if (Object.keys(priceData).length > 0) {
+            setLivePrices(prev => ({ ...prev, ...priceData }));
+          }
+        });
+      }
     }, 300);
   }, []);
 
@@ -797,19 +826,41 @@ export default function SwingEdge() {
   const winRate    = closedTrades.length ? closedTrades.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length / closedTrades.length * 100 : 0;
   const avgR       = closedTrades.length ? closedTrades.reduce((a, t) => a + (calcTradeMetrics(t).rMultiple || 0), 0) / closedTrades.length : 0;
 
-  // Central Capital Engine: capital + closed P&L + live open P&L
+  // ─── CENTRAL EQUITY ENGINE ──────────────────────────────────────────────────
+  // Single source of truth: equity = base capital + closed P&L + live open P&L.
+  // Reacts automatically whenever any live price updates.
+  // Ticker lookup is variant-safe (handles BTC / BTC-USD / BINANCE:BTCUSDT etc).
+  const getLivePrice = useCallback((ticker) => {
+    if (!ticker) return null;
+    const raw = String(ticker).toUpperCase();
+    const candidates = [
+      raw,
+      raw.replace("-USD", ""),
+      `${raw}-USD`,
+      raw.replace(/^BINANCE:/, "").replace(/USDT$|USD$/, ""),
+    ];
+    for (const key of candidates) {
+      const lp = livePrices[key];
+      if (lp && typeof lp.price === "number") return lp;
+    }
+    return null;
+  }, [livePrices]);
+
   const openPnL = useMemo(() => {
     return openTrades.reduce((sum, t) => {
-      const lp = livePrices[t.ticker];
+      const lp = getLivePrice(t.ticker);
       if (!lp) return sum;
       const pnl = t.side === "LONG"
         ? (lp.price - t.entry) * t.shares
         : (t.entry - lp.price) * t.shares;
       return sum + pnl;
     }, 0);
-  }, [openTrades, livePrices]);
+  }, [openTrades, getLivePrice]);
 
-  const curEquity = capital + totalPnL + openPnL;
+  const curEquity = useMemo(
+    () => capital + totalPnL + openPnL,
+    [capital, totalPnL, openPnL]
+  );
 
   // Daily P&L calculation
   const dailyPnL = useMemo(() => {
@@ -843,14 +894,14 @@ export default function SwingEdge() {
   // Ticker tape from watchlist with live prices
   const tickerTapeItems = useMemo(() => {
     return watchlistItems.slice(0, 10).map(w => {
-      const lp = livePrices[w.ticker];
+      const lp = getLivePrice(w.ticker);
       return {
         ticker: w.ticker,
         changePct: lp ? lp.changePct : (w.change || 0),
         price: lp ? lp.price : w.price,
       };
     });
-  }, [watchlistItems, livePrices]);
+  }, [watchlistItems, getLivePrice]);
 
   useEffect(() => {
     const t = setInterval(() => setTickerIdx(i => (i + 1) % Math.max(tickerTapeItems.length, 1)), 2000);
@@ -1062,11 +1113,8 @@ export default function SwingEdge() {
     ticker = ticker.replace(/USDT$|USD$/, "") || ticker;
     const tickerUpper = ticker.toUpperCase();
 
-    // Try both ticker variants for live price lookup
-    const livePrice =
-      livePrices[tickerUpper]?.price ??
-      livePrices[`${tickerUpper}-USD`]?.price ??
-      null;
+    // Use central engine for variant-safe price lookup
+    const livePrice = getLivePrice(tickerUpper)?.price ?? null;
     const entryStr = livePrice != null ? String(livePrice.toFixed(2)) : "";
 
     if (target === "position") {
@@ -1098,7 +1146,7 @@ export default function SwingEdge() {
 
       {/* ── PRICE ALERT NOTIFICATION ── */}
       {alertNotification && (
-        <div className="fixed top-20 right-6 z-[60] animate-bounce bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 rounded-xl p-4 shadow-2xl max-w-xs">
+        <div className="fixed top-20 right-6 rtl:right-auto rtl:left-6 z-[60] animate-bounce bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 rounded-xl p-4 shadow-2xl max-w-xs">
           <div className="flex items-center gap-2 mb-1">
             <Bell size={16} className="text-amber-400" />
             <span className="text-sm font-bold text-amber-300">{t.alertTriggered}</span>
@@ -1108,7 +1156,7 @@ export default function SwingEdge() {
             <span className="font-mono font-bold text-white">{alertNotification.ticker}</span>
             <span className="text-xs text-slate-400">reached ${alertNotification.price.toFixed(2)}</span>
           </div>
-          <button onClick={() => setAlertNotification(null)} className="absolute top-2 right-2 text-slate-500 hover:text-white"><X size={12} /></button>
+          <button onClick={() => setAlertNotification(null)} className="absolute top-2 right-2 rtl:right-auto rtl:left-2 text-slate-500 hover:text-white"><X size={12} /></button>
         </div>
       )}
 
@@ -1162,7 +1210,7 @@ export default function SwingEdge() {
               <User size={15} className="text-cyan-400" />
             </button>
             {showProfileDropdown && (
-              <div className="absolute right-0 top-10 w-56 bg-[#0d1424] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden">
+              <div className="absolute right-0 rtl:right-auto rtl:left-0 top-10 w-56 bg-[#0d1424] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden">
                 <div className="px-4 py-3 border-b border-white/[0.06] bg-gradient-to-r from-cyan-500/5 to-violet-500/5">
                   <p className="text-xs font-bold text-white">{userProfile?.name || "Trader"}</p>
                   <p className="text-[10px] text-slate-500 mt-0.5 font-mono">${capital.toLocaleString()} portfolio</p>
@@ -1248,7 +1296,7 @@ export default function SwingEdge() {
                 </div>
                 <div className="space-y-2">
                   {openTrades.map(tr => {
-                    const lp = livePrices[tr.ticker];
+                    const lp = getLivePrice(tr.ticker);
                     const currentPrice = lp?.price;
                     const livePnl = currentPrice
                       ? (tr.side === "LONG" ? (currentPrice - tr.entry) * tr.shares : (tr.entry - currentPrice) * tr.shares)
@@ -1592,22 +1640,25 @@ export default function SwingEdge() {
                         <td className="p-3 font-mono text-slate-400">{t.shares}</td>
                         {/* Current Price */}
                         <td className="p-3 font-mono text-xs whitespace-nowrap">
-                          {isOpen ? (
-                            livePrices[t.ticker]?.price
-                              ? <span className="text-slate-200 font-bold">${livePrices[t.ticker].price.toFixed(2)}</span>
+                          {isOpen ? (() => {
+                            const cp = getLivePrice(t.ticker)?.price;
+                            return cp
+                              ? <span className="text-slate-200 font-bold">${cp.toFixed(2)}</span>
                               : pricesLoading
                                 ? <span className="text-slate-600 animate-pulse text-[10px]"><RefreshCw size={8} className="inline animate-spin" /></span>
-                                : <span className="text-slate-700">–</span>
-                          ) : <span className="text-slate-700">–</span>}
+                                : <span className="text-slate-700">–</span>;
+                          })() : <span className="text-slate-700">–</span>}
                         </td>
                         {/* Live P&L */}
                         <td className="p-3 font-bold font-mono text-xs whitespace-nowrap">
-                          {isOpen && livePrices[t.ticker]?.price ? (() => {
+                          {(() => {
+                            const cp = isOpen ? getLivePrice(t.ticker)?.price : null;
+                            if (!cp) return <span className="text-slate-700">–</span>;
                             const lp = t.side === "LONG"
-                              ? (livePrices[t.ticker].price - t.entry) * t.shares
-                              : (t.entry - livePrices[t.ticker].price) * t.shares;
+                              ? (cp - t.entry) * t.shares
+                              : (t.entry - cp) * t.shares;
                             return <span className={lp >= 0 ? "text-[#10b981]" : "text-[#ef4444]"}>{fmt$(Math.round(lp))}</span>;
-                          })() : <span className="text-slate-700">–</span>}
+                          })()}
                         </td>
                         <td className="p-3 font-mono text-slate-300">{t.exit ? `$${t.exit}` : "–"}</td>
                         <td className={`p-3 font-bold font-mono ${isOpen ? "text-slate-500" : win ? "text-[#10b981]" : "text-[#ef4444]"}`}>
@@ -1745,7 +1796,7 @@ export default function SwingEdge() {
                 <div className="relative rounded-lg overflow-hidden border border-white/10">
                   <img src={analyzerImagePreview} alt="Trade chart" className="w-full h-40 object-cover" />
                   <button onClick={() => { setAnalyzerImage(null); setAnalyzerImagePreview(null); }}
-                    className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-slate-300 hover:text-white">
+                    className="absolute top-2 right-2 rtl:right-auto rtl:left-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-slate-300 hover:text-white">
                     <X size={11} />
                   </button>
                 </div>
@@ -1862,8 +1913,8 @@ export default function SwingEdge() {
             setTimeout(() => setPosCopied(false), 2000);
           };
 
-          // Auto-load live price when ticker changes
-          const tickerPrice = posCalc.ticker ? livePrices[posCalc.ticker.toUpperCase()]?.price : null;
+          // Auto-load live price when ticker changes (variant-safe)
+          const tickerPrice = posCalc.ticker ? getLivePrice(posCalc.ticker)?.price ?? null : null;
 
           return (
             <div className="space-y-5 animate-fade-in max-w-2xl mx-auto">
@@ -1887,8 +1938,8 @@ export default function SwingEdge() {
                       onChange={e => {
                         const tk = e.target.value.toUpperCase();
                         setPosCalc(f => ({ ...f, ticker: tk }));
-                        // Auto-load live price
-                        const lp = livePrices[tk]?.price;
+                        // Auto-load live price (variant-safe)
+                        const lp = getLivePrice(tk)?.price;
                         if (lp && !posCalc.entry) {
                           setPosCalc(f => ({ ...f, ticker: tk, entry: String(lp) }));
                         }
@@ -2323,7 +2374,7 @@ export default function SwingEdge() {
                 <div ref={tvRef} style={{ height: "calc(100% - 48px)" }} />
 
                 {/* ── Floating AI Trade Buttons ── */}
-                <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-2">
+                <div className="absolute bottom-4 right-4 rtl:right-auto rtl:left-4 z-10 flex flex-col gap-2">
                   <button
                     onClick={() => handleChartAiExtract("position")}
                     disabled={chartAiLoading}
@@ -2384,7 +2435,7 @@ export default function SwingEdge() {
                       )}
                       {watchlistSearchResults.map(r => {
                         const cleanSym = r.symbol.replace("-USD", "");
-                        const lp = livePrices[cleanSym] || livePrices[r.symbol];
+                        const lp = getLivePrice(cleanSym) || getLivePrice(r.symbol);
                         const isCrypto = r.type === "CRYPTOCURRENCY";
                         const chartSym = isCrypto
                           ? `BINANCE:${cleanSym}USDT`
@@ -2439,13 +2490,13 @@ export default function SwingEdge() {
 
                 <div className="space-y-1.5 overflow-y-auto flex-1">
                   {[...watchlistItems].sort((a, b) => {
-                    const lpA = livePrices[a.ticker] || {};
-                    const lpB = livePrices[b.ticker] || {};
+                    const lpA = getLivePrice(a.ticker) || {};
+                    const lpB = getLivePrice(b.ticker) || {};
                     if (watchlistSortBy === "changePct") return (lpB.changePct || 0) - (lpA.changePct || 0);
                     if (watchlistSortBy === "price") return (lpB.price || 0) - (lpA.price || 0);
                     return a.ticker.localeCompare(b.ticker);
                   }).map(s => {
-                    const lp = livePrices[s.ticker];
+                    const lp = getLivePrice(s.ticker);
                     const price = lp?.price ?? s.price;
                     const changePct = lp?.changePct ?? s.change ?? 0;
                     return (
@@ -2835,7 +2886,7 @@ export default function SwingEdge() {
                       <div className="relative rounded-lg overflow-hidden border border-white/10 h-24">
                         <img src={playbookForm.imagePreview} alt="Setup" className="w-full h-full object-cover" />
                         <button onClick={() => setPlaybookForm(f => ({ ...f, imagePreview: null }))}
-                          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-slate-300 hover:text-white">
+                          className="absolute top-1 right-1 rtl:right-auto rtl:left-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-slate-300 hover:text-white">
                           <X size={10} />
                         </button>
                       </div>
@@ -3104,7 +3155,7 @@ export default function SwingEdge() {
                 <div className="relative rounded-lg overflow-hidden border border-white/10">
                   <img src={form.tradeImagePreview} alt="Trade chart" className="w-full h-32 object-cover" />
                   <button onClick={() => setForm(f=>({...f,tradeImage:null,tradeImagePreview:null}))}
-                    className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-slate-300 hover:text-white">
+                    className="absolute top-1 right-1 rtl:right-auto rtl:left-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-slate-300 hover:text-white">
                     <X size={10} />
                   </button>
                 </div>
@@ -3388,7 +3439,7 @@ export default function SwingEdge() {
       {/* ── FLOATING NEW TRADE BUTTON ── */}
       <button
         onClick={() => setShowForm(true)}
-        className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-violet-500 text-white shadow-2xl shadow-cyan-500/25 flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
+        className="fixed bottom-6 right-6 rtl:right-auto rtl:left-6 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-violet-500 text-white shadow-2xl shadow-cyan-500/25 flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
         title="New Trade"
       >
         <Plus size={24} />
