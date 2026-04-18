@@ -247,6 +247,7 @@ export default function OnboardingScreen({ onComplete }) {
 
   return (
     <div
+      dir="rtl"
       className={`fixed inset-0 z-[100] flex items-center justify-center bg-[#070c18] transition-opacity duration-400 ${visible ? "opacity-100" : "opacity-0"}`}
       style={{ background: "radial-gradient(ellipse at 50% 0%, #0f172a 0%, #070c18 70%)" }}
     >

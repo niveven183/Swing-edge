@@ -1105,36 +1105,66 @@ export default function SwingEdge() {
     setAnalyzerLoading(false);
   };
 
-  // ─── CHART QUICK ACTIONS (Populate forms with chart symbol + live price) ───
+  // ─── CHART QUICK ACTIONS ─────────────────────────────────────────────────
+  // Uses the local rule engine to suggest a sensible stop (2% below entry for
+  // LONG / above for SHORT) and a 2:1 R/R target based on the live chart price.
+  // No external AI required. Emotion/notes/lesson fields are intentionally
+  // left empty for the trader to fill in.
   const handleChartAiExtract = (target) => {
-    // Extract ticker from chartSymbol (e.g. "NASDAQ:NVDA" → "NVDA", "BINANCE:BTCUSDT" → "BTC")
+    setChartAiTarget(target);
+    setChartAiLoading(true);
+
     let ticker = chartSymbol.includes(":") ? chartSymbol.split(":")[1] : chartSymbol;
-    // Clean crypto pairs
     ticker = ticker.replace(/USDT$|USD$/, "") || ticker;
     const tickerUpper = ticker.toUpperCase();
 
-    // Use central engine for variant-safe price lookup
     const livePrice = getLivePrice(tickerUpper)?.price ?? null;
-    const entryStr = livePrice != null ? String(livePrice.toFixed(2)) : "";
+    const entry = livePrice != null ? Number(livePrice.toFixed(2)) : null;
+
+    // Local AI: stop 2% below entry, target at 2:1 R/R
+    const side = "LONG";
+    const stop = entry != null ? Number((entry * 0.98).toFixed(2)) : null;
+    const targetPrice = entry != null && stop != null
+      ? Number((entry + (entry - stop) * 2).toFixed(2))
+      : null;
+
+    const entryStr = entry != null ? String(entry) : "";
+    const stopStr = stop != null ? String(stop) : "";
+    const targetStr = targetPrice != null ? String(targetPrice) : "";
 
     if (target === "position") {
       setPosCalc(f => ({
         ...f,
         ticker: tickerUpper,
+        capital: f.capital || String(capital),
+        risk: f.risk || "1",
         entry: entryStr || f.entry,
+        stop: stopStr || f.stop,
       }));
       setTab("position");
     } else if (target === "journal") {
-      setForm(f => ({
-        ...f,
+      setForm({
         ticker: tickerUpper,
-        side: "LONG",
+        side,
         entry: entryStr,
-        stop: "",
-        target: "",
-      }));
+        stop: stopStr,
+        target: targetStr,
+        setup: "Breakout",
+        notes: "",
+        marketCondition: "Trending Up",
+        emotionAtEntry: "Neutral",
+        entryQuality: 3,
+        tradeImage: null,
+        tradeImagePreview: null,
+      });
+      setAiAnalysis(null);
       setShowForm(true);
     }
+
+    setTimeout(() => {
+      setChartAiLoading(false);
+      setChartAiTarget(null);
+    }, 250);
   };
 
   if (showOnboarding) {
