@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import OnboardingScreen from "./src/components/OnboardingScreen.jsx";
+import AuthScreen from "./src/components/AuthScreen.jsx";
+import BetaWelcome from "./src/components/BetaWelcome.jsx";
+import FeedbackTab from "./src/components/FeedbackTab.jsx";
+import IOSInstallBanner from "./src/components/IOSInstallBanner.jsx";
+import { supabase, isSupabaseConfigured } from "./src/supabaseClient.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell
@@ -12,7 +17,7 @@ import {
   ArrowDownRight, Eye, Layers, Cpu, Radio, FlaskConical,
   Calculator, Copy, Percent, Hash,
   Settings, BookMarked, Thermometer, Trash2, User,
-  Download, FileText, Bell, Flame, Globe
+  Download, FileText, Bell, Flame, Globe, LogOut, MessageCircle
 } from "lucide-react";
 import { getTranslations, LANGUAGES, isRTLLang } from "./src/i18n.js";
 import { fetchPrices, fmtVolume, fmtMarketCap, searchTickers } from "./src/priceService.js";
@@ -477,6 +482,7 @@ const NAV_KEYS = [
   { id: "position",  key: "positionCalc",   icon: Calculator },
   { id: "analytics", key: "analytics",      icon: BarChart2 },
   { id: "intel",     key: "marketIntel",    icon: Rss },
+  { id: "feedback",  key: "feedback",       icon: MessageCircle },
 ];
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
@@ -498,6 +504,55 @@ export default function SwingEdge() {
     setUserProfile(profile);
     setShowOnboarding(false);
   };
+
+  // ── SUPABASE AUTH ──
+  const [authReady, setAuthReady] = useState(!isSupabaseConfigured);
+  const [session, setSession] = useState(null);
+  const authUser = session?.user || null;
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) {
+      setAuthReady(true);
+      return;
+    }
+    let cancelled = false;
+    supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
+      setSession(data?.session || null);
+      setAuthReady(true);
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s || null);
+    });
+    return () => {
+      cancelled = true;
+      listener?.subscription?.unsubscribe?.();
+    };
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    if (isSupabaseConfigured && supabase) {
+      try { await supabase.auth.signOut(); } catch {}
+    }
+    setSession(null);
+    setShowProfileDropdown(false);
+  }, []);
+
+  // Beta welcome — shown once per user after first login
+  const [showBetaWelcome, setShowBetaWelcome] = useState(false);
+  useEffect(() => {
+    if (!authUser) { setShowBetaWelcome(false); return; }
+    try {
+      const key = `swingEdgeBetaWelcome:${authUser.id}`;
+      if (!localStorage.getItem(key)) setShowBetaWelcome(true);
+    } catch {}
+  }, [authUser?.id]);
+
+  const dismissBetaWelcome = useCallback(() => {
+    if (!authUser) return;
+    try { localStorage.setItem(`swingEdgeBetaWelcome:${authUser.id}`, "1"); } catch {}
+    setShowBetaWelcome(false);
+  }, [authUser?.id]);
 
   const [capital, setCapital] = useState(() => {
     try { return parseFloat(localStorage.getItem("swingEdgeCapital")) || 2500; } catch { return 2500; }
@@ -1222,12 +1277,41 @@ export default function SwingEdge() {
     }, 250);
   };
 
+  // Auth gate — block app until we know session state
+  if (!authReady) {
+    return (
+      <div className="min-h-screen bg-[#0a0f1e] text-slate-300 flex items-center justify-center" style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-violet-500 flex items-center justify-center animate-pulse">
+            <Zap size={20} className="text-white" />
+          </div>
+          <span className="text-xs tracking-widest uppercase text-slate-500">Loading SwingEdge…</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (isSupabaseConfigured && !session) {
+    return <AuthScreen />;
+  }
+
   if (showOnboarding) {
     return <OnboardingScreen onComplete={handleOnboardingComplete} />;
   }
 
   return (
     <div className="min-h-screen bg-[#0a0f1e] text-slate-200 font-sans flex flex-col" data-theme={lightMode ? "light" : "dark"} dir={isRTL ? "rtl" : "ltr"} style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
+
+      {/* ── BETA WELCOME (first login only) ── */}
+      {showBetaWelcome && (
+        <BetaWelcome
+          userName={authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || userProfile?.name}
+          onStart={dismissBetaWelcome}
+        />
+      )}
+
+      {/* ── iOS INSTALL BANNER ── */}
+      <IOSInstallBanner />
 
       {/* ── PRICE ALERT NOTIFICATION ── */}
       {alertNotification && (
@@ -1295,9 +1379,12 @@ export default function SwingEdge() {
               <User size={15} className="text-cyan-400" />
             </button>
             {showProfileDropdown && (
-              <div className="absolute right-0 rtl:right-auto rtl:left-0 top-10 w-56 bg-[#0d1424] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden">
+              <div className="absolute right-0 rtl:right-auto rtl:left-0 top-10 w-60 bg-[#0d1424] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden">
                 <div className="px-4 py-3 border-b border-white/[0.06] bg-gradient-to-r from-cyan-500/5 to-violet-500/5">
-                  <p className="text-xs font-bold text-white">{userProfile?.name || "Trader"}</p>
+                  <p className="text-xs font-bold text-white truncate">{userProfile?.name || authUser?.user_metadata?.full_name || "Trader"}</p>
+                  {authUser?.email && (
+                    <p className="text-[10px] text-slate-400 mt-0.5 font-mono truncate">{authUser.email}</p>
+                  )}
                   <p className="text-[10px] text-slate-500 mt-0.5 font-mono">${capital.toLocaleString()} portfolio</p>
                 </div>
                 <div className="p-2 space-y-1">
@@ -1305,11 +1392,24 @@ export default function SwingEdge() {
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-300 hover:bg-white/5 hover:text-white transition text-left">
                     <Settings size={13} className="text-cyan-400" /> {t.profileAndSettings}
                   </button>
+                  <button onClick={() => { setTab("feedback"); setShowProfileDropdown(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-300 hover:bg-white/5 hover:text-white transition text-left">
+                    <MessageCircle size={13} className="text-cyan-400" /> {t.feedback || "Feedback"}
+                  </button>
                   <button onClick={() => { toggleLightMode(); setShowProfileDropdown(false); }}
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-300 hover:bg-white/5 hover:text-white transition text-left">
                     <span className="text-sm">{lightMode ? "🌙" : "☀️"}</span>
                     {lightMode ? "Dark Mode" : "Light Mode"}
                   </button>
+                  {isSupabaseConfigured && session && (
+                    <>
+                      <div className="my-1 h-px bg-white/[0.06]" />
+                      <button onClick={handleLogout}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-rose-300 hover:bg-rose-500/10 hover:text-rose-200 transition text-left">
+                        <LogOut size={13} /> התנתקות
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -3132,6 +3232,11 @@ export default function SwingEdge() {
             </div>
           );
         })()}
+
+        {/* ══════════════ FEEDBACK ══════════════ */}
+        {tab === "feedback" && (
+          <FeedbackTab user={authUser} />
+        )}
 
       </main>
 

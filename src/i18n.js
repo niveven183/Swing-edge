@@ -11,6 +11,7 @@ const en = {
   positionCalc: "Position Calc",
   analytics: "Analytics",
   marketIntel: "Market Intel",
+  feedback: "Feedback",
   settings: "Settings",
 
   // Header
@@ -213,6 +214,7 @@ const he = {
   positionCalc: "מחשבון פוזיציה",
   analytics: "ניתוח ביצועים",
   marketIntel: "מודיעין שוק",
+  feedback: "💬 פידבק",
   settings: "הגדרות",
 
   // Header
