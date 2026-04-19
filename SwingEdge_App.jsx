@@ -17,6 +17,10 @@ import {
 import { getTranslations, LANGUAGES, isRTLLang } from "./src/i18n.js";
 import { fetchPrices, fmtVolume, fmtMarketCap, searchTickers } from "./src/priceService.js";
 import { analyzeTradeLocal, analyzeTradeLocalText } from "./src/localAI.js";
+import { SwingEdgeAI } from "./src/intelligence/SwingEdgeAI.js";
+import {
+  DNACard, EdgeCard, DecisionCoachPanel, TiltShield, GrowthChart, RegimeIndicator,
+} from "./src/intelligence/ui/IntelligenceUI.jsx";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const RISK_PCT = 0.01;
@@ -826,6 +830,30 @@ export default function SwingEdge() {
   const winRate    = closedTrades.length ? closedTrades.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length / closedTrades.length * 100 : 0;
   const avgR       = closedTrades.length ? closedTrades.reduce((a, t) => a + (calcTradeMetrics(t).rMultiple || 0), 0) / closedTrades.length : 0;
 
+  // ─── SWINGEDGE AI REPORTS ──────────────────────────────────────────────────
+  // Memoised against the trades reference — the orchestrator also has an
+  // internal WeakMap cache so repeated reads are effectively free.
+  const aiDNA          = useMemo(() => SwingEdgeAI.getDNA(trades),          [trades]);
+  const aiEdges        = useMemo(() => SwingEdgeAI.getEdges(trades),        [trades]);
+  const aiRegime       = useMemo(() => SwingEdgeAI.getRegime(trades),       [trades]);
+  const aiGrowth       = useMemo(() => SwingEdgeAI.getGrowth(trades),       [trades]);
+  const aiEvolution    = useMemo(() => SwingEdgeAI.getEvolution(trades, 6), [trades]);
+  const aiGrowthReport = useMemo(() => SwingEdgeAI.getGrowthReport(trades), [trades]);
+
+  // Tilt re-evaluates on a 60s tick so cooldown expiry and new conditions update.
+  const [tiltTick, setTiltTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTiltTick(x => x + 1), 60000);
+    return () => clearInterval(id);
+  }, []);
+  const aiTilt = useMemo(() => SwingEdgeAI.checkTilt(trades), [trades, tiltTick]);
+
+  // Live Decision Coach analysis for the new-trade form.
+  const aiCoach = useMemo(
+    () => SwingEdgeAI.analyzeNewTrade(form, trades),
+    [form, trades]
+  );
+
   // ─── CENTRAL EQUITY ENGINE ──────────────────────────────────────────────────
   // Single source of truth: equity = base capital + closed P&L + live open P&L.
   // Reacts automatically whenever any live price updates.
@@ -937,10 +965,28 @@ export default function SwingEdge() {
 
   const handleSubmit = () => {
     if (!form.ticker || !entryN || !stopN) return;
+    // Capture the AI coach's prediction so LearningEngine can grade it at close.
+    const predictionSnapshot = {
+      verdict: aiCoach?.verdict || null,
+      confidence: aiCoach?.confidence ?? null,
+      channels: {
+        setup:   (aiCoach?.insights || []).filter(i => i.text && /setup|breakout|pullback|retest/i.test(i.text.en || ""))
+                  .reduce((s, i) => s + (i.weight > 0 ? 1 : i.weight < 0 ? -1 : 0), 0),
+        emotion: (aiCoach?.insights || []).filter(i => i.text && /emotion|fomo|confident|fear/i.test(i.text.en || ""))
+                  .reduce((s, i) => s + (i.weight > 0 ? 1 : i.weight < 0 ? -1 : 0), 0),
+        market:  (aiCoach?.insights || []).filter(i => i.text && /regime|market/i.test(i.text.en || ""))
+                  .reduce((s, i) => s + (i.weight > 0 ? 1 : i.weight < 0 ? -1 : 0), 0),
+        rr:      (aiCoach?.insights || []).filter(i => i.text && /r\/r|ratio/i.test(i.text.en || ""))
+                  .reduce((s, i) => s + (i.weight > 0 ? 1 : i.weight < 0 ? -1 : 0), 0),
+        time:    0,
+      },
+    };
+
     const newTrade = {
       id: trades.length + 1,
       ticker: form.ticker.toUpperCase(),
       date: new Date().toISOString().slice(0, 10),
+      createdAt: new Date().toISOString(),
       side: form.side,
       entry: entryN, stop: stopN, target: targetN,
       shares: posSize, status: "OPEN", exit: null,
@@ -950,6 +996,8 @@ export default function SwingEdge() {
       entryQuality: form.entryQuality,
       tradeImage: form.tradeImagePreview,
       exitReason: null, followedPlan: null, lessonLearned: null, maxFavorable: null, maxAdverse: null,
+      _capitalAtEntry: capital,
+      _prediction: predictionSnapshot,
     };
     setTrades(prev => [...prev, newTrade]);
     setForm({ ticker: "", side: "LONG", entry: "", stop: "", target: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
@@ -960,13 +1008,20 @@ export default function SwingEdge() {
 
   const handleCloseSubmit = () => {
     if (!closingTrade || !closeForm.exit) return;
-    setTrades(prev => prev.map(t => t.id === closingTrade.id ? {
-      ...t, status: "CLOSED", exit: parseFloat(closeForm.exit),
-      exitReason: closeForm.exitReason, followedPlan: closeForm.followedPlan,
+    const closedTrade = {
+      ...closingTrade,
+      status: "CLOSED",
+      exit: parseFloat(closeForm.exit),
+      closedAt: new Date().toISOString(),
+      exitReason: closeForm.exitReason,
+      followedPlan: closeForm.followedPlan,
       lessonLearned: closeForm.lessonLearned,
       maxFavorable: parseFloat(closeForm.maxFavorable) || null,
       maxAdverse: parseFloat(closeForm.maxAdverse) || null,
-    } : t));
+    };
+    // Close the loop: grade the prediction we made at entry.
+    try { SwingEdgeAI.reinforceFromTrade(closedTrade); } catch { /* learning is best-effort */ }
+    setTrades(prev => prev.map(t => t.id === closingTrade.id ? closedTrade : t));
     setShowCloseForm(false);
     setClosingTrade(null);
     setCloseForm({ exit: "", exitReason: "Target Hit", followedPlan: true, lessonLearned: "", maxFavorable: "", maxAdverse: "" });
@@ -1291,6 +1346,35 @@ export default function SwingEdge() {
               <StatCard label={t.dailyPnl} value={fmt$(Math.round(dailyPnL))} sub={t.todayTrades} icon={DollarSign} accent={dailyPnL >= 0 ? "green" : "red"} />
               <StatCard label={t.streakCounter} value={<span className="flex items-center gap-1">{currentStreak > 0 && <Flame size={18} className="text-orange-400" />}{currentStreak}</span>} sub={`${t.bestStreak}: ${bestStreak}`} icon={Zap} accent={currentStreak >= 3 ? "green" : "amber"} />
             </div>
+
+            {/* ══ SWINGEDGE AI — DNA · GROWTH · REGIME ══ */}
+            {aiTilt && aiTilt.level > 0 && (
+              <TiltShield
+                tilt={aiTilt}
+                lang={lang}
+                onDismiss={() => { SwingEdgeAI.acknowledgeWarning("tilt"); setTiltTick(x => x + 1); }}
+                onCooldown={(mins) => { SwingEdgeAI.engageCooldown(mins); setTiltTick(x => x + 1); }}
+                onClearCooldown={() => { SwingEdgeAI.clearCooldown(); setTiltTick(x => x + 1); }}
+              />
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <DNACard dna={aiDNA} lang={lang} />
+              <GrowthChart
+                evolution={aiEvolution}
+                current={aiGrowth.total}
+                delta={aiGrowthReport.delta}
+                lang={lang}
+              />
+              <RegimeIndicator regime={aiRegime} lang={lang} />
+            </div>
+
+            {/* Top Edge & Anti-Edge */}
+            {(aiEdges?.topEdge || aiEdges?.topAntiEdge) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {aiEdges.topEdge && <EdgeCard edge={aiEdges.topEdge} lang={lang} variant="edge" />}
+                {aiEdges.topAntiEdge && <EdgeCard edge={aiEdges.topAntiEdge} lang={lang} variant="anti" />}
+              </div>
+            )}
 
             {/* Mini Equity + Open Positions */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -3121,6 +3205,9 @@ export default function SwingEdge() {
                   </div>
                 </div>
               )}
+
+              {/* Live Decision Coach — analyses the trade as you type */}
+              <DecisionCoachPanel coaching={aiCoach} lang={lang} />
 
               {/* Setup Type + Notes */}
               <div className="grid grid-cols-2 gap-3">
