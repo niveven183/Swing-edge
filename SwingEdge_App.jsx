@@ -24,7 +24,10 @@ import {
   Shield, Filter, Save, BarChart3
 } from "lucide-react";
 import { getTranslations, LANGUAGES, isRTLLang } from "./src/i18n.js";
-import { fetchPrices, fmtVolume, fmtMarketCap, searchTickers } from "./src/priceService.js";
+import {
+  fetchPrices, fmtVolume, fmtMarketCap, searchTickers,
+  fetchQuote, getMarketState, getMarketStateBadge, getRefreshInterval, MARKET_STATE,
+} from "./src/priceService.js";
 import { analyzeTradeLocal, analyzeTradeLocalText } from "./src/localAI.js";
 import { SwingEdgeAI } from "./src/intelligence/SwingEdgeAI.js";
 import {
@@ -46,6 +49,112 @@ const SECTOR_ETFS = [
 ];
 
 const MOCK_TRADES = [];
+
+// ─── DEMO TRADES (loaded via Settings → "Load Demo Trades") ────────────────
+// Position sizes computed at 1% risk on a rolling $2,500 account. MAE/MFE
+// values are realistic (MFE ≈ peak favorable, MAE ≈ worst adverse tick).
+const DEMO_TRADES = [
+  {
+    id: "demo-1", ticker: "NVDA", side: "LONG", date: "2026-04-05",
+    entry: 175.40, stop: 171.30, target: 185.00, exit: 184.20, shares: 6,
+    status: "CLOSED", setup: "Pullback", marketCondition: "Trending Up",
+    emotionAtEntry: "Confident", entryQuality: 5, followedPlan: true,
+    exitReason: "Target Hit",
+    notes: "RSI נכנס מעל 50 מ-42, wick rejection ב-171.38, 3 ירוקים ברצף ב-4H",
+    lessonLearned: "סבלנות עם setup נקי משתלמת — לא רדפתי, חיכיתי לרי-טסט",
+    maxFavorable: 185.10, maxAdverse: 173.90, _capitalAtEntry: 2500.00,
+  },
+  {
+    id: "demo-2", ticker: "AAPL", side: "LONG", date: "2026-04-07",
+    entry: 218.50, stop: 215.80, target: 226.00, exit: 225.40, shares: 9,
+    status: "CLOSED", setup: "Breakout", marketCondition: "Trending Up",
+    emotionAtEntry: "Neutral", entryQuality: 4, followedPlan: true,
+    exitReason: "Target Hit",
+    notes: "פריצה של $218 אחרי 5 ימי דשדוש, volume 130% מהממוצע",
+    lessonLearned: "Breakouts עם volume confirmation — האחוזי הצלחה הכי גבוהים שלי",
+    maxFavorable: 226.20, maxAdverse: 217.10, _capitalAtEntry: 2552.80,
+  },
+  {
+    id: "demo-3", ticker: "TSLA", side: "LONG", date: "2026-04-08",
+    entry: 285.00, stop: 278.50, target: 298.00, exit: 278.50, shares: 4,
+    status: "CLOSED", setup: "Other", marketCondition: "Volatile",
+    emotionAtEntry: "FOMO", entryQuality: 2, followedPlan: false,
+    exitReason: "Stop Loss",
+    notes: "ניסיתי לתפוס breakout ב-$285 אחרי news של דליבריות",
+    lessonLearned: "FOMO + שוק choppy = הפסד בטוח. לא שוב!",
+    maxFavorable: 287.40, maxAdverse: 278.50, _capitalAtEntry: 2614.90,
+  },
+  {
+    id: "demo-4", ticker: "BTC", side: "LONG", date: "2026-04-09",
+    entry: 71250, stop: 69800, target: 74500, exit: 73950, shares: 0.02,
+    status: "CLOSED", setup: "Pullback", marketCondition: "Trending Up",
+    emotionAtEntry: "Confident", entryQuality: 5, followedPlan: true,
+    exitReason: "Target Hit",
+    notes: "BTC עשה HL ב-69500 ופרץ resistance של 71K עם volume",
+    lessonLearned: "קריפטו עובד מצוין כשיש מבנה ברור של HH/HL",
+    maxFavorable: 74480, maxAdverse: 70640, _capitalAtEntry: 2588.90,
+  },
+  {
+    id: "demo-5", ticker: "META", side: "LONG", date: "2026-04-10",
+    entry: 612.00, stop: 605.00, target: 628.00, exit: 626.50, shares: 3,
+    status: "CLOSED", setup: "Pullback", marketCondition: "Trending Up",
+    emotionAtEntry: "Neutral", entryQuality: 4, followedPlan: true,
+    exitReason: "Target Hit",
+    notes: "מחיר נגע ב-50 EMA, hammer candle, RSI ב-45 מתאושש",
+    lessonLearned: "EMA bounces עובדים כשהטרנד הראשי חזק",
+    maxFavorable: 627.20, maxAdverse: 609.40, _capitalAtEntry: 2642.90,
+  },
+  {
+    id: "demo-6", ticker: "SPY", side: "LONG", date: "2026-04-11",
+    entry: 588.50, stop: 585.20, target: 595.00, exit: 588.80, shares: 8,
+    status: "CLOSED", setup: "Breakout", marketCondition: "Sideways",
+    emotionAtEntry: "Nervous", entryQuality: 2, followedPlan: true,
+    exitReason: "Chart Read",
+    notes: "ניסיתי breakout ב-$588 אבל לא היה volume אמיתי",
+    lessonLearned: "אם אני מהסס בכניסה — סימן שלא צריך להיכנס. סגרתי בזמן.",
+    maxFavorable: 589.90, maxAdverse: 587.10, _capitalAtEntry: 2686.40,
+  },
+  {
+    id: "demo-7", ticker: "AMD", side: "LONG", date: "2026-04-12",
+    entry: 168.20, stop: 164.50, target: 178.00, exit: 176.80, shares: 7,
+    status: "CLOSED", setup: "Breakout", marketCondition: "Trending Up",
+    emotionAtEntry: "Confident", entryQuality: 5, followedPlan: true,
+    exitReason: "Target Hit",
+    notes: "תבנית Cup and Handle ברורה, פריצה ב-$168 עם volume גבוה",
+    lessonLearned: "Cup and Handle — אחת התבניות הכי אמינות שלי",
+    maxFavorable: 178.40, maxAdverse: 166.90, _capitalAtEntry: 2688.80,
+  },
+  {
+    id: "demo-8", ticker: "ETH", side: "LONG", date: "2026-04-14",
+    entry: 3850, stop: 3760, target: 4050, exit: 3760, shares: 0.3,
+    status: "CLOSED", setup: "Pullback", marketCondition: "Volatile",
+    emotionAtEntry: "FOMO", entryQuality: 1, followedPlan: false,
+    exitReason: "Stop Loss",
+    notes: "ניסיתי להחזיר את ההפסד של TSLA — נכנסתי בלי setup ברור",
+    lessonLearned: "Revenge trading = הפסד מובטח. לקחת הפסקה אחרי הפסד!",
+    maxFavorable: 3880, maxAdverse: 3760, _capitalAtEntry: 2749.00,
+  },
+  {
+    id: "demo-9", ticker: "MSFT", side: "LONG", date: "2026-04-15",
+    entry: 445.00, stop: 440.20, target: 458.00, exit: 456.50, shares: 5,
+    status: "CLOSED", setup: "Breakout", marketCondition: "Trending Up",
+    emotionAtEntry: "Confident", entryQuality: 5, followedPlan: true,
+    exitReason: "Target Hit",
+    notes: "אחרי דוחות חזקים, gap up ביום ראשון, hold above $445",
+    lessonLearned: "Post-earnings strength עובד מצוין כשה-setup pattern נשמר",
+    maxFavorable: 457.30, maxAdverse: 443.10, _capitalAtEntry: 2722.00,
+  },
+  {
+    id: "demo-10", ticker: "NVDA", side: "LONG", date: "2026-04-17",
+    entry: 195.50, stop: 192.00, target: 205.00, exit: 201.68, shares: 7,
+    status: "CLOSED", setup: "Breakout", marketCondition: "Trending Up",
+    emotionAtEntry: "Confident", entryQuality: 5, followedPlan: true,
+    exitReason: "Chart Read",
+    notes: "NVDA פרץ $195 עם buy signals מ-MA short+long, volume rising",
+    lessonLearned: "כשכל הסיגנלים מתיישרים — תאמין למערכת",
+    maxFavorable: 202.40, maxAdverse: 194.20, _capitalAtEntry: 2779.50,
+  },
+];
 
 const POPULAR_TICKERS = [
   { symbol: "NVDA", name: "NVIDIA Corporation", exchange: "NASDAQ", type: "EQUITY" },
@@ -478,6 +587,46 @@ const StatCard = ({ label, value, sub, trend, icon: Icon, accent = "cyan" }) => 
   );
 };
 
+// ─── RIBBON TICKER ────────────────────────────────────────────────────────────
+// Shows one symbol on the header ribbon: logo + price + %-change + arrow,
+// with a tooltip (open/prev close/high/low) and a short flash when the price
+// ticks in either direction.
+const RibbonTicker = ({ item }) => {
+  const [flash, setFlash] = useState(null); // "green" | "red" | null
+  const prevPriceRef = useRef(item.price);
+  useEffect(() => {
+    const prev = prevPriceRef.current;
+    if (typeof prev === "number" && typeof item.price === "number" && prev !== item.price) {
+      setFlash(item.price > prev ? "green" : "red");
+      const t = setTimeout(() => setFlash(null), 700);
+      return () => clearTimeout(t);
+    }
+    prevPriceRef.current = item.price;
+  }, [item.price]);
+
+  const bull = (item.changePct || 0) >= 0;
+  const tooltip = [
+    item.open != null ? `Open ${item.open.toFixed(2)}` : null,
+    item.prevClose != null ? `PrevClose ${item.prevClose.toFixed(2)}` : null,
+    item.high != null ? `High ${item.high.toFixed(2)}` : null,
+    item.low != null ? `Low ${item.low.toFixed(2)}` : null,
+  ].filter(Boolean).join(" · ");
+
+  return (
+    <span
+      title={tooltip || item.displayTicker}
+      className={`flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors ${bull ? "text-[#10b981]" : "text-[#ef4444]"} ${flash === "green" ? "flash-green" : ""} ${flash === "red" ? "flash-red" : ""}`}
+    >
+      <TickerLogo ticker={item.displayTicker.replace("-USD","")} size={14} />
+      <span className="font-bold">{item.displayTicker}</span>
+      {typeof item.price === "number" && (
+        <span className="text-slate-300">${item.price.toFixed(2)}</span>
+      )}
+      <span>{bull ? "▲" : "▼"} {bull ? "+" : ""}{(item.changePct || 0).toFixed(2)}%</span>
+    </span>
+  );
+};
+
 // ─── NAV ──────────────────────────────────────────────────────────────────────
 const NAV_KEYS = [
   { id: "dashboard", key: "dashboard",      icon: LayoutDashboard },
@@ -594,6 +743,10 @@ export default function SwingEdge() {
   const tvRef = useRef(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ticker: "", side: "LONG", entry: "", stop: "", target: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
+  // Live quote shown in the Add Trade modal (auto-fills Entry Price).
+  const [formQuote, setFormQuote] = useState(null);
+  const [formQuoteLoading, setFormQuoteLoading] = useState(false);
+  const formQuoteTimer = useRef(null);
   const [pulse, setPulse] = useState(false);
   const [tickerIdx, setTickerIdx] = useState(0);
   const [showCloseForm, setShowCloseForm] = useState(false);
@@ -840,12 +993,13 @@ export default function SwingEdge() {
     try { localStorage.setItem("swingEdgeLang", lang); } catch {}
   }, [lang]);
 
-  // Global live price fetching - fetches for ALL tickers (watchlist + open trades + popular)
+  // Global live price fetching - fetches for ALL tickers (ribbon + watchlist + open trades + popular)
+  const RIBBON_TICKERS = ["NVDA", "AAPL", "TSLA", "MSFT", "META", "AMD", "BTC", "SPY"];
   const fetchLivePrices = useCallback(async () => {
     const openTickers = trades.filter(t => t.status === "OPEN").map(t => t.ticker);
     const watchTickers = watchlistItems.map(w => w.ticker);
     const popularTickers = POPULAR_TICKERS.map(p => p.symbol.replace("-USD", ""));
-    const allTickers = [...new Set([...openTickers, ...watchTickers, ...popularTickers])];
+    const allTickers = [...new Set([...RIBBON_TICKERS, ...openTickers, ...watchTickers, ...popularTickers])];
     if (allTickers.length === 0) return true;
     setPricesLoading(true);
     let ok = false;
@@ -873,7 +1027,18 @@ export default function SwingEdge() {
     return ok;
   }, [trades, watchlistItems, priceAlerts]);
 
-  // Fetch prices globally on mount and every 60 seconds.
+  // Market state — drives badge + refresh cadence. Re-evaluated every 30s so the
+  // UI keeps up with session transitions (pre-market → open → after-hours → closed).
+  const [marketState, setMarketState] = useState(() => getMarketState());
+  useEffect(() => {
+    const t = setInterval(() => setMarketState(getMarketState()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Fetch prices globally on mount and re-run at an interval tuned to market state:
+  //   OPEN   → 15s
+  //   PRE/AFTER → 30s
+  //   CLOSED → 5 min
   // On failure, retry once after 10 seconds.
   useEffect(() => {
     let cancelled = false;
@@ -888,13 +1053,13 @@ export default function SwingEdge() {
     };
 
     run();
-    const interval = setInterval(run, 60000);
+    const interval = setInterval(run, getRefreshInterval(marketState));
     return () => {
       cancelled = true;
       clearInterval(interval);
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [fetchLivePrices]);
+  }, [fetchLivePrices, marketState]);
 
   // Watchlist search handler — dynamic Yahoo Finance search with live prices
   const handleWatchlistSearch = useCallback((query) => {
@@ -1089,17 +1254,24 @@ export default function SwingEdge() {
   // Smart lessons
   const smartLessons = useMemo(() => generateSmartLessons(closedTrades, calcTradeMetrics), [closedTrades]);
 
-  // Ticker tape from watchlist with live prices
+  // Top ticker ribbon — fixed 8 tickers updated with live prices
+  const TOP_RIBBON = ["NVDA", "AAPL", "TSLA", "MSFT", "META", "AMD", "BTC-USD", "SPY"];
   const tickerTapeItems = useMemo(() => {
-    return watchlistItems.slice(0, 10).map(w => {
-      const lp = getLivePrice(w.ticker);
+    return TOP_RIBBON.map(display => {
+      const lookupKey = display.replace("-USD", "");
+      const lp = getLivePrice(lookupKey) || getLivePrice(display);
       return {
-        ticker: w.ticker,
-        changePct: lp ? lp.changePct : (w.change || 0),
-        price: lp ? lp.price : w.price,
+        ticker: display,
+        displayTicker: display === "BTC-USD" ? "BTC" : display,
+        changePct: lp ? lp.changePct : 0,
+        price: lp ? lp.price : null,
+        open: lp?.regularMarketOpen ?? null,
+        high: lp?.regularMarketDayHigh ?? null,
+        low: lp?.regularMarketDayLow ?? null,
+        prevClose: lp?.previousClose ?? null,
       };
     });
-  }, [watchlistItems, getLivePrice]);
+  }, [livePrices]);
 
   useEffect(() => {
     const t = setInterval(() => setTickerIdx(i => (i + 1) % Math.max(tickerTapeItems.length, 1)), 2000);
@@ -1132,6 +1304,37 @@ export default function SwingEdge() {
   const azPortfolioRisk = capital > 0 ? (azDollarRisk / capital) * 100 : 0;
   const azPotGain  = azShares * Math.abs(azTarget - azEntry);
   const azRRRatio  = azDollarRisk > 0 ? azPotGain / azDollarRisk : 0;
+
+  // ─── LIVE QUOTE FOR ADD-TRADE FORM ──────────────────────────────────────────
+  // When the form is open and a ticker is entered, fetch a live quote from Yahoo
+  // and auto-fill Entry Price. Uses a short debounce so rapid typing doesn't
+  // spam the API, and respects a user-edited Entry (won't overwrite).
+  const fetchFormQuote = useCallback(async (ticker, { force = false } = {}) => {
+    if (!ticker) return;
+    setFormQuoteLoading(true);
+    try {
+      const q = await fetchQuote(ticker);
+      if (!q) return;
+      setFormQuote({ ...q, ticker: ticker.toUpperCase() });
+      // Auto-fill Entry Price only if empty (or a manual refresh was requested).
+      setForm(f => {
+        if (f.ticker.toUpperCase() !== ticker.toUpperCase()) return f;
+        if (!force && f.entry) return f;
+        return { ...f, entry: String(q.price.toFixed(2)) };
+      });
+    } finally {
+      setFormQuoteLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!showForm) return;
+    if (formQuoteTimer.current) clearTimeout(formQuoteTimer.current);
+    const ticker = form.ticker.trim();
+    if (!ticker) { setFormQuote(null); return; }
+    formQuoteTimer.current = setTimeout(() => fetchFormQuote(ticker), 250);
+    return () => { if (formQuoteTimer.current) clearTimeout(formQuoteTimer.current); };
+  }, [form.ticker, showForm, fetchFormQuote]);
 
   const handleSubmit = () => {
     if (!form.ticker || !entryN || !stopN) return;
@@ -1271,6 +1474,39 @@ export default function SwingEdge() {
     setShowEditForm(false);
     setEditingTrade(null);
     toast.success(lang === "he" ? "העסקה עודכנה" : "Trade updated");
+  };
+
+  // ─── DEMO TRADES LOADER ─────────────────────────────────────────────────
+  // Adds the 10 DEMO_TRADES into the journal (skipping any already present),
+  // tags each with the logged-in user_id so they are Supabase-ready, and
+  // persists to localStorage through the existing setTrades → useEffect flow.
+  const handleLoadDemoTrades = async () => {
+    const userId = authUser?.id || null;
+    const existingIds = new Set(trades.map(t => t.id));
+    const stamped = DEMO_TRADES
+      .filter(d => !existingIds.has(d.id))
+      .map(d => ({
+        ...d,
+        user_id: userId,
+        createdAt: new Date(d.date + "T14:30:00").toISOString(),
+        closedAt:  new Date(d.date + "T20:00:00").toISOString(),
+        tradeImage: null,
+        _prediction: null,
+      }));
+    if (stamped.length === 0) {
+      toast.info(lang === "he" ? "עסקאות הדמו כבר נטענו" : "Demo trades already loaded");
+      return;
+    }
+    setTrades(prev => [...prev, ...stamped]);
+    // Best-effort Supabase upsert — silently no-op if the `trades` table
+    // hasn't been provisioned yet (keeps the local flow unaffected).
+    if (isSupabaseConfigured && supabase && userId) {
+      try {
+        await supabase.from("trades").upsert(stamped, { onConflict: "id" });
+      } catch { /* ignore — local state is still saved */ }
+    }
+    toast.success(lang === "he" ? `נטענו ${stamped.length} עסקאות דמו` : `Loaded ${stamped.length} demo trades`);
+    setTab("journal");
   };
 
   const handleAddWatchlistTicker = () => {
@@ -1471,17 +1707,11 @@ export default function SwingEdge() {
           <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-500 border border-cyan-500/20 tracking-widest uppercase">Pro</span>
         </div>
 
-        {/* Ticker Tape - Live from watchlist */}
+        {/* Ticker Tape — fixed 8 tickers, flash on price change, tooltip on hover */}
         <div className="hidden md:flex items-center gap-3 text-xs font-mono">
-          {tickerTapeItems.map((item, i) => {
-            const bull = (item.changePct || 0) >= 0;
-            return (
-              <span key={item.ticker} className={`flex items-center gap-1 transition-all duration-500 ${i === tickerIdx ? "opacity-100 scale-105" : "opacity-40"} ${bull ? "text-[#10b981]" : "text-[#ef4444]"}`}>
-                <TickerLogo ticker={item.ticker} size={14} />
-                {item.ticker} {bull ? "+" : ""}{(item.changePct || 0).toFixed(1)}%
-              </span>
-            );
-          })}
+          {tickerTapeItems.map((item) => (
+            <RibbonTicker key={item.ticker} item={item} />
+          ))}
           {pricesLoading && <RefreshCw size={10} className="animate-spin text-slate-600" />}
         </div>
 
@@ -1491,8 +1721,26 @@ export default function SwingEdge() {
             className="flex items-center gap-1.5"
             title={pricesLastUpdated ? `${t.lastUpdated}: ${pricesLastUpdated.toLocaleTimeString()}` : t.live}
           >
-            <span className={`w-2 h-2 rounded-full ${pulse ? "bg-emerald-400" : "bg-emerald-600"} transition-colors`} />
-            <span className="text-[10px] text-emerald-400 font-bold tracking-wider">● LIVE</span>
+            {(() => {
+              const badge = getMarketStateBadge(marketState);
+              return (
+                <>
+                  <span
+                    className="w-2 h-2 rounded-full transition-colors"
+                    style={{
+                      backgroundColor: badge.color,
+                      opacity: marketState === MARKET_STATE.OPEN ? (pulse ? 1 : 0.55) : 0.85,
+                    }}
+                  />
+                  <span
+                    className="text-[10px] font-bold tracking-wider whitespace-nowrap"
+                    style={{ color: badge.color }}
+                  >
+                    {badge.emoji} {badge.label}
+                  </span>
+                </>
+              );
+            })()}
             {pricesLastUpdated && (
               <span className="text-[9px] text-slate-600 font-mono hidden md:inline">
                 {pricesLastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
@@ -1510,7 +1758,22 @@ export default function SwingEdge() {
               <User size={15} className="text-cyan-400" />
             </button>
             {showProfileDropdown && (
-              <div className="absolute right-0 rtl:right-auto rtl:left-0 top-10 w-60 max-w-[calc(100vw-2rem)] bg-[#0d1424] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden">
+              <>
+                {/* Backdrop — clicking anywhere outside closes the menu (also catches iPad/mobile taps) */}
+                <div
+                  className="fixed inset-0 bg-black/40 backdrop-blur-[1px] z-[9998] animate-fade-in"
+                  onClick={() => setShowProfileDropdown(false)}
+                />
+                <div
+                  className="w-60 bg-[#0d1424] border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-fade-in"
+                  style={{
+                    position: "fixed",
+                    top: 56,
+                    right: 16,
+                    maxWidth: "calc(100vw - 32px)",
+                    zIndex: 9999,
+                  }}
+                >
                 <div className="px-4 py-3 border-b border-white/[0.06] bg-gradient-to-r from-cyan-500/5 to-violet-500/5">
                   <p className="text-xs font-bold text-white truncate">{userProfile?.name || authUser?.user_metadata?.full_name || "Trader"}</p>
                   {authUser?.email && (
@@ -1548,7 +1811,8 @@ export default function SwingEdge() {
                     </>
                   )}
                 </div>
-              </div>
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -3265,6 +3529,25 @@ export default function SwingEdge() {
                 </p>
               </div>
 
+              {/* ── DEMO TRADES ── */}
+              <div className="bg-[#0d1424] border border-amber-500/20 rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <FlaskConical size={16} className="text-amber-400" />
+                  <h3 className="text-sm font-bold text-white">Demo Trades</h3>
+                </div>
+                <p className="text-xs text-slate-500 mb-3">
+                  טען 10 עסקאות לדוגמה מציאותיות (7 WIN · 2 LOSS · 1 BE) מהשבועיים האחרונים, כולל MAE/MFE, רגש, לקחים וחישובי 1% risk על הון $2,500.
+                </p>
+                <button
+                  onClick={handleLoadDemoTrades}
+                  className="w-full py-2.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
+                  <Download size={12} /> Load Demo Trades
+                </button>
+                <p className="text-[10px] text-slate-700 mt-2">
+                  * העסקאות נשמרות מקומית ומסונכרנות ל-Supabase תחת ה-user_id שלך (אם מוגדר).
+                </p>
+              </div>
+
               {/* ── TILTMETER ── */}
               <div className={`bg-[#0d1424] border rounded-xl p-5 ${tiltBg}`}>
                 <div className="flex items-center justify-between mb-4">
@@ -3571,6 +3854,65 @@ export default function SwingEdge() {
                   </div>
                 </div>
               </div>
+
+              {/* Live quote badge + Open/High/Low/Pre/After */}
+              {form.ticker && (() => {
+                const badge = getMarketStateBadge(formQuote?.marketState || marketState);
+                const q = formQuote;
+                const marketOpen = (formQuote?.marketState || marketState) === MARKET_STATE.OPEN;
+                return (
+                  <div className="bg-white/3 border border-white/[0.06] rounded-xl p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="text-[10px] font-bold tracking-wider px-2 py-0.5 rounded-full border"
+                          style={{ color: badge.color, borderColor: badge.color + "40", background: badge.color + "15" }}
+                        >
+                          {badge.emoji} {marketOpen ? "LIVE" : q ? "LAST CLOSE" : badge.label}
+                        </span>
+                        {q?.price != null && (
+                          <span className="text-sm font-mono font-bold text-white">${q.price.toFixed(2)}</span>
+                        )}
+                        {q?.changePct != null && (
+                          <span className={`text-[11px] font-mono ${q.changePct >= 0 ? "text-[#10b981]" : "text-[#ef4444]"}`}>
+                            {q.changePct >= 0 ? "+" : ""}{q.changePct.toFixed(2)}%
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => fetchFormQuote(form.ticker, { force: true })}
+                        disabled={formQuoteLoading}
+                        title="Refresh price"
+                        className="text-slate-400 hover:text-cyan-400 transition p-1 rounded hover:bg-white/5 disabled:opacity-50"
+                      >
+                        <RefreshCw size={12} className={formQuoteLoading ? "animate-spin" : ""} />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-5 gap-1 text-[9px] text-slate-500">
+                      <div className="text-center">
+                        <div className="uppercase tracking-wider">Open</div>
+                        <div className="font-mono text-slate-300">{q?.regularMarketOpen != null ? q.regularMarketOpen.toFixed(2) : "—"}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="uppercase tracking-wider">High</div>
+                        <div className="font-mono text-[#10b981]">{q?.regularMarketDayHigh != null ? q.regularMarketDayHigh.toFixed(2) : "—"}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="uppercase tracking-wider">Low</div>
+                        <div className="font-mono text-[#ef4444]">{q?.regularMarketDayLow != null ? q.regularMarketDayLow.toFixed(2) : "—"}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="uppercase tracking-wider">Pre</div>
+                        <div className="font-mono text-amber-400">{q?.preMarketPrice != null ? q.preMarketPrice.toFixed(2) : "—"}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="uppercase tracking-wider">After</div>
+                        <div className="font-mono text-orange-400">{q?.postMarketPrice != null ? q.postMarketPrice.toFixed(2) : "—"}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Prices */}
               <div className="grid grid-cols-3 gap-3">

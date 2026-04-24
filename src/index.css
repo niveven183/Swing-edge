@@ -2,6 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Animations ── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fadeIn 200ms ease-out; }
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-down { animation: slideDown 200ms ease-out; }
+
+@keyframes flashGreen {
+  0%   { background-color: rgba(16,185,129,0.35); }
+  100% { background-color: transparent; }
+}
+@keyframes flashRed {
+  0%   { background-color: rgba(239,68,68,0.35); }
+  100% { background-color: transparent; }
+}
+.flash-green { animation: flashGreen 700ms ease-out; }
+.flash-red   { animation: flashRed   700ms ease-out; }
+
 /* ── RTL SUPPORT ── */
 /* Keep monospace numeric content readable (LTR) even inside RTL pages */
 [dir="rtl"] .font-mono { direction: ltr; unicode-bidi: isolate; text-align: inherit; }
