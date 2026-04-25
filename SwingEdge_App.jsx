@@ -1,5 +1,13 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import OnboardingScreen from "./src/components/OnboardingScreen.jsx";
+import AuthScreen from "./src/components/AuthScreen.jsx";
+import BetaWelcome from "./src/components/BetaWelcome.jsx";
+import FeedbackTab from "./src/components/FeedbackTab.jsx";
+import IOSInstallBanner from "./src/components/IOSInstallBanner.jsx";
+import AdminPanel from "./src/components/AdminPanel.jsx";
+import TradingViewSearch from "./src/components/TradingViewSearch.jsx";
+import { useToast, useConfirm, Tooltip as UiTooltip } from "./src/components/ToastProvider.jsx";
+import { supabase, isSupabaseConfigured } from "./src/supabaseClient.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell
@@ -12,11 +20,19 @@ import {
   ArrowDownRight, Eye, Layers, Cpu, Radio, FlaskConical,
   Calculator, Copy, Percent, Hash,
   Settings, BookMarked, Thermometer, Trash2, User,
-  Download, FileText, Bell, Flame, Globe
+  Download, FileText, Bell, Flame, Globe, LogOut, MessageCircle,
+  Shield, Filter, Save, BarChart3
 } from "lucide-react";
 import { getTranslations, LANGUAGES, isRTLLang } from "./src/i18n.js";
-import { fetchPrices, fmtVolume, fmtMarketCap, searchTickers } from "./src/priceService.js";
+import {
+  fetchPrices, fmtVolume, fmtMarketCap, searchTickers,
+  fetchQuote, getMarketState, getMarketStateBadge, getRefreshInterval, MARKET_STATE,
+} from "./src/priceService.js";
 import { analyzeTradeLocal, analyzeTradeLocalText } from "./src/localAI.js";
+import { SwingEdgeAI } from "./src/intelligence/SwingEdgeAI.js";
+import {
+  DNACard, EdgeCard, DecisionCoachPanel, TiltShield, GrowthChart, RegimeIndicator,
+} from "./src/intelligence/ui/IntelligenceUI.jsx";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const RISK_PCT = 0.01;
@@ -33,6 +49,112 @@ const SECTOR_ETFS = [
 ];
 
 const MOCK_TRADES = [];
+
+// ─── DEMO TRADES (loaded via Settings → "Load Demo Trades") ────────────────
+// Position sizes computed at 1% risk on a rolling $2,500 account. MAE/MFE
+// values are realistic (MFE ≈ peak favorable, MAE ≈ worst adverse tick).
+const DEMO_TRADES = [
+  {
+    id: "demo-1", ticker: "NVDA", side: "LONG", date: "2026-04-05",
+    entry: 175.40, stop: 171.30, target: 185.00, exit: 184.20, shares: 6,
+    status: "CLOSED", setup: "Pullback", marketCondition: "Trending Up",
+    emotionAtEntry: "Confident", entryQuality: 5, followedPlan: true,
+    exitReason: "Target Hit",
+    notes: "RSI נכנס מעל 50 מ-42, wick rejection ב-171.38, 3 ירוקים ברצף ב-4H",
+    lessonLearned: "סבלנות עם setup נקי משתלמת — לא רדפתי, חיכיתי לרי-טסט",
+    maxFavorable: 185.10, maxAdverse: 173.90, _capitalAtEntry: 2500.00,
+  },
+  {
+    id: "demo-2", ticker: "AAPL", side: "LONG", date: "2026-04-07",
+    entry: 218.50, stop: 215.80, target: 226.00, exit: 225.40, shares: 9,
+    status: "CLOSED", setup: "Breakout", marketCondition: "Trending Up",
+    emotionAtEntry: "Neutral", entryQuality: 4, followedPlan: true,
+    exitReason: "Target Hit",
+    notes: "פריצה של $218 אחרי 5 ימי דשדוש, volume 130% מהממוצע",
+    lessonLearned: "Breakouts עם volume confirmation — האחוזי הצלחה הכי גבוהים שלי",
+    maxFavorable: 226.20, maxAdverse: 217.10, _capitalAtEntry: 2552.80,
+  },
+  {
+    id: "demo-3", ticker: "TSLA", side: "LONG", date: "2026-04-08",
+    entry: 285.00, stop: 278.50, target: 298.00, exit: 278.50, shares: 4,
+    status: "CLOSED", setup: "Other", marketCondition: "Volatile",
+    emotionAtEntry: "FOMO", entryQuality: 2, followedPlan: false,
+    exitReason: "Stop Loss",
+    notes: "ניסיתי לתפוס breakout ב-$285 אחרי news של דליבריות",
+    lessonLearned: "FOMO + שוק choppy = הפסד בטוח. לא שוב!",
+    maxFavorable: 287.40, maxAdverse: 278.50, _capitalAtEntry: 2614.90,
+  },
+  {
+    id: "demo-4", ticker: "BTC", side: "LONG", date: "2026-04-09",
+    entry: 71250, stop: 69800, target: 74500, exit: 73950, shares: 0.02,
+    status: "CLOSED", setup: "Pullback", marketCondition: "Trending Up",
+    emotionAtEntry: "Confident", entryQuality: 5, followedPlan: true,
+    exitReason: "Target Hit",
+    notes: "BTC עשה HL ב-69500 ופרץ resistance של 71K עם volume",
+    lessonLearned: "קריפטו עובד מצוין כשיש מבנה ברור של HH/HL",
+    maxFavorable: 74480, maxAdverse: 70640, _capitalAtEntry: 2588.90,
+  },
+  {
+    id: "demo-5", ticker: "META", side: "LONG", date: "2026-04-10",
+    entry: 612.00, stop: 605.00, target: 628.00, exit: 626.50, shares: 3,
+    status: "CLOSED", setup: "Pullback", marketCondition: "Trending Up",
+    emotionAtEntry: "Neutral", entryQuality: 4, followedPlan: true,
+    exitReason: "Target Hit",
+    notes: "מחיר נגע ב-50 EMA, hammer candle, RSI ב-45 מתאושש",
+    lessonLearned: "EMA bounces עובדים כשהטרנד הראשי חזק",
+    maxFavorable: 627.20, maxAdverse: 609.40, _capitalAtEntry: 2642.90,
+  },
+  {
+    id: "demo-6", ticker: "SPY", side: "LONG", date: "2026-04-11",
+    entry: 588.50, stop: 585.20, target: 595.00, exit: 588.80, shares: 8,
+    status: "CLOSED", setup: "Breakout", marketCondition: "Sideways",
+    emotionAtEntry: "Nervous", entryQuality: 2, followedPlan: true,
+    exitReason: "Chart Read",
+    notes: "ניסיתי breakout ב-$588 אבל לא היה volume אמיתי",
+    lessonLearned: "אם אני מהסס בכניסה — סימן שלא צריך להיכנס. סגרתי בזמן.",
+    maxFavorable: 589.90, maxAdverse: 587.10, _capitalAtEntry: 2686.40,
+  },
+  {
+    id: "demo-7", ticker: "AMD", side: "LONG", date: "2026-04-12",
+    entry: 168.20, stop: 164.50, target: 178.00, exit: 176.80, shares: 7,
+    status: "CLOSED", setup: "Breakout", marketCondition: "Trending Up",
+    emotionAtEntry: "Confident", entryQuality: 5, followedPlan: true,
+    exitReason: "Target Hit",
+    notes: "תבנית Cup and Handle ברורה, פריצה ב-$168 עם volume גבוה",
+    lessonLearned: "Cup and Handle — אחת התבניות הכי אמינות שלי",
+    maxFavorable: 178.40, maxAdverse: 166.90, _capitalAtEntry: 2688.80,
+  },
+  {
+    id: "demo-8", ticker: "ETH", side: "LONG", date: "2026-04-14",
+    entry: 3850, stop: 3760, target: 4050, exit: 3760, shares: 0.3,
+    status: "CLOSED", setup: "Pullback", marketCondition: "Volatile",
+    emotionAtEntry: "FOMO", entryQuality: 1, followedPlan: false,
+    exitReason: "Stop Loss",
+    notes: "ניסיתי להחזיר את ההפסד של TSLA — נכנסתי בלי setup ברור",
+    lessonLearned: "Revenge trading = הפסד מובטח. לקחת הפסקה אחרי הפסד!",
+    maxFavorable: 3880, maxAdverse: 3760, _capitalAtEntry: 2749.00,
+  },
+  {
+    id: "demo-9", ticker: "MSFT", side: "LONG", date: "2026-04-15",
+    entry: 445.00, stop: 440.20, target: 458.00, exit: 456.50, shares: 5,
+    status: "CLOSED", setup: "Breakout", marketCondition: "Trending Up",
+    emotionAtEntry: "Confident", entryQuality: 5, followedPlan: true,
+    exitReason: "Target Hit",
+    notes: "אחרי דוחות חזקים, gap up ביום ראשון, hold above $445",
+    lessonLearned: "Post-earnings strength עובד מצוין כשה-setup pattern נשמר",
+    maxFavorable: 457.30, maxAdverse: 443.10, _capitalAtEntry: 2722.00,
+  },
+  {
+    id: "demo-10", ticker: "NVDA", side: "LONG", date: "2026-04-17",
+    entry: 195.50, stop: 192.00, target: 205.00, exit: 201.68, shares: 7,
+    status: "CLOSED", setup: "Breakout", marketCondition: "Trending Up",
+    emotionAtEntry: "Confident", entryQuality: 5, followedPlan: true,
+    exitReason: "Chart Read",
+    notes: "NVDA פרץ $195 עם buy signals מ-MA short+long, volume rising",
+    lessonLearned: "כשכל הסיגנלים מתיישרים — תאמין למערכת",
+    maxFavorable: 202.40, maxAdverse: 194.20, _capitalAtEntry: 2779.50,
+  },
+];
 
 const POPULAR_TICKERS = [
   { symbol: "NVDA", name: "NVIDIA Corporation", exchange: "NASDAQ", type: "EQUITY" },
@@ -450,7 +572,7 @@ const StatCard = ({ label, value, sub, trend, icon: Icon, accent = "cyan" }) => 
   const { border, iconColor, bg } = accents[accent] || accents.cyan;
   return (
     <div className={`${bg} border ${border} rounded-xl p-4 flex flex-col gap-1 relative overflow-hidden bg-[#0d1424]`}>
-      <div className={`absolute top-3 right-3 opacity-15 ${iconColor}`}>
+      <div className={`absolute top-3 right-3 rtl:right-auto rtl:left-3 opacity-15 ${iconColor}`}>
         <Icon size={26} />
       </div>
       <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500">{label}</span>
@@ -465,6 +587,46 @@ const StatCard = ({ label, value, sub, trend, icon: Icon, accent = "cyan" }) => 
   );
 };
 
+// ─── RIBBON TICKER ────────────────────────────────────────────────────────────
+// Shows one symbol on the header ribbon: logo + price + %-change + arrow,
+// with a tooltip (open/prev close/high/low) and a short flash when the price
+// ticks in either direction.
+const RibbonTicker = ({ item }) => {
+  const [flash, setFlash] = useState(null); // "green" | "red" | null
+  const prevPriceRef = useRef(item.price);
+  useEffect(() => {
+    const prev = prevPriceRef.current;
+    if (typeof prev === "number" && typeof item.price === "number" && prev !== item.price) {
+      setFlash(item.price > prev ? "green" : "red");
+      const t = setTimeout(() => setFlash(null), 700);
+      return () => clearTimeout(t);
+    }
+    prevPriceRef.current = item.price;
+  }, [item.price]);
+
+  const bull = (item.changePct || 0) >= 0;
+  const tooltip = [
+    item.open != null ? `Open ${item.open.toFixed(2)}` : null,
+    item.prevClose != null ? `PrevClose ${item.prevClose.toFixed(2)}` : null,
+    item.high != null ? `High ${item.high.toFixed(2)}` : null,
+    item.low != null ? `Low ${item.low.toFixed(2)}` : null,
+  ].filter(Boolean).join(" · ");
+
+  return (
+    <span
+      title={tooltip || item.displayTicker}
+      className={`flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors ${bull ? "text-[#10b981]" : "text-[#ef4444]"} ${flash === "green" ? "flash-green" : ""} ${flash === "red" ? "flash-red" : ""}`}
+    >
+      <TickerLogo ticker={item.displayTicker.replace("-USD","")} size={14} />
+      <span className="font-bold">{item.displayTicker}</span>
+      {typeof item.price === "number" && (
+        <span className="text-slate-300">${item.price.toFixed(2)}</span>
+      )}
+      <span>{bull ? "▲" : "▼"} {bull ? "+" : ""}{(item.changePct || 0).toFixed(2)}%</span>
+    </span>
+  );
+};
+
 // ─── NAV ──────────────────────────────────────────────────────────────────────
 const NAV_KEYS = [
   { id: "dashboard", key: "dashboard",      icon: LayoutDashboard },
@@ -473,6 +635,7 @@ const NAV_KEYS = [
   { id: "position",  key: "positionCalc",   icon: Calculator },
   { id: "analytics", key: "analytics",      icon: BarChart2 },
   { id: "intel",     key: "marketIntel",    icon: Rss },
+  { id: "feedback",  key: "feedback",       icon: MessageCircle },
 ];
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
@@ -495,6 +658,60 @@ export default function SwingEdge() {
     setShowOnboarding(false);
   };
 
+  // ── SUPABASE AUTH ──
+  const [authReady, setAuthReady] = useState(!isSupabaseConfigured);
+  const [session, setSession] = useState(null);
+  const authUser = session?.user || null;
+  const isAdmin = (authUser?.email || "").toLowerCase() === "niveven183@gmail.com";
+
+  // Toast + Confirm (UX infrastructure)
+  const toast = useToast();
+  const confirmDialog = useConfirm();
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) {
+      setAuthReady(true);
+      return;
+    }
+    let cancelled = false;
+    supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
+      setSession(data?.session || null);
+      setAuthReady(true);
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s || null);
+    });
+    return () => {
+      cancelled = true;
+      listener?.subscription?.unsubscribe?.();
+    };
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    if (isSupabaseConfigured && supabase) {
+      try { await supabase.auth.signOut(); } catch {}
+    }
+    setSession(null);
+    setShowProfileDropdown(false);
+  }, []);
+
+  // Beta welcome — shown once per user after first login
+  const [showBetaWelcome, setShowBetaWelcome] = useState(false);
+  useEffect(() => {
+    if (!authUser) { setShowBetaWelcome(false); return; }
+    try {
+      const key = `swingEdgeBetaWelcome:${authUser.id}`;
+      if (!localStorage.getItem(key)) setShowBetaWelcome(true);
+    } catch {}
+  }, [authUser?.id]);
+
+  const dismissBetaWelcome = useCallback(() => {
+    if (!authUser) return;
+    try { localStorage.setItem(`swingEdgeBetaWelcome:${authUser.id}`, "1"); } catch {}
+    setShowBetaWelcome(false);
+  }, [authUser?.id]);
+
   const [capital, setCapital] = useState(() => {
     try { return parseFloat(localStorage.getItem("swingEdgeCapital")) || 2500; } catch { return 2500; }
   });
@@ -506,7 +723,14 @@ export default function SwingEdge() {
   const [sectorLoading, setSectorLoading] = useState(false);
   const [sectorLastUpdated, setSectorLastUpdated] = useState(null);
 
-  const [tab, setTab] = useState("dashboard");
+  const [tab, setTab] = useState(() => {
+    try {
+      const path = (window.location.pathname || "").toLowerCase();
+      const hash = (window.location.hash || "").toLowerCase();
+      if (path.includes("/admin") || hash.includes("admin")) return "admin";
+    } catch {}
+    return "dashboard";
+  });
   const [trades, setTrades] = useState(() => {
     try {
       const saved = localStorage.getItem("swingEdgeTrades");
@@ -514,10 +738,15 @@ export default function SwingEdge() {
     } catch { return MOCK_TRADES; }
   });
   const [chartSymbol, setChartSymbol] = useState("NASDAQ:NVDA");
-  const [chartInterval, setChartInterval] = useState("D");
+  const [chartInterval, setChartInterval] = useState("1D");
+  const [chartStyle, setChartStyle] = useState("1");
   const tvRef = useRef(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ticker: "", side: "LONG", entry: "", stop: "", target: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
+  // Live quote shown in the Add Trade modal (auto-fills Entry Price).
+  const [formQuote, setFormQuote] = useState(null);
+  const [formQuoteLoading, setFormQuoteLoading] = useState(false);
+  const formQuoteTimer = useRef(null);
   const [pulse, setPulse] = useState(false);
   const [tickerIdx, setTickerIdx] = useState(0);
   const [showCloseForm, setShowCloseForm] = useState(false);
@@ -613,6 +842,12 @@ export default function SwingEdge() {
   });
   const [watchlistInput, setWatchlistInput] = useState("");
 
+  // Journal Pro filters
+  const [journalFilters, setJournalFilters] = useState({
+    ticker: "", setup: "all", result: "all", from: "", to: "", rMin: "", rMax: "",
+  });
+  const [showJournalFilters, setShowJournalFilters] = useState(false);
+
   // Persist trades to localStorage
   useEffect(() => {
     try { localStorage.setItem("swingEdgeTrades", JSON.stringify(trades)); } catch {}
@@ -634,7 +869,7 @@ export default function SwingEdge() {
     inner.style.height = "100%";
     container.appendChild(inner);
 
-    const intervalMap = { "1D": "D", "4H": "240", "1H": "60", "15m": "15" };
+    const intervalMap = { "1m": "1", "5m": "5", "15m": "15", "1H": "60", "4H": "240", "1D": "D", "1W": "W" };
     const tvInterval = intervalMap[chartInterval] || chartInterval;
 
     const script = document.createElement("script");
@@ -649,7 +884,7 @@ export default function SwingEdge() {
         interval: tvInterval,
         timezone: "America/New_York",
         theme: "dark",
-        style: "1",
+        style: chartStyle || "1",
         locale: "en",
         toolbar_bg: "#0d1424",
         backgroundColor: "#0a0f1e",
@@ -662,7 +897,7 @@ export default function SwingEdge() {
     };
     document.head.appendChild(script);
     return () => { try { document.head.removeChild(script); } catch {} };
-  }, [tab, chartSymbol, chartInterval]);
+  }, [tab, chartSymbol, chartInterval, chartStyle]);
 
   // Close profile dropdown on outside click
   useEffect(() => {
@@ -674,6 +909,31 @@ export default function SwingEdge() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  // Global keyboard shortcuts: N=new trade, J=journal, D=dashboard, ESC=close modals
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = (e.target?.tagName || "").toLowerCase();
+      const isTyping = tag === "input" || tag === "textarea" || e.target?.isContentEditable;
+      if (e.key === "Escape") {
+        if (showForm) setShowForm(false);
+        if (showCloseForm) { setShowCloseForm(false); setClosingTrade(null); }
+        if (showEditForm) { setShowEditForm(false); setEditingTrade(null); }
+        if (showProfileDropdown) setShowProfileDropdown(false);
+        return;
+      }
+      if (isTyping) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k === "n") { e.preventDefault(); setShowForm(true); }
+      else if (k === "j") { e.preventDefault(); setTab("journal"); }
+      else if (k === "d") { e.preventDefault(); setTab("dashboard"); }
+      else if (k === "a") { e.preventDefault(); setTab("analyzer"); }
+      else if (k === "i") { e.preventDefault(); setTab("intel"); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showForm, showCloseForm, showEditForm, showProfileDropdown]);
 
   // Sector data fetch
   const fetchSectorData = useCallback(async () => {
@@ -733,17 +993,20 @@ export default function SwingEdge() {
     try { localStorage.setItem("swingEdgeLang", lang); } catch {}
   }, [lang]);
 
-  // Global live price fetching - fetches for ALL tickers (watchlist + open trades + popular)
+  // Global live price fetching - fetches for ALL tickers (ribbon + watchlist + open trades + popular)
+  const RIBBON_TICKERS = ["NVDA", "AAPL", "TSLA", "MSFT", "META", "AMD", "BTC", "SPY"];
   const fetchLivePrices = useCallback(async () => {
     const openTickers = trades.filter(t => t.status === "OPEN").map(t => t.ticker);
     const watchTickers = watchlistItems.map(w => w.ticker);
     const popularTickers = POPULAR_TICKERS.map(p => p.symbol.replace("-USD", ""));
-    const allTickers = [...new Set([...openTickers, ...watchTickers, ...popularTickers])];
-    if (allTickers.length === 0) return;
+    const allTickers = [...new Set([...RIBBON_TICKERS, ...openTickers, ...watchTickers, ...popularTickers])];
+    if (allTickers.length === 0) return true;
     setPricesLoading(true);
+    let ok = false;
     try {
       const priceData = await fetchPrices(allTickers);
       if (Object.keys(priceData).length > 0) {
+        ok = true;
         setLivePrices(prev => ({ ...prev, ...priceData }));
         setPricesLastUpdated(new Date());
 
@@ -761,16 +1024,44 @@ export default function SwingEdge() {
       }
     } catch (e) { console.warn("Live prices fetch failed:", e); }
     setPricesLoading(false);
+    return ok;
   }, [trades, watchlistItems, priceAlerts]);
 
-  // Fetch prices globally on mount and every 60 seconds
+  // Market state — drives badge + refresh cadence. Re-evaluated every 30s so the
+  // UI keeps up with session transitions (pre-market → open → after-hours → closed).
+  const [marketState, setMarketState] = useState(() => getMarketState());
   useEffect(() => {
-    fetchLivePrices();
-    const interval = setInterval(fetchLivePrices, 60000);
-    return () => clearInterval(interval);
-  }, [fetchLivePrices]);
+    const t = setInterval(() => setMarketState(getMarketState()), 30_000);
+    return () => clearInterval(t);
+  }, []);
 
-  // Watchlist search handler
+  // Fetch prices globally on mount and re-run at an interval tuned to market state:
+  //   OPEN   → 15s
+  //   PRE/AFTER → 30s
+  //   CLOSED → 5 min
+  // On failure, retry once after 10 seconds.
+  useEffect(() => {
+    let cancelled = false;
+    let retryTimer = null;
+
+    const run = async () => {
+      const ok = await fetchLivePrices();
+      if (cancelled) return;
+      if (!ok) {
+        retryTimer = setTimeout(() => { if (!cancelled) run(); }, 10000);
+      }
+    };
+
+    run();
+    const interval = setInterval(run, getRefreshInterval(marketState));
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [fetchLivePrices, marketState]);
+
+  // Watchlist search handler — dynamic Yahoo Finance search with live prices
   const handleWatchlistSearch = useCallback((query) => {
     setWatchlistInput(query.toUpperCase());
     if (watchlistSearchTimeout.current) clearTimeout(watchlistSearchTimeout.current);
@@ -778,8 +1069,18 @@ export default function SwingEdge() {
     setWatchlistSearching(true);
     watchlistSearchTimeout.current = setTimeout(async () => {
       const results = await searchTickers(query);
-      setWatchlistSearchResults(results.length > 0 ? results : POPULAR_TICKERS);
+      const final = results.length > 0 ? results : POPULAR_TICKERS;
+      setWatchlistSearchResults(final);
       setWatchlistSearching(false);
+      // Pre-fetch prices for the first few results so each row can show its price
+      const topSyms = final.slice(0, 8).map(r => r.symbol.replace("-USD", ""));
+      if (topSyms.length > 0) {
+        fetchPrices(topSyms).then(priceData => {
+          if (Object.keys(priceData).length > 0) {
+            setLivePrices(prev => ({ ...prev, ...priceData }));
+          }
+        });
+      }
     }, 300);
   }, []);
 
@@ -797,19 +1098,132 @@ export default function SwingEdge() {
   const winRate    = closedTrades.length ? closedTrades.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length / closedTrades.length * 100 : 0;
   const avgR       = closedTrades.length ? closedTrades.reduce((a, t) => a + (calcTradeMetrics(t).rMultiple || 0), 0) / closedTrades.length : 0;
 
-  // Central Capital Engine: capital + closed P&L + live open P&L
+  // ─── JOURNAL PRO: filtered view + stats ─────────────────────────────────────
+  const holdTimeDays = (t) => {
+    if (!t.date || !t.exitDate) return null;
+    try {
+      const d1 = new Date(t.date).getTime();
+      const d2 = new Date(t.exitDate).getTime();
+      if (!d1 || !d2) return null;
+      return Math.max(0, Math.round((d2 - d1) / 86400000));
+    } catch { return null; }
+  };
+
+  const filteredTrades = useMemo(() => {
+    const f = journalFilters;
+    return trades.filter(tr => {
+      if (f.ticker && !String(tr.ticker || "").toUpperCase().includes(f.ticker.toUpperCase())) return false;
+      if (f.setup !== "all" && tr.setup !== f.setup) return false;
+      if (f.from && tr.date && tr.date < f.from) return false;
+      if (f.to && tr.date && tr.date > f.to) return false;
+      const { pnl, rMultiple } = calcTradeMetrics(tr);
+      if (f.result !== "all") {
+        if (tr.status !== "CLOSED") return false;
+        if (f.result === "win" && !(pnl > 0)) return false;
+        if (f.result === "loss" && !(pnl < 0)) return false;
+        if (f.result === "be" && !(pnl === 0)) return false;
+      }
+      if (f.rMin !== "" && rMultiple < parseFloat(f.rMin)) return false;
+      if (f.rMax !== "" && rMultiple > parseFloat(f.rMax)) return false;
+      return true;
+    });
+  }, [trades, journalFilters]);
+
+  const journalStats = useMemo(() => {
+    const closed = filteredTrades.filter(t => t.status === "CLOSED");
+    if (closed.length === 0) {
+      return { total: 0, wins: 0, losses: 0, winRate: 0, avgWin: 0, avgLoss: 0, profitFactor: 0, maxDD: 0, avgHold: 0, totalPnL: 0 };
+    }
+    const pnls = closed.map(t => calcTradeMetrics(t).pnl || 0);
+    const wins = pnls.filter(p => p > 0);
+    const losses = pnls.filter(p => p < 0);
+    const avgWin = wins.length ? wins.reduce((a, b) => a + b, 0) / wins.length : 0;
+    const avgLoss = losses.length ? losses.reduce((a, b) => a + b, 0) / losses.length : 0;
+    const sumWins = wins.reduce((a, b) => a + b, 0);
+    const sumLosses = Math.abs(losses.reduce((a, b) => a + b, 0));
+    const profitFactor = sumLosses > 0 ? sumWins / sumLosses : (sumWins > 0 ? Infinity : 0);
+    // Max drawdown on running equity from these trades
+    let peak = 0, equity = 0, maxDD = 0;
+    pnls.forEach(p => { equity += p; if (equity > peak) peak = equity; const dd = peak - equity; if (dd > maxDD) maxDD = dd; });
+    const holds = closed.map(holdTimeDays).filter(d => typeof d === "number");
+    const avgHold = holds.length ? holds.reduce((a, b) => a + b, 0) / holds.length : 0;
+    return {
+      total: closed.length,
+      wins: wins.length,
+      losses: losses.length,
+      winRate: (wins.length / closed.length) * 100,
+      avgWin, avgLoss,
+      profitFactor,
+      maxDD,
+      avgHold,
+      totalPnL: pnls.reduce((a, b) => a + b, 0),
+    };
+  }, [filteredTrades]);
+
+  const uniqueSetups = useMemo(() => {
+    const s = new Set(trades.map(t => t.setup).filter(Boolean));
+    return Array.from(s).sort();
+  }, [trades]);
+
+  // ─── SWINGEDGE AI REPORTS ──────────────────────────────────────────────────
+  // Memoised against the trades reference — the orchestrator also has an
+  // internal WeakMap cache so repeated reads are effectively free.
+  const aiDNA          = useMemo(() => SwingEdgeAI.getDNA(trades),          [trades]);
+  const aiEdges        = useMemo(() => SwingEdgeAI.getEdges(trades),        [trades]);
+  const aiRegime       = useMemo(() => SwingEdgeAI.getRegime(trades),       [trades]);
+  const aiGrowth       = useMemo(() => SwingEdgeAI.getGrowth(trades),       [trades]);
+  const aiEvolution    = useMemo(() => SwingEdgeAI.getEvolution(trades, 6), [trades]);
+  const aiGrowthReport = useMemo(() => SwingEdgeAI.getGrowthReport(trades), [trades]);
+
+  // Tilt re-evaluates on a 60s tick so cooldown expiry and new conditions update.
+  const [tiltTick, setTiltTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTiltTick(x => x + 1), 60000);
+    return () => clearInterval(id);
+  }, []);
+  const aiTilt = useMemo(() => SwingEdgeAI.checkTilt(trades), [trades, tiltTick]);
+
+  // Live Decision Coach analysis for the new-trade form.
+  const aiCoach = useMemo(
+    () => SwingEdgeAI.analyzeNewTrade(form, trades),
+    [form, trades]
+  );
+
+  // ─── CENTRAL EQUITY ENGINE ──────────────────────────────────────────────────
+  // Single source of truth: equity = base capital + closed P&L + live open P&L.
+  // Reacts automatically whenever any live price updates.
+  // Ticker lookup is variant-safe (handles BTC / BTC-USD / BINANCE:BTCUSDT etc).
+  const getLivePrice = useCallback((ticker) => {
+    if (!ticker) return null;
+    const raw = String(ticker).toUpperCase();
+    const candidates = [
+      raw,
+      raw.replace("-USD", ""),
+      `${raw}-USD`,
+      raw.replace(/^BINANCE:/, "").replace(/USDT$|USD$/, ""),
+    ];
+    for (const key of candidates) {
+      const lp = livePrices[key];
+      if (lp && typeof lp.price === "number") return lp;
+    }
+    return null;
+  }, [livePrices]);
+
   const openPnL = useMemo(() => {
     return openTrades.reduce((sum, t) => {
-      const lp = livePrices[t.ticker];
+      const lp = getLivePrice(t.ticker);
       if (!lp) return sum;
       const pnl = t.side === "LONG"
         ? (lp.price - t.entry) * t.shares
         : (t.entry - lp.price) * t.shares;
       return sum + pnl;
     }, 0);
-  }, [openTrades, livePrices]);
+  }, [openTrades, getLivePrice]);
 
-  const curEquity = capital + totalPnL + openPnL;
+  const curEquity = useMemo(
+    () => capital + totalPnL + openPnL,
+    [capital, totalPnL, openPnL]
+  );
 
   // Daily P&L calculation
   const dailyPnL = useMemo(() => {
@@ -840,17 +1254,24 @@ export default function SwingEdge() {
   // Smart lessons
   const smartLessons = useMemo(() => generateSmartLessons(closedTrades, calcTradeMetrics), [closedTrades]);
 
-  // Ticker tape from watchlist with live prices
+  // Top ticker ribbon — fixed 8 tickers updated with live prices
+  const TOP_RIBBON = ["NVDA", "AAPL", "TSLA", "MSFT", "META", "AMD", "BTC-USD", "SPY"];
   const tickerTapeItems = useMemo(() => {
-    return watchlistItems.slice(0, 10).map(w => {
-      const lp = livePrices[w.ticker];
+    return TOP_RIBBON.map(display => {
+      const lookupKey = display.replace("-USD", "");
+      const lp = getLivePrice(lookupKey) || getLivePrice(display);
       return {
-        ticker: w.ticker,
-        changePct: lp ? lp.changePct : (w.change || 0),
-        price: lp ? lp.price : w.price,
+        ticker: display,
+        displayTicker: display === "BTC-USD" ? "BTC" : display,
+        changePct: lp ? lp.changePct : 0,
+        price: lp ? lp.price : null,
+        open: lp?.regularMarketOpen ?? null,
+        high: lp?.regularMarketDayHigh ?? null,
+        low: lp?.regularMarketDayLow ?? null,
+        prevClose: lp?.previousClose ?? null,
       };
     });
-  }, [watchlistItems, livePrices]);
+  }, [livePrices]);
 
   useEffect(() => {
     const t = setInterval(() => setTickerIdx(i => (i + 1) % Math.max(tickerTapeItems.length, 1)), 2000);
@@ -884,12 +1305,61 @@ export default function SwingEdge() {
   const azPotGain  = azShares * Math.abs(azTarget - azEntry);
   const azRRRatio  = azDollarRisk > 0 ? azPotGain / azDollarRisk : 0;
 
+  // ─── LIVE QUOTE FOR ADD-TRADE FORM ──────────────────────────────────────────
+  // When the form is open and a ticker is entered, fetch a live quote from Yahoo
+  // and auto-fill Entry Price. Uses a short debounce so rapid typing doesn't
+  // spam the API, and respects a user-edited Entry (won't overwrite).
+  const fetchFormQuote = useCallback(async (ticker, { force = false } = {}) => {
+    if (!ticker) return;
+    setFormQuoteLoading(true);
+    try {
+      const q = await fetchQuote(ticker);
+      if (!q) return;
+      setFormQuote({ ...q, ticker: ticker.toUpperCase() });
+      // Auto-fill Entry Price only if empty (or a manual refresh was requested).
+      setForm(f => {
+        if (f.ticker.toUpperCase() !== ticker.toUpperCase()) return f;
+        if (!force && f.entry) return f;
+        return { ...f, entry: String(q.price.toFixed(2)) };
+      });
+    } finally {
+      setFormQuoteLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!showForm) return;
+    if (formQuoteTimer.current) clearTimeout(formQuoteTimer.current);
+    const ticker = form.ticker.trim();
+    if (!ticker) { setFormQuote(null); return; }
+    formQuoteTimer.current = setTimeout(() => fetchFormQuote(ticker), 250);
+    return () => { if (formQuoteTimer.current) clearTimeout(formQuoteTimer.current); };
+  }, [form.ticker, showForm, fetchFormQuote]);
+
   const handleSubmit = () => {
     if (!form.ticker || !entryN || !stopN) return;
+    // Capture the AI coach's prediction so LearningEngine can grade it at close.
+    const predictionSnapshot = {
+      verdict: aiCoach?.verdict || null,
+      confidence: aiCoach?.confidence ?? null,
+      channels: {
+        setup:   (aiCoach?.insights || []).filter(i => i.text && /setup|breakout|pullback|retest/i.test(i.text.en || ""))
+                  .reduce((s, i) => s + (i.weight > 0 ? 1 : i.weight < 0 ? -1 : 0), 0),
+        emotion: (aiCoach?.insights || []).filter(i => i.text && /emotion|fomo|confident|fear/i.test(i.text.en || ""))
+                  .reduce((s, i) => s + (i.weight > 0 ? 1 : i.weight < 0 ? -1 : 0), 0),
+        market:  (aiCoach?.insights || []).filter(i => i.text && /regime|market/i.test(i.text.en || ""))
+                  .reduce((s, i) => s + (i.weight > 0 ? 1 : i.weight < 0 ? -1 : 0), 0),
+        rr:      (aiCoach?.insights || []).filter(i => i.text && /r\/r|ratio/i.test(i.text.en || ""))
+                  .reduce((s, i) => s + (i.weight > 0 ? 1 : i.weight < 0 ? -1 : 0), 0),
+        time:    0,
+      },
+    };
+
     const newTrade = {
       id: trades.length + 1,
       ticker: form.ticker.toUpperCase(),
       date: new Date().toISOString().slice(0, 10),
+      createdAt: new Date().toISOString(),
       side: form.side,
       entry: entryN, stop: stopN, target: targetN,
       shares: posSize, status: "OPEN", exit: null,
@@ -899,31 +1369,55 @@ export default function SwingEdge() {
       entryQuality: form.entryQuality,
       tradeImage: form.tradeImagePreview,
       exitReason: null, followedPlan: null, lessonLearned: null, maxFavorable: null, maxAdverse: null,
+      _capitalAtEntry: capital,
+      _prediction: predictionSnapshot,
     };
     setTrades(prev => [...prev, newTrade]);
     setForm({ ticker: "", side: "LONG", entry: "", stop: "", target: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
     setAiAnalysis(null);
     setShowForm(false);
     setTab("journal");
+    toast.success(lang === "he" ? `${newTrade.ticker} נוספה ליומן` : `${newTrade.ticker} added to journal`);
   };
 
   const handleCloseSubmit = () => {
     if (!closingTrade || !closeForm.exit) return;
-    setTrades(prev => prev.map(t => t.id === closingTrade.id ? {
-      ...t, status: "CLOSED", exit: parseFloat(closeForm.exit),
-      exitReason: closeForm.exitReason, followedPlan: closeForm.followedPlan,
+    const closedTrade = {
+      ...closingTrade,
+      status: "CLOSED",
+      exit: parseFloat(closeForm.exit),
+      closedAt: new Date().toISOString(),
+      exitReason: closeForm.exitReason,
+      followedPlan: closeForm.followedPlan,
       lessonLearned: closeForm.lessonLearned,
       maxFavorable: parseFloat(closeForm.maxFavorable) || null,
       maxAdverse: parseFloat(closeForm.maxAdverse) || null,
-    } : t));
+    };
+    // Close the loop: grade the prediction we made at entry.
+    try { SwingEdgeAI.reinforceFromTrade(closedTrade); } catch { /* learning is best-effort */ }
+    setTrades(prev => prev.map(t => t.id === closingTrade.id ? closedTrade : t));
     setShowCloseForm(false);
     setClosingTrade(null);
     setCloseForm({ exit: "", exitReason: "Target Hit", followedPlan: true, lessonLearned: "", maxFavorable: "", maxAdverse: "" });
+    const { pnl } = calcTradeMetrics(closedTrade);
+    if (pnl > 0) toast.success(lang === "he" ? `רווח ${fmt$(Math.round(pnl))} נסגר בהצלחה` : `Closed with profit ${fmt$(Math.round(pnl))}`);
+    else if (pnl < 0) toast.error(lang === "he" ? `הפסד ${fmt$(Math.round(pnl))} — נסגר` : `Closed with loss ${fmt$(Math.round(pnl))}`);
+    else toast.info(lang === "he" ? "העסקה נסגרה" : "Trade closed");
   };
 
-  const handleDeleteTrade = (tradeId) => {
-    if (window.confirm("האם למחוק עסקה זו? פעולה זו לא ניתנת לביטול.")) {
+  const handleDeleteTrade = async (tradeId) => {
+    const ok = await confirmDialog({
+      title: lang === "he" ? "מחיקת עסקה" : "Delete Trade",
+      message: lang === "he"
+        ? "האם למחוק עסקה זו? פעולה זו לא ניתנת לביטול."
+        : "Delete this trade? This action cannot be undone.",
+      confirmText: lang === "he" ? "מחק" : "Delete",
+      cancelText: lang === "he" ? "ביטול" : "Cancel",
+      danger: true,
+    });
+    if (ok) {
       setTrades(prev => prev.filter(t => t.id !== tradeId));
+      toast.success(lang === "he" ? "העסקה נמחקה" : "Trade deleted");
     }
   };
 
@@ -979,6 +1473,40 @@ export default function SwingEdge() {
     setTrades(prev => prev.map(t => t.id === editingTrade.id ? updated : t));
     setShowEditForm(false);
     setEditingTrade(null);
+    toast.success(lang === "he" ? "העסקה עודכנה" : "Trade updated");
+  };
+
+  // ─── DEMO TRADES LOADER ─────────────────────────────────────────────────
+  // Adds the 10 DEMO_TRADES into the journal (skipping any already present),
+  // tags each with the logged-in user_id so they are Supabase-ready, and
+  // persists to localStorage through the existing setTrades → useEffect flow.
+  const handleLoadDemoTrades = async () => {
+    const userId = authUser?.id || null;
+    const existingIds = new Set(trades.map(t => t.id));
+    const stamped = DEMO_TRADES
+      .filter(d => !existingIds.has(d.id))
+      .map(d => ({
+        ...d,
+        user_id: userId,
+        createdAt: new Date(d.date + "T14:30:00").toISOString(),
+        closedAt:  new Date(d.date + "T20:00:00").toISOString(),
+        tradeImage: null,
+        _prediction: null,
+      }));
+    if (stamped.length === 0) {
+      toast.info(lang === "he" ? "עסקאות הדמו כבר נטענו" : "Demo trades already loaded");
+      return;
+    }
+    setTrades(prev => [...prev, ...stamped]);
+    // Best-effort Supabase upsert — silently no-op if the `trades` table
+    // hasn't been provisioned yet (keeps the local flow unaffected).
+    if (isSupabaseConfigured && supabase && userId) {
+      try {
+        await supabase.from("trades").upsert(stamped, { onConflict: "id" });
+      } catch { /* ignore — local state is still saved */ }
+    }
+    toast.success(lang === "he" ? `נטענו ${stamped.length} עסקאות דמו` : `Loaded ${stamped.length} demo trades`);
+    setTab("journal");
   };
 
   const handleAddWatchlistTicker = () => {
@@ -1054,40 +1582,85 @@ export default function SwingEdge() {
     setAnalyzerLoading(false);
   };
 
-  // ─── CHART QUICK ACTIONS (Populate forms with chart symbol + live price) ───
+  // ─── CHART QUICK ACTIONS ─────────────────────────────────────────────────
+  // Uses the local rule engine to suggest a sensible stop (2% below entry for
+  // LONG / above for SHORT) and a 2:1 R/R target based on the live chart price.
+  // No external AI required. Emotion/notes/lesson fields are intentionally
+  // left empty for the trader to fill in.
   const handleChartAiExtract = (target) => {
-    // Extract ticker from chartSymbol (e.g. "NASDAQ:NVDA" → "NVDA", "BINANCE:BTCUSDT" → "BTC")
+    setChartAiTarget(target);
+    setChartAiLoading(true);
+
     let ticker = chartSymbol.includes(":") ? chartSymbol.split(":")[1] : chartSymbol;
-    // Clean crypto pairs
     ticker = ticker.replace(/USDT$|USD$/, "") || ticker;
     const tickerUpper = ticker.toUpperCase();
 
-    // Try both ticker variants for live price lookup
-    const livePrice =
-      livePrices[tickerUpper]?.price ??
-      livePrices[`${tickerUpper}-USD`]?.price ??
-      null;
-    const entryStr = livePrice != null ? String(livePrice.toFixed(2)) : "";
+    const livePrice = getLivePrice(tickerUpper)?.price ?? null;
+    const entry = livePrice != null ? Number(livePrice.toFixed(2)) : null;
+
+    // Local AI: stop 2% below entry, target at 2:1 R/R
+    const side = "LONG";
+    const stop = entry != null ? Number((entry * 0.98).toFixed(2)) : null;
+    const targetPrice = entry != null && stop != null
+      ? Number((entry + (entry - stop) * 2).toFixed(2))
+      : null;
+
+    const entryStr = entry != null ? String(entry) : "";
+    const stopStr = stop != null ? String(stop) : "";
+    const targetStr = targetPrice != null ? String(targetPrice) : "";
 
     if (target === "position") {
       setPosCalc(f => ({
         ...f,
         ticker: tickerUpper,
+        capital: f.capital || String(capital),
+        risk: f.risk || "1",
         entry: entryStr || f.entry,
+        stop: stopStr || f.stop,
       }));
       setTab("position");
     } else if (target === "journal") {
-      setForm(f => ({
-        ...f,
+      setForm({
         ticker: tickerUpper,
-        side: "LONG",
+        side,
         entry: entryStr,
-        stop: "",
-        target: "",
-      }));
+        stop: stopStr,
+        target: targetStr,
+        setup: "Breakout",
+        notes: "",
+        marketCondition: "Trending Up",
+        emotionAtEntry: "Neutral",
+        entryQuality: 3,
+        tradeImage: null,
+        tradeImagePreview: null,
+      });
+      setAiAnalysis(null);
       setShowForm(true);
     }
+
+    setTimeout(() => {
+      setChartAiLoading(false);
+      setChartAiTarget(null);
+    }, 250);
   };
+
+  // Auth gate — block app until we know session state
+  if (!authReady) {
+    return (
+      <div className="min-h-screen bg-[#0a0f1e] text-slate-300 flex items-center justify-center" style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-violet-500 flex items-center justify-center animate-pulse">
+            <Zap size={20} className="text-white" />
+          </div>
+          <span className="text-xs tracking-widest uppercase text-slate-500">Loading SwingEdge…</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (isSupabaseConfigured && !session) {
+    return <AuthScreen />;
+  }
 
   if (showOnboarding) {
     return <OnboardingScreen onComplete={handleOnboardingComplete} />;
@@ -1096,9 +1669,20 @@ export default function SwingEdge() {
   return (
     <div className="min-h-screen bg-[#0a0f1e] text-slate-200 font-sans flex flex-col" data-theme={lightMode ? "light" : "dark"} dir={isRTL ? "rtl" : "ltr"} style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
 
+      {/* ── BETA WELCOME (first login only) ── */}
+      {showBetaWelcome && (
+        <BetaWelcome
+          userName={authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || userProfile?.name}
+          onStart={dismissBetaWelcome}
+        />
+      )}
+
+      {/* ── iOS INSTALL BANNER ── */}
+      <IOSInstallBanner />
+
       {/* ── PRICE ALERT NOTIFICATION ── */}
       {alertNotification && (
-        <div className="fixed top-20 right-6 z-[60] animate-bounce bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 rounded-xl p-4 shadow-2xl max-w-xs">
+        <div className="fixed top-20 right-6 rtl:right-auto rtl:left-6 z-[60] animate-bounce bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 rounded-xl p-4 shadow-2xl max-w-xs">
           <div className="flex items-center gap-2 mb-1">
             <Bell size={16} className="text-amber-400" />
             <span className="text-sm font-bold text-amber-300">{t.alertTriggered}</span>
@@ -1108,7 +1692,7 @@ export default function SwingEdge() {
             <span className="font-mono font-bold text-white">{alertNotification.ticker}</span>
             <span className="text-xs text-slate-400">reached ${alertNotification.price.toFixed(2)}</span>
           </div>
-          <button onClick={() => setAlertNotification(null)} className="absolute top-2 right-2 text-slate-500 hover:text-white"><X size={12} /></button>
+          <button onClick={() => setAlertNotification(null)} className="absolute top-2 right-2 rtl:right-auto rtl:left-2 text-slate-500 hover:text-white"><X size={12} /></button>
         </div>
       )}
 
@@ -1123,17 +1707,11 @@ export default function SwingEdge() {
           <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-500 border border-cyan-500/20 tracking-widest uppercase">Pro</span>
         </div>
 
-        {/* Ticker Tape - Live from watchlist */}
+        {/* Ticker Tape — fixed 8 tickers, flash on price change, tooltip on hover */}
         <div className="hidden md:flex items-center gap-3 text-xs font-mono">
-          {tickerTapeItems.map((item, i) => {
-            const bull = (item.changePct || 0) >= 0;
-            return (
-              <span key={item.ticker} className={`flex items-center gap-1 transition-all duration-500 ${i === tickerIdx ? "opacity-100 scale-105" : "opacity-40"} ${bull ? "text-[#10b981]" : "text-[#ef4444]"}`}>
-                <TickerLogo ticker={item.ticker} size={14} />
-                {item.ticker} {bull ? "+" : ""}{(item.changePct || 0).toFixed(1)}%
-              </span>
-            );
-          })}
+          {tickerTapeItems.map((item) => (
+            <RibbonTicker key={item.ticker} item={item} />
+          ))}
           {pricesLoading && <RefreshCw size={10} className="animate-spin text-slate-600" />}
         </div>
 
@@ -1143,8 +1721,26 @@ export default function SwingEdge() {
             className="flex items-center gap-1.5"
             title={pricesLastUpdated ? `${t.lastUpdated}: ${pricesLastUpdated.toLocaleTimeString()}` : t.live}
           >
-            <span className={`w-2 h-2 rounded-full ${pulse ? "bg-emerald-400" : "bg-emerald-600"} transition-colors`} />
-            <span className="text-[10px] text-emerald-400 font-bold tracking-wider">● LIVE</span>
+            {(() => {
+              const badge = getMarketStateBadge(marketState);
+              return (
+                <>
+                  <span
+                    className="w-2 h-2 rounded-full transition-colors"
+                    style={{
+                      backgroundColor: badge.color,
+                      opacity: marketState === MARKET_STATE.OPEN ? (pulse ? 1 : 0.55) : 0.85,
+                    }}
+                  />
+                  <span
+                    className="text-[10px] font-bold tracking-wider whitespace-nowrap"
+                    style={{ color: badge.color }}
+                  >
+                    {badge.emoji} {badge.label}
+                  </span>
+                </>
+              );
+            })()}
             {pricesLastUpdated && (
               <span className="text-[9px] text-slate-600 font-mono hidden md:inline">
                 {pricesLastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
@@ -1162,23 +1758,61 @@ export default function SwingEdge() {
               <User size={15} className="text-cyan-400" />
             </button>
             {showProfileDropdown && (
-              <div className="absolute right-0 top-10 w-56 bg-[#0d1424] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden">
+              <>
+                {/* Backdrop — clicking anywhere outside closes the menu (also catches iPad/mobile taps) */}
+                <div
+                  className="fixed inset-0 bg-black/40 backdrop-blur-[1px] z-[9998] animate-fade-in"
+                  onClick={() => setShowProfileDropdown(false)}
+                />
+                <div
+                  className="w-60 bg-[#0d1424] border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-fade-in"
+                  style={{
+                    position: "fixed",
+                    top: 56,
+                    right: 16,
+                    maxWidth: "calc(100vw - 32px)",
+                    zIndex: 9999,
+                  }}
+                >
                 <div className="px-4 py-3 border-b border-white/[0.06] bg-gradient-to-r from-cyan-500/5 to-violet-500/5">
-                  <p className="text-xs font-bold text-white">{userProfile?.name || "Trader"}</p>
+                  <p className="text-xs font-bold text-white truncate">{userProfile?.name || authUser?.user_metadata?.full_name || "Trader"}</p>
+                  {authUser?.email && (
+                    <p className="text-[10px] text-slate-400 mt-0.5 font-mono truncate">{authUser.email}</p>
+                  )}
                   <p className="text-[10px] text-slate-500 mt-0.5 font-mono">${capital.toLocaleString()} portfolio</p>
                 </div>
                 <div className="p-2 space-y-1">
+                  {isAdmin && (
+                    <button onClick={() => { setTab("admin"); setShowProfileDropdown(false); }}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-amber-300 hover:bg-amber-500/10 hover:text-amber-200 transition text-left border border-amber-500/20 bg-amber-500/5">
+                      <Shield size={13} className="text-amber-400" /> Admin Dashboard
+                    </button>
+                  )}
                   <button onClick={() => { setTab("settings"); setShowProfileDropdown(false); }}
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-300 hover:bg-white/5 hover:text-white transition text-left">
                     <Settings size={13} className="text-cyan-400" /> {t.profileAndSettings}
+                  </button>
+                  <button onClick={() => { setTab("feedback"); setShowProfileDropdown(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-300 hover:bg-white/5 hover:text-white transition text-left">
+                    <MessageCircle size={13} className="text-cyan-400" /> {t.feedback || "Feedback"}
                   </button>
                   <button onClick={() => { toggleLightMode(); setShowProfileDropdown(false); }}
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-300 hover:bg-white/5 hover:text-white transition text-left">
                     <span className="text-sm">{lightMode ? "🌙" : "☀️"}</span>
                     {lightMode ? "Dark Mode" : "Light Mode"}
                   </button>
+                  {isSupabaseConfigured && session && (
+                    <>
+                      <div className="my-1 h-px bg-white/[0.06]" />
+                      <button onClick={handleLogout}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-rose-300 hover:bg-rose-500/10 hover:text-rose-200 transition text-left">
+                        <LogOut size={13} /> התנתקות
+                      </button>
+                    </>
+                  )}
                 </div>
-              </div>
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -1214,6 +1848,35 @@ export default function SwingEdge() {
               <StatCard label={t.streakCounter} value={<span className="flex items-center gap-1">{currentStreak > 0 && <Flame size={18} className="text-orange-400" />}{currentStreak}</span>} sub={`${t.bestStreak}: ${bestStreak}`} icon={Zap} accent={currentStreak >= 3 ? "green" : "amber"} />
             </div>
 
+            {/* ══ SWINGEDGE AI — DNA · GROWTH · REGIME ══ */}
+            {aiTilt && aiTilt.level > 0 && (
+              <TiltShield
+                tilt={aiTilt}
+                lang={lang}
+                onDismiss={() => { SwingEdgeAI.acknowledgeWarning("tilt"); setTiltTick(x => x + 1); }}
+                onCooldown={(mins) => { SwingEdgeAI.engageCooldown(mins); setTiltTick(x => x + 1); }}
+                onClearCooldown={() => { SwingEdgeAI.clearCooldown(); setTiltTick(x => x + 1); }}
+              />
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <DNACard dna={aiDNA} lang={lang} />
+              <GrowthChart
+                evolution={aiEvolution}
+                current={aiGrowth.total}
+                delta={aiGrowthReport.delta}
+                lang={lang}
+              />
+              <RegimeIndicator regime={aiRegime} lang={lang} />
+            </div>
+
+            {/* Top Edge & Anti-Edge */}
+            {(aiEdges?.topEdge || aiEdges?.topAntiEdge) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {aiEdges.topEdge && <EdgeCard edge={aiEdges.topEdge} lang={lang} variant="edge" />}
+                {aiEdges.topAntiEdge && <EdgeCard edge={aiEdges.topAntiEdge} lang={lang} variant="anti" />}
+              </div>
+            )}
+
             {/* Mini Equity + Open Positions */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Equity mini */}
@@ -1248,7 +1911,7 @@ export default function SwingEdge() {
                 </div>
                 <div className="space-y-2">
                   {openTrades.map(tr => {
-                    const lp = livePrices[tr.ticker];
+                    const lp = getLivePrice(tr.ticker);
                     const currentPrice = lp?.price;
                     const livePnl = currentPrice
                       ? (tr.side === "LONG" ? (currentPrice - tr.entry) * tr.shares : (tr.entry - currentPrice) * tr.shares)
@@ -1547,37 +2210,151 @@ export default function SwingEdge() {
               </div>
             )}
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
                 <h2 className="text-sm font-bold text-white">{t.tradeJournal}</h2>
                 <p className="text-xs text-slate-600 mt-0.5">{trades.length} {t.totalEntries} · {openTrades.length} {t.open} · {closedTrades.length} {t.closed}</p>
               </div>
-              {openTrades.length > 0 && (
-                <div className="flex items-center gap-2">
-                  {pricesLastUpdated && (
-                    <span className="text-[10px] text-slate-700 font-mono">
-                      עודכן {fmtTimeAgo(pricesLastUpdated)}
-                    </span>
-                  )}
+              <div className="flex items-center gap-2 flex-wrap">
+                <button onClick={() => setShowJournalFilters(v => !v)}
+                  className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg border transition ${showJournalFilters ? "bg-cyan-500/15 border-cyan-500/30 text-cyan-300" : "bg-white/5 border-white/10 text-slate-400 hover:border-cyan-500/30 hover:text-cyan-300"}`}>
+                  <Filter size={11} /> {lang === "he" ? "מסננים" : "Filters"}
+                </button>
+                <button onClick={() => { exportTradesCSV(filteredTrades); toast.success(lang === "he" ? "יוצא כ-CSV" : "CSV exported"); }}
+                  className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:border-emerald-500/30 hover:text-emerald-300 transition">
+                  <Download size={11} /> CSV
+                </button>
+                {openTrades.length > 0 && pricesLastUpdated && (
+                  <span className="text-[10px] text-slate-700 font-mono hidden md:inline">
+                    {lang === "he" ? "עודכן" : "Updated"} {fmtTimeAgo(pricesLastUpdated)}
+                  </span>
+                )}
+                {openTrades.length > 0 && (
                   <button onClick={fetchLivePrices} disabled={pricesLoading}
                     className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-cyan-400 transition disabled:opacity-40 border border-white/[0.06] rounded-lg px-2 py-1">
                     <RefreshCw size={10} className={pricesLoading ? "animate-spin" : ""} />
-                    {pricesLoading ? "טוען…" : "רענן מחירים"}
+                    {pricesLoading ? (lang === "he" ? "טוען…" : "Loading…") : (lang === "he" ? "רענן מחירים" : "Refresh")}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* ── PRO STATS BAR ── */}
+            {closedTrades.length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
+                <div className="bg-[#0d1424] border border-white/[0.06] rounded-lg p-2.5">
+                  <div className="text-[9px] uppercase tracking-widest text-slate-600">{lang === "he" ? "סה״כ סגורות" : "Closed"}</div>
+                  <div className="text-sm font-bold text-white font-mono mt-0.5">{journalStats.total}</div>
+                </div>
+                <div className="bg-[#0d1424] border border-white/[0.06] rounded-lg p-2.5">
+                  <div className="text-[9px] uppercase tracking-widest text-slate-600">{lang === "he" ? "אחוז הצלחה" : "Win Rate"}</div>
+                  <div className="text-sm font-bold font-mono mt-0.5 text-emerald-300">{journalStats.winRate.toFixed(1)}%</div>
+                </div>
+                <div className="bg-[#0d1424] border border-white/[0.06] rounded-lg p-2.5">
+                  <div className="text-[9px] uppercase tracking-widest text-slate-600">{lang === "he" ? "רווח ממוצע" : "Avg Win"}</div>
+                  <div className="text-sm font-bold font-mono mt-0.5 text-emerald-400">{fmt$(Math.round(journalStats.avgWin))}</div>
+                </div>
+                <div className="bg-[#0d1424] border border-white/[0.06] rounded-lg p-2.5">
+                  <div className="text-[9px] uppercase tracking-widest text-slate-600">{lang === "he" ? "הפסד ממוצע" : "Avg Loss"}</div>
+                  <div className="text-sm font-bold font-mono mt-0.5 text-rose-400">{fmt$(Math.round(journalStats.avgLoss))}</div>
+                </div>
+                <div className="bg-[#0d1424] border border-white/[0.06] rounded-lg p-2.5">
+                  <div className="text-[9px] uppercase tracking-widest text-slate-600">Profit Factor</div>
+                  <div className="text-sm font-bold font-mono mt-0.5 text-cyan-300">{isFinite(journalStats.profitFactor) ? journalStats.profitFactor.toFixed(2) : "∞"}</div>
+                </div>
+                <div className="bg-[#0d1424] border border-white/[0.06] rounded-lg p-2.5">
+                  <div className="text-[9px] uppercase tracking-widest text-slate-600">Max DD</div>
+                  <div className="text-sm font-bold font-mono mt-0.5 text-rose-300">{fmt$(Math.round(journalStats.maxDD))}</div>
+                </div>
+                <div className="bg-[#0d1424] border border-white/[0.06] rounded-lg p-2.5">
+                  <div className="text-[9px] uppercase tracking-widest text-slate-600">{lang === "he" ? "זמן החזקה" : "Avg Hold"}</div>
+                  <div className="text-sm font-bold font-mono mt-0.5 text-violet-300">{journalStats.avgHold.toFixed(1)}d</div>
+                </div>
+              </div>
+            )}
+
+            {/* ── FILTERS PANEL ── */}
+            {showJournalFilters && (
+              <div className="bg-[#0d1424] border border-cyan-500/20 rounded-xl p-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                <div>
+                  <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">Ticker</label>
+                  <input value={journalFilters.ticker} onChange={e => setJournalFilters(f => ({ ...f, ticker: e.target.value }))}
+                    placeholder="NVDA" className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-mono text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">Setup</label>
+                  <select value={journalFilters.setup} onChange={e => setJournalFilters(f => ({ ...f, setup: e.target.value }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:border-cyan-500/50 focus:outline-none">
+                    <option value="all">All</option>
+                    {uniqueSetups.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">Result</label>
+                  <select value={journalFilters.result} onChange={e => setJournalFilters(f => ({ ...f, result: e.target.value }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:border-cyan-500/50 focus:outline-none">
+                    <option value="all">All</option>
+                    <option value="win">Win</option>
+                    <option value="loss">Loss</option>
+                    <option value="be">Break Even</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">From</label>
+                  <input type="date" value={journalFilters.from} onChange={e => setJournalFilters(f => ({ ...f, from: e.target.value }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:border-cyan-500/50 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">To</label>
+                  <input type="date" value={journalFilters.to} onChange={e => setJournalFilters(f => ({ ...f, to: e.target.value }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:border-cyan-500/50 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">R Min</label>
+                  <input type="number" step="0.1" value={journalFilters.rMin} onChange={e => setJournalFilters(f => ({ ...f, rMin: e.target.value }))}
+                    placeholder="-2" className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-mono text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">R Max</label>
+                  <input type="number" step="0.1" value={journalFilters.rMax} onChange={e => setJournalFilters(f => ({ ...f, rMax: e.target.value }))}
+                    placeholder="5" className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-mono text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none" />
+                </div>
+                <div className="col-span-2 md:col-span-4 lg:col-span-7 flex justify-end">
+                  <button onClick={() => setJournalFilters({ ticker: "", setup: "all", result: "all", from: "", to: "", rMin: "", rMax: "" })}
+                    className="text-[10px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition">
+                    {lang === "he" ? "נקה מסננים" : "Clear Filters"}
                   </button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+            {trades.length === 0 ? (
+              <div className="bg-[#0d1424] border border-white/[0.06] rounded-2xl p-12 text-center">
+                <BookOpen size={36} className="mx-auto text-slate-600 mb-3" />
+                <h3 className="text-sm font-bold text-white mb-2">{lang === "he" ? "אין עדיין עסקאות" : "No trades yet"}</h3>
+                <p className="text-xs text-slate-500 mb-4">{lang === "he" ? "התחל את היומן שלך — לחץ על הכפתור למטה או הקש N" : "Start journaling — click below or press N"}</p>
+                <button onClick={() => setShowForm(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500 text-black font-bold text-xs hover:bg-cyan-400 transition">
+                  <Plus size={13} /> {lang === "he" ? "עסקה ראשונה" : "Add First Trade"}
+                </button>
+              </div>
+            ) : filteredTrades.length === 0 ? (
+              <div className="bg-[#0d1424] border border-white/[0.06] rounded-2xl p-8 text-center">
+                <Filter size={28} className="mx-auto text-slate-600 mb-3" />
+                <h3 className="text-sm font-bold text-white mb-1">{lang === "he" ? "אין תוצאות למסננים" : "No matching trades"}</h3>
+                <p className="text-xs text-slate-500">{lang === "he" ? "נסה לשנות או לנקות את המסננים" : "Try adjusting the filters"}</p>
+              </div>
+            ) : (
             <div className="overflow-x-auto bg-[#0d1424] border border-white/[0.06] rounded-xl">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-slate-600 border-b border-white/[0.06] text-[10px] tracking-widest uppercase">
-                    {["Ticker","Date","Side","Entry","Stop","Target","Shares","מחיר נוכחי","P&L חי","Exit","P&L","R","Setup","Mkt","Emotion","★","Exit Rsn","Plan","Lesson","Status","Action"].map(h => (
+                    {["Ticker","Date","Side","Entry","Stop","Target","Shares","מחיר נוכחי","P&L חי","Exit","P&L","R","Hold","Setup","Mkt","Emotion","★","Exit Rsn","Plan","Lesson","Status","Action"].map(h => (
                       <th key={h} className={`p-3 text-left font-semibold whitespace-nowrap ${h==="מחיר נוכחי"||h==="P&L חי" ? "text-cyan-600" : ""}`}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {[...trades].reverse().map(t => {
+                  {[...filteredTrades].reverse().map(t => {
                     const { pnl, rMultiple } = calcTradeMetrics(t);
                     const isOpen = t.status === "OPEN";
                     const win = !isOpen && pnl > 0;
@@ -1592,22 +2369,25 @@ export default function SwingEdge() {
                         <td className="p-3 font-mono text-slate-400">{t.shares}</td>
                         {/* Current Price */}
                         <td className="p-3 font-mono text-xs whitespace-nowrap">
-                          {isOpen ? (
-                            livePrices[t.ticker]?.price
-                              ? <span className="text-slate-200 font-bold">${livePrices[t.ticker].price.toFixed(2)}</span>
+                          {isOpen ? (() => {
+                            const cp = getLivePrice(t.ticker)?.price;
+                            return cp
+                              ? <span className="text-slate-200 font-bold">${cp.toFixed(2)}</span>
                               : pricesLoading
                                 ? <span className="text-slate-600 animate-pulse text-[10px]"><RefreshCw size={8} className="inline animate-spin" /></span>
-                                : <span className="text-slate-700">–</span>
-                          ) : <span className="text-slate-700">–</span>}
+                                : <span className="text-slate-700">–</span>;
+                          })() : <span className="text-slate-700">–</span>}
                         </td>
                         {/* Live P&L */}
                         <td className="p-3 font-bold font-mono text-xs whitespace-nowrap">
-                          {isOpen && livePrices[t.ticker]?.price ? (() => {
+                          {(() => {
+                            const cp = isOpen ? getLivePrice(t.ticker)?.price : null;
+                            if (!cp) return <span className="text-slate-700">–</span>;
                             const lp = t.side === "LONG"
-                              ? (livePrices[t.ticker].price - t.entry) * t.shares
-                              : (t.entry - livePrices[t.ticker].price) * t.shares;
+                              ? (cp - t.entry) * t.shares
+                              : (t.entry - cp) * t.shares;
                             return <span className={lp >= 0 ? "text-[#10b981]" : "text-[#ef4444]"}>{fmt$(Math.round(lp))}</span>;
-                          })() : <span className="text-slate-700">–</span>}
+                          })()}
                         </td>
                         <td className="p-3 font-mono text-slate-300">{t.exit ? `$${t.exit}` : "–"}</td>
                         <td className={`p-3 font-bold font-mono ${isOpen ? "text-slate-500" : win ? "text-[#10b981]" : "text-[#ef4444]"}`}>
@@ -1615,6 +2395,13 @@ export default function SwingEdge() {
                         </td>
                         <td className={`p-3 font-bold font-mono text-xs ${isOpen ? "text-slate-500" : rMultiple >= 0 ? "text-cyan-400" : "text-[#ef4444]"}`}>
                           {isOpen ? "–" : fmtR(rMultiple)}
+                        </td>
+                        <td className="p-3 text-[10px] font-mono text-violet-300 whitespace-nowrap">
+                          {(() => {
+                            const d = holdTimeDays(t);
+                            if (typeof d !== "number") return <span className="text-slate-700">–</span>;
+                            return `${d}d`;
+                          })()}
                         </td>
                         <td className="p-3"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 whitespace-nowrap">{t.setup}</span></td>
                         <td className="p-3 text-slate-500 text-[10px] whitespace-nowrap">{t.marketCondition || "–"}</td>
@@ -1660,6 +2447,7 @@ export default function SwingEdge() {
                 </tbody>
               </table>
             </div>
+            )}
           </div>
         )}
 
@@ -1745,7 +2533,7 @@ export default function SwingEdge() {
                 <div className="relative rounded-lg overflow-hidden border border-white/10">
                   <img src={analyzerImagePreview} alt="Trade chart" className="w-full h-40 object-cover" />
                   <button onClick={() => { setAnalyzerImage(null); setAnalyzerImagePreview(null); }}
-                    className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-slate-300 hover:text-white">
+                    className="absolute top-2 right-2 rtl:right-auto rtl:left-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-slate-300 hover:text-white">
                     <X size={11} />
                   </button>
                 </div>
@@ -1862,8 +2650,8 @@ export default function SwingEdge() {
             setTimeout(() => setPosCopied(false), 2000);
           };
 
-          // Auto-load live price when ticker changes
-          const tickerPrice = posCalc.ticker ? livePrices[posCalc.ticker.toUpperCase()]?.price : null;
+          // Auto-load live price when ticker changes (variant-safe)
+          const tickerPrice = posCalc.ticker ? getLivePrice(posCalc.ticker)?.price ?? null : null;
 
           return (
             <div className="space-y-5 animate-fade-in max-w-2xl mx-auto">
@@ -1887,8 +2675,8 @@ export default function SwingEdge() {
                       onChange={e => {
                         const tk = e.target.value.toUpperCase();
                         setPosCalc(f => ({ ...f, ticker: tk }));
-                        // Auto-load live price
-                        const lp = livePrices[tk]?.price;
+                        // Auto-load live price (variant-safe)
+                        const lp = getLivePrice(tk)?.price;
                         if (lp && !posCalc.entry) {
                           setPosCalc(f => ({ ...f, ticker: tk, entry: String(lp) }));
                         }
@@ -2299,31 +3087,47 @@ export default function SwingEdge() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* TradingView Chart */}
-              <div className="md:col-span-2 bg-[#0d1424] border border-white/[0.06] rounded-xl overflow-hidden relative" style={{ height: 440 }}>
-                <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Live Chart</span>
-                    <input
-                      value={chartSymbol}
-                      onChange={e => setChartSymbol(e.target.value.toUpperCase())}
-                      onKeyDown={e => { if (e.key === "Enter") e.target.blur(); }}
-                      className="text-xs font-mono font-bold text-white bg-white/5 border border-white/10 rounded px-2 py-0.5 w-32 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20"
-                      placeholder="NASDAQ:NVDA"
-                    />
+              <div className="md:col-span-2 bg-[#0d1424] border border-white/[0.06] rounded-xl overflow-hidden relative" style={{ height: 520 }}>
+                <div className="flex flex-col gap-2 px-4 py-3 border-b border-white/[0.06]">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-semibold tracking-widest uppercase text-slate-500 shrink-0">Live Chart</span>
+                    <div className="flex-1 min-w-[180px]">
+                      <TradingViewSearch
+                        value={chartSymbol}
+                        onPick={(tvSym) => setChartSymbol(tvSym)}
+                        livePrices={livePrices}
+                        setLivePrices={setLivePrices}
+                        placeholder="Search symbol (NVDA, BTC, EURUSD...)"
+                      />
+                    </div>
                   </div>
-                  <div className="flex gap-1">
-                    {["1D","4H","1H","15m"].map(tf => (
-                      <button key={tf} onClick={() => setChartInterval(tf)}
-                        className={`text-[10px] px-2 py-0.5 rounded transition ${chartInterval === tf ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30" : "bg-white/5 text-slate-400 hover:bg-cyan-500/10 hover:text-cyan-400"}`}>
-                        {tf}
-                      </button>
-                    ))}
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex gap-1 flex-wrap">
+                      {["1m","5m","15m","1H","4H","1D","1W"].map(tf => (
+                        <button key={tf} onClick={() => setChartInterval(tf)}
+                          className={`text-[10px] px-2 py-1 rounded transition font-mono font-bold ${chartInterval === tf ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30" : "bg-white/5 text-slate-400 border border-transparent hover:bg-cyan-500/10 hover:text-cyan-400"}`}>
+                          {tf}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex gap-1">
+                      {[
+                        { id: "1", label: "Candles" },
+                        { id: "3", label: "Line" },
+                        { id: "0", label: "Bars" },
+                      ].map(st => (
+                        <button key={st.id} onClick={() => setChartStyle(st.id)}
+                          className={`text-[10px] px-2 py-1 rounded transition font-semibold ${chartStyle === st.id ? "bg-violet-500/20 text-violet-300 border border-violet-500/30" : "bg-white/5 text-slate-400 border border-transparent hover:bg-violet-500/10 hover:text-violet-300"}`}>
+                          {st.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
-                <div ref={tvRef} style={{ height: "calc(100% - 48px)" }} />
+                <div ref={tvRef} style={{ height: "calc(100% - 110px)" }} />
 
                 {/* ── Floating AI Trade Buttons ── */}
-                <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-2">
+                <div className="absolute bottom-4 right-4 rtl:right-auto rtl:left-4 z-10 flex flex-col gap-2">
                   <button
                     onClick={() => handleChartAiExtract("position")}
                     disabled={chartAiLoading}
@@ -2384,7 +3188,7 @@ export default function SwingEdge() {
                       )}
                       {watchlistSearchResults.map(r => {
                         const cleanSym = r.symbol.replace("-USD", "");
-                        const lp = livePrices[cleanSym] || livePrices[r.symbol];
+                        const lp = getLivePrice(cleanSym) || getLivePrice(r.symbol);
                         const isCrypto = r.type === "CRYPTOCURRENCY";
                         const chartSym = isCrypto
                           ? `BINANCE:${cleanSym}USDT`
@@ -2439,13 +3243,13 @@ export default function SwingEdge() {
 
                 <div className="space-y-1.5 overflow-y-auto flex-1">
                   {[...watchlistItems].sort((a, b) => {
-                    const lpA = livePrices[a.ticker] || {};
-                    const lpB = livePrices[b.ticker] || {};
+                    const lpA = getLivePrice(a.ticker) || {};
+                    const lpB = getLivePrice(b.ticker) || {};
                     if (watchlistSortBy === "changePct") return (lpB.changePct || 0) - (lpA.changePct || 0);
                     if (watchlistSortBy === "price") return (lpB.price || 0) - (lpA.price || 0);
                     return a.ticker.localeCompare(b.ticker);
                   }).map(s => {
-                    const lp = livePrices[s.ticker];
+                    const lp = getLivePrice(s.ticker);
                     const price = lp?.price ?? s.price;
                     const changePct = lp?.changePct ?? s.change ?? 0;
                     return (
@@ -2725,6 +3529,25 @@ export default function SwingEdge() {
                 </p>
               </div>
 
+              {/* ── DEMO TRADES ── */}
+              <div className="bg-[#0d1424] border border-amber-500/20 rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <FlaskConical size={16} className="text-amber-400" />
+                  <h3 className="text-sm font-bold text-white">Demo Trades</h3>
+                </div>
+                <p className="text-xs text-slate-500 mb-3">
+                  טען 10 עסקאות לדוגמה מציאותיות (7 WIN · 2 LOSS · 1 BE) מהשבועיים האחרונים, כולל MAE/MFE, רגש, לקחים וחישובי 1% risk על הון $2,500.
+                </p>
+                <button
+                  onClick={handleLoadDemoTrades}
+                  className="w-full py-2.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
+                  <Download size={12} /> Load Demo Trades
+                </button>
+                <p className="text-[10px] text-slate-700 mt-2">
+                  * העסקאות נשמרות מקומית ומסונכרנות ל-Supabase תחת ה-user_id שלך (אם מוגדר).
+                </p>
+              </div>
+
               {/* ── TILTMETER ── */}
               <div className={`bg-[#0d1424] border rounded-xl p-5 ${tiltBg}`}>
                 <div className="flex items-center justify-between mb-4">
@@ -2835,7 +3658,7 @@ export default function SwingEdge() {
                       <div className="relative rounded-lg overflow-hidden border border-white/10 h-24">
                         <img src={playbookForm.imagePreview} alt="Setup" className="w-full h-full object-cover" />
                         <button onClick={() => setPlaybookForm(f => ({ ...f, imagePreview: null }))}
-                          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-slate-300 hover:text-white">
+                          className="absolute top-1 right-1 rtl:right-auto rtl:left-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-slate-300 hover:text-white">
                           <X size={10} />
                         </button>
                       </div>
@@ -2968,6 +3791,30 @@ export default function SwingEdge() {
           );
         })()}
 
+        {/* ══════════════ FEEDBACK ══════════════ */}
+        {tab === "feedback" && (
+          <FeedbackTab user={authUser} />
+        )}
+
+        {/* ══════════════ ADMIN (niveven183@gmail.com only) ══════════════ */}
+        {tab === "admin" && (
+          isAdmin ? (
+            <AdminPanel />
+          ) : (
+            <div className="flex items-center justify-center py-20">
+              <div className="max-w-md text-center bg-[#0d1424] border border-rose-500/30 rounded-2xl p-8 shadow-2xl">
+                <Shield size={32} className="text-rose-400 mx-auto mb-3" />
+                <h2 className="text-lg font-bold text-white mb-2">Access Denied</h2>
+                <p className="text-xs text-slate-400 mb-4">This area is restricted to administrators only.</p>
+                <button onClick={() => setTab("dashboard")}
+                  className="px-4 py-2 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 text-xs font-bold hover:bg-cyan-500/25 transition">
+                  Back to Dashboard
+                </button>
+              </div>
+            </div>
+          )
+        )}
+
       </main>
 
       {/* ── TRADE ENTRY MODAL ── */}
@@ -3008,6 +3855,65 @@ export default function SwingEdge() {
                 </div>
               </div>
 
+              {/* Live quote badge + Open/High/Low/Pre/After */}
+              {form.ticker && (() => {
+                const badge = getMarketStateBadge(formQuote?.marketState || marketState);
+                const q = formQuote;
+                const marketOpen = (formQuote?.marketState || marketState) === MARKET_STATE.OPEN;
+                return (
+                  <div className="bg-white/3 border border-white/[0.06] rounded-xl p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="text-[10px] font-bold tracking-wider px-2 py-0.5 rounded-full border"
+                          style={{ color: badge.color, borderColor: badge.color + "40", background: badge.color + "15" }}
+                        >
+                          {badge.emoji} {marketOpen ? "LIVE" : q ? "LAST CLOSE" : badge.label}
+                        </span>
+                        {q?.price != null && (
+                          <span className="text-sm font-mono font-bold text-white">${q.price.toFixed(2)}</span>
+                        )}
+                        {q?.changePct != null && (
+                          <span className={`text-[11px] font-mono ${q.changePct >= 0 ? "text-[#10b981]" : "text-[#ef4444]"}`}>
+                            {q.changePct >= 0 ? "+" : ""}{q.changePct.toFixed(2)}%
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => fetchFormQuote(form.ticker, { force: true })}
+                        disabled={formQuoteLoading}
+                        title="Refresh price"
+                        className="text-slate-400 hover:text-cyan-400 transition p-1 rounded hover:bg-white/5 disabled:opacity-50"
+                      >
+                        <RefreshCw size={12} className={formQuoteLoading ? "animate-spin" : ""} />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-5 gap-1 text-[9px] text-slate-500">
+                      <div className="text-center">
+                        <div className="uppercase tracking-wider">Open</div>
+                        <div className="font-mono text-slate-300">{q?.regularMarketOpen != null ? q.regularMarketOpen.toFixed(2) : "—"}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="uppercase tracking-wider">High</div>
+                        <div className="font-mono text-[#10b981]">{q?.regularMarketDayHigh != null ? q.regularMarketDayHigh.toFixed(2) : "—"}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="uppercase tracking-wider">Low</div>
+                        <div className="font-mono text-[#ef4444]">{q?.regularMarketDayLow != null ? q.regularMarketDayLow.toFixed(2) : "—"}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="uppercase tracking-wider">Pre</div>
+                        <div className="font-mono text-amber-400">{q?.preMarketPrice != null ? q.preMarketPrice.toFixed(2) : "—"}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="uppercase tracking-wider">After</div>
+                        <div className="font-mono text-orange-400">{q?.postMarketPrice != null ? q.postMarketPrice.toFixed(2) : "—"}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Prices */}
               <div className="grid grid-cols-3 gap-3">
                 {[["Entry *","entry","text-white"],["Stop Loss *","stop","text-[#ef4444]"],["Target","target","text-[#10b981]"]].map(([label,key,cls])=>(
@@ -3040,6 +3946,9 @@ export default function SwingEdge() {
                   </div>
                 </div>
               )}
+
+              {/* Live Decision Coach — analyses the trade as you type */}
+              <DecisionCoachPanel coaching={aiCoach} lang={lang} />
 
               {/* Setup Type + Notes */}
               <div className="grid grid-cols-2 gap-3">
@@ -3104,7 +4013,7 @@ export default function SwingEdge() {
                 <div className="relative rounded-lg overflow-hidden border border-white/10">
                   <img src={form.tradeImagePreview} alt="Trade chart" className="w-full h-32 object-cover" />
                   <button onClick={() => setForm(f=>({...f,tradeImage:null,tradeImagePreview:null}))}
-                    className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-slate-300 hover:text-white">
+                    className="absolute top-1 right-1 rtl:right-auto rtl:left-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-slate-300 hover:text-white">
                     <X size={10} />
                   </button>
                 </div>
@@ -3388,7 +4297,7 @@ export default function SwingEdge() {
       {/* ── FLOATING NEW TRADE BUTTON ── */}
       <button
         onClick={() => setShowForm(true)}
-        className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-violet-500 text-white shadow-2xl shadow-cyan-500/25 flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
+        className="fixed bottom-6 right-6 rtl:right-auto rtl:left-6 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-violet-500 text-white shadow-2xl shadow-cyan-500/25 flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
         title="New Trade"
       >
         <Plus size={24} />

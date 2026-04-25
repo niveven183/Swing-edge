@@ -2,6 +2,45 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Animations ── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fadeIn 200ms ease-out; }
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-down { animation: slideDown 200ms ease-out; }
+
+@keyframes flashGreen {
+  0%   { background-color: rgba(16,185,129,0.35); }
+  100% { background-color: transparent; }
+}
+@keyframes flashRed {
+  0%   { background-color: rgba(239,68,68,0.35); }
+  100% { background-color: transparent; }
+}
+.flash-green { animation: flashGreen 700ms ease-out; }
+.flash-red   { animation: flashRed   700ms ease-out; }
+
+/* ── RTL SUPPORT ── */
+/* Keep monospace numeric content readable (LTR) even inside RTL pages */
+[dir="rtl"] .font-mono { direction: ltr; unicode-bidi: isolate; text-align: inherit; }
+
+/* Flip common text alignments so buttons/rows align with the reading direction */
+[dir="rtl"] .text-left { text-align: right; }
+[dir="rtl"] .text-right { text-align: left; }
+
+/* Keep the header row (logo/ticker-tape/profile) readable as LTR, but
+   ensure Hebrew labels flow correctly in the profile dropdown beneath it */
+[dir="rtl"] header .flex { unicode-bidi: isolate; }
+
+/* Recharts SVG labels shouldn't get flipped by body direction */
+[dir="rtl"] .recharts-wrapper { direction: ltr; }
+
 /* ── LIGHT MODE OVERRIDES ── */
 [data-theme="light"] {
   background-color: #f1f5f9 !important;
