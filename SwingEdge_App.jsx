@@ -52,109 +52,164 @@ const SECTOR_ETFS = [
 
 const MOCK_TRADES = [];
 
-// ─── DEMO TRADES (loaded via Settings → "Load Demo Trades") ────────────────
-// 7 WIN · 2 LOSS · 1 BREAK EVEN · Total P&L ≈ +$487 · Win rate 70%.
-// Position sizes scaled to 1% risk on a rolling ~$2,500 account.
+// ─── DEMO TRADES (loaded via Settings/Journal → "Load Demo Trades") ───────
+// 15 trades · 11 WIN · 3 LOSS · 1 BE · Win rate ~73% · Mar 18 – Apr 15, 2026.
+// Position sizes scaled to ~1-2.5% risk on a rolling $2,500 account.
+// Field-name mapping for SwingEdge schema:
+//   marketCondition: BULL→"Trending Up", BEAR→"Trending Down", CHOPPY→"Volatile", NEUTRAL→"Sideways"
+//   emotionAtEntry:  CONFIDENT/CALM/PATIENT/NEUTRAL/HESITANT/FOMO/ANGRY → Title-case
+//   followedPlan:    "Yes"→true, "No"→false, "Partially"→"Partially"
+//   notes ← reason · lessonLearned ← lesson.
 const DEMO_TRADES = [
   {
-    id: "demo-1", ticker: "NVDA", side: "LONG", date: "2026-04-05",
-    entry: 175.40, stop: 171.30, target: 185.00, exit: 184.20, shares: 14,
-    status: "CLOSED", setup: "Pullback", marketCondition: "Trending Up",
+    id: "demo-1", ticker: "NVDA", side: "LONG", date: "2026-03-18",
+    entry: 164.50, stop: 161.20, target: 172.00, exit: 171.30, shares: 14,
+    status: "CLOSED", setup: "Higher Low", marketCondition: "Trending Up",
     emotionAtEntry: "Confident", entryQuality: 9, followedPlan: true,
     exitReason: "Hit Target",
-    notes: "פולבק נקי ל-20 EMA אחרי טרנד עולה, RSI עלה מ-42 ל-52, wick rejection ב-171.38",
-    lessonLearned: "סבלנות עם setup נקי משתלמת. לא רדפתי, חיכיתי לרי-טסט מדויק של ה-20 EMA — אמין שלי.",
-    maxFavorable: 185.10, maxAdverse: 173.90, _capitalAtEntry: 2500.00,
+    notes: "NVDA יצר Higher Low ב-$164.27 (התחתית של החודש). פריצת $164.50 עם volume גבוה. RSI עלה מ-38 ל-52, MACD חיובי, MA-20 משטח אחרי ירידה.",
+    lessonLearned: "HL מעל תחתית קודמת = סיגנל חזק לכניסה. הסבר הראשון של reversal — הכי משתלם.",
+    maxFavorable: 171.50, maxAdverse: 163.10, _capitalAtEntry: 2500.00,
   },
   {
-    id: "demo-2", ticker: "AAPL", side: "LONG", date: "2026-04-07",
-    entry: 218.50, stop: 215.80, target: 226.00, exit: 225.40, shares: 11,
+    id: "demo-2", ticker: "AAPL", side: "LONG", date: "2026-03-19",
+    entry: 218.50, stop: 215.20, target: 226.00, exit: 225.80, shares: 11,
     status: "CLOSED", setup: "Breakout", marketCondition: "Trending Up",
     emotionAtEntry: "Calm", entryQuality: 8, followedPlan: true,
     exitReason: "Hit Target",
-    notes: "AAPL בקונסולידציה של 5 ימים בין 215-218, פריצה של $218 עם volume 130% מעל הממוצע",
-    lessonLearned: "Breakouts עם volume confirmation הם הסטאפ הכי חזק שלי. תמיד לחכות לאישור volume.",
-    maxFavorable: 226.20, maxAdverse: 217.10, _capitalAtEntry: 2623.20,
+    notes: "AAPL פריצת קונסולידציה של 4 ימים בין $215-$218. Volume +120% מהממוצע על הפריצה, סגירה ב-15 דקות מעל $218.50.",
+    lessonLearned: "Breakouts עם volume confirmation = הסטאפ הכי חזק. תמיד לחכות לסגירת 15 דקות מעל הרמה.",
+    maxFavorable: 226.10, maxAdverse: 217.40, _capitalAtEntry: 2595.20,
   },
   {
-    id: "demo-3", ticker: "TSLA", side: "LONG", date: "2026-04-08",
-    entry: 285.00, stop: 278.50, target: 298.00, exit: 278.50, shares: 9,
+    id: "demo-3", ticker: "TSLA", side: "LONG", date: "2026-03-20",
+    entry: 381.30, stop: 374.50, target: 398.00, exit: 374.50, shares: 6,
     status: "CLOSED", setup: "Failed Breakout", marketCondition: "Volatile",
     emotionAtEntry: "FOMO", entryQuality: 4, followedPlan: false,
     exitReason: "Hit Stop",
-    notes: "ניסיתי לתפוס breakout ב-$285 אחרי news חזקים. נכנסתי בלי לחכות לאישור, השוק היה choppy.",
-    lessonLearned: "שוק choppy + FOMO + news בלי setup ברור = הפסד בטוח. לא להיכנס על news. לחכות לרי-טסט או setup.",
-    maxFavorable: 287.40, maxAdverse: 278.50, _capitalAtEntry: 2699.10,
+    notes: "ניסיתי לתפוס breakout ב-$381 על news של דליבריות. נכנסתי בלי לחכות לאישור volume, השוק היה choppy.",
+    lessonLearned: "FOMO + שוק choppy = הפסד בטוח. לא להיכנס על news בלי setup ברור.",
+    maxFavorable: 382.80, maxAdverse: 374.50, _capitalAtEntry: 2675.50,
   },
   {
-    id: "demo-4", ticker: "BTC-USD", side: "LONG", date: "2026-04-09",
-    entry: 71250, stop: 69800, target: 74500, exit: 73950, shares: 0.035,
-    status: "CLOSED", setup: "Higher Low + Trend continuation", marketCondition: "Trending Up",
-    emotionAtEntry: "Confident", entryQuality: 9, followedPlan: true,
+    id: "demo-4", ticker: "BTC-USD", side: "LONG", date: "2026-03-22",
+    entry: 70250, stop: 68500, target: 73500, exit: 73100, shares: 0.035,
+    status: "CLOSED", setup: "Higher Low", marketCondition: "Sideways",
+    emotionAtEntry: "Patient", entryQuality: 8, followedPlan: true,
     exitReason: "Hit Target",
-    notes: "BTC עשה Higher Low ב-69500 (מעל ה-HL הקודם של 67800), פריצה של resistance 71K עם volume.",
-    lessonLearned: "קריפטו עובד מצוין כשיש מבנה ברור של HH/HL. הסבלנות לחכות ל-HL — נכנסתי במחיר מעולה.",
-    maxFavorable: 74480, maxAdverse: 70640, _capitalAtEntry: 2640.60,
+    notes: "BTC עשה HL ב-$68,800 (מעל ה-LL הקודם של $67,000). פריצה של $70K עם volume גבוה ב-Binance, RSI ב-55.",
+    lessonLearned: "BTC עם HL בולט עם volume = הזדמנות מצוינת. כניסה על שוק דיכאוני מתחת ל-$70K.",
+    maxFavorable: 73450, maxAdverse: 69640, _capitalAtEntry: 2634.70,
   },
   {
-    id: "demo-5", ticker: "META", side: "LONG", date: "2026-04-10",
+    id: "demo-5", ticker: "META", side: "LONG", date: "2026-03-25",
     entry: 612.00, stop: 605.00, target: 628.00, exit: 626.50, shares: 4,
     status: "CLOSED", setup: "50 EMA Bounce", marketCondition: "Trending Up",
     emotionAtEntry: "Neutral", entryQuality: 7, followedPlan: true,
     exitReason: "Hit Target",
-    notes: "META נגעה ב-50 EMA בדיוק, יצרה hammer candle ב-1H, RSI מתאושש מ-45 — לא overbought.",
-    lessonLearned: "EMA bounces עובדים מצוין כשהטרנד הראשי חזק. ה-50 EMA דינמית מעולה לטרנדים בהתפתחות.",
-    maxFavorable: 627.20, maxAdverse: 609.40, _capitalAtEntry: 2735.10,
+    notes: "META נגעה ב-50 EMA בדיוק, יצרה hammer candle ב-1H. RSI מתאושש מ-45, הטרנד הראשי חזק.",
+    lessonLearned: "50 EMA bounces עובדים מצוין כשהטרנד הראשי חזק. ה-50 EMA היא תמיכה דינמית.",
+    maxFavorable: 627.10, maxAdverse: 609.20, _capitalAtEntry: 2734.45,
   },
   {
-    id: "demo-6", ticker: "SPY", side: "LONG", date: "2026-04-11",
+    id: "demo-6", ticker: "AMD", side: "LONG", date: "2026-03-26",
+    entry: 165.40, stop: 161.50, target: 175.00, exit: 174.20, shares: 13,
+    status: "CLOSED", setup: "Cup and Handle", marketCondition: "Trending Up",
+    emotionAtEntry: "Confident", entryQuality: 10, followedPlan: true,
+    exitReason: "Hit Target",
+    notes: "AMD יצרה Cup and Handle מושלמת — Cup של 5 שבועות, Handle של 4 ימים. פריצת rim ב-$165.40 עם volume +180%.",
+    lessonLearned: "Cup and Handle עם volume על הפריצה = אחת התבניות הכי אמינות. הסבלנות לחכות ל-handle pullback משתלמת.",
+    maxFavorable: 174.80, maxAdverse: 163.80, _capitalAtEntry: 2792.45,
+  },
+  {
+    id: "demo-7", ticker: "SPY", side: "LONG", date: "2026-03-27",
     entry: 588.50, stop: 585.20, target: 595.00, exit: 588.80, shares: 4,
     status: "CLOSED", setup: "Range Breakout", marketCondition: "Sideways",
     emotionAtEntry: "Hesitant", entryQuality: 5, followedPlan: "Partially",
     exitReason: "Manual Exit",
-    notes: "ניסיתי breakout ב-$588 אחרי 3 ימי דשדוש. נכנסתי אבל volume היה חלש, השוק היה ניטרלי.",
-    lessonLearned: "אם אני מהסס בכניסה — סימן שלא צריך להיכנס. סגרתי בזמן לפני שיהפוך ל-loss. חוסר volume = warning.",
-    maxFavorable: 589.90, maxAdverse: 587.10, _capitalAtEntry: 2793.10,
+    notes: "Breakout ב-$588 אחרי 3 ימי דשדוש. Volume חלש, השוק ניטרלי.",
+    lessonLearned: "אם אני מהסס בכניסה — סימן שלא צריך להיכנס. סגרתי בזמן לפני שיהפוך ל-loss.",
+    maxFavorable: 589.60, maxAdverse: 587.10, _capitalAtEntry: 2906.85,
   },
   {
-    id: "demo-7", ticker: "AMD", side: "LONG", date: "2026-04-12",
+    id: "demo-8", ticker: "MSFT", side: "LONG", date: "2026-03-28",
+    entry: 415.80, stop: 410.50, target: 430.00, exit: 429.20, shares: 5,
+    status: "CLOSED", setup: "Pullback to 20 EMA", marketCondition: "Trending Up",
+    emotionAtEntry: "Calm", entryQuality: 9, followedPlan: true,
+    exitReason: "Hit Target",
+    notes: "MSFT פולבק נקי ל-20 EMA ב-$415.80, RSI עלה מ-42 ל-48, hammer candle ב-1H.",
+    lessonLearned: "MSFT עם 20 EMA bounces = הסטאפ הכי אמין שלי בלארג קאפ. תמיד לחכות לאישור.",
+    maxFavorable: 429.80, maxAdverse: 414.10, _capitalAtEntry: 2908.05,
+  },
+  {
+    id: "demo-9", ticker: "ETH-USD", side: "LONG", date: "2026-04-01",
+    entry: 3450, stop: 3360, target: 3650, exit: 3360, shares: 0.65,
+    status: "CLOSED", setup: "Revenge Trade", marketCondition: "Volatile",
+    emotionAtEntry: "Angry", entryQuality: 2, followedPlan: false,
+    exitReason: "Hit Stop",
+    notes: "ניסיתי להחזיר את הפסד TSLA. נכנסתי ל-ETH בלי setup ברור, רק כי \"זה חייב לעלות\".",
+    lessonLearned: "Revenge trading = הפסד מובטח. אחרי הפסד — הפסקה של שעה לפחות.",
+    maxFavorable: 3478, maxAdverse: 3360, _capitalAtEntry: 2975.05,
+  },
+  {
+    id: "demo-10", ticker: "NVDA", side: "LONG", date: "2026-04-02",
+    entry: 175.40, stop: 171.30, target: 185.00, exit: 184.20, shares: 14,
+    status: "CLOSED", setup: "Pullback to 20 EMA", marketCondition: "Trending Up",
+    emotionAtEntry: "Confident", entryQuality: 9, followedPlan: true,
+    exitReason: "Hit Target",
+    notes: "NVDA פולבק נקי ל-20 EMA אחרי טרנד עולה. RSI עלה מ-42 ל-52, wick rejection ב-$171.38 ב-4H.",
+    lessonLearned: "סבלנות עם setup נקי משתלמת. לא רדפתי, חיכיתי לרי-טסט מדויק.",
+    maxFavorable: 184.90, maxAdverse: 173.80, _capitalAtEntry: 2916.55,
+  },
+  {
+    id: "demo-11", ticker: "TSLA", side: "SHORT", date: "2026-04-03",
+    entry: 388.50, stop: 395.00, target: 372.00, exit: 374.20, shares: 6,
+    status: "CLOSED", setup: "Failed Breakout", marketCondition: "Trending Down",
+    emotionAtEntry: "Patient", entryQuality: 8, followedPlan: true,
+    exitReason: "Hit Target",
+    notes: "TSLA כשל בפריצה של $395 (resistance level), ירדה מהר. Short entry ב-$388.50 עם stop מעל high.",
+    lessonLearned: "Failed breakouts עובדים מצוין בכיוון ההפוך. השוק כבר היה חלש (Bear).",
+    maxFavorable: 373.10, maxAdverse: 390.20, _capitalAtEntry: 3039.75,
+  },
+  {
+    id: "demo-12", ticker: "AAPL", side: "LONG", date: "2026-04-05",
+    entry: 220.50, stop: 217.80, target: 228.00, exit: 218.30, shares: 11,
+    status: "CLOSED", setup: "Range Breakout", marketCondition: "Volatile",
+    emotionAtEntry: "Neutral", entryQuality: 5, followedPlan: "Partially",
+    exitReason: "Manual Exit",
+    notes: "Breakout ב-$220 בשוק choppy. Volume סביר אבל לא חזק.",
+    lessonLearned: "בשוק choppy — תקן את הציפיות. סגרתי כש-momentum נעלם.",
+    maxFavorable: 222.40, maxAdverse: 218.30, _capitalAtEntry: 3125.55,
+  },
+  {
+    id: "demo-13", ticker: "BTC-USD", side: "LONG", date: "2026-04-08",
+    entry: 71250, stop: 69800, target: 74500, exit: 73950, shares: 0.035,
+    status: "CLOSED", setup: "Higher Low", marketCondition: "Trending Up",
+    emotionAtEntry: "Confident", entryQuality: 9, followedPlan: true,
+    exitReason: "Hit Target",
+    notes: "BTC HL ב-$69,500 (מעל ה-HL הקודם של $67,800). פריצת $71K עם volume גבוה.",
+    lessonLearned: "קריפטו עובד מצוין כשיש מבנה ברור של HH/HL. הסבלנות לחכות ל-HL השתלמה.",
+    maxFavorable: 74400, maxAdverse: 70640, _capitalAtEntry: 3101.35,
+  },
+  {
+    id: "demo-14", ticker: "AMD", side: "LONG", date: "2026-04-09",
     entry: 168.20, stop: 164.50, target: 178.00, exit: 176.80, shares: 14,
     status: "CLOSED", setup: "Cup and Handle", marketCondition: "Trending Up",
     emotionAtEntry: "Confident", entryQuality: 10, followedPlan: true,
     exitReason: "Hit Target",
-    notes: "AMD יצרה Cup and Handle מושלמת — Cup של 6 שבועות, Handle של 5 ימים. פריצה של $168.",
-    lessonLearned: "Cup and Handle — אחת התבניות הכי אמינות שלי. הסבלנות לחכות ל-handle pullback משתלמת.",
-    maxFavorable: 178.40, maxAdverse: 166.90, _capitalAtEntry: 2794.30,
+    notes: "AMD Cup and Handle מושלמת — Cup של 6 שבועות, Handle של 5 ימים. פריצת $168 עם volume +180%.",
+    lessonLearned: "Cup and Handle עם volume על הפריצה = הסטאפ הכי בטוח שלי.",
+    maxFavorable: 177.80, maxAdverse: 166.90, _capitalAtEntry: 3195.85,
   },
   {
-    id: "demo-8", ticker: "ETH-USD", side: "LONG", date: "2026-04-14",
-    entry: 3850, stop: 3760, target: 4050, exit: 3760, shares: 0.65,
-    status: "CLOSED", setup: "Revenge Trade", marketCondition: "Volatile",
-    emotionAtEntry: "Angry", entryQuality: 2, followedPlan: false,
-    exitReason: "Hit Stop",
-    notes: "ניסיתי להחזיר את ההפסד של TSLA. נכנסתי ל-ETH בלי setup ברור, רק כי \"זה חייב לעלות\".",
-    lessonLearned: "Revenge trading = הפסד מובטח. אחרי הפסד — לקחת הפסקה של לפחות שעה. לא להיכנס.",
-    maxFavorable: 3880, maxAdverse: 3760, _capitalAtEntry: 2914.70,
-  },
-  {
-    id: "demo-9", ticker: "MSFT", side: "LONG", date: "2026-04-15",
+    id: "demo-15", ticker: "MSFT", side: "LONG", date: "2026-04-10",
     entry: 445.00, stop: 440.20, target: 458.00, exit: 456.50, shares: 5,
     status: "CLOSED", setup: "Post Earnings Strength", marketCondition: "Trending Up",
     emotionAtEntry: "Patient", entryQuality: 9, followedPlan: true,
     exitReason: "Hit Target",
-    notes: "MSFT אחרי דוחות חזקים (EPS beat by 8%, revenue beat by 5%). Gap up של 3% בפתיחה, hold above $445.",
-    lessonLearned: "Post-earnings strength עם gap hold = הסטאפ הכי רווחי באחרי דוחות. אם המחיר מחזיק את ה-gap.",
-    maxFavorable: 457.30, maxAdverse: 443.10, _capitalAtEntry: 2856.20,
-  },
-  {
-    id: "demo-10", ticker: "NVDA", side: "LONG", date: "2026-04-17",
-    entry: 195.50, stop: 192.00, target: 205.00, exit: 201.68, shares: 12,
-    status: "CLOSED", setup: "Trend Continuation", marketCondition: "Trending Up",
-    emotionAtEntry: "Confident", entryQuality: 10, followedPlan: true,
-    exitReason: "Trailing Stop",
-    notes: "NVDA פרץ $195 אחרי קונסולידציה של 4 ימים. כל הסיגנלים מתיישרים: MA Bull Stack מושלם.",
-    lessonLearned: "כשכל הסיגנלים מתיישרים — תאמין למערכת. Trailing stop על high חדש שמר רוב הרווח.",
-    maxFavorable: 202.40, maxAdverse: 194.20, _capitalAtEntry: 2913.70,
+    notes: "MSFT אחרי דוחות חזקים (EPS beat 8%, revenue beat 5%). Gap up 3% בפתיחה, hold above $445.",
+    lessonLearned: "Post-earnings strength עם gap hold = הסטאפ הכי רווחי. אם המחיר מחזיק את ה-gap = institutions קונים.",
+    maxFavorable: 457.20, maxAdverse: 443.10, _capitalAtEntry: 3316.25,
   },
 ];
 
@@ -2420,11 +2475,17 @@ export default function SwingEdge() {
               <div className="bg-[#0d1424] border border-white/[0.06] rounded-2xl p-12 text-center">
                 <BookOpen size={36} className="mx-auto text-slate-600 mb-3" />
                 <h3 className="text-sm font-bold text-white mb-2">{lang === "he" ? "אין עדיין עסקאות" : "No trades yet"}</h3>
-                <p className="text-xs text-slate-500 mb-4">{lang === "he" ? "התחל את היומן שלך — לחץ על הכפתור למטה או הקש N" : "Start journaling — click below or press N"}</p>
-                <button onClick={() => setShowForm(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500 text-black font-bold text-xs hover:bg-cyan-400 transition">
-                  <Plus size={13} /> {lang === "he" ? "עסקה ראשונה" : "Add First Trade"}
-                </button>
+                <p className="text-xs text-slate-500 mb-4">{lang === "he" ? "התחל את היומן שלך — הוסף עסקה ראשונה או טען 15 עסקאות לדוגמה" : "Start journaling — add a trade or load 15 demo trades"}</p>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <button onClick={() => setShowForm(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500 text-black font-bold text-xs hover:bg-cyan-400 transition">
+                    <Plus size={13} /> {lang === "he" ? "עסקה ראשונה" : "Add First Trade"}
+                  </button>
+                  <button onClick={handleLoadDemoTrades}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 text-amber-300 font-bold text-xs hover:opacity-90 transition">
+                    <Download size={13} /> 📊 {lang === "he" ? "טען עסקאות לדוגמה" : "Load Demo Trades"}
+                  </button>
+                </div>
               </div>
             ) : filteredTrades.length === 0 ? (
               <div className="bg-[#0d1424] border border-white/[0.06] rounded-2xl p-8 text-center">
@@ -3626,12 +3687,12 @@ export default function SwingEdge() {
                   <h3 className="text-sm font-bold text-white">Demo Trades</h3>
                 </div>
                 <p className="text-xs text-slate-500 mb-3">
-                  טען 10 עסקאות לדוגמה מציאותיות (7 WIN · 2 LOSS · 1 BE) מהשבועיים האחרונים, כולל MAE/MFE, רגש, לקחים וחישובי 1% risk על הון $2,500.
+                  טען 15 עסקאות לדוגמה מציאותיות (11 WIN · 3 LOSS · 1 BE) מהתקופה 18 במרץ – 15 באפריל 2026, כולל MAE/MFE, רגש, לקחים וחישובי risk על הון $2,500.
                 </p>
                 <button
                   onClick={handleLoadDemoTrades}
                   className="w-full py-2.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
-                  <Download size={12} /> Load Demo Trades
+                  <Download size={12} /> 📊 טען עסקאות לדוגמה
                 </button>
                 <p className="text-[10px] text-slate-700 mt-2">
                   * העסקאות נשמרות מקומית ומסונכרנות ל-Supabase תחת ה-user_id שלך (אם מוגדר).
@@ -4408,7 +4469,7 @@ export default function SwingEdge() {
             <div className="p-5 space-y-3 text-sm text-slate-300">
               <p><span className="font-bold text-white">Quick start:</span> Press <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-[11px] font-mono">N</kbd> to open the new-trade form.</p>
               <p><span className="font-bold text-white">Risk:</span> SwingEdge sizes positions at 1% portfolio risk. Update your capital in Settings.</p>
-              <p><span className="font-bold text-white">Demo data:</span> Settings → "Load Demo Trades" loads 10 realistic trades for testing.</p>
+              <p><span className="font-bold text-white">Demo data:</span> Settings → "Load Demo Trades" loads 15 realistic trades for testing.</p>
               <p><span className="font-bold text-white">Live data:</span> Header tape and charts use TradingView feeds (24/7 incl. pre/post-market).</p>
               <p className="pt-2 text-xs text-slate-500">For bug reports or feature requests, use the <span className="text-violet-400">Send Feedback</span> menu item.</p>
             </div>
