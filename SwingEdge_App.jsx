@@ -9,6 +9,7 @@ import TradingViewSearch from "./src/components/TradingViewSearch.jsx";
 import { TVTickerTape, TVMarketOverview } from "./src/components/TradingViewWidgets.jsx";
 import { useToast, useConfirm, Tooltip as UiTooltip } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured } from "./src/supabaseClient.js";
+import { extractTradeFromImage } from "./src/utils/chartImageOCR.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell
@@ -834,6 +835,7 @@ export default function SwingEdge() {
   const tvRef = useRef(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ticker: "", side: "LONG", entry: "", stop: "", target: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
+  const [ocrStatus, setOcrStatus] = useState(null);
   // Live quote shown in the Add Trade modal (auto-fills Entry Price).
   const [formQuote, setFormQuote] = useState(null);
   const [formQuoteLoading, setFormQuoteLoading] = useState(false);
@@ -1465,6 +1467,7 @@ export default function SwingEdge() {
     };
     setTrades(prev => [...prev, newTrade]);
     setForm({ ticker: "", side: "LONG", entry: "", stop: "", target: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
+    setOcrStatus(null);
     setAiAnalysis(null);
     setShowForm(false);
     setTab("journal");
@@ -1629,7 +1632,24 @@ export default function SwingEdge() {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => setForm(f => ({ ...f, tradeImage: file, tradeImagePreview: ev.target.result }));
+    reader.onload = async (ev) => {
+      const dataURL = ev.target.result;
+      setForm(f => ({ ...f, tradeImage: file, tradeImagePreview: dataURL }));
+      setOcrStatus("processing");
+      const r = await extractTradeFromImage(dataURL, form.side);
+      if (!r.success || (!r.ticker && !r.entry && !r.stop && !r.target)) {
+        setOcrStatus("failed");
+        return;
+      }
+      setForm(f => ({
+        ...f,
+        ticker: f.ticker || r.ticker,
+        entry:  f.entry  || r.entry,
+        stop:   f.stop   || r.stop,
+        target: f.target || r.target,
+      }));
+      setOcrStatus("success");
+    };
     reader.readAsDataURL(file);
   };
 
@@ -4150,10 +4170,15 @@ export default function SwingEdge() {
                   </div>
                 </div>
                 <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Trade Image</label>
+                  <label className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">
+                    <span>{t.tradeImage}</span>
+                    <UiTooltip label={t.ocrTooltip} position="top">
+                      <HelpCircle size={11} className="text-slate-500 hover:text-cyan-400 cursor-help" />
+                    </UiTooltip>
+                  </label>
                   <label className="flex items-center gap-2 cursor-pointer w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-400 hover:border-cyan-500/30 hover:text-cyan-400 transition">
                     <Eye size={12} />
-                    <span>{form.tradeImage ? form.tradeImage.name : "Upload chart..."}</span>
+                    <span>{form.tradeImage ? form.tradeImage.name : t.uploadChart}</span>
                     <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
                   </label>
                 </div>
@@ -4163,10 +4188,28 @@ export default function SwingEdge() {
               {form.tradeImagePreview && (
                 <div className="relative rounded-lg overflow-hidden border border-white/10">
                   <img src={form.tradeImagePreview} alt="Trade chart" className="w-full h-32 object-cover" />
-                  <button onClick={() => setForm(f=>({...f,tradeImage:null,tradeImagePreview:null}))}
+                  <button onClick={() => { setForm(f=>({...f,tradeImage:null,tradeImagePreview:null})); setOcrStatus(null); }}
                     className="absolute top-1 right-1 rtl:right-auto rtl:left-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-slate-300 hover:text-white">
                     <X size={10} />
                   </button>
+                </div>
+              )}
+
+              {/* OCR status pill */}
+              {ocrStatus && (
+                <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-[11px] ${
+                  ocrStatus === "processing" ? "bg-cyan-500/5 border-cyan-500/20 text-cyan-300" :
+                  ocrStatus === "success" ? "bg-emerald-500/5 border-emerald-500/20 text-[#10b981]" :
+                  "bg-amber-500/5 border-amber-500/20 text-amber-400"
+                }`}>
+                  {ocrStatus === "processing" && <RefreshCw size={12} className="animate-spin" />}
+                  {ocrStatus === "success" && <CheckCircle size={12} />}
+                  {ocrStatus === "failed" && <AlertTriangle size={12} />}
+                  <span>{
+                    ocrStatus === "processing" ? t.ocrProcessing :
+                    ocrStatus === "success" ? t.ocrSuccess :
+                    t.ocrFailed
+                  }</span>
                 </div>
               )}
 
