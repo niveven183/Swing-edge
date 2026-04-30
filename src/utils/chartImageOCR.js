@@ -1,5 +1,3 @@
-import Tesseract from "tesseract.js";
-
 const TICKER_BLOCKLIST = new Set([
   "THE", "AND", "FOR", "USD", "BUY", "SELL", "MAX", "MIN",
   "OPEN", "HIGH", "LOW", "CLOSE", "VOL", "VOLUME", "DAY",
@@ -8,6 +6,7 @@ const TICKER_BLOCKLIST = new Set([
 
 export async function extractTradeFromImage(imageDataURL, side = "LONG") {
   try {
+    const { default: Tesseract } = await import("tesseract.js");
     const result = await Tesseract.recognize(imageDataURL, "eng");
     const rawText = result.data.text || "";
     const lines = rawText.split("\n").map((l) => l.trim()).filter(Boolean);
