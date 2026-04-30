@@ -6,6 +6,7 @@ import FeedbackTab from "./src/components/FeedbackTab.jsx";
 import IOSInstallBanner from "./src/components/IOSInstallBanner.jsx";
 import AdminPanel from "./src/components/AdminPanel.jsx";
 import TradingViewSearch from "./src/components/TradingViewSearch.jsx";
+import { TVTickerTape, TVMarketOverview } from "./src/components/TradingViewWidgets.jsx";
 import { useToast, useConfirm, Tooltip as UiTooltip } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured } from "./src/supabaseClient.js";
 import {
@@ -21,7 +22,8 @@ import {
   Calculator, Copy, Percent, Hash,
   Settings, BookMarked, Thermometer, Trash2, User,
   Download, FileText, Bell, Flame, Globe, LogOut, MessageCircle,
-  Shield, Filter, Save, BarChart3
+  Shield, Filter, Save, BarChart3, ChevronDown, HelpCircle, Lock,
+  CreditCard, Smartphone
 } from "lucide-react";
 import { getTranslations, LANGUAGES, isRTLLang } from "./src/i18n.js";
 import {
@@ -50,109 +52,164 @@ const SECTOR_ETFS = [
 
 const MOCK_TRADES = [];
 
-// ─── DEMO TRADES (loaded via Settings → "Load Demo Trades") ────────────────
-// Position sizes computed at 1% risk on a rolling $2,500 account. MAE/MFE
-// values are realistic (MFE ≈ peak favorable, MAE ≈ worst adverse tick).
+// ─── DEMO TRADES (loaded via Settings/Journal → "Load Demo Trades") ───────
+// 15 trades · 11 WIN · 3 LOSS · 1 BE · Win rate ~73% · Mar 18 – Apr 15, 2026.
+// Position sizes scaled to ~1-2.5% risk on a rolling $2,500 account.
+// Field-name mapping for SwingEdge schema:
+//   marketCondition: BULL→"Trending Up", BEAR→"Trending Down", CHOPPY→"Volatile", NEUTRAL→"Sideways"
+//   emotionAtEntry:  CONFIDENT/CALM/PATIENT/NEUTRAL/HESITANT/FOMO/ANGRY → Title-case
+//   followedPlan:    "Yes"→true, "No"→false, "Partially"→"Partially"
+//   notes ← reason · lessonLearned ← lesson.
 const DEMO_TRADES = [
   {
-    id: "demo-1", ticker: "NVDA", side: "LONG", date: "2026-04-05",
-    entry: 175.40, stop: 171.30, target: 185.00, exit: 184.20, shares: 6,
-    status: "CLOSED", setup: "Pullback", marketCondition: "Trending Up",
-    emotionAtEntry: "Confident", entryQuality: 5, followedPlan: true,
-    exitReason: "Target Hit",
-    notes: "RSI נכנס מעל 50 מ-42, wick rejection ב-171.38, 3 ירוקים ברצף ב-4H",
-    lessonLearned: "סבלנות עם setup נקי משתלמת — לא רדפתי, חיכיתי לרי-טסט",
-    maxFavorable: 185.10, maxAdverse: 173.90, _capitalAtEntry: 2500.00,
+    id: "demo-1", ticker: "NVDA", side: "LONG", date: "2026-03-18",
+    entry: 164.50, stop: 161.20, target: 172.00, exit: 171.30, shares: 14,
+    status: "CLOSED", setup: "Higher Low", marketCondition: "Trending Up",
+    emotionAtEntry: "Confident", entryQuality: 9, followedPlan: true,
+    exitReason: "Hit Target",
+    notes: "NVDA יצר Higher Low ב-$164.27 (התחתית של החודש). פריצת $164.50 עם volume גבוה. RSI עלה מ-38 ל-52, MACD חיובי, MA-20 משטח אחרי ירידה.",
+    lessonLearned: "HL מעל תחתית קודמת = סיגנל חזק לכניסה. הסבר הראשון של reversal — הכי משתלם.",
+    maxFavorable: 171.50, maxAdverse: 163.10, _capitalAtEntry: 2500.00,
   },
   {
-    id: "demo-2", ticker: "AAPL", side: "LONG", date: "2026-04-07",
-    entry: 218.50, stop: 215.80, target: 226.00, exit: 225.40, shares: 9,
+    id: "demo-2", ticker: "AAPL", side: "LONG", date: "2026-03-19",
+    entry: 218.50, stop: 215.20, target: 226.00, exit: 225.80, shares: 11,
     status: "CLOSED", setup: "Breakout", marketCondition: "Trending Up",
-    emotionAtEntry: "Neutral", entryQuality: 4, followedPlan: true,
-    exitReason: "Target Hit",
-    notes: "פריצה של $218 אחרי 5 ימי דשדוש, volume 130% מהממוצע",
-    lessonLearned: "Breakouts עם volume confirmation — האחוזי הצלחה הכי גבוהים שלי",
-    maxFavorable: 226.20, maxAdverse: 217.10, _capitalAtEntry: 2552.80,
+    emotionAtEntry: "Calm", entryQuality: 8, followedPlan: true,
+    exitReason: "Hit Target",
+    notes: "AAPL פריצת קונסולידציה של 4 ימים בין $215-$218. Volume +120% מהממוצע על הפריצה, סגירה ב-15 דקות מעל $218.50.",
+    lessonLearned: "Breakouts עם volume confirmation = הסטאפ הכי חזק. תמיד לחכות לסגירת 15 דקות מעל הרמה.",
+    maxFavorable: 226.10, maxAdverse: 217.40, _capitalAtEntry: 2595.20,
   },
   {
-    id: "demo-3", ticker: "TSLA", side: "LONG", date: "2026-04-08",
-    entry: 285.00, stop: 278.50, target: 298.00, exit: 278.50, shares: 4,
-    status: "CLOSED", setup: "Other", marketCondition: "Volatile",
-    emotionAtEntry: "FOMO", entryQuality: 2, followedPlan: false,
-    exitReason: "Stop Loss",
-    notes: "ניסיתי לתפוס breakout ב-$285 אחרי news של דליבריות",
-    lessonLearned: "FOMO + שוק choppy = הפסד בטוח. לא שוב!",
-    maxFavorable: 287.40, maxAdverse: 278.50, _capitalAtEntry: 2614.90,
+    id: "demo-3", ticker: "TSLA", side: "LONG", date: "2026-03-20",
+    entry: 381.30, stop: 374.50, target: 398.00, exit: 374.50, shares: 6,
+    status: "CLOSED", setup: "Failed Breakout", marketCondition: "Volatile",
+    emotionAtEntry: "FOMO", entryQuality: 4, followedPlan: false,
+    exitReason: "Hit Stop",
+    notes: "ניסיתי לתפוס breakout ב-$381 על news של דליבריות. נכנסתי בלי לחכות לאישור volume, השוק היה choppy.",
+    lessonLearned: "FOMO + שוק choppy = הפסד בטוח. לא להיכנס על news בלי setup ברור.",
+    maxFavorable: 382.80, maxAdverse: 374.50, _capitalAtEntry: 2675.50,
   },
   {
-    id: "demo-4", ticker: "BTC", side: "LONG", date: "2026-04-09",
-    entry: 71250, stop: 69800, target: 74500, exit: 73950, shares: 0.02,
-    status: "CLOSED", setup: "Pullback", marketCondition: "Trending Up",
-    emotionAtEntry: "Confident", entryQuality: 5, followedPlan: true,
-    exitReason: "Target Hit",
-    notes: "BTC עשה HL ב-69500 ופרץ resistance של 71K עם volume",
-    lessonLearned: "קריפטו עובד מצוין כשיש מבנה ברור של HH/HL",
-    maxFavorable: 74480, maxAdverse: 70640, _capitalAtEntry: 2588.90,
+    id: "demo-4", ticker: "BTC-USD", side: "LONG", date: "2026-03-22",
+    entry: 70250, stop: 68500, target: 73500, exit: 73100, shares: 0.035,
+    status: "CLOSED", setup: "Higher Low", marketCondition: "Sideways",
+    emotionAtEntry: "Patient", entryQuality: 8, followedPlan: true,
+    exitReason: "Hit Target",
+    notes: "BTC עשה HL ב-$68,800 (מעל ה-LL הקודם של $67,000). פריצה של $70K עם volume גבוה ב-Binance, RSI ב-55.",
+    lessonLearned: "BTC עם HL בולט עם volume = הזדמנות מצוינת. כניסה על שוק דיכאוני מתחת ל-$70K.",
+    maxFavorable: 73450, maxAdverse: 69640, _capitalAtEntry: 2634.70,
   },
   {
-    id: "demo-5", ticker: "META", side: "LONG", date: "2026-04-10",
-    entry: 612.00, stop: 605.00, target: 628.00, exit: 626.50, shares: 3,
-    status: "CLOSED", setup: "Pullback", marketCondition: "Trending Up",
-    emotionAtEntry: "Neutral", entryQuality: 4, followedPlan: true,
-    exitReason: "Target Hit",
-    notes: "מחיר נגע ב-50 EMA, hammer candle, RSI ב-45 מתאושש",
-    lessonLearned: "EMA bounces עובדים כשהטרנד הראשי חזק",
-    maxFavorable: 627.20, maxAdverse: 609.40, _capitalAtEntry: 2642.90,
+    id: "demo-5", ticker: "META", side: "LONG", date: "2026-03-25",
+    entry: 612.00, stop: 605.00, target: 628.00, exit: 626.50, shares: 4,
+    status: "CLOSED", setup: "50 EMA Bounce", marketCondition: "Trending Up",
+    emotionAtEntry: "Neutral", entryQuality: 7, followedPlan: true,
+    exitReason: "Hit Target",
+    notes: "META נגעה ב-50 EMA בדיוק, יצרה hammer candle ב-1H. RSI מתאושש מ-45, הטרנד הראשי חזק.",
+    lessonLearned: "50 EMA bounces עובדים מצוין כשהטרנד הראשי חזק. ה-50 EMA היא תמיכה דינמית.",
+    maxFavorable: 627.10, maxAdverse: 609.20, _capitalAtEntry: 2734.45,
   },
   {
-    id: "demo-6", ticker: "SPY", side: "LONG", date: "2026-04-11",
-    entry: 588.50, stop: 585.20, target: 595.00, exit: 588.80, shares: 8,
-    status: "CLOSED", setup: "Breakout", marketCondition: "Sideways",
-    emotionAtEntry: "Nervous", entryQuality: 2, followedPlan: true,
-    exitReason: "Chart Read",
-    notes: "ניסיתי breakout ב-$588 אבל לא היה volume אמיתי",
-    lessonLearned: "אם אני מהסס בכניסה — סימן שלא צריך להיכנס. סגרתי בזמן.",
-    maxFavorable: 589.90, maxAdverse: 587.10, _capitalAtEntry: 2686.40,
+    id: "demo-6", ticker: "AMD", side: "LONG", date: "2026-03-26",
+    entry: 165.40, stop: 161.50, target: 175.00, exit: 174.20, shares: 13,
+    status: "CLOSED", setup: "Cup and Handle", marketCondition: "Trending Up",
+    emotionAtEntry: "Confident", entryQuality: 10, followedPlan: true,
+    exitReason: "Hit Target",
+    notes: "AMD יצרה Cup and Handle מושלמת — Cup של 5 שבועות, Handle של 4 ימים. פריצת rim ב-$165.40 עם volume +180%.",
+    lessonLearned: "Cup and Handle עם volume על הפריצה = אחת התבניות הכי אמינות. הסבלנות לחכות ל-handle pullback משתלמת.",
+    maxFavorable: 174.80, maxAdverse: 163.80, _capitalAtEntry: 2792.45,
   },
   {
-    id: "demo-7", ticker: "AMD", side: "LONG", date: "2026-04-12",
-    entry: 168.20, stop: 164.50, target: 178.00, exit: 176.80, shares: 7,
-    status: "CLOSED", setup: "Breakout", marketCondition: "Trending Up",
-    emotionAtEntry: "Confident", entryQuality: 5, followedPlan: true,
-    exitReason: "Target Hit",
-    notes: "תבנית Cup and Handle ברורה, פריצה ב-$168 עם volume גבוה",
-    lessonLearned: "Cup and Handle — אחת התבניות הכי אמינות שלי",
-    maxFavorable: 178.40, maxAdverse: 166.90, _capitalAtEntry: 2688.80,
+    id: "demo-7", ticker: "SPY", side: "LONG", date: "2026-03-27",
+    entry: 588.50, stop: 585.20, target: 595.00, exit: 588.80, shares: 4,
+    status: "CLOSED", setup: "Range Breakout", marketCondition: "Sideways",
+    emotionAtEntry: "Hesitant", entryQuality: 5, followedPlan: "Partially",
+    exitReason: "Manual Exit",
+    notes: "Breakout ב-$588 אחרי 3 ימי דשדוש. Volume חלש, השוק ניטרלי.",
+    lessonLearned: "אם אני מהסס בכניסה — סימן שלא צריך להיכנס. סגרתי בזמן לפני שיהפוך ל-loss.",
+    maxFavorable: 589.60, maxAdverse: 587.10, _capitalAtEntry: 2906.85,
   },
   {
-    id: "demo-8", ticker: "ETH", side: "LONG", date: "2026-04-14",
-    entry: 3850, stop: 3760, target: 4050, exit: 3760, shares: 0.3,
-    status: "CLOSED", setup: "Pullback", marketCondition: "Volatile",
-    emotionAtEntry: "FOMO", entryQuality: 1, followedPlan: false,
-    exitReason: "Stop Loss",
-    notes: "ניסיתי להחזיר את ההפסד של TSLA — נכנסתי בלי setup ברור",
-    lessonLearned: "Revenge trading = הפסד מובטח. לקחת הפסקה אחרי הפסד!",
-    maxFavorable: 3880, maxAdverse: 3760, _capitalAtEntry: 2749.00,
+    id: "demo-8", ticker: "MSFT", side: "LONG", date: "2026-03-28",
+    entry: 415.80, stop: 410.50, target: 430.00, exit: 429.20, shares: 5,
+    status: "CLOSED", setup: "Pullback to 20 EMA", marketCondition: "Trending Up",
+    emotionAtEntry: "Calm", entryQuality: 9, followedPlan: true,
+    exitReason: "Hit Target",
+    notes: "MSFT פולבק נקי ל-20 EMA ב-$415.80, RSI עלה מ-42 ל-48, hammer candle ב-1H.",
+    lessonLearned: "MSFT עם 20 EMA bounces = הסטאפ הכי אמין שלי בלארג קאפ. תמיד לחכות לאישור.",
+    maxFavorable: 429.80, maxAdverse: 414.10, _capitalAtEntry: 2908.05,
   },
   {
-    id: "demo-9", ticker: "MSFT", side: "LONG", date: "2026-04-15",
+    id: "demo-9", ticker: "ETH-USD", side: "LONG", date: "2026-04-01",
+    entry: 3450, stop: 3360, target: 3650, exit: 3360, shares: 0.65,
+    status: "CLOSED", setup: "Revenge Trade", marketCondition: "Volatile",
+    emotionAtEntry: "Angry", entryQuality: 2, followedPlan: false,
+    exitReason: "Hit Stop",
+    notes: "ניסיתי להחזיר את הפסד TSLA. נכנסתי ל-ETH בלי setup ברור, רק כי \"זה חייב לעלות\".",
+    lessonLearned: "Revenge trading = הפסד מובטח. אחרי הפסד — הפסקה של שעה לפחות.",
+    maxFavorable: 3478, maxAdverse: 3360, _capitalAtEntry: 2975.05,
+  },
+  {
+    id: "demo-10", ticker: "NVDA", side: "LONG", date: "2026-04-02",
+    entry: 175.40, stop: 171.30, target: 185.00, exit: 184.20, shares: 14,
+    status: "CLOSED", setup: "Pullback to 20 EMA", marketCondition: "Trending Up",
+    emotionAtEntry: "Confident", entryQuality: 9, followedPlan: true,
+    exitReason: "Hit Target",
+    notes: "NVDA פולבק נקי ל-20 EMA אחרי טרנד עולה. RSI עלה מ-42 ל-52, wick rejection ב-$171.38 ב-4H.",
+    lessonLearned: "סבלנות עם setup נקי משתלמת. לא רדפתי, חיכיתי לרי-טסט מדויק.",
+    maxFavorable: 184.90, maxAdverse: 173.80, _capitalAtEntry: 2916.55,
+  },
+  {
+    id: "demo-11", ticker: "TSLA", side: "SHORT", date: "2026-04-03",
+    entry: 388.50, stop: 395.00, target: 372.00, exit: 374.20, shares: 6,
+    status: "CLOSED", setup: "Failed Breakout", marketCondition: "Trending Down",
+    emotionAtEntry: "Patient", entryQuality: 8, followedPlan: true,
+    exitReason: "Hit Target",
+    notes: "TSLA כשל בפריצה של $395 (resistance level), ירדה מהר. Short entry ב-$388.50 עם stop מעל high.",
+    lessonLearned: "Failed breakouts עובדים מצוין בכיוון ההפוך. השוק כבר היה חלש (Bear).",
+    maxFavorable: 373.10, maxAdverse: 390.20, _capitalAtEntry: 3039.75,
+  },
+  {
+    id: "demo-12", ticker: "AAPL", side: "LONG", date: "2026-04-05",
+    entry: 220.50, stop: 217.80, target: 228.00, exit: 218.30, shares: 11,
+    status: "CLOSED", setup: "Range Breakout", marketCondition: "Volatile",
+    emotionAtEntry: "Neutral", entryQuality: 5, followedPlan: "Partially",
+    exitReason: "Manual Exit",
+    notes: "Breakout ב-$220 בשוק choppy. Volume סביר אבל לא חזק.",
+    lessonLearned: "בשוק choppy — תקן את הציפיות. סגרתי כש-momentum נעלם.",
+    maxFavorable: 222.40, maxAdverse: 218.30, _capitalAtEntry: 3125.55,
+  },
+  {
+    id: "demo-13", ticker: "BTC-USD", side: "LONG", date: "2026-04-08",
+    entry: 71250, stop: 69800, target: 74500, exit: 73950, shares: 0.035,
+    status: "CLOSED", setup: "Higher Low", marketCondition: "Trending Up",
+    emotionAtEntry: "Confident", entryQuality: 9, followedPlan: true,
+    exitReason: "Hit Target",
+    notes: "BTC HL ב-$69,500 (מעל ה-HL הקודם של $67,800). פריצת $71K עם volume גבוה.",
+    lessonLearned: "קריפטו עובד מצוין כשיש מבנה ברור של HH/HL. הסבלנות לחכות ל-HL השתלמה.",
+    maxFavorable: 74400, maxAdverse: 70640, _capitalAtEntry: 3101.35,
+  },
+  {
+    id: "demo-14", ticker: "AMD", side: "LONG", date: "2026-04-09",
+    entry: 168.20, stop: 164.50, target: 178.00, exit: 176.80, shares: 14,
+    status: "CLOSED", setup: "Cup and Handle", marketCondition: "Trending Up",
+    emotionAtEntry: "Confident", entryQuality: 10, followedPlan: true,
+    exitReason: "Hit Target",
+    notes: "AMD Cup and Handle מושלמת — Cup של 6 שבועות, Handle של 5 ימים. פריצת $168 עם volume +180%.",
+    lessonLearned: "Cup and Handle עם volume על הפריצה = הסטאפ הכי בטוח שלי.",
+    maxFavorable: 177.80, maxAdverse: 166.90, _capitalAtEntry: 3195.85,
+  },
+  {
+    id: "demo-15", ticker: "MSFT", side: "LONG", date: "2026-04-10",
     entry: 445.00, stop: 440.20, target: 458.00, exit: 456.50, shares: 5,
-    status: "CLOSED", setup: "Breakout", marketCondition: "Trending Up",
-    emotionAtEntry: "Confident", entryQuality: 5, followedPlan: true,
-    exitReason: "Target Hit",
-    notes: "אחרי דוחות חזקים, gap up ביום ראשון, hold above $445",
-    lessonLearned: "Post-earnings strength עובד מצוין כשה-setup pattern נשמר",
-    maxFavorable: 457.30, maxAdverse: 443.10, _capitalAtEntry: 2722.00,
-  },
-  {
-    id: "demo-10", ticker: "NVDA", side: "LONG", date: "2026-04-17",
-    entry: 195.50, stop: 192.00, target: 205.00, exit: 201.68, shares: 7,
-    status: "CLOSED", setup: "Breakout", marketCondition: "Trending Up",
-    emotionAtEntry: "Confident", entryQuality: 5, followedPlan: true,
-    exitReason: "Chart Read",
-    notes: "NVDA פרץ $195 עם buy signals מ-MA short+long, volume rising",
-    lessonLearned: "כשכל הסיגנלים מתיישרים — תאמין למערכת",
-    maxFavorable: 202.40, maxAdverse: 194.20, _capitalAtEntry: 2779.50,
+    status: "CLOSED", setup: "Post Earnings Strength", marketCondition: "Trending Up",
+    emotionAtEntry: "Patient", entryQuality: 9, followedPlan: true,
+    exitReason: "Hit Target",
+    notes: "MSFT אחרי דוחות חזקים (EPS beat 8%, revenue beat 5%). Gap up 3% בפתיחה, hold above $445.",
+    lessonLearned: "Post-earnings strength עם gap hold = הסטאפ הכי רווחי. אם המחיר מחזיק את ה-gap = institutions קונים.",
+    maxFavorable: 457.20, maxAdverse: 443.10, _capitalAtEntry: 3316.25,
   },
 ];
 
@@ -224,7 +281,7 @@ const exportTradesCSV = (trades) => {
       t.status, t.exit ?? "",
       t.setup ?? "", `"${(t.notes ?? "").replace(/"/g, '""')}"`,
       t.marketCondition ?? "", t.emotionAtEntry ?? "", t.entryQuality ?? "",
-      t.exitReason ?? "", t.followedPlan != null ? (t.followedPlan ? "Yes" : "No") : "",
+      t.exitReason ?? "", t.followedPlan === "Partially" ? "Partially" : t.followedPlan != null ? (t.followedPlan ? "Yes" : "No") : "",
       `"${(t.lessonLearned ?? "").replace(/"/g, '""')}"`,
       t.maxFavorable ?? "", t.maxAdverse ?? "",
       m.pnl != null ? m.pnl.toFixed(2) : "",
@@ -299,7 +356,7 @@ const exportMonthlyPDF = (trades, capital) => {
         <td>${t.exit != null ? "$" + t.exit : "-"}</td>
         <td style="color:${pnlColor(pnl)};font-weight:600">${fmtDollar(pnl)}</td>
         <td style="color:${pnlColor(r)};font-weight:600">${r >= 0 ? "+" : ""}${r.toFixed(2)}R</td>
-        <td>${t.followedPlan != null ? (t.followedPlan ? "✓" : "✗") : "-"}</td>
+        <td>${t.followedPlan === "Partially" ? "◐" : t.followedPlan != null ? (t.followedPlan ? "✓" : "✗") : "-"}</td>
       </tr>`;
   }).join("");
 
@@ -587,6 +644,17 @@ const StatCard = ({ label, value, sub, trend, icon: Icon, accent = "cyan" }) => 
   );
 };
 
+// ─── USER MENU ITEM ──────────────────────────────────────────────────────────
+const UserMenuItem = ({ icon: Icon, label, color = "text-slate-300", onClick }) => (
+  <button
+    onClick={onClick}
+    className="w-full h-10 px-3 flex items-center gap-3 rounded-lg hover:bg-[#1a2235] active:bg-[#0d9488] transition-[background-color] duration-150 text-left group"
+  >
+    <Icon size={16} className={`${color} group-active:text-white`} />
+    <span className="text-sm text-slate-200 font-medium group-active:text-white">{label}</span>
+  </button>
+);
+
 // ─── RIBBON TICKER ────────────────────────────────────────────────────────────
 // Shows one symbol on the header ribbon: logo + price + %-change + arrow,
 // with a tooltip (open/prev close/high/low) and a short flash when the price
@@ -719,6 +787,29 @@ export default function SwingEdge() {
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const profileRef = useRef(null);
 
+  // Modals + PWA install
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [showBillingModal, setShowBillingModal] = useState(false);
+  const [pwaPromptEvent, setPwaPromptEvent] = useState(null);
+  useEffect(() => {
+    const onBeforeInstall = (e) => {
+      e.preventDefault();
+      setPwaPromptEvent(e);
+    };
+    window.addEventListener("beforeinstallprompt", onBeforeInstall);
+    return () => window.removeEventListener("beforeinstallprompt", onBeforeInstall);
+  }, []);
+  const handleInstallPwa = useCallback(async () => {
+    if (!pwaPromptEvent) return;
+    try {
+      pwaPromptEvent.prompt();
+      const choice = await pwaPromptEvent.userChoice;
+      if (choice?.outcome === "accepted") setPwaPromptEvent(null);
+    } catch {}
+    setShowProfileDropdown(false);
+  }, [pwaPromptEvent]);
+
   const [sectorData, setSectorData] = useState([]);
   const [sectorLoading, setSectorLoading] = useState(false);
   const [sectorLastUpdated, setSectorLastUpdated] = useState(null);
@@ -743,6 +834,7 @@ export default function SwingEdge() {
   const tvRef = useRef(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ticker: "", side: "LONG", entry: "", stop: "", target: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
+  const [ocrStatus, setOcrStatus] = useState(null);
   // Live quote shown in the Add Trade modal (auto-fills Entry Price).
   const [formQuote, setFormQuote] = useState(null);
   const [formQuoteLoading, setFormQuoteLoading] = useState(false);
@@ -751,7 +843,7 @@ export default function SwingEdge() {
   const [tickerIdx, setTickerIdx] = useState(0);
   const [showCloseForm, setShowCloseForm] = useState(false);
   const [closingTrade, setClosingTrade] = useState(null);
-  const [closeForm, setCloseForm] = useState({ exit: "", exitReason: "Target Hit", followedPlan: true, lessonLearned: "", maxFavorable: "", maxAdverse: "" });
+  const [closeForm, setCloseForm] = useState({ exit: "", exitReason: "Hit Target", followedPlan: true, lessonLearned: "", maxFavorable: "", maxAdverse: "" });
   const [aiAnalysis, setAiAnalysis] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
 
@@ -824,7 +916,7 @@ export default function SwingEdge() {
     ticker: "", side: "LONG", entry: "", stop: "", target: "", shares: "",
     setup: "Breakout", notes: "", marketCondition: "Trending Up",
     emotionAtEntry: "Neutral", entryQuality: 3, status: "OPEN",
-    exit: "", exitReason: "Target Hit", followedPlan: null, lessonLearned: "",
+    exit: "", exitReason: "Hit Target", followedPlan: null, lessonLearned: "",
     maxFavorable: "", maxAdverse: "",
   });
 
@@ -1374,6 +1466,7 @@ export default function SwingEdge() {
     };
     setTrades(prev => [...prev, newTrade]);
     setForm({ ticker: "", side: "LONG", entry: "", stop: "", target: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
+    setOcrStatus(null);
     setAiAnalysis(null);
     setShowForm(false);
     setTab("journal");
@@ -1437,7 +1530,7 @@ export default function SwingEdge() {
       entryQuality: trade.entryQuality || 3,
       status: trade.status,
       exit: trade.exit != null ? String(trade.exit) : "",
-      exitReason: trade.exitReason || "Target Hit",
+      exitReason: trade.exitReason || "Hit Target",
       followedPlan: trade.followedPlan,
       lessonLearned: trade.lessonLearned || "",
       maxFavorable: trade.maxFavorable != null ? String(trade.maxFavorable) : "",
@@ -1538,7 +1631,38 @@ export default function SwingEdge() {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => setForm(f => ({ ...f, tradeImage: file, tradeImagePreview: ev.target.result }));
+    reader.onload = async (ev) => {
+      const dataURL = ev.target.result;
+      setForm(f => ({ ...f, tradeImage: file, tradeImagePreview: dataURL }));
+      setOcrStatus("processing");
+      try {
+        const { analyzeChart } = await import('./src/vision/ChartVisionEngine');
+        const tickerKey = (form.ticker || "").toUpperCase();
+        const livePrice = tickerKey ? (getLivePrice(tickerKey)?.price ?? null) : null;
+
+        const result = await analyzeChart(dataURL, {
+          side: form.side,
+          livePrice,
+        });
+
+        if (!result.success || (!result.ticker && !result.entry && !result.stop && !result.target)) {
+          setOcrStatus("failed");
+          return;
+        }
+
+        setForm(f => ({
+          ...f,
+          ticker: f.ticker || result.ticker,
+          entry:  f.entry  || result.entry,
+          stop:   f.stop   || result.stop,
+          target: f.target || result.target,
+        }));
+        setOcrStatus("success");
+      } catch (err) {
+        console.error('Vision error:', err);
+        setOcrStatus("failed");
+      }
+    };
     reader.readAsDataURL(file);
   };
 
@@ -1698,24 +1822,129 @@ export default function SwingEdge() {
 
       {/* ── HEADER ── */}
       <header dir="ltr" className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06] bg-[#0d1424]/90 backdrop-blur-md sticky top-0 z-50">
-        {/* Logo */}
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-400 to-violet-500 flex items-center justify-center">
-            <Zap size={14} className="text-white" />
-          </div>
-          <span className="font-bold text-sm tracking-wider text-white">SWING<span className="text-cyan-400">EDGE</span></span>
-          <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-500 border border-cyan-500/20 tracking-widest uppercase">Pro</span>
+        {/* Logo + User Menu (left side, combined) */}
+        <div className="relative" ref={profileRef}>
+          <button
+            onClick={() => setShowProfileDropdown(v => !v)}
+            className="flex items-center gap-2 hover:bg-white/[0.04] active:bg-white/[0.07] rounded-lg px-2 py-1 transition"
+            aria-label="Open user menu"
+          >
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-400 to-violet-500 flex items-center justify-center">
+              <Zap size={14} className="text-white" />
+            </div>
+            <span className="font-bold text-sm tracking-wider text-white">SWING<span className="text-cyan-400">EDGE</span></span>
+            <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-500 border border-cyan-500/20 tracking-widest uppercase">Pro</span>
+            <ChevronDown size={13} className={`text-slate-400 transition-transform ${showProfileDropdown ? "rotate-180" : ""}`} />
+          </button>
+          {showProfileDropdown && (
+            <>
+              <div
+                className="fixed inset-0 bg-black/40 backdrop-blur-[1px] z-[9998] animate-fade-in"
+                onClick={() => setShowProfileDropdown(false)}
+              />
+              <div
+                className="bg-[#131a2c] border border-white/[0.08] rounded-xl overflow-hidden animate-fade-in flex flex-col"
+                style={{
+                  position: "fixed",
+                  top: 60,
+                  left: 16,
+                  width: 280,
+                  maxWidth: "calc(100vw - 32px)",
+                  maxHeight: "calc(100vh - 80px)",
+                  boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+                  zIndex: 99999,
+                }}
+              >
+                {/* HEADER */}
+                <div className="px-4 py-3 border-b border-white/[0.06] bg-gradient-to-r from-cyan-500/5 to-violet-500/5">
+                  <p className="text-sm font-bold text-white truncate">{userProfile?.name || authUser?.user_metadata?.full_name || "Trader"}</p>
+                  {authUser?.email && (
+                    <p className="text-[11px] text-slate-400 mt-0.5 font-mono truncate">{authUser.email}</p>
+                  )}
+                  <span className="inline-block mt-2 text-[9px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold tracking-wider uppercase">
+                    Beta Tester
+                  </span>
+                </div>
+
+                {/* SCROLLABLE BODY */}
+                <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+                  {/* NAVIGATION */}
+                  <div className="px-2 py-1.5 text-[9px] font-bold tracking-widest uppercase text-slate-500">Navigation</div>
+                  <UserMenuItem icon={LayoutDashboard} label="Dashboard"     color="text-cyan-400"   onClick={() => { setTab("dashboard"); setShowProfileDropdown(false); }} />
+                  <UserMenuItem icon={BookOpen}        label="Journal"       color="text-violet-400" onClick={() => { setTab("journal");   setShowProfileDropdown(false); }} />
+                  <UserMenuItem icon={FlaskConical}    label="AI Coach"      color="text-amber-400"  onClick={() => { setTab("analyzer");  setShowProfileDropdown(false); }} />
+                  <UserMenuItem icon={BarChart2}       label="Analytics"     color="text-emerald-400" onClick={() => { setTab("analytics"); setShowProfileDropdown(false); }} />
+                  <UserMenuItem icon={BookMarked}      label="Playbook"      color="text-pink-400"   onClick={() => { setTab("settings");  setShowProfileDropdown(false); }} />
+                  <UserMenuItem icon={Thermometer}    label="Risk Center"   color="text-rose-400"   onClick={() => { setTab("settings");  setShowProfileDropdown(false); }} />
+
+                  <div className="my-1.5 h-px bg-white/[0.06]" />
+
+                  {/* TOOLS */}
+                  <div className="px-2 py-1.5 text-[9px] font-bold tracking-widest uppercase text-slate-500">Tools</div>
+                  <UserMenuItem icon={Settings}      label="Settings"       color="text-cyan-400"   onClick={() => { setTab("settings"); setShowProfileDropdown(false); }} />
+                  <UserMenuItem icon={MessageCircle} label="Send Feedback"  color="text-violet-400" onClick={() => { setTab("feedback"); setShowProfileDropdown(false); }} />
+                  <UserMenuItem icon={HelpCircle}    label="Help & Docs"    color="text-blue-400"   onClick={() => { setShowHelpModal(true); setShowProfileDropdown(false); }} />
+                  <UserMenuItem icon={Bell}          label="Notifications"  color="text-amber-400"  onClick={() => { toast.info("Notifications panel coming soon"); setShowProfileDropdown(false); }} />
+
+                  {isAdmin && (
+                    <>
+                      <div className="my-1.5 h-px bg-white/[0.06]" />
+                      <div className="px-2 py-1.5 text-[9px] font-bold tracking-widest uppercase text-amber-400">Admin</div>
+                      <UserMenuItem icon={Shield} label="Admin Panel" color="text-amber-300" onClick={() => { setTab("admin"); setShowProfileDropdown(false); }} />
+                    </>
+                  )}
+
+                  <div className="my-1.5 h-px bg-white/[0.06]" />
+
+                  {/* PREFERENCES */}
+                  <div className="px-2 py-1.5 text-[9px] font-bold tracking-widest uppercase text-slate-500">Preferences</div>
+                  <div className="px-3 py-2 rounded-lg flex items-center gap-3">
+                    <Globe size={16} className="text-violet-400" />
+                    <span className="text-sm text-slate-300 flex-1">Language</span>
+                    <select
+                      value={lang}
+                      onChange={e => setLang(e.target.value)}
+                      dir="ltr"
+                      onClick={e => e.stopPropagation()}
+                      className="bg-white/5 border border-white/10 rounded px-2 py-1 text-[11px] text-white focus:outline-none"
+                    >
+                      {LANGUAGES.map(l => (
+                        <option key={l.code} value={l.code}>{l.nativeName}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    onClick={() => { toggleLightMode(); }}
+                    className="w-full h-10 px-3 flex items-center gap-3 rounded-lg hover:bg-[#1a2235] transition-[background-color] duration-150 text-left">
+                    <span className="text-base w-4 text-center">{lightMode ? "🌙" : "☀️"}</span>
+                    <span className="text-sm text-slate-300 flex-1">Theme</span>
+                    <span className="text-[11px] text-slate-500 font-mono">{lightMode ? "Light" : "Dark"}</span>
+                  </button>
+                  {pwaPromptEvent && (
+                    <UserMenuItem icon={Smartphone} label="Install App" color="text-cyan-400" onClick={() => { handleInstallPwa(); }} />
+                  )}
+
+                  <div className="my-1.5 h-px bg-white/[0.06]" />
+
+                  {/* ACCOUNT */}
+                  <div className="px-2 py-1.5 text-[9px] font-bold tracking-widest uppercase text-slate-500">Account</div>
+                  <UserMenuItem icon={Lock}       label="Privacy & Security" color="text-slate-300" onClick={() => { setShowPrivacyModal(true); setShowProfileDropdown(false); }} />
+                  <UserMenuItem icon={CreditCard} label="Billing & Plan"     color="text-emerald-400" onClick={() => { setShowBillingModal(true); setShowProfileDropdown(false); }} />
+                  {isSupabaseConfigured && session && (
+                    <button
+                      onClick={handleLogout}
+                      className="w-full h-10 px-3 flex items-center gap-3 rounded-lg hover:bg-rose-500/10 transition-[background-color] duration-150 text-left text-rose-400">
+                      <LogOut size={16} />
+                      <span className="text-sm font-semibold flex-1">Logout</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Ticker Tape — fixed 8 tickers, flash on price change, tooltip on hover */}
-        <div className="hidden md:flex items-center gap-3 text-xs font-mono">
-          {tickerTapeItems.map((item) => (
-            <RibbonTicker key={item.ticker} item={item} />
-          ))}
-          {pricesLoading && <RefreshCw size={10} className="animate-spin text-slate-600" />}
-        </div>
-
-        {/* Status + Profile */}
+        {/* Status + Account (right side) */}
         <div className="flex items-center gap-3">
           <div
             className="flex items-center gap-1.5"
@@ -1751,72 +1980,11 @@ export default function SwingEdge() {
             <div className="text-xs text-slate-500">Account</div>
             <div className="text-sm font-bold font-mono text-cyan-400">${curEquity.toLocaleString("en-US", { minimumFractionDigits: 2 })}</div>
           </div>
-          {/* Profile dropdown */}
-          <div className="relative" ref={profileRef}>
-            <button onClick={() => setShowProfileDropdown(v => !v)}
-              className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500/20 to-violet-500/20 border border-cyan-500/30 flex items-center justify-center hover:border-cyan-500/60 transition">
-              <User size={15} className="text-cyan-400" />
-            </button>
-            {showProfileDropdown && (
-              <>
-                {/* Backdrop — clicking anywhere outside closes the menu (also catches iPad/mobile taps) */}
-                <div
-                  className="fixed inset-0 bg-black/40 backdrop-blur-[1px] z-[9998] animate-fade-in"
-                  onClick={() => setShowProfileDropdown(false)}
-                />
-                <div
-                  className="w-60 bg-[#0d1424] border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-fade-in"
-                  style={{
-                    position: "fixed",
-                    top: 56,
-                    right: 16,
-                    maxWidth: "calc(100vw - 32px)",
-                    zIndex: 9999,
-                  }}
-                >
-                <div className="px-4 py-3 border-b border-white/[0.06] bg-gradient-to-r from-cyan-500/5 to-violet-500/5">
-                  <p className="text-xs font-bold text-white truncate">{userProfile?.name || authUser?.user_metadata?.full_name || "Trader"}</p>
-                  {authUser?.email && (
-                    <p className="text-[10px] text-slate-400 mt-0.5 font-mono truncate">{authUser.email}</p>
-                  )}
-                  <p className="text-[10px] text-slate-500 mt-0.5 font-mono">${capital.toLocaleString()} portfolio</p>
-                </div>
-                <div className="p-2 space-y-1">
-                  {isAdmin && (
-                    <button onClick={() => { setTab("admin"); setShowProfileDropdown(false); }}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-amber-300 hover:bg-amber-500/10 hover:text-amber-200 transition text-left border border-amber-500/20 bg-amber-500/5">
-                      <Shield size={13} className="text-amber-400" /> Admin Dashboard
-                    </button>
-                  )}
-                  <button onClick={() => { setTab("settings"); setShowProfileDropdown(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-300 hover:bg-white/5 hover:text-white transition text-left">
-                    <Settings size={13} className="text-cyan-400" /> {t.profileAndSettings}
-                  </button>
-                  <button onClick={() => { setTab("feedback"); setShowProfileDropdown(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-300 hover:bg-white/5 hover:text-white transition text-left">
-                    <MessageCircle size={13} className="text-cyan-400" /> {t.feedback || "Feedback"}
-                  </button>
-                  <button onClick={() => { toggleLightMode(); setShowProfileDropdown(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-300 hover:bg-white/5 hover:text-white transition text-left">
-                    <span className="text-sm">{lightMode ? "🌙" : "☀️"}</span>
-                    {lightMode ? "Dark Mode" : "Light Mode"}
-                  </button>
-                  {isSupabaseConfigured && session && (
-                    <>
-                      <div className="my-1 h-px bg-white/[0.06]" />
-                      <button onClick={handleLogout}
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-rose-300 hover:bg-rose-500/10 hover:text-rose-200 transition text-left">
-                        <LogOut size={13} /> התנתקות
-                      </button>
-                    </>
-                  )}
-                </div>
-                </div>
-              </>
-            )}
-          </div>
         </div>
       </header>
+
+      {/* ── LIVE TICKER TAPE (TradingView) ── */}
+      <TVTickerTape />
 
       {/* ── NAV ── */}
       <nav className="flex items-center gap-0 px-5 border-b border-white/[0.06] bg-[#0d1424]/60 overflow-x-auto">
@@ -1876,6 +2044,15 @@ export default function SwingEdge() {
                 {aiEdges.topAntiEdge && <EdgeCard edge={aiEdges.topAntiEdge} lang={lang} variant="anti" />}
               </div>
             )}
+
+            {/* Live Market Overview (TradingView) */}
+            <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Globe size={14} className="text-cyan-400" />
+                <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Live Market Overview</span>
+              </div>
+              <TVMarketOverview height={400} />
+            </div>
 
             {/* Mini Equity + Open Positions */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2331,11 +2508,17 @@ export default function SwingEdge() {
               <div className="bg-[#0d1424] border border-white/[0.06] rounded-2xl p-12 text-center">
                 <BookOpen size={36} className="mx-auto text-slate-600 mb-3" />
                 <h3 className="text-sm font-bold text-white mb-2">{lang === "he" ? "אין עדיין עסקאות" : "No trades yet"}</h3>
-                <p className="text-xs text-slate-500 mb-4">{lang === "he" ? "התחל את היומן שלך — לחץ על הכפתור למטה או הקש N" : "Start journaling — click below or press N"}</p>
-                <button onClick={() => setShowForm(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500 text-black font-bold text-xs hover:bg-cyan-400 transition">
-                  <Plus size={13} /> {lang === "he" ? "עסקה ראשונה" : "Add First Trade"}
-                </button>
+                <p className="text-xs text-slate-500 mb-4">{lang === "he" ? "התחל את היומן שלך — הוסף עסקה ראשונה או טען 15 עסקאות לדוגמה" : "Start journaling — add a trade or load 15 demo trades"}</p>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <button onClick={() => setShowForm(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500 text-black font-bold text-xs hover:bg-cyan-400 transition">
+                    <Plus size={13} /> {lang === "he" ? "עסקה ראשונה" : "Add First Trade"}
+                  </button>
+                  <button onClick={handleLoadDemoTrades}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 text-amber-300 font-bold text-xs hover:opacity-90 transition">
+                    <Download size={13} /> 📊 {lang === "he" ? "טען עסקאות לדוגמה" : "Load Demo Trades"}
+                  </button>
+                </div>
               </div>
             ) : filteredTrades.length === 0 ? (
               <div className="bg-[#0d1424] border border-white/[0.06] rounded-2xl p-8 text-center">
@@ -2413,9 +2596,10 @@ export default function SwingEdge() {
                             : <span className="text-slate-700">–</span>}
                         </td>
                         <td className="p-3 text-center">
-                          {t.followedPlan === true  && <span className="text-[#10b981] text-sm font-bold">✓</span>}
-                          {t.followedPlan === false && <span className="text-[#ef4444] text-sm font-bold">✗</span>}
-                          {t.followedPlan == null   && <span className="text-slate-700 text-[10px]">–</span>}
+                          {t.followedPlan === true        && <span className="text-[#10b981] text-sm font-bold">✓</span>}
+                          {t.followedPlan === false       && <span className="text-[#ef4444] text-sm font-bold">✗</span>}
+                          {t.followedPlan === "Partially" && <span className="text-amber-400 text-sm font-bold">◐</span>}
+                          {t.followedPlan == null         && <span className="text-slate-700 text-[10px]">–</span>}
                         </td>
                         <td className="p-3 text-slate-500 text-[10px] max-w-[160px] truncate" title={t.lessonLearned || t.notes}>
                           {t.lessonLearned
@@ -3002,7 +3186,7 @@ export default function SwingEdge() {
               const bestSetup = setupStats[0];
 
               // Best Emotion
-              const EMOTIONS = ["Confident","Nervous","FOMO","Neutral"];
+              const EMOTIONS = ["Confident","Calm","Patient","Neutral","Hesitant","Nervous","FOMO","Angry"];
               const emotionStats = EMOTIONS.map(em => {
                 const e = closedTrades.filter(t => t.emotionAtEntry === em);
                 const wins = e.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length;
@@ -3536,12 +3720,12 @@ export default function SwingEdge() {
                   <h3 className="text-sm font-bold text-white">Demo Trades</h3>
                 </div>
                 <p className="text-xs text-slate-500 mb-3">
-                  טען 10 עסקאות לדוגמה מציאותיות (7 WIN · 2 LOSS · 1 BE) מהשבועיים האחרונים, כולל MAE/MFE, רגש, לקחים וחישובי 1% risk על הון $2,500.
+                  טען 15 עסקאות לדוגמה מציאותיות (11 WIN · 3 LOSS · 1 BE) מהתקופה 18 במרץ – 15 באפריל 2026, כולל MAE/MFE, רגש, לקחים וחישובי risk על הון $2,500.
                 </p>
                 <button
                   onClick={handleLoadDemoTrades}
                   className="w-full py-2.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
-                  <Download size={12} /> Load Demo Trades
+                  <Download size={12} /> 📊 טען עסקאות לדוגמה
                 </button>
                 <p className="text-[10px] text-slate-700 mt-2">
                   * העסקאות נשמרות מקומית ומסונכרנות ל-Supabase תחת ה-user_id שלך (אם מוגדר).
@@ -3979,7 +4163,7 @@ export default function SwingEdge() {
                   <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Emotion at Entry</label>
                   <select value={form.emotionAtEntry} onChange={e=>setForm(f=>({...f,emotionAtEntry:e.target.value}))}
                     className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
-                    {["Confident","Nervous","FOMO","Neutral"].map(s=><option key={s}>{s}</option>)}
+                    {["Confident","Calm","Patient","Neutral","Hesitant","Nervous","FOMO","Angry"].map(s=><option key={s}>{s}</option>)}
                   </select>
                 </div>
               </div>
@@ -3999,10 +4183,15 @@ export default function SwingEdge() {
                   </div>
                 </div>
                 <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Trade Image</label>
+                  <label className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">
+                    <span>{t.tradeImage}</span>
+                    <UiTooltip label={t.ocrTooltip} position="top">
+                      <HelpCircle size={11} className="text-slate-500 hover:text-cyan-400 cursor-help" />
+                    </UiTooltip>
+                  </label>
                   <label className="flex items-center gap-2 cursor-pointer w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-400 hover:border-cyan-500/30 hover:text-cyan-400 transition">
                     <Eye size={12} />
-                    <span>{form.tradeImage ? form.tradeImage.name : "Upload chart..."}</span>
+                    <span>{form.tradeImage ? form.tradeImage.name : t.uploadChart}</span>
                     <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
                   </label>
                 </div>
@@ -4012,10 +4201,28 @@ export default function SwingEdge() {
               {form.tradeImagePreview && (
                 <div className="relative rounded-lg overflow-hidden border border-white/10">
                   <img src={form.tradeImagePreview} alt="Trade chart" className="w-full h-32 object-cover" />
-                  <button onClick={() => setForm(f=>({...f,tradeImage:null,tradeImagePreview:null}))}
+                  <button onClick={() => { setForm(f=>({...f,tradeImage:null,tradeImagePreview:null})); setOcrStatus(null); }}
                     className="absolute top-1 right-1 rtl:right-auto rtl:left-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-slate-300 hover:text-white">
                     <X size={10} />
                   </button>
+                </div>
+              )}
+
+              {/* OCR status pill */}
+              {ocrStatus && (
+                <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-[11px] ${
+                  ocrStatus === "processing" ? "bg-cyan-500/5 border-cyan-500/20 text-cyan-300" :
+                  ocrStatus === "success" ? "bg-emerald-500/5 border-emerald-500/20 text-[#10b981]" :
+                  "bg-amber-500/5 border-amber-500/20 text-amber-400"
+                }`}>
+                  {ocrStatus === "processing" && <RefreshCw size={12} className="animate-spin" />}
+                  {ocrStatus === "success" && <CheckCircle size={12} />}
+                  {ocrStatus === "failed" && <AlertTriangle size={12} />}
+                  <span>{
+                    ocrStatus === "processing" ? t.ocrProcessing :
+                    ocrStatus === "success" ? t.ocrSuccess :
+                    t.ocrFailed
+                  }</span>
                 </div>
               )}
 
@@ -4094,7 +4301,7 @@ export default function SwingEdge() {
                   <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Exit Reason</label>
                   <select value={closeForm.exitReason} onChange={e=>setCloseForm(f=>({...f,exitReason:e.target.value}))}
                     className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-rose-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
-                    {["Stop Loss","Target Hit","Chart Read","Fear","Other"].map(s=><option key={s}>{s}</option>)}
+                    {["Hit Target","Hit Stop","Manual Exit","Trailing Stop","Other"].map(s=><option key={s}>{s}</option>)}
                   </select>
                 </div>
               </div>
@@ -4117,10 +4324,14 @@ export default function SwingEdge() {
               <div>
                 <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Followed Plan?</label>
                 <div className="flex gap-2">
-                  {[true, false].map(val => (
+                  {[
+                    { val: true, label: "✓ Yes", on: "bg-[#10b981]/20 text-[#10b981] border-[#10b981]/30" },
+                    { val: "Partially", label: "◐ Partially", on: "bg-amber-500/20 text-amber-300 border-amber-500/30" },
+                    { val: false, label: "✗ No", on: "bg-[#ef4444]/20 text-[#ef4444] border-[#ef4444]/30" },
+                  ].map(({ val, label, on }) => (
                     <button key={String(val)} onClick={()=>setCloseForm(f=>({...f,followedPlan:val}))}
-                      className={`flex-1 py-2 rounded-lg text-xs font-bold transition border ${closeForm.followedPlan===val?(val?"bg-[#10b981]/20 text-[#10b981] border-[#10b981]/30":"bg-[#ef4444]/20 text-[#ef4444] border-[#ef4444]/30"):"bg-white/3 text-slate-500 border-white/10 hover:border-white/20"}`}>
-                      {val ? "✓ Yes" : "✗ No"}
+                      className={`flex-1 py-2 rounded-lg text-xs font-bold transition border ${closeForm.followedPlan===val ? on : "bg-white/3 text-slate-500 border-white/10 hover:border-white/20"}`}>
+                      {label}
                     </button>
                   ))}
                 </div>
@@ -4129,8 +4340,9 @@ export default function SwingEdge() {
               {/* Lesson Learned */}
               <div>
                 <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Lesson Learned</label>
-                <input value={closeForm.lessonLearned} onChange={e=>setCloseForm(f=>({...f,lessonLearned:e.target.value}))}
-                  placeholder="One sentence takeaway..." className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-violet-500/50 focus:outline-none transition" />
+                <textarea value={closeForm.lessonLearned} onChange={e=>setCloseForm(f=>({...f,lessonLearned:e.target.value}))}
+                  rows={3}
+                  placeholder="What did this trade teach you?" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-violet-500/50 focus:outline-none transition resize-y" />
               </div>
 
               {/* Actions */}
@@ -4214,7 +4426,7 @@ export default function SwingEdge() {
                   <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Emotion at Entry</label>
                   <select value={editForm.emotionAtEntry} onChange={e => setEditForm(f => ({ ...f, emotionAtEntry: e.target.value }))}
                     className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
-                    {["Confident","Nervous","FOMO","Neutral"].map(s => <option key={s}>{s}</option>)}
+                    {["Confident","Calm","Patient","Neutral","Hesitant","Nervous","FOMO","Angry"].map(s => <option key={s}>{s}</option>)}
                   </select>
                 </div>
               </div>
@@ -4246,7 +4458,7 @@ export default function SwingEdge() {
                     <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Exit Reason</label>
                     <select value={editForm.exitReason} onChange={e => setEditForm(f => ({ ...f, exitReason: e.target.value }))}
                       className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
-                      {["Stop Loss","Target Hit","Chart Read","Fear","Other"].map(s => <option key={s}>{s}</option>)}
+                      {["Hit Target","Hit Stop","Manual Exit","Trailing Stop","Other"].map(s => <option key={s}>{s}</option>)}
                     </select>
                   </div>
                 </div>
@@ -4265,18 +4477,23 @@ export default function SwingEdge() {
                 <div className="mt-3">
                   <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Followed Plan?</label>
                   <div className="flex gap-2">
-                    {[true, false].map(val => (
+                    {[
+                      { val: true, label: "✓ Yes", on: "bg-[#10b981]/20 text-[#10b981] border-[#10b981]/30" },
+                      { val: "Partially", label: "◐ Partially", on: "bg-amber-500/20 text-amber-300 border-amber-500/30" },
+                      { val: false, label: "✗ No", on: "bg-[#ef4444]/20 text-[#ef4444] border-[#ef4444]/30" },
+                    ].map(({ val, label, on }) => (
                       <button key={String(val)} onClick={() => setEditForm(f => ({ ...f, followedPlan: val }))}
-                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition border ${editForm.followedPlan===val?(val?"bg-[#10b981]/20 text-[#10b981] border-[#10b981]/30":"bg-[#ef4444]/20 text-[#ef4444] border-[#ef4444]/30"):"bg-white/3 text-slate-500 border-white/10 hover:border-white/20"}`}>
-                        {val ? "✓ Yes" : "✗ No"}
+                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition border ${editForm.followedPlan===val ? on : "bg-white/3 text-slate-500 border-white/10 hover:border-white/20"}`}>
+                        {label}
                       </button>
                     ))}
                   </div>
                 </div>
                 <div className="mt-3">
                   <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Lesson Learned</label>
-                  <input value={editForm.lessonLearned} onChange={e => setEditForm(f => ({ ...f, lessonLearned: e.target.value }))}
-                    placeholder="One sentence takeaway..." className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-violet-500/50 focus:outline-none transition" />
+                  <textarea value={editForm.lessonLearned} onChange={e => setEditForm(f => ({ ...f, lessonLearned: e.target.value }))}
+                    rows={3}
+                    placeholder="What did this trade teach you?" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-violet-500/50 focus:outline-none transition resize-y" />
                 </div>
               </div>
               <div className="flex gap-2 pt-1">
@@ -4289,6 +4506,73 @@ export default function SwingEdge() {
                   ביטול
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── HELP MODAL ── */}
+      {showHelpModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowHelpModal(false)}>
+          <div className="bg-[#131a2c] border border-white/[0.08] rounded-2xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
+              <div className="flex items-center gap-2">
+                <HelpCircle size={16} className="text-blue-400" />
+                <h3 className="text-sm font-bold text-white">Help & Documentation</h3>
+              </div>
+              <button onClick={() => setShowHelpModal(false)} className="text-slate-500 hover:text-white transition"><X size={16} /></button>
+            </div>
+            <div className="p-5 space-y-3 text-sm text-slate-300">
+              <p><span className="font-bold text-white">Quick start:</span> Press <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-[11px] font-mono">N</kbd> to open the new-trade form.</p>
+              <p><span className="font-bold text-white">Risk:</span> SwingEdge sizes positions at 1% portfolio risk. Update your capital in Settings.</p>
+              <p><span className="font-bold text-white">Demo data:</span> Settings → "Load Demo Trades" loads 15 realistic trades for testing.</p>
+              <p><span className="font-bold text-white">Live data:</span> Header tape and charts use TradingView feeds (24/7 incl. pre/post-market).</p>
+              <p className="pt-2 text-xs text-slate-500">For bug reports or feature requests, use the <span className="text-violet-400">Send Feedback</span> menu item.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── PRIVACY & SECURITY MODAL ── */}
+      {showPrivacyModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowPrivacyModal(false)}>
+          <div className="bg-[#131a2c] border border-white/[0.08] rounded-2xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
+              <div className="flex items-center gap-2">
+                <Lock size={16} className="text-slate-300" />
+                <h3 className="text-sm font-bold text-white">Privacy & Security</h3>
+              </div>
+              <button onClick={() => setShowPrivacyModal(false)} className="text-slate-500 hover:text-white transition"><X size={16} /></button>
+            </div>
+            <div className="p-5 space-y-3 text-sm text-slate-300">
+              <p>Your trades are stored locally in your browser. If you signed in, they sync to your private Supabase row keyed by your user ID — only you can read them.</p>
+              <p>Live prices are fetched directly from TradingView; SwingEdge does not log or share which symbols you view.</p>
+              <p className="pt-2 text-xs text-slate-500">To erase all local data, clear your browser storage for this site or use Settings → Reset Demo Trades.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── BILLING & PLAN MODAL ── */}
+      {showBillingModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowBillingModal(false)}>
+          <div className="bg-[#131a2c] border border-white/[0.08] rounded-2xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
+              <div className="flex items-center gap-2">
+                <CreditCard size={16} className="text-emerald-400" />
+                <h3 className="text-sm font-bold text-white">Billing & Plan</h3>
+              </div>
+              <button onClick={() => setShowBillingModal(false)} className="text-slate-500 hover:text-white transition"><X size={16} /></button>
+            </div>
+            <div className="p-5 space-y-3 text-sm text-slate-300">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-cyan-500/5 border border-cyan-500/20">
+                <div>
+                  <div className="text-xs text-slate-400">Current Plan</div>
+                  <div className="text-base font-bold text-cyan-400">Beta — Free</div>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold tracking-wider uppercase">Beta</span>
+              </div>
+              <p>You're on the free Beta tier — full access to every feature while we collect feedback. Paid plans will roll out after public launch; existing Beta accounts will keep extended free access.</p>
             </div>
           </div>
         </div>
