@@ -9,7 +9,6 @@ import TradingViewSearch from "./src/components/TradingViewSearch.jsx";
 import { TVTickerTape, TVMarketOverview } from "./src/components/TradingViewWidgets.jsx";
 import { useToast, useConfirm, Tooltip as UiTooltip } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured } from "./src/supabaseClient.js";
-import { extractTradeFromImage } from "./src/utils/chartImageOCR.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell
@@ -1636,19 +1635,33 @@ export default function SwingEdge() {
       const dataURL = ev.target.result;
       setForm(f => ({ ...f, tradeImage: file, tradeImagePreview: dataURL }));
       setOcrStatus("processing");
-      const r = await extractTradeFromImage(dataURL, form.side);
-      if (!r.success || (!r.ticker && !r.entry && !r.stop && !r.target)) {
+      try {
+        const { analyzeChart } = await import('./src/vision/ChartVisionEngine');
+        const tickerKey = (form.ticker || "").toUpperCase();
+        const livePrice = tickerKey ? (getLivePrice(tickerKey)?.price ?? null) : null;
+
+        const result = await analyzeChart(dataURL, {
+          side: form.side,
+          livePrice,
+        });
+
+        if (!result.success || (!result.ticker && !result.entry && !result.stop && !result.target)) {
+          setOcrStatus("failed");
+          return;
+        }
+
+        setForm(f => ({
+          ...f,
+          ticker: f.ticker || result.ticker,
+          entry:  f.entry  || result.entry,
+          stop:   f.stop   || result.stop,
+          target: f.target || result.target,
+        }));
+        setOcrStatus("success");
+      } catch (err) {
+        console.error('Vision error:', err);
         setOcrStatus("failed");
-        return;
       }
-      setForm(f => ({
-        ...f,
-        ticker: f.ticker || r.ticker,
-        entry:  f.entry  || r.entry,
-        stop:   f.stop   || r.stop,
-        target: f.target || r.target,
-      }));
-      setOcrStatus("success");
     };
     reader.readAsDataURL(file);
   };
