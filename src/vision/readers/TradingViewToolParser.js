@@ -57,16 +57,16 @@ export function parseTradingViewTool(rawText, side = 'LONG') {
     if (m) currentPrice = parseFloat(m[1]);
   }
 
-  // Calculate entry/stop/target from deltas + current price
+  // Calculate entry/stop/target from deltas + current price.
+  // currentPrice is always entry — never stop.
   if (currentPrice && targetDelta && stopDelta) {
+    result.entry = currentPrice.toFixed(2);
     if (side === 'LONG') {
-      result.entry = currentPrice.toFixed(2);
+      result.stop   = (currentPrice - stopDelta).toFixed(2);
       result.target = (currentPrice + targetDelta).toFixed(2);
-      result.stop = (currentPrice - stopDelta).toFixed(2);
     } else {
-      result.entry = currentPrice.toFixed(2);
+      result.stop   = (currentPrice + stopDelta).toFixed(2);
       result.target = (currentPrice - targetDelta).toFixed(2);
-      result.stop = (currentPrice + stopDelta).toFixed(2);
     }
     return result;
   }
@@ -109,10 +109,14 @@ function findBestCluster(prices, referencePrice, side) {
         let score = 100 - Math.abs(midPos - 0.4) * 80;
 
         if (referencePrice) {
-          const dist = Math.abs(mid - referencePrice) / referencePrice * 100;
-          if (dist < 3) score += 50;
-          else if (dist < 10) score += 20;
-          else if (dist > 30) score -= 60;
+          const distMid  = Math.abs(mid  - referencePrice) / referencePrice * 100;
+          const distLow  = Math.abs(low  - referencePrice) / referencePrice * 100;
+          // Reward clusters where entry (mid) ≈ livePrice
+          if (distMid < 3)  score += 80;
+          else if (distMid < 10) score += 30;
+          else if (distMid > 30) score -= 60;
+          // Penalise clusters where stop (low) ≈ livePrice — that would be wrong
+          if (distLow < distMid) score -= 50;
         }
 
         if (score > bestScore) {
