@@ -60,13 +60,14 @@ export function parseTradingViewTool(rawText, side = 'LONG') {
   // Calculate entry/stop/target from deltas + current price.
   // currentPrice is always entry — never stop.
   if (currentPrice && targetDelta && stopDelta) {
-    result.entry = currentPrice.toFixed(2);
     if (side === 'LONG') {
-      result.stop   = (currentPrice - stopDelta).toFixed(2);
-      result.target = (currentPrice + targetDelta).toFixed(2);
+      result.entry  = currentPrice.toFixed(2)
+      result.target = (currentPrice + targetDelta).toFixed(2)
+      result.stop   = (currentPrice - stopDelta).toFixed(2)
     } else {
-      result.stop   = (currentPrice + stopDelta).toFixed(2);
-      result.target = (currentPrice - targetDelta).toFixed(2);
+      result.entry  = currentPrice.toFixed(2)
+      result.target = (currentPrice - targetDelta).toFixed(2)
+      result.stop   = (currentPrice + stopDelta).toFixed(2)
     }
     return result;
   }
