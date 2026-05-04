@@ -4,10 +4,11 @@ export async function extractRegions(imageDataURL) {
   const h = img.height;
 
   return {
-    titleArea: cropImage(img, 0, 0, w * 0.4, h * 0.12),
-    rightAxis: cropImage(img, w * 0.85, 0, w * 0.15, h),
-    centerArea: cropImage(img, w * 0.1, h * 0.15, w * 0.75, h * 0.7),
-    livePriceBox: cropImage(img, w * 0.85, h * 0.4, w * 0.15, h * 0.2),
+    titleArea: cropImage(img, 0, 0, w * 0.5, h * 0.15),
+    toolArea: cropImage(img, w * 0.05, h * 0.15, w * 0.7, h * 0.6),
+    priceAxis: cropImage(img, w * 0.8, 0, w * 0.2, h),
+    tickerTag: cropImage(img, w * 0.7, h * 0.15, w * 0.3, h * 0.35),
+    fullImage: imageDataURL,
   };
 }
 
@@ -22,9 +23,9 @@ function loadImage(dataURL) {
 
 function cropImage(img, x, y, w, h) {
   const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
+  canvas.width = Math.max(1, Math.floor(w));
+  canvas.height = Math.max(1, Math.floor(h));
   const ctx = canvas.getContext('2d');
-  ctx.drawImage(img, x, y, w, h, 0, 0, w, h);
+  ctx.drawImage(img, x, y, w, h, 0, 0, canvas.width, canvas.height);
   return canvas.toDataURL('image/png');
 }

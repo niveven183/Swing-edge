@@ -4527,6 +4527,13 @@ export default function SwingEdge() {
               <p><span className="font-bold text-white">Risk:</span> SwingEdge sizes positions at 1% portfolio risk. Update your capital in Settings.</p>
               <p><span className="font-bold text-white">Demo data:</span> Settings → "Load Demo Trades" loads 15 realistic trades for testing.</p>
               <p><span className="font-bold text-white">Live data:</span> Header tape and charts use TradingView feeds (24/7 incl. pre/post-market).</p>
+              <div className="flex gap-3 py-1">
+                <div className="w-7 h-7 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-sm flex-shrink-0">💡</div>
+                <div>
+                  <div className="text-white font-semibold text-sm">טיפ: הפעל "Always show stats"</div>
+                  <div className="text-slate-400 text-xs mt-1">לחץ פעמיים על הכלי → Display → סמן ✅ "Always show stats". זה מציג את כל הנתונים על הגרף ומשפר את הזיהוי ב-90%.</div>
+                </div>
+              </div>
               <p className="pt-2 text-xs text-slate-500">For bug reports or feature requests, use the <span className="text-violet-400">Send Feedback</span> menu item.</p>
             </div>
           </div>
