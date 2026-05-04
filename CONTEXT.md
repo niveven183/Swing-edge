@@ -10,3 +10,16 @@
 - src/vision/brain/TraderLogic.js — ולידציות סוחר
 - אסטרטגיה: קודם TradingView tool parser → fallback ל-price axis → מחמיר (confidence<50=ריק)
 - שלב הבא: Learning Engine + Visual Preview Modal
+
+## Master Stats Hub (useTradingStats)
+- src/hooks/useTradingStats.js — Single Source of Truth לכל הסטטיסטיקות
+- שימוש כפול ב-SwingEdge_App.jsx:
+  - `stats = useTradingStats(trades, capital, calcTradeMetrics)` — גלובלי (Dashboard, Analytics)
+  - `journalStats = useTradingStats(filteredTrades, ...)` — מסונן לפי פילטרי ה-Journal
+- useMemo — חישוב פעם אחת, עדכון אוטומטי בכל שינוי עסקה
+- מטריקות: totalPnL, winRate, profitFactor, avgR, expectancy, maxDrawdown,
+  currentStreak, equityCurve, bySetup, byEmotion, byMarket, byDayOfWeek,
+  topEdges, antiEdges, lastWeekStats, lastMonthStats, planFollowedWR
+- Aliases לתאימות: total, maxDD ($), avgHold (ימים), bestStreak
+- closedMetrics — מערך עסקאות סגורות עם pnl/rMultiple כבר מצורפים
+- Top/Anti Edges מוצגים בטאבים: Dashboard (ליד EdgeCard) + Analytics (אחרי Insight Cards)

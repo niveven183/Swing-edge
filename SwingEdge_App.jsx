@@ -35,6 +35,7 @@ import { SwingEdgeAI } from "./src/intelligence/SwingEdgeAI.js";
 import {
   DNACard, EdgeCard, DecisionCoachPanel, TiltShield, GrowthChart, RegimeIndicator,
 } from "./src/intelligence/ui/IntelligenceUI.jsx";
+import { useTradingStats } from "./src/hooks/useTradingStats.js";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const RISK_PCT = 0.01;
@@ -1186,9 +1187,9 @@ export default function SwingEdge() {
   const closedTrades = trades.filter(t => t.status === "CLOSED");
   const openTrades   = trades.filter(t => t.status === "OPEN");
 
-  const totalPnL   = closedTrades.reduce((a, t) => a + (calcTradeMetrics(t).pnl || 0), 0);
-  const winRate    = closedTrades.length ? closedTrades.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length / closedTrades.length * 100 : 0;
-  const avgR       = closedTrades.length ? closedTrades.reduce((a, t) => a + (calcTradeMetrics(t).rMultiple || 0), 0) / closedTrades.length : 0;
+  // ─── MASTER STATS HUB — single source of truth ──────────────────────────────
+  const stats = useTradingStats(trades, capital, calcTradeMetrics);
+  const { totalPnL, winRate, avgR } = stats;
 
   // ─── JOURNAL PRO: filtered view + stats ─────────────────────────────────────
   const holdTimeDays = (t) => {
@@ -1221,36 +1222,8 @@ export default function SwingEdge() {
     });
   }, [trades, journalFilters]);
 
-  const journalStats = useMemo(() => {
-    const closed = filteredTrades.filter(t => t.status === "CLOSED");
-    if (closed.length === 0) {
-      return { total: 0, wins: 0, losses: 0, winRate: 0, avgWin: 0, avgLoss: 0, profitFactor: 0, maxDD: 0, avgHold: 0, totalPnL: 0 };
-    }
-    const pnls = closed.map(t => calcTradeMetrics(t).pnl || 0);
-    const wins = pnls.filter(p => p > 0);
-    const losses = pnls.filter(p => p < 0);
-    const avgWin = wins.length ? wins.reduce((a, b) => a + b, 0) / wins.length : 0;
-    const avgLoss = losses.length ? losses.reduce((a, b) => a + b, 0) / losses.length : 0;
-    const sumWins = wins.reduce((a, b) => a + b, 0);
-    const sumLosses = Math.abs(losses.reduce((a, b) => a + b, 0));
-    const profitFactor = sumLosses > 0 ? sumWins / sumLosses : (sumWins > 0 ? Infinity : 0);
-    // Max drawdown on running equity from these trades
-    let peak = 0, equity = 0, maxDD = 0;
-    pnls.forEach(p => { equity += p; if (equity > peak) peak = equity; const dd = peak - equity; if (dd > maxDD) maxDD = dd; });
-    const holds = closed.map(holdTimeDays).filter(d => typeof d === "number");
-    const avgHold = holds.length ? holds.reduce((a, b) => a + b, 0) / holds.length : 0;
-    return {
-      total: closed.length,
-      wins: wins.length,
-      losses: losses.length,
-      winRate: (wins.length / closed.length) * 100,
-      avgWin, avgLoss,
-      profitFactor,
-      maxDD,
-      avgHold,
-      totalPnL: pnls.reduce((a, b) => a + b, 0),
-    };
-  }, [filteredTrades]);
+  // journalStats — same hub, scoped to the user's journal filters.
+  const journalStats = useTradingStats(filteredTrades, capital, calcTradeMetrics);
 
   const uniqueSetups = useMemo(() => {
     const s = new Set(trades.map(t => t.setup).filter(Boolean));
@@ -1326,22 +1299,11 @@ export default function SwingEdge() {
     return closedToday + openPnL;
   }, [closedTrades, openPnL]);
 
-  // Win Streak Counter
-  const { currentStreak, bestStreak } = useMemo(() => {
-    let current = 0;
-    let best = 0;
-    const sorted = [...closedTrades].sort((a, b) => a.date.localeCompare(b.date));
-    for (const t of sorted) {
-      const pnl = calcTradeMetrics(t).pnl || 0;
-      if (pnl > 0) {
-        current++;
-        if (current > best) best = current;
-      } else {
-        current = 0;
-      }
-    }
-    return { currentStreak: current, bestStreak: best };
-  }, [closedTrades]);
+  // Win Streak Counter (delegated to Master Stats Hub).
+  // stats.currentStreak is signed (negative for losing streak); the dashboard
+  // counter shows wins-only, so clamp to >= 0 to preserve the original UX.
+  const currentStreak = Math.max(0, stats.currentStreak);
+  const bestStreak    = stats.maxWinStreak;
 
   // Smart lessons
   const smartLessons = useMemo(() => generateSmartLessons(closedTrades, calcTradeMetrics), [closedTrades]);
@@ -2042,6 +2004,46 @@ export default function SwingEdge() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {aiEdges.topEdge && <EdgeCard edge={aiEdges.topEdge} lang={lang} variant="edge" />}
                 {aiEdges.topAntiEdge && <EdgeCard edge={aiEdges.topAntiEdge} lang={lang} variant="anti" />}
+              </div>
+            )}
+
+            {/* ── Master Stats Hub — Top Edges / Anti-Edges (Setup × Emotion) ── */}
+            {(stats.topEdges.length > 0 || stats.antiEdges.length > 0) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {stats.topEdges.length > 0 && (
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4">
+                    <h3 className="text-emerald-400 font-bold text-sm mb-3">🎯 Top Edges שלך</h3>
+                    {stats.topEdges.map((edge, i) => (
+                      <div key={i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
+                        <div>
+                          <div className="text-white font-semibold text-sm">{edge.name}</div>
+                          <div className="text-slate-400 text-xs">{edge.count} עסקאות</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-emerald-400 font-bold text-sm">{edge.winRate.toFixed(0)}% WR</div>
+                          <div className="text-slate-300 text-xs">${edge.totalPnL.toFixed(0)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {stats.antiEdges.length > 0 && (
+                  <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4">
+                    <h3 className="text-rose-400 font-bold text-sm mb-3">⚠️ Anti-Edges — להימנע!</h3>
+                    {stats.antiEdges.map((edge, i) => (
+                      <div key={i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
+                        <div>
+                          <div className="text-white font-semibold text-sm">{edge.name}</div>
+                          <div className="text-slate-400 text-xs">{edge.count} עסקאות</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-rose-400 font-bold text-sm">{edge.winRate.toFixed(0)}% WR</div>
+                          <div className="text-slate-300 text-xs">${edge.totalPnL.toFixed(0)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -3244,6 +3246,46 @@ export default function SwingEdge() {
                 </div>
               );
             })()}
+
+            {/* ── Master Stats Hub — Top Edges / Anti-Edges (Setup × Emotion) ── */}
+            {(stats.topEdges.length > 0 || stats.antiEdges.length > 0) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {stats.topEdges.length > 0 && (
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4">
+                    <h3 className="text-emerald-400 font-bold text-sm mb-3">🎯 Top Edges שלך</h3>
+                    {stats.topEdges.map((edge, i) => (
+                      <div key={i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
+                        <div>
+                          <div className="text-white font-semibold text-sm">{edge.name}</div>
+                          <div className="text-slate-400 text-xs">{edge.count} עסקאות</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-emerald-400 font-bold text-sm">{edge.winRate.toFixed(0)}% WR</div>
+                          <div className="text-slate-300 text-xs">${edge.totalPnL.toFixed(0)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {stats.antiEdges.length > 0 && (
+                  <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4">
+                    <h3 className="text-rose-400 font-bold text-sm mb-3">⚠️ Anti-Edges — להימנע!</h3>
+                    {stats.antiEdges.map((edge, i) => (
+                      <div key={i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
+                        <div>
+                          <div className="text-white font-semibold text-sm">{edge.name}</div>
+                          <div className="text-slate-400 text-xs">{edge.count} עסקאות</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-rose-400 font-bold text-sm">{edge.winRate.toFixed(0)}% WR</div>
+                          <div className="text-slate-300 text-xs">${edge.totalPnL.toFixed(0)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
