@@ -3063,26 +3063,35 @@ export default function SwingEdge() {
               </ResponsiveContainer>
             </div>
 
-            {/* Setup breakdown */}
+            {/* Setup breakdown — dynamic grouping from actual trade data */}
             <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5">
               <h3 className="text-sm font-bold text-white mb-4">Performance by Setup</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {["Breakout","Pullback","Retest","Breakdown"].map(setup => {
-                  const s = closedTrades.filter(t => t.setup === setup);
-                  const wins = s.filter(t => (calcTradeMetrics(t).pnl||0) > 0).length;
-                  const wr = s.length ? wins/s.length*100 : 0;
-                  const totalR = s.reduce((a,t) => a + (calcTradeMetrics(t).rMultiple||0), 0);
-                  return (
-                    <div key={setup} className="bg-white/3 rounded-xl p-3 border border-white/[0.06]">
-                      <div className="text-xs font-semibold text-violet-400 mb-2">{setup}</div>
-                      <div className="font-bold text-white text-lg font-mono">{wr.toFixed(0)}%</div>
-                      <div className="text-[10px] text-slate-500">{s.length} trades · {totalR.toFixed(1)}R total</div>
-                      <div className="mt-2 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-violet-500 to-cyan-500 rounded-full transition-all" style={{ width: `${wr}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
+                {(() => {
+                  const setupMap = {};
+                  closedTrades.forEach(t => {
+                    const key = (t.setup || "").trim() || "Unknown";
+                    if (!setupMap[key]) setupMap[key] = [];
+                    setupMap[key].push(t);
+                  });
+                  return Object.entries(setupMap)
+                    .sort((a, b) => b[1].length - a[1].length)
+                    .map(([setup, s]) => {
+                      const wins = s.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length;
+                      const wr = s.length ? wins / s.length * 100 : 0;
+                      const totalR = s.reduce((a, t) => a + (calcTradeMetrics(t).rMultiple || 0), 0);
+                      return (
+                        <div key={setup} className="bg-white/3 rounded-xl p-3 border border-white/[0.06]">
+                          <div className="text-xs font-semibold text-violet-400 mb-2 truncate" title={setup}>{setup}</div>
+                          <div className="font-bold text-white text-lg font-mono">{wr.toFixed(0)}%</div>
+                          <div className="text-[10px] text-slate-500">{s.length} trades · {totalR.toFixed(1)}R total</div>
+                          <div className="mt-2 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-violet-500 to-cyan-500 rounded-full transition-all" style={{ width: `${wr}%` }} />
+                          </div>
+                        </div>
+                      );
+                    });
+                })()}
               </div>
             </div>
 
@@ -3129,30 +3138,39 @@ export default function SwingEdge() {
               );
             })()}
 
-            {/* ── Win Rate by Setup Bar Chart ── */}
+            {/* ── Win Rate by Setup Bar Chart — dynamic grouping ── */}
             {(() => {
-              const SETUPS = ["Breakout","Pullback","Retest","Breakdown"];
-              const data = SETUPS.map(setup => {
-                const s = closedTrades.filter(t => t.setup === setup);
-                const wins = s.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length;
-                const wr = s.length ? Math.round(wins / s.length * 100) : 0;
-                return { setup, winRate: wr, count: s.length };
+              const setupMap = {};
+              closedTrades.forEach(t => {
+                const key = (t.setup || "").trim() || "Unknown";
+                if (!setupMap[key]) setupMap[key] = [];
+                setupMap[key].push(t);
               });
+              const data = Object.entries(setupMap)
+                .map(([setup, s]) => {
+                  const wins = s.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length;
+                  const wr = s.length ? Math.round(wins / s.length * 100) : 0;
+                  return { setup, winRate: wr, count: s.length };
+                })
+                .filter(d => d.count > 0)
+                .sort((a, b) => b.count - a.count);
+              const short = name => name.length > 11 ? name.slice(0, 10) + "…" : name;
               return (
                 <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5">
                   <h3 className="text-sm font-bold text-white mb-1">Win Rate by Setup</h3>
-                  <p className="text-xs text-slate-600 mb-4">Success percentage per setup type</p>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                  <p className="text-xs text-slate-600 mb-4">Success % per setup · bar label = trade count</p>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={data} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
-                      <XAxis dataKey="setup" tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} />
+                      <XAxis dataKey="setup" tick={{ fontSize: 9, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={short} />
                       <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`} />
                       <Tooltip
                         contentStyle={{ background: "#0d1424", border: "1px solid #162032", borderRadius: 10, fontSize: 11 }}
                         formatter={(v, n, p) => [`${v}% · ${p.payload.count} trade${p.payload.count !== 1 ? "s" : ""}`, "Win Rate"]}
+                        labelFormatter={l => l}
                       />
                       <ReferenceLine y={50} stroke="#475569" strokeDasharray="4 4" label={{ value: "50%", position: "insideTopRight", fontSize: 9, fill: "#475569" }} />
-                      <Bar dataKey="winRate" radius={[4, 4, 0, 0]}>
+                      <Bar dataKey="winRate" radius={[4, 4, 0, 0]} label={{ position: "top", fontSize: 9, fill: "#94a3b8", formatter: (v, entry) => entry?.payload?.count ? `${entry.payload.count}t` : "" }}>
                         {data.map((d, i) => (
                           <Cell key={i} fill={d.winRate >= 50 ? "#8b5cf6" : "#64748b"} />
                         ))}
@@ -3177,10 +3195,14 @@ export default function SwingEdge() {
               });
               const bestDayEntry = Object.entries(dayMap).sort((a, b) => b[1].pnl - a[1].pnl)[0];
 
-              // Best Setup
-              const SETUPS = ["Breakout","Pullback","Retest","Breakdown"];
-              const setupStats = SETUPS.map(setup => {
-                const s = closedTrades.filter(t => t.setup === setup);
+              // Best Setup — dynamic grouping from actual trade data
+              const setupBuckets = {};
+              closedTrades.forEach(t => {
+                const key = (t.setup || "").trim() || "Unknown";
+                if (!setupBuckets[key]) setupBuckets[key] = [];
+                setupBuckets[key].push(t);
+              });
+              const setupStats = Object.entries(setupBuckets).map(([setup, s]) => {
                 const wins = s.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length;
                 const wr = s.length ? wins / s.length * 100 : 0;
                 return { setup, winRate: wr, count: s.length };
