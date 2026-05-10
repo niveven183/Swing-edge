@@ -944,6 +944,30 @@ export default function SwingEdge() {
   });
   const [showJournalFilters, setShowJournalFilters] = useState(false);
 
+  // ── Sync trades from Supabase on login ──────────────────────────────────
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase || !authUser?.id) return;
+    let cancelled = false;
+    const syncFromSupabase = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("trades")
+          .select("*")
+          .eq("user_id", authUser.id)
+          .order("date", { ascending: false });
+        if (cancelled || error || !data?.length) return;
+        setTrades(prev => {
+          const existingIds = new Set(prev.map(t => t.id));
+          const incoming = data.filter(t => !existingIds.has(t.id));
+          if (!incoming.length) return prev;
+          return [...incoming, ...prev];
+        });
+      } catch {}
+    };
+    syncFromSupabase();
+    return () => { cancelled = true; };
+  }, [authUser?.id]);
+
   // Persist trades to localStorage
   useEffect(() => {
     try { localStorage.setItem("swingEdgeTrades", JSON.stringify(trades)); } catch {}
@@ -1430,6 +1454,10 @@ export default function SwingEdge() {
       _prediction: predictionSnapshot,
     };
     setTrades(prev => [...prev, newTrade]);
+    // Sync new trade to Supabase
+    if (isSupabaseConfigured && supabase && authUser?.id) {
+      supabase.from("trades").upsert({ ...newTrade, user_id: authUser.id }, { onConflict: "id" }).then(() => {});
+    }
     setForm({ ticker: "", side: "LONG", entry: "", stop: "", target: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
     setOcrStatus(null);
     setAiAnalysis(null);
