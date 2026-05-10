@@ -13,6 +13,8 @@ import {
   capabilities, getWeights, resetLearning,
 } from "./core/LearningEngine.js";
 import { calculateGrowthScore, generateGrowthReport, dnaEvolutionSeries } from "./core/GrowthTracker.js";
+import { detectEdgeDecay }                                                  from "./core/EdgeDecayAlert.js";
+import { checkAntiEdgeLocks, isSetupLocked, manualUnlock, manualRelock }   from "./core/AntiEdgeLock.js";
 
 // ─── MEMO CACHE ──────────────────────────────────────────────────────────────
 // We cache per trades-array *identity* — the app keeps trades in a single
@@ -47,14 +49,23 @@ export const SwingEdgeAI = {
     regime: SwingEdgeAI.getRegime(trades, snapshot),
   }),
 
+  // Edge health — decay detection and anti-edge locking.
+  getEdgeDecay:    (trades)         => memoize(trades, "edgeDecay",    () => detectEdgeDecay(trades)),
+  getAntiEdgeLocks:(trades)         => memoize(trades, "antiEdgeLocks",() => checkAntiEdgeLocks(trades)),
+  isSetupLocked:   (setup, trades)  => isSetupLocked(setup, checkAntiEdgeLocks(trades)),
+  unlockSetup:     (setup)          => manualUnlock(setup),
+  relockSetup:     (setup)          => manualRelock(setup),
+
   // Higher-level insights, packaged for dashboard widgets.
   getInsights: (trades, timeframe = "all") => {
-    const dna    = SwingEdgeAI.getDNA(trades);
-    const edges  = SwingEdgeAI.getEdges(trades);
-    const growth = SwingEdgeAI.getGrowth(trades);
-    const regime = SwingEdgeAI.getRegime(trades);
-    const tilt   = SwingEdgeAI.checkTilt(trades);
-    return { dna, edges, growth, regime, tilt, timeframe };
+    const dna           = SwingEdgeAI.getDNA(trades);
+    const edges         = SwingEdgeAI.getEdges(trades);
+    const growth        = SwingEdgeAI.getGrowth(trades);
+    const regime        = SwingEdgeAI.getRegime(trades);
+    const tilt          = SwingEdgeAI.checkTilt(trades);
+    const edgeDecay     = SwingEdgeAI.getEdgeDecay(trades);
+    const antiEdgeLocks = SwingEdgeAI.getAntiEdgeLocks(trades);
+    return { dna, edges, growth, regime, tilt, edgeDecay, antiEdgeLocks, timeframe };
   },
 
   // Tilt protection — expose both the read and the state transitions.

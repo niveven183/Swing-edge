@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import {
   Brain, Sparkles, Shield, Flame, TrendingUp, TrendingDown,
   AlertTriangle, Activity, Target, Compass, Zap, Timer,
+  Lock, Unlock, TrendingDown as Decay, BarChart2,
 } from "lucide-react";
 import {
   AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -318,6 +319,161 @@ export const RegimeIndicator = ({ regime, lang = "he" }) => {
           {lang === "he" ? "גודל פוזיציה מומלץ" : "Suggested sizing"}: {(regime.advice.sizing * 100).toFixed(0)}%
         </div>
       )}
+    </div>
+  );
+};
+
+// ─── EDGE DECAY ALERT CARD ────────────────────────────────────────────────────
+// Shows setups whose recent performance is meaningfully below their baseline.
+export const EdgeDecayCard = ({ edgeDecay, lang = "he" }) => {
+  if (!edgeDecay || !edgeDecay.alerts || !edgeDecay.alerts.length) return null;
+
+  const levelConfig = {
+    severe:   { color: "rose",   labelHe: "חמור",    labelEn: "Severe" },
+    moderate: { color: "amber",  labelHe: "בינוני",  labelEn: "Moderate" },
+    mild:     { color: "yellow", labelHe: "קל",      labelEn: "Mild" },
+  };
+
+  const colorMap = {
+    rose:   { text: "text-rose-400",   bg: "bg-rose-500/8",   border: "border-rose-500/25",   badge: "bg-rose-500/15 text-rose-300 border-rose-500/30" },
+    amber:  { text: "text-amber-400",  bg: "bg-amber-500/8",  border: "border-amber-500/25",  badge: "bg-amber-500/15 text-amber-300 border-amber-500/30" },
+    yellow: { text: "text-yellow-400", bg: "bg-yellow-500/8", border: "border-yellow-500/25", badge: "bg-yellow-500/15 text-yellow-300 border-yellow-500/30" },
+  };
+
+  return (
+    <div className="bg-[#0d1424] border border-amber-500/25 rounded-xl p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <BarChart2 size={15} className="text-amber-400" />
+        <span className="text-[11px] font-semibold tracking-widest uppercase text-amber-400">
+          {lang === "he" ? "דעיכת Edge" : "Edge Decay"}
+        </span>
+        <span className="ml-auto text-[10px] font-mono text-slate-500">
+          {lang === "he" ? `${edgeDecay.scanned} סטאפים נסרקו` : `${edgeDecay.scanned} setups scanned`}
+        </span>
+      </div>
+
+      {edgeDecay.alerts.map((alert) => {
+        const cfg   = levelConfig[alert.level] || levelConfig.mild;
+        const c     = colorMap[cfg.color] || colorMap.amber;
+        return (
+          <div key={alert.setup} className={`${c.bg} ${c.border} border rounded-lg p-3 space-y-1.5`}>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-white">{alert.setup}</span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold ${c.badge}`}>
+                {lang === "he" ? cfg.labelHe : cfg.labelEn}
+              </span>
+            </div>
+            <p className={`text-[11px] leading-relaxed ${c.text}`}>
+              {pick(alert.message, lang)}
+            </p>
+            <div className="flex items-center gap-3 text-[10px] font-mono text-slate-500 pt-0.5">
+              <span>
+                {lang === "he" ? "כל הזמן" : "All-time"}: <b className="text-slate-300">{alert.historicalAvgR}R</b>
+              </span>
+              <span>→</span>
+              <span>
+                {lang === "he" ? "אחרון" : "Recent"}: <b className={alert.recentAvgR < 0 ? "text-rose-400" : "text-slate-300"}>{alert.recentAvgR}R</b>
+              </span>
+              <span>({lang === "he" ? `ירידה של ` : `drop: `}<b className="text-rose-400">{alert.drop}R</b>)</span>
+            </div>
+            <p className="text-[10px] text-slate-500 italic">{pick(alert.detail, lang)}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ─── ANTI-EDGE LOCK CARD ──────────────────────────────────────────────────────
+// Shows locked and near-lock setups with unlock controls.
+export const AntiEdgeLockCard = ({ antiEdgeLocks, onUnlock, onRelock, lang = "he" }) => {
+  if (!antiEdgeLocks) return null;
+  const { locked, warnings } = antiEdgeLocks;
+  if (!locked.length && !warnings.length) return null;
+
+  const WeekDot = ({ w }) => (
+    <div className="flex flex-col items-center gap-0.5" title={w.week}>
+      <div
+        className={`w-2 h-2 rounded-full ${w.negative ? "bg-rose-500" : "bg-emerald-500"}`}
+      />
+      <span className="text-[8px] text-slate-600 font-mono">{w.week.slice(-3)}</span>
+    </div>
+  );
+
+  const SetupRow = ({ s, isLocked }) => (
+    <div className={`rounded-lg border p-3 space-y-2 ${
+      isLocked
+        ? "bg-rose-500/8 border-rose-500/30"
+        : "bg-amber-500/8 border-amber-500/30"
+    }`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {isLocked
+            ? <Lock size={12} className="text-rose-400" />
+            : <AlertTriangle size={12} className="text-amber-400" />
+          }
+          <span className="text-sm font-semibold text-white">{s.setup}</span>
+        </div>
+        {isLocked && (
+          <button
+            onClick={() => onUnlock && onUnlock(s.setup)}
+            className="flex items-center gap-1 text-[10px] px-2 py-1 rounded border border-slate-600/50 bg-slate-700/30 text-slate-400 hover:text-white hover:border-slate-400 transition"
+          >
+            <Unlock size={9} />
+            {lang === "he" ? "בטל חסימה" : "Override"}
+          </button>
+        )}
+        {!isLocked && s.manuallyUnlocked && (
+          <button
+            onClick={() => onRelock && onRelock(s.setup)}
+            className="flex items-center gap-1 text-[10px] px-2 py-1 rounded border border-rose-600/40 bg-rose-900/20 text-rose-400 hover:bg-rose-900/40 transition"
+          >
+            <Lock size={9} />
+            {lang === "he" ? "חסום מחדש" : "Re-lock"}
+          </button>
+        )}
+      </div>
+
+      <p className={`text-[11px] leading-relaxed ${isLocked ? "text-rose-300" : "text-amber-300"}`}>
+        {pick(s.message, lang)}
+      </p>
+
+      {/* Weekly dots visualisation */}
+      <div className="flex items-end gap-1.5 pt-0.5">
+        <span className="text-[9px] text-slate-600 mr-1">
+          {lang === "he" ? "שבועות אחרונים:" : "Recent weeks:"}
+        </span>
+        {[...s.weeksData].reverse().map((w) => <WeekDot key={w.week} w={w} />)}
+      </div>
+
+      <div className="flex items-center gap-3 text-[10px] font-mono text-slate-500">
+        <span>
+          {lang === "he" ? "כולל" : "Overall"}: <b className={s.overallAvgR < 0 ? "text-rose-400" : "text-emerald-400"}>{s.overallAvgR}R</b>
+        </span>
+        <span>·</span>
+        <span>WR <b className="text-slate-300">{s.overallWR}%</b></span>
+        <span>·</span>
+        <span>{s.totalTrades} {lang === "he" ? "עסקאות" : "trades"}</span>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="bg-[#0d1424] border border-rose-500/25 rounded-xl p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <Lock size={15} className="text-rose-400" />
+        <span className="text-[11px] font-semibold tracking-widest uppercase text-rose-400">
+          {lang === "he" ? "Anti-Edge Lock" : "Anti-Edge Lock"}
+        </span>
+        {locked.length > 0 && (
+          <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30 font-mono">
+            {locked.length} {lang === "he" ? "חסומים" : "locked"}
+          </span>
+        )}
+      </div>
+
+      {locked.map((s) => <SetupRow key={s.setup} s={s} isLocked={true} />)}
+      {warnings.map((s) => <SetupRow key={s.setup} s={s} isLocked={false} />)}
     </div>
   );
 };
