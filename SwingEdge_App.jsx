@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import OnboardingScreen from "./src/components/OnboardingScreen.jsx";
 import AuthScreen from "./src/components/AuthScreen.jsx";
+import HelpModal from "./src/components/HelpModal.jsx";
+import PrivacyModal from "./src/components/PrivacyModal.jsx";
+import BillingModal from "./src/components/BillingModal.jsx";
 import BetaWelcome from "./src/components/BetaWelcome.jsx";
 import FeedbackTab from "./src/components/FeedbackTab.jsx";
 import IOSInstallBanner from "./src/components/IOSInstallBanner.jsx";
@@ -4576,78 +4579,13 @@ export default function SwingEdge() {
       )}
 
       {/* ── HELP MODAL ── */}
-      {showHelpModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" role="presentation" onClick={() => setShowHelpModal(false)}>
-          <div className="bg-[#131a2c] border border-white/[0.08] rounded-2xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
-              <div className="flex items-center gap-2">
-                <HelpCircle size={16} className="text-blue-400" />
-                <h3 className="text-sm font-bold text-white">Help & Documentation</h3>
-              </div>
-              <button onClick={() => setShowHelpModal(false)} className="text-slate-500 hover:text-white transition"><X size={16} /></button>
-            </div>
-            <div className="p-5 space-y-3 text-sm text-slate-300">
-              <p><span className="font-bold text-white">Quick start:</span> Press <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-[11px] font-mono">N</kbd> to open the new-trade form.</p>
-              <p><span className="font-bold text-white">Risk:</span> SwingEdge sizes positions at 1% portfolio risk. Update your capital in Settings.</p>
-              <p><span className="font-bold text-white">Demo data:</span> Settings → "Load Demo Trades" loads 15 realistic trades for testing.</p>
-              <p><span className="font-bold text-white">Live data:</span> Header tape and charts use TradingView feeds (24/7 incl. pre/post-market).</p>
-              <div className="flex gap-3 py-1">
-                <div className="w-7 h-7 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-sm flex-shrink-0">💡</div>
-                <div>
-                  <div className="text-white font-semibold text-sm">טיפ: הפעל "Always show stats"</div>
-                  <div className="text-slate-400 text-xs mt-1">לחץ פעמיים על הכלי → Display → סמן ✅ "Always show stats". זה מציג את כל הנתונים על הגרף ומשפר את הזיהוי ב-90%.</div>
-                </div>
-              </div>
-              <p className="pt-2 text-xs text-slate-500">For bug reports or feature requests, use the <span className="text-violet-400">Send Feedback</span> menu item.</p>
-            </div>
-          </div>
-        </div>
-      )}
+      {showHelpModal && <HelpModal onClose={() => setShowHelpModal(false)} />}
 
-      {/* ── PRIVACY & SECURITY MODAL ── */}
-      {showPrivacyModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" role="presentation" onClick={() => setShowPrivacyModal(false)}>
-          <div className="bg-[#131a2c] border border-white/[0.08] rounded-2xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
-              <div className="flex items-center gap-2">
-                <Lock size={16} className="text-slate-300" />
-                <h3 className="text-sm font-bold text-white">Privacy & Security</h3>
-              </div>
-              <button onClick={() => setShowPrivacyModal(false)} className="text-slate-500 hover:text-white transition"><X size={16} /></button>
-            </div>
-            <div className="p-5 space-y-3 text-sm text-slate-300">
-              <p>Your trades are stored locally in your browser. If you signed in, they sync to your private Supabase row keyed by your user ID — only you can read them.</p>
-              <p>Live prices are fetched directly from TradingView; SwingEdge does not log or share which symbols you view.</p>
-              <p className="pt-2 text-xs text-slate-500">To erase all local data, clear your browser storage for this site or use Settings → Reset Demo Trades.</p>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ── PRIVACY MODAL ── */}
+      {showPrivacyModal && <PrivacyModal onClose={() => setShowPrivacyModal(false)} />}
 
-      {/* ── BILLING & PLAN MODAL ── */}
-      {showBillingModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" role="presentation" onClick={() => setShowBillingModal(false)}>
-          <div className="bg-[#131a2c] border border-white/[0.08] rounded-2xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
-              <div className="flex items-center gap-2">
-                <CreditCard size={16} className="text-emerald-400" />
-                <h3 className="text-sm font-bold text-white">Billing & Plan</h3>
-              </div>
-              <button onClick={() => setShowBillingModal(false)} className="text-slate-500 hover:text-white transition"><X size={16} /></button>
-            </div>
-            <div className="p-5 space-y-3 text-sm text-slate-300">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-cyan-500/5 border border-cyan-500/20">
-                <div>
-                  <div className="text-xs text-slate-400">Current Plan</div>
-                  <div className="text-base font-bold text-cyan-400">Beta — Free</div>
-                </div>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold tracking-wider uppercase">Beta</span>
-              </div>
-              <p>You're on the free Beta tier — full access to every feature while we collect feedback. Paid plans will roll out after public launch; existing Beta accounts will keep extended free access.</p>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ── BILLING MODAL ── */}
+      {showBillingModal && <BillingModal onClose={() => setShowBillingModal(false)} />}
 
       {/* ── FLOATING NEW TRADE BUTTON ── */}
       <button
