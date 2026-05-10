@@ -3503,13 +3503,13 @@ export default function SwingEdge() {
                     return (
                       <div key={s.ticker}
                         className={`flex items-center justify-between p-2 bg-white/3 rounded-lg border transition group ${chartSymbol === s.chartSym ? "border-cyan-500/40 bg-cyan-500/5" : "border-white/[0.06] hover:border-cyan-500/20 hover:bg-cyan-500/3"}`}>
-                        <div className="flex items-center gap-1.5 flex-1 cursor-pointer" onClick={() => setChartSymbol(s.chartSym)}>
+                        <button type="button" className="flex items-center gap-1.5 flex-1 text-right" onClick={() => setChartSymbol(s.chartSym)} aria-label="בחר מניה">
                           <TickerLogo ticker={s.ticker} size={18} />
                           <div>
                             <div className="font-bold text-[11px] text-white font-mono">{s.ticker}</div>
                             {lp?.volume ? <div className="text-[8px] text-slate-700 font-mono">Vol: {fmtVolume(lp.volume)}</div> : null}
                           </div>
-                        </div>
+                        </button>
                         <div className="text-right flex items-center gap-1.5">
                           {price != null ? (
                             <div>
@@ -4577,7 +4577,7 @@ export default function SwingEdge() {
 
       {/* ── HELP MODAL ── */}
       {showHelpModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowHelpModal(false)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" role="presentation" onClick={() => setShowHelpModal(false)}>
           <div className="bg-[#131a2c] border border-white/[0.08] rounded-2xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
               <div className="flex items-center gap-2">
@@ -4606,7 +4606,7 @@ export default function SwingEdge() {
 
       {/* ── PRIVACY & SECURITY MODAL ── */}
       {showPrivacyModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowPrivacyModal(false)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" role="presentation" onClick={() => setShowPrivacyModal(false)}>
           <div className="bg-[#131a2c] border border-white/[0.08] rounded-2xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
               <div className="flex items-center gap-2">
@@ -4626,7 +4626,7 @@ export default function SwingEdge() {
 
       {/* ── BILLING & PLAN MODAL ── */}
       {showBillingModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowBillingModal(false)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" role="presentation" onClick={() => setShowBillingModal(false)}>
           <div className="bg-[#131a2c] border border-white/[0.08] rounded-2xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
               <div className="flex items-center gap-2">
