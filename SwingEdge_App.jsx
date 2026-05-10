@@ -1803,7 +1803,7 @@ export default function SwingEdge() {
           </button>
           {showProfileDropdown && (
             <>
-              <div
+              <button type="button"
                 className="fixed inset-0 bg-black/40 backdrop-blur-[1px] z-[9998] animate-fade-in"
                 onClick={() => setShowProfileDropdown(false)}
               />
