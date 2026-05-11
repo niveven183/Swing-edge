@@ -24,7 +24,7 @@ export default function HelpModal({ onClose }) {
           </div>
           <p className="pt-2 text-xs text-slate-500">For bug reports, use the <span className="text-violet-400">Send Feedback</span> menu item.</p>
         </div>
-      </div>
+      </button>
     </div>
   );
 }

@@ -20,7 +20,7 @@ export default function BillingModal({ onClose }) {
           </div>
           <p>You are on the free Beta tier — full access to every feature. Paid plans will roll out after public launch.</p>
         </div>
-      </div>
+      </button>
     </div>
   );
 }

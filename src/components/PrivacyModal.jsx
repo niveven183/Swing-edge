@@ -15,7 +15,7 @@ export default function PrivacyModal({ onClose }) {
           <p>Live prices are fetched directly from TradingView; SwingEdge does not log or share which symbols you view.</p>
           <p className="pt-2 text-xs text-slate-500">To erase all local data, clear your browser storage or use Settings → Reset Demo Trades.</p>
         </div>
-      </div>
+      </button>
     </div>
   );
 }
