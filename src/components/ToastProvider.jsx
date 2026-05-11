@@ -124,8 +124,8 @@ export function ConfirmProvider({ children }) {
                 {state.confirmText}
               </button>
             </div>
-          </div>
-        </div>
+          </button>
+        </button>
       )}
     </ConfirmCtx.Provider>
   );
