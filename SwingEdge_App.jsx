@@ -1542,7 +1542,7 @@ export default function SwingEdge() {
       entry: parseFloat(editForm.entry) || editingTrade.entry,
       stop: parseFloat(editForm.stop) || editingTrade.stop,
       target: parseFloat(editForm.target) || null,
-      shares: parseInt(editForm.shares) || editingTrade.shares,
+      shares: parseInt(editForm.shares, 10) || editingTrade.shares,
       setup: editForm.setup,
       notes: editForm.notes,
       marketCondition: editForm.marketCondition,
