@@ -56,6 +56,46 @@ const SECTOR_ETFS = [
 
 const MOCK_TRADES = [];
 
+// ─── TRADE DATA SANITIZER ────────────────────────────────────────────────────
+// Cleans legacy localStorage entries: maps Hive/SIM setup codes to friendly
+// names, normalizes invalid emotions, strips SIM- ticker prefix, and flags
+// demo trades.
+function cleanTrades(trades) {
+  const SETUP_MAP = {
+    'Hive-S1_premarket': 'Gap and Go',
+    'Hive-S2_open': 'ORB Breakout',
+    'Hive-S3_midday': 'Bull Flag',
+    'Hive-S4_close': 'Power Hour Break',
+    'Hive-S5_postmarket': 'Earnings Gap Play',
+    'Hive-setup': 'Breakout',
+    'Hive-Earnings Gap Play': 'Earnings Gap Play',
+    'Hive-Overnight Reversal': 'Overnight Reversal',
+    'Hive-MOC Fade': 'MOC Fade',
+    'Hive-Power Hour Break': 'Power Hour Break',
+    'Hive-Gap and Go': 'Gap and Go',
+    'Hive-Overnight Hold': 'Overnight Hold',
+    'SIM-PREMARKET': 'Gap and Go',
+    'SIM-OPEN': 'ORB Breakout',
+    'SIM-MIDDAY': 'Bull Flag',
+    'SIM-CLOSE': 'Power Hour Break',
+    'SIM-POSTMARKET': 'Earnings Gap Play',
+    'SIM-SETUPTEST': 'Breakout'
+  };
+  const VALID_EMOTIONS = ['Confident','Calm','FOMO','Angry','Neutral','Hesitant','Patient'];
+  if (!Array.isArray(trades)) return trades;
+  return trades.map(t => {
+    const isSimTicker = typeof t.ticker === 'string' && t.ticker.startsWith('SIM-');
+    const isHiveSetup = typeof t.setup === 'string' && t.setup.startsWith('Hive-');
+    return {
+      ...t,
+      ticker: isSimTicker ? t.ticker.replace('SIM-', '') : t.ticker,
+      setup: SETUP_MAP[t.setup] || t.setup,
+      emotionAtEntry: VALID_EMOTIONS.includes(t.emotionAtEntry) ? t.emotionAtEntry : 'Neutral',
+      isDemo: t.isDemo || isSimTicker || isHiveSetup || false,
+    };
+  });
+}
+
 // ─── DEMO TRADES (loaded via Settings/Journal → "Load Demo Trades") ───────
 // 15 trades · 11 WIN · 3 LOSS · 1 BE · Win rate ~73% · Mar 18 – Apr 15, 2026.
 // Position sizes scaled to ~1-2.5% risk on a rolling $2,500 account.
@@ -248,12 +288,16 @@ const SCANNER_DATA = [
 const generateEquityCurve = (cap, trades = []) => {
   let balance = cap;
   const data = [];
-  trades.filter(t => t.status === "CLOSED").forEach(t => {
+  trades
+    .filter(t => t.status === "CLOSED")
+    .sort((a, b) => new Date(a.date || a.exitDate) - new Date(b.date || b.exitDate))
+    .forEach(t => {
     const pnl = t.side === "LONG"
       ? (t.exit - t.entry) * t.shares
       : (t.entry - t.exit) * t.shares;
     balance += pnl;
-    data.push({ date: t.date, equity: Math.round(balance), ticker: t.ticker, pnl: Math.round(pnl) });
+    const d = t.date || t.exitDate;
+    data.push({ date: d, equity: Math.round(balance), ticker: t.ticker, pnl: Math.round(pnl) });
   });
   return [{ date: "2025-01-01", equity: cap, ticker: "START", pnl: 0 }, ...data];
 };
@@ -829,7 +873,10 @@ export default function SwingEdge() {
   const [trades, setTrades] = useState(() => {
     try {
       const saved = localStorage.getItem("swingEdgeTrades");
-      return saved ? JSON.parse(saved) : MOCK_TRADES;
+      const parsed = saved ? JSON.parse(saved) : MOCK_TRADES;
+      const cleaned = cleanTrades(parsed);
+      try { localStorage.setItem("swingEdgeTrades", JSON.stringify(cleaned)); } catch {}
+      return cleaned;
     } catch { return MOCK_TRADES; }
   });
   const [chartSymbol, setChartSymbol] = useState("NASDAQ:NVDA");
