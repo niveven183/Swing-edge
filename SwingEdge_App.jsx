@@ -96,6 +96,25 @@ function cleanTrades(trades) {
   });
 }
 
+function purgeInvalidTrades(trades) {
+  const FAKE_TICKERS = [
+    'PREMARKET','CLOSE','OPEN','MIDDAY',
+    'POSTMARKET','SETUPTEST'
+  ];
+  const VALID_MARKETS_MAP = {
+    'Trend': 'Trending Up',
+    'Unknown': 'Sideways',
+    'Mixed': 'Volatile'
+  };
+  if (!Array.isArray(trades)) return trades;
+  return trades
+    .filter(t => !FAKE_TICKERS.includes(t.ticker))
+    .map(t => ({
+      ...t,
+      marketCondition: VALID_MARKETS_MAP[t.marketCondition] || t.marketCondition
+    }));
+}
+
 // ─── DEMO TRADES (loaded via Settings/Journal → "Load Demo Trades") ───────
 // 15 trades · 11 WIN · 3 LOSS · 1 BE · Win rate ~73% · Mar 18 – Apr 15, 2026.
 // Position sizes scaled to ~1-2.5% risk on a rolling $2,500 account.
@@ -874,7 +893,7 @@ export default function SwingEdge() {
     try {
       const saved = localStorage.getItem("swingEdgeTrades");
       const parsed = saved ? JSON.parse(saved) : MOCK_TRADES;
-      const cleaned = cleanTrades(parsed);
+      const cleaned = purgeInvalidTrades(cleanTrades(parsed));
       try { localStorage.setItem("swingEdgeTrades", JSON.stringify(cleaned)); } catch {}
       return cleaned;
     } catch { return MOCK_TRADES; }
