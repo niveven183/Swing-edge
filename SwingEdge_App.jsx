@@ -307,10 +307,10 @@ const SCANNER_DATA = [
 const generateEquityCurve = (cap, trades = []) => {
   let balance = cap;
   const data = [];
-  trades
+  const sortedTrades = [...trades]
     .filter(t => t.status === "CLOSED")
-    .sort((a, b) => new Date(a.date || a.exitDate) - new Date(b.date || b.exitDate))
-    .forEach(t => {
+    .sort((a, b) => new Date(a.date || a.exitDate) - new Date(b.date || b.exitDate));
+  sortedTrades.forEach(t => {
     const pnl = t.side === "LONG"
       ? (t.exit - t.entry) * t.shares
       : (t.entry - t.exit) * t.shares;
@@ -1276,12 +1276,14 @@ export default function SwingEdge() {
     }
   }, [watchlistInput]);
 
-  const equityCurve = useMemo(() => generateEquityCurve(capital, trades), [trades, capital]);
-  const closedTrades = trades.filter(t => t.status === "CLOSED");
-  const openTrades   = trades.filter(t => t.status === "OPEN");
+  const realTrades = useMemo(() => trades.filter(t => !t.isDemo), [trades]);
+  const demoTrades = useMemo(() => trades.filter(t => t.isDemo), [trades]);
+  const equityCurve = useMemo(() => generateEquityCurve(capital, realTrades), [realTrades, capital]);
+  const closedTrades = realTrades.filter(t => t.status === "CLOSED");
+  const openTrades   = realTrades.filter(t => t.status === "OPEN");
 
   // ─── MASTER STATS HUB — single source of truth ──────────────────────────────
-  const stats = useTradingStats(trades, capital, calcTradeMetrics);
+  const stats = useTradingStats(realTrades, capital, calcTradeMetrics);
   const { totalPnL, winRate, avgR } = stats;
 
   // ─── JOURNAL PRO: filtered view + stats ─────────────────────────────────────
@@ -1326,12 +1328,12 @@ export default function SwingEdge() {
   // ─── SWINGEDGE AI REPORTS ──────────────────────────────────────────────────
   // Memoised against the trades reference — the orchestrator also has an
   // internal WeakMap cache so repeated reads are effectively free.
-  const aiDNA          = useMemo(() => SwingEdgeAI.getDNA(trades),          [trades]);
-  const aiEdges        = useMemo(() => SwingEdgeAI.getEdges(trades),        [trades]);
-  const aiRegime       = useMemo(() => SwingEdgeAI.getRegime(trades),       [trades]);
-  const aiGrowth       = useMemo(() => SwingEdgeAI.getGrowth(trades),       [trades]);
-  const aiEvolution    = useMemo(() => SwingEdgeAI.getEvolution(trades, 6), [trades]);
-  const aiGrowthReport = useMemo(() => SwingEdgeAI.getGrowthReport(trades), [trades]);
+  const aiDNA          = useMemo(() => SwingEdgeAI.getDNA(realTrades),          [realTrades]);
+  const aiEdges        = useMemo(() => SwingEdgeAI.getEdges(realTrades),        [realTrades]);
+  const aiRegime       = useMemo(() => SwingEdgeAI.getRegime(realTrades),       [realTrades]);
+  const aiGrowth       = useMemo(() => SwingEdgeAI.getGrowth(realTrades),       [realTrades]);
+  const aiEvolution    = useMemo(() => SwingEdgeAI.getEvolution(realTrades, 6), [realTrades]);
+  const aiGrowthReport = useMemo(() => SwingEdgeAI.getGrowthReport(realTrades), [realTrades]);
 
   // Tilt re-evaluates on a 60s tick so cooldown expiry and new conditions update.
   const [tiltTick, setTiltTick] = useState(0);
@@ -1339,12 +1341,12 @@ export default function SwingEdge() {
     const id = setInterval(() => setTiltTick(x => x + 1), 60000);
     return () => clearInterval(id);
   }, []);
-  const aiTilt = useMemo(() => SwingEdgeAI.checkTilt(trades), [trades, tiltTick]);
+  const aiTilt = useMemo(() => SwingEdgeAI.checkTilt(realTrades), [realTrades, tiltTick]);
 
   // Live Decision Coach analysis for the new-trade form.
   const aiCoach = useMemo(
-    () => SwingEdgeAI.analyzeNewTrade(form, trades),
-    [form, trades]
+    () => SwingEdgeAI.analyzeNewTrade(form, realTrades),
+    [form, realTrades]
   );
 
   // ─── CENTRAL EQUITY ENGINE ──────────────────────────────────────────────────
@@ -2065,6 +2067,21 @@ export default function SwingEdge() {
         {/* ══════════════ DASHBOARD ══════════════ */}
         {tab === "dashboard" && (
           <div className="space-y-5 animate-fade-in">
+            {realTrades.length === 0 && (
+              <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-2xl p-6 text-center mb-6">
+                <div className="text-5xl mb-3">👋</div>
+                <h2 className="text-white font-bold text-xl mb-2">ברוך הבא ל-SwingEdge!</h2>
+                <p className="text-slate-400 text-sm mb-4 leading-relaxed">
+                  אתה רואה כרגע <strong className="text-white">עסקאות דמו</strong> לדוגמה.<br/>
+                  הסטטיסטיקות שלך יתחילו להיבנות מהעסקה הראשונה שלך.
+                </p>
+                <button
+                  onClick={() => setTab('journal')}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2.5 rounded-xl font-semibold transition-all shadow-lg shadow-blue-500/20">
+                  ➕ הוסף עסקה ראשונה
+                </button>
+              </div>
+            )}
             {/* KPI Row */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               <StatCard label={t.accountEquity}  value={`$${curEquity.toLocaleString("en-US", {minimumFractionDigits:0})}`} sub={`${t.startedAt} $${capital.toLocaleString()}`} trend={totalPnL/capital*100} icon={DollarSign} accent="cyan" />
@@ -2642,7 +2659,7 @@ export default function SwingEdge() {
                     const win = !isOpen && pnl > 0;
                     return (
                       <tr key={t.id} className={`border-b border-white/[0.04] transition-colors ${!isOpen && win ? "hover:bg-[#10b981]/[0.04]" : !isOpen ? "hover:bg-[#ef4444]/[0.04]" : "hover:bg-white/[0.03]"}`}>
-                        <td className="p-3 font-bold text-white font-mono whitespace-nowrap"><div className="flex items-center gap-1.5"><TickerLogo ticker={t.ticker} size={16} />{t.ticker}</div></td>
+                        <td className="p-3 font-bold text-white font-mono whitespace-nowrap"><div className="flex items-center gap-1.5"><TickerLogo ticker={t.ticker} size={16} />{t.ticker}{t.isDemo && <span className="text-xs bg-slate-700 text-slate-400 px-1 py-0.5 rounded ml-1 font-normal">DEMO</span>}</div></td>
                         <td className="p-3 text-slate-500 whitespace-nowrap">{t.date}</td>
                         <td className="p-3"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side==="LONG"?"bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20":"bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20"}`}>{t.side}</span></td>
                         <td className="p-3 font-mono text-slate-300">${t.entry}</td>
