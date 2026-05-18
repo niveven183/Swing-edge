@@ -1331,7 +1331,12 @@ export default function SwingEdge() {
   }, [trades, journalFilters]);
 
   // journalStats — same hub, scoped to the user's journal filters.
-  const journalStats = useTradingStats(filteredTrades, capital, calcTradeMetrics);
+  // Stats exclude demo trades; the table itself still renders them with a badge.
+  const filteredRealTrades = useMemo(
+    () => filteredTrades.filter(t => !t.isDemo),
+    [filteredTrades]
+  );
+  const journalStats = useTradingStats(filteredRealTrades, capital, calcTradeMetrics);
 
   const uniqueSetups = useMemo(() => {
     const s = new Set(trades.map(t => t.setup).filter(Boolean));
@@ -3165,7 +3170,7 @@ export default function SwingEdge() {
         {tab === "analytics" && (
           <div className="space-y-5 animate-fade-in">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <StatCard label="Total Trades"  value={trades.length}     sub="All time"      icon={Layers}    accent="cyan"   />
+              <StatCard label="Total Trades"  value={realTrades.length} sub="All time"      icon={Layers}    accent="cyan"   />
               <StatCard label="Win Rate"       value={`${winRate.toFixed(1)}%`} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length} wins`} icon={CheckCircle} accent="green" />
               <StatCard label="Avg R Multiple" value={fmtR(avgR)}        sub="Closed trades" icon={Activity}  accent="purple" />
               <StatCard label="Total Return"   value={`${(totalPnL/capital*100).toFixed(2)}%`} sub={`$${Math.round(Math.abs(totalPnL)).toLocaleString()} P&L`} icon={TrendingUp} accent={totalPnL>=0?"green":"red"} />
@@ -3818,7 +3823,7 @@ export default function SwingEdge() {
           const now = new Date();
           const thisMonth = now.getMonth();
           const thisYear = now.getFullYear();
-          const tiltCount = trades.filter(t => {
+          const tiltCount = realTrades.filter(t => {
             if (t.followedPlan !== false) return false;
             const d = new Date(t.date + "T12:00:00");
             return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
@@ -3830,7 +3835,7 @@ export default function SwingEdge() {
 
           // ── Playbook: calculate success rate per setup from journal ──
           const calcSetupSuccess = (setupName) => {
-            const matched = trades.filter(t => t.setup === setupName && t.status === "CLOSED");
+            const matched = realTrades.filter(t => t.setup === setupName && t.status === "CLOSED");
             if (matched.length === 0) return null;
             const wins = matched.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length;
             return { rate: Math.round(wins / matched.length * 100), count: matched.length };
