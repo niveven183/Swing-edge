@@ -1010,27 +1010,38 @@ export default function SwingEdge() {
   });
   const [showJournalFilters, setShowJournalFilters] = useState(false);
 
-  // ── Sync trades from Supabase on login ──────────────────────────────────
+  // ── Load trades: Supabase is source of truth; localStorage is fallback ──
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase || !authUser?.id) return;
     let cancelled = false;
-    const syncFromSupabase = async () => {
+    const loadTrades = async () => {
       try {
         const { data, error } = await supabase
           .from("trades")
           .select("*")
           .eq("user_id", authUser.id)
           .order("date", { ascending: false });
-        if (cancelled || error || !data?.length) return;
-        setTrades(prev => {
-          const existingIds = new Set(prev.map(t => t.id));
-          const incoming = data.filter(t => !existingIds.has(t.id));
-          if (!incoming.length) return prev;
-          return [...incoming, ...prev];
-        });
-      } catch {}
+        if (cancelled) return;
+        if (error) {
+          console.error("Error loading trades from Supabase:", error);
+          try {
+            const local = localStorage.getItem("swingEdgeTrades");
+            if (local) {
+              const cleaned = purgeInvalidTrades(cleanTrades(JSON.parse(local)));
+              setTrades(cleaned);
+            }
+          } catch {}
+          return;
+        }
+        if (data) {
+          const cleaned = purgeInvalidTrades(cleanTrades(data));
+          setTrades(cleaned);
+        }
+      } catch (e) {
+        console.error("Supabase load failed:", e);
+      }
     };
-    syncFromSupabase();
+    loadTrades();
     return () => { cancelled = true; };
   }, [authUser?.id]);
 
@@ -1505,7 +1516,7 @@ export default function SwingEdge() {
     };
 
     const newTrade = {
-      id: trades.length + 1,
+      id: (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       ticker: form.ticker.toUpperCase(),
       date: new Date().toISOString().slice(0, 10),
       createdAt: new Date().toISOString(),
@@ -1522,9 +1533,10 @@ export default function SwingEdge() {
       _prediction: predictionSnapshot,
     };
     setTrades(prev => [...prev, newTrade]);
-    // Sync new trade to Supabase
+    // Sync new trade to Supabase (primary source of truth)
     if (isSupabaseConfigured && supabase && authUser?.id) {
-      supabase.from("trades").upsert({ ...newTrade, user_id: authUser.id }, { onConflict: "id" }).then(() => {});
+      supabase.from("trades").insert({ ...newTrade, user_id: authUser.id, isDemo: false })
+        .then(({ error }) => { if (error) console.error("Supabase insert failed:", error); });
     }
     setForm({ ticker: "", side: "LONG", entry: "", stop: "", target: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
     setOcrStatus(null);
@@ -1534,7 +1546,7 @@ export default function SwingEdge() {
     toast.success(lang === "he" ? `${newTrade.ticker} נוספה ליומן` : `${newTrade.ticker} added to journal`);
   };
 
-  const handleCloseSubmit = () => {
+  const handleCloseSubmit = async () => {
     if (!closingTrade || !closeForm.exit) return;
     const closedTrade = {
       ...closingTrade,
@@ -1550,6 +1562,16 @@ export default function SwingEdge() {
     // Close the loop: grade the prediction we made at entry.
     try { SwingEdgeAI.reinforceFromTrade(closedTrade); } catch { /* learning is best-effort */ }
     setTrades(prev => prev.map(t => t.id === closingTrade.id ? closedTrade : t));
+    // Sync close to Supabase
+    if (isSupabaseConfigured && supabase && authUser?.id && closedTrade.id) {
+      try {
+        const { error } = await supabase.from("trades")
+          .update(closedTrade)
+          .eq("id", closedTrade.id)
+          .eq("user_id", authUser.id);
+        if (error) console.error("Supabase close-update failed:", error);
+      } catch (e) { console.error("Supabase close-update threw:", e); }
+    }
     setShowCloseForm(false);
     setClosingTrade(null);
     setCloseForm({ exit: "", exitReason: "Target Hit", followedPlan: true, lessonLearned: "", maxFavorable: "", maxAdverse: "" });
@@ -1571,6 +1593,16 @@ export default function SwingEdge() {
     });
     if (ok) {
       setTrades(prev => prev.filter(t => t.id !== tradeId));
+      // Sync delete to Supabase
+      if (isSupabaseConfigured && supabase && authUser?.id && tradeId) {
+        try {
+          const { error } = await supabase.from("trades")
+            .delete()
+            .eq("id", tradeId)
+            .eq("user_id", authUser.id);
+          if (error) console.error("Supabase delete failed:", error);
+        } catch (e) { console.error("Supabase delete threw:", e); }
+      }
       toast.success(lang === "he" ? "העסקה נמחקה" : "Trade deleted");
     }
   };
@@ -1600,7 +1632,7 @@ export default function SwingEdge() {
     setShowEditForm(true);
   };
 
-  const handleEditSubmit = () => {
+  const handleEditSubmit = async () => {
     if (!editingTrade) return;
     const exitVal = parseFloat(editForm.exit) || null;
     const updated = {
@@ -1625,6 +1657,16 @@ export default function SwingEdge() {
       maxAdverse: parseFloat(editForm.maxAdverse) || null,
     };
     setTrades(prev => prev.map(t => t.id === editingTrade.id ? updated : t));
+    // Sync edit to Supabase
+    if (isSupabaseConfigured && supabase && authUser?.id && updated.id) {
+      try {
+        const { error } = await supabase.from("trades")
+          .update(updated)
+          .eq("id", updated.id)
+          .eq("user_id", authUser.id);
+        if (error) console.error("Supabase update failed:", error);
+      } catch (e) { console.error("Supabase update threw:", e); }
+    }
     setShowEditForm(false);
     setEditingTrade(null);
     toast.success(lang === "he" ? "העסקה עודכנה" : "Trade updated");
