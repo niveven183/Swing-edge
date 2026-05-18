@@ -169,7 +169,7 @@ const DEMO_TRADES = [
   {
     id: "demo-5", ticker: "META", side: "LONG", date: "2026-03-25",
     entry: 612.00, stop: 605.00, target: 628.00, exit: 626.50, shares: 4,
-    status: "CLOSED", setup: "50 EMA Bounce", marketCondition: "Trending Up",
+    status: "CLOSED", setup: "EMA Bounce 50", marketCondition: "Trending Up",
     emotionAtEntry: "Neutral", entryQuality: 7, followedPlan: true,
     exitReason: "Hit Target",
     notes: "META נגעה ב-50 EMA בדיוק, יצרה hammer candle ב-1H. RSI מתאושש מ-45, הטרנד הראשי חזק.",
@@ -209,7 +209,7 @@ const DEMO_TRADES = [
   {
     id: "demo-9", ticker: "ETH-USD", side: "LONG", date: "2026-04-01",
     entry: 3450, stop: 3360, target: 3650, exit: 3360, shares: 0.65,
-    status: "CLOSED", setup: "Revenge Trade", marketCondition: "Volatile",
+    status: "CLOSED", setup: "Range Breakout", marketCondition: "Volatile",
     emotionAtEntry: "Angry", entryQuality: 2, followedPlan: false,
     exitReason: "Hit Stop",
     notes: "ניסיתי להחזיר את הפסד TSLA. נכנסתי ל-ETH בלי setup ברור, רק כי \"זה חייב לעלות\".",
