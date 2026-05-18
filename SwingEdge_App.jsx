@@ -79,7 +79,9 @@ function cleanTrades(trades) {
     'SIM-MIDDAY': 'Bull Flag',
     'SIM-CLOSE': 'Power Hour Break',
     'SIM-POSTMARKET': 'Earnings Gap Play',
-    'SIM-SETUPTEST': 'Breakout'
+    'SIM-SETUPTEST': 'Breakout',
+    '50 EMA Bounce': 'EMA Bounce 50',
+    'Revenge Trade': 'Range Breakout'
   };
   const VALID_EMOTIONS = ['Confident','Calm','FOMO','Angry','Neutral','Hesitant','Patient'];
   if (!Array.isArray(trades)) return trades;
