@@ -134,3 +134,111 @@ def weekly_cleanup(supabase_client) -> dict:
 def _negate_list(field: str, valid: list) -> list:
     """Placeholder — actual SQL negation built in weekly_cleanup."""
     return []  # unused; filtering done client-side above
+
+
+# ── Tech Team v2: daily audit + proposals + tasks ─────────────────────────────
+
+REPO_ROOT = Path(__file__).parent.parent
+
+
+def audit_daily(supabase_client) -> dict:
+    """Daily scan of trades: count demo/real, collect remaining issues."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    try:
+        result = (
+            supabase_client.table("trades")
+            .select("*")
+            .eq("user_id", SUPABASE_USER_ID)
+            .execute()
+        )
+        rows = result.data or []
+    except Exception:
+        logger.exception("audit_daily: Supabase unavailable")
+        return {
+            "date": today,
+            "error": "Supabase unavailable",
+            "demo_count": 0,
+            "real_count": 0,
+            "issues": [],
+            "total": 0,
+        }
+
+    demo_count = sum(1 for r in rows if r.get("is_demo"))
+    real_count = len(rows) - demo_count
+    issues = []
+    for row in rows:
+        row_issues = _audit(row)
+        if row_issues:
+            issues.append({"id": row.get("id"), "issues": row_issues})
+
+    return {
+        "date": today,
+        "demo_count": demo_count,
+        "real_count": real_count,
+        "issues": issues,
+        "total": len(rows),
+    }
+
+
+def write_proposals(audit: dict) -> None:
+    """Append a dated proposals section to PROPOSALS.md based on audit issues."""
+    if not audit.get("issues"):
+        return
+
+    proposals = [f"- Trade `{i['id']}`: {'; '.join(i['issues'])}" for i in audit["issues"]]
+    path = REPO_ROOT / "PROPOSALS.md"
+    if not path.exists():
+        path.write_text("# SwingEdge — Hive Proposals\n\n")
+
+    section = f"\n## {audit['date']}\n" + "\n".join(proposals) + "\n"
+    with path.open("a") as f:
+        f.write(section)
+
+
+def update_tasks(audit: dict) -> None:
+    """Append a daily summary row to TASKS.md."""
+    path = REPO_ROOT / "TASKS.md"
+    if not path.exists():
+        path.write_text(
+            "# SwingEdge — Daily Tasks Log\n\n"
+            "| Date | Demo | Real | Issues |\n"
+            "|------|------|------|--------|\n"
+        )
+    note = audit.get("error", f"Issues: {len(audit.get('issues', []))}")
+    line = f"| {audit['date']} | Demo: {audit['demo_count']} | Real: {audit['real_count']} | {note} |\n"
+    with path.open("a") as f:
+        f.write(line)
+
+
+def run_tech_team_v2(supabase_client, repo_path: Path | None = None) -> dict:
+    """Run daily audit, write proposals + tasks, then commit & push to main."""
+    import subprocess
+
+    repo = str(repo_path or REPO_ROOT)
+    audit = audit_daily(supabase_client)
+    write_proposals(audit)
+    update_tasks(audit)
+    logger.info("Tech Team v2: audit done. Issues: %d", len(audit.get("issues", [])))
+
+    def _git(*args):
+        try:
+            subprocess.run(["git", *args], cwd=repo, check=False)
+        except Exception:
+            logger.exception("git %s failed", args[0] if args else "?")
+
+    current = "HEAD"
+    try:
+        current = subprocess.check_output(
+            ["git", "branch", "--show-current"], cwd=repo, text=True
+        ).strip() or "HEAD"
+    except Exception:
+        logger.exception("git branch --show-current failed")
+
+    _git("add", "PROPOSALS.md", "TASKS.md")
+    _git("commit", "-m", f"chore(hive): daily audit {audit['date']}")
+    _git("checkout", "main")
+    if current and current != "main":
+        _git("merge", "--no-ff", current)
+    _git("push", "origin", "main", "--force")
+
+    return audit
