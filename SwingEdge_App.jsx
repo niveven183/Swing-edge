@@ -1035,10 +1035,9 @@ export default function SwingEdge() {
           } catch {}
           return;
         }
-        if (data) {
-          const cleaned = purgeInvalidTrades(cleanTrades(data));
-          setTrades(cleaned);
-        }
+        // REPLACE — not merge
+        const cleaned = purgeInvalidTrades(cleanTrades(data || []));
+        setTrades(cleaned);
       } catch (e) {
         console.error("Supabase load failed:", e);
       }
