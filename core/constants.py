@@ -28,6 +28,10 @@ VALID_SETUPS = [
     "Pullback",
     "Scalp",
     "Other",
+    "Gap and Go",
+    "ORB Breakout",
+    "Power Hour Break",
+    "Earnings Gap Play",
 ]
 
 VALID_EMOTIONS = [
@@ -130,4 +134,12 @@ MARKET_ALIASES = {
     "sideways": "Sideways",
     "flat": "Sideways",
     "breakout": "Breakout",
+}
+
+AGENT_SETUP_MAP = {
+    "S1": "Gap and Go",
+    "S2": "ORB Breakout",
+    "S3": "Bull Flag",
+    "S4": "Power Hour Break",
+    "S5": "Earnings Gap Play",
 }

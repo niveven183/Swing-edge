@@ -5,7 +5,7 @@ Every agent inherits validate_and_fix() — called automatically before simulate
 
 import json
 import logging
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 from core.constants import (
@@ -103,6 +103,21 @@ class BaseAgent:
     """
 
     name: str = "BaseAgent"
+
+    def daily_flush_gate(self, supabase_client) -> bool:
+        """
+        Returns True if this agent already inserted a trade today — skip the run.
+        """
+        from core.constants import AGENT_SETUP_MAP
+        today = str(date.today())
+        setup = AGENT_SETUP_MAP.get(self.name, "")
+        result = supabase_client.table("trades").select("id").eq(
+            "setup", setup
+        ).gte("date", today).execute()
+        if result.data and len(result.data) > 0:
+            logger.info("[%s] daily_flush_gate: already ran today — skipping", self.name)
+            return True
+        return False
 
     def simulate_trade(self, raw_trade: dict) -> dict | None:
         trade = validate_and_fix(raw_trade)
