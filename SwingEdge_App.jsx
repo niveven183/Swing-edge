@@ -39,8 +39,6 @@ import {
   DNACard, EdgeCard, DecisionCoachPanel, TiltShield, GrowthChart, RegimeIndicator,
 } from "./src/intelligence/ui/IntelligenceUI.jsx";
 import { useTradingStats } from "./src/hooks/useTradingStats.js";
-import DashboardV2 from "./src/components/dashboard/DashboardV2.jsx";
-
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const RISK_PCT = 0.01;
 
@@ -892,13 +890,9 @@ export default function SwingEdge() {
     } catch {}
     return "dashboard";
   });
-  const [dashboardVariant, setDashboardVariant] = useState(() => {
-    try { return localStorage.getItem("swingEdgeDashboardVariant") || "v2"; }
-    catch { return "v2"; }
-  });
   useEffect(() => {
-    try { localStorage.setItem("swingEdgeDashboardVariant", dashboardVariant); } catch {}
-  }, [dashboardVariant]);
+    try { localStorage.removeItem("swingEdgeDashboardVariant"); } catch {}
+  }, []);
   const [trades, setTrades] = useState(() => {
     try {
       const saved = localStorage.getItem("swingEdgeTrades");
@@ -2123,59 +2117,7 @@ export default function SwingEdge() {
         {/* ══════════════ DASHBOARD ══════════════ */}
         {tab === "dashboard" && (
           <div className="space-y-5 animate-fade-in">
-            {/* V2 / Classic toggle */}
-            <div className="flex justify-end">
-              <div
-                role="tablist"
-                aria-label="Dashboard variant"
-                style={{
-                  display: "inline-flex",
-                  background: "var(--surface-sunken)",
-                  border: "1px solid var(--border-soft)",
-                  borderRadius: "var(--radius-pill)",
-                  padding: 3,
-                  gap: 2,
-                }}
-              >
-                {["classic", "v2"].map((v) => {
-                  const active = dashboardVariant === v;
-                  return (
-                    <button
-                      key={v}
-                      role="tab"
-                      aria-selected={active}
-                      onClick={() => setDashboardVariant(v)}
-                      style={{
-                        padding: "6px 14px",
-                        borderRadius: "var(--radius-pill)",
-                        border: "none",
-                        background: active ? "var(--text-primary)" : "transparent",
-                        color: active ? "#FFFFFF" : "var(--text-secondary)",
-                        fontFamily: "var(--font-body)",
-                        fontSize: 12,
-                        fontWeight: 600,
-                        letterSpacing: "0.06em",
-                        textTransform: "uppercase",
-                        cursor: "pointer",
-                        transition: "background var(--transition-base), color var(--transition-base)",
-                      }}
-                    >
-                      {v === "v2" ? "V2" : "Classic"}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {dashboardVariant === "v2" ? (
-              <DashboardV2
-                stats={stats}
-                realTrades={realTrades}
-                trades={trades}
-                TickerLogo={TickerLogo}
-                lang={lang}
-              />
-            ) : (<>
+            <>
             {realTrades.length === 0 && (
               <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-2xl p-6 text-center mb-6">
                 <div className="text-5xl mb-3">👋</div>
@@ -2564,7 +2506,7 @@ export default function SwingEdge() {
                 </div>
               );
             })()}
-            </>)}
+            </>
           </div>
         )}
 
