@@ -37,8 +37,8 @@ export function TVTickerTape() {
         { proName: "AMEX:SPY",      title: "SPY"  },
       ],
       showSymbolLogo: true,
-      colorTheme: "dark",
-      isTransparent: true,
+      colorTheme: "light",
+      isTransparent: false,
       displayMode: "adaptive",
       locale: "en",
     },
@@ -46,7 +46,7 @@ export function TVTickerTape() {
   );
 
   return (
-    <div className="bg-[#0a0f1e] border-b border-white/[0.06]">
+    <div className="bg-white border-b border-black/[0.06]">
       <div ref={container} className="tradingview-widget-container" />
     </div>
   );
@@ -58,8 +58,8 @@ export function TVSingleQuote({ symbol }) {
     {
       symbol,
       width: "100%",
-      colorTheme: "dark",
-      isTransparent: true,
+      colorTheme: "light",
+      isTransparent: false,
       locale: "en",
     },
     [symbol]
@@ -77,12 +77,12 @@ export function TVMiniChart({ symbol, height = 220 }) {
       height,
       locale: "en",
       dateRange: "1D",
-      colorTheme: "dark",
-      isTransparent: true,
+      colorTheme: "light",
+      isTransparent: false,
       autosize: true,
-      trendLineColor: "rgba(34, 211, 238, 1)",
-      underLineColor: "rgba(34, 211, 238, 0.15)",
-      underLineBottomColor: "rgba(34, 211, 238, 0)",
+      trendLineColor: "rgba(0, 192, 118, 1)",
+      underLineColor: "rgba(0, 192, 118, 0.12)",
+      underLineBottomColor: "rgba(0, 192, 118, 0)",
     },
     [symbol]
   );
@@ -94,7 +94,7 @@ export function TVMarketOverview({ height = 400 }) {
   const container = useTradingViewScript(
     `${TV_BASE}embed-widget-market-overview.js`,
     {
-      colorTheme: "dark",
+      colorTheme: "light",
       dateRange: "1D",
       showChart: true,
       locale: "en",
