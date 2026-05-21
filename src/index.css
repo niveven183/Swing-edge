@@ -271,3 +271,161 @@ footer {
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
+
+/* ═══════════════════════════════════════════════
+   PASS 2 — Depth + Gradient overrides
+   ═══════════════════════════════════════════════ */
+
+/* ━━━ Fix 1: Kill cyan-purple gradients → emerald ━━━ */
+
+[class*="from-cyan-5"],
+[class*="from-cyan-4"],
+[class*="from-blue-5"],
+[class*="from-indigo-5"],
+[class*="from-violet-5"] {
+  background-image: linear-gradient(
+    135deg,
+    var(--accent-emerald) 0%,
+    var(--accent-emerald-bright) 100%
+  ) !important;
+}
+
+/* Logo icon (from-cyan-4 to-violet): deeper 3-stop green */
+[class*="from-cyan-4"][class*="to-violet"] {
+  background-image: linear-gradient(
+    135deg,
+    var(--accent-emerald) 0%,
+    #0EA66B 50%,
+    #008555 100%
+  ) !important;
+  box-shadow: var(--shadow-glow) !important;
+}
+
+/* FAB: replace cyan glow with emerald glow */
+[class*="shadow-cyan-"] {
+  box-shadow: var(--shadow-glow) !important;
+}
+
+/* Auth inputs: force emerald focus ring */
+input:focus {
+  border-color: var(--accent-emerald) !important;
+  box-shadow: 0 0 0 3px var(--accent-emerald-soft) !important;
+}
+
+/* ━━━ Fix 2: Card depth + hierarchy ━━━ */
+
+div.rounded-xl,
+div.rounded-2xl,
+section.rounded-xl,
+section.rounded-2xl {
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-sm);
+}
+
+div.rounded-xl:hover,
+div.rounded-2xl:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-medium);
+}
+
+/* KPI numbers: subtle top→bottom gradient */
+[class*="text-3xl"][class*="font-bold"],
+[class*="text-4xl"][class*="font-bold"] {
+  background: linear-gradient(180deg, var(--text-primary) 0%, var(--text-secondary) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.03em;
+}
+
+/* ━━━ Fix 3: Button polish — gradient buttons get hover lift ━━━ */
+
+button[class*="from-cyan-5"],
+button[class*="from-cyan-4"],
+button[class*="from-blue-5"],
+button[class*="from-violet-5"] {
+  background-image: linear-gradient(
+    135deg,
+    var(--accent-emerald) 0%,
+    var(--accent-emerald-bright) 100%
+  ) !important;
+  color: var(--text-inverse) !important;
+  box-shadow: 0 1px 2px rgba(0,192,118,0.10), 0 4px 12px rgba(0,192,118,0.15);
+  transition: all var(--transition-fast);
+}
+
+button[class*="from-cyan-5"]:hover,
+button[class*="from-cyan-4"]:hover,
+button[class*="from-blue-5"]:hover,
+button[class*="from-violet-5"]:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0,192,118,0.15), 0 12px 24px rgba(0,192,118,0.20);
+}
+
+button[class*="from-cyan-5"]:active,
+button[class*="from-cyan-4"]:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0,192,118,0.10);
+}
+
+/* ━━━ Fix 4: AuthScreen + Modal depth ━━━ */
+
+/* Auth screen: add subtle emerald radial at top */
+.min-h-screen.bg-\[\#0a0f1e\],
+.min-h-screen.bg-slate-900,
+.min-h-screen.bg-gray-900 {
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% 0%,
+      rgba(0,192,118,0.05),
+      transparent 70%);
+}
+
+/* Modal backdrop: strengthen from Pass 1 (30%/8px → 40%/12px) */
+.fixed.inset-0.bg-black\/70 {
+  background-color: rgba(15,20,15,0.40) !important;
+  backdrop-filter: blur(12px) saturate(120%) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(120%) !important;
+}
+
+/* Auth tab pills: active state → emerald */
+.flex.bg-slate-800 button[class*="bg-cyan"],
+.flex.bg-slate-800 button[class*="text-cyan"] {
+  background-color: var(--accent-emerald-soft) !important;
+  color: var(--accent-emerald) !important;
+  font-weight: 600;
+}
+
+/* ━━━ Fix 5: Micro-details ━━━ */
+
+/* Cyan badges → indigo tint */
+[class*="bg-cyan-500\/10"],
+[class*="bg-cyan-400\/10"] {
+  background-color: var(--accent-indigo-soft) !important;
+  color: var(--accent-indigo) !important;
+}
+
+/* Cyan borders (Pro/Beta badges) → emerald */
+[class*="border-cyan-"] {
+  border-color: var(--accent-emerald-mid) !important;
+  color: var(--accent-emerald) !important;
+}
+
+/* Entry animation for dashboard cards */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+div.rounded-xl { animation: fadeUp 400ms var(--ease-out) backwards; }
+div.rounded-xl:nth-child(1) { animation-delay:   0ms; }
+div.rounded-xl:nth-child(2) { animation-delay:  60ms; }
+div.rounded-xl:nth-child(3) { animation-delay: 120ms; }
+div.rounded-xl:nth-child(4) { animation-delay: 180ms; }
+
+/* Tabular nums for all significant figures */
+[class*="text-2xl"],
+[class*="text-3xl"],
+[class*="text-4xl"] {
+  font-feature-settings: "tnum", "cv11", "ss01";
+  font-variant-numeric: tabular-nums;
+}
