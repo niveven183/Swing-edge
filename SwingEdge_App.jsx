@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import OnboardingScreen from "./src/components/OnboardingScreen.jsx";
 import AuthScreen from "./src/components/AuthScreen.jsx";
+import Logo from "./src/components/Logo.jsx";
 import HelpModal from "./src/components/HelpModal.jsx";
 import PrivacyModal from "./src/components/PrivacyModal.jsx";
 import BillingModal from "./src/components/BillingModal.jsx";
@@ -1892,8 +1893,8 @@ export default function SwingEdge() {
     return (
       <div className="min-h-screen bg-[#0a0f1e] text-slate-300 flex items-center justify-center" style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-violet-500 flex items-center justify-center animate-pulse">
-            <Zap size={20} className="text-white" />
+          <div className="animate-pulse">
+            <Logo size={40} showText={false} />
           </div>
           <span className="text-xs tracking-widest uppercase text-slate-500">Loading SwingEdge…</span>
         </div>
@@ -1948,10 +1949,8 @@ export default function SwingEdge() {
             className="flex items-center gap-2 hover:bg-white/[0.04] active:bg-white/[0.07] rounded-lg px-2 py-1 transition"
             aria-label="Open user menu"
           >
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-400 to-violet-500 flex items-center justify-center">
-              <Zap size={14} className="text-white" />
-            </div>
-            <span className="font-bold text-sm tracking-wider text-white">SWING<span className="text-cyan-400">EDGE</span></span>
+            <Logo size={28} showText={false} />
+            <span className="font-bold text-sm tracking-wider text-white">SWING<span className="text-emerald-400">EDGE</span></span>
             <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-500 border border-cyan-500/20 tracking-widest uppercase">Pro</span>
             <ChevronDown size={13} className={`text-slate-400 transition-transform ${showProfileDropdown ? "rotate-180" : ""}`} />
           </button>
