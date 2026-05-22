@@ -109,7 +109,7 @@ export default function InfoTooltip({ label, children, side = "auto" }) {
           fontFamily: "var(--font-body)",
           fontSize: 12,
           lineHeight: 1.4,
-          maxWidth: 240,
+          maxWidth: 280,
           minWidth: 160,
           width: "max-content",
           zIndex: 60,

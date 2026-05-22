@@ -39,6 +39,8 @@ import {
   DNACard, EdgeCard, DecisionCoachPanel, TiltShield, GrowthChart, RegimeIndicator,
 } from "./src/intelligence/ui/IntelligenceUI.jsx";
 import { useTradingStats } from "./src/hooks/useTradingStats.js";
+import InfoTooltip from "./src/components/ui/InfoTooltip.jsx";
+import { TRADING_TOOLTIPS } from "./src/data/tooltips.js";
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const RISK_PCT = 0.01;
 
@@ -2137,8 +2139,8 @@ export default function SwingEdge() {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               <StatCard label={t.accountEquity}  value={`$${curEquity.toLocaleString("en-US", {minimumFractionDigits:0})}`} sub={`${t.startedAt} $${capital.toLocaleString()}`} trend={totalPnL/capital*100} icon={DollarSign} accent="cyan" />
               <StatCard label={t.netPnlClosed} value={fmt$(Math.round(totalPnL))} sub={`${closedTrades.length} ${t.closedTrades}`} trend={totalPnL/capital*100} icon={TrendingUp} accent={totalPnL >= 0 ? "green" : "red"} />
-              <StatCard label={t.winRate} value={`${winRate.toFixed(0)}%`} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length}W / ${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)<0).length}L`} icon={Target} accent="purple" />
-              <StatCard label={t.avgRMultiple} value={fmtR(avgR)} sub={t.perClosedTrade} icon={Activity} accent="amber" />
+              <StatCard label={<span className="flex items-center gap-1">{t.winRate}<InfoTooltip label="Win Rate">{TRADING_TOOLTIPS.winRate[lang]||TRADING_TOOLTIPS.winRate.en}</InfoTooltip></span>} value={`${winRate.toFixed(0)}%`} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length}W / ${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)<0).length}L`} icon={Target} accent="purple" />
+              <StatCard label={<span className="flex items-center gap-1">{t.avgRMultiple}<InfoTooltip label="Avg R Multiple">{TRADING_TOOLTIPS.avgR[lang]||TRADING_TOOLTIPS.avgR.en}</InfoTooltip></span>} value={fmtR(avgR)} sub={t.perClosedTrade} icon={Activity} accent="amber" />
               <StatCard label={t.dailyPnl} value={fmt$(Math.round(dailyPnL))} sub={t.todayTrades} icon={DollarSign} accent={dailyPnL >= 0 ? "green" : "red"} />
               <StatCard label={t.streakCounter} value={<span className="flex items-center gap-1">{currentStreak > 0 && <Flame size={18} className="text-orange-400" />}{currentStreak}</span>} sub={`${t.bestStreak}: ${bestStreak}`} icon={Zap} accent={currentStreak >= 3 ? "green" : "amber"} />
             </div>
@@ -2177,7 +2179,7 @@ export default function SwingEdge() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {stats.topEdges.length > 0 && (
                   <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4">
-                    <h3 className="text-emerald-400 font-bold text-sm mb-3">🎯 Top Edges שלך</h3>
+                    <h3 className="text-emerald-400 font-bold text-sm mb-3 flex items-center gap-1.5">🎯 Top Edges שלך<InfoTooltip label="Edge">{TRADING_TOOLTIPS.edge[lang]||TRADING_TOOLTIPS.edge.en}</InfoTooltip></h3>
                     {stats.topEdges.map((edge, i) => (
                       <div key={i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                         <div>
@@ -2194,7 +2196,7 @@ export default function SwingEdge() {
                 )}
                 {stats.antiEdges.length > 0 && (
                   <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4">
-                    <h3 className="text-rose-400 font-bold text-sm mb-3">⚠️ Anti-Edges — להימנע!</h3>
+                    <h3 className="text-rose-400 font-bold text-sm mb-3 flex items-center gap-1.5">⚠️ Anti-Edges — להימנע!<InfoTooltip label="Anti-Edge">{TRADING_TOOLTIPS.antiEdge[lang]||TRADING_TOOLTIPS.antiEdge.en}</InfoTooltip></h3>
                     {stats.antiEdges.map((edge, i) => (
                       <div key={i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                         <div>
@@ -2592,7 +2594,7 @@ export default function SwingEdge() {
                   <div className="text-sm font-bold text-white font-mono mt-0.5">{journalStats.total}</div>
                 </div>
                 <div className="bg-[#0d1424] border border-white/[0.06] rounded-lg p-2.5">
-                  <div className="text-[9px] uppercase tracking-widest text-slate-600">{lang === "he" ? "אחוז הצלחה" : "Win Rate"}</div>
+                  <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{lang === "he" ? "אחוז הצלחה" : "Win Rate"}<InfoTooltip label="Win Rate">{TRADING_TOOLTIPS.winRate[lang]||TRADING_TOOLTIPS.winRate.en}</InfoTooltip></div>
                   <div className="text-sm font-bold font-mono mt-0.5 text-emerald-300">{journalStats.winRate.toFixed(1)}%</div>
                 </div>
                 <div className="bg-[#0d1424] border border-white/[0.06] rounded-lg p-2.5">
@@ -2604,15 +2606,15 @@ export default function SwingEdge() {
                   <div className="text-sm font-bold font-mono mt-0.5 text-rose-400">{fmt$(Math.round(journalStats.avgLoss))}</div>
                 </div>
                 <div className="bg-[#0d1424] border border-white/[0.06] rounded-lg p-2.5">
-                  <div className="text-[9px] uppercase tracking-widest text-slate-600">Profit Factor</div>
+                  <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">Profit Factor<InfoTooltip label="Profit Factor">{TRADING_TOOLTIPS.profitFactor[lang]||TRADING_TOOLTIPS.profitFactor.en}</InfoTooltip></div>
                   <div className="text-sm font-bold font-mono mt-0.5 text-cyan-300">{isFinite(journalStats.profitFactor) ? journalStats.profitFactor.toFixed(2) : "∞"}</div>
                 </div>
                 <div className="bg-[#0d1424] border border-white/[0.06] rounded-lg p-2.5">
-                  <div className="text-[9px] uppercase tracking-widest text-slate-600">Max DD</div>
+                  <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">Max DD<InfoTooltip label="Max Drawdown">{TRADING_TOOLTIPS.maxDD[lang]||TRADING_TOOLTIPS.maxDD.en}</InfoTooltip></div>
                   <div className="text-sm font-bold font-mono mt-0.5 text-rose-300">{fmt$(Math.round(journalStats.maxDD))}</div>
                 </div>
                 <div className="bg-[#0d1424] border border-white/[0.06] rounded-lg p-2.5">
-                  <div className="text-[9px] uppercase tracking-widest text-slate-600">{lang === "he" ? "זמן החזקה" : "Avg Hold"}</div>
+                  <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{lang === "he" ? "זמן החזקה" : "Avg Hold"}<InfoTooltip label="Avg Hold">{TRADING_TOOLTIPS.avgHold[lang]||TRADING_TOOLTIPS.avgHold.en}</InfoTooltip></div>
                   <div className="text-sm font-bold font-mono mt-0.5 text-violet-300">{journalStats.avgHold.toFixed(1)}d</div>
                 </div>
               </div>
@@ -3174,8 +3176,8 @@ export default function SwingEdge() {
           <div className="space-y-5 animate-fade-in">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <StatCard label="Total Trades"  value={realTrades.length} sub="All time"      icon={Layers}    accent="cyan"   />
-              <StatCard label="Win Rate"       value={`${winRate.toFixed(1)}%`} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length} wins`} icon={CheckCircle} accent="green" />
-              <StatCard label="Avg R Multiple" value={fmtR(avgR)}        sub="Closed trades" icon={Activity}  accent="purple" />
+              <StatCard label={<span className="flex items-center gap-1">Win Rate<InfoTooltip label="Win Rate">{TRADING_TOOLTIPS.winRate[lang]||TRADING_TOOLTIPS.winRate.en}</InfoTooltip></span>} value={`${winRate.toFixed(1)}%`} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length} wins`} icon={CheckCircle} accent="green" />
+              <StatCard label={<span className="flex items-center gap-1">Avg R Multiple<InfoTooltip label="Avg R Multiple">{TRADING_TOOLTIPS.avgR[lang]||TRADING_TOOLTIPS.avgR.en}</InfoTooltip></span>} value={fmtR(avgR)} sub="Closed trades" icon={Activity}  accent="purple" />
               <StatCard label="Total Return"   value={`${(totalPnL/capital*100).toFixed(2)}%`} sub={`$${Math.round(Math.abs(totalPnL)).toLocaleString()} P&L`} icon={TrendingUp} accent={totalPnL>=0?"green":"red"} />
             </div>
 
@@ -3183,7 +3185,7 @@ export default function SwingEdge() {
             <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-sm font-bold text-white">Equity Curve</h3>
+                  <h3 className="text-sm font-bold text-white flex items-center gap-1.5">Equity Curve<InfoTooltip label="Equity Curve">{TRADING_TOOLTIPS.equityCurve[lang]||TRADING_TOOLTIPS.equityCurve.en}</InfoTooltip></h3>
                   <p className="text-xs text-slate-600">Account balance over time · starting capital ${capital.toLocaleString()}</p>
                 </div>
                 <span className={`text-sm font-bold font-mono ${totalPnL>=0?"text-[#10b981]":"text-[#ef4444]"}`}>{fmt$(Math.round(totalPnL))}</span>
@@ -3440,7 +3442,7 @@ export default function SwingEdge() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {stats.topEdges.length > 0 && (
                   <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4">
-                    <h3 className="text-emerald-400 font-bold text-sm mb-3">🎯 Top Edges שלך</h3>
+                    <h3 className="text-emerald-400 font-bold text-sm mb-3 flex items-center gap-1.5">🎯 Top Edges שלך<InfoTooltip label="Edge">{TRADING_TOOLTIPS.edge[lang]||TRADING_TOOLTIPS.edge.en}</InfoTooltip></h3>
                     {stats.topEdges.map((edge, i) => (
                       <div key={i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                         <div>
@@ -3457,7 +3459,7 @@ export default function SwingEdge() {
                 )}
                 {stats.antiEdges.length > 0 && (
                   <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4">
-                    <h3 className="text-rose-400 font-bold text-sm mb-3">⚠️ Anti-Edges — להימנע!</h3>
+                    <h3 className="text-rose-400 font-bold text-sm mb-3 flex items-center gap-1.5">⚠️ Anti-Edges — להימנע!<InfoTooltip label="Anti-Edge">{TRADING_TOOLTIPS.antiEdge[lang]||TRADING_TOOLTIPS.antiEdge.en}</InfoTooltip></h3>
                     {stats.antiEdges.map((edge, i) => (
                       <div key={i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                         <div>
