@@ -1,39 +1,103 @@
 export const TRADING_TOOLTIPS = {
-  // Performance metrics
+
+  // ── Performance metrics (rich content) ──────────────────────────────────
+
   winRate: {
-    en: "Percentage of trades that closed in profit. Above 50% is positive, but profit factor matters more.",
-    he: "אחוז העסקאות שנסגרו ברווח. מעל 50% חיובי, אך Profit Factor חשוב יותר."
-  },
-  profitFactor: {
-    en: "Gross wins ÷ gross losses. Above 1.5 is healthy, above 2.0 is professional, above 3.0 is exceptional.",
-    he: "סה״כ רווחים חלקי סה״כ הפסדים. מעל 1.5 בריא, מעל 2.0 מקצועי, מעל 3.0 יוצא דופן."
-  },
-  avgR: {
-    en: "Average reward-to-risk multiple per closed trade. R = (Exit - Entry) ÷ Initial Risk. Aim for +0.3R or higher.",
-    he: "ממוצע יחס רווח-סיכון לעסקה. R = (יציאה - כניסה) חלקי הסיכון הראשוני. שאף ל-0.3R ומעלה."
-  },
-  expectancy: {
-    en: "Expected profit per trade based on win rate and average win/loss. (Win% × AvgWin) - (Loss% × AvgLoss).",
-    he: "רווח ממוצע צפוי לעסקה לפי אחוזי הצלחה. (אחוז זכייה × רווח ממוצע) - (אחוז הפסד × הפסד ממוצע)."
-  },
-  sharpe: {
-    en: "Risk-adjusted return. Above 1.0 is good, above 2.0 is excellent. Measures consistency, not just profit.",
-    he: "תשואה מותאמת סיכון. מעל 1.0 טוב, מעל 2.0 מצוין. מודד עקביות, לא רק רווח."
-  },
-  maxDD: {
-    en: "Maximum drawdown — the largest peak-to-trough decline. Below 20% indicates good risk management.",
-    he: "ירידה מקסימלית — הירידה הכי גדולה מנקודת שיא. מתחת ל-20% מצביע על ניהול סיכון טוב."
-  },
-  avgHold: {
-    en: "Average holding period per closed trade. Swing trades typically range 2-10 days.",
-    he: "זמן החזקה ממוצע לעסקה סגורה. עסקאות סווינג בדרך כלל 2-10 ימים."
-  },
-  equityCurve: {
-    en: "Your account balance over time. A smooth upward curve indicates consistent edge.",
-    he: "מאזן החשבון שלך לאורך זמן. עקומה עולה חלקה מעידה על Edge עקבי."
+    en: "Win Rate is the percentage of your closed trades that ended in profit.\n\nAbove 55% is solid. But win rate alone doesn't determine success — a trader with 40% WR can be profitable with strong risk-reward ratios. Focus on Profit Factor too.",
+    he: "אחוז הזכייה הוא האחוז מהעסקאות הסגורות שהסתיימו ברווח.\n\nמעל 55% זה טוב. אבל אחוז זכייה לבד לא קובע הצלחה — סוחר עם 40% יכול להיות רווחי אם יחס הסיכון-סיכוי שלו גבוה. תסתכל גם על Profit Factor."
   },
 
-  // Setup names
+  profitFactor: {
+    en: "Profit Factor = Total Gross Wins ÷ Total Gross Losses.\n\n• Above 1.0 = profitable\n• Above 1.5 = healthy edge\n• Above 2.0 = professional level\n• Above 3.0 = exceptional\n\nThis is one of the most important metrics in trading.",
+    he: "Profit Factor = סה״כ רווחים גולמיים ÷ סה״כ הפסדים גולמיים.\n\n• מעל 1.0 = רווחי\n• מעל 1.5 = Edge בריא\n• מעל 2.0 = רמה מקצועית\n• מעל 3.0 = יוצא דופן\n\nזה אחד המדדים החשובים ביותר במסחר."
+  },
+
+  avgR: {
+    en: "Average R-Multiple per closed trade.\n\nR = (Exit Price − Entry Price) ÷ Initial Risk Per Share.\n\n+1.0R means you made exactly what you risked. Aim for +0.3R or higher as a minimum average. Elite traders average +1.5R to +2.5R.",
+    he: "ממוצע R-Multiple לעסקה סגורה.\n\nR = (מחיר יציאה − מחיר כניסה) ÷ סיכון ראשוני למניה.\n\n+1.0R אומר שהרווחת בדיוק כמה שסיכנת. שאף ל-+0.3R לפחות כממוצע. סוחרים עילית מגיעים ל-+1.5R עד +2.5R."
+  },
+
+  expectancy: {
+    en: "Expectancy = (Win% × Avg Win) − (Loss% × Avg Loss).\n\nTells you the expected dollar profit per trade on average. Positive = your system has edge. Negative = you're losing money over time regardless of individual wins.",
+    he: "תוחלת = (אחוז זכייה × רווח ממוצע) − (אחוז הפסד × הפסד ממוצע).\n\nמראה כמה דולר אתה מצפה לרוויח בממוצע לעסקה. חיובי = יש לך Edge. שלילי = אתה מפסיד לאורך זמן בלי קשר לניצחונות בודדים."
+  },
+
+  sharpe: {
+    en: "Sharpe Ratio measures risk-adjusted return.\n\n• Above 1.0 = good\n• Above 2.0 = excellent\n• Above 3.0 = exceptional (hedge fund level)\n\nA high Sharpe means consistent returns without wild swings. More important than raw profit for evaluating system quality.",
+    he: "יחס שארפ מודד תשואה מותאמת לסיכון.\n\n• מעל 1.0 = טוב\n• מעל 2.0 = מצוין\n• מעל 3.0 = יוצא דופן (רמת קרן גידור)\n\nשארפ גבוה = תשואות עקביות בלי תנודות חריפות. חשוב יותר מרווח גולמי להערכת איכות המערכת."
+  },
+
+  maxDD: {
+    en: "Maximum Drawdown — the largest peak-to-trough decline in your account balance.\n\nBelow 10% = excellent risk management\n10-20% = acceptable\nAbove 25% = needs review\n\nDeep drawdowns are psychologically damaging and hard to recover from mathematically.",
+    he: "ירידה מקסימלית — הירידה הגדולה ביותר מנקודת שיא לנקודת שפל ביתרת החשבון.\n\nמתחת ל-10% = ניהול סיכון מצוין\n10-20% = סביר\nמעל 25% = דורש בדיקה\n\nירידות עמוקות פוגעות פסיכולוגית וקשות להתאוששות מתמטית."
+  },
+
+  avgHold: {
+    en: "Average holding period per closed trade (in days).\n\nSwing trading typically targets 2-10 day holds. Very short holds (< 1 day) often indicate cutting trades too early. Very long holds (> 20 days) may suggest avoiding stop-losses.",
+    he: "זמן החזקה ממוצע לעסקה סגורה (בימים).\n\nמסחר סווינג מכוון בדרך כלל ל-2-10 ימים. החזקות קצרות מאוד (< 1 יום) מעידות לעיתים על יציאה מוקדמת מדי. החזקות ארוכות מאוד (> 20 ימים) עשויות להצביע על הימנעות מסטופ לוס."
+  },
+
+  equityCurve: {
+    en: "Your Equity Curve shows account balance over time.\n\nA smooth, steadily rising curve = consistent edge and good risk management.\nJagged spikes = inconsistent position sizing or emotional trading.\nLong flat periods = overtrading without edge.",
+    he: "עקומת ההון מציגה את יתרת החשבון לאורך זמן.\n\nעקומה חלקה ועולה באופן עקבי = Edge עקבי וניהול סיכון טוב.\nקפיצות חדות = גודל פוזיציה לא עקבי או מסחר רגשי.\nתקופות שטוחות ארוכות = מסחר יתר ללא Edge."
+  },
+
+  // ── AI & Analytics (rich content) ────────────────────────────────────────
+
+  dna: {
+    en: "Your Trading DNA measures 4 core dimensions of your trading personality:\n\n• Risk Management (0-100): How well you control losses\n• Discipline (0-100): Do you follow your rules?\n• Consistency (0-100): Stable results across different conditions\n• Growth (0-100): Are you improving over time?\n\nBased on your actual trade history — not self-assessment.",
+    he: "ה-DNA המסחרי שלך מודד 4 ממדים מרכזיים:\n\n• ניהול סיכון (0-100): כמה טוב אתה שולט בהפסדים\n• משמעת (0-100): האם אתה עוקב אחר הכללים שלך?\n• עקביות (0-100): תוצאות יציבות בתנאים שונים\n• צמיחה (0-100): האם אתה משתפר לאורך זמן?\n\nמבוסס על היסטוריית העסקאות האמיתית שלך — לא הערכה עצמית."
+  },
+
+  edge: {
+    en: "Your Edge — setups where you have a statistically significant advantage based on your actual trade history.\n\nHigh win rate + positive average R = real edge. These are the setups you should trade most. The market is paying you to do these.",
+    he: "ה-Edge שלך — סטאפים שבהם יש לך יתרון סטטיסטי משמעותי לפי היסטוריית העסקאות האמיתית שלך.\n\nאחוז זכייה גבוה + R ממוצע חיובי = Edge אמיתי. אלה הסטאפים שעליך לסחור הכי הרבה. השוק משלם לך על אלה."
+  },
+
+  antiEdge: {
+    en: "Anti-Edge — setups where you consistently lose money based on your trade history.\n\nLow win rate + negative R = your personal anti-edge. Either fix these setups (study why they fail for you) or stop trading them entirely.\n\nAvoiding anti-edges is as important as exploiting edges.",
+    he: "Anti-Edge — סטאפים שבהם אתה מפסיד כסף באופן עקבי לפי היסטוריית העסקאות שלך.\n\nאחוז זכייה נמוך + R שלילי = ה-Anti-Edge האישי שלך. תתקן אותם (תלמד למה הם נכשלים עבורך) או תפסיק לסחור אותם לחלוטין.\n\nהימנעות מ-Anti-Edge חשובה כמו ניצול Edge."
+  },
+
+  tilt: {
+    en: "Tilt — emotional state that causes you to deviate from your trading rules.\n\nCommon after: large losses, missing a big move, or a string of wins creating overconfidence.\n\nSigns: increasing position size, trading more frequently, ignoring stops.\n\nPrevention: mandatory break after 2+ consecutive losses.",
+    he: "Tilt — מצב רגשי שגורם לסטייה מכללי המסחר שלך.\n\nנפוץ אחרי: הפסדים גדולים, פספוס תנועה גדולה, או סדרת ניצחונות שיוצרת בטחון יתר.\n\nסימנים: הגדלת גודל פוזיציה, מסחר תכוף יותר, התעלמות מסטופים.\n\nמניעה: הפסקה חובה אחרי 2+ הפסדים רצופים."
+  },
+
+  marketRegime: {
+    en: "Market Regime — current market environment that affects which setups work best.\n\n• Bull Trend: Momentum, breakouts, pullback entries work best\n• Bear Trend: Short setups, fade the rip, reduce size\n• Sideways/Range: Mean-reversion, avoid breakouts\n• Volatile: Reduce size by 50%, widen stops",
+    he: "מצב שוק — סביבת השוק הנוכחית שמשפיעה על אילו סטאפים עובדים הכי טוב.\n\n• מגמה שורית: מומנטום, פריצות, כניסות בתיקון עובדות הכי טוב\n• מגמה דובית: סטאפי שורט, פייד של עליות, הקטן גודל\n• עצור/טווח: היפוך ממוצע, הימנע מפריצות\n• תנודתי: הקטן גודל ב-50%, הרחב סטופים"
+  },
+
+  // ── Risk management (rich content) ───────────────────────────────────────
+
+  riskPerTrade: {
+    en: "Maximum risk per trade as % of total account.\n\nProfessional standard:\n• 1% per trade = conservative, sustainable\n• 2% per trade = moderate, still acceptable\n• 5%+ per trade = gambling territory\n\n'Risk of ruin' increases exponentially above 2% per trade.",
+    he: "סיכון מקסימלי לעסקה כאחוז מהחשבון הכולל.\n\nסטנדרט מקצועי:\n• 1% לעסקה = שמרני, בר-קיימא\n• 2% לעסקה = מתון, עדיין מקובל\n• 5%+ לעסקה = טריטוריית הימור\n\n'סיכון פשיטת רגל' עולה באופן מעריכי מעל 2% לעסקה."
+  },
+
+  positionSize: {
+    en: "Position Size = (Account Size × Risk %) ÷ (Entry − Stop Loss)\n\nExample: $10,000 account, 1% risk, $100 entry, $97 stop:\nPosition = $100 ÷ $3 = 33 shares\n\nAlways calculate before entry. Never size by feel.",
+    he: "גודל פוזיציה = (גודל חשבון × % סיכון) ÷ (כניסה − סטופ לוס)\n\nדוגמה: חשבון $10,000, סיכון 1%, כניסה $100, סטופ $97:\nפוזיציה = $100 ÷ $3 = 33 מניות\n\nתמיד חשב לפני כניסה. לעולם אל תסיז לפי תחושה."
+  },
+
+  stopLoss: {
+    en: "Stop Loss — the price level where you exit a losing trade to prevent larger losses.\n\nPlace at a logical technical level:\n• Below key support (long trades)\n• Above key resistance (short trades)\n• Never arbitrary (e.g., 'just $0.50 below entry')\n\nA stop loss is not optional — it's the foundation of risk management.",
+    he: "סטופ לוס — רמת המחיר שבה יוצאים מעסקה מפסידה כדי למנוע הפסדים גדולים יותר.\n\nהצב ברמה טכנית הגיונית:\n• מתחת לתמיכה מרכזית (עסקאות לונג)\n• מעל להתנגדות מרכזית (עסקאות שורט)\n• לעולם לא שרירותי (למשל 'רק $0.50 מתחת לכניסה')\n\nסטופ לוס הוא לא אופציונלי — הוא הבסיס של ניהול הסיכון."
+  },
+
+  takeProfit: {
+    en: "Take Profit — your target price for exiting a winning trade.\n\nMinimum rule: Target must be at least 1.5× your risk (1.5R).\n\nBest practice:\n• Scale out: take 50% at 1R, hold rest to target\n• Use technical levels (resistance, prior highs)\n• Never move target lower when winning",
+    he: "Take Profit — מחיר היעד שלך לסגירת עסקה מנצחת.\n\nכלל מינימום: היעד חייב להיות לפחות 1.5× הסיכון שלך (1.5R).\n\nשיטה טובה:\n• צאת חלקית: קח 50% ב-1R, החזק שאר עד היעד\n• השתמש ברמות טכניות (התנגדות, שיאים קודמים)\n• לעולם אל תזיז יעד למטה בזמן שמנצחים"
+  },
+
+  rMultiple: {
+    en: "R-Multiple = (Exit − Entry) ÷ Initial Risk\n\nExamples:\n+2R = you made 2× what you risked ✓\n+1R = made exactly what you risked ✓\n-1R = lost your planned risk (normal)\n-2R = stop was not honored (problem)\n\nTracking R-Multiple eliminates dollar bias and lets you compare trades objectively.",
+    he: "R-Multiple = (יציאה − כניסה) ÷ סיכון ראשוני\n\nדוגמאות:\n+2R = הרווחת פי 2 ממה שסיכנת ✓\n+1R = הרווחת בדיוק מה שסיכנת ✓\n-1R = הפסדת את הסיכון המתוכנן (נורמלי)\n-2R = הסטופ לא כובד (בעיה)\n\nמעקב אחר R-Multiple מסיר הטיית דולר ומאפשר השוואה אובייקטיבית בין עסקאות."
+  },
+
+  // ── Setup names (preserved from original) ────────────────────────────────
+
   breakout: {
     en: "Price breaking above a key resistance level with volume. Best in trending markets.",
     he: "מחיר פורץ מעל רמת התנגדות חשובה עם נפח. עובד טוב בשוק מגמתי."
@@ -109,49 +173,5 @@ export const TRADING_TOOLTIPS = {
   overnightReversal: {
     en: "Trade reversal of overnight move at market open. Counter-trend, requires confirmation.",
     he: "מסחר היפוך של תנועת לילה בפתיחת השוק. נגד המגמה, דורש אישור."
-  },
-
-  // AI & Analytics
-  dna: {
-    en: "Your Trading DNA — 4 personality dimensions: Risk, Discipline, Consistency, Growth.",
-    he: "ה-DNA שלך למסחר — 4 ממדי אישיות: סיכון, משמעת, עקביות, צמיחה."
-  },
-  edge: {
-    en: "Setups where you have a statistical advantage based on your history. Lean into these.",
-    he: "סטאפים שבהם יש לך יתרון סטטיסטי לפי ההיסטוריה שלך. תתמקד בהם."
-  },
-  antiEdge: {
-    en: "Setups where you lose money historically. Avoid or fix before trading.",
-    he: "סטאפים שבהם אתה מפסיד היסטורית. הימנע או תקן לפני מסחר."
-  },
-  tilt: {
-    en: "Emotional state affecting trading decisions. Common after losses or big wins.",
-    he: "מצב רגשי המשפיע על החלטות מסחר. נפוץ אחרי הפסדים או רווחים גדולים."
-  },
-  marketRegime: {
-    en: "Current market environment — Bull/Bear/Range. Different setups work in each.",
-    he: "סביבת השוק הנוכחית — שורי/דובי/טווח. סטאפים שונים עובדים בכל אחד."
-  },
-
-  // Risk
-  riskPerTrade: {
-    en: "Maximum risk per trade as % of account. 1-2% is professional, 5%+ is gambling.",
-    he: "סיכון מקסימלי לעסקה כאחוז מהחשבון. 1-2% מקצועי, 5%+ זה הימור."
-  },
-  positionSize: {
-    en: "Number of shares = Risk Amount ÷ (Entry - Stop). Always calculate before entry.",
-    he: "מספר מניות = סכום סיכון חלקי (כניסה - סטופ). תמיד חשב לפני כניסה."
-  },
-  stopLoss: {
-    en: "Price level where you exit if wrong. Place at logical technical level, not arbitrary.",
-    he: "רמת מחיר שבה יוצאים אם טעית. הצב ברמה טכנית הגיונית, לא שרירותית."
-  },
-  takeProfit: {
-    en: "Price target for profit-taking. Aim for minimum 1.5R risk-to-reward ratio.",
-    he: "יעד מחיר לקיחת רווח. שאף ליחס מינימלי של 1.5R רווח-סיכון."
-  },
-  rMultiple: {
-    en: "Reward ÷ Risk = R Multiple. 2R means you made 2× what you risked.",
-    he: "רווח חלקי סיכון = R Multiple. 2R אומר שעשית פי 2 ממה שסיכנת."
   },
 };
