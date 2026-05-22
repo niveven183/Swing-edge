@@ -13,7 +13,7 @@ export default function InfoTooltip({ children, label = 'More info', side = 'aut
     const trigger = triggerRef.current.getBoundingClientRect();
     const POPOVER_W = 280;
     const POPOVER_H = popoverRef.current.getBoundingClientRect().height || 160;
-    const MARGIN = 10;
+    const MARGIN = 8;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
 
@@ -26,13 +26,13 @@ export default function InfoTooltip({ children, label = 'More info', side = 'aut
     let placement, top;
     if (spaceAbove >= POPOVER_H + MARGIN) {
       placement = 'top';
-      top = trigger.top + window.scrollY - POPOVER_H - MARGIN;
+      top = trigger.top - POPOVER_H - MARGIN;
     } else if (spaceBelow >= POPOVER_H + MARGIN) {
       placement = 'bottom';
-      top = trigger.bottom + window.scrollY + MARGIN;
+      top = trigger.bottom + MARGIN;
     } else {
       placement = 'top';
-      top = Math.max(MARGIN + window.scrollY, trigger.top + window.scrollY - POPOVER_H - MARGIN);
+      top = Math.max(MARGIN, trigger.top - POPOVER_H - MARGIN);
     }
 
     setPos({ top, left, placement });
@@ -79,8 +79,12 @@ export default function InfoTooltip({ children, label = 'More info', side = 'aut
         aria-label={label}
         aria-describedby={open ? tooltipId : undefined}
         aria-expanded={open}
-        onClick={(e) => { e.stopPropagation(); setOpen(v => !v); }}
-        onMouseEnter={openTooltip}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setOpen(v => !v);
+        }}
+        onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => {
           setTimeout(() => {
             if (!popoverRef.current?.matches(':hover')) setOpen(false);
@@ -88,16 +92,21 @@ export default function InfoTooltip({ children, label = 'More info', side = 'aut
         }}
         className="
           inline-flex items-center justify-center
-          w-[18px] h-[18px] rounded-full
-          border border-slate-400
-          text-slate-500 text-[10px] font-semibold
-          hover:border-emerald-400 hover:text-emerald-500 hover:bg-emerald-50
+          w-[20px] h-[20px] rounded-full
+          border-2 border-slate-400
+          text-slate-500 text-[11px] font-bold
+          bg-white
+          hover:border-emerald-500 hover:text-emerald-600 hover:bg-emerald-50
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400
           transition-all duration-150
           select-none flex-shrink-0
           cursor-pointer
+          relative z-10
         "
-        style={{ lineHeight: 1 }}
+        style={{
+          lineHeight: 1,
+          pointerEvents: 'auto',
+        }}
       >
         ?
       </button>

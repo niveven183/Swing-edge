@@ -808,3 +808,10 @@ a:hover {
 .animate-fadeUpSoft {
   animation: fadeUpSoft 150ms ease-out forwards;
 }
+
+/* InfoTooltip — ודא שתמיד לחיץ */
+button[aria-expanded] {
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 10;
+}
