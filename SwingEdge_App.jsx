@@ -26,7 +26,7 @@ import {
   Settings, BookMarked, Thermometer, Trash2, User,
   Download, FileText, Bell, Flame, Globe, LogOut, MessageCircle,
   Shield, Filter, Save, BarChart3, ChevronDown, HelpCircle, Lock,
-  CreditCard, Smartphone
+  CreditCard, Smartphone, Wrench
 } from "lucide-react";
 import { getTranslations, LANGUAGES, isRTLLang } from "./src/i18n.js";
 import {
@@ -769,8 +769,7 @@ const RibbonTicker = ({ item }) => {
 const NAV_KEYS = [
   { id: "dashboard", key: "dashboard",      icon: LayoutDashboard },
   { id: "journal",   key: "journal",        icon: BookOpen },
-  { id: "analyzer",  key: "tradeAnalyzer",  icon: FlaskConical },
-  { id: "position",  key: "positionCalc",   icon: Calculator },
+  { id: "tools",     key: "tools",           icon: Wrench },
   { id: "analytics", key: "analytics",      icon: BarChart2 },
   { id: "intel",     key: "marketIntel",    icon: Rss },
   { id: "feedback",  key: "feedback",       icon: MessageCircle },
@@ -895,6 +894,13 @@ export default function SwingEdge() {
   useEffect(() => {
     try { localStorage.removeItem("swingEdgeDashboardVariant"); } catch {}
   }, []);
+  const [toolsTab, setToolsTab] = useState('analyzer');
+  useEffect(() => {
+    if (tab === 'analyzer' || tab === 'position') {
+      setToolsTab(tab === 'position' ? 'calc' : 'analyzer');
+      setTab('tools');
+    }
+  }, [tab]);
   const [trades, setTrades] = useState(() => {
     try {
       const saved = localStorage.getItem("swingEdgeTrades");
@@ -2805,8 +2811,26 @@ export default function SwingEdge() {
           </div>
         )}
 
+        {/* ══════════════ TOOLS — sub-nav ══════════════ */}
+        {tab === "tools" && (
+          <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit mx-auto">
+            <button
+              onClick={() => setToolsTab('analyzer')}
+              className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${toolsTab === 'analyzer' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              🧪 {lang === 'he' ? 'ניתוח עסקה' : 'Trade Analyzer'}
+            </button>
+            <button
+              onClick={() => setToolsTab('calc')}
+              className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${toolsTab === 'calc' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              🧮 {lang === 'he' ? 'מחשבון פוזיציה' : 'Position Calculator'}
+            </button>
+          </div>
+        )}
+
         {/* ══════════════ TRADE ANALYZER ══════════════ */}
-        {tab === "analyzer" && (
+        {tab === "tools" && toolsTab === 'analyzer' && (
           <div className="space-y-5 animate-fade-in max-w-3xl mx-auto">
             <div>
               <h2 className="text-sm font-bold text-white flex items-center gap-2"><FlaskConical size={15} className="text-violet-400" /> Trade Analyzer</h2>
@@ -2977,7 +3001,7 @@ export default function SwingEdge() {
         )}
 
         {/* ══════════════ POSITION CALCULATOR ══════════════ */}
-        {tab === "position" && (() => {
+        {tab === "tools" && toolsTab === 'calc' && (() => {
           const capN   = parseFloat(posCalc.capital) || capital;
           const riskN  = parseFloat(posCalc.risk)    || 0;
           const entN   = parseFloat(posCalc.entry)   || 0;
@@ -4756,6 +4780,7 @@ export default function SwingEdge() {
       <button
         onClick={() => setShowForm(true)}
         className="fixed bottom-6 right-6 rtl:right-auto rtl:left-6 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-violet-500 text-white shadow-2xl shadow-cyan-500/25 flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
+        aria-label="New trade"
         title="New Trade"
       >
         <Plus size={24} />
@@ -4771,7 +4796,7 @@ export default function SwingEdge() {
         <div className="flex items-center gap-4">
           <span>{t.trades}: {trades.length}</span>
           <span>{t.open}: {openTrades.length}</span>
-          <span>SwingEdge Pro v2.0</span>
+          <span>SwingEdge Pro v2.1</span>
         </div>
       </footer>
     </div>

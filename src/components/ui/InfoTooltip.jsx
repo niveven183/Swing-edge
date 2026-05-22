@@ -89,8 +89,8 @@ export default function InfoTooltip({ children, label = 'More info', side = 'aut
         className="
           inline-flex items-center justify-center
           w-[18px] h-[18px] rounded-full
-          border border-slate-300
-          text-slate-400 text-[10px] font-semibold
+          border border-slate-400
+          text-slate-500 text-[10px] font-semibold
           hover:border-emerald-400 hover:text-emerald-500 hover:bg-emerald-50
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400
           transition-all duration-150
