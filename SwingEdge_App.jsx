@@ -3325,7 +3325,7 @@ export default function SwingEdge() {
               const short = name => name.length > 11 ? name.slice(0, 10) + "…" : name;
               return (
                 <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5">
-                  <h3 className="text-sm font-bold text-white mb-1">Win Rate by Setup</h3>
+                  <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">Win Rate by Setup<InfoTooltip label="Win Rate by Setup">{lang === 'he' ? 'אחוז הזכייה לכל סטאפ. עמודות סגולות = מעל 50% WR. עמודות אפורות = מתחת ל-50%. גובה העמודה = מספר עסקאות.' : 'Win rate per setup. Purple bars = above 50% WR. Gray bars = below 50%. Bar height = trade count.'}</InfoTooltip></h3>
                   <p className="text-xs text-slate-600 mb-4">Success % per setup · bar label = trade count</p>
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={data} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
@@ -3392,7 +3392,7 @@ export default function SwingEdge() {
                   {/* Best Day */}
                   <div className="bg-[#0d1424] border border-emerald-500/20 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs font-semibold tracking-widest uppercase text-emerald-400">Best Day</span>
+                      <span className="text-xs font-semibold tracking-widest uppercase text-emerald-400 flex items-center gap-1">Best Day<InfoTooltip label="Best Day">{lang === 'he' ? 'יום השבוע שבו הרווחת הכי הרבה מבחינת P&L כולל ומספר עסקאות.' : 'The weekday where you made the most total P&L and traded most successfully.'}</InfoTooltip></span>
                     </div>
                     {bestDayEntry ? (
                       <>
@@ -3407,7 +3407,7 @@ export default function SwingEdge() {
                   {/* Best Setup */}
                   <div className="bg-[#0d1424] border border-violet-500/20 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs font-semibold tracking-widest uppercase text-violet-400">Best Setup</span>
+                      <span className="text-xs font-semibold tracking-widest uppercase text-violet-400 flex items-center gap-1">Best Setup<InfoTooltip label="Best Setup">{lang === 'he' ? 'הסטאפ הרווחי ביותר שלך לפי P&L כולל ואחוז זכייה. זה ה-Edge שלך — תסחור אותו יותר.' : 'Your most profitable setup by total P&L and win rate. This is your edge — trade it more.'}</InfoTooltip></span>
                     </div>
                     {bestSetup ? (
                       <>
@@ -3422,7 +3422,7 @@ export default function SwingEdge() {
                   {/* Best Emotion */}
                   <div className="bg-[#0d1424] border border-amber-500/20 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs font-semibold tracking-widest uppercase text-amber-400">Best Emotion</span>
+                      <span className="text-xs font-semibold tracking-widest uppercase text-amber-400 flex items-center gap-1">Best Emotion<InfoTooltip label="Best Emotion">{lang === 'he' ? 'המצב הרגשי שבו אתה מניב הכי טוב. כשאתה מרגיש ככה — הביצועים שלך חדים יותר.' : 'The emotional state where you perform best. When you feel this way, your trading is sharper.'}</InfoTooltip></span>
                     </div>
                     {bestEmotion ? (
                       <>

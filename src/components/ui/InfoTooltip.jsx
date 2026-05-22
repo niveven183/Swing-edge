@@ -11,23 +11,29 @@ export default function InfoTooltip({ children, label = 'More info', side = 'aut
     if (!triggerRef.current || !popoverRef.current) return;
 
     const trigger = triggerRef.current.getBoundingClientRect();
-    const pop = popoverRef.current.getBoundingClientRect();
+    const POPOVER_W = 280;
+    const POPOVER_H = popoverRef.current.getBoundingClientRect().height || 160;
+    const MARGIN = 10;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const MARGIN = 8;
-    const POPOVER_W = 280;
 
     let left = trigger.left + trigger.width / 2 - POPOVER_W / 2;
-    if (left + POPOVER_W + MARGIN > vw) left = vw - POPOVER_W - MARGIN;
-    if (left < MARGIN) left = MARGIN;
+    left = Math.max(MARGIN, Math.min(left, vw - POPOVER_W - MARGIN));
 
-    const spaceBelow = vh - trigger.bottom;
     const spaceAbove = trigger.top;
-    const placement = spaceBelow >= 160 || spaceBelow >= spaceAbove ? 'bottom' : 'top';
+    const spaceBelow = vh - trigger.bottom;
 
-    const top = placement === 'bottom'
-      ? trigger.bottom + window.scrollY + 8
-      : trigger.top + window.scrollY - (pop.height || 120) - 8;
+    let placement, top;
+    if (spaceAbove >= POPOVER_H + MARGIN) {
+      placement = 'top';
+      top = trigger.top + window.scrollY - POPOVER_H - MARGIN;
+    } else if (spaceBelow >= POPOVER_H + MARGIN) {
+      placement = 'bottom';
+      top = trigger.bottom + window.scrollY + MARGIN;
+    } else {
+      placement = 'top';
+      top = Math.max(MARGIN + window.scrollY, trigger.top + window.scrollY - POPOVER_H - MARGIN);
+    }
 
     setPos({ top, left, placement });
   }, []);
