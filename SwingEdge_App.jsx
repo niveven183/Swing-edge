@@ -36,6 +36,7 @@ import {
   fetchQuote, getMarketState, getMarketStateBadge, getRefreshInterval, MARKET_STATE,
 } from "./src/priceService.js";
 import { analyzeTradeLocal, analyzeTradeLocalText } from "./src/localAI.js";
+import { POPULAR_TICKERS as STATIC_TICKERS, getTickerMeta } from "./src/data/tickers.js";
 import { SwingEdgeAI } from "./src/intelligence/SwingEdgeAI.js";
 import {
   DNACard, EdgeCard, DecisionCoachPanel, TiltShield, GrowthChart, RegimeIndicator,
@@ -4032,7 +4033,7 @@ export default function SwingEdge() {
                 {/* Sort controls */}
                 <div className="flex items-center gap-1 mb-2">
                   <span className="text-[9px] text-slate-600">{t.sortBy}:</span>
-                  {[["ticker","A-Z"],["changePct","%"],["price","$"]].map(([key, label]) => (
+                  {[["ticker","A-Z"],["changePct","%"],["price","$"],["sector","Sector"]].map(([key, label]) => (
                     <button key={key} onClick={() => setWatchlistSortBy(key)}
                       className={`text-[9px] px-1.5 py-0.5 rounded ${watchlistSortBy === key ? "bg-cyan-500/20 text-cyan-400" : "text-slate-600 hover:text-slate-400"} transition`}>
                       {label}
@@ -4046,11 +4047,25 @@ export default function SwingEdge() {
                     const lpB = getLivePrice(b.ticker) || {};
                     if (watchlistSortBy === "changePct") return (lpB.changePct || 0) - (lpA.changePct || 0);
                     if (watchlistSortBy === "price") return (lpB.price || 0) - (lpA.price || 0);
+                    if (watchlistSortBy === "sector") {
+                      const sa = getTickerMeta(a.ticker)?.sector ?? "zzz";
+                      const sb = getTickerMeta(b.ticker)?.sector ?? "zzz";
+                      return sa.localeCompare(sb);
+                    }
                     return a.ticker.localeCompare(b.ticker);
                   }).map(s => {
                     const lp = getLivePrice(s.ticker);
                     const price = lp?.price ?? s.price;
                     const changePct = lp?.changePct ?? s.change ?? 0;
+                    const meta = getTickerMeta(s.ticker);
+                    const sectorColor = meta?.sector === 'ETF' ? 'bg-blue-500/20 text-blue-400' :
+                      meta?.sector === 'Crypto' ? 'bg-amber-500/20 text-amber-400' :
+                      meta?.sector === 'Technology' ? 'bg-purple-500/20 text-purple-400' :
+                      meta?.sector === 'Healthcare' ? 'bg-emerald-500/20 text-emerald-400' :
+                      meta?.sector === 'Financials' ? 'bg-sky-500/20 text-sky-400' :
+                      meta?.sector === 'Automotive' ? 'bg-orange-500/20 text-orange-400' :
+                      meta?.sector === 'Communications' ? 'bg-pink-500/20 text-pink-400' :
+                      'bg-slate-500/20 text-slate-400';
                     return (
                       <div key={s.ticker}
                         className={`flex items-center justify-between p-2 bg-white/3 rounded-lg border transition group ${chartSymbol === s.chartSym ? "border-cyan-500/40 bg-cyan-500/5" : "border-white/[0.06] hover:border-cyan-500/20 hover:bg-cyan-500/3"}`}>
@@ -4058,7 +4073,14 @@ export default function SwingEdge() {
                           <TickerLogo ticker={s.ticker} size={18} />
                           <div>
                             <div className="font-bold text-[11px] text-white font-mono">{s.ticker}</div>
-                            {lp?.volume ? <div className="text-[8px] text-slate-700 font-mono">Vol: {fmtVolume(lp.volume)}</div> : null}
+                            {meta ? (
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <span className="text-[8px] text-slate-500 truncate max-w-[72px]">{meta.name}</span>
+                                <span className={`text-[7px] px-1 rounded-full font-medium ${sectorColor}`}>{meta.sector}</span>
+                              </div>
+                            ) : lp?.volume ? (
+                              <div className="text-[8px] text-slate-700 font-mono">Vol: {fmtVolume(lp.volume)}</div>
+                            ) : null}
                           </div>
                         </button>
                         <div className="text-right flex items-center gap-1.5">
