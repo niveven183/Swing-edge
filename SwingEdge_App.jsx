@@ -15,7 +15,8 @@ import { useToast, useConfirm, Tooltip as UiTooltip } from "./src/components/Toa
 import { supabase, isSupabaseConfigured } from "./src/supabaseClient.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell
+  ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell,
+  ScatterChart, Scatter
 } from "recharts";
 import {
   LayoutDashboard, BookOpen, BarChart2, Rss,
@@ -3543,6 +3544,321 @@ export default function SwingEdge() {
                 )}
               </div>
             )}
+
+            {/* ═══════════ NEW: 6 ADDITIONAL ANALYTICS CHARTS ═══════════ */}
+            {closedTrades.length > 0 && (() => {
+              // 1. R Distribution
+              const rBuckets = [
+                { range: "< -2R", min: -Infinity, max: -2, count: 0 },
+                { range: "-2 to -1R", min: -2, max: -1, count: 0 },
+                { range: "-1 to 0R", min: -1, max: 0, count: 0 },
+                { range: "0 to 1R", min: 0, max: 1, count: 0 },
+                { range: "1 to 2R", min: 1, max: 2, count: 0 },
+                { range: "2 to 3R", min: 2, max: 3, count: 0 },
+                { range: "> 3R", min: 3, max: Infinity, count: 0 },
+              ];
+              closedTrades.forEach(t => {
+                const { rMultiple } = calcTradeMetrics(t);
+                if (rMultiple == null) return;
+                const b = rBuckets.find(b => rMultiple >= b.min && rMultiple < b.max);
+                if (b) b.count++;
+              });
+
+              // 2. P&L by Month
+              const monthMap = {};
+              closedTrades.forEach(t => {
+                const d = t.exitDate || t.date;
+                if (!d) return;
+                const { pnl } = calcTradeMetrics(t);
+                if (pnl == null) return;
+                const key = d.slice(0, 7); // YYYY-MM
+                if (!monthMap[key]) monthMap[key] = { month: key, pnl: 0, count: 0 };
+                monthMap[key].pnl += pnl;
+                monthMap[key].count += 1;
+              });
+              const pnlByMonth = Object.values(monthMap)
+                .sort((a, b) => a.month.localeCompare(b.month))
+                .map(m => ({ ...m, pnl: Math.round(m.pnl) }));
+
+              // 3. Emotion Performance
+              const emoMap = {};
+              closedTrades.forEach(t => {
+                const e = t.emotionAtEntry || "Neutral";
+                const { pnl } = calcTradeMetrics(t);
+                if (!emoMap[e]) emoMap[e] = { emotion: e, count: 0, wins: 0, totalPnL: 0 };
+                emoMap[e].count++;
+                if ((pnl ?? 0) > 0) emoMap[e].wins++;
+                emoMap[e].totalPnL += pnl ?? 0;
+              });
+              const emotionStatsArr = Object.values(emoMap).map(e => ({
+                ...e,
+                totalPnL: Math.round(e.totalPnL),
+                winRate: e.count ? Math.round(e.wins / e.count * 100) : 0,
+              }));
+
+              // 4. Streak History
+              const sorted = [...closedTrades].sort((a, b) =>
+                new Date(a.date || 0) - new Date(b.date || 0));
+              const streaks = [];
+              let cur = 0, curType = null;
+              sorted.forEach(t => {
+                const { pnl } = calcTradeMetrics(t);
+                if (pnl == null) return;
+                const isWin = pnl > 0;
+                const nt = isWin ? "win" : "loss";
+                if (curType === null || curType === nt) { curType = nt; cur++; }
+                else { streaks.push({ type: curType, length: cur }); curType = nt; cur = 1; }
+              });
+              if (cur > 0 && curType) streaks.push({ type: curType, length: cur });
+              const maxStreak = streaks.reduce((m, s) => Math.max(m, s.length), 1);
+
+              // 5. Setup Matrix
+              const sMap = {};
+              closedTrades.forEach(t => {
+                const s = (t.setup || "").trim() || "Unknown";
+                const { pnl, rMultiple } = calcTradeMetrics(t);
+                if (!sMap[s]) sMap[s] = { setup: s, count: 0, wins: 0, totalPnL: 0, totalR: 0 };
+                sMap[s].count++;
+                if ((pnl ?? 0) > 0) sMap[s].wins++;
+                sMap[s].totalPnL += pnl ?? 0;
+                sMap[s].totalR += rMultiple ?? 0;
+              });
+              const setupMatrix = Object.values(sMap).map(s => ({
+                ...s,
+                winRate: s.count ? Math.round(s.wins / s.count * 100) : 0,
+                avgR: s.count ? (s.totalR / s.count).toFixed(2) : "0",
+                totalPnL: Math.round(s.totalPnL),
+              })).sort((a, b) => b.totalPnL - a.totalPnL);
+
+              // 6. Hold Time vs P&L
+              const holdScatter = closedTrades.map(t => {
+                const { pnl } = calcTradeMetrics(t);
+                if (pnl == null || !t.date || !t.exitDate) return null;
+                const hold = Math.max(1, Math.round((new Date(t.exitDate) - new Date(t.date)) / 86400000));
+                return { hold, pnl: Math.round(pnl), ticker: t.ticker };
+              }).filter(Boolean);
+
+              const darkTooltip = { background: "#0d1424", border: "1px solid #162032", borderRadius: 10, fontSize: 11, color: "#e2e8f0" };
+
+              return (
+                <>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* R Distribution */}
+                    <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5">
+                      <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">
+                        {lang === "he" ? "התפלגות R Multiple" : "R Multiple Distribution"}
+                        <InfoTooltip label="R Distribution">
+                          {lang === "he"
+                            ? "כמה עסקאות בכל טווח R. רוב העסקאות ב-0-1R = יוצא מוקדם מדי."
+                            : "Trades per R range. Most in 0-1R = exiting too early."}
+                        </InfoTooltip>
+                      </h3>
+                      <p className="text-xs text-slate-600 mb-4">{lang === "he" ? "פיזור התוצאות שלך" : "Distribution of your outcomes"}</p>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={rBuckets} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
+                          <XAxis dataKey="range" tick={{ fontSize: 9, fill: "#475569" }} tickLine={false} axisLine={false} />
+                          <YAxis tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} />
+                          <Tooltip contentStyle={darkTooltip} />
+                          <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                            {rBuckets.map((entry, i) => (
+                              <Cell key={i} fill={entry.max <= 0 ? "#f43f5e" : "#10b981"} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* P&L by Month */}
+                    <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5">
+                      <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">
+                        {lang === "he" ? "P&L לפי חודש" : "P&L by Month"}
+                        <InfoTooltip label="P&L by Month">
+                          {lang === "he"
+                            ? "רווח/הפסד חודשי. עוזר לזהות חודשים חזקים וחלשים."
+                            : "Monthly P&L. Spot your strong and weak months."}
+                        </InfoTooltip>
+                      </h3>
+                      <p className="text-xs text-slate-600 mb-4">{lang === "he" ? "מגמת ביצועים חודשית" : "Monthly performance trend"}</p>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={pnlByMonth} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
+                          <XAxis dataKey="month" tick={{ fontSize: 9, fill: "#475569" }} tickLine={false} axisLine={false} />
+                          <YAxis tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
+                          <Tooltip contentStyle={darkTooltip} formatter={(v, n, p) => [`${fmt$(v)} · ${p.payload.count} trade${p.payload.count !== 1 ? "s" : ""}`, "P&L"]} />
+                          <ReferenceLine y={0} stroke="#334155" />
+                          <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
+                            {pnlByMonth.map((d, i) => (
+                              <Cell key={i} fill={d.pnl >= 0 ? "#10b981" : "#f43f5e"} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Emotion Performance */}
+                    <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5">
+                      <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">
+                        {lang === "he" ? "ביצועים לפי רגש" : "Performance by Emotion"}
+                        <InfoTooltip label="Emotion Performance">
+                          {lang === "he"
+                            ? "P&L כולל לפי רגש בכניסה. FOMO/Angry שלילי = להימנע."
+                            : "Total P&L by entry emotion. Negative FOMO/Angry = avoid."}
+                        </InfoTooltip>
+                      </h3>
+                      <p className="text-xs text-slate-600 mb-4">{lang === "he" ? "הרגש שמרוויח לך כסף" : "Which emotion pays off"}</p>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={emotionStatsArr} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
+                          <XAxis dataKey="emotion" tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} />
+                          <YAxis tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
+                          <Tooltip contentStyle={darkTooltip} formatter={(v, n, p) => [`${fmt$(v)} · ${p.payload.winRate}% WR`, "P&L"]} />
+                          <ReferenceLine y={0} stroke="#334155" />
+                          <Bar dataKey="totalPnL" radius={[4, 4, 0, 0]}>
+                            {emotionStatsArr.map((e, i) => (
+                              <Cell key={i} fill={e.totalPnL >= 0 ? "#10b981" : "#f43f5e"} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Streak History */}
+                    <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5">
+                      <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">
+                        {lang === "he" ? "היסטוריית רצפים" : "Streak History"}
+                        <InfoTooltip label="Streak History">
+                          {lang === "he"
+                            ? "רצפי ניצחונות/הפסדים. רצף הפסד ארוך = איתות לעצור ולנשום."
+                            : "Win/loss streaks. Long loss streak = stop and reassess."}
+                        </InfoTooltip>
+                      </h3>
+                      <p className="text-xs text-slate-600 mb-4">{lang === "he" ? `${streaks.length} רצפים · מקסימום ${maxStreak}` : `${streaks.length} streaks · max ${maxStreak}`}</p>
+                      <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                        {streaks.length === 0 ? (
+                          <p className="text-xs text-slate-600 text-center py-8">{lang === "he" ? "אין מספיק נתונים" : "Not enough data"}</p>
+                        ) : streaks.map((s, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <span className="text-[10px] font-mono text-slate-500 w-14 shrink-0">
+                              {s.type === "win" ? (lang === "he" ? "ניצחון" : "Win") : (lang === "he" ? "הפסד" : "Loss")} ×{s.length}
+                            </span>
+                            <div className="flex-1 bg-white/5 rounded-full h-3 overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${s.type === "win" ? "bg-emerald-500" : "bg-rose-500"}`}
+                                style={{ width: `${Math.max(8, (s.length / maxStreak) * 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Setup Matrix */}
+                  <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5">
+                    <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">
+                      {lang === "he" ? "מטריצת סטאפים" : "Setup Matrix"}
+                      <InfoTooltip label="Setup Matrix">
+                        {lang === "he"
+                          ? "ביצועים מלאים לכל סטאפ: עסקאות, WR%, ממוצע R, רווח כולל."
+                          : "Full performance per setup: trades, WR%, avg R, total P&L."}
+                      </InfoTooltip>
+                    </h3>
+                    <p className="text-xs text-slate-600 mb-4">{lang === "he" ? "מסודר לפי רווח כולל" : "Sorted by total P&L"}</p>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-[10px] text-slate-500 uppercase tracking-wider border-b border-white/[0.06]">
+                            <th className="text-left py-2 font-semibold">{lang === "he" ? "סטאפ" : "Setup"}</th>
+                            <th className="text-center py-2 font-semibold">{lang === "he" ? "עסקאות" : "Trades"}</th>
+                            <th className="text-center py-2 font-semibold">WR%</th>
+                            <th className="text-center py-2 font-semibold">Avg R</th>
+                            <th className="text-right py-2 font-semibold">{lang === "he" ? "רווח כולל" : "Total P&L"}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {setupMatrix.map(s => (
+                            <tr key={s.setup} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
+                              <td className="py-2.5 font-semibold text-white">{s.setup}</td>
+                              <td className="py-2.5 text-center text-slate-400 font-mono">{s.count}</td>
+                              <td className="py-2.5 text-center">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  s.winRate >= 60 ? "bg-emerald-500/15 text-emerald-400"
+                                  : s.winRate >= 40 ? "bg-amber-500/15 text-amber-400"
+                                  : "bg-rose-500/15 text-rose-400"
+                                }`}>{s.winRate}%</span>
+                              </td>
+                              <td className="py-2.5 text-center font-mono text-slate-300">{s.avgR}R</td>
+                              <td className={`py-2.5 text-right font-mono font-bold ${s.totalPnL >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                                {fmt$(s.totalPnL)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Hold Time vs P&L Scatter */}
+                  {holdScatter.length > 0 && (
+                    <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5">
+                      <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">
+                        {lang === "he" ? "זמן החזקה vs P&L" : "Hold Time vs P&L"}
+                        <InfoTooltip label="Hold Time vs PnL">
+                          {lang === "he"
+                            ? "כל נקודה = עסקה אחת. רואים אם החזקה ארוכה משתלמת."
+                            : "Each dot = one trade. Reveals if longer holds pay off."}
+                        </InfoTooltip>
+                      </h3>
+                      <p className="text-xs text-slate-600 mb-4">{lang === "he" ? `${holdScatter.length} עסקאות` : `${holdScatter.length} trades`}</p>
+                      <ResponsiveContainer width="100%" height={280}>
+                        <ScatterChart margin={{ top: 10, right: 16, left: 0, bottom: 10 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
+                          <XAxis
+                            type="number"
+                            dataKey="hold"
+                            name="Days"
+                            tick={{ fontSize: 10, fill: "#475569" }}
+                            tickLine={false}
+                            axisLine={false}
+                            label={{ value: lang === "he" ? "ימי החזקה" : "Days held", position: "insideBottom", offset: -2, fontSize: 10, fill: "#475569" }}
+                          />
+                          <YAxis
+                            type="number"
+                            dataKey="pnl"
+                            name="P&L"
+                            tick={{ fontSize: 10, fill: "#475569" }}
+                            tickLine={false}
+                            axisLine={false}
+                            tickFormatter={v => `$${v}`}
+                          />
+                          <ReferenceLine y={0} stroke="#334155" />
+                          <Tooltip
+                            cursor={{ strokeDasharray: "3 3" }}
+                            content={({ payload }) => {
+                              if (!payload?.length) return null;
+                              const d = payload[0].payload;
+                              return (
+                                <div className="bg-[#0d1424] border border-[#162032] rounded-lg px-3 py-2 text-xs shadow-xl">
+                                  <p className="font-mono font-bold text-white">{d.ticker}</p>
+                                  <p className="text-slate-400">{lang === "he" ? "ימים" : "Days"}: {d.hold}</p>
+                                  <p className={d.pnl >= 0 ? "text-emerald-400" : "text-rose-400"}>{fmt$(d.pnl)}</p>
+                                </div>
+                              );
+                            }}
+                          />
+                          <Scatter data={holdScatter}>
+                            {holdScatter.map((entry, i) => (
+                              <Cell key={i} fill={entry.pnl >= 0 ? "#10b981" : "#f43f5e"} fillOpacity={0.75} />
+                            ))}
+                          </Scatter>
+                        </ScatterChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
 
