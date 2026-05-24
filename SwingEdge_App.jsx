@@ -42,6 +42,8 @@ import {
 import { useTradingStats } from "./src/hooks/useTradingStats.js";
 import InfoTooltip from "./src/components/ui/InfoTooltip.jsx";
 import { TRADING_TOOLTIPS } from "./src/data/tooltips.js";
+import { TradeCalendar } from "./src/components/TradeCalendar.jsx";
+import { AdaptiveLessons } from "./src/intelligence/core/AdaptiveLessons.js";
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const RISK_PCT = 0.01;
 
@@ -1022,6 +1024,7 @@ export default function SwingEdge() {
     ticker: "", setup: "all", result: "all", from: "", to: "", rMin: "", rMax: "",
   });
   const [showJournalFilters, setShowJournalFilters] = useState(false);
+  const [journalView, setJournalView] = useState('table');
 
   // ── Load trades: Supabase is source of truth; localStorage is fallback ──
   useEffect(() => {
@@ -1429,7 +1432,18 @@ export default function SwingEdge() {
   const bestStreak    = stats.maxWinStreak;
 
   // Smart lessons
-  const smartLessons = useMemo(() => generateSmartLessons(closedTrades, calcTradeMetrics), [closedTrades]);
+  const smartLessons = useMemo(() => {
+    const base = generateSmartLessons(closedTrades, calcTradeMetrics) || [];
+    const adaptive = AdaptiveLessons.generate(closedTrades, calcTradeMetrics, lang) || [];
+    const seen = new Set(base.map(l => l.id).filter(Boolean));
+    const merged = [...base];
+    for (const l of adaptive) {
+      if (l.id && seen.has(l.id)) continue;
+      merged.push(l);
+      if (l.id) seen.add(l.id);
+    }
+    return merged;
+  }, [closedTrades, lang]);
 
   // Top ticker ribbon — fixed 8 tickers updated with live prices
   const TOP_RIBBON = ["NVDA", "AAPL", "TSLA", "MSFT", "META", "AMD", "BTC-USD", "SPY"];
@@ -2679,7 +2693,37 @@ export default function SwingEdge() {
                 </div>
               </div>
             )}
-            {trades.length === 0 ? (
+            {/* ── VIEW TOGGLE: Table / Calendar ── */}
+            <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
+              <button
+                type="button"
+                onClick={() => setJournalView('table')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all
+                  ${journalView === 'table'
+                    ? 'bg-white shadow-sm text-emerald-600'
+                    : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                {lang === 'he' ? '📋 טבלה' : '📋 Table'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setJournalView('calendar')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all
+                  ${journalView === 'calendar'
+                    ? 'bg-white shadow-sm text-emerald-600'
+                    : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                {lang === 'he' ? '📅 לוח שנה' : '📅 Calendar'}
+              </button>
+            </div>
+
+            {journalView === 'calendar' ? (
+              <TradeCalendar
+                trades={filteredTrades.filter(t => t.status === 'CLOSED')}
+                calcMetrics={calcTradeMetrics}
+                lang={lang}
+              />
+            ) : trades.length === 0 ? (
               <div className="bg-[#0d1424] border border-white/[0.06] rounded-2xl p-12 text-center">
                 <BookOpen size={36} className="mx-auto text-slate-600 mb-3" />
                 <h3 className="text-sm font-bold text-white mb-2">{lang === "he" ? "אין עדיין עסקאות" : "No trades yet"}</h3>
