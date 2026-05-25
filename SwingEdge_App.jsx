@@ -36,7 +36,7 @@ import {
   fetchQuote, getMarketState, getMarketStateBadge, getRefreshInterval, MARKET_STATE,
 } from "./src/priceService.js";
 import { analyzeTradeLocal, analyzeTradeLocalText } from "./src/localAI.js";
-import { POPULAR_TICKERS as STATIC_TICKERS, getTickerMeta } from "./src/data/tickers.js";
+import { POPULAR_TICKERS as STATIC_TICKERS, getTickerMeta, searchTickers as searchStaticTickers } from "./src/data/tickers.js";
 import { SwingEdgeAI } from "./src/intelligence/SwingEdgeAI.js";
 import {
   DNACard, EdgeCard, DecisionCoachPanel, TiltShield, GrowthChart, RegimeIndicator,
@@ -1275,26 +1275,35 @@ export default function SwingEdge() {
     };
   }, [fetchLivePrices, marketState]);
 
-  // Watchlist search handler — dynamic Yahoo Finance search with live prices
+  // Watchlist search handler — instant local suggestions + Yahoo Finance fallback
   const handleWatchlistSearch = useCallback((query) => {
     setWatchlistInput(query.toUpperCase());
     if (watchlistSearchTimeout.current) clearTimeout(watchlistSearchTimeout.current);
     if (query.length < 1) { setWatchlistSearchResults(POPULAR_TICKERS); return; }
+    // Show instant local results immediately (no API wait)
+    const staticResults = searchStaticTickers(query).map(t => ({
+      symbol: t.symbol,
+      name: t.name,
+      type: t.sector === 'Crypto' ? 'CRYPTOCURRENCY' : t.sector === 'ETF' ? 'ETF' : 'EQUITY',
+      exchange: 'NASDAQ',
+    }));
+    if (staticResults.length > 0) setWatchlistSearchResults(staticResults);
     setWatchlistSearching(true);
+    // Then override with Yahoo Finance results after debounce
     watchlistSearchTimeout.current = setTimeout(async () => {
-      const results = await searchTickers(query);
-      const final = results.length > 0 ? results : POPULAR_TICKERS;
-      setWatchlistSearchResults(final);
+      try {
+        const results = await searchTickers(query);
+        const final = results.length > 0 ? results : (staticResults.length > 0 ? staticResults : POPULAR_TICKERS);
+        setWatchlistSearchResults(final);
+        // Pre-fetch prices for the first few results so each row can show its price
+        const topSyms = final.slice(0, 8).map(r => r.symbol.replace("-USD", ""));
+        if (topSyms.length > 0) {
+          fetchPrices(topSyms).then(priceData => {
+            if (Object.keys(priceData).length > 0) setLivePrices(prev => ({ ...prev, ...priceData }));
+          });
+        }
+      } catch {}
       setWatchlistSearching(false);
-      // Pre-fetch prices for the first few results so each row can show its price
-      const topSyms = final.slice(0, 8).map(r => r.symbol.replace("-USD", ""));
-      if (topSyms.length > 0) {
-        fetchPrices(topSyms).then(priceData => {
-          if (Object.keys(priceData).length > 0) {
-            setLivePrices(prev => ({ ...prev, ...priceData }));
-          }
-        });
-      }
     }, 300);
   }, []);
 
@@ -1465,6 +1474,28 @@ export default function SwingEdge() {
       };
     });
   }, [livePrices]);
+
+  // Reactive sector trends derived from watchlist + live prices (no external API needed)
+  const sectorTrendsData = useMemo(() => {
+    if (!watchlistItems || watchlistItems.length === 0) return [];
+    const sectors = {};
+    watchlistItems.forEach(item => {
+      const meta = getTickerMeta(item.ticker);
+      const sector = meta?.sector || 'Other';
+      if (!sectors[sector]) sectors[sector] = { sector, count: 0, tickers: [], totalChange: 0, hasChange: 0 };
+      sectors[sector].count++;
+      sectors[sector].tickers.push(item.ticker);
+      const raw = item.ticker.replace('-USD', '');
+      const lp = livePrices[raw] || livePrices[item.ticker] || livePrices[raw + '-USD'];
+      if (lp?.changePct != null) {
+        sectors[sector].totalChange += parseFloat(lp.changePct) || 0;
+        sectors[sector].hasChange++;
+      }
+    });
+    return Object.values(sectors)
+      .map(s => ({ ...s, avgChange: s.hasChange > 0 ? (s.totalChange / s.hasChange) : 0 }))
+      .sort((a, b) => b.avgChange - a.avgChange);
+  }, [watchlistItems, livePrices]);
 
   useEffect(() => {
     const t = setInterval(() => setTickerIdx(i => (i + 1) % Math.max(tickerTapeItems.length, 1)), 2000);
@@ -3874,10 +3905,11 @@ export default function SwingEdge() {
                 const active = chartSymbol === item.chartSym;
                 return (
                   <button key={item.ticker} onClick={() => setChartSymbol(item.chartSym)}
+                    title={getTickerMeta(item.ticker)?.name ?? item.ticker}
                     className={`text-xs font-mono font-bold px-3 py-1.5 rounded-lg border transition ${
                       active
-                        ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40"
-                        : "bg-white/3 text-slate-400 border-white/[0.06] hover:bg-cyan-500/10 hover:text-cyan-400 hover:border-cyan-500/20"
+                        ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                        : "bg-white/3 text-slate-400 border-white/[0.06] hover:bg-emerald-500/10 hover:text-emerald-400 hover:border-emerald-500/20"
                     }`}>
                     {item.ticker}
                   </button>
@@ -3889,18 +3921,6 @@ export default function SwingEdge() {
               {/* TradingView Chart */}
               <div className="md:col-span-2 bg-[#0d1424] border border-white/[0.06] rounded-xl overflow-hidden relative" style={{ height: 520 }}>
                 <div className="flex flex-col gap-2 px-4 py-3 border-b border-white/[0.06]">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-semibold tracking-widest uppercase text-slate-500 shrink-0">Live Chart</span>
-                    <div className="flex-1 min-w-[180px]">
-                      <TradingViewSearch
-                        value={chartSymbol}
-                        onPick={(tvSym) => setChartSymbol(tvSym)}
-                        livePrices={livePrices}
-                        setLivePrices={setLivePrices}
-                        placeholder="Search symbol (NVDA, BTC, EURUSD...)"
-                      />
-                    </div>
-                  </div>
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex gap-1 flex-wrap">
                       {["1m","5m","15m","1H","4H","1D","1W"].map(tf => (
@@ -4113,53 +4133,41 @@ export default function SwingEdge() {
               </div>
             </div>
 
-            {/* ── SECTOR TRENDS ── */}
+            {/* ── SECTOR TRENDS ── reactive from watchlist */}
             <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-4">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Sector Trends</span>
-                  <span className={`w-1.5 h-1.5 rounded-full ${pulse ? "bg-emerald-400" : "bg-emerald-700"} transition-colors`} />
-                  {sectorLastUpdated && (
-                    <span className="text-[10px] text-slate-700">Updated {fmtTimeAgo(sectorLastUpdated)}</span>
-                  )}
-                </div>
-                <button onClick={fetchSectorData} disabled={sectorLoading}
-                  className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-cyan-400 transition disabled:opacity-40">
-                  <RefreshCw size={10} className={sectorLoading ? "animate-spin" : ""} />
-                  {sectorLoading ? "Loading…" : "Refresh"}
-                </button>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Sector Trends</span>
+                <span className={`w-1.5 h-1.5 rounded-full ${pulse ? "bg-emerald-400" : "bg-emerald-700"} transition-colors`} />
+                <span className="text-[10px] text-slate-700">Live from watchlist</span>
               </div>
 
-              {/* Loading skeleton */}
-              {sectorLoading && sectorData.length === 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {[...Array(8)].map((_, i) => (
-                    <div key={i} className="h-20 bg-white/3 rounded-xl border border-white/[0.06] animate-pulse" />
-                  ))}
+              {sectorTrendsData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 gap-2 text-slate-600">
+                  <BarChart2 size={24} />
+                  <p className="text-xs text-center">
+                    {lang === "he"
+                      ? "הוסף ניירות ערך לרשימת המעקב לצפייה בטרנדים"
+                      : "Add tickers to your watchlist to see sector trends"}
+                  </p>
                 </div>
-              )}
-
-              {sectorData.length > 0 && (() => {
-                const sorted = [...sectorData].sort((a, b) => b.dayChange - a.dayChange);
-                const hot = sorted.filter(s => s.dayChange > 0);
-                const declining = sorted.filter(s => s.dayChange <= 0).reverse();
+              ) : (() => {
+                const hot = sectorTrendsData.filter(s => s.avgChange > 0);
+                const declining = [...sectorTrendsData].filter(s => s.avgChange <= 0).reverse();
+                const barData = sectorTrendsData.map(s => ({ name: s.sector, dayChange: s.avgChange }));
 
                 const SectorCard = ({ s }) => (
-                  <div className={`rounded-xl border p-3 ${s.dayChange >= 0 ? "bg-[#10b981]/5 border-[#10b981]/15" : "bg-[#ef4444]/5 border-[#ef4444]/15"}`}>
+                  <div className={`rounded-xl border p-3 ${s.avgChange >= 0 ? "bg-[#10b981]/5 border-[#10b981]/15" : "bg-[#ef4444]/5 border-[#ef4444]/15"}`}>
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs font-bold text-white">{s.name}</span>
-                      <span className={`text-[10px] font-mono font-bold ${s.dayChange >= 0 ? "text-[#10b981]" : "text-[#ef4444]"}`}>
-                        {s.dayChange >= 0 ? "+" : ""}{s.dayChange.toFixed(2)}%
+                      <span className="text-xs font-bold text-white">{s.sector}</span>
+                      <span className={`text-[10px] font-mono font-bold ${s.avgChange >= 0 ? "text-[#10b981]" : "text-[#ef4444]"}`}>
+                        {s.avgChange >= 0 ? "+" : ""}{s.avgChange.toFixed(2)}%
                       </span>
                     </div>
-                    <div className="text-[10px] font-mono text-slate-400 mb-1.5">${s.price.toFixed(2)}</div>
-                    <div className="flex gap-2 text-[9px] font-mono">
-                      <span className={`px-1.5 py-0.5 rounded ${s.weekChange >= 0 ? "bg-[#10b981]/10 text-[#10b981]" : "bg-[#ef4444]/10 text-[#ef4444]"}`}>
-                        7d {s.weekChange >= 0 ? "+" : ""}{s.weekChange.toFixed(1)}%
-                      </span>
-                      <span className={`px-1.5 py-0.5 rounded ${s.monthChange >= 0 ? "bg-[#10b981]/10 text-[#10b981]" : "bg-[#ef4444]/10 text-[#ef4444]"}`}>
-                        1m {s.monthChange >= 0 ? "+" : ""}{s.monthChange.toFixed(1)}%
-                      </span>
+                    <div className="text-[10px] text-slate-500 mb-1.5 truncate">
+                      {s.tickers.slice(0, 3).join(", ")}{s.tickers.length > 3 ? ` +${s.tickers.length - 3}` : ""}
+                    </div>
+                    <div className="text-[9px] font-mono text-slate-600">
+                      {s.count} {lang === "he" ? "ניירות" : "symbol"}{s.count !== 1 ? "s" : ""}
                     </div>
                   </div>
                 );
@@ -4168,19 +4176,19 @@ export default function SwingEdge() {
                   <div className="space-y-4">
                     {/* Comparison bar chart */}
                     <div>
-                      <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-600 mb-2">Daily % Change — All Sectors</p>
+                      <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-600 mb-2">Avg % Change by Sector</p>
                       <ResponsiveContainer width="100%" height={120}>
-                        <BarChart data={sorted} margin={{ top: 4, right: 4, left: 0, bottom: 4 }}>
+                        <BarChart data={barData} margin={{ top: 4, right: 4, left: 0, bottom: 4 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" vertical={false} />
                           <XAxis dataKey="name" tick={{ fontSize: 9, fill: "#64748b" }} tickLine={false} axisLine={false} />
                           <YAxis tick={{ fontSize: 9, fill: "#64748b" }} tickLine={false} axisLine={false} tickFormatter={v => `${v.toFixed(1)}%`} />
                           <ReferenceLine y={0} stroke="#334155" strokeWidth={1} />
                           <Tooltip
                             contentStyle={{ background: "#0d1424", border: "1px solid #1e293b", borderRadius: 8, fontSize: 11 }}
-                            formatter={(v) => [`${v.toFixed(2)}%`, "Daily Change"]}
+                            formatter={(v) => [`${Number(v).toFixed(2)}%`, "Avg Change"]}
                           />
                           <Bar dataKey="dayChange" radius={[3, 3, 0, 0]}>
-                            {sorted.map((s, i) => (
+                            {barData.map((s, i) => (
                               <Cell key={i} fill={s.dayChange >= 0 ? "#10b981" : "#ef4444"} fillOpacity={0.8} />
                             ))}
                           </Bar>
@@ -4196,7 +4204,7 @@ export default function SwingEdge() {
                           <span className="text-[10px] font-bold tracking-widest uppercase text-[#10b981]">Hot Now</span>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                          {hot.map(s => <SectorCard key={s.symbol} s={s} />)}
+                          {hot.map(s => <SectorCard key={s.sector} s={s} />)}
                         </div>
                       </div>
                     )}
@@ -4209,20 +4217,13 @@ export default function SwingEdge() {
                           <span className="text-[10px] font-bold tracking-widest uppercase text-[#ef4444]">Declining Now</span>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                          {declining.map(s => <SectorCard key={s.symbol} s={s} />)}
+                          {declining.map(s => <SectorCard key={s.sector} s={s} />)}
                         </div>
                       </div>
                     )}
                   </div>
                 );
               })()}
-
-              {!sectorLoading && sectorData.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-8 gap-2 text-slate-600">
-                  <BarChart2 size={24} />
-                  <p className="text-xs">No sector data — click Refresh to load</p>
-                </div>
-              )}
             </div>
           </div>
         )}
