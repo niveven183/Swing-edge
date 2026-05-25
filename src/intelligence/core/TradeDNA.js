@@ -74,11 +74,15 @@ const inferStyle = (trades) => {
   // Aggression: average portfolio risk taken per trade, relative to 1% baseline.
   const risks = closed
     .map(t => {
-      const riskPerShare = Math.abs(t.entry - t.stop);
-      const capital = t._capitalAtEntry || 25000;
-      return capital > 0 ? (riskPerShare * t.shares) / capital : 0;
+      const entry = Number(t.entry);
+      const stop = Number(t.stop);
+      const shares = Number(t.shares);
+      if (!Number.isFinite(entry) || !Number.isFinite(stop) || !Number.isFinite(shares)) return 0;
+      const riskPerShare = Math.abs(entry - stop);
+      const capital = Number(t._capitalAtEntry) || 25000;
+      return capital > 0 ? (riskPerShare * shares) / capital : 0;
     })
-    .filter(r => r > 0);
+    .filter(r => r > 0 && Number.isFinite(r));
   const avgRisk = risks.length ? risks.reduce((s, x) => s + x, 0) / risks.length : 0.01;
   const aggression = to100(Math.min(1, avgRisk / 0.02)); // 2% = fully aggressive
 
@@ -109,11 +113,15 @@ const computeScores = (trades) => {
   // Risk score — 100 means always within the 1% rule, falls as risk drifts up.
   const risks = closed
     .map(t => {
-      const capital = t._capitalAtEntry || 25000;
-      const rd = Math.abs(t.entry - t.stop) * t.shares;
+      const entry = Number(t.entry);
+      const stop = Number(t.stop);
+      const shares = Number(t.shares);
+      if (!Number.isFinite(entry) || !Number.isFinite(stop) || !Number.isFinite(shares)) return 0;
+      const capital = Number(t._capitalAtEntry) || 25000;
+      const rd = Math.abs(entry - stop) * shares;
       return capital > 0 ? rd / capital : 0;
     })
-    .filter(r => r > 0);
+    .filter(r => r > 0 && Number.isFinite(r));
   const avgRiskPct = risks.length ? risks.reduce((s, x) => s + x, 0) / risks.length : 0.01;
   const risk = to100(Math.max(0, 1 - Math.max(0, avgRiskPct - 0.01) * 50));
 

@@ -28,9 +28,10 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he' }) {
   const tradesByDate = useMemo(() => {
     const map = {};
     trades.forEach(t => {
-      const raw = t.date || t.openDate || t.createdAt || '';
-      const key = String(raw).slice(0, 10);
-      if (!key) return;
+      const raw = t.date || t.openDate || t.createdAt;
+      if (!raw || typeof raw !== 'string') return;
+      const key = raw.slice(0, 10);
+      if (!key || key === 'null' || key === 'undefined') return;
       if (!map[key]) map[key] = [];
       map[key].push(t);
     });
