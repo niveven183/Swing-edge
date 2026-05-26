@@ -149,7 +149,14 @@ const computeScores = (trades) => {
 };
 
 // ─── PUBLIC API ──────────────────────────────────────────────────────────────
+// Single-entry cache: avoids recomputing for the same trade set.
+// Key = count + last-trade date (O(1) to compute, covers add/edit events).
+let _dnaCache = { key: null, result: null };
+
 export const calculateTradeDNA = (allTrades = []) => {
+  const _cacheKey = `${allTrades.length}_${allTrades[allTrades.length - 1]?.date || ''}`;
+  if (_dnaCache.key === _cacheKey && _dnaCache.result !== null) return _dnaCache.result;
+
   const closed = getClosed(allTrades);
   const n = closed.length;
 
@@ -158,7 +165,7 @@ export const calculateTradeDNA = (allTrades = []) => {
   const marketsRank     = rankGroups(closed, t => t.marketCondition);
   const daysRank        = rankGroups(closed, dayOfWeek, { minN: 2 });
 
-  return {
+  const result = {
     sampleSize: n,
     totalTrades: (allTrades || []).length,
     maturity: maturityFor(n),
@@ -188,6 +195,9 @@ export const calculateTradeDNA = (allTrades = []) => {
     },
     updatedAt: new Date().toISOString(),
   };
+
+  _dnaCache = { key: _cacheKey, result };
+  return result;
 };
 
 // Incremental update: cheapest possible — just recompute from the full set.

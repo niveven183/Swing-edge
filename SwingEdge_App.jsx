@@ -1319,8 +1319,12 @@ export default function SwingEdge() {
   const closedTrades = realTrades.filter(t => t.status === "CLOSED");
   const openTrades   = realTrades.filter(t => t.status === "OPEN");
 
+  // Stable reference for the pure calcTradeMetrics function — prevents
+  // useTradingStats from re-running its useMemo on every render.
+  const stableCalcTradeMetrics = useCallback(calcTradeMetrics, []);
+
   // ─── MASTER STATS HUB — single source of truth ──────────────────────────────
-  const stats = useTradingStats(realTrades, capital, calcTradeMetrics);
+  const stats = useTradingStats(realTrades, capital, stableCalcTradeMetrics);
   const { totalPnL, winRate, avgR } = stats;
 
   // ─── JOURNAL PRO: filtered view + stats ─────────────────────────────────────
@@ -1360,7 +1364,7 @@ export default function SwingEdge() {
     () => filteredTrades.filter(t => !t.isDemo),
     [filteredTrades]
   );
-  const journalStats = useTradingStats(filteredRealTrades, capital, calcTradeMetrics);
+  const journalStats = useTradingStats(filteredRealTrades, capital, stableCalcTradeMetrics);
 
   const uniqueSetups = useMemo(() => {
     const s = new Set(trades.map(t => t.setup).filter(Boolean));
@@ -2233,7 +2237,7 @@ export default function SwingEdge() {
                   <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4">
                     <h3 className="text-emerald-400 font-bold text-sm mb-3 flex items-center gap-1.5">🎯 Top Edges שלך<InfoTooltip label="Edge">{TRADING_TOOLTIPS.edge[lang]||TRADING_TOOLTIPS.edge.en}</InfoTooltip></h3>
                     {stats.topEdges.map((edge, i) => (
-                      <div key={i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
+                      <div key={edge.name || i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                         <div>
                           <div className="text-white font-semibold text-sm">{edge.name}</div>
                           <div className="text-slate-400 text-xs">{edge.count} עסקאות</div>
@@ -2250,7 +2254,7 @@ export default function SwingEdge() {
                   <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4">
                     <h3 className="text-rose-400 font-bold text-sm mb-3 flex items-center gap-1.5">⚠️ Anti-Edges — להימנע!<InfoTooltip label="Anti-Edge">{TRADING_TOOLTIPS.antiEdge[lang]||TRADING_TOOLTIPS.antiEdge.en}</InfoTooltip></h3>
                     {stats.antiEdges.map((edge, i) => (
-                      <div key={i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
+                      <div key={edge.name || i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                         <div>
                           <div className="text-white font-semibold text-sm">{edge.name}</div>
                           <div className="text-slate-400 text-xs">{edge.count} עסקאות</div>
@@ -2577,7 +2581,7 @@ export default function SwingEdge() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {smartLessons.map((lesson, i) => (
-                    <div key={i} className={`bg-[#0d1424] border rounded-xl p-4 ${
+                    <div key={lesson.title || `${lesson.type}_${i}`} className={`bg-[#0d1424] border rounded-xl p-4 ${
                       lesson.type === "strength" ? "border-[#10b981]/25" :
                       lesson.type === "warning" ? "border-amber-500/25" :
                       lesson.type === "insight" ? "border-cyan-500/25" :
@@ -3544,7 +3548,7 @@ export default function SwingEdge() {
                   <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4">
                     <h3 className="text-emerald-400 font-bold text-sm mb-3 flex items-center gap-1.5">🎯 Top Edges שלך<InfoTooltip label="Edge">{TRADING_TOOLTIPS.edge[lang]||TRADING_TOOLTIPS.edge.en}</InfoTooltip></h3>
                     {stats.topEdges.map((edge, i) => (
-                      <div key={i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
+                      <div key={edge.name || i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                         <div>
                           <div className="text-white font-semibold text-sm">{edge.name}</div>
                           <div className="text-slate-400 text-xs">{edge.count} עסקאות</div>
@@ -3561,7 +3565,7 @@ export default function SwingEdge() {
                   <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4">
                     <h3 className="text-rose-400 font-bold text-sm mb-3 flex items-center gap-1.5">⚠️ Anti-Edges — להימנע!<InfoTooltip label="Anti-Edge">{TRADING_TOOLTIPS.antiEdge[lang]||TRADING_TOOLTIPS.antiEdge.en}</InfoTooltip></h3>
                     {stats.antiEdges.map((edge, i) => (
-                      <div key={i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
+                      <div key={edge.name || i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                         <div>
                           <div className="text-white font-semibold text-sm">{edge.name}</div>
                           <div className="text-slate-400 text-xs">{edge.count} עסקאות</div>

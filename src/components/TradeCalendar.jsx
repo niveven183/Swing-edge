@@ -149,6 +149,8 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he' }) {
               key={key}
               type="button"
               onClick={() => setSelectedDate(isSelected ? null : day)}
+              aria-label={`${format(day, lang === 'he' ? 'dd/MM/yyyy' : 'MMMM d, yyyy', { locale })}${hasTrades ? ` — ${dayTrades.length} ${lang === 'he' ? 'עסקאות' : 'trades'}` : ''}`}
+              aria-pressed={isSelected ? true : false}
               className={`
                 relative min-h-[56px] p-1.5 border-b border-r border-slate-100
                 transition-all text-left

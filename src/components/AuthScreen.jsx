@@ -165,11 +165,13 @@ export default function AuthScreen() {
               {tab === "signin" ? (
                 <form onSubmit={handleSignIn} className="flex flex-col gap-3">
                   <Input icon={Mail} type="email" placeholder={t("email")} value={email}
-                    onChange={(e) => setEmail(e.target.value)} isRTL={isRTL} autoComplete="email" />
+                    onChange={(e) => setEmail(e.target.value)} isRTL={isRTL} autoComplete="email"
+                    aria-label={t("email")} />
                   <Input icon={Lock} type={show ? "text" : "password"} placeholder={t("password")}
                     value={password} onChange={(e) => setPassword(e.target.value)} isRTL={isRTL}
                     autoComplete="current-password"
-                    rightIcon={show ? EyeOff : Eye} onRightClick={() => setShow((s) => !s)} />
+                    rightIcon={show ? EyeOff : Eye} onRightClick={() => setShow((s) => !s)}
+                    aria-label={t("password")} />
 
                   <div className={isRTL ? "text-left" : "text-right"}>
                     <button
@@ -196,14 +198,17 @@ export default function AuthScreen() {
               ) : (
                 <form onSubmit={handleSignUp} className="flex flex-col gap-3">
                   <Input icon={Mail} type="email" placeholder={t("email")} value={email}
-                    onChange={(e) => setEmail(e.target.value)} isRTL={isRTL} autoComplete="email" />
+                    onChange={(e) => setEmail(e.target.value)} isRTL={isRTL} autoComplete="email"
+                    aria-label={t("email")} />
                   <Input icon={Lock} type={show ? "text" : "password"} placeholder={t("password")}
                     value={password} onChange={(e) => setPassword(e.target.value)} isRTL={isRTL}
                     autoComplete="new-password"
-                    rightIcon={show ? EyeOff : Eye} onRightClick={() => setShow((s) => !s)} />
+                    rightIcon={show ? EyeOff : Eye} onRightClick={() => setShow((s) => !s)}
+                    aria-label={t("password")} />
                   <Input icon={Lock} type={show ? "text" : "password"} placeholder={t("confirmPass")}
                     value={confirm} onChange={(e) => setConfirm(e.target.value)} isRTL={isRTL}
-                    autoComplete="new-password" />
+                    autoComplete="new-password"
+                    aria-label={t("confirmPass")} />
 
                   <FeedbackArea error={error} success={success} />
 
