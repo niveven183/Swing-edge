@@ -99,17 +99,19 @@ function UsersSection({ toast }) {
         });
       } catch {}
       try {
+        // trades table uses camelCase `createdAt`. (feedback table uses snake_case `created_at`.)
         const { data: tr } = await supabase
           .from("trades")
-          .select("user_id,user_email,created_at")
-          .order("created_at", { ascending: false });
+          .select("user_id,createdAt")
+          .order("createdAt", { ascending: false });
         (tr || []).forEach((r) => {
-          const key = r.user_email || r.user_id;
+          const key = r.user_id;
           if (!key) return;
-          const cur = emailsMap.get(key) || { email: r.user_email, id: r.user_id, joined: r.created_at, feedbackCount: 0, tradeCount: 0, lastActivity: r.created_at };
+          const ts = r.createdAt;
+          const cur = emailsMap.get(key) || { email: undefined, id: r.user_id, joined: ts, feedbackCount: 0, tradeCount: 0, lastActivity: ts };
           cur.tradeCount = (cur.tradeCount || 0) + 1;
-          if (!cur.lastActivity || r.created_at > cur.lastActivity) cur.lastActivity = r.created_at;
-          if (!cur.joined || r.created_at < cur.joined) cur.joined = r.created_at;
+          if (!cur.lastActivity || (ts && ts > cur.lastActivity)) cur.lastActivity = ts;
+          if (!cur.joined || (ts && ts < cur.joined)) cur.joined = ts;
           emailsMap.set(key, cur);
         });
       } catch {}
@@ -345,7 +347,7 @@ function TradesSection({ toast }) {
       const { data, error } = await supabase
         .from("trades")
         .select("*")
-        .order("created_at", { ascending: false });
+        .order("createdAt", { ascending: false });
       if (error) throw error;
       setRows(data || []);
     } catch (e) {
@@ -424,7 +426,7 @@ function TradesSection({ toast }) {
               <tr key={t.id} className="border-b border-white/[0.04] hover:bg-white/[0.02]">
                 <td className="p-2 font-mono font-bold text-white">{t.ticker}</td>
                 <td className="p-2 font-mono text-[10px] text-slate-500">{t.user_email || "—"}</td>
-                <td className="p-2 font-mono text-[10px] text-slate-500">{t.date || (t.created_at && new Date(t.created_at).toLocaleDateString("he-IL"))}</td>
+                <td className="p-2 font-mono text-[10px] text-slate-500">{t.date || (t.createdAt && new Date(t.createdAt).toLocaleDateString("he-IL"))}</td>
                 <td className="p-2 font-mono">{t.side}</td>
                 <td className="p-2 font-mono text-slate-300">${t.entry}</td>
                 <td className="p-2 font-mono text-rose-400">${t.stop}</td>

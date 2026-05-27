@@ -9,10 +9,12 @@ import BetaWelcome from "./src/components/BetaWelcome.jsx";
 import FeedbackTab from "./src/components/FeedbackTab.jsx";
 import IOSInstallBanner from "./src/components/IOSInstallBanner.jsx";
 import AdminPanel from "./src/components/AdminPanel.jsx";
+import EditTradeModal from "./src/components/EditTradeModal.jsx";
+import ResetAllModal from "./src/components/ResetAllModal.jsx";
 import TradingViewSearch from "./src/components/TradingViewSearch.jsx";
 import { TVTickerTape, TVMarketOverview } from "./src/components/TradingViewWidgets.jsx";
 import { useToast, useConfirm, Tooltip as UiTooltip } from "./src/components/ToastProvider.jsx";
-import { supabase, isSupabaseConfigured } from "./src/supabaseClient.js";
+import { supabase, isSupabaseConfigured, tradeForSupabase } from "./src/supabaseClient.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell,
@@ -996,16 +998,15 @@ export default function SwingEdge() {
     try { return localStorage.getItem("swingEdgeLightMode") === "true"; } catch { return false; }
   });
 
-  // Edit trade state
-  const [showEditForm, setShowEditForm] = useState(false);
+  // Edit trade state (modal owns its form; we just track the open trade)
   const [editingTrade, setEditingTrade] = useState(null);
-  const [editForm, setEditForm] = useState({
-    ticker: "", side: "LONG", entry: "", stop: "", target: "", shares: "",
-    setup: "Breakout", notes: "", marketCondition: "Trending Up",
-    emotionAtEntry: "Neutral", entryQuality: 3, status: "OPEN",
-    exit: "", exitReason: "Hit Target", followedPlan: null, lessonLearned: "",
-    maxFavorable: "", maxAdverse: "",
-  });
+  const showEditForm = editingTrade != null;
+
+  // Bulk selection state for the Journal table
+  const [selectedTrades, setSelectedTrades] = useState(() => new Set());
+
+  // Reset-all (Danger Zone) modal toggle
+  const [showResetAll, setShowResetAll] = useState(false);
 
   // Watchlist state
   const DEFAULT_WATCHLIST = [
@@ -1132,7 +1133,7 @@ export default function SwingEdge() {
       if (e.key === "Escape") {
         if (showForm) setShowForm(false);
         if (showCloseForm) { setShowCloseForm(false); setClosingTrade(null); }
-        if (showEditForm) { setShowEditForm(false); setEditingTrade(null); }
+        if (showEditForm) { setEditingTrade(null); }
         if (showProfileDropdown) setShowProfileDropdown(false);
         return;
       }
@@ -1603,7 +1604,7 @@ export default function SwingEdge() {
     setTrades(prev => [...prev, newTrade]);
     // Sync new trade to Supabase (primary source of truth)
     if (isSupabaseConfigured && supabase && authUser?.id) {
-      supabase.from("trades").insert({ ...newTrade, user_id: authUser.id, isDemo: false })
+      supabase.from("trades").insert(tradeForSupabase({ ...newTrade, user_id: authUser.id, is_demo: false }))
         .then(({ error }) => { if (error) console.error("Supabase insert failed:", error); });
     }
     setForm({ ticker: "", side: "LONG", entry: "", stop: "", target: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
@@ -1634,7 +1635,7 @@ export default function SwingEdge() {
     if (isSupabaseConfigured && supabase && authUser?.id && closedTrade.id) {
       try {
         const { error } = await supabase.from("trades")
-          .update(closedTrade)
+          .update(tradeForSupabase(closedTrade))
           .eq("id", closedTrade.id)
           .eq("user_id", authUser.id);
         if (error) console.error("Supabase close-update failed:", error);
@@ -1675,67 +1676,54 @@ export default function SwingEdge() {
     }
   };
 
-  const handleEditOpen = (trade) => {
-    setEditingTrade(trade);
-    setEditForm({
-      ticker: trade.ticker,
-      side: trade.side,
-      entry: String(trade.entry),
-      stop: String(trade.stop),
-      target: String(trade.target || ""),
-      shares: String(trade.shares),
-      setup: trade.setup || "Breakout",
-      notes: trade.notes || "",
-      marketCondition: trade.marketCondition || "Trending Up",
-      emotionAtEntry: trade.emotionAtEntry || "Neutral",
-      entryQuality: trade.entryQuality || 3,
-      status: trade.status,
-      exit: trade.exit != null ? String(trade.exit) : "",
-      exitReason: trade.exitReason || "Hit Target",
-      followedPlan: trade.followedPlan,
-      lessonLearned: trade.lessonLearned || "",
-      maxFavorable: trade.maxFavorable != null ? String(trade.maxFavorable) : "",
-      maxAdverse: trade.maxAdverse != null ? String(trade.maxAdverse) : "",
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedTrades);
+    if (!ids.length) return;
+    const ok = await confirmDialog({
+      title: lang === "he" ? "מחיקת עסקאות" : "Delete Trades",
+      message: lang === "he"
+        ? `האם למחוק ${ids.length} עסקאות שנבחרו? פעולה זו לא ניתנת לביטול.`
+        : `Delete the ${ids.length} selected trades? This action cannot be undone.`,
+      confirmText: lang === "he" ? "מחק" : "Delete",
+      cancelText: lang === "he" ? "ביטול" : "Cancel",
+      danger: true,
     });
-    setShowEditForm(true);
+    if (!ok) return;
+    const idSet = new Set(ids);
+    setTrades(prev => prev.filter(t => !idSet.has(t.id)));
+    if (isSupabaseConfigured && supabase && authUser?.id) {
+      try {
+        const { error } = await supabase.from("trades")
+          .delete()
+          .in("id", ids)
+          .eq("user_id", authUser.id);
+        if (error) console.error("Supabase bulk delete failed:", error);
+      } catch (e) { console.error("Supabase bulk delete threw:", e); }
+    }
+    setSelectedTrades(new Set());
+    toast.success(
+      lang === "he" ? `${ids.length} עסקאות נמחקו` : `${ids.length} trades deleted`
+    );
   };
 
-  const handleEditSubmit = async () => {
-    if (!editingTrade) return;
-    const exitVal = parseFloat(editForm.exit) || null;
-    const updated = {
-      ...editingTrade,
-      ticker: editForm.ticker.toUpperCase(),
-      side: editForm.side,
-      entry: parseFloat(editForm.entry) || editingTrade.entry,
-      stop: parseFloat(editForm.stop) || editingTrade.stop,
-      target: parseFloat(editForm.target) || null,
-      shares: parseInt(editForm.shares, 10) || editingTrade.shares,
-      setup: editForm.setup,
-      notes: editForm.notes,
-      marketCondition: editForm.marketCondition,
-      emotionAtEntry: editForm.emotionAtEntry,
-      entryQuality: editForm.entryQuality,
-      status: exitVal != null ? "CLOSED" : editForm.status,
-      exit: exitVal,
-      exitReason: editForm.exitReason,
-      followedPlan: editForm.followedPlan,
-      lessonLearned: editForm.lessonLearned,
-      maxFavorable: parseFloat(editForm.maxFavorable) || null,
-      maxAdverse: parseFloat(editForm.maxAdverse) || null,
-    };
-    setTrades(prev => prev.map(t => t.id === editingTrade.id ? updated : t));
+  const handleEditOpen = (trade) => {
+    setEditingTrade(trade);
+  };
+
+  // Receives the fully built `updated` trade from <EditTradeModal />
+  const handleEditSubmit = async (updated) => {
+    if (!updated || !updated.id) return;
+    setTrades(prev => prev.map(t => t.id === updated.id ? updated : t));
     // Sync edit to Supabase
     if (isSupabaseConfigured && supabase && authUser?.id && updated.id) {
       try {
         const { error } = await supabase.from("trades")
-          .update(updated)
+          .update(tradeForSupabase(updated))
           .eq("id", updated.id)
           .eq("user_id", authUser.id);
         if (error) console.error("Supabase update failed:", error);
       } catch (e) { console.error("Supabase update threw:", e); }
     }
-    setShowEditForm(false);
     setEditingTrade(null);
     toast.success(lang === "he" ? "העסקה עודכנה" : "Trade updated");
   };
@@ -1766,7 +1754,7 @@ export default function SwingEdge() {
     // hasn't been provisioned yet (keeps the local flow unaffected).
     if (isSupabaseConfigured && supabase && userId) {
       try {
-        await supabase.from("trades").upsert(stamped, { onConflict: "id" });
+        await supabase.from("trades").upsert(stamped.map(s => tradeForSupabase({ ...s, is_demo: true })), { onConflict: "id" });
       } catch { /* ignore — local state is still saved */ }
     }
     toast.success(lang === "he" ? `נטענו ${stamped.length} עסקאות דמו` : `Loaded ${stamped.length} demo trades`);
@@ -2783,10 +2771,55 @@ export default function SwingEdge() {
                 <p className="text-xs text-slate-500">{lang === "he" ? "נסה לשנות או לנקות את המסננים" : "Try adjusting the filters"}</p>
               </div>
             ) : (
+            <>
+            {selectedTrades.size > 0 && (
+              <div className="sticky top-0 z-10 bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 mb-3 flex items-center justify-between backdrop-blur shadow-sm">
+                <span className="text-sm font-medium text-emerald-300">
+                  {lang === "he"
+                    ? `${selectedTrades.size} עסקאות נבחרו`
+                    : `${selectedTrades.size} trades selected`}
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setSelectedTrades(new Set())}
+                    className="px-3 py-1.5 text-sm text-slate-300 hover:bg-white/5 rounded-lg border border-white/10 transition"
+                  >
+                    {lang === "he" ? "בטל" : "Cancel"}
+                  </button>
+                  <button
+                    onClick={handleBulkDelete}
+                    className="px-3 py-1.5 text-sm bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-medium transition"
+                  >
+                    🗑️ {lang === "he" ? "מחק נבחרים" : "Delete Selected"}
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="overflow-x-auto bg-[#0d1424] border border-white/[0.06] rounded-xl">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-slate-600 border-b border-white/[0.06] text-[10px] tracking-widest uppercase">
+                    <th className="p-3 text-left font-semibold w-8">
+                      <input
+                        type="checkbox"
+                        aria-label={lang === "he" ? "בחר הכל" : "Select all"}
+                        ref={(el) => {
+                          if (!el) return;
+                          const total = filteredTrades.length;
+                          const selectedVisible = filteredTrades.filter(t => selectedTrades.has(t.id)).length;
+                          el.indeterminate = selectedVisible > 0 && selectedVisible < total;
+                        }}
+                        checked={filteredTrades.length > 0 && filteredTrades.every(t => selectedTrades.has(t.id))}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedTrades(new Set(filteredTrades.map(t => t.id)));
+                          } else {
+                            setSelectedTrades(new Set());
+                          }
+                        }}
+                        className="w-3.5 h-3.5 rounded border border-white/20 bg-white/5 cursor-pointer accent-cyan-500"
+                      />
+                    </th>
                     {["Ticker","Date","Side","Entry","Stop","Target","Shares","מחיר נוכחי","P&L חי","Exit","P&L","R","Hold","Setup","Mkt","Emotion","★","Exit Rsn","Plan","Lesson","Status","Action"].map(h => (
                       <th key={h} className={`p-3 text-left font-semibold whitespace-nowrap ${h==="מחיר נוכחי"||h==="P&L חי" ? "text-cyan-600" : ""}`}>{h}</th>
                     ))}
@@ -2797,8 +2830,25 @@ export default function SwingEdge() {
                     const { pnl, rMultiple } = calcTradeMetrics(t);
                     const isOpen = t.status === "OPEN";
                     const win = !isOpen && pnl > 0;
+                    const isSelected = selectedTrades.has(t.id);
                     return (
-                      <tr key={t.id} className={`border-b border-white/[0.04] transition-colors ${!isOpen && win ? "hover:bg-[#10b981]/[0.04]" : !isOpen ? "hover:bg-[#ef4444]/[0.04]" : "hover:bg-white/[0.03]"}`}>
+                      <tr key={t.id} className={`border-b border-white/[0.04] transition-colors ${isSelected ? "bg-cyan-500/[0.06]" : ""} ${!isOpen && win ? "hover:bg-[#10b981]/[0.04]" : !isOpen ? "hover:bg-[#ef4444]/[0.04]" : "hover:bg-white/[0.03]"}`}>
+                        <td className="p-3 w-8">
+                          <input
+                            type="checkbox"
+                            aria-label={lang === "he" ? "בחר עסקה" : "Select trade"}
+                            checked={isSelected}
+                            onChange={(e) => {
+                              setSelectedTrades(prev => {
+                                const next = new Set(prev);
+                                if (e.target.checked) next.add(t.id);
+                                else next.delete(t.id);
+                                return next;
+                              });
+                            }}
+                            className="w-3.5 h-3.5 rounded border border-white/20 bg-white/5 cursor-pointer accent-cyan-500"
+                          />
+                        </td>
                         <td className="p-3 font-bold text-white font-mono whitespace-nowrap"><div className="flex items-center gap-1.5"><TickerLogo ticker={t.ticker} size={16} />{t.ticker}{t.isDemo && <span className="text-xs bg-slate-700 text-slate-400 px-1 py-0.5 rounded ml-1 font-normal">DEMO</span>}</div></td>
                         <td className="p-3 text-slate-500 whitespace-nowrap">{t.date}</td>
                         <td className="p-3"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side==="LONG"?"bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20":"bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20"}`}>{t.side}</span></td>
@@ -2887,6 +2937,7 @@ export default function SwingEdge() {
                 </tbody>
               </table>
             </div>
+            </>
             )}
           </div>
         )}
@@ -4613,6 +4664,27 @@ export default function SwingEdge() {
                 </p>
               </div>
 
+              {/* ── DANGER ZONE ── */}
+              <div className="mt-8 p-4 border-2 border-rose-500/30 bg-rose-500/5 rounded-2xl">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-lg">⚠️</span>
+                  <h3 className="font-bold text-rose-400 text-sm">
+                    {lang === "he" ? "אזור מסוכן" : "Danger Zone"}
+                  </h3>
+                </div>
+                <p className="text-sm text-rose-300/80 mb-3">
+                  {lang === "he"
+                    ? "מחיקת כל העסקאות לא ניתנת לביטול. נדרשת סיסמת חשבון לאימות."
+                    : "Resetting all trades cannot be undone. Account password is required to confirm."}
+                </p>
+                <button
+                  onClick={() => setShowResetAll(true)}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-medium transition"
+                >
+                  {lang === "he" ? "אפס יומן" : "Reset Journal"}
+                </button>
+              </div>
+
             </div>
           );
         })()}
@@ -5003,155 +5075,20 @@ export default function SwingEdge() {
       )}
 
       {/* ── EDIT TRADE MODAL ── */}
-      {showEditForm && editingTrade && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg bg-[#0d1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06] bg-gradient-to-r from-cyan-500/5 to-violet-500/5">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-white">✏️ עריכת עסקה — <span className="text-cyan-400 font-mono">{editingTrade.ticker}</span></span>
-              </div>
-              <button onClick={() => { setShowEditForm(false); setEditingTrade(null); }} className="text-slate-600 hover:text-slate-300 transition">
-                <X size={16} />
-              </button>
-            </div>
-            <div className="p-5 space-y-4 overflow-y-auto">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Ticker</label>
-                  <input value={editForm.ticker} onChange={e => setEditForm(f => ({ ...f, ticker: e.target.value.toUpperCase() }))}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none transition font-mono font-bold" />
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Direction</label>
-                  <div className="flex gap-2">
-                    {["LONG","SHORT"].map(s => (
-                      <button key={s} onClick={() => setEditForm(f => ({ ...f, side: s }))}
-                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition border ${editForm.side===s?(s==="LONG"?"bg-[#10b981]/20 text-[#10b981] border-[#10b981]/30":"bg-[#ef4444]/20 text-[#ef4444] border-[#ef4444]/30"):"bg-white/3 text-slate-500 border-white/10 hover:border-white/20"}`}>
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                {[["Entry","entry","text-white"],["Stop Loss","stop","text-[#ef4444]"],["Target","target","text-[#10b981]"]].map(([label,key,cls]) => (
-                  <div key={key}>
-                    <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{label}</label>
-                    <input value={editForm[key]} onChange={e => setEditForm(f => ({ ...f, [key]: e.target.value }))}
-                      placeholder="0.00" className={`w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none transition font-mono ${cls}`} />
-                  </div>
-                ))}
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Shares</label>
-                  <input value={editForm.shares} onChange={e => setEditForm(f => ({ ...f, shares: e.target.value }))} type="number" min="0"
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none transition font-mono" />
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Setup Type</label>
-                  <select value={editForm.setup} onChange={e => setEditForm(f => ({ ...f, setup: e.target.value }))}
-                    className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
-                    {["Breakout","Pullback","Support Bounce","Resistance Break","Other"].map(s => <option key={s}>{s}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Market Condition</label>
-                  <select value={editForm.marketCondition} onChange={e => setEditForm(f => ({ ...f, marketCondition: e.target.value }))}
-                    className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
-                    {["Trending Up","Trending Down","Sideways","Volatile"].map(s => <option key={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Emotion at Entry</label>
-                  <select value={editForm.emotionAtEntry} onChange={e => setEditForm(f => ({ ...f, emotionAtEntry: e.target.value }))}
-                    className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
-                    {["Confident","Calm","Patient","Neutral","Hesitant","Nervous","FOMO","Angry"].map(s => <option key={s}>{s}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Entry Quality</label>
-                <div className="flex items-center gap-1 mt-1">
-                  {[1,2,3,4,5].map(star => (
-                    <button key={star} type="button" onClick={() => setEditForm(f => ({ ...f, entryQuality: star }))}
-                      className={`text-xl transition-transform hover:scale-110 ${editForm.entryQuality >= star ? "text-amber-400" : "text-slate-700"}`}>★</button>
-                  ))}
-                  <span className="text-[10px] text-slate-600 ml-1">{editForm.entryQuality}/5</span>
-                </div>
-              </div>
-              <div>
-                <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Notes</label>
-                <input value={editForm.notes} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))}
-                  placeholder="Trade thesis..." className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none transition" />
-              </div>
-              {/* Exit fields */}
-              <div className="border-t border-white/[0.06] pt-4">
-                <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-3">שדות סגירה (אם נסגרה)</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Exit Price</label>
-                    <input value={editForm.exit} onChange={e => setEditForm(f => ({ ...f, exit: e.target.value }))}
-                      placeholder="0.00" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-[#10b981] placeholder-slate-600 focus:border-emerald-500/50 focus:outline-none transition font-mono" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Exit Reason</label>
-                    <select value={editForm.exitReason} onChange={e => setEditForm(f => ({ ...f, exitReason: e.target.value }))}
-                      className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
-                      {["Hit Target","Hit Stop","Manual Exit","Trailing Stop","Other"].map(s => <option key={s}>{s}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3 mt-3">
-                  <div>
-                    <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">MFE</label>
-                    <input value={editForm.maxFavorable} onChange={e => setEditForm(f => ({ ...f, maxFavorable: e.target.value }))}
-                      placeholder="Highest price" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-[#10b981] placeholder-slate-600 focus:outline-none transition font-mono" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">MAE</label>
-                    <input value={editForm.maxAdverse} onChange={e => setEditForm(f => ({ ...f, maxAdverse: e.target.value }))}
-                      placeholder="Lowest price" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-[#ef4444] placeholder-slate-600 focus:outline-none transition font-mono" />
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Followed Plan?</label>
-                  <div className="flex gap-2">
-                    {[
-                      { val: true, label: "✓ Yes", on: "bg-[#10b981]/20 text-[#10b981] border-[#10b981]/30" },
-                      { val: "Partially", label: "◐ Partially", on: "bg-amber-500/20 text-amber-300 border-amber-500/30" },
-                      { val: false, label: "✗ No", on: "bg-[#ef4444]/20 text-[#ef4444] border-[#ef4444]/30" },
-                    ].map(({ val, label, on }) => (
-                      <button key={String(val)} onClick={() => setEditForm(f => ({ ...f, followedPlan: val }))}
-                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition border ${editForm.followedPlan===val ? on : "bg-white/3 text-slate-500 border-white/10 hover:border-white/20"}`}>
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Lesson Learned</label>
-                  <textarea value={editForm.lessonLearned} onChange={e => setEditForm(f => ({ ...f, lessonLearned: e.target.value }))}
-                    rows={3}
-                    placeholder="What did this trade teach you?" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-violet-500/50 focus:outline-none transition resize-y" />
-                </div>
-              </div>
-              <div className="flex gap-2 pt-1">
-                <button onClick={handleEditSubmit}
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-white text-sm font-bold hover:opacity-90 transition">
-                  שמור שינויים →
-                </button>
-                <button onClick={() => { setShowEditForm(false); setEditingTrade(null); }}
-                  className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm hover:text-white hover:border-white/20 transition">
-                  ביטול
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <EditTradeModal
+        trade={editingTrade}
+        lang={lang}
+        onClose={() => setEditingTrade(null)}
+        onSave={handleEditSubmit}
+      />
+
+      {/* ── RESET ALL (DANGER ZONE) MODAL ── */}
+      <ResetAllModal
+        open={showResetAll}
+        tradesCount={trades.length}
+        lang={lang}
+        onClose={() => setShowResetAll(false)}
+      />
 
       {/* ── HELP MODAL ── */}
       {showHelpModal && <HelpModal onClose={() => setShowHelpModal(false)} />}
