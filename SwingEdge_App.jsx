@@ -1211,6 +1211,16 @@ export default function SwingEdge() {
     try { localStorage.setItem("swingEdgeLang", lang); } catch {}
   }, [lang]);
 
+  // Sync document-level lang/dir so third-party widgets (TradingView, native form
+  // widgets) match the user's selected language. Without this, <html lang="he" dir="rtl">
+  // from index.html stays stale forever after a user picks en/es/pt.
+  useEffect(() => {
+    try {
+      document.documentElement.lang = lang;
+      document.documentElement.dir  = isRTL ? "rtl" : "ltr";
+    } catch {}
+  }, [lang, isRTL]);
+
   // Global live price fetching - fetches for ALL tickers (ribbon + watchlist + open trades + popular)
   const RIBBON_TICKERS = ["NVDA", "AAPL", "TSLA", "MSFT", "META", "AMD", "BTC", "SPY"];
   const fetchLivePrices = useCallback(async () => {
@@ -1980,12 +1990,12 @@ export default function SwingEdge() {
         <div className="relative" ref={profileRef}>
           <button
             onClick={() => setShowProfileDropdown(v => !v)}
-            className="flex items-center gap-2 hover:bg-white/[0.04] active:bg-white/[0.07] rounded-lg px-2 py-1 transition"
+            className="flex items-center gap-2 hover:bg-white/[0.04] active:bg-white/[0.07] rounded-lg px-2 py-1 transition whitespace-nowrap shrink-0"
             aria-label="Open user menu"
           >
             <Logo size={28} showText={false} />
-            <span className="font-bold text-sm tracking-wider text-white">SWING<span className="text-emerald-400">EDGE</span></span>
-            <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-500 border border-cyan-500/20 tracking-widest uppercase">Pro</span>
+            <span className="font-bold text-sm tracking-wider text-white whitespace-nowrap">SWING<span className="text-emerald-400">EDGE</span></span>
+            <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-500 border border-cyan-500/20 tracking-widest uppercase hidden sm:inline">{t.pro}</span>
             <ChevronDown size={13} className={`text-slate-400 transition-transform ${showProfileDropdown ? "rotate-180" : ""}`} />
           </button>
           {showProfileDropdown && (
@@ -2014,42 +2024,42 @@ export default function SwingEdge() {
                     <p className="text-[11px] text-slate-400 mt-0.5 font-mono truncate">{authUser.email}</p>
                   )}
                   <span className="inline-block mt-2 text-[9px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold tracking-wider uppercase">
-                    Beta Tester
+                    {t.betaTester}
                   </span>
                 </div>
 
                 {/* SCROLLABLE BODY */}
                 <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
                   {/* TOOLS */}
-                  <div className="px-2 py-1.5 text-[9px] font-bold tracking-widest uppercase text-slate-500">Tools</div>
-                  <UserMenuItem icon={MessageCircle} label="Send Feedback"  color="text-violet-400" onClick={() => { setTab("feedback"); setShowProfileDropdown(false); }} />
-                  <UserMenuItem icon={Settings}      label={lang === 'he' ? 'הגדרות' : 'Settings'} color="text-cyan-400"    onClick={() => { setTab("settings"); setShowProfileDropdown(false); }} />
-                  <UserMenuItem icon={HelpCircle}    label="Help & Docs"    color="text-blue-400"   onClick={() => { setShowHelpModal(true); setShowProfileDropdown(false); }} />
-                  <UserMenuItem icon={Bell}          label="Notifications"  color="text-amber-400"  onClick={() => { toast.info("Notifications panel coming soon"); setShowProfileDropdown(false); }} />
+                  <div className="px-2 py-1.5 text-[9px] font-bold tracking-widest uppercase text-slate-500">{t.tools}</div>
+                  <UserMenuItem icon={MessageCircle} label={t.sendFeedback}  color="text-violet-400" onClick={() => { setTab("feedback"); setShowProfileDropdown(false); }} />
+                  <UserMenuItem icon={Settings}      label={t.settings}      color="text-cyan-400"    onClick={() => { setTab("settings"); setShowProfileDropdown(false); }} />
+                  <UserMenuItem icon={HelpCircle}    label={t.helpDocs}      color="text-blue-400"   onClick={() => { setShowHelpModal(true); setShowProfileDropdown(false); }} />
+                  <UserMenuItem icon={Bell}          label={t.notifications} color="text-amber-400"  onClick={() => { toast.info(t.notifications); setShowProfileDropdown(false); }} />
                   {pwaPromptEvent && (
-                    <UserMenuItem icon={Smartphone} label="Install App" color="text-cyan-400" onClick={() => { handleInstallPwa(); }} />
+                    <UserMenuItem icon={Smartphone} label={t.installApp} color="text-cyan-400" onClick={() => { handleInstallPwa(); }} />
                   )}
 
                   {isAdmin && (
                     <>
                       <div className="my-1.5 h-px bg-white/[0.06]" />
-                      <div className="px-2 py-1.5 text-[9px] font-bold tracking-widest uppercase text-amber-400">Admin</div>
-                      <UserMenuItem icon={Shield} label="Admin Panel" color="text-amber-300" onClick={() => { setTab("admin"); setShowProfileDropdown(false); }} />
+                      <div className="px-2 py-1.5 text-[9px] font-bold tracking-widest uppercase text-amber-400">{t.admin}</div>
+                      <UserMenuItem icon={Shield} label={t.adminPanel} color="text-amber-300" onClick={() => { setTab("admin"); setShowProfileDropdown(false); }} />
                     </>
                   )}
 
                   <div className="my-1.5 h-px bg-white/[0.06]" />
 
                   {/* ACCOUNT */}
-                  <div className="px-2 py-1.5 text-[9px] font-bold tracking-widest uppercase text-slate-500">Account</div>
-                  <UserMenuItem icon={Lock}       label="Privacy & Security" color="text-slate-300" onClick={() => { setShowPrivacyModal(true); setShowProfileDropdown(false); }} />
-                  <UserMenuItem icon={CreditCard} label="Billing & Plan"     color="text-emerald-400" onClick={() => { setShowBillingModal(true); setShowProfileDropdown(false); }} />
+                  <div className="px-2 py-1.5 text-[9px] font-bold tracking-widest uppercase text-slate-500">{t.account}</div>
+                  <UserMenuItem icon={Lock}       label={t.privacySecurity} color="text-slate-300"   onClick={() => { setShowPrivacyModal(true); setShowProfileDropdown(false); }} />
+                  <UserMenuItem icon={CreditCard} label={t.billingAndPlan}  color="text-emerald-400" onClick={() => { setShowBillingModal(true); setShowProfileDropdown(false); }} />
                   {isSupabaseConfigured && session && (
                     <button
                       onClick={handleLogout}
                       className="w-full h-10 px-3 flex items-center gap-3 rounded-lg hover:bg-rose-500/10 transition-[background-color] duration-150 text-left text-rose-400">
                       <LogOut size={16} />
-                      <span className="text-sm font-semibold flex-1">Logout</span>
+                      <span className="text-sm font-semibold flex-1">{t.logout}</span>
                     </button>
                   )}
                 </div>
@@ -2059,7 +2069,7 @@ export default function SwingEdge() {
         </div>
 
         {/* Status + Account (right side) */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <div
             className="flex items-center gap-1.5"
             title={pricesLastUpdated ? `${t.lastUpdated}: ${pricesLastUpdated.toLocaleTimeString()}` : t.live}
@@ -4312,20 +4322,14 @@ export default function SwingEdge() {
               <div className="bg-[#0d1424] border border-emerald-500/20 rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-4">
                   <span aria-hidden="true" className="text-base">🎨</span>
-                  <h3 className="text-sm font-bold text-white">
-                    {lang === "he" ? "מראה" : "Appearance"}
-                  </h3>
+                  <h3 className="text-sm font-bold text-white">{t.appearance}</h3>
                 </div>
-                <p className="text-xs text-slate-500 mb-3">
-                  {lang === "he"
-                    ? "בחר ערכת נושא: אוטומטי (לפי מערכת ההפעלה), בהיר או כהה."
-                    : "Choose a theme: automatic (matches your OS), light, or dark."}
-                </p>
+                <p className="text-xs text-slate-500 mb-3">{t.appearanceDesc}</p>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { value: "auto",  icon: Monitor, label: lang === "he" ? "אוטומטי" : "Auto",  desc: lang === "he" ? "לפי המערכת" : "System" },
-                    { value: "light", icon: Sun,     label: lang === "he" ? "בהיר"    : "Light" },
-                    { value: "dark",  icon: Moon,    label: lang === "he" ? "כהה"     : "Dark"  },
+                    { value: "auto",  icon: Monitor, label: t.themeAuto,  desc: t.themeSystem },
+                    { value: "light", icon: Sun,     label: t.themeLight },
+                    { value: "dark",  icon: Moon,    label: t.themeDark  },
                   ].map((opt) => {
                     const Icon = opt.icon;
                     const isActive = themeMode === opt.value;
@@ -4355,9 +4359,7 @@ export default function SwingEdge() {
                 </div>
                 {themeMode === "auto" && (
                   <p className="text-xs text-slate-500 mt-3">
-                    {lang === "he"
-                      ? `כרגע: ${themeResolved === "dark" ? "כהה" : "בהיר"} (לפי המערכת)`
-                      : `Currently: ${themeResolved} (system preference)`}
+                    {t.themeCurrentlyLabel} {themeResolved === "dark" ? t.themeDark : t.themeLight} ({t.themeSystemPreference})
                   </p>
                 )}
               </div>
@@ -4376,11 +4378,20 @@ export default function SwingEdge() {
                   className="w-full border border-violet-500/30 rounded-lg px-3 py-2.5 text-sm text-white focus:border-violet-500/60 focus:outline-none transition font-semibold"
                   style={{ background: "#0d1424" }}
                 >
-                  {LANGUAGES.map(l => (
-                    <option key={l.code} value={l.code}>
-                      {l.nativeName} — {l.name}{l.rtl ? " (RTL)" : ""}
-                    </option>
-                  ))}
+                  <optgroup label="★ Primary">
+                    {LANGUAGES.filter(l => l.tier1).map(l => (
+                      <option key={l.code} value={l.code}>
+                        {l.nativeName} — {l.name}{l.rtl ? " (RTL)" : ""}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="── More languages (English fallback)">
+                    {LANGUAGES.filter(l => !l.tier1).map(l => (
+                      <option key={l.code} value={l.code}>
+                        {l.nativeName} — {l.name}{l.rtl ? " (RTL)" : ""}
+                      </option>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
 
@@ -4392,16 +4403,12 @@ export default function SwingEdge() {
                   <div className="bg-[#0d1424] border border-emerald-500/20 rounded-xl p-5">
                     <div className="flex items-center gap-2 mb-4">
                       <KeyRound size={16} className="text-emerald-400" />
-                      <h3 className="text-sm font-bold text-white">
-                        {lang === "he" ? "אבטחה" : "Security"}
-                      </h3>
+                      <h3 className="text-sm font-bold text-white">{t.security}</h3>
                     </div>
                     {isGoogle ? (
                       <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-xl">
                         <p className="text-xs text-slate-300 leading-relaxed">
-                          {lang === "he"
-                            ? "אתה מחובר דרך Google. לשינוי סיסמה — נהל אותה מחשבון Google שלך."
-                            : "You're signed in with Google. To change your password, manage it from your Google account."}
+                          {t.googleSignedInInfo}
                         </p>
                         <a
                           href="https://myaccount.google.com/security"
@@ -4409,16 +4416,14 @@ export default function SwingEdge() {
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 mt-2 text-xs font-semibold text-emerald-400 hover:underline"
                         >
-                          {lang === "he" ? "לחשבון Google" : "Open Google account"}
+                          {t.manageOnGoogle}
                           <ExternalLink size={11} />
                         </a>
                       </div>
                     ) : (
                       <>
                         <p className="text-xs text-slate-500 mb-3">
-                          {lang === "he"
-                            ? "עדכן את סיסמת הכניסה שלך. נדרשת אימות הסיסמה הנוכחית."
-                            : "Update your sign-in password. Current password verification required."}
+                          {t.changePassword}
                         </p>
                         <button
                           type="button"
@@ -4427,9 +4432,9 @@ export default function SwingEdge() {
                         >
                           <span className="flex items-center gap-2">
                             <Lock size={12} />
-                            {lang === "he" ? "שנה סיסמה" : "Change Password"}
+                            {t.changePassword}
                           </span>
-                          <span className="text-slate-400">{lang === "he" ? "←" : "→"}</span>
+                          <span className="text-slate-400">{isRTL ? "←" : "→"}</span>
                         </button>
                       </>
                     )}
