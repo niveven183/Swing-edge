@@ -102,7 +102,56 @@
   }
 }
 
-/* Force light mode — no dark mode */
-:root, [data-theme="dark"], [data-theme="light"] {
-  color-scheme: light;
+:root { color-scheme: light; }
+
+/* ──────────────────────────────────────────────────────────────────
+   DARK THEME — applied via <html class="dark"> (ThemeProvider)
+   Overrides token values; the global restyle layer in index.css
+   maps Tailwind/hex classes to these variables, so dark mode flows
+   through the entire app without per-component dark: variants.
+   ────────────────────────────────────────────────────────────────── */
+.dark {
+  /* ━━━ Surfaces ━━━ */
+  --bg:                #0a0f1e;
+  --bg-elevated:       #131a2c;
+  --surface:           #0d1424;
+  --surface-elevated:  #131a2c;
+  --surface-sunken:    #0a1020;
+  --surface-hover:     #131c2e;
+  --border-soft:       rgba(255,255,255,0.06);
+  --border-medium:     rgba(255,255,255,0.10);
+  --border-strong:     rgba(255,255,255,0.15);
+
+  /* ━━━ Text ━━━ */
+  --text-primary:    #F8FAFC;
+  --text-secondary:  #CBD5E1;
+  --text-tertiary:   #94A3B8;
+  --text-muted:      #64748B;
+  --text-inverse:    #0A0F0B;
+
+  /* ━━━ Accents — slightly brighter for dark backgrounds ━━━ */
+  --accent-emerald:        #10B981;
+  --accent-emerald-bright: #34D399;
+  --accent-emerald-soft:   rgba(16,185,129,0.14);
+  --accent-emerald-mid:    rgba(16,185,129,0.25);
+  --accent-emerald-glow:   rgba(16,185,129,0.35);
+  --accent-rose:           #F43F5E;
+  --accent-rose-soft:      rgba(244,63,94,0.14);
+  --accent-rose-mid:       rgba(244,63,94,0.25);
+  --accent-amber:          #F59E0B;
+  --accent-amber-soft:     rgba(245,158,11,0.14);
+  --accent-indigo:         #818CF8;
+  --accent-indigo-soft:    rgba(129,140,248,0.14);
+  --focus-ring:            rgba(16,185,129,0.55);
+
+  /* ━━━ Shadows (deeper for dark) ━━━ */
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.30);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.30), 0 2px 6px rgba(0,0,0,0.25);
+  --shadow-md: 0 2px 4px rgba(0,0,0,0.35), 0 8px 20px rgba(0,0,0,0.30);
+  --shadow-lg: 0 4px 8px rgba(0,0,0,0.40), 0 16px 40px rgba(0,0,0,0.35);
+  --shadow-glow:
+    0 0 0 1px rgba(16,185,129,0.30),
+    0 4px 16px rgba(16,185,129,0.25);
+
+  color-scheme: dark;
 }

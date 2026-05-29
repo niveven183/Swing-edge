@@ -11,6 +11,8 @@ import IOSInstallBanner from "./src/components/IOSInstallBanner.jsx";
 import AdminPanel from "./src/components/AdminPanel.jsx";
 import EditTradeModal from "./src/components/EditTradeModal.jsx";
 import ResetAllModal from "./src/components/ResetAllModal.jsx";
+import ChangePasswordModal from "./src/components/ChangePasswordModal.jsx";
+import { useTheme } from "./src/contexts/ThemeContext.jsx";
 import TradingViewSearch from "./src/components/TradingViewSearch.jsx";
 import { TVTickerTape, TVMarketOverview } from "./src/components/TradingViewWidgets.jsx";
 import { useToast, useConfirm, Tooltip as UiTooltip } from "./src/components/ToastProvider.jsx";
@@ -30,7 +32,7 @@ import {
   Settings, BookMarked, Thermometer, Trash2, User,
   Download, FileText, Bell, Flame, Globe, LogOut, MessageCircle,
   Shield, Filter, Save, BarChart3, ChevronDown, HelpCircle, Lock,
-  CreditCard, Smartphone, Wrench
+  CreditCard, Smartphone, Wrench, Sun, Moon, Monitor, KeyRound, ExternalLink
 } from "lucide-react";
 import { getTranslations, LANGUAGES, isRTLLang } from "./src/i18n.js";
 import {
@@ -993,10 +995,11 @@ export default function SwingEdge() {
   const [pricesLoading, setPricesLoading] = useState(false);
   const [pricesLastUpdated, setPricesLastUpdated] = useState(null);
 
-  // Light/Dark mode
-  const [lightMode, setLightMode] = useState(() => {
-    try { return localStorage.getItem("swingEdgeLightMode") === "true"; } catch { return false; }
-  });
+  // Theme (auto / light / dark) — driven by ThemeProvider
+  const { mode: themeMode, setMode: setThemeMode, resolved: themeResolved } = useTheme();
+
+  // Change password modal
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   // Edit trade state (modal owns its form; we just track the open trade)
   const [editingTrade, setEditingTrade] = useState(null);
@@ -1778,14 +1781,6 @@ export default function SwingEdge() {
     try { localStorage.setItem("swingEdgeWatchlist", JSON.stringify(updated)); } catch {}
   };
 
-  const toggleLightMode = () => {
-    setLightMode(v => {
-      const next = !v;
-      try { localStorage.setItem("swingEdgeLightMode", String(next)); } catch {}
-      return next;
-    });
-  };
-
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -1950,7 +1945,7 @@ export default function SwingEdge() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0f1e] text-slate-200 font-sans flex flex-col" data-theme={lightMode ? "light" : "dark"} dir={isRTL ? "rtl" : "ltr"} style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
+    <div className="min-h-screen bg-[#0a0f1e] text-slate-200 font-sans flex flex-col" dir={isRTL ? "rtl" : "ltr"} style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
 
       {/* ── BETA WELCOME (first login only) ── */}
       {showBetaWelcome && (
@@ -2025,23 +2020,14 @@ export default function SwingEdge() {
 
                 {/* SCROLLABLE BODY */}
                 <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
-                  {/* NAVIGATION */}
-                  <div className="px-2 py-1.5 text-[9px] font-bold tracking-widest uppercase text-slate-500">Navigation</div>
-                  <UserMenuItem icon={LayoutDashboard} label="Dashboard"     color="text-cyan-400"   onClick={() => { setTab("dashboard"); setShowProfileDropdown(false); }} />
-                  <UserMenuItem icon={BookOpen}        label="Journal"       color="text-violet-400" onClick={() => { setTab("journal");   setShowProfileDropdown(false); }} />
-                  <UserMenuItem icon={FlaskConical}    label="AI Coach"      color="text-amber-400"  onClick={() => { setTab("analyzer");  setShowProfileDropdown(false); }} />
-                  <UserMenuItem icon={BarChart2}       label="Analytics"     color="text-emerald-400" onClick={() => { setTab("analytics"); setShowProfileDropdown(false); }} />
-                  <UserMenuItem icon={BookMarked}      label="Playbook"      color="text-pink-400"   onClick={() => { setTab("settings");  setShowProfileDropdown(false); }} />
-                  <UserMenuItem icon={Thermometer}    label="Risk Center"   color="text-rose-400"   onClick={() => { setTab("settings");  setShowProfileDropdown(false); }} />
-
-                  <div className="my-1.5 h-px bg-white/[0.06]" />
-
                   {/* TOOLS */}
                   <div className="px-2 py-1.5 text-[9px] font-bold tracking-widest uppercase text-slate-500">Tools</div>
-                  <UserMenuItem icon={Settings}      label="Settings"       color="text-cyan-400"   onClick={() => { setTab("settings"); setShowProfileDropdown(false); }} />
                   <UserMenuItem icon={MessageCircle} label="Send Feedback"  color="text-violet-400" onClick={() => { setTab("feedback"); setShowProfileDropdown(false); }} />
                   <UserMenuItem icon={HelpCircle}    label="Help & Docs"    color="text-blue-400"   onClick={() => { setShowHelpModal(true); setShowProfileDropdown(false); }} />
                   <UserMenuItem icon={Bell}          label="Notifications"  color="text-amber-400"  onClick={() => { toast.info("Notifications panel coming soon"); setShowProfileDropdown(false); }} />
+                  {pwaPromptEvent && (
+                    <UserMenuItem icon={Smartphone} label="Install App" color="text-cyan-400" onClick={() => { handleInstallPwa(); }} />
+                  )}
 
                   {isAdmin && (
                     <>
@@ -2049,36 +2035,6 @@ export default function SwingEdge() {
                       <div className="px-2 py-1.5 text-[9px] font-bold tracking-widest uppercase text-amber-400">Admin</div>
                       <UserMenuItem icon={Shield} label="Admin Panel" color="text-amber-300" onClick={() => { setTab("admin"); setShowProfileDropdown(false); }} />
                     </>
-                  )}
-
-                  <div className="my-1.5 h-px bg-white/[0.06]" />
-
-                  {/* PREFERENCES */}
-                  <div className="px-2 py-1.5 text-[9px] font-bold tracking-widest uppercase text-slate-500">Preferences</div>
-                  <div className="px-3 py-2 rounded-lg flex items-center gap-3">
-                    <Globe size={16} className="text-violet-400" />
-                    <span className="text-sm text-slate-300 flex-1">Language</span>
-                    <select
-                      value={lang}
-                      onChange={e => setLang(e.target.value)}
-                      dir="ltr"
-                      onClick={e => e.stopPropagation()}
-                      className="bg-white/5 border border-white/10 rounded px-2 py-1 text-[11px] text-white focus:outline-none"
-                    >
-                      {LANGUAGES.map(l => (
-                        <option key={l.code} value={l.code}>{l.nativeName}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <button
-                    onClick={() => { toggleLightMode(); }}
-                    className="w-full h-10 px-3 flex items-center gap-3 rounded-lg hover:bg-[#1a2235] transition-[background-color] duration-150 text-left">
-                    <span className="text-base w-4 text-center">{lightMode ? "🌙" : "☀️"}</span>
-                    <span className="text-sm text-slate-300 flex-1">Theme</span>
-                    <span className="text-[11px] text-slate-500 font-mono">{lightMode ? "Light" : "Dark"}</span>
-                  </button>
-                  {pwaPromptEvent && (
-                    <UserMenuItem icon={Smartphone} label="Install App" color="text-cyan-400" onClick={() => { handleInstallPwa(); }} />
                   )}
 
                   <div className="my-1.5 h-px bg-white/[0.06]" />
@@ -4351,6 +4307,60 @@ export default function SwingEdge() {
                 <p className="text-xs text-slate-600 mt-0.5">{t.playbookAndDiscipline}</p>
               </div>
 
+              {/* ── APPEARANCE (Theme) ── */}
+              <div className="bg-[#0d1424] border border-emerald-500/20 rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <span aria-hidden="true" className="text-base">🎨</span>
+                  <h3 className="text-sm font-bold text-white">
+                    {lang === "he" ? "מראה" : "Appearance"}
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-500 mb-3">
+                  {lang === "he"
+                    ? "בחר ערכת נושא: אוטומטי (לפי מערכת ההפעלה), בהיר או כהה."
+                    : "Choose a theme: automatic (matches your OS), light, or dark."}
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: "auto",  icon: Monitor, label: lang === "he" ? "אוטומטי" : "Auto",  desc: lang === "he" ? "לפי המערכת" : "System" },
+                    { value: "light", icon: Sun,     label: lang === "he" ? "בהיר"    : "Light" },
+                    { value: "dark",  icon: Moon,    label: lang === "he" ? "כהה"     : "Dark"  },
+                  ].map((opt) => {
+                    const Icon = opt.icon;
+                    const isActive = themeMode === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setThemeMode(opt.value)}
+                        aria-label={opt.label}
+                        aria-pressed={isActive}
+                        className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl border-2 transition-all ${
+                          isActive
+                            ? "border-emerald-500 bg-emerald-500/10"
+                            : "border-white/10 hover:border-white/20"
+                        }`}
+                      >
+                        <Icon size={18} className={isActive ? "text-emerald-400" : "text-slate-400"} />
+                        <span className={`text-xs font-semibold ${isActive ? "text-emerald-300" : "text-slate-300"}`}>
+                          {opt.label}
+                        </span>
+                        {opt.desc && (
+                          <span className="text-[10px] text-slate-500">{opt.desc}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                {themeMode === "auto" && (
+                  <p className="text-xs text-slate-500 mt-3">
+                    {lang === "he"
+                      ? `כרגע: ${themeResolved === "dark" ? "כהה" : "בהיר"} (לפי המערכת)`
+                      : `Currently: ${themeResolved} (system preference)`}
+                  </p>
+                )}
+              </div>
+
               {/* ── LANGUAGE SELECTOR ── */}
               <div className="bg-[#0d1424] border border-violet-500/20 rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-4">
@@ -4372,6 +4382,59 @@ export default function SwingEdge() {
                   ))}
                 </select>
               </div>
+
+              {/* ── SECURITY (Change Password) ── */}
+              {(() => {
+                const provider = authUser?.app_metadata?.provider || "email";
+                const isGoogle = provider === "google";
+                return (
+                  <div className="bg-[#0d1424] border border-emerald-500/20 rounded-xl p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <KeyRound size={16} className="text-emerald-400" />
+                      <h3 className="text-sm font-bold text-white">
+                        {lang === "he" ? "אבטחה" : "Security"}
+                      </h3>
+                    </div>
+                    {isGoogle ? (
+                      <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          {lang === "he"
+                            ? "אתה מחובר דרך Google. לשינוי סיסמה — נהל אותה מחשבון Google שלך."
+                            : "You're signed in with Google. To change your password, manage it from your Google account."}
+                        </p>
+                        <a
+                          href="https://myaccount.google.com/security"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 mt-2 text-xs font-semibold text-emerald-400 hover:underline"
+                        >
+                          {lang === "he" ? "לחשבון Google" : "Open Google account"}
+                          <ExternalLink size={11} />
+                        </a>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-xs text-slate-500 mb-3">
+                          {lang === "he"
+                            ? "עדכן את סיסמת הכניסה שלך. נדרשת אימות הסיסמה הנוכחית."
+                            : "Update your sign-in password. Current password verification required."}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setShowChangePassword(true)}
+                          className="w-full px-4 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-bold hover:bg-emerald-500/20 transition flex items-center justify-between"
+                        >
+                          <span className="flex items-center gap-2">
+                            <Lock size={12} />
+                            {lang === "he" ? "שנה סיסמה" : "Change Password"}
+                          </span>
+                          <span className="text-slate-400">{lang === "he" ? "←" : "→"}</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* ── PORTFOLIO CAPITAL ── */}
               <div className="bg-[#0d1424] border border-cyan-500/20 rounded-xl p-5">
@@ -5098,6 +5161,13 @@ export default function SwingEdge() {
 
       {/* ── BILLING MODAL ── */}
       {showBillingModal && <BillingModal onClose={() => setShowBillingModal(false)} />}
+
+      {/* ── CHANGE PASSWORD MODAL ── */}
+      <ChangePasswordModal
+        open={showChangePassword}
+        onClose={() => setShowChangePassword(false)}
+        lang={lang}
+      />
 
       {/* ── FLOATING NEW TRADE BUTTON ── */}
       <button

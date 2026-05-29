@@ -49,6 +49,10 @@ html, body, #root {
   -moz-osx-font-smoothing: grayscale;
 }
 
+html, body {
+  transition: background-color 200ms ease, color 200ms ease;
+}
+
 [dir="rtl"] body, html[lang="he"] body {
   font-family: var(--font-hebrew);
 }

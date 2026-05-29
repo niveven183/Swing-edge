@@ -4,6 +4,7 @@ import * as Sentry from "@sentry/react";
 import "./index.css";
 import SwingEdge from "../SwingEdge_App.jsx";
 import { ToastProvider, ConfirmProvider } from "./components/ToastProvider.jsx";
+import { ThemeProvider } from "./contexts/ThemeContext.jsx";
 
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN,
@@ -16,11 +17,13 @@ Sentry.init({
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <Sentry.ErrorBoundary fallback={<p>משהו השתבש. רענן את הדף.</p>}>
-      <ToastProvider>
-        <ConfirmProvider>
-          <SwingEdge />
-        </ConfirmProvider>
-      </ToastProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          <ConfirmProvider>
+            <SwingEdge />
+          </ConfirmProvider>
+        </ToastProvider>
+      </ThemeProvider>
     </Sentry.ErrorBoundary>
   </StrictMode>
 );
