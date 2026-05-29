@@ -2023,6 +2023,7 @@ export default function SwingEdge() {
                   {/* TOOLS */}
                   <div className="px-2 py-1.5 text-[9px] font-bold tracking-widest uppercase text-slate-500">Tools</div>
                   <UserMenuItem icon={MessageCircle} label="Send Feedback"  color="text-violet-400" onClick={() => { setTab("feedback"); setShowProfileDropdown(false); }} />
+                  <UserMenuItem icon={Settings}      label={lang === 'he' ? 'הגדרות' : 'Settings'} color="text-cyan-400"    onClick={() => { setTab("settings"); setShowProfileDropdown(false); }} />
                   <UserMenuItem icon={HelpCircle}    label="Help & Docs"    color="text-blue-400"   onClick={() => { setShowHelpModal(true); setShowProfileDropdown(false); }} />
                   <UserMenuItem icon={Bell}          label="Notifications"  color="text-amber-400"  onClick={() => { toast.info("Notifications panel coming soon"); setShowProfileDropdown(false); }} />
                   {pwaPromptEvent && (
