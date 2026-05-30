@@ -50,6 +50,7 @@ import InfoTooltip from "./src/components/ui/InfoTooltip.jsx";
 import { TRADING_TOOLTIPS } from "./src/data/tooltips.js";
 import { TradeCalendar } from "./src/components/TradeCalendar.jsx";
 import { AdaptiveLessons } from "./src/intelligence/core/AdaptiveLessons.js";
+import GrowthPredictor from "./src/components/GrowthPredictor.jsx";
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const RISK_PCT = 0.01;
 
@@ -2176,6 +2177,14 @@ export default function SwingEdge() {
               />
               <RegimeIndicator regime={aiRegime} lang={lang} />
             </div>
+
+            {/* ══ GROWTH PREDICTOR — 3 questions + 24mo compound forecast ══ */}
+            <GrowthPredictor
+              trades={realTrades}
+              stats={stats}
+              capital={capital}
+              lang={lang}
+            />
 
             {/* Top Edge & Anti-Edge */}
             {(aiEdges?.topEdge || aiEdges?.topAntiEdge) && (
