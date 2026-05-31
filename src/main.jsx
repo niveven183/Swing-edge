@@ -4,6 +4,8 @@ import "./index.css";
 import SwingEdge from "../SwingEdge_App.jsx";
 import { ToastProvider, ConfirmProvider } from "./components/ToastProvider.jsx";
 
+console.info('[SwingEdge] Build v1.0.1 — ' + new Date().toISOString());
+
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <ToastProvider>
