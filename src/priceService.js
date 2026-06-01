@@ -162,7 +162,8 @@ const fetchOneQuote = async (yahooSymbol) => {
       postMarketPrice,
       marketState: state,
     };
-  } catch {
+  } catch (e) {
+    console.warn(`[priceService] fetchOneQuote failed for ${yahooSymbol}:`, e?.message || e);
     return null;
   }
 };

@@ -58,7 +58,7 @@ export const isRevengeWindow = (trades, nowTs = Date.now(), minutes = 30) => {
 // Count of trades opened on the same calendar date (local time).
 export const tradesToday = (trades, now = new Date()) => {
   const ymd = now.toISOString().slice(0, 10);
-  return (trades || []).filter(t => (t.date || "").slice(0, 10) === ymd).length;
+  return (trades || []).filter(t => !t.isDemo && (t.date || "").slice(0, 10) === ymd).length;
 };
 
 // Detect late-night trades (outside 07:00-22:59 local).

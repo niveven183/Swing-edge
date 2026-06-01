@@ -1,17 +1,26 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import OnboardingScreen from "./src/components/OnboardingScreen.jsx";
 import AuthScreen from "./src/components/AuthScreen.jsx";
+import Logo from "./src/components/Logo.jsx";
+import HelpModal from "./src/components/HelpModal.jsx";
+import PrivacyModal from "./src/components/PrivacyModal.jsx";
+import BillingModal from "./src/components/BillingModal.jsx";
 import BetaWelcome from "./src/components/BetaWelcome.jsx";
 import FeedbackTab from "./src/components/FeedbackTab.jsx";
 import IOSInstallBanner from "./src/components/IOSInstallBanner.jsx";
 import AdminPanel from "./src/components/AdminPanel.jsx";
+import EditTradeModal from "./src/components/EditTradeModal.jsx";
+import ResetAllModal from "./src/components/ResetAllModal.jsx";
+import ChangePasswordModal from "./src/components/ChangePasswordModal.jsx";
+import { useTheme } from "./src/contexts/ThemeContext.jsx";
 import TradingViewSearch from "./src/components/TradingViewSearch.jsx";
 import { TVTickerTape, TVMarketOverview } from "./src/components/TradingViewWidgets.jsx";
 import { useToast, useConfirm, Tooltip as UiTooltip } from "./src/components/ToastProvider.jsx";
-import { supabase, isSupabaseConfigured } from "./src/supabaseClient.js";
+import { supabase, isSupabaseConfigured, tradeForSupabase } from "./src/supabaseClient.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell
+  ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell,
+  ScatterChart, Scatter
 } from "recharts";
 import {
   LayoutDashboard, BookOpen, BarChart2, Rss,
@@ -23,7 +32,7 @@ import {
   Settings, BookMarked, Thermometer, Trash2, User,
   Download, FileText, Bell, Flame, Globe, LogOut, MessageCircle,
   Shield, Filter, Save, BarChart3, ChevronDown, HelpCircle, Lock,
-  CreditCard, Smartphone
+  CreditCard, Smartphone, Wrench, Sun, Moon, Monitor, KeyRound, ExternalLink
 } from "lucide-react";
 import { getTranslations, LANGUAGES, isRTLLang } from "./src/i18n.js";
 import {
@@ -31,11 +40,17 @@ import {
   fetchQuote, getMarketState, getMarketStateBadge, getRefreshInterval, MARKET_STATE,
 } from "./src/priceService.js";
 import { analyzeTradeLocal, analyzeTradeLocalText } from "./src/localAI.js";
+import { POPULAR_TICKERS as STATIC_TICKERS, getTickerMeta, searchTickers as searchStaticTickers } from "./src/data/tickers.js";
 import { SwingEdgeAI } from "./src/intelligence/SwingEdgeAI.js";
 import {
   DNACard, EdgeCard, DecisionCoachPanel, TiltShield, GrowthChart, RegimeIndicator,
 } from "./src/intelligence/ui/IntelligenceUI.jsx";
-
+import { useTradingStats } from "./src/hooks/useTradingStats.js";
+import InfoTooltip from "./src/components/ui/InfoTooltip.jsx";
+import { TRADING_TOOLTIPS } from "./src/data/tooltips.js";
+import { TradeCalendar } from "./src/components/TradeCalendar.jsx";
+import { AdaptiveLessons } from "./src/intelligence/core/AdaptiveLessons.js";
+import GrowthPredictor from "./src/components/GrowthPredictor.jsx";
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const RISK_PCT = 0.01;
 
@@ -51,6 +66,67 @@ const SECTOR_ETFS = [
 ];
 
 const MOCK_TRADES = [];
+
+// ─── TRADE DATA SANITIZER ────────────────────────────────────────────────────
+// Cleans legacy localStorage entries: maps Hive/SIM setup codes to friendly
+// names, normalizes invalid emotions, strips SIM- ticker prefix, and flags
+// demo trades.
+function cleanTrades(trades) {
+  const SETUP_MAP = {
+    'Hive-S1_premarket': 'Gap and Go',
+    'Hive-S2_open': 'ORB Breakout',
+    'Hive-S3_midday': 'Bull Flag',
+    'Hive-S4_close': 'Power Hour Break',
+    'Hive-S5_postmarket': 'Earnings Gap Play',
+    'Hive-setup': 'Breakout',
+    'Hive-Earnings Gap Play': 'Earnings Gap Play',
+    'Hive-Overnight Reversal': 'Overnight Reversal',
+    'Hive-MOC Fade': 'MOC Fade',
+    'Hive-Power Hour Break': 'Power Hour Break',
+    'Hive-Gap and Go': 'Gap and Go',
+    'Hive-Overnight Hold': 'Overnight Hold',
+    'SIM-PREMARKET': 'Gap and Go',
+    'SIM-OPEN': 'ORB Breakout',
+    'SIM-MIDDAY': 'Bull Flag',
+    'SIM-CLOSE': 'Power Hour Break',
+    'SIM-POSTMARKET': 'Earnings Gap Play',
+    'SIM-SETUPTEST': 'Breakout',
+    '50 EMA Bounce': 'EMA Bounce 50',
+    'Revenge Trade': 'Range Breakout'
+  };
+  const VALID_EMOTIONS = ['Confident','Calm','FOMO','Angry','Neutral','Hesitant','Patient'];
+  if (!Array.isArray(trades)) return trades;
+  return trades.map(t => {
+    const isSimTicker = typeof t.ticker === 'string' && t.ticker.startsWith('SIM-');
+    const isHiveSetup = typeof t.setup === 'string' && t.setup.startsWith('Hive-');
+    return {
+      ...t,
+      ticker: isSimTicker ? t.ticker.replace('SIM-', '') : t.ticker,
+      setup: SETUP_MAP[t.setup] || t.setup,
+      emotionAtEntry: VALID_EMOTIONS.includes(t.emotionAtEntry) ? t.emotionAtEntry : 'Neutral',
+      isDemo: t.isDemo || isSimTicker || isHiveSetup || false,
+    };
+  });
+}
+
+function purgeInvalidTrades(trades) {
+  const FAKE_TICKERS = [
+    'PREMARKET','CLOSE','OPEN','MIDDAY',
+    'POSTMARKET','SETUPTEST'
+  ];
+  const VALID_MARKETS_MAP = {
+    'Trend': 'Trending Up',
+    'Unknown': 'Sideways',
+    'Mixed': 'Volatile'
+  };
+  if (!Array.isArray(trades)) return trades;
+  return trades
+    .filter(t => !FAKE_TICKERS.includes(t.ticker))
+    .map(t => ({
+      ...t,
+      marketCondition: VALID_MARKETS_MAP[t.marketCondition] || t.marketCondition
+    }));
+}
 
 // ─── DEMO TRADES (loaded via Settings/Journal → "Load Demo Trades") ───────
 // 30 trades · ~22 WIN · ~8 LOSS · Win rate ~73% · Mar 18 – Apr 24, 2026.
@@ -393,12 +469,16 @@ const SCANNER_DATA = [
 const generateEquityCurve = (cap, trades = []) => {
   let balance = cap;
   const data = [];
-  trades.filter(t => t.status === "CLOSED").forEach(t => {
+  const sortedTrades = [...trades]
+    .filter(t => t.status === "CLOSED")
+    .sort((a, b) => new Date(a.date || a.exitDate) - new Date(b.date || b.exitDate));
+  sortedTrades.forEach(t => {
     const pnl = t.side === "LONG"
       ? (t.exit - t.entry) * t.shares
       : (t.entry - t.exit) * t.shares;
     balance += pnl;
-    data.push({ date: t.date, equity: Math.round(balance), ticker: t.ticker, pnl: Math.round(pnl) });
+    const d = t.date || t.exitDate;
+    data.push({ date: d, equity: Math.round(balance), ticker: t.ticker, pnl: Math.round(pnl) });
   });
   return [{ date: "2025-01-01", equity: cap, ticker: "START", pnl: 0 }, ...data];
 };
@@ -848,8 +928,7 @@ const RibbonTicker = ({ item }) => {
 const NAV_KEYS = [
   { id: "dashboard", key: "dashboard",      icon: LayoutDashboard },
   { id: "journal",   key: "journal",        icon: BookOpen },
-  { id: "analyzer",  key: "tradeAnalyzer",  icon: FlaskConical },
-  { id: "position",  key: "positionCalc",   icon: Calculator },
+  { id: "tools",     key: "tools",           icon: Wrench },
   { id: "analytics", key: "analytics",      icon: BarChart2 },
   { id: "intel",     key: "marketIntel",    icon: Rss },
   { id: "feedback",  key: "feedback",       icon: MessageCircle },
@@ -971,10 +1050,23 @@ export default function SwingEdge() {
     } catch {}
     return "dashboard";
   });
+  useEffect(() => {
+    try { localStorage.removeItem("swingEdgeDashboardVariant"); } catch {}
+  }, []);
+  const [toolsTab, setToolsTab] = useState('analyzer');
+  useEffect(() => {
+    if (tab === 'analyzer' || tab === 'position') {
+      setToolsTab(tab === 'position' ? 'calc' : 'analyzer');
+      setTab('tools');
+    }
+  }, [tab]);
   const [trades, setTrades] = useState(() => {
     try {
       const saved = localStorage.getItem("swingEdgeTrades");
-      return saved ? JSON.parse(saved) : MOCK_TRADES;
+      const parsed = saved ? JSON.parse(saved) : MOCK_TRADES;
+      const cleaned = purgeInvalidTrades(cleanTrades(parsed));
+      try { localStorage.setItem("swingEdgeTrades", JSON.stringify(cleaned)); } catch {}
+      return cleaned;
     } catch { return MOCK_TRADES; }
   });
   const [chartSymbol, setChartSymbol] = useState("NASDAQ:NVDA");
@@ -1053,21 +1145,21 @@ export default function SwingEdge() {
   const [pricesLoading, setPricesLoading] = useState(false);
   const [pricesLastUpdated, setPricesLastUpdated] = useState(null);
 
-  // Light/Dark mode
-  const [lightMode, setLightMode] = useState(() => {
-    try { return localStorage.getItem("swingEdgeLightMode") === "true"; } catch { return false; }
-  });
+  // Theme (auto / light / dark) — driven by ThemeProvider
+  const { mode: themeMode, setMode: setThemeMode, resolved: themeResolved } = useTheme();
 
-  // Edit trade state
-  const [showEditForm, setShowEditForm] = useState(false);
+  // Change password modal
+  const [showChangePassword, setShowChangePassword] = useState(false);
+
+  // Edit trade state (modal owns its form; we just track the open trade)
   const [editingTrade, setEditingTrade] = useState(null);
-  const [editForm, setEditForm] = useState({
-    ticker: "", side: "LONG", entry: "", stop: "", target: "", shares: "",
-    setup: "Breakout", notes: "", marketCondition: "Trending Up",
-    emotionAtEntry: "Neutral", entryQuality: 3, status: "OPEN",
-    exit: "", exitReason: "Hit Target", followedPlan: null, lessonLearned: "",
-    maxFavorable: "", maxAdverse: "",
-  });
+  const showEditForm = editingTrade != null;
+
+  // Bulk selection state for the Journal table
+  const [selectedTrades, setSelectedTrades] = useState(() => new Set());
+
+  // Reset-all (Danger Zone) modal toggle
+  const [showResetAll, setShowResetAll] = useState(false);
 
   // Watchlist state
   const DEFAULT_WATCHLIST = [
@@ -1088,6 +1180,41 @@ export default function SwingEdge() {
     ticker: "", setup: "all", result: "all", from: "", to: "", rMin: "", rMax: "",
   });
   const [showJournalFilters, setShowJournalFilters] = useState(false);
+  const [journalView, setJournalView] = useState('table');
+
+  // ── Load trades: Supabase is source of truth; localStorage is fallback ──
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase || !authUser?.id) return;
+    let cancelled = false;
+    const loadTrades = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("trades")
+          .select("*")
+          .eq("user_id", authUser.id)
+          .order("date", { ascending: false });
+        if (cancelled) return;
+        if (error) {
+          console.error("Error loading trades from Supabase:", error);
+          try {
+            const local = localStorage.getItem("swingEdgeTrades");
+            if (local) {
+              const cleaned = purgeInvalidTrades(cleanTrades(JSON.parse(local)));
+              setTrades(cleaned);
+            }
+          } catch {}
+          return;
+        }
+        // REPLACE — not merge
+        const cleaned = purgeInvalidTrades(cleanTrades(data || []));
+        setTrades(cleaned);
+      } catch (e) {
+        console.error("Supabase load failed:", e);
+      }
+    };
+    loadTrades();
+    return () => { cancelled = true; };
+  }, [authUser?.id]);
 
   // Persist trades to localStorage
   useEffect(() => {
@@ -1159,7 +1286,7 @@ export default function SwingEdge() {
       if (e.key === "Escape") {
         if (showForm) setShowForm(false);
         if (showCloseForm) { setShowCloseForm(false); setClosingTrade(null); }
-        if (showEditForm) { setShowEditForm(false); setEditingTrade(null); }
+        if (showEditForm) { setEditingTrade(null); }
         if (showProfileDropdown) setShowProfileDropdown(false);
         return;
       }
@@ -1234,6 +1361,16 @@ export default function SwingEdge() {
     try { localStorage.setItem("swingEdgeLang", lang); } catch {}
   }, [lang]);
 
+  // Sync document-level lang/dir so third-party widgets (TradingView, native form
+  // widgets) match the user's selected language. Without this, <html lang="he" dir="rtl">
+  // from index.html stays stale forever after a user picks en/es/pt.
+  useEffect(() => {
+    try {
+      document.documentElement.lang = lang;
+      document.documentElement.dir  = isRTL ? "rtl" : "ltr";
+    } catch {}
+  }, [lang, isRTL]);
+
   // Global live price fetching - fetches for ALL tickers (ribbon + watchlist + open trades + popular)
   const RIBBON_TICKERS = ["NVDA", "AAPL", "TSLA", "MSFT", "META", "AMD", "BTC", "SPY"];
   const fetchLivePrices = useCallback(async () => {
@@ -1302,26 +1439,35 @@ export default function SwingEdge() {
     };
   }, [fetchLivePrices, marketState]);
 
-  // Watchlist search handler — dynamic Yahoo Finance search with live prices
+  // Watchlist search handler — instant local suggestions + Yahoo Finance fallback
   const handleWatchlistSearch = useCallback((query) => {
     setWatchlistInput(query.toUpperCase());
     if (watchlistSearchTimeout.current) clearTimeout(watchlistSearchTimeout.current);
     if (query.length < 1) { setWatchlistSearchResults(POPULAR_TICKERS); return; }
+    // Show instant local results immediately (no API wait)
+    const staticResults = searchStaticTickers(query).map(t => ({
+      symbol: t.symbol,
+      name: t.name,
+      type: t.sector === 'Crypto' ? 'CRYPTOCURRENCY' : t.sector === 'ETF' ? 'ETF' : 'EQUITY',
+      exchange: 'NASDAQ',
+    }));
+    if (staticResults.length > 0) setWatchlistSearchResults(staticResults);
     setWatchlistSearching(true);
+    // Then override with Yahoo Finance results after debounce
     watchlistSearchTimeout.current = setTimeout(async () => {
-      const results = await searchTickers(query);
-      const final = results.length > 0 ? results : POPULAR_TICKERS;
-      setWatchlistSearchResults(final);
+      try {
+        const results = await searchTickers(query);
+        const final = results.length > 0 ? results : (staticResults.length > 0 ? staticResults : POPULAR_TICKERS);
+        setWatchlistSearchResults(final);
+        // Pre-fetch prices for the first few results so each row can show its price
+        const topSyms = final.slice(0, 8).map(r => r.symbol.replace("-USD", ""));
+        if (topSyms.length > 0) {
+          fetchPrices(topSyms).then(priceData => {
+            if (Object.keys(priceData).length > 0) setLivePrices(prev => ({ ...prev, ...priceData }));
+          });
+        }
+      } catch {}
       setWatchlistSearching(false);
-      // Pre-fetch prices for the first few results so each row can show its price
-      const topSyms = final.slice(0, 8).map(r => r.symbol.replace("-USD", ""));
-      if (topSyms.length > 0) {
-        fetchPrices(topSyms).then(priceData => {
-          if (Object.keys(priceData).length > 0) {
-            setLivePrices(prev => ({ ...prev, ...priceData }));
-          }
-        });
-      }
     }, 300);
   }, []);
 
@@ -1331,13 +1477,19 @@ export default function SwingEdge() {
     }
   }, [watchlistInput]);
 
-  const equityCurve = useMemo(() => generateEquityCurve(capital, trades), [trades, capital]);
-  const closedTrades = trades.filter(t => t.status === "CLOSED");
-  const openTrades   = trades.filter(t => t.status === "OPEN");
+  const realTrades = useMemo(() => trades.filter(t => !t.isDemo), [trades]);
+  const demoTrades = useMemo(() => trades.filter(t => t.isDemo), [trades]);
+  const equityCurve = useMemo(() => generateEquityCurve(capital, realTrades), [realTrades, capital]);
+  const closedTrades = realTrades.filter(t => t.status === "CLOSED");
+  const openTrades   = realTrades.filter(t => t.status === "OPEN");
 
-  const totalPnL   = closedTrades.reduce((a, t) => a + (calcTradeMetrics(t).pnl || 0), 0);
-  const winRate    = closedTrades.length ? closedTrades.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length / closedTrades.length * 100 : 0;
-  const avgR       = closedTrades.length ? closedTrades.reduce((a, t) => a + (calcTradeMetrics(t).rMultiple || 0), 0) / closedTrades.length : 0;
+  // Stable reference for the pure calcTradeMetrics function — prevents
+  // useTradingStats from re-running its useMemo on every render.
+  const stableCalcTradeMetrics = useCallback(calcTradeMetrics, []);
+
+  // ─── MASTER STATS HUB — single source of truth ──────────────────────────────
+  const stats = useTradingStats(realTrades, capital, stableCalcTradeMetrics);
+  const { totalPnL, winRate, avgR } = stats;
 
   // ─── JOURNAL PRO: filtered view + stats ─────────────────────────────────────
   const holdTimeDays = (t) => {
@@ -1370,36 +1522,13 @@ export default function SwingEdge() {
     });
   }, [trades, journalFilters]);
 
-  const journalStats = useMemo(() => {
-    const closed = filteredTrades.filter(t => t.status === "CLOSED");
-    if (closed.length === 0) {
-      return { total: 0, wins: 0, losses: 0, winRate: 0, avgWin: 0, avgLoss: 0, profitFactor: 0, maxDD: 0, avgHold: 0, totalPnL: 0 };
-    }
-    const pnls = closed.map(t => calcTradeMetrics(t).pnl || 0);
-    const wins = pnls.filter(p => p > 0);
-    const losses = pnls.filter(p => p < 0);
-    const avgWin = wins.length ? wins.reduce((a, b) => a + b, 0) / wins.length : 0;
-    const avgLoss = losses.length ? losses.reduce((a, b) => a + b, 0) / losses.length : 0;
-    const sumWins = wins.reduce((a, b) => a + b, 0);
-    const sumLosses = Math.abs(losses.reduce((a, b) => a + b, 0));
-    const profitFactor = sumLosses > 0 ? sumWins / sumLosses : (sumWins > 0 ? Infinity : 0);
-    // Max drawdown on running equity from these trades
-    let peak = 0, equity = 0, maxDD = 0;
-    pnls.forEach(p => { equity += p; if (equity > peak) peak = equity; const dd = peak - equity; if (dd > maxDD) maxDD = dd; });
-    const holds = closed.map(holdTimeDays).filter(d => typeof d === "number");
-    const avgHold = holds.length ? holds.reduce((a, b) => a + b, 0) / holds.length : 0;
-    return {
-      total: closed.length,
-      wins: wins.length,
-      losses: losses.length,
-      winRate: (wins.length / closed.length) * 100,
-      avgWin, avgLoss,
-      profitFactor,
-      maxDD,
-      avgHold,
-      totalPnL: pnls.reduce((a, b) => a + b, 0),
-    };
-  }, [filteredTrades]);
+  // journalStats — same hub, scoped to the user's journal filters.
+  // Stats exclude demo trades; the table itself still renders them with a badge.
+  const filteredRealTrades = useMemo(
+    () => filteredTrades.filter(t => !t.isDemo),
+    [filteredTrades]
+  );
+  const journalStats = useTradingStats(filteredRealTrades, capital, stableCalcTradeMetrics);
 
   const uniqueSetups = useMemo(() => {
     const s = new Set(trades.map(t => t.setup).filter(Boolean));
@@ -1409,12 +1538,12 @@ export default function SwingEdge() {
   // ─── SWINGEDGE AI REPORTS ──────────────────────────────────────────────────
   // Memoised against the trades reference — the orchestrator also has an
   // internal WeakMap cache so repeated reads are effectively free.
-  const aiDNA          = useMemo(() => SwingEdgeAI.getDNA(trades),          [trades]);
-  const aiEdges        = useMemo(() => SwingEdgeAI.getEdges(trades),        [trades]);
-  const aiRegime       = useMemo(() => SwingEdgeAI.getRegime(trades),       [trades]);
-  const aiGrowth       = useMemo(() => SwingEdgeAI.getGrowth(trades),       [trades]);
-  const aiEvolution    = useMemo(() => SwingEdgeAI.getEvolution(trades, 6), [trades]);
-  const aiGrowthReport = useMemo(() => SwingEdgeAI.getGrowthReport(trades), [trades]);
+  const aiDNA          = useMemo(() => SwingEdgeAI.getDNA(realTrades),          [realTrades]);
+  const aiEdges        = useMemo(() => SwingEdgeAI.getEdges(realTrades),        [realTrades]);
+  const aiRegime       = useMemo(() => SwingEdgeAI.getRegime(realTrades),       [realTrades]);
+  const aiGrowth       = useMemo(() => SwingEdgeAI.getGrowth(realTrades),       [realTrades]);
+  const aiEvolution    = useMemo(() => SwingEdgeAI.getEvolution(realTrades, 6), [realTrades]);
+  const aiGrowthReport = useMemo(() => SwingEdgeAI.getGrowthReport(realTrades), [realTrades]);
 
   // Tilt re-evaluates on a 60s tick so cooldown expiry and new conditions update.
   const [tiltTick, setTiltTick] = useState(0);
@@ -1422,12 +1551,12 @@ export default function SwingEdge() {
     const id = setInterval(() => setTiltTick(x => x + 1), 60000);
     return () => clearInterval(id);
   }, []);
-  const aiTilt = useMemo(() => SwingEdgeAI.checkTilt(trades), [trades, tiltTick]);
+  const aiTilt = useMemo(() => SwingEdgeAI.checkTilt(realTrades), [realTrades, tiltTick]);
 
   // Live Decision Coach analysis for the new-trade form.
   const aiCoach = useMemo(
-    () => SwingEdgeAI.analyzeNewTrade(form, trades),
-    [form, trades]
+    () => SwingEdgeAI.analyzeNewTrade(form, realTrades),
+    [form, realTrades]
   );
 
   // ─── CENTRAL EQUITY ENGINE ──────────────────────────────────────────────────
@@ -1475,25 +1604,25 @@ export default function SwingEdge() {
     return closedToday + openPnL;
   }, [closedTrades, openPnL]);
 
-  // Win Streak Counter
-  const { currentStreak, bestStreak } = useMemo(() => {
-    let current = 0;
-    let best = 0;
-    const sorted = [...closedTrades].sort((a, b) => a.date.localeCompare(b.date));
-    for (const t of sorted) {
-      const pnl = calcTradeMetrics(t).pnl || 0;
-      if (pnl > 0) {
-        current++;
-        if (current > best) best = current;
-      } else {
-        current = 0;
-      }
-    }
-    return { currentStreak: current, bestStreak: best };
-  }, [closedTrades]);
+  // Win Streak Counter (delegated to Master Stats Hub).
+  // stats.currentStreak is signed (negative for losing streak); the dashboard
+  // counter shows wins-only, so clamp to >= 0 to preserve the original UX.
+  const currentStreak = Math.max(0, stats.currentStreak);
+  const bestStreak    = stats.maxWinStreak;
 
   // Smart lessons
-  const smartLessons = useMemo(() => generateSmartLessons(closedTrades, calcTradeMetrics), [closedTrades]);
+  const smartLessons = useMemo(() => {
+    const base = generateSmartLessons(closedTrades, calcTradeMetrics) || [];
+    const adaptive = AdaptiveLessons.generate(closedTrades, calcTradeMetrics, lang) || [];
+    const seen = new Set(base.map(l => l.id).filter(Boolean));
+    const merged = [...base];
+    for (const l of adaptive) {
+      if (l.id && seen.has(l.id)) continue;
+      merged.push(l);
+      if (l.id) seen.add(l.id);
+    }
+    return merged;
+  }, [closedTrades, lang]);
 
   // Top ticker ribbon — fixed 8 tickers updated with live prices
   const TOP_RIBBON = ["NVDA", "AAPL", "TSLA", "MSFT", "META", "AMD", "BTC-USD", "SPY"];
@@ -1513,6 +1642,28 @@ export default function SwingEdge() {
       };
     });
   }, [livePrices]);
+
+  // Reactive sector trends derived from watchlist + live prices (no external API needed)
+  const sectorTrendsData = useMemo(() => {
+    if (!watchlistItems || watchlistItems.length === 0) return [];
+    const sectors = {};
+    watchlistItems.forEach(item => {
+      const meta = getTickerMeta(item.ticker);
+      const sector = meta?.sector || 'Other';
+      if (!sectors[sector]) sectors[sector] = { sector, count: 0, tickers: [], totalChange: 0, hasChange: 0 };
+      sectors[sector].count++;
+      sectors[sector].tickers.push(item.ticker);
+      const raw = item.ticker.replace('-USD', '');
+      const lp = livePrices[raw] || livePrices[item.ticker] || livePrices[raw + '-USD'];
+      if (lp?.changePct != null) {
+        sectors[sector].totalChange += parseFloat(lp.changePct) || 0;
+        sectors[sector].hasChange++;
+      }
+    });
+    return Object.values(sectors)
+      .map(s => ({ ...s, avgChange: s.hasChange > 0 ? (s.totalChange / s.hasChange) : 0 }))
+      .sort((a, b) => b.avgChange - a.avgChange);
+  }, [watchlistItems, livePrices]);
 
   useEffect(() => {
     const t = setInterval(() => setTickerIdx(i => (i + 1) % Math.max(tickerTapeItems.length, 1)), 2000);
@@ -1597,7 +1748,7 @@ export default function SwingEdge() {
     };
 
     const newTrade = {
-      id: trades.length + 1,
+      id: (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       ticker: form.ticker.toUpperCase(),
       date: new Date().toISOString().slice(0, 10),
       createdAt: new Date().toISOString(),
@@ -1614,6 +1765,11 @@ export default function SwingEdge() {
       _prediction: predictionSnapshot,
     };
     setTrades(prev => [...prev, newTrade]);
+    // Sync new trade to Supabase (primary source of truth)
+    if (isSupabaseConfigured && supabase && authUser?.id) {
+      supabase.from("trades").insert(tradeForSupabase({ ...newTrade, user_id: authUser.id, is_demo: false }))
+        .then(({ error }) => { if (error) console.error("Supabase insert failed:", error); });
+    }
     setForm({ ticker: "", side: "LONG", entry: "", stop: "", target: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
     setOcrStatus(null);
     setAiAnalysis(null);
@@ -1622,7 +1778,7 @@ export default function SwingEdge() {
     toast.success(lang === "he" ? `${newTrade.ticker} נוספה ליומן` : `${newTrade.ticker} added to journal`);
   };
 
-  const handleCloseSubmit = () => {
+  const handleCloseSubmit = async () => {
     if (!closingTrade || !closeForm.exit) return;
     const closedTrade = {
       ...closingTrade,
@@ -1638,6 +1794,16 @@ export default function SwingEdge() {
     // Close the loop: grade the prediction we made at entry.
     try { SwingEdgeAI.reinforceFromTrade(closedTrade); } catch { /* learning is best-effort */ }
     setTrades(prev => prev.map(t => t.id === closingTrade.id ? closedTrade : t));
+    // Sync close to Supabase
+    if (isSupabaseConfigured && supabase && authUser?.id && closedTrade.id) {
+      try {
+        const { error } = await supabase.from("trades")
+          .update(tradeForSupabase(closedTrade))
+          .eq("id", closedTrade.id)
+          .eq("user_id", authUser.id);
+        if (error) console.error("Supabase close-update failed:", error);
+      } catch (e) { console.error("Supabase close-update threw:", e); }
+    }
     setShowCloseForm(false);
     setClosingTrade(null);
     setCloseForm({ exit: "", exitReason: "Target Hit", followedPlan: true, lessonLearned: "", maxFavorable: "", maxAdverse: "" });
@@ -1659,61 +1825,68 @@ export default function SwingEdge() {
     });
     if (ok) {
       setTrades(prev => prev.filter(t => t.id !== tradeId));
+      // Sync delete to Supabase
+      if (isSupabaseConfigured && supabase && authUser?.id && tradeId) {
+        try {
+          const { error } = await supabase.from("trades")
+            .delete()
+            .eq("id", tradeId)
+            .eq("user_id", authUser.id);
+          if (error) console.error("Supabase delete failed:", error);
+        } catch (e) { console.error("Supabase delete threw:", e); }
+      }
       toast.success(lang === "he" ? "העסקה נמחקה" : "Trade deleted");
     }
   };
 
-  const handleEditOpen = (trade) => {
-    setEditingTrade(trade);
-    setEditForm({
-      ticker: trade.ticker,
-      side: trade.side,
-      entry: String(trade.entry),
-      stop: String(trade.stop),
-      target: String(trade.target || ""),
-      shares: String(trade.shares),
-      setup: trade.setup || "Breakout",
-      notes: trade.notes || "",
-      marketCondition: trade.marketCondition || "Trending Up",
-      emotionAtEntry: trade.emotionAtEntry || "Neutral",
-      entryQuality: trade.entryQuality || 3,
-      status: trade.status,
-      exit: trade.exit != null ? String(trade.exit) : "",
-      exitReason: trade.exitReason || "Hit Target",
-      followedPlan: trade.followedPlan,
-      lessonLearned: trade.lessonLearned || "",
-      maxFavorable: trade.maxFavorable != null ? String(trade.maxFavorable) : "",
-      maxAdverse: trade.maxAdverse != null ? String(trade.maxAdverse) : "",
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedTrades);
+    if (!ids.length) return;
+    const ok = await confirmDialog({
+      title: lang === "he" ? "מחיקת עסקאות" : "Delete Trades",
+      message: lang === "he"
+        ? `האם למחוק ${ids.length} עסקאות שנבחרו? פעולה זו לא ניתנת לביטול.`
+        : `Delete the ${ids.length} selected trades? This action cannot be undone.`,
+      confirmText: lang === "he" ? "מחק" : "Delete",
+      cancelText: lang === "he" ? "ביטול" : "Cancel",
+      danger: true,
     });
-    setShowEditForm(true);
+    if (!ok) return;
+    const idSet = new Set(ids);
+    setTrades(prev => prev.filter(t => !idSet.has(t.id)));
+    if (isSupabaseConfigured && supabase && authUser?.id) {
+      try {
+        const { error } = await supabase.from("trades")
+          .delete()
+          .in("id", ids)
+          .eq("user_id", authUser.id);
+        if (error) console.error("Supabase bulk delete failed:", error);
+      } catch (e) { console.error("Supabase bulk delete threw:", e); }
+    }
+    setSelectedTrades(new Set());
+    toast.success(
+      lang === "he" ? `${ids.length} עסקאות נמחקו` : `${ids.length} trades deleted`
+    );
   };
 
-  const handleEditSubmit = () => {
-    if (!editingTrade) return;
-    const exitVal = parseFloat(editForm.exit) || null;
-    const updated = {
-      ...editingTrade,
-      ticker: editForm.ticker.toUpperCase(),
-      side: editForm.side,
-      entry: parseFloat(editForm.entry) || editingTrade.entry,
-      stop: parseFloat(editForm.stop) || editingTrade.stop,
-      target: parseFloat(editForm.target) || null,
-      shares: parseInt(editForm.shares) || editingTrade.shares,
-      setup: editForm.setup,
-      notes: editForm.notes,
-      marketCondition: editForm.marketCondition,
-      emotionAtEntry: editForm.emotionAtEntry,
-      entryQuality: editForm.entryQuality,
-      status: exitVal != null ? "CLOSED" : editForm.status,
-      exit: exitVal,
-      exitReason: editForm.exitReason,
-      followedPlan: editForm.followedPlan,
-      lessonLearned: editForm.lessonLearned,
-      maxFavorable: parseFloat(editForm.maxFavorable) || null,
-      maxAdverse: parseFloat(editForm.maxAdverse) || null,
-    };
-    setTrades(prev => prev.map(t => t.id === editingTrade.id ? updated : t));
-    setShowEditForm(false);
+  const handleEditOpen = (trade) => {
+    setEditingTrade(trade);
+  };
+
+  // Receives the fully built `updated` trade from <EditTradeModal />
+  const handleEditSubmit = async (updated) => {
+    if (!updated || !updated.id) return;
+    setTrades(prev => prev.map(t => t.id === updated.id ? updated : t));
+    // Sync edit to Supabase
+    if (isSupabaseConfigured && supabase && authUser?.id && updated.id) {
+      try {
+        const { error } = await supabase.from("trades")
+          .update(tradeForSupabase(updated))
+          .eq("id", updated.id)
+          .eq("user_id", authUser.id);
+        if (error) console.error("Supabase update failed:", error);
+      } catch (e) { console.error("Supabase update threw:", e); }
+    }
     setEditingTrade(null);
     toast.success(lang === "he" ? "העסקה עודכנה" : "Trade updated");
   };
@@ -1771,14 +1944,6 @@ export default function SwingEdge() {
     const updated = watchlistItems.filter(i => i.ticker !== ticker);
     setWatchlistItems(updated);
     try { localStorage.setItem("swingEdgeWatchlist", JSON.stringify(updated)); } catch {}
-  };
-
-  const toggleLightMode = () => {
-    setLightMode(v => {
-      const next = !v;
-      try { localStorage.setItem("swingEdgeLightMode", String(next)); } catch {}
-      return next;
-    });
   };
 
   const handleImageUpload = (e) => {
@@ -1927,8 +2092,8 @@ export default function SwingEdge() {
     return (
       <div className="min-h-screen bg-[#0a0f1e] text-slate-300 flex items-center justify-center" style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-violet-500 flex items-center justify-center animate-pulse">
-            <Zap size={20} className="text-white" />
+          <div className="animate-pulse">
+            <Logo size={40} showText={false} />
           </div>
           <span className="text-xs tracking-widest uppercase text-slate-500">Loading SwingEdge…</span>
         </div>
@@ -1945,7 +2110,7 @@ export default function SwingEdge() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0f1e] text-slate-200 font-sans flex flex-col" data-theme={lightMode ? "light" : "dark"} dir={isRTL ? "rtl" : "ltr"} style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
+    <div className="min-h-screen bg-[#0a0f1e] text-slate-200 font-sans flex flex-col" dir={isRTL ? "rtl" : "ltr"} style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
 
       {/* ── BETA WELCOME (first login only) ── */}
       {showBetaWelcome && (
@@ -1980,19 +2145,17 @@ export default function SwingEdge() {
         <div className="relative" ref={profileRef}>
           <button
             onClick={() => setShowProfileDropdown(v => !v)}
-            className="flex items-center gap-2 hover:bg-white/[0.04] active:bg-white/[0.07] rounded-lg px-2 py-1 transition"
+            className="flex items-center gap-2 hover:bg-white/[0.04] active:bg-white/[0.07] rounded-lg px-2 py-1 transition whitespace-nowrap shrink-0"
             aria-label="Open user menu"
           >
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-400 to-violet-500 flex items-center justify-center">
-              <Zap size={14} className="text-white" />
-            </div>
-            <span className="font-bold text-sm tracking-wider text-white">SWING<span className="text-cyan-400">EDGE</span></span>
-            <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-500 border border-cyan-500/20 tracking-widest uppercase">Pro</span>
+            <Logo size={28} showText={false} />
+            <span className="font-bold text-sm tracking-wider text-white whitespace-nowrap">SWING<span className="text-emerald-400">EDGE</span></span>
+            <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-500 border border-cyan-500/20 tracking-widest uppercase hidden sm:inline">{t.pro}</span>
             <ChevronDown size={13} className={`text-slate-400 transition-transform ${showProfileDropdown ? "rotate-180" : ""}`} />
           </button>
           {showProfileDropdown && (
             <>
-              <div
+              <button type="button"
                 className="fixed inset-0 bg-black/40 backdrop-blur-[1px] z-[9998] animate-fade-in"
                 onClick={() => setShowProfileDropdown(false)}
               />
@@ -2016,80 +2179,42 @@ export default function SwingEdge() {
                     <p className="text-[11px] text-slate-400 mt-0.5 font-mono truncate">{authUser.email}</p>
                   )}
                   <span className="inline-block mt-2 text-[9px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold tracking-wider uppercase">
-                    Beta Tester
+                    {t.betaTester}
                   </span>
                 </div>
 
                 {/* SCROLLABLE BODY */}
                 <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
-                  {/* NAVIGATION */}
-                  <div className="px-2 py-1.5 text-[9px] font-bold tracking-widest uppercase text-slate-500">Navigation</div>
-                  <UserMenuItem icon={LayoutDashboard} label="Dashboard"     color="text-cyan-400"   onClick={() => { setTab("dashboard"); setShowProfileDropdown(false); }} />
-                  <UserMenuItem icon={BookOpen}        label="Journal"       color="text-violet-400" onClick={() => { setTab("journal");   setShowProfileDropdown(false); }} />
-                  <UserMenuItem icon={FlaskConical}    label="AI Coach"      color="text-amber-400"  onClick={() => { setTab("analyzer");  setShowProfileDropdown(false); }} />
-                  <UserMenuItem icon={BarChart2}       label="Analytics"     color="text-emerald-400" onClick={() => { setTab("analytics"); setShowProfileDropdown(false); }} />
-                  <UserMenuItem icon={BookMarked}      label="Playbook"      color="text-pink-400"   onClick={() => { setTab("settings");  setShowProfileDropdown(false); }} />
-                  <UserMenuItem icon={Thermometer}    label="Risk Center"   color="text-rose-400"   onClick={() => { setTab("settings");  setShowProfileDropdown(false); }} />
-
-                  <div className="my-1.5 h-px bg-white/[0.06]" />
-
                   {/* TOOLS */}
-                  <div className="px-2 py-1.5 text-[9px] font-bold tracking-widest uppercase text-slate-500">Tools</div>
-                  <UserMenuItem icon={Settings}      label="Settings"       color="text-cyan-400"   onClick={() => { setTab("settings"); setShowProfileDropdown(false); }} />
-                  <UserMenuItem icon={MessageCircle} label="Send Feedback"  color="text-violet-400" onClick={() => { setTab("feedback"); setShowProfileDropdown(false); }} />
-                  <UserMenuItem icon={HelpCircle}    label="Help & Docs"    color="text-blue-400"   onClick={() => { setShowHelpModal(true); setShowProfileDropdown(false); }} />
-                  <UserMenuItem icon={Bell}          label="Notifications"  color="text-amber-400"  onClick={() => { toast.info("Notifications panel coming soon"); setShowProfileDropdown(false); }} />
+                  <div className="px-2 py-1.5 text-[9px] font-bold tracking-widest uppercase text-slate-500">{t.tools}</div>
+                  <UserMenuItem icon={MessageCircle} label={t.sendFeedback}  color="text-violet-400" onClick={() => { setTab("feedback"); setShowProfileDropdown(false); }} />
+                  <UserMenuItem icon={Settings}      label={t.settings}      color="text-cyan-400"    onClick={() => { setTab("settings"); setShowProfileDropdown(false); }} />
+                  <UserMenuItem icon={HelpCircle}    label={t.helpDocs}      color="text-blue-400"   onClick={() => { setShowHelpModal(true); setShowProfileDropdown(false); }} />
+                  <UserMenuItem icon={Bell}          label={t.notifications} color="text-amber-400"  onClick={() => { toast.info(t.notifications); setShowProfileDropdown(false); }} />
+                  {pwaPromptEvent && (
+                    <UserMenuItem icon={Smartphone} label={t.installApp} color="text-cyan-400" onClick={() => { handleInstallPwa(); }} />
+                  )}
 
                   {isAdmin && (
                     <>
                       <div className="my-1.5 h-px bg-white/[0.06]" />
-                      <div className="px-2 py-1.5 text-[9px] font-bold tracking-widest uppercase text-amber-400">Admin</div>
-                      <UserMenuItem icon={Shield} label="Admin Panel" color="text-amber-300" onClick={() => { setTab("admin"); setShowProfileDropdown(false); }} />
+                      <div className="px-2 py-1.5 text-[9px] font-bold tracking-widest uppercase text-amber-400">{t.admin}</div>
+                      <UserMenuItem icon={Shield} label={t.adminPanel} color="text-amber-300" onClick={() => { setTab("admin"); setShowProfileDropdown(false); }} />
                     </>
                   )}
 
                   <div className="my-1.5 h-px bg-white/[0.06]" />
 
-                  {/* PREFERENCES */}
-                  <div className="px-2 py-1.5 text-[9px] font-bold tracking-widest uppercase text-slate-500">Preferences</div>
-                  <div className="px-3 py-2 rounded-lg flex items-center gap-3">
-                    <Globe size={16} className="text-violet-400" />
-                    <span className="text-sm text-slate-300 flex-1">Language</span>
-                    <select
-                      value={lang}
-                      onChange={e => setLang(e.target.value)}
-                      dir="ltr"
-                      onClick={e => e.stopPropagation()}
-                      className="bg-white/5 border border-white/10 rounded px-2 py-1 text-[11px] text-white focus:outline-none"
-                    >
-                      {LANGUAGES.map(l => (
-                        <option key={l.code} value={l.code}>{l.nativeName}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <button
-                    onClick={() => { toggleLightMode(); }}
-                    className="w-full h-10 px-3 flex items-center gap-3 rounded-lg hover:bg-[#1a2235] transition-[background-color] duration-150 text-left">
-                    <span className="text-base w-4 text-center">{lightMode ? "🌙" : "☀️"}</span>
-                    <span className="text-sm text-slate-300 flex-1">Theme</span>
-                    <span className="text-[11px] text-slate-500 font-mono">{lightMode ? "Light" : "Dark"}</span>
-                  </button>
-                  {pwaPromptEvent && (
-                    <UserMenuItem icon={Smartphone} label="Install App" color="text-cyan-400" onClick={() => { handleInstallPwa(); }} />
-                  )}
-
-                  <div className="my-1.5 h-px bg-white/[0.06]" />
-
                   {/* ACCOUNT */}
-                  <div className="px-2 py-1.5 text-[9px] font-bold tracking-widest uppercase text-slate-500">Account</div>
-                  <UserMenuItem icon={Lock}       label="Privacy & Security" color="text-slate-300" onClick={() => { setShowPrivacyModal(true); setShowProfileDropdown(false); }} />
-                  <UserMenuItem icon={CreditCard} label="Billing & Plan"     color="text-emerald-400" onClick={() => { setShowBillingModal(true); setShowProfileDropdown(false); }} />
+                  <div className="px-2 py-1.5 text-[9px] font-bold tracking-widest uppercase text-slate-500">{t.account}</div>
+                  <UserMenuItem icon={Lock}       label={t.privacySecurity} color="text-slate-300"   onClick={() => { setShowPrivacyModal(true); setShowProfileDropdown(false); }} />
+                  <UserMenuItem icon={CreditCard} label={t.billingAndPlan}  color="text-emerald-400" onClick={() => { setShowBillingModal(true); setShowProfileDropdown(false); }} />
                   {isSupabaseConfigured && session && (
                     <button
                       onClick={handleLogout}
                       className="w-full h-10 px-3 flex items-center gap-3 rounded-lg hover:bg-rose-500/10 transition-[background-color] duration-150 text-left text-rose-400">
                       <LogOut size={16} />
-                      <span className="text-sm font-semibold flex-1">Logout</span>
+                      <span className="text-sm font-semibold flex-1">{t.logout}</span>
                     </button>
                   )}
                 </div>
@@ -2099,7 +2224,7 @@ export default function SwingEdge() {
         </div>
 
         {/* Status + Account (right side) */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <div
             className="flex items-center gap-1.5"
             title={pricesLastUpdated ? `${t.lastUpdated}: ${pricesLastUpdated.toLocaleTimeString()}` : t.live}
@@ -2160,12 +2285,28 @@ export default function SwingEdge() {
         {/* ══════════════ DASHBOARD ══════════════ */}
         {tab === "dashboard" && (
           <div className="space-y-5 animate-fade-in">
+            <>
+            {realTrades.length === 0 && (
+              <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-2xl p-6 text-center mb-6">
+                <div className="text-5xl mb-3">👋</div>
+                <h2 className="text-white font-bold text-xl mb-2">ברוך הבא ל-SwingEdge!</h2>
+                <p className="text-slate-400 text-sm mb-4 leading-relaxed">
+                  אתה רואה כרגע <strong className="text-white">עסקאות דמו</strong> לדוגמה.<br/>
+                  הסטטיסטיקות שלך יתחילו להיבנות מהעסקה הראשונה שלך.
+                </p>
+                <button
+                  onClick={() => setTab('journal')}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2.5 rounded-xl font-semibold transition-all shadow-lg shadow-blue-500/20">
+                  ➕ הוסף עסקה ראשונה
+                </button>
+              </div>
+            )}
             {/* KPI Row */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               <StatCard label={t.accountEquity}  value={`$${curEquity.toLocaleString("en-US", {minimumFractionDigits:0})}`} sub={`${t.startedAt} $${capital.toLocaleString()}`} trend={totalPnL/capital*100} icon={DollarSign} accent="cyan" />
               <StatCard label={t.netPnlClosed} value={fmt$(Math.round(totalPnL))} sub={`${closedTrades.length} ${t.closedTrades}`} trend={totalPnL/capital*100} icon={TrendingUp} accent={totalPnL >= 0 ? "green" : "red"} />
-              <StatCard label={t.winRate} value={`${winRate.toFixed(0)}%`} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length}W / ${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)<0).length}L`} icon={Target} accent="purple" />
-              <StatCard label={t.avgRMultiple} value={fmtR(avgR)} sub={t.perClosedTrade} icon={Activity} accent="amber" />
+              <StatCard label={<span className="flex items-center gap-1">{t.winRate}<InfoTooltip label="Win Rate">{TRADING_TOOLTIPS.winRate[lang]||TRADING_TOOLTIPS.winRate.en}</InfoTooltip></span>} value={`${winRate.toFixed(0)}%`} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length}W / ${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)<0).length}L`} icon={Target} accent="purple" />
+              <StatCard label={<span className="flex items-center gap-1">{t.avgRMultiple}<InfoTooltip label="Avg R Multiple">{TRADING_TOOLTIPS.avgR[lang]||TRADING_TOOLTIPS.avgR.en}</InfoTooltip></span>} value={fmtR(avgR)} sub={t.perClosedTrade} icon={Activity} accent="amber" />
               <StatCard label={t.dailyPnl} value={fmt$(Math.round(dailyPnL))} sub={t.todayTrades} icon={DollarSign} accent={dailyPnL >= 0 ? "green" : "red"} />
               <StatCard label={t.streakCounter} value={<span className="flex items-center gap-1">{currentStreak > 0 && <Flame size={18} className="text-orange-400" />}{currentStreak}</span>} sub={`${t.bestStreak}: ${bestStreak}`} icon={Zap} accent={currentStreak >= 3 ? "green" : "amber"} />
             </div>
@@ -2191,11 +2332,59 @@ export default function SwingEdge() {
               <RegimeIndicator regime={aiRegime} lang={lang} />
             </div>
 
+            {/* ══ GROWTH PREDICTOR — 3 questions + 24mo compound forecast ══ */}
+            <GrowthPredictor
+              trades={realTrades}
+              stats={stats}
+              capital={capital}
+              lang={lang}
+            />
+
             {/* Top Edge & Anti-Edge */}
             {(aiEdges?.topEdge || aiEdges?.topAntiEdge) && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {aiEdges.topEdge && <EdgeCard edge={aiEdges.topEdge} lang={lang} variant="edge" />}
                 {aiEdges.topAntiEdge && <EdgeCard edge={aiEdges.topAntiEdge} lang={lang} variant="anti" />}
+              </div>
+            )}
+
+            {/* ── Master Stats Hub — Top Edges / Anti-Edges (Setup × Emotion) ── */}
+            {(stats.topEdges.length > 0 || stats.antiEdges.length > 0) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {stats.topEdges.length > 0 && (
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4">
+                    <h3 className="text-emerald-400 font-bold text-sm mb-3 flex items-center gap-1.5">🎯 Top Edges שלך<InfoTooltip label="Edge">{TRADING_TOOLTIPS.edge[lang]||TRADING_TOOLTIPS.edge.en}</InfoTooltip></h3>
+                    {stats.topEdges.map((edge, i) => (
+                      <div key={edge.name || i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
+                        <div>
+                          <div className="text-white font-semibold text-sm">{edge.name}</div>
+                          <div className="text-slate-400 text-xs">{edge.count} עסקאות</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-emerald-400 font-bold text-sm">{edge.winRate.toFixed(0)}% WR</div>
+                          <div className="text-slate-300 text-xs">${edge.totalPnL.toFixed(0)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {stats.antiEdges.length > 0 && (
+                  <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4">
+                    <h3 className="text-rose-400 font-bold text-sm mb-3 flex items-center gap-1.5">⚠️ Anti-Edges — להימנע!<InfoTooltip label="Anti-Edge">{TRADING_TOOLTIPS.antiEdge[lang]||TRADING_TOOLTIPS.antiEdge.en}</InfoTooltip></h3>
+                    {stats.antiEdges.map((edge, i) => (
+                      <div key={edge.name || i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
+                        <div>
+                          <div className="text-white font-semibold text-sm">{edge.name}</div>
+                          <div className="text-slate-400 text-xs">{edge.count} עסקאות</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-rose-400 font-bold text-sm">{edge.winRate.toFixed(0)}% WR</div>
+                          <div className="text-slate-300 text-xs">${edge.totalPnL.toFixed(0)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -2493,6 +2682,7 @@ export default function SwingEdge() {
                 </div>
               );
             })()}
+            </>
           </div>
         )}
 
@@ -2509,7 +2699,7 @@ export default function SwingEdge() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {smartLessons.map((lesson, i) => (
-                    <div key={i} className={`bg-[#0d1424] border rounded-xl p-4 ${
+                    <div key={lesson.title || `${lesson.type}_${i}`} className={`bg-[#0d1424] border rounded-xl p-4 ${
                       lesson.type === "strength" ? "border-[#10b981]/25" :
                       lesson.type === "warning" ? "border-amber-500/25" :
                       lesson.type === "insight" ? "border-cyan-500/25" :
@@ -2578,7 +2768,7 @@ export default function SwingEdge() {
                   <div className="text-sm font-bold text-white font-mono mt-0.5">{journalStats.total}</div>
                 </div>
                 <div className="bg-[#0d1424] border border-white/[0.06] rounded-lg p-2.5">
-                  <div className="text-[9px] uppercase tracking-widest text-slate-600">{lang === "he" ? "אחוז הצלחה" : "Win Rate"}</div>
+                  <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{lang === "he" ? "אחוז הצלחה" : "Win Rate"}<InfoTooltip label="Win Rate">{TRADING_TOOLTIPS.winRate[lang]||TRADING_TOOLTIPS.winRate.en}</InfoTooltip></div>
                   <div className="text-sm font-bold font-mono mt-0.5 text-emerald-300">{journalStats.winRate.toFixed(1)}%</div>
                 </div>
                 <div className="bg-[#0d1424] border border-white/[0.06] rounded-lg p-2.5">
@@ -2590,15 +2780,15 @@ export default function SwingEdge() {
                   <div className="text-sm font-bold font-mono mt-0.5 text-rose-400">{fmt$(Math.round(journalStats.avgLoss))}</div>
                 </div>
                 <div className="bg-[#0d1424] border border-white/[0.06] rounded-lg p-2.5">
-                  <div className="text-[9px] uppercase tracking-widest text-slate-600">Profit Factor</div>
+                  <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">Profit Factor<InfoTooltip label="Profit Factor">{TRADING_TOOLTIPS.profitFactor[lang]||TRADING_TOOLTIPS.profitFactor.en}</InfoTooltip></div>
                   <div className="text-sm font-bold font-mono mt-0.5 text-cyan-300">{isFinite(journalStats.profitFactor) ? journalStats.profitFactor.toFixed(2) : "∞"}</div>
                 </div>
                 <div className="bg-[#0d1424] border border-white/[0.06] rounded-lg p-2.5">
-                  <div className="text-[9px] uppercase tracking-widest text-slate-600">Max DD</div>
+                  <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">Max DD<InfoTooltip label="Max Drawdown">{TRADING_TOOLTIPS.maxDD[lang]||TRADING_TOOLTIPS.maxDD.en}</InfoTooltip></div>
                   <div className="text-sm font-bold font-mono mt-0.5 text-rose-300">{fmt$(Math.round(journalStats.maxDD))}</div>
                 </div>
                 <div className="bg-[#0d1424] border border-white/[0.06] rounded-lg p-2.5">
-                  <div className="text-[9px] uppercase tracking-widest text-slate-600">{lang === "he" ? "זמן החזקה" : "Avg Hold"}</div>
+                  <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{lang === "he" ? "זמן החזקה" : "Avg Hold"}<InfoTooltip label="Avg Hold">{TRADING_TOOLTIPS.avgHold[lang]||TRADING_TOOLTIPS.avgHold.en}</InfoTooltip></div>
                   <div className="text-sm font-bold font-mono mt-0.5 text-violet-300">{journalStats.avgHold.toFixed(1)}d</div>
                 </div>
               </div>
@@ -2658,7 +2848,37 @@ export default function SwingEdge() {
                 </div>
               </div>
             )}
-            {trades.length === 0 ? (
+            {/* ── VIEW TOGGLE: Table / Calendar ── */}
+            <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
+              <button
+                type="button"
+                onClick={() => setJournalView('table')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all
+                  ${journalView === 'table'
+                    ? 'bg-white shadow-sm text-emerald-600'
+                    : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                {lang === 'he' ? '📋 טבלה' : '📋 Table'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setJournalView('calendar')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all
+                  ${journalView === 'calendar'
+                    ? 'bg-white shadow-sm text-emerald-600'
+                    : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                {lang === 'he' ? '📅 לוח שנה' : '📅 Calendar'}
+              </button>
+            </div>
+
+            {journalView === 'calendar' ? (
+              <TradeCalendar
+                trades={filteredTrades.filter(t => t.status === 'CLOSED')}
+                calcMetrics={calcTradeMetrics}
+                lang={lang}
+              />
+            ) : trades.length === 0 ? (
               <div className="bg-[#0d1424] border border-white/[0.06] rounded-2xl p-12 text-center">
                 <BookOpen size={36} className="mx-auto text-slate-600 mb-3" />
                 <h3 className="text-sm font-bold text-white mb-2">{lang === "he" ? "אין עדיין עסקאות" : "No trades yet"}</h3>
@@ -2681,10 +2901,55 @@ export default function SwingEdge() {
                 <p className="text-xs text-slate-500">{lang === "he" ? "נסה לשנות או לנקות את המסננים" : "Try adjusting the filters"}</p>
               </div>
             ) : (
+            <>
+            {selectedTrades.size > 0 && (
+              <div className="sticky top-0 z-10 bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 mb-3 flex items-center justify-between backdrop-blur shadow-sm">
+                <span className="text-sm font-medium text-emerald-300">
+                  {lang === "he"
+                    ? `${selectedTrades.size} עסקאות נבחרו`
+                    : `${selectedTrades.size} trades selected`}
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setSelectedTrades(new Set())}
+                    className="px-3 py-1.5 text-sm text-slate-300 hover:bg-white/5 rounded-lg border border-white/10 transition"
+                  >
+                    {lang === "he" ? "בטל" : "Cancel"}
+                  </button>
+                  <button
+                    onClick={handleBulkDelete}
+                    className="px-3 py-1.5 text-sm bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-medium transition"
+                  >
+                    🗑️ {lang === "he" ? "מחק נבחרים" : "Delete Selected"}
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="overflow-x-auto bg-[#0d1424] border border-white/[0.06] rounded-xl">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-slate-600 border-b border-white/[0.06] text-[10px] tracking-widest uppercase">
+                    <th className="p-3 text-left font-semibold w-8">
+                      <input
+                        type="checkbox"
+                        aria-label={lang === "he" ? "בחר הכל" : "Select all"}
+                        ref={(el) => {
+                          if (!el) return;
+                          const total = filteredTrades.length;
+                          const selectedVisible = filteredTrades.filter(t => selectedTrades.has(t.id)).length;
+                          el.indeterminate = selectedVisible > 0 && selectedVisible < total;
+                        }}
+                        checked={filteredTrades.length > 0 && filteredTrades.every(t => selectedTrades.has(t.id))}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedTrades(new Set(filteredTrades.map(t => t.id)));
+                          } else {
+                            setSelectedTrades(new Set());
+                          }
+                        }}
+                        className="w-3.5 h-3.5 rounded border border-white/20 bg-white/5 cursor-pointer accent-cyan-500"
+                      />
+                    </th>
                     {["Ticker","Date","Side","Entry","Stop","Target","Shares","מחיר נוכחי","P&L חי","Exit","P&L","R","Hold","Setup","Mkt","Emotion","★","Exit Rsn","Plan","Lesson","Status","Action"].map(h => (
                       <th key={h} className={`p-3 text-left font-semibold whitespace-nowrap ${h==="מחיר נוכחי"||h==="P&L חי" ? "text-cyan-600" : ""}`}>{h}</th>
                     ))}
@@ -2695,9 +2960,26 @@ export default function SwingEdge() {
                     const { pnl, rMultiple } = calcTradeMetrics(t);
                     const isOpen = t.status === "OPEN";
                     const win = !isOpen && pnl > 0;
+                    const isSelected = selectedTrades.has(t.id);
                     return (
-                      <tr key={t.id} className={`border-b border-white/[0.04] transition-colors ${!isOpen && win ? "hover:bg-[#10b981]/[0.04]" : !isOpen ? "hover:bg-[#ef4444]/[0.04]" : "hover:bg-white/[0.03]"}`}>
-                        <td className="p-3 font-bold text-white font-mono whitespace-nowrap"><div className="flex items-center gap-1.5"><TickerLogo ticker={t.ticker} size={16} />{t.ticker}</div></td>
+                      <tr key={t.id} className={`border-b border-white/[0.04] transition-colors ${isSelected ? "bg-cyan-500/[0.06]" : ""} ${!isOpen && win ? "hover:bg-[#10b981]/[0.04]" : !isOpen ? "hover:bg-[#ef4444]/[0.04]" : "hover:bg-white/[0.03]"}`}>
+                        <td className="p-3 w-8">
+                          <input
+                            type="checkbox"
+                            aria-label={lang === "he" ? "בחר עסקה" : "Select trade"}
+                            checked={isSelected}
+                            onChange={(e) => {
+                              setSelectedTrades(prev => {
+                                const next = new Set(prev);
+                                if (e.target.checked) next.add(t.id);
+                                else next.delete(t.id);
+                                return next;
+                              });
+                            }}
+                            className="w-3.5 h-3.5 rounded border border-white/20 bg-white/5 cursor-pointer accent-cyan-500"
+                          />
+                        </td>
+                        <td className="p-3 font-bold text-white font-mono whitespace-nowrap"><div className="flex items-center gap-1.5"><TickerLogo ticker={t.ticker} size={16} />{t.ticker}{t.isDemo && <span className="text-xs bg-slate-700 text-slate-400 px-1 py-0.5 rounded ml-1 font-normal">DEMO</span>}</div></td>
                         <td className="p-3 text-slate-500 whitespace-nowrap">{t.date}</td>
                         <td className="p-3"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side==="LONG"?"bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20":"bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20"}`}>{t.side}</span></td>
                         <td className="p-3 font-mono text-slate-300">${t.entry}</td>
@@ -2785,12 +3067,31 @@ export default function SwingEdge() {
                 </tbody>
               </table>
             </div>
+            </>
             )}
           </div>
         )}
 
+        {/* ══════════════ TOOLS — sub-nav ══════════════ */}
+        {tab === "tools" && (
+          <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit mx-auto">
+            <button
+              onClick={() => setToolsTab('analyzer')}
+              className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${toolsTab === 'analyzer' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              🧪 {lang === 'he' ? 'ניתוח עסקה' : 'Trade Analyzer'}
+            </button>
+            <button
+              onClick={() => setToolsTab('calc')}
+              className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${toolsTab === 'calc' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              🧮 {lang === 'he' ? 'מחשבון פוזיציה' : 'Position Calculator'}
+            </button>
+          </div>
+        )}
+
         {/* ══════════════ TRADE ANALYZER ══════════════ */}
-        {tab === "analyzer" && (
+        {tab === "tools" && toolsTab === 'analyzer' && (
           <div className="space-y-5 animate-fade-in max-w-3xl mx-auto">
             <div>
               <h2 className="text-sm font-bold text-white flex items-center gap-2"><FlaskConical size={15} className="text-violet-400" /> Trade Analyzer</h2>
@@ -2961,7 +3262,7 @@ export default function SwingEdge() {
         )}
 
         {/* ══════════════ POSITION CALCULATOR ══════════════ */}
-        {tab === "position" && (() => {
+        {tab === "tools" && toolsTab === 'calc' && (() => {
           const capN   = parseFloat(posCalc.capital) || capital;
           const riskN  = parseFloat(posCalc.risk)    || 0;
           const entN   = parseFloat(posCalc.entry)   || 0;
@@ -3159,9 +3460,9 @@ export default function SwingEdge() {
         {tab === "analytics" && (
           <div className="space-y-5 animate-fade-in">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <StatCard label="Total Trades"  value={trades.length}     sub="All time"      icon={Layers}    accent="cyan"   />
-              <StatCard label="Win Rate"       value={`${winRate.toFixed(1)}%`} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length} wins`} icon={CheckCircle} accent="green" />
-              <StatCard label="Avg R Multiple" value={fmtR(avgR)}        sub="Closed trades" icon={Activity}  accent="purple" />
+              <StatCard label="Total Trades"  value={realTrades.length} sub="All time"      icon={Layers}    accent="cyan"   />
+              <StatCard label={<span className="flex items-center gap-1">Win Rate<InfoTooltip label="Win Rate">{TRADING_TOOLTIPS.winRate[lang]||TRADING_TOOLTIPS.winRate.en}</InfoTooltip></span>} value={`${winRate.toFixed(1)}%`} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length} wins`} icon={CheckCircle} accent="green" />
+              <StatCard label={<span className="flex items-center gap-1">Avg R Multiple<InfoTooltip label="Avg R Multiple">{TRADING_TOOLTIPS.avgR[lang]||TRADING_TOOLTIPS.avgR.en}</InfoTooltip></span>} value={fmtR(avgR)} sub="Closed trades" icon={Activity}  accent="purple" />
               <StatCard label="Total Return"   value={`${(totalPnL/capital*100).toFixed(2)}%`} sub={`$${Math.round(Math.abs(totalPnL)).toLocaleString()} P&L`} icon={TrendingUp} accent={totalPnL>=0?"green":"red"} />
             </div>
 
@@ -3169,7 +3470,7 @@ export default function SwingEdge() {
             <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-sm font-bold text-white">Equity Curve</h3>
+                  <h3 className="text-sm font-bold text-white flex items-center gap-1.5">Equity Curve<InfoTooltip label="Equity Curve">{TRADING_TOOLTIPS.equityCurve[lang]||TRADING_TOOLTIPS.equityCurve.en}</InfoTooltip></h3>
                   <p className="text-xs text-slate-600">Account balance over time · starting capital ${capital.toLocaleString()}</p>
                 </div>
                 <span className={`text-sm font-bold font-mono ${totalPnL>=0?"text-[#10b981]":"text-[#ef4444]"}`}>{fmt$(Math.round(totalPnL))}</span>
@@ -3215,26 +3516,35 @@ export default function SwingEdge() {
               </ResponsiveContainer>
             </div>
 
-            {/* Setup breakdown */}
+            {/* Setup breakdown — dynamic grouping from actual trade data */}
             <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5">
               <h3 className="text-sm font-bold text-white mb-4">Performance by Setup</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {["Breakout","Pullback","Retest","Breakdown"].map(setup => {
-                  const s = closedTrades.filter(t => t.setup === setup);
-                  const wins = s.filter(t => (calcTradeMetrics(t).pnl||0) > 0).length;
-                  const wr = s.length ? wins/s.length*100 : 0;
-                  const totalR = s.reduce((a,t) => a + (calcTradeMetrics(t).rMultiple||0), 0);
-                  return (
-                    <div key={setup} className="bg-white/3 rounded-xl p-3 border border-white/[0.06]">
-                      <div className="text-xs font-semibold text-violet-400 mb-2">{setup}</div>
-                      <div className="font-bold text-white text-lg font-mono">{wr.toFixed(0)}%</div>
-                      <div className="text-[10px] text-slate-500">{s.length} trades · {totalR.toFixed(1)}R total</div>
-                      <div className="mt-2 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-violet-500 to-cyan-500 rounded-full transition-all" style={{ width: `${wr}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
+                {(() => {
+                  const setupMap = {};
+                  closedTrades.forEach(t => {
+                    const key = (t.setup || "").trim() || "Unknown";
+                    if (!setupMap[key]) setupMap[key] = [];
+                    setupMap[key].push(t);
+                  });
+                  return Object.entries(setupMap)
+                    .sort((a, b) => b[1].length - a[1].length)
+                    .map(([setup, s]) => {
+                      const wins = s.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length;
+                      const wr = s.length ? wins / s.length * 100 : 0;
+                      const totalR = s.reduce((a, t) => a + (calcTradeMetrics(t).rMultiple || 0), 0);
+                      return (
+                        <div key={setup} className="bg-white/3 rounded-xl p-3 border border-white/[0.06]">
+                          <div className="text-xs font-semibold text-violet-400 mb-2 truncate" title={setup}>{setup}</div>
+                          <div className="font-bold text-white text-lg font-mono">{wr.toFixed(0)}%</div>
+                          <div className="text-[10px] text-slate-500">{s.length} trades · {totalR.toFixed(1)}R total</div>
+                          <div className="mt-2 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-violet-500 to-cyan-500 rounded-full transition-all" style={{ width: `${wr}%` }} />
+                          </div>
+                        </div>
+                      );
+                    });
+                })()}
               </div>
             </div>
 
@@ -3281,30 +3591,39 @@ export default function SwingEdge() {
               );
             })()}
 
-            {/* ── Win Rate by Setup Bar Chart ── */}
+            {/* ── Win Rate by Setup Bar Chart — dynamic grouping ── */}
             {(() => {
-              const SETUPS = ["Breakout","Pullback","Retest","Breakdown"];
-              const data = SETUPS.map(setup => {
-                const s = closedTrades.filter(t => t.setup === setup);
-                const wins = s.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length;
-                const wr = s.length ? Math.round(wins / s.length * 100) : 0;
-                return { setup, winRate: wr, count: s.length };
+              const setupMap = {};
+              closedTrades.forEach(t => {
+                const key = (t.setup || "").trim() || "Unknown";
+                if (!setupMap[key]) setupMap[key] = [];
+                setupMap[key].push(t);
               });
+              const data = Object.entries(setupMap)
+                .map(([setup, s]) => {
+                  const wins = s.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length;
+                  const wr = s.length ? Math.round(wins / s.length * 100) : 0;
+                  return { setup, winRate: wr, count: s.length };
+                })
+                .filter(d => d.count > 0)
+                .sort((a, b) => b.count - a.count);
+              const short = name => name.length > 11 ? name.slice(0, 10) + "…" : name;
               return (
                 <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5">
-                  <h3 className="text-sm font-bold text-white mb-1">Win Rate by Setup</h3>
-                  <p className="text-xs text-slate-600 mb-4">Success percentage per setup type</p>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                  <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">Win Rate by Setup<InfoTooltip label="Win Rate by Setup">{lang === 'he' ? 'אחוז הזכייה לכל סטאפ. עמודות סגולות = מעל 50% WR. עמודות אפורות = מתחת ל-50%. גובה העמודה = מספר עסקאות.' : 'Win rate per setup. Purple bars = above 50% WR. Gray bars = below 50%. Bar height = trade count.'}</InfoTooltip></h3>
+                  <p className="text-xs text-slate-600 mb-4">Success % per setup · bar label = trade count</p>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={data} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
-                      <XAxis dataKey="setup" tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} />
+                      <XAxis dataKey="setup" tick={{ fontSize: 9, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={short} />
                       <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`} />
                       <Tooltip
                         contentStyle={{ background: "#0d1424", border: "1px solid #162032", borderRadius: 10, fontSize: 11 }}
                         formatter={(v, n, p) => [`${v}% · ${p.payload.count} trade${p.payload.count !== 1 ? "s" : ""}`, "Win Rate"]}
+                        labelFormatter={l => l}
                       />
                       <ReferenceLine y={50} stroke="#475569" strokeDasharray="4 4" label={{ value: "50%", position: "insideTopRight", fontSize: 9, fill: "#475569" }} />
-                      <Bar dataKey="winRate" radius={[4, 4, 0, 0]}>
+                      <Bar dataKey="winRate" radius={[4, 4, 0, 0]} label={{ position: "top", fontSize: 9, fill: "#94a3b8", formatter: (v, entry) => entry?.payload?.count ? `${entry.payload.count}t` : "" }}>
                         {data.map((d, i) => (
                           <Cell key={i} fill={d.winRate >= 50 ? "#8b5cf6" : "#64748b"} />
                         ))}
@@ -3329,10 +3648,14 @@ export default function SwingEdge() {
               });
               const bestDayEntry = Object.entries(dayMap).sort((a, b) => b[1].pnl - a[1].pnl)[0];
 
-              // Best Setup
-              const SETUPS = ["Breakout","Pullback","Retest","Breakdown"];
-              const setupStats = SETUPS.map(setup => {
-                const s = closedTrades.filter(t => t.setup === setup);
+              // Best Setup — dynamic grouping from actual trade data
+              const setupBuckets = {};
+              closedTrades.forEach(t => {
+                const key = (t.setup || "").trim() || "Unknown";
+                if (!setupBuckets[key]) setupBuckets[key] = [];
+                setupBuckets[key].push(t);
+              });
+              const setupStats = Object.entries(setupBuckets).map(([setup, s]) => {
                 const wins = s.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length;
                 const wr = s.length ? wins / s.length * 100 : 0;
                 return { setup, winRate: wr, count: s.length };
@@ -3354,7 +3677,7 @@ export default function SwingEdge() {
                   {/* Best Day */}
                   <div className="bg-[#0d1424] border border-emerald-500/20 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs font-semibold tracking-widest uppercase text-emerald-400">Best Day</span>
+                      <span className="text-xs font-semibold tracking-widest uppercase text-emerald-400 flex items-center gap-1">Best Day<InfoTooltip label="Best Day">{lang === 'he' ? 'יום השבוע שבו הרווחת הכי הרבה מבחינת P&L כולל ומספר עסקאות.' : 'The weekday where you made the most total P&L and traded most successfully.'}</InfoTooltip></span>
                     </div>
                     {bestDayEntry ? (
                       <>
@@ -3369,7 +3692,7 @@ export default function SwingEdge() {
                   {/* Best Setup */}
                   <div className="bg-[#0d1424] border border-violet-500/20 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs font-semibold tracking-widest uppercase text-violet-400">Best Setup</span>
+                      <span className="text-xs font-semibold tracking-widest uppercase text-violet-400 flex items-center gap-1">Best Setup<InfoTooltip label="Best Setup">{lang === 'he' ? 'הסטאפ הרווחי ביותר שלך לפי P&L כולל ואחוז זכייה. זה ה-Edge שלך — תסחור אותו יותר.' : 'Your most profitable setup by total P&L and win rate. This is your edge — trade it more.'}</InfoTooltip></span>
                     </div>
                     {bestSetup ? (
                       <>
@@ -3384,7 +3707,7 @@ export default function SwingEdge() {
                   {/* Best Emotion */}
                   <div className="bg-[#0d1424] border border-amber-500/20 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs font-semibold tracking-widest uppercase text-amber-400">Best Emotion</span>
+                      <span className="text-xs font-semibold tracking-widest uppercase text-amber-400 flex items-center gap-1">Best Emotion<InfoTooltip label="Best Emotion">{lang === 'he' ? 'המצב הרגשי שבו אתה מניב הכי טוב. כשאתה מרגיש ככה — הביצועים שלך חדים יותר.' : 'The emotional state where you perform best. When you feel this way, your trading is sharper.'}</InfoTooltip></span>
                     </div>
                     {bestEmotion ? (
                       <>
@@ -3396,6 +3719,361 @@ export default function SwingEdge() {
                     )}
                   </div>
                 </div>
+              );
+            })()}
+
+            {/* ── Master Stats Hub — Top Edges / Anti-Edges (Setup × Emotion) ── */}
+            {(stats.topEdges.length > 0 || stats.antiEdges.length > 0) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {stats.topEdges.length > 0 && (
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4">
+                    <h3 className="text-emerald-400 font-bold text-sm mb-3 flex items-center gap-1.5">🎯 Top Edges שלך<InfoTooltip label="Edge">{TRADING_TOOLTIPS.edge[lang]||TRADING_TOOLTIPS.edge.en}</InfoTooltip></h3>
+                    {stats.topEdges.map((edge, i) => (
+                      <div key={edge.name || i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
+                        <div>
+                          <div className="text-white font-semibold text-sm">{edge.name}</div>
+                          <div className="text-slate-400 text-xs">{edge.count} עסקאות</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-emerald-400 font-bold text-sm">{edge.winRate.toFixed(0)}% WR</div>
+                          <div className="text-slate-300 text-xs">${edge.totalPnL.toFixed(0)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {stats.antiEdges.length > 0 && (
+                  <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4">
+                    <h3 className="text-rose-400 font-bold text-sm mb-3 flex items-center gap-1.5">⚠️ Anti-Edges — להימנע!<InfoTooltip label="Anti-Edge">{TRADING_TOOLTIPS.antiEdge[lang]||TRADING_TOOLTIPS.antiEdge.en}</InfoTooltip></h3>
+                    {stats.antiEdges.map((edge, i) => (
+                      <div key={edge.name || i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
+                        <div>
+                          <div className="text-white font-semibold text-sm">{edge.name}</div>
+                          <div className="text-slate-400 text-xs">{edge.count} עסקאות</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-rose-400 font-bold text-sm">{edge.winRate.toFixed(0)}% WR</div>
+                          <div className="text-slate-300 text-xs">${edge.totalPnL.toFixed(0)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ═══════════ NEW: 6 ADDITIONAL ANALYTICS CHARTS ═══════════ */}
+            {closedTrades.length > 0 && (() => {
+              // 1. R Distribution
+              const rBuckets = [
+                { range: "< -2R", min: -Infinity, max: -2, count: 0 },
+                { range: "-2 to -1R", min: -2, max: -1, count: 0 },
+                { range: "-1 to 0R", min: -1, max: 0, count: 0 },
+                { range: "0 to 1R", min: 0, max: 1, count: 0 },
+                { range: "1 to 2R", min: 1, max: 2, count: 0 },
+                { range: "2 to 3R", min: 2, max: 3, count: 0 },
+                { range: "> 3R", min: 3, max: Infinity, count: 0 },
+              ];
+              closedTrades.forEach(t => {
+                const { rMultiple } = calcTradeMetrics(t);
+                if (rMultiple == null) return;
+                const b = rBuckets.find(b => rMultiple >= b.min && rMultiple < b.max);
+                if (b) b.count++;
+              });
+
+              // 2. P&L by Month
+              const monthMap = {};
+              closedTrades.forEach(t => {
+                const d = t.exitDate || t.date;
+                if (!d) return;
+                const { pnl } = calcTradeMetrics(t);
+                if (pnl == null) return;
+                const key = d.slice(0, 7); // YYYY-MM
+                if (!monthMap[key]) monthMap[key] = { month: key, pnl: 0, count: 0 };
+                monthMap[key].pnl += pnl;
+                monthMap[key].count += 1;
+              });
+              const pnlByMonth = Object.values(monthMap)
+                .sort((a, b) => a.month.localeCompare(b.month))
+                .map(m => ({ ...m, pnl: Math.round(m.pnl) }));
+
+              // 3. Emotion Performance
+              const emoMap = {};
+              closedTrades.forEach(t => {
+                const e = t.emotionAtEntry || "Neutral";
+                const { pnl } = calcTradeMetrics(t);
+                if (!emoMap[e]) emoMap[e] = { emotion: e, count: 0, wins: 0, totalPnL: 0 };
+                emoMap[e].count++;
+                if ((pnl ?? 0) > 0) emoMap[e].wins++;
+                emoMap[e].totalPnL += pnl ?? 0;
+              });
+              const emotionStatsArr = Object.values(emoMap).map(e => ({
+                ...e,
+                totalPnL: Math.round(e.totalPnL),
+                winRate: e.count ? Math.round(e.wins / e.count * 100) : 0,
+              }));
+
+              // 4. Streak History
+              const sorted = [...closedTrades].sort((a, b) =>
+                new Date(a.date || 0) - new Date(b.date || 0));
+              const streaks = [];
+              let cur = 0, curType = null;
+              sorted.forEach(t => {
+                const { pnl } = calcTradeMetrics(t);
+                if (pnl == null) return;
+                const isWin = pnl > 0;
+                const nt = isWin ? "win" : "loss";
+                if (curType === null || curType === nt) { curType = nt; cur++; }
+                else { streaks.push({ type: curType, length: cur }); curType = nt; cur = 1; }
+              });
+              if (cur > 0 && curType) streaks.push({ type: curType, length: cur });
+              const maxStreak = streaks.reduce((m, s) => Math.max(m, s.length), 1);
+
+              // 5. Setup Matrix
+              const sMap = {};
+              closedTrades.forEach(t => {
+                const s = (t.setup || "").trim() || "Unknown";
+                const { pnl, rMultiple } = calcTradeMetrics(t);
+                if (!sMap[s]) sMap[s] = { setup: s, count: 0, wins: 0, totalPnL: 0, totalR: 0 };
+                sMap[s].count++;
+                if ((pnl ?? 0) > 0) sMap[s].wins++;
+                sMap[s].totalPnL += pnl ?? 0;
+                sMap[s].totalR += rMultiple ?? 0;
+              });
+              const setupMatrix = Object.values(sMap).map(s => ({
+                ...s,
+                winRate: s.count ? Math.round(s.wins / s.count * 100) : 0,
+                avgR: s.count ? (s.totalR / s.count).toFixed(2) : "0",
+                totalPnL: Math.round(s.totalPnL),
+              })).sort((a, b) => b.totalPnL - a.totalPnL);
+
+              // 6. Hold Time vs P&L
+              const holdScatter = closedTrades.map(t => {
+                const { pnl } = calcTradeMetrics(t);
+                if (pnl == null || !t.date || !t.exitDate) return null;
+                const hold = Math.max(1, Math.round((new Date(t.exitDate) - new Date(t.date)) / 86400000));
+                return { hold, pnl: Math.round(pnl), ticker: t.ticker };
+              }).filter(Boolean);
+
+              const darkTooltip = { background: "#0d1424", border: "1px solid #162032", borderRadius: 10, fontSize: 11, color: "#e2e8f0" };
+
+              return (
+                <>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* R Distribution */}
+                    <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5">
+                      <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">
+                        {lang === "he" ? "התפלגות R Multiple" : "R Multiple Distribution"}
+                        <InfoTooltip label="R Distribution">
+                          {lang === "he"
+                            ? "כמה עסקאות בכל טווח R. רוב העסקאות ב-0-1R = יוצא מוקדם מדי."
+                            : "Trades per R range. Most in 0-1R = exiting too early."}
+                        </InfoTooltip>
+                      </h3>
+                      <p className="text-xs text-slate-600 mb-4">{lang === "he" ? "פיזור התוצאות שלך" : "Distribution of your outcomes"}</p>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={rBuckets} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
+                          <XAxis dataKey="range" tick={{ fontSize: 9, fill: "#475569" }} tickLine={false} axisLine={false} />
+                          <YAxis tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} />
+                          <Tooltip contentStyle={darkTooltip} />
+                          <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                            {rBuckets.map((entry, i) => (
+                              <Cell key={i} fill={entry.max <= 0 ? "#f43f5e" : "#10b981"} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* P&L by Month */}
+                    <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5">
+                      <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">
+                        {lang === "he" ? "P&L לפי חודש" : "P&L by Month"}
+                        <InfoTooltip label="P&L by Month">
+                          {lang === "he"
+                            ? "רווח/הפסד חודשי. עוזר לזהות חודשים חזקים וחלשים."
+                            : "Monthly P&L. Spot your strong and weak months."}
+                        </InfoTooltip>
+                      </h3>
+                      <p className="text-xs text-slate-600 mb-4">{lang === "he" ? "מגמת ביצועים חודשית" : "Monthly performance trend"}</p>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={pnlByMonth} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
+                          <XAxis dataKey="month" tick={{ fontSize: 9, fill: "#475569" }} tickLine={false} axisLine={false} />
+                          <YAxis tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
+                          <Tooltip contentStyle={darkTooltip} formatter={(v, n, p) => [`${fmt$(v)} · ${p.payload.count} trade${p.payload.count !== 1 ? "s" : ""}`, "P&L"]} />
+                          <ReferenceLine y={0} stroke="#334155" />
+                          <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
+                            {pnlByMonth.map((d, i) => (
+                              <Cell key={i} fill={d.pnl >= 0 ? "#10b981" : "#f43f5e"} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Emotion Performance */}
+                    <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5">
+                      <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">
+                        {lang === "he" ? "ביצועים לפי רגש" : "Performance by Emotion"}
+                        <InfoTooltip label="Emotion Performance">
+                          {lang === "he"
+                            ? "P&L כולל לפי רגש בכניסה. FOMO/Angry שלילי = להימנע."
+                            : "Total P&L by entry emotion. Negative FOMO/Angry = avoid."}
+                        </InfoTooltip>
+                      </h3>
+                      <p className="text-xs text-slate-600 mb-4">{lang === "he" ? "הרגש שמרוויח לך כסף" : "Which emotion pays off"}</p>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={emotionStatsArr} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
+                          <XAxis dataKey="emotion" tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} />
+                          <YAxis tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
+                          <Tooltip contentStyle={darkTooltip} formatter={(v, n, p) => [`${fmt$(v)} · ${p.payload.winRate}% WR`, "P&L"]} />
+                          <ReferenceLine y={0} stroke="#334155" />
+                          <Bar dataKey="totalPnL" radius={[4, 4, 0, 0]}>
+                            {emotionStatsArr.map((e, i) => (
+                              <Cell key={i} fill={e.totalPnL >= 0 ? "#10b981" : "#f43f5e"} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Streak History */}
+                    <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5">
+                      <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">
+                        {lang === "he" ? "היסטוריית רצפים" : "Streak History"}
+                        <InfoTooltip label="Streak History">
+                          {lang === "he"
+                            ? "רצפי ניצחונות/הפסדים. רצף הפסד ארוך = איתות לעצור ולנשום."
+                            : "Win/loss streaks. Long loss streak = stop and reassess."}
+                        </InfoTooltip>
+                      </h3>
+                      <p className="text-xs text-slate-600 mb-4">{lang === "he" ? `${streaks.length} רצפים · מקסימום ${maxStreak}` : `${streaks.length} streaks · max ${maxStreak}`}</p>
+                      <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                        {streaks.length === 0 ? (
+                          <p className="text-xs text-slate-600 text-center py-8">{lang === "he" ? "אין מספיק נתונים" : "Not enough data"}</p>
+                        ) : streaks.map((s, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <span className="text-[10px] font-mono text-slate-500 w-14 shrink-0">
+                              {s.type === "win" ? (lang === "he" ? "ניצחון" : "Win") : (lang === "he" ? "הפסד" : "Loss")} ×{s.length}
+                            </span>
+                            <div className="flex-1 bg-white/5 rounded-full h-3 overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${s.type === "win" ? "bg-emerald-500" : "bg-rose-500"}`}
+                                style={{ width: `${Math.max(8, (s.length / maxStreak) * 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Setup Matrix */}
+                  <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5">
+                    <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">
+                      {lang === "he" ? "מטריצת סטאפים" : "Setup Matrix"}
+                      <InfoTooltip label="Setup Matrix">
+                        {lang === "he"
+                          ? "ביצועים מלאים לכל סטאפ: עסקאות, WR%, ממוצע R, רווח כולל."
+                          : "Full performance per setup: trades, WR%, avg R, total P&L."}
+                      </InfoTooltip>
+                    </h3>
+                    <p className="text-xs text-slate-600 mb-4">{lang === "he" ? "מסודר לפי רווח כולל" : "Sorted by total P&L"}</p>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-[10px] text-slate-500 uppercase tracking-wider border-b border-white/[0.06]">
+                            <th className="text-left py-2 font-semibold">{lang === "he" ? "סטאפ" : "Setup"}</th>
+                            <th className="text-center py-2 font-semibold">{lang === "he" ? "עסקאות" : "Trades"}</th>
+                            <th className="text-center py-2 font-semibold">WR%</th>
+                            <th className="text-center py-2 font-semibold">Avg R</th>
+                            <th className="text-right py-2 font-semibold">{lang === "he" ? "רווח כולל" : "Total P&L"}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {setupMatrix.map(s => (
+                            <tr key={s.setup} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
+                              <td className="py-2.5 font-semibold text-white">{s.setup}</td>
+                              <td className="py-2.5 text-center text-slate-400 font-mono">{s.count}</td>
+                              <td className="py-2.5 text-center">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  s.winRate >= 60 ? "bg-emerald-500/15 text-emerald-400"
+                                  : s.winRate >= 40 ? "bg-amber-500/15 text-amber-400"
+                                  : "bg-rose-500/15 text-rose-400"
+                                }`}>{s.winRate}%</span>
+                              </td>
+                              <td className="py-2.5 text-center font-mono text-slate-300">{s.avgR}R</td>
+                              <td className={`py-2.5 text-right font-mono font-bold ${s.totalPnL >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                                {fmt$(s.totalPnL)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Hold Time vs P&L Scatter */}
+                  {holdScatter.length > 0 && (
+                    <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-5">
+                      <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">
+                        {lang === "he" ? "זמן החזקה vs P&L" : "Hold Time vs P&L"}
+                        <InfoTooltip label="Hold Time vs PnL">
+                          {lang === "he"
+                            ? "כל נקודה = עסקה אחת. רואים אם החזקה ארוכה משתלמת."
+                            : "Each dot = one trade. Reveals if longer holds pay off."}
+                        </InfoTooltip>
+                      </h3>
+                      <p className="text-xs text-slate-600 mb-4">{lang === "he" ? `${holdScatter.length} עסקאות` : `${holdScatter.length} trades`}</p>
+                      <ResponsiveContainer width="100%" height={280}>
+                        <ScatterChart margin={{ top: 10, right: 16, left: 0, bottom: 10 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
+                          <XAxis
+                            type="number"
+                            dataKey="hold"
+                            name="Days"
+                            tick={{ fontSize: 10, fill: "#475569" }}
+                            tickLine={false}
+                            axisLine={false}
+                            label={{ value: lang === "he" ? "ימי החזקה" : "Days held", position: "insideBottom", offset: -2, fontSize: 10, fill: "#475569" }}
+                          />
+                          <YAxis
+                            type="number"
+                            dataKey="pnl"
+                            name="P&L"
+                            tick={{ fontSize: 10, fill: "#475569" }}
+                            tickLine={false}
+                            axisLine={false}
+                            tickFormatter={v => `$${v}`}
+                          />
+                          <ReferenceLine y={0} stroke="#334155" />
+                          <Tooltip
+                            cursor={{ strokeDasharray: "3 3" }}
+                            content={({ payload }) => {
+                              if (!payload?.length) return null;
+                              const d = payload[0].payload;
+                              return (
+                                <div className="bg-[#0d1424] border border-[#162032] rounded-lg px-3 py-2 text-xs shadow-xl">
+                                  <p className="font-mono font-bold text-white">{d.ticker}</p>
+                                  <p className="text-slate-400">{lang === "he" ? "ימים" : "Days"}: {d.hold}</p>
+                                  <p className={d.pnl >= 0 ? "text-emerald-400" : "text-rose-400"}>{fmt$(d.pnl)}</p>
+                                </div>
+                              );
+                            }}
+                          />
+                          <Scatter data={holdScatter}>
+                            {holdScatter.map((entry, i) => (
+                              <Cell key={i} fill={entry.pnl >= 0 ? "#10b981" : "#f43f5e"} fillOpacity={0.75} />
+                            ))}
+                          </Scatter>
+                        </ScatterChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </>
               );
             })()}
           </div>
@@ -3412,10 +4090,11 @@ export default function SwingEdge() {
                 const active = chartSymbol === item.chartSym;
                 return (
                   <button key={item.ticker} onClick={() => setChartSymbol(item.chartSym)}
+                    title={getTickerMeta(item.ticker)?.name ?? item.ticker}
                     className={`text-xs font-mono font-bold px-3 py-1.5 rounded-lg border transition ${
                       active
-                        ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40"
-                        : "bg-white/3 text-slate-400 border-white/[0.06] hover:bg-cyan-500/10 hover:text-cyan-400 hover:border-cyan-500/20"
+                        ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                        : "bg-white/3 text-slate-400 border-white/[0.06] hover:bg-emerald-500/10 hover:text-emerald-400 hover:border-emerald-500/20"
                     }`}>
                     {item.ticker}
                   </button>
@@ -3427,18 +4106,6 @@ export default function SwingEdge() {
               {/* TradingView Chart */}
               <div className="md:col-span-2 bg-[#0d1424] border border-white/[0.06] rounded-xl overflow-hidden relative" style={{ height: 520 }}>
                 <div className="flex flex-col gap-2 px-4 py-3 border-b border-white/[0.06]">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-semibold tracking-widest uppercase text-slate-500 shrink-0">Live Chart</span>
-                    <div className="flex-1 min-w-[180px]">
-                      <TradingViewSearch
-                        value={chartSymbol}
-                        onPick={(tvSym) => setChartSymbol(tvSym)}
-                        livePrices={livePrices}
-                        setLivePrices={setLivePrices}
-                        placeholder="Search symbol (NVDA, BTC, EURUSD...)"
-                      />
-                    </div>
-                  </div>
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex gap-1 flex-wrap">
                       {["1m","5m","15m","1H","4H","1D","1W"].map(tf => (
@@ -3571,7 +4238,7 @@ export default function SwingEdge() {
                 {/* Sort controls */}
                 <div className="flex items-center gap-1 mb-2">
                   <span className="text-[9px] text-slate-600">{t.sortBy}:</span>
-                  {[["ticker","A-Z"],["changePct","%"],["price","$"]].map(([key, label]) => (
+                  {[["ticker","A-Z"],["changePct","%"],["price","$"],["sector","Sector"]].map(([key, label]) => (
                     <button key={key} onClick={() => setWatchlistSortBy(key)}
                       className={`text-[9px] px-1.5 py-0.5 rounded ${watchlistSortBy === key ? "bg-cyan-500/20 text-cyan-400" : "text-slate-600 hover:text-slate-400"} transition`}>
                       {label}
@@ -3585,21 +4252,42 @@ export default function SwingEdge() {
                     const lpB = getLivePrice(b.ticker) || {};
                     if (watchlistSortBy === "changePct") return (lpB.changePct || 0) - (lpA.changePct || 0);
                     if (watchlistSortBy === "price") return (lpB.price || 0) - (lpA.price || 0);
+                    if (watchlistSortBy === "sector") {
+                      const sa = getTickerMeta(a.ticker)?.sector ?? "zzz";
+                      const sb = getTickerMeta(b.ticker)?.sector ?? "zzz";
+                      return sa.localeCompare(sb);
+                    }
                     return a.ticker.localeCompare(b.ticker);
                   }).map(s => {
                     const lp = getLivePrice(s.ticker);
                     const price = lp?.price ?? s.price;
                     const changePct = lp?.changePct ?? s.change ?? 0;
+                    const meta = getTickerMeta(s.ticker);
+                    const sectorColor = meta?.sector === 'ETF' ? 'bg-blue-500/20 text-blue-400' :
+                      meta?.sector === 'Crypto' ? 'bg-amber-500/20 text-amber-400' :
+                      meta?.sector === 'Technology' ? 'bg-purple-500/20 text-purple-400' :
+                      meta?.sector === 'Healthcare' ? 'bg-emerald-500/20 text-emerald-400' :
+                      meta?.sector === 'Financials' ? 'bg-sky-500/20 text-sky-400' :
+                      meta?.sector === 'Automotive' ? 'bg-orange-500/20 text-orange-400' :
+                      meta?.sector === 'Communications' ? 'bg-pink-500/20 text-pink-400' :
+                      'bg-slate-500/20 text-slate-400';
                     return (
                       <div key={s.ticker}
                         className={`flex items-center justify-between p-2 bg-white/3 rounded-lg border transition group ${chartSymbol === s.chartSym ? "border-cyan-500/40 bg-cyan-500/5" : "border-white/[0.06] hover:border-cyan-500/20 hover:bg-cyan-500/3"}`}>
-                        <div className="flex items-center gap-1.5 flex-1 cursor-pointer" onClick={() => setChartSymbol(s.chartSym)}>
+                        <button type="button" className="flex items-center gap-1.5 flex-1 text-right" onClick={() => setChartSymbol(s.chartSym)} aria-label="בחר מניה">
                           <TickerLogo ticker={s.ticker} size={18} />
                           <div>
                             <div className="font-bold text-[11px] text-white font-mono">{s.ticker}</div>
-                            {lp?.volume ? <div className="text-[8px] text-slate-700 font-mono">Vol: {fmtVolume(lp.volume)}</div> : null}
+                            {meta ? (
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <span className="text-[8px] text-slate-500 truncate max-w-[72px]">{meta.name}</span>
+                                <span className={`text-[7px] px-1 rounded-full font-medium ${sectorColor}`}>{meta.sector}</span>
+                              </div>
+                            ) : lp?.volume ? (
+                              <div className="text-[8px] text-slate-700 font-mono">Vol: {fmtVolume(lp.volume)}</div>
+                            ) : null}
                           </div>
-                        </div>
+                        </button>
                         <div className="text-right flex items-center gap-1.5">
                           {price != null ? (
                             <div>
@@ -3630,53 +4318,41 @@ export default function SwingEdge() {
               </div>
             </div>
 
-            {/* ── SECTOR TRENDS ── */}
+            {/* ── SECTOR TRENDS ── reactive from watchlist */}
             <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-4">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Sector Trends</span>
-                  <span className={`w-1.5 h-1.5 rounded-full ${pulse ? "bg-emerald-400" : "bg-emerald-700"} transition-colors`} />
-                  {sectorLastUpdated && (
-                    <span className="text-[10px] text-slate-700">Updated {fmtTimeAgo(sectorLastUpdated)}</span>
-                  )}
-                </div>
-                <button onClick={fetchSectorData} disabled={sectorLoading}
-                  className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-cyan-400 transition disabled:opacity-40">
-                  <RefreshCw size={10} className={sectorLoading ? "animate-spin" : ""} />
-                  {sectorLoading ? "Loading…" : "Refresh"}
-                </button>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Sector Trends</span>
+                <span className={`w-1.5 h-1.5 rounded-full ${pulse ? "bg-emerald-400" : "bg-emerald-700"} transition-colors`} />
+                <span className="text-[10px] text-slate-700">Live from watchlist</span>
               </div>
 
-              {/* Loading skeleton */}
-              {sectorLoading && sectorData.length === 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {[...Array(8)].map((_, i) => (
-                    <div key={i} className="h-20 bg-white/3 rounded-xl border border-white/[0.06] animate-pulse" />
-                  ))}
+              {sectorTrendsData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 gap-2 text-slate-600">
+                  <BarChart2 size={24} />
+                  <p className="text-xs text-center">
+                    {lang === "he"
+                      ? "הוסף ניירות ערך לרשימת המעקב לצפייה בטרנדים"
+                      : "Add tickers to your watchlist to see sector trends"}
+                  </p>
                 </div>
-              )}
-
-              {sectorData.length > 0 && (() => {
-                const sorted = [...sectorData].sort((a, b) => b.dayChange - a.dayChange);
-                const hot = sorted.filter(s => s.dayChange > 0);
-                const declining = sorted.filter(s => s.dayChange <= 0).reverse();
+              ) : (() => {
+                const hot = sectorTrendsData.filter(s => s.avgChange > 0);
+                const declining = [...sectorTrendsData].filter(s => s.avgChange <= 0).reverse();
+                const barData = sectorTrendsData.map(s => ({ name: s.sector, dayChange: s.avgChange }));
 
                 const SectorCard = ({ s }) => (
-                  <div className={`rounded-xl border p-3 ${s.dayChange >= 0 ? "bg-[#10b981]/5 border-[#10b981]/15" : "bg-[#ef4444]/5 border-[#ef4444]/15"}`}>
+                  <div className={`rounded-xl border p-3 ${s.avgChange >= 0 ? "bg-[#10b981]/5 border-[#10b981]/15" : "bg-[#ef4444]/5 border-[#ef4444]/15"}`}>
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs font-bold text-white">{s.name}</span>
-                      <span className={`text-[10px] font-mono font-bold ${s.dayChange >= 0 ? "text-[#10b981]" : "text-[#ef4444]"}`}>
-                        {s.dayChange >= 0 ? "+" : ""}{s.dayChange.toFixed(2)}%
+                      <span className="text-xs font-bold text-white">{s.sector}</span>
+                      <span className={`text-[10px] font-mono font-bold ${s.avgChange >= 0 ? "text-[#10b981]" : "text-[#ef4444]"}`}>
+                        {s.avgChange >= 0 ? "+" : ""}{s.avgChange.toFixed(2)}%
                       </span>
                     </div>
-                    <div className="text-[10px] font-mono text-slate-400 mb-1.5">${s.price.toFixed(2)}</div>
-                    <div className="flex gap-2 text-[9px] font-mono">
-                      <span className={`px-1.5 py-0.5 rounded ${s.weekChange >= 0 ? "bg-[#10b981]/10 text-[#10b981]" : "bg-[#ef4444]/10 text-[#ef4444]"}`}>
-                        7d {s.weekChange >= 0 ? "+" : ""}{s.weekChange.toFixed(1)}%
-                      </span>
-                      <span className={`px-1.5 py-0.5 rounded ${s.monthChange >= 0 ? "bg-[#10b981]/10 text-[#10b981]" : "bg-[#ef4444]/10 text-[#ef4444]"}`}>
-                        1m {s.monthChange >= 0 ? "+" : ""}{s.monthChange.toFixed(1)}%
-                      </span>
+                    <div className="text-[10px] text-slate-500 mb-1.5 truncate">
+                      {s.tickers.slice(0, 3).join(", ")}{s.tickers.length > 3 ? ` +${s.tickers.length - 3}` : ""}
+                    </div>
+                    <div className="text-[9px] font-mono text-slate-600">
+                      {s.count} {lang === "he" ? "ניירות" : "symbol"}{s.count !== 1 ? "s" : ""}
                     </div>
                   </div>
                 );
@@ -3685,19 +4361,19 @@ export default function SwingEdge() {
                   <div className="space-y-4">
                     {/* Comparison bar chart */}
                     <div>
-                      <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-600 mb-2">Daily % Change — All Sectors</p>
+                      <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-600 mb-2">Avg % Change by Sector</p>
                       <ResponsiveContainer width="100%" height={120}>
-                        <BarChart data={sorted} margin={{ top: 4, right: 4, left: 0, bottom: 4 }}>
+                        <BarChart data={barData} margin={{ top: 4, right: 4, left: 0, bottom: 4 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" vertical={false} />
                           <XAxis dataKey="name" tick={{ fontSize: 9, fill: "#64748b" }} tickLine={false} axisLine={false} />
                           <YAxis tick={{ fontSize: 9, fill: "#64748b" }} tickLine={false} axisLine={false} tickFormatter={v => `${v.toFixed(1)}%`} />
                           <ReferenceLine y={0} stroke="#334155" strokeWidth={1} />
                           <Tooltip
                             contentStyle={{ background: "#0d1424", border: "1px solid #1e293b", borderRadius: 8, fontSize: 11 }}
-                            formatter={(v) => [`${v.toFixed(2)}%`, "Daily Change"]}
+                            formatter={(v) => [`${Number(v).toFixed(2)}%`, "Avg Change"]}
                           />
                           <Bar dataKey="dayChange" radius={[3, 3, 0, 0]}>
-                            {sorted.map((s, i) => (
+                            {barData.map((s, i) => (
                               <Cell key={i} fill={s.dayChange >= 0 ? "#10b981" : "#ef4444"} fillOpacity={0.8} />
                             ))}
                           </Bar>
@@ -3713,7 +4389,7 @@ export default function SwingEdge() {
                           <span className="text-[10px] font-bold tracking-widest uppercase text-[#10b981]">Hot Now</span>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                          {hot.map(s => <SectorCard key={s.symbol} s={s} />)}
+                          {hot.map(s => <SectorCard key={s.sector} s={s} />)}
                         </div>
                       </div>
                     )}
@@ -3726,20 +4402,13 @@ export default function SwingEdge() {
                           <span className="text-[10px] font-bold tracking-widest uppercase text-[#ef4444]">Declining Now</span>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                          {declining.map(s => <SectorCard key={s.symbol} s={s} />)}
+                          {declining.map(s => <SectorCard key={s.sector} s={s} />)}
                         </div>
                       </div>
                     )}
                   </div>
                 );
               })()}
-
-              {!sectorLoading && sectorData.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-8 gap-2 text-slate-600">
-                  <BarChart2 size={24} />
-                  <p className="text-xs">No sector data — click Refresh to load</p>
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -3750,7 +4419,7 @@ export default function SwingEdge() {
           const now = new Date();
           const thisMonth = now.getMonth();
           const thisYear = now.getFullYear();
-          const tiltCount = trades.filter(t => {
+          const tiltCount = realTrades.filter(t => {
             if (t.followedPlan !== false) return false;
             const d = new Date(t.date + "T12:00:00");
             return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
@@ -3762,7 +4431,7 @@ export default function SwingEdge() {
 
           // ── Playbook: calculate success rate per setup from journal ──
           const calcSetupSuccess = (setupName) => {
-            const matched = trades.filter(t => t.setup === setupName && t.status === "CLOSED");
+            const matched = realTrades.filter(t => t.setup === setupName && t.status === "CLOSED");
             if (matched.length === 0) return null;
             const wins = matched.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length;
             return { rate: Math.round(wins / matched.length * 100), count: matched.length };
@@ -3812,6 +4481,52 @@ export default function SwingEdge() {
                 <p className="text-xs text-slate-600 mt-0.5">{t.playbookAndDiscipline}</p>
               </div>
 
+              {/* ── APPEARANCE (Theme) ── */}
+              <div className="bg-[#0d1424] border border-emerald-500/20 rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <span aria-hidden="true" className="text-base">🎨</span>
+                  <h3 className="text-sm font-bold text-white">{t.appearance}</h3>
+                </div>
+                <p className="text-xs text-slate-500 mb-3">{t.appearanceDesc}</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: "auto",  icon: Monitor, label: t.themeAuto,  desc: t.themeSystem },
+                    { value: "light", icon: Sun,     label: t.themeLight },
+                    { value: "dark",  icon: Moon,    label: t.themeDark  },
+                  ].map((opt) => {
+                    const Icon = opt.icon;
+                    const isActive = themeMode === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setThemeMode(opt.value)}
+                        aria-label={opt.label}
+                        aria-pressed={isActive}
+                        className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl border-2 transition-all ${
+                          isActive
+                            ? "border-emerald-500 bg-emerald-500/10"
+                            : "border-white/10 hover:border-white/20"
+                        }`}
+                      >
+                        <Icon size={18} className={isActive ? "text-emerald-400" : "text-slate-400"} />
+                        <span className={`text-xs font-semibold ${isActive ? "text-emerald-300" : "text-slate-300"}`}>
+                          {opt.label}
+                        </span>
+                        {opt.desc && (
+                          <span className="text-[10px] text-slate-500">{opt.desc}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                {themeMode === "auto" && (
+                  <p className="text-xs text-slate-500 mt-3">
+                    {t.themeCurrentlyLabel} {themeResolved === "dark" ? t.themeDark : t.themeLight} ({t.themeSystemPreference})
+                  </p>
+                )}
+              </div>
+
               {/* ── LANGUAGE SELECTOR ── */}
               <div className="bg-[#0d1424] border border-violet-500/20 rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-4">
@@ -3826,13 +4541,69 @@ export default function SwingEdge() {
                   className="w-full border border-violet-500/30 rounded-lg px-3 py-2.5 text-sm text-white focus:border-violet-500/60 focus:outline-none transition font-semibold"
                   style={{ background: "#0d1424" }}
                 >
-                  {LANGUAGES.map(l => (
-                    <option key={l.code} value={l.code}>
-                      {l.nativeName} — {l.name}{l.rtl ? " (RTL)" : ""}
-                    </option>
-                  ))}
+                  <optgroup label="★ Primary">
+                    {LANGUAGES.filter(l => l.tier1).map(l => (
+                      <option key={l.code} value={l.code}>
+                        {l.nativeName} — {l.name}{l.rtl ? " (RTL)" : ""}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="── More languages (English fallback)">
+                    {LANGUAGES.filter(l => !l.tier1).map(l => (
+                      <option key={l.code} value={l.code}>
+                        {l.nativeName} — {l.name}{l.rtl ? " (RTL)" : ""}
+                      </option>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
+
+              {/* ── SECURITY (Change Password) ── */}
+              {(() => {
+                const provider = authUser?.app_metadata?.provider || "email";
+                const isGoogle = provider === "google";
+                return (
+                  <div className="bg-[#0d1424] border border-emerald-500/20 rounded-xl p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <KeyRound size={16} className="text-emerald-400" />
+                      <h3 className="text-sm font-bold text-white">{t.security}</h3>
+                    </div>
+                    {isGoogle ? (
+                      <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          {t.googleSignedInInfo}
+                        </p>
+                        <a
+                          href="https://myaccount.google.com/security"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 mt-2 text-xs font-semibold text-emerald-400 hover:underline"
+                        >
+                          {t.manageOnGoogle}
+                          <ExternalLink size={11} />
+                        </a>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-xs text-slate-500 mb-3">
+                          {t.changePassword}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setShowChangePassword(true)}
+                          className="w-full px-4 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-bold hover:bg-emerald-500/20 transition flex items-center justify-between"
+                        >
+                          <span className="flex items-center gap-2">
+                            <Lock size={12} />
+                            {t.changePassword}
+                          </span>
+                          <span className="text-slate-400">{isRTL ? "←" : "→"}</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* ── PORTFOLIO CAPITAL ── */}
               <div className="bg-[#0d1424] border border-cyan-500/20 rounded-xl p-5">
@@ -4123,6 +4894,27 @@ export default function SwingEdge() {
                 <p className="text-[10px] text-slate-700 mt-3">
                   * דוח ה-PDF נפתח בטאב חדש — לחץ על "Save as PDF" בתוך הדוח כדי לשמור.
                 </p>
+              </div>
+
+              {/* ── DANGER ZONE ── */}
+              <div className="mt-8 p-4 border-2 border-rose-500/30 bg-rose-500/5 rounded-2xl">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-lg">⚠️</span>
+                  <h3 className="font-bold text-rose-400 text-sm">
+                    {lang === "he" ? "אזור מסוכן" : "Danger Zone"}
+                  </h3>
+                </div>
+                <p className="text-sm text-rose-300/80 mb-3">
+                  {lang === "he"
+                    ? "מחיקת כל העסקאות לא ניתנת לביטול. נדרשת סיסמת חשבון לאימות."
+                    : "Resetting all trades cannot be undone. Account password is required to confirm."}
+                </p>
+                <button
+                  onClick={() => setShowResetAll(true)}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-medium transition"
+                >
+                  {lang === "he" ? "אפס יומן" : "Reset Journal"}
+                </button>
               </div>
 
             </div>
@@ -4515,234 +5307,42 @@ export default function SwingEdge() {
       )}
 
       {/* ── EDIT TRADE MODAL ── */}
-      {showEditForm && editingTrade && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg bg-[#0d1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06] bg-gradient-to-r from-cyan-500/5 to-violet-500/5">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-white">✏️ עריכת עסקה — <span className="text-cyan-400 font-mono">{editingTrade.ticker}</span></span>
-              </div>
-              <button onClick={() => { setShowEditForm(false); setEditingTrade(null); }} className="text-slate-600 hover:text-slate-300 transition">
-                <X size={16} />
-              </button>
-            </div>
-            <div className="p-5 space-y-4 overflow-y-auto">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Ticker</label>
-                  <input value={editForm.ticker} onChange={e => setEditForm(f => ({ ...f, ticker: e.target.value.toUpperCase() }))}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none transition font-mono font-bold" />
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Direction</label>
-                  <div className="flex gap-2">
-                    {["LONG","SHORT"].map(s => (
-                      <button key={s} onClick={() => setEditForm(f => ({ ...f, side: s }))}
-                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition border ${editForm.side===s?(s==="LONG"?"bg-[#10b981]/20 text-[#10b981] border-[#10b981]/30":"bg-[#ef4444]/20 text-[#ef4444] border-[#ef4444]/30"):"bg-white/3 text-slate-500 border-white/10 hover:border-white/20"}`}>
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                {[["Entry","entry","text-white"],["Stop Loss","stop","text-[#ef4444]"],["Target","target","text-[#10b981]"]].map(([label,key,cls]) => (
-                  <div key={key}>
-                    <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{label}</label>
-                    <input value={editForm[key]} onChange={e => setEditForm(f => ({ ...f, [key]: e.target.value }))}
-                      placeholder="0.00" className={`w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none transition font-mono ${cls}`} />
-                  </div>
-                ))}
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Shares</label>
-                  <input value={editForm.shares} onChange={e => setEditForm(f => ({ ...f, shares: e.target.value }))} type="number" min="0"
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none transition font-mono" />
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Setup Type</label>
-                  <select value={editForm.setup} onChange={e => setEditForm(f => ({ ...f, setup: e.target.value }))}
-                    className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
-                    {["Breakout","Pullback","Support Bounce","Resistance Break","Other"].map(s => <option key={s}>{s}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Market Condition</label>
-                  <select value={editForm.marketCondition} onChange={e => setEditForm(f => ({ ...f, marketCondition: e.target.value }))}
-                    className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
-                    {["Trending Up","Trending Down","Sideways","Volatile"].map(s => <option key={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Emotion at Entry</label>
-                  <select value={editForm.emotionAtEntry} onChange={e => setEditForm(f => ({ ...f, emotionAtEntry: e.target.value }))}
-                    className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
-                    {["Confident","Calm","Patient","Neutral","Hesitant","Nervous","FOMO","Angry"].map(s => <option key={s}>{s}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Entry Quality</label>
-                <div className="flex items-center gap-1 mt-1">
-                  {[1,2,3,4,5].map(star => (
-                    <button key={star} type="button" onClick={() => setEditForm(f => ({ ...f, entryQuality: star }))}
-                      className={`text-xl transition-transform hover:scale-110 ${editForm.entryQuality >= star ? "text-amber-400" : "text-slate-700"}`}>★</button>
-                  ))}
-                  <span className="text-[10px] text-slate-600 ml-1">{editForm.entryQuality}/5</span>
-                </div>
-              </div>
-              <div>
-                <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Notes</label>
-                <input value={editForm.notes} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))}
-                  placeholder="Trade thesis..." className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none transition" />
-              </div>
-              {/* Exit fields */}
-              <div className="border-t border-white/[0.06] pt-4">
-                <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-3">שדות סגירה (אם נסגרה)</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Exit Price</label>
-                    <input value={editForm.exit} onChange={e => setEditForm(f => ({ ...f, exit: e.target.value }))}
-                      placeholder="0.00" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-[#10b981] placeholder-slate-600 focus:border-emerald-500/50 focus:outline-none transition font-mono" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Exit Reason</label>
-                    <select value={editForm.exitReason} onChange={e => setEditForm(f => ({ ...f, exitReason: e.target.value }))}
-                      className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
-                      {["Hit Target","Hit Stop","Manual Exit","Trailing Stop","Other"].map(s => <option key={s}>{s}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3 mt-3">
-                  <div>
-                    <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">MFE</label>
-                    <input value={editForm.maxFavorable} onChange={e => setEditForm(f => ({ ...f, maxFavorable: e.target.value }))}
-                      placeholder="Highest price" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-[#10b981] placeholder-slate-600 focus:outline-none transition font-mono" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">MAE</label>
-                    <input value={editForm.maxAdverse} onChange={e => setEditForm(f => ({ ...f, maxAdverse: e.target.value }))}
-                      placeholder="Lowest price" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-[#ef4444] placeholder-slate-600 focus:outline-none transition font-mono" />
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Followed Plan?</label>
-                  <div className="flex gap-2">
-                    {[
-                      { val: true, label: "✓ Yes", on: "bg-[#10b981]/20 text-[#10b981] border-[#10b981]/30" },
-                      { val: "Partially", label: "◐ Partially", on: "bg-amber-500/20 text-amber-300 border-amber-500/30" },
-                      { val: false, label: "✗ No", on: "bg-[#ef4444]/20 text-[#ef4444] border-[#ef4444]/30" },
-                    ].map(({ val, label, on }) => (
-                      <button key={String(val)} onClick={() => setEditForm(f => ({ ...f, followedPlan: val }))}
-                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition border ${editForm.followedPlan===val ? on : "bg-white/3 text-slate-500 border-white/10 hover:border-white/20"}`}>
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Lesson Learned</label>
-                  <textarea value={editForm.lessonLearned} onChange={e => setEditForm(f => ({ ...f, lessonLearned: e.target.value }))}
-                    rows={3}
-                    placeholder="What did this trade teach you?" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-violet-500/50 focus:outline-none transition resize-y" />
-                </div>
-              </div>
-              <div className="flex gap-2 pt-1">
-                <button onClick={handleEditSubmit}
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-white text-sm font-bold hover:opacity-90 transition">
-                  שמור שינויים →
-                </button>
-                <button onClick={() => { setShowEditForm(false); setEditingTrade(null); }}
-                  className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm hover:text-white hover:border-white/20 transition">
-                  ביטול
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <EditTradeModal
+        trade={editingTrade}
+        lang={lang}
+        onClose={() => setEditingTrade(null)}
+        onSave={handleEditSubmit}
+      />
+
+      {/* ── RESET ALL (DANGER ZONE) MODAL ── */}
+      <ResetAllModal
+        open={showResetAll}
+        tradesCount={trades.length}
+        lang={lang}
+        onClose={() => setShowResetAll(false)}
+      />
 
       {/* ── HELP MODAL ── */}
-      {showHelpModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowHelpModal(false)}>
-          <div className="bg-[#131a2c] border border-white/[0.08] rounded-2xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
-              <div className="flex items-center gap-2">
-                <HelpCircle size={16} className="text-blue-400" />
-                <h3 className="text-sm font-bold text-white">Help & Documentation</h3>
-              </div>
-              <button onClick={() => setShowHelpModal(false)} className="text-slate-500 hover:text-white transition"><X size={16} /></button>
-            </div>
-            <div className="p-5 space-y-3 text-sm text-slate-300">
-              <p><span className="font-bold text-white">Quick start:</span> Press <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-[11px] font-mono">N</kbd> to open the new-trade form.</p>
-              <p><span className="font-bold text-white">Risk:</span> SwingEdge sizes positions at 1% portfolio risk. Update your capital in Settings.</p>
-              <p><span className="font-bold text-white">Demo data:</span> Settings → "Load Demo Trades" loads 30 realistic trades for testing.</p>
-              <p><span className="font-bold text-white">Live data:</span> Header tape and charts use TradingView feeds (24/7 incl. pre/post-market).</p>
-              <div className="flex gap-3 py-1">
-                <div className="w-7 h-7 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-sm flex-shrink-0">💡</div>
-                <div>
-                  <div className="text-white font-semibold text-sm">טיפ: הפעל "Always show stats"</div>
-                  <div className="text-slate-400 text-xs mt-1">לחץ פעמיים על הכלי → Display → סמן ✅ "Always show stats". זה מציג את כל הנתונים על הגרף ומשפר את הזיהוי ב-90%.</div>
-                </div>
-              </div>
-              <p className="pt-2 text-xs text-slate-500">For bug reports or feature requests, use the <span className="text-violet-400">Send Feedback</span> menu item.</p>
-            </div>
-          </div>
-        </div>
-      )}
+      {showHelpModal && <HelpModal onClose={() => setShowHelpModal(false)} />}
 
-      {/* ── PRIVACY & SECURITY MODAL ── */}
-      {showPrivacyModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowPrivacyModal(false)}>
-          <div className="bg-[#131a2c] border border-white/[0.08] rounded-2xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
-              <div className="flex items-center gap-2">
-                <Lock size={16} className="text-slate-300" />
-                <h3 className="text-sm font-bold text-white">Privacy & Security</h3>
-              </div>
-              <button onClick={() => setShowPrivacyModal(false)} className="text-slate-500 hover:text-white transition"><X size={16} /></button>
-            </div>
-            <div className="p-5 space-y-3 text-sm text-slate-300">
-              <p>Your trades are stored locally in your browser. If you signed in, they sync to your private Supabase row keyed by your user ID — only you can read them.</p>
-              <p>Live prices are fetched directly from TradingView; SwingEdge does not log or share which symbols you view.</p>
-              <p className="pt-2 text-xs text-slate-500">To erase all local data, clear your browser storage for this site or use Settings → Reset Demo Trades.</p>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ── PRIVACY MODAL ── */}
+      {showPrivacyModal && <PrivacyModal onClose={() => setShowPrivacyModal(false)} />}
 
-      {/* ── BILLING & PLAN MODAL ── */}
-      {showBillingModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowBillingModal(false)}>
-          <div className="bg-[#131a2c] border border-white/[0.08] rounded-2xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
-              <div className="flex items-center gap-2">
-                <CreditCard size={16} className="text-emerald-400" />
-                <h3 className="text-sm font-bold text-white">Billing & Plan</h3>
-              </div>
-              <button onClick={() => setShowBillingModal(false)} className="text-slate-500 hover:text-white transition"><X size={16} /></button>
-            </div>
-            <div className="p-5 space-y-3 text-sm text-slate-300">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-cyan-500/5 border border-cyan-500/20">
-                <div>
-                  <div className="text-xs text-slate-400">Current Plan</div>
-                  <div className="text-base font-bold text-cyan-400">Beta — Free</div>
-                </div>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold tracking-wider uppercase">Beta</span>
-              </div>
-              <p>You're on the free Beta tier — full access to every feature while we collect feedback. Paid plans will roll out after public launch; existing Beta accounts will keep extended free access.</p>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ── BILLING MODAL ── */}
+      {showBillingModal && <BillingModal onClose={() => setShowBillingModal(false)} />}
+
+      {/* ── CHANGE PASSWORD MODAL ── */}
+      <ChangePasswordModal
+        open={showChangePassword}
+        onClose={() => setShowChangePassword(false)}
+        lang={lang}
+      />
 
       {/* ── FLOATING NEW TRADE BUTTON ── */}
       <button
         onClick={() => setShowForm(true)}
         className="fixed bottom-6 right-6 rtl:right-auto rtl:left-6 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-violet-500 text-white shadow-2xl shadow-cyan-500/25 flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
+        aria-label="New trade"
         title="New Trade"
       >
         <Plus size={24} />
@@ -4758,7 +5358,7 @@ export default function SwingEdge() {
         <div className="flex items-center gap-4">
           <span>{t.trades}: {trades.length}</span>
           <span>{t.open}: {openTrades.length}</span>
-          <span>SwingEdge Pro v2.0</span>
+          <span>SwingEdge Pro v2.1</span>
         </div>
       </footer>
     </div>

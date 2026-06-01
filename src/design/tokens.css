@@ -1,0 +1,157 @@
+/* ──────────────────────────────────────────────────────────────────
+   SwingEdge Design Tokens — Clean Luxury
+   Imported once from index.css. No class overrides here.
+   ────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ━━━ Surfaces ━━━ */
+  --bg:                #F8FAF7;
+  --bg-elevated:       #FFFFFF;
+  --surface:           #FFFFFF;
+  --surface-elevated:  #FFFFFF;
+  --surface-sunken:    #F1F4F0;
+  --surface-hover:     #F4F7F3;
+  --border-soft:       rgba(15,20,15,0.06);
+  --border-medium:     rgba(15,20,15,0.10);
+  --border-strong:     rgba(15,20,15,0.15);
+
+  /* ━━━ Text ━━━ */
+  --text-primary:    #0A0F0B;
+  --text-secondary:  #3A4A3C;
+  --text-tertiary:   #6B7C6E;
+  --text-muted:      #8E9E91;
+  --text-inverse:    #FFFFFF;
+
+  /* ━━━ Accents — Robinhood-style green ━━━ */
+  --accent-emerald:        #00C076;
+  --accent-emerald-bright: #16D687;
+  --accent-emerald-soft:   rgba(0,192,118,0.10);
+  --accent-emerald-mid:    rgba(0,192,118,0.20);
+  --accent-emerald-glow:   rgba(0,192,118,0.30);
+  --accent-rose:           #E63950;
+  --accent-rose-soft:      rgba(230,57,80,0.10);
+  --accent-rose-mid:       rgba(230,57,80,0.20);
+  --accent-amber:          #D69333;
+  --accent-amber-soft:     rgba(214,147,51,0.10);
+  --accent-indigo:         #3F4FB8;
+  --accent-indigo-soft:    rgba(63,79,184,0.08);
+  --focus-ring:            rgba(0,192,118,0.45);
+
+  /* ━━━ Semantic ━━━ */
+  --color-success:  var(--accent-emerald);
+  --color-danger:   var(--accent-rose);
+  --color-warning:  var(--accent-amber);
+  --color-info:     var(--accent-indigo);
+
+  /* ━━━ Typography — Clean Sans only ━━━ */
+  --font-display: 'General Sans', 'Inter', system-ui, sans-serif;
+  --font-body:    'General Sans', 'Inter', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+  --font-hebrew:  'Heebo', system-ui, sans-serif;
+
+  /* ━━━ Spacing ━━━ */
+  --space-1: 4px;   --space-2: 8px;    --space-3: 12px;
+  --space-4: 16px;  --space-5: 20px;   --space-6: 24px;
+  --space-8: 32px;  --space-10: 40px;  --space-12: 56px;
+  --space-16: 64px;
+
+  /* ━━━ Radius ━━━ */
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   14px;
+  --radius-xl:   20px;
+  --radius-2xl:  28px;
+  --radius-pill: 999px;
+
+  /* ━━━ Shadows ━━━ */
+  --shadow-xs:
+    0 1px 2px rgba(15,20,15,0.04);
+  --shadow-sm:
+    0 1px 2px rgba(15,20,15,0.04),
+    0 2px 6px rgba(15,20,15,0.04);
+  --shadow-md:
+    0 2px 4px rgba(15,20,15,0.05),
+    0 8px 20px rgba(15,20,15,0.06);
+  --shadow-lg:
+    0 4px 8px rgba(15,20,15,0.06),
+    0 16px 40px rgba(15,20,15,0.08);
+  --shadow-glow:
+    0 0 0 1px rgba(0,192,118,0.20),
+    0 4px 16px rgba(0,192,118,0.15);
+
+  /* ━━━ Motion ━━━ */
+  --ease-out:        cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-spring:     cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition-fast: 120ms var(--ease-out);
+  --transition-base: 220ms var(--ease-out);
+  --transition-slow: 400ms var(--ease-out);
+
+  /* ━━━ Z-index ━━━ */
+  --z-dropdown:    100;
+  --z-sticky:      200;
+  --z-modal:       300;
+  --z-toast:       400;
+  --z-tooltip:     500;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition-fast: 0ms;
+    --transition-base: 0ms;
+    --transition-slow: 0ms;
+  }
+}
+
+:root { color-scheme: light; }
+
+/* ──────────────────────────────────────────────────────────────────
+   DARK THEME — applied via <html class="dark"> (ThemeProvider)
+   Overrides token values; the global restyle layer in index.css
+   maps Tailwind/hex classes to these variables, so dark mode flows
+   through the entire app without per-component dark: variants.
+   ────────────────────────────────────────────────────────────────── */
+.dark {
+  /* ━━━ Surfaces ━━━ */
+  --bg:                #0a0f1e;
+  --bg-elevated:       #131a2c;
+  --surface:           #0d1424;
+  --surface-elevated:  #131a2c;
+  --surface-sunken:    #0a1020;
+  --surface-hover:     #131c2e;
+  --border-soft:       rgba(255,255,255,0.06);
+  --border-medium:     rgba(255,255,255,0.10);
+  --border-strong:     rgba(255,255,255,0.15);
+
+  /* ━━━ Text ━━━ */
+  --text-primary:    #F8FAFC;
+  --text-secondary:  #CBD5E1;
+  --text-tertiary:   #94A3B8;
+  --text-muted:      #64748B;
+  --text-inverse:    #0A0F0B;
+
+  /* ━━━ Accents — slightly brighter for dark backgrounds ━━━ */
+  --accent-emerald:        #10B981;
+  --accent-emerald-bright: #34D399;
+  --accent-emerald-soft:   rgba(16,185,129,0.14);
+  --accent-emerald-mid:    rgba(16,185,129,0.25);
+  --accent-emerald-glow:   rgba(16,185,129,0.35);
+  --accent-rose:           #F43F5E;
+  --accent-rose-soft:      rgba(244,63,94,0.14);
+  --accent-rose-mid:       rgba(244,63,94,0.25);
+  --accent-amber:          #F59E0B;
+  --accent-amber-soft:     rgba(245,158,11,0.14);
+  --accent-indigo:         #818CF8;
+  --accent-indigo-soft:    rgba(129,140,248,0.14);
+  --focus-ring:            rgba(16,185,129,0.55);
+
+  /* ━━━ Shadows (deeper for dark) ━━━ */
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.30);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.30), 0 2px 6px rgba(0,0,0,0.25);
+  --shadow-md: 0 2px 4px rgba(0,0,0,0.35), 0 8px 20px rgba(0,0,0,0.30);
+  --shadow-lg: 0 4px 8px rgba(0,0,0,0.40), 0 16px 40px rgba(0,0,0,0.35);
+  --shadow-glow:
+    0 0 0 1px rgba(16,185,129,0.30),
+    0 4px 16px rgba(16,185,129,0.25);
+
+  color-scheme: dark;
+}
