@@ -41,7 +41,8 @@ const STR = {
     winrateExplain: "ה-Win Rate שלך מתוך כל העסקאות הסגורות.",
     unlocked: "🎉 התחזית נפתחה!",
     forecastTitle: "תחזית צמיחה — 24 חודשים",
-    monthlyDeposit: "הפקדה חודשית (אופציונלי)",
+    monthlyDeposit: "הפקדה חודשית — מנוף את הצמיחה (אופציונלי)",
+    enterAmount: "הזן סכום",
     month3: "חודש 3",
     month12: "חודש 12",
     month24: "חודש 24",
@@ -74,7 +75,8 @@ const STR = {
     winrateExplain: "Your win rate across all closed trades.",
     unlocked: "🎉 Forecast unlocked!",
     forecastTitle: "Growth Forecast — 24 months",
-    monthlyDeposit: "Monthly deposit (optional)",
+    monthlyDeposit: "Monthly Deposit — Amplify Growth (Optional)",
+    enterAmount: "Enter amount",
     month3: "Month 3",
     month12: "Month 12",
     month24: "Month 24",
@@ -87,6 +89,18 @@ const STR = {
     fromNow: "Now",
     balance: "Balance",
     reset: "Reset forecast",
+  },
+  es: {
+    monthlyDeposit: "Depósito Mensual — Amplifica el Crecimiento (Opcional)",
+    enterAmount: "Introducir cantidad",
+  },
+  pt: {
+    monthlyDeposit: "Depósito Mensal — Amplie o Crescimento (Opcional)",
+    enterAmount: "Inserir valor",
+  },
+  ar: {
+    monthlyDeposit: "إيداع شهري — ضاعف النمو (اختياري)",
+    enterAmount: "أدخل المبلغ",
   },
 };
 
@@ -124,7 +138,7 @@ function fmtUsd(n) {
 
 // Generate the 3 questions from real data
 function generateQuestions(closedTrades, stats, lang) {
-  const S = STR[lang] || STR.en;
+  const S = { ...STR.en, ...(STR[lang] || {}) };
 
   // ── Q1: Best Setup ──
   const setups = (stats.bySetup || []).filter((s) => s.count >= 2 && s.name && s.name !== "Unknown");
@@ -180,7 +194,7 @@ function generateQuestions(closedTrades, stats, lang) {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function GrowthPredictor({ trades = [], stats = {}, capital = 0, lang = "en" }) {
-  const S = STR[lang] || STR.en;
+  const S = { ...STR.en, ...(STR[lang] || {}) };
 
   const closedTrades = useMemo(
     () => (trades || []).filter((t) => t.status === "CLOSED"),
@@ -499,7 +513,7 @@ export default function GrowthPredictor({ trades = [], stats = {}, capital = 0, 
 
       {/* Monthly return badge + deposit input */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-        <div className="bg-slate-900/50 border border-white/[0.06] rounded-xl px-3 py-2.5">
+        <div className="bg-slate-900/50 border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl px-3 py-2.5">
           <div className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">
             {S.monthlyReturnLabel}
           </div>
@@ -508,25 +522,24 @@ export default function GrowthPredictor({ trades = [], stats = {}, capital = 0, 
             {monthlyReturn.toFixed(2)}%
           </div>
         </div>
-        <div className="md:col-span-2 bg-slate-900/50 border border-white/[0.06] rounded-xl px-3 py-2.5">
+        <div className="md:col-span-2 bg-slate-900/50 border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl px-3 py-2.5">
           <label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider flex items-center gap-1">
             <DollarSign className="w-3 h-3" />
             {S.monthlyDeposit}
           </label>
           <input
             type="number"
-            min="0"
             step="50"
-            value={monthlyDeposit}
+            value={monthlyDeposit === 0 ? "" : monthlyDeposit}
             onChange={(e) => setMonthlyDeposit(Math.max(0, Number(e.target.value) || 0))}
-            placeholder="0"
-            className="w-full bg-transparent text-white font-mono text-lg font-bold mt-0.5 focus:outline-none placeholder:text-slate-600"
+            placeholder={S.enterAmount}
+            className="w-full bg-transparent text-white font-mono text-lg font-bold mt-0.5 focus:outline-none placeholder:text-slate-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           />
         </div>
       </div>
 
       {/* Chart */}
-      <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-3 mb-4">
+      <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-3 mb-4">
         <ResponsiveContainer width="100%" height={220}>
           <AreaChart data={forecastData} margin={{ top: 5, right: 10, left: -5, bottom: 0 }}>
             <defs>
@@ -589,7 +602,7 @@ export default function GrowthPredictor({ trades = [], stats = {}, capital = 0, 
         ].map((c) => (
           <div
             key={c.label}
-            className="bg-slate-900/50 border border-white/[0.06] rounded-xl px-3 py-2.5"
+            className="bg-slate-900/50 border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl px-3 py-2.5"
           >
             <div className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">
               {c.label}

@@ -311,7 +311,7 @@ export default function OnboardingScreen({ onComplete }) {
             </div>
 
             {/* Question card */}
-            <div className="bg-[#0d1424] border border-white/[0.08] rounded-2xl p-6 shadow-2xl">
+            <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.08] rounded-2xl p-6 shadow-2xl">
               {/* Icon + title */}
               <div className="flex items-center gap-3 mb-1">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-violet-500/20 border border-cyan-500/20 flex items-center justify-center">
@@ -407,7 +407,7 @@ export default function OnboardingScreen({ onComplete }) {
                 </div>
 
                 {/* Profile card */}
-                <div className="bg-[#0d1424] border border-white/[0.08] rounded-2xl p-4">
+                <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.08] rounded-2xl p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <Star size={14} className="text-amber-400" />
                     <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">סיכום פרופיל</span>
@@ -440,7 +440,7 @@ export default function OnboardingScreen({ onComplete }) {
                 </div>
 
                 {/* Recommendations */}
-                <div className="bg-[#0d1424] border border-white/[0.08] rounded-2xl p-4">
+                <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.08] rounded-2xl p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <Zap size={14} className="text-violet-400" />
                     <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">3 המלצות מותאמות אישית</span>

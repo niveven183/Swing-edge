@@ -98,7 +98,7 @@ export default function FeedbackTab({ user }) {
   return (
     <div className="space-y-5 animate-fade-in">
       {/* Hero */}
-      <div className="rounded-2xl border border-white/[0.08] bg-gradient-to-br from-cyan-500/5 via-[#0d1424]/60 to-violet-500/5 p-6">
+      <div className="rounded-2xl border border-[var(--border-subtle)] dark:border-white/[0.08] bg-gradient-to-br from-cyan-500/5 via-[#0d1424]/60 to-violet-500/5 p-6">
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400 to-violet-500 flex items-center justify-center shadow-lg shadow-cyan-500/20 shrink-0">
             <MessageCircle size={22} className="text-white" />
@@ -123,7 +123,7 @@ export default function FeedbackTab({ user }) {
       {/* Form */}
       <form
         onSubmit={handleSubmit}
-        className="rounded-2xl border border-white/[0.08] bg-[#0d1424]/60 p-5 md:p-6 space-y-5"
+        className="rounded-2xl border border-[var(--border-subtle)] dark:border-white/[0.08] bg-[var(--bg-elevated)] dark:bg-[#0d1424]/60 p-5 md:p-6 space-y-5"
       >
         {/* Type selector as cards */}
         <div>
@@ -141,7 +141,7 @@ export default function FeedbackTab({ user }) {
                   className={`rounded-xl border px-3 py-3 text-right transition ${
                     active
                       ? "border-cyan-400/60 bg-gradient-to-br from-cyan-500/15 to-violet-500/10 text-white shadow-inner"
-                      : "border-white/[0.08] bg-white/[0.02] text-slate-300 hover:border-white/20 hover:bg-white/[0.04]"
+                      : "border-[var(--border-subtle)] dark:border-white/[0.08] bg-white/[0.02] text-slate-300 hover:border-white/20 hover:bg-white/[0.04]"
                   }`}
                 >
                   <div className="text-xl mb-1">{type.emoji}</div>
@@ -185,7 +185,7 @@ export default function FeedbackTab({ user }) {
             rows={6}
             maxLength={2000}
             placeholder="ספר לנו מה קרה, מה אהבת, או מה היית רוצה שיהיה אחרת..."
-            className="w-full rounded-xl bg-white/[0.03] border border-white/[0.08] px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-cyan-400/50 focus:bg-white/[0.05] transition leading-relaxed resize-y"
+            className="w-full rounded-xl bg-white/[0.03] border border-[var(--border-subtle)] dark:border-white/[0.08] px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-cyan-400/50 focus:bg-white/[0.05] transition leading-relaxed resize-y"
             required
           />
           <div className="flex items-center justify-between mt-1.5 text-[11px] text-slate-500">
@@ -196,7 +196,7 @@ export default function FeedbackTab({ user }) {
 
         {/* Sender preview */}
         {user?.email && (
-          <div className="text-[11px] text-slate-500 border border-white/[0.06] rounded-lg bg-white/[0.02] px-3 py-2">
+          <div className="text-[11px] text-slate-500 border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg bg-white/[0.02] px-3 py-2">
             <span className="text-slate-400 font-semibold">נשלח מטעם:</span>{" "}
             <span className="font-mono text-cyan-300">{user.email}</span>
           </div>

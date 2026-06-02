@@ -106,8 +106,8 @@ export default function EditTradeModal({ trade, lang, onClose, onSave }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg bg-[#0d1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06] bg-gradient-to-r from-cyan-500/5 to-violet-500/5">
+      <div className="w-full max-w-lg bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-gradient-to-r from-cyan-500/5 to-violet-500/5">
           <div className="flex items-center gap-2">
             <span className="text-sm font-bold text-white">
               ✏️ {isHe ? "עריכת עסקה" : "Edit Trade"} —{" "}
@@ -290,7 +290,7 @@ export default function EditTradeModal({ trade, lang, onClose, onSave }) {
           </div>
 
           {/* Exit section */}
-          <div className="border-t border-white/[0.06] pt-4">
+          <div className="border-t border-[var(--border-subtle)] dark:border-white/[0.06] pt-4">
             <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-3">
               {isHe ? "שדות סגירה (אם נסגרה)" : "Closing Fields (if closed)"}
             </p>

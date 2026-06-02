@@ -243,10 +243,10 @@ function Modal({ open, onClose, title, children, wide = false }) {
       aria-modal="true"
     >
       <div
-        className={`w-full ${wide ? "max-w-4xl" : "max-w-md"} bg-[#0d1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[85vh] flex flex-col`}
+        className={`w-full ${wide ? "max-w-4xl" : "max-w-md"} bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[85vh] flex flex-col`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">
+        <div className="px-5 py-4 border-b border-[var(--border-subtle)] dark:border-white/[0.06] flex items-center justify-between">
           <span className="text-sm font-bold text-white">{title}</span>
           <button onClick={onClose} className="text-slate-500 hover:text-slate-200 transition" aria-label="Close">
             <X size={16} />
@@ -320,9 +320,9 @@ function PasswordGate({ open, onClose, onConfirm, title, message, busy }) {
       <form
         onSubmit={submit}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm bg-[#0d1424] border border-rose-500/30 rounded-2xl shadow-2xl overflow-hidden"
+        className="w-full max-w-sm bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-rose-500/30 rounded-2xl shadow-2xl overflow-hidden"
       >
-        <div className="px-5 py-4 border-b border-white/[0.06] bg-rose-500/5 flex items-center gap-2">
+        <div className="px-5 py-4 border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-rose-500/5 flex items-center gap-2">
           <Lock size={14} className="text-rose-400" />
           <span className="text-sm font-bold text-white">{title || "Confirm Password"}</span>
         </div>
@@ -456,7 +456,7 @@ export default function AdminPanel() {
       )}
 
       {/* Tab nav */}
-      <div className="flex items-center gap-1 border-b border-white/[0.06] overflow-x-auto">
+      <div className="flex items-center gap-1 border-b border-[var(--border-subtle)] dark:border-white/[0.06] overflow-x-auto">
         {TAB_DEFS.map(({ id, label, icon: Icon }) => {
           const active = tab === id;
           const showBadge = id === "feedback" && unreadFeedbackCount > 0;
@@ -529,7 +529,7 @@ function OverviewTab({ trades, feedback, users, loading }) {
         <KpiCard label="Trades this week" value={tradesThisWeek} accent="slate" icon={Zap} sub="replaces 'avg session' (anon-key limit)" />
       </div>
 
-      <div className="bg-[#0d1424] border border-white/[0.06] rounded-2xl p-4">
+      <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-2xl p-4">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-xs font-bold text-white tracking-wide uppercase">New users per week</h3>
           <span className="text-[10px] text-slate-500">last 7 weeks</span>
@@ -559,11 +559,11 @@ function OverviewTab({ trades, feedback, users, loading }) {
         </p>
       </div>
 
-      <div className="bg-[#0d1424] border border-white/[0.06] rounded-2xl p-4">
+      <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-2xl p-4">
         <h3 className="text-xs font-bold text-white tracking-wide uppercase mb-3">Top 5 active users</h3>
         <table className="w-full text-xs">
           <thead>
-            <tr className="text-slate-600 border-b border-white/[0.06] text-[10px] tracking-widest uppercase">
+            <tr className="text-slate-600 border-b border-[var(--border-subtle)] dark:border-white/[0.06] text-[10px] tracking-widest uppercase">
               <th className="p-2 text-left font-semibold">Email</th>
               <th className="p-2 text-right font-semibold">Trades</th>
               <th className="p-2 text-left font-semibold">Last active</th>
@@ -699,11 +699,11 @@ function UsersTab({ users, trades, feedback, toast, onMutate }) {
         Provider (Google/Email) requires Supabase service_role and is not available with anon key — column shows "—".
       </GapNote>
 
-      <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl overflow-hidden">
+      <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-slate-600 border-b border-white/[0.06] text-[10px] tracking-widest uppercase bg-white/[0.02]">
+              <tr className="text-slate-600 border-b border-[var(--border-subtle)] dark:border-white/[0.06] text-[10px] tracking-widest uppercase bg-white/[0.02]">
                 <th className="p-2 text-left font-semibold">Email</th>
                 <th className="p-2 text-left font-semibold">Joined (proxy)</th>
                 <th className="p-2 text-left font-semibold">Last activity</th>
@@ -764,7 +764,7 @@ function UsersTab({ users, trades, feedback, toast, onMutate }) {
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between p-3 border-t border-white/[0.06]">
+        <div className="flex items-center justify-between p-3 border-t border-[var(--border-subtle)] dark:border-white/[0.06]">
           <span className="text-[10px] text-slate-500 font-mono">
             {pageRows.length ? `${(page - 1) * PER_PAGE + 1}–${(page - 1) * PER_PAGE + pageRows.length}` : "0"} of {filtered.length}
           </span>
@@ -806,7 +806,7 @@ function UserTradesView({ user, trades }) {
   return (
     <table className="w-full text-xs">
       <thead>
-        <tr className="text-slate-600 border-b border-white/[0.06] text-[10px] tracking-widest uppercase">
+        <tr className="text-slate-600 border-b border-[var(--border-subtle)] dark:border-white/[0.06] text-[10px] tracking-widest uppercase">
           <th className="p-2 text-left">Ticker</th>
           <th className="p-2 text-left">Date</th>
           <th className="p-2 text-left">Side</th>
@@ -848,7 +848,7 @@ function UserFeedbackView({ user, feedback }) {
   return (
     <div className="space-y-2">
       {list.map((f) => (
-        <div key={f.id} className="bg-white/3 border border-white/[0.06] rounded-lg p-3">
+        <div key={f.id} className="bg-white/3 border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-3">
           <div className="flex items-center gap-2 text-[11px] text-slate-500 mb-1">
             <span>{emoji[f.type] || "💬"}</span>
             <span>{formatDateTime(f.created_at)}</span>
@@ -951,7 +951,7 @@ function TradesTab({ trades, toast, onMutate }) {
         <KpiCard label="Top ticker" value={stats.topTicker} accent="amber" />
       </div>
 
-      <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-3 flex flex-wrap items-center gap-2">
+      <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-3 flex flex-wrap items-center gap-2">
         <input
           value={filters.email}
           onChange={(e) => setFilters((f) => ({ ...f, email: e.target.value }))}
@@ -1006,11 +1006,11 @@ function TradesTab({ trades, toast, onMutate }) {
         ><Download size={11} /> Filtered CSV</button>
       </div>
 
-      <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl overflow-hidden">
+      <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-slate-600 border-b border-white/[0.06] text-[10px] tracking-widest uppercase bg-white/[0.02]">
+              <tr className="text-slate-600 border-b border-[var(--border-subtle)] dark:border-white/[0.06] text-[10px] tracking-widest uppercase bg-white/[0.02]">
                 <th className="p-2 text-left">Ticker</th>
                 <th className="p-2 text-left">User</th>
                 <th className="p-2 text-left">Date</th>
@@ -1057,7 +1057,7 @@ function TradesTab({ trades, toast, onMutate }) {
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between p-3 border-t border-white/[0.06]">
+        <div className="flex items-center justify-between p-3 border-t border-[var(--border-subtle)] dark:border-white/[0.06]">
           <span className="text-[10px] text-slate-500 font-mono">
             {pageRows.length ? `${(page - 1) * PER_PAGE + 1}–${(page - 1) * PER_PAGE + pageRows.length}` : "0"} of {filtered.length}
           </span>
@@ -1172,7 +1172,7 @@ function FeedbackTab({ feedback, setFeedback, toast }) {
         {filtered.map((f) => {
           const status = getStatus(f);
           return (
-            <div key={f.id} className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-3">
+            <div key={f.id} className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-3">
               <div className="flex items-start gap-3 flex-wrap">
                 <div className="text-xl">{typeEmoji[f.type] || "💬"}</div>
                 <div className="flex-1 min-w-[200px]">
@@ -1280,7 +1280,7 @@ function SystemTab({ trades, feedback, supaUp, toast, onMutate }) {
       </header>
 
       {/* 5.1 Demo Trades */}
-      <section className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-4 space-y-3">
+      <section className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-bold text-white tracking-wide uppercase">Demo trades</h3>
           <span className="text-[11px] text-slate-400 font-mono">{demoCount} in DB</span>
@@ -1307,7 +1307,7 @@ function SystemTab({ trades, feedback, supaUp, toast, onMutate }) {
       </section>
 
       {/* 5.2 Feature flags */}
-      <section className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-4 space-y-3">
+      <section className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4 space-y-3">
         <h3 className="text-xs font-bold text-white tracking-wide uppercase">Feature flags</h3>
         <p className="text-[10px] text-slate-600">Stored in localStorage (this admin's browser only). Server-side sync is out of scope.</p>
         <FlagRow label="Beta badge" desc="Show 'Beta' label across the app" value={flags.betaBadge} onChange={(v) => saveFlag("betaBadge", v)} />
@@ -1328,7 +1328,7 @@ function SystemTab({ trades, feedback, supaUp, toast, onMutate }) {
       </section>
 
       {/* 5.3 App health */}
-      <section className="bg-[#0d1424] border border-white/[0.06] rounded-xl p-4 space-y-3">
+      <section className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4 space-y-3">
         <h3 className="text-xs font-bold text-white tracking-wide uppercase">App health</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <HealthRow
@@ -1386,7 +1386,7 @@ function FlagRow({ label, desc, value, onChange, danger }) {
 
 function HealthRow({ icon: Icon, label, ok, detail }) {
   return (
-    <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-3 flex items-center gap-3">
+    <div className="bg-white/[0.02] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-3 flex items-center gap-3">
       <Icon size={14} className={ok ? "text-emerald-400" : "text-rose-400"} />
       <div className="flex-1">
         <div className="text-[11px] text-slate-300 font-semibold">{label}</div>
@@ -1500,7 +1500,7 @@ function LogsTab({ trades, feedback }) {
         Auth events (sign-in / signup) aren't accessible with the anon key. "Auth" filter is disabled.
       </GapNote>
 
-      <div className="bg-[#0d1424] border border-white/[0.06] rounded-xl overflow-hidden">
+      <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl overflow-hidden">
         <div className="max-h-[520px] overflow-y-auto divide-y divide-white/[0.04]">
           {filtered.length === 0 && (
             <div className="p-6 text-center text-slate-600 text-xs">No events</div>

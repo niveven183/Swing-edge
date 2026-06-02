@@ -14,7 +14,7 @@ export default function BetaWelcome({ onStart, userName }) {
       </div>
 
       <div className="relative z-10 w-full max-w-lg">
-        <div className="rounded-2xl border border-white/[0.08] bg-[#0d1424]/80 backdrop-blur-md p-8 shadow-2xl text-center">
+        <div className="rounded-2xl border border-[var(--border-subtle)] dark:border-white/[0.08] bg-[var(--bg-elevated)] dark:bg-[#0d1424]/80 backdrop-blur-md p-8 shadow-2xl text-center">
           {/* Badge */}
           <div className="flex justify-center mb-5">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-cyan-500/15 to-violet-500/15 border border-cyan-500/30 text-cyan-300 text-[10px] font-bold tracking-[0.2em] uppercase">
@@ -62,7 +62,7 @@ export default function BetaWelcome({ onStart, userName }) {
             ].map(({ icon: Icon, title, body }) => (
               <div
                 key={title}
-                className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3.5"
+                className="rounded-xl border border-[var(--border-subtle)] dark:border-white/[0.08] bg-white/[0.03] p-3.5"
               >
                 <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center mb-2">
                   <Icon size={15} className="text-cyan-400" />

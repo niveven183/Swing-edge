@@ -2,8 +2,8 @@ import { HelpCircle, X } from "lucide-react";
 export default function HelpModal({ onClose }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" role="presentation" onClick={onClose}>
-      <button type="button" className="bg-[#131a2c] border border-white/[0.08] rounded-2xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
+      <button type="button" className="bg-[#131a2c] border border-[var(--border-subtle)] dark:border-white/[0.08] rounded-2xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-subtle)] dark:border-white/[0.06]">
           <div className="flex items-center gap-2">
             <HelpCircle size={16} className="text-blue-400" />
             <h3 className="text-sm font-bold text-white">Help &amp; Documentation</h3>

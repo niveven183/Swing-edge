@@ -181,9 +181,9 @@ export default function TradingViewSearch({ value, onPick, livePrices = {}, setL
       </div>
 
       {open && results.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-[#0d1424] border border-white/10 rounded-lg shadow-2xl z-30 max-h-80 overflow-y-auto animate-slide-down">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-white/10 rounded-lg shadow-2xl z-30 max-h-80 overflow-y-auto animate-slide-down">
           {!query && (
-            <div className="px-3 py-1.5 text-[9px] text-slate-500 uppercase tracking-widest border-b border-white/[0.06] bg-white/3">
+            <div className="px-3 py-1.5 text-[9px] text-slate-500 uppercase tracking-widest border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-white/3">
               Popular
             </div>
           )}

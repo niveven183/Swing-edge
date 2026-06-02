@@ -121,9 +121,9 @@ export default function ChangePasswordModal({ open, onClose, lang = "he" }) {
         aria-modal="true"
         aria-labelledby="change-password-title"
         onClick={(e) => e.stopPropagation()}
-        className="bg-[#0d1424] border border-white/[0.08] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
+        className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.08] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
       >
-        <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-subtle)] dark:border-white/[0.06]">
           <div className="flex items-center gap-2">
             <Lock size={16} className="text-emerald-400" />
             <h3 id="change-password-title" className="text-sm font-bold text-white">

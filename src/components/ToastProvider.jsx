@@ -106,15 +106,15 @@ export function ConfirmProvider({ children }) {
       {state && (
         <button type="button" className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => close(false)}>
           <button type="button" onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm bg-[#0d1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-white/[0.06] flex items-center gap-2">
+            className="w-full max-w-sm bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-[var(--border-subtle)] dark:border-white/[0.06] flex items-center gap-2">
               <AlertTriangle size={16} className={state.danger ? "text-rose-400" : "text-amber-400"} />
               <span className="text-sm font-bold text-white">{state.title}</span>
             </div>
             <div className="px-5 py-4">
               <p className="text-sm text-slate-300 leading-relaxed">{state.message}</p>
             </div>
-            <div className="px-5 py-3 border-t border-white/[0.06] bg-black/20 flex gap-2 justify-end">
+            <div className="px-5 py-3 border-t border-[var(--border-subtle)] dark:border-white/[0.06] bg-black/20 flex gap-2 justify-end">
               <button onClick={() => close(false)}
                 className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-slate-300 text-xs hover:bg-white/10 transition">
                 {state.cancelText}
@@ -144,7 +144,7 @@ export function Tooltip({ label, children, position = "top" }) {
     <span className="relative inline-flex" onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)} onFocus={() => setShow(true)} onBlur={() => setShow(false)}>
       {children}
       {show && label && (
-        <span className={`absolute ${positions[position] || positions.top} z-50 px-2 py-1 rounded-md bg-[#0a0f1e] border border-white/10 text-[10px] text-slate-200 font-medium whitespace-nowrap shadow-xl pointer-events-none`}>
+        <span className={`absolute ${positions[position] || positions.top} z-50 px-2 py-1 rounded-md bg-[var(--bg-primary)] dark:bg-[#0a0f1e] border border-white/10 text-[10px] text-slate-200 font-medium whitespace-nowrap shadow-xl pointer-events-none`}>
           {label}
         </span>
       )}

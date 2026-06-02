@@ -45,7 +45,7 @@ export default function IOSInstallBanner() {
   return (
     <div
       dir="rtl"
-      className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[90] w-[min(92vw,460px)] rounded-2xl border border-cyan-500/30 bg-[#0d1424]/95 backdrop-blur-md shadow-2xl shadow-black/50 p-4"
+      className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[90] w-[min(92vw,460px)] rounded-2xl border border-cyan-500/30 bg-[var(--bg-elevated)] dark:bg-[#0d1424]/95 backdrop-blur-md shadow-2xl shadow-black/50 p-4"
       style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}
     >
       <button

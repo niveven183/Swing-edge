@@ -4,44 +4,65 @@
    ────────────────────────────────────────────────────────────────── */
 
 :root {
-  /* ━━━ Surfaces ━━━ */
+  /* ━━━ Surfaces — Robinhood-style sage palette ━━━ */
   --bg:                #F8FAF7;
   --bg-elevated:       #FFFFFF;
   --surface:           #FFFFFF;
   --surface-elevated:  #FFFFFF;
-  --surface-sunken:    #F1F4F0;
-  --surface-hover:     #F4F7F3;
-  --border-soft:       rgba(15,20,15,0.06);
-  --border-medium:     rgba(15,20,15,0.10);
-  --border-strong:     rgba(15,20,15,0.15);
+  --surface-sunken:    #F0F4EE;
+  --surface-hover:     #EDF2EA;
+  --border-soft:       #D8E2D0;
+  --border-medium:     #B8C9AC;
+  --border-strong:     #8FA67C;
 
-  /* ━━━ Text ━━━ */
-  --text-primary:    #0A0F0B;
-  --text-secondary:  #3A4A3C;
-  --text-tertiary:   #6B7C6E;
-  --text-muted:      #8E9E91;
+  /* New layered-background names (task G spec) */
+  --bg-primary:        #F8FAF7;
+  --bg-secondary:      #F0F4EE;
+  --bg-subtle:         #EDF2EA;
+  --border-subtle:     #D8E2D0;
+  --border-default:    #B8C9AC;
+
+  /* ━━━ Text — deep forest charcoal ━━━ */
+  --text-primary:    #1B2419;
+  --text-secondary:  #4A5848;
+  --text-tertiary:   #6B7868;
+  --text-muted:      #9CA89A;
+  --text-disabled:   #9CA89A;
   --text-inverse:    #FFFFFF;
 
-  /* ━━━ Accents — Robinhood-style green ━━━ */
-  --accent-emerald:        #00C076;
+  /* ━━━ Accents — Robinhood signature green ━━━ */
+  --accent-emerald:        #00C805;
   --accent-emerald-bright: #16D687;
-  --accent-emerald-soft:   rgba(0,192,118,0.10);
-  --accent-emerald-mid:    rgba(0,192,118,0.20);
-  --accent-emerald-glow:   rgba(0,192,118,0.30);
-  --accent-rose:           #E63950;
-  --accent-rose-soft:      rgba(230,57,80,0.10);
-  --accent-rose-mid:       rgba(230,57,80,0.20);
-  --accent-amber:          #D69333;
-  --accent-amber-soft:     rgba(214,147,51,0.10);
-  --accent-indigo:         #3F4FB8;
-  --accent-indigo-soft:    rgba(63,79,184,0.08);
-  --focus-ring:            rgba(0,192,118,0.45);
+  --accent-emerald-soft:   rgba(0,200,5,0.08);
+  --accent-emerald-mid:    rgba(0,200,5,0.18);
+  --accent-emerald-glow:   rgba(0,200,5,0.15);
+  --accent-rose:           #C8201F;
+  --accent-rose-soft:      rgba(200,32,31,0.10);
+  --accent-rose-mid:       rgba(200,32,31,0.20);
+  --accent-amber:          #D97706;
+  --accent-amber-soft:     rgba(217,119,6,0.10);
+  --accent-indigo:         #0284C7;
+  --accent-indigo-soft:    rgba(2,132,199,0.08);
+  --focus-ring:            rgba(0,200,5,0.40);
+
+  /* Brand aliases (task G spec) */
+  --brand-primary:    #00C805;
+  --brand-secondary:  #00A805;
+  --brand-hover:      #009404;
+  --brand-soft:       rgba(0,200,5,0.08);
+  --brand-glow:       rgba(0,200,5,0.15);
 
   /* ━━━ Semantic ━━━ */
-  --color-success:  var(--accent-emerald);
+  --color-success:  #00A805;
   --color-danger:   var(--accent-rose);
   --color-warning:  var(--accent-amber);
   --color-info:     var(--accent-indigo);
+
+  /* Unprefixed semantic aliases */
+  --success:        var(--color-success);
+  --danger:         var(--color-danger);
+  --warning:        var(--color-warning);
+  --info:           var(--color-info);
 
   /* ━━━ Typography — Clean Sans only ━━━ */
   --font-display: 'General Sans', 'Inter', system-ui, sans-serif;
@@ -63,21 +84,21 @@
   --radius-2xl:  28px;
   --radius-pill: 999px;
 
-  /* ━━━ Shadows ━━━ */
+  /* ━━━ Shadows — soft warm charcoal ━━━ */
   --shadow-xs:
-    0 1px 2px rgba(15,20,15,0.04);
+    0 1px 2px rgba(27,36,25,0.04);
   --shadow-sm:
-    0 1px 2px rgba(15,20,15,0.04),
-    0 2px 6px rgba(15,20,15,0.04);
+    0 1px 2px rgba(27,36,25,0.04);
   --shadow-md:
-    0 2px 4px rgba(15,20,15,0.05),
-    0 8px 20px rgba(15,20,15,0.06);
+    0 4px 12px rgba(27,36,25,0.06);
   --shadow-lg:
-    0 4px 8px rgba(15,20,15,0.06),
-    0 16px 40px rgba(15,20,15,0.08);
+    0 12px 32px rgba(27,36,25,0.08);
+  --shadow-card:
+    0 1px 3px rgba(27,36,25,0.05),
+    0 2px 8px rgba(27,36,25,0.03);
   --shadow-glow:
-    0 0 0 1px rgba(0,192,118,0.20),
-    0 4px 16px rgba(0,192,118,0.15);
+    0 0 0 1px rgba(0,200,5,0.20),
+    0 4px 16px rgba(0,200,5,0.15);
 
   /* ━━━ Motion ━━━ */
   --ease-out:        cubic-bezier(0.25, 1, 0.5, 1);
@@ -152,6 +173,28 @@
   --shadow-glow:
     0 0 0 1px rgba(16,185,129,0.30),
     0 4px 16px rgba(16,185,129,0.25);
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.25);
+
+  /* ━━━ New token aliases (task G spec) — map to existing dark values ━━━ */
+  --bg-primary:    var(--bg);
+  --bg-secondary:  var(--surface-sunken);
+  --bg-subtle:     var(--surface-hover);
+  --border-subtle: var(--border-soft);
+  --border-default: var(--border-medium);
+
+  --brand-primary:   var(--accent-emerald);
+  --brand-secondary: var(--accent-emerald);
+  --brand-hover:     var(--accent-emerald-bright);
+  --brand-soft:      var(--accent-emerald-soft);
+  --brand-glow:      var(--accent-emerald-glow);
+
+  --text-disabled: var(--text-muted);
+
+  --color-success:  var(--accent-emerald);
+  --success:        var(--accent-emerald);
+  --danger:         var(--accent-rose);
+  --warning:        var(--accent-amber);
+  --info:           var(--accent-indigo);
 
   color-scheme: dark;
 }
