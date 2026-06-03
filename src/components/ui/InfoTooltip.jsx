@@ -93,10 +93,11 @@ export default function InfoTooltip({ children, label = 'More info', side = 'aut
         className="
           inline-flex items-center justify-center
           w-[20px] h-[20px] rounded-full
-          border-2 border-slate-400
-          text-slate-500 text-[11px] font-bold
-          bg-white
+          border-2 border-slate-400 dark:border-slate-600
+          text-slate-500 dark:text-slate-400 text-[11px] font-bold
+          bg-white dark:bg-white/[0.06]
           hover:border-emerald-500 hover:text-emerald-600 hover:bg-emerald-50
+          dark:hover:border-emerald-400 dark:hover:text-emerald-400 dark:hover:bg-emerald-500/10
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400
           transition-all duration-150
           select-none flex-shrink-0
@@ -126,9 +127,9 @@ export default function InfoTooltip({ children, label = 'More info', side = 'aut
             zIndex: 9999,
           }}
           className="
-            bg-white
+            bg-white dark:bg-slate-900
             rounded-xl
-            border border-slate-200
+            border border-slate-200 dark:border-white/[0.08]
             shadow-[0_8px_32px_rgba(15,20,15,0.12),0_2px_8px_rgba(15,20,15,0.06)]
             p-4
             animate-fadeUpSoft
@@ -137,7 +138,7 @@ export default function InfoTooltip({ children, label = 'More info', side = 'aut
         >
           <div
             className={`
-              absolute w-3 h-3 bg-white border-slate-200
+              absolute w-3 h-3 bg-white dark:bg-slate-900 border-slate-200 dark:border-white/[0.08]
               ${pos.placement === 'bottom'
                 ? 'top-[-7px] border-t border-l'
                 : 'bottom-[-7px] border-b border-r'}
@@ -146,7 +147,7 @@ export default function InfoTooltip({ children, label = 'More info', side = 'aut
           />
 
           <div
-            className="text-[13px] leading-relaxed text-slate-700 font-normal"
+            className="text-[13px] leading-relaxed text-slate-700 dark:text-slate-100 font-normal"
             style={{ direction: 'inherit' }}
           >
             {children}
@@ -159,6 +160,7 @@ export default function InfoTooltip({ children, label = 'More info', side = 'aut
               w-6 h-6 rounded-full
               flex items-center justify-center
               text-slate-400 hover:text-slate-700 hover:bg-slate-100
+              dark:text-slate-500 dark:hover:text-slate-200 dark:hover:bg-white/[0.08]
               text-xs md:hidden transition-all
             "
             aria-label="Close"

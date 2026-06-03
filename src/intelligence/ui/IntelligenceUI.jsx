@@ -20,16 +20,16 @@ const pick = (msg, lang) => (msg && typeof msg === "object" ? (msg[lang] || msg.
 // ─── Small utility for a 0..100 bar ──────────────────────────────────────────
 const ScoreBar = ({ value, accent = "cyan" }) => {
   const colors = {
-    cyan:   "from-cyan-500 to-cyan-300",
-    green:  "from-emerald-500 to-emerald-300",
-    amber:  "from-amber-500 to-amber-300",
-    violet: "from-violet-500 to-violet-300",
-    rose:   "from-rose-500 to-rose-300",
+    cyan:   "bg-cyan-500 dark:bg-cyan-400",
+    green:  "bg-emerald-500 dark:bg-emerald-400",
+    amber:  "bg-amber-500 dark:bg-amber-400",
+    violet: "bg-violet-500 dark:bg-violet-400",
+    rose:   "bg-rose-500 dark:bg-rose-400",
   };
   return (
-    <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+    <div className="h-1.5 rounded-full bg-slate-200 dark:bg-white/[0.07] overflow-hidden">
       <div
-        className={`h-full bg-gradient-to-r ${colors[accent] || colors.cyan}`}
+        className={`h-full ${colors[accent] || colors.cyan}`}
         style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
       />
     </div>
@@ -51,14 +51,14 @@ export const DNACard = ({ dna, lang = "he" }) => {
   ];
 
   return (
-    <div className="bg-[#0d1424] border border-violet-500/25 rounded-xl p-4 relative overflow-hidden">
+    <div className="bg-white dark:bg-[#0d1424] border border-slate-200 dark:border-violet-500/25 rounded-xl p-4 relative overflow-hidden">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Brain size={16} className="text-violet-400" />
-          <span className="text-xs font-semibold tracking-widest uppercase text-slate-400">{labels.title}</span>
+          <Brain size={16} className="text-violet-500 dark:text-violet-400" />
+          <span className="text-xs font-semibold tracking-widest uppercase text-slate-500 dark:text-slate-400">{labels.title}</span>
           <InfoTooltip label="Trading DNA">{TRADING_TOOLTIPS.dna[lang]||TRADING_TOOLTIPS.dna.en}</InfoTooltip>
         </div>
-        <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-300 border border-violet-500/20 font-mono">
+        <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-500/20 font-mono">
           {labels.maturity[dna.maturity] || dna.maturity} · {dna.sampleSize} {labels.sample}
         </span>
       </div>
@@ -66,8 +66,8 @@ export const DNACard = ({ dna, lang = "he" }) => {
         {rows.map(r => (
           <div key={r.key} className="space-y-1">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-slate-400">{labels[r.key]}</span>
-              <span className="text-xs font-bold font-mono text-white">{r.value}</span>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">{labels[r.key]}</span>
+              <span className="text-xs font-bold font-mono text-slate-900 dark:text-white">{r.value}</span>
             </div>
             <ScoreBar value={r.value} accent={r.accent} />
           </div>
@@ -248,18 +248,27 @@ export const TiltShield = ({ tilt, lang = "he", onDismiss, onCooldown, onClearCo
 
 // ─── GROWTH SCORE + CHART ────────────────────────────────────────────────────
 export const GrowthChart = ({ evolution, current, delta, lang = "he" }) => {
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
+  useEffect(() => {
+    const obs = new MutationObserver(() =>
+      setIsDark(document.documentElement.classList.contains('dark'))
+    );
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => obs.disconnect();
+  }, []);
+
   if (!evolution || !evolution.length) return null;
   return (
-    <div className="bg-[#0d1424] border border-white/10 rounded-xl p-4">
+    <div className="bg-white dark:bg-[#0d1424] border border-slate-200 dark:border-white/10 rounded-xl p-4">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <Activity size={15} className="text-cyan-400" />
-          <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-400">
+          <Activity size={15} className="text-cyan-500 dark:text-cyan-400" />
+          <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 dark:text-slate-400">
             {lang === "he" ? "התפתחות כסוחר" : "Trader Growth"}
           </span>
         </div>
         <div className="text-right">
-          <div className="text-xl font-bold font-mono text-white leading-none">{current}</div>
+          <div className="text-xl font-bold font-mono text-slate-900 dark:text-white leading-none">{current}</div>
           {delta != null && (
             <div className={`text-[10px] font-mono ${delta >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
               {delta >= 0 ? "▲" : "▼"} {Math.abs(delta)}
@@ -271,15 +280,18 @@ export const GrowthChart = ({ evolution, current, delta, lang = "he" }) => {
         <AreaChart data={evolution}>
           <defs>
             <linearGradient id="growthGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%"   stopColor="#8b5cf6" stopOpacity={0.35} />
-              <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0} />
+              <stop offset="0%"   stopColor="#00C805" stopOpacity={0.20} />
+              <stop offset="100%" stopColor="#00C805" stopOpacity={0.01} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" />
+          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#ffffff08" : "#00000010"} />
           <XAxis dataKey="label" tick={{ fontSize: 9, fill: "#475569" }} axisLine={false} tickLine={false} />
           <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: "#475569" }} axisLine={false} tickLine={false} />
-          <Tooltip contentStyle={{ background: "#0d1424", border: "1px solid #162032", borderRadius: 8, fontSize: 11 }} />
-          <Area type="monotone" dataKey="score" stroke="#8b5cf6" strokeWidth={2} fill="url(#growthGrad)" />
+          <Tooltip contentStyle={isDark
+            ? { background: "#0d1424", border: "1px solid #162032", borderRadius: 8, fontSize: 11 }
+            : { background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 11 }
+          } />
+          <Area type="monotone" dataKey="score" stroke="#00C805" strokeWidth={2} fill="url(#growthGrad)" />
         </AreaChart>
       </ResponsiveContainer>
     </div>
