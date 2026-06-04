@@ -4,6 +4,8 @@
 // Uses multiple CORS proxy fallbacks with per-call retry for reliability.
 // Single source of truth for all pricing data in the app.
 
+import * as Sentry from "@sentry/react";
+
 const CORS_PROXIES = [
   (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
   (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
@@ -88,27 +90,50 @@ const fromYahooSymbol = (symbol) => {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// ─── QUOTE CACHE (12s TTL) ──────────────────────────────────────────────────
+// Prevents duplicate concurrent calls within the same refresh burst.
+// TTL is just under the 15s market-open interval so live data stays fresh.
+const _quoteCache = new Map(); // yahooSymbol → { data, ts }
+const QUOTE_CACHE_TTL_MS = 12_000;
+
+// ─── SECTOR HISTORICAL CACHE (15 min TTL) ──────────────────────────────────
+// Caches 1-month daily closes for sector ETFs. Week/month % changes are
+// slow-moving; no need to refetch more than once per 15 minutes.
+const _sectorHistCache = new Map(); // yahooSymbol → { data, ts }
+const SECTOR_HIST_CACHE_TTL_MS = 15 * 60_000;
+
 // Fetch a single URL through fallback proxies (tries each proxy in order).
 // Throws if all proxies fail.
 const fetchWithProxies = async (targetUrl) => {
   let lastErr;
-  for (const wrap of CORS_PROXIES) {
+  for (let i = 0; i < CORS_PROXIES.length; i++) {
+    const wrap = CORS_PROXIES[i];
     try {
       const res = await fetch(wrap(targetUrl), { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const text = await res.text();
       if (!text) throw new Error("empty body");
+      if (i > 0) {
+        Sentry.addBreadcrumb({ category: "proxy", message: `proxy[${i}] succeeded after ${i} failure(s)`, level: "warning" });
+      }
       return JSON.parse(text);
     } catch (e) {
       lastErr = e;
+      if (i < CORS_PROXIES.length - 1) {
+        Sentry.addBreadcrumb({ category: "proxy", message: `proxy[${i}] failed (${e?.message}), trying next`, level: "warning" });
+      }
     }
   }
+  Sentry.addBreadcrumb({ category: "proxy", message: `all ${CORS_PROXIES.length} proxies failed for URL`, level: "error" });
   throw lastErr || new Error("All proxies failed");
 };
 
 // Fetch quote for ONE symbol via v8/chart (no auth needed).
 // Returns null on failure.  includes pre/post prices via includePrePost=true.
 const fetchOneQuote = async (yahooSymbol) => {
+  const cached = _quoteCache.get(yahooSymbol);
+  if (cached && Date.now() - cached.ts < QUOTE_CACHE_TTL_MS) return cached.data;
+
   const url = `${YAHOO_CHART_URL}/${encodeURIComponent(yahooSymbol)}?interval=1d&range=5d&includePrePost=true`;
   try {
     const data = await fetchWithProxies(url);
@@ -142,7 +167,7 @@ const fetchOneQuote = async (yahooSymbol) => {
         ? postMarketPrice
         : price;
 
-    return {
+    const quote = {
       // primary fields (back-compat)
       price: displayPrice,
       change,
@@ -162,6 +187,8 @@ const fetchOneQuote = async (yahooSymbol) => {
       postMarketPrice,
       marketState: state,
     };
+    _quoteCache.set(yahooSymbol, { data: quote, ts: Date.now() });
+    return quote;
   } catch (e) {
     console.warn(`[priceService] fetchOneQuote failed for ${yahooSymbol}:`, e?.message || e);
     return null;
@@ -282,5 +309,42 @@ export const getMarketStateBadge = (state = getMarketState()) => {
     case MARKET_STATE.PRE:   return { label: "PRE-MARKET",  emoji: "🟡", color: "#f59e0b" };
     case MARKET_STATE.AFTER: return { label: "AFTER-HOURS", emoji: "🟠", color: "#fb923c" };
     default:                 return { label: "CLOSED",      emoji: "⚫", color: "#64748b" };
+  }
+};
+
+/**
+ * Fetch 1-month daily closes for a sector ETF symbol.
+ * Used to compute weekChange and monthChange percentages.
+ * Results are cached for SECTOR_HIST_CACHE_TTL_MS (15 minutes) to avoid
+ * repeated HTTP calls — sector historical data changes slowly.
+ *
+ * Returns: { weekChange, monthChange } or null on failure.
+ */
+export const fetchSectorHistorical = async (symbol) => {
+  const yahooSymbol = toYahooSymbol(symbol);
+  const cached = _sectorHistCache.get(yahooSymbol);
+  if (cached && Date.now() - cached.ts < SECTOR_HIST_CACHE_TTL_MS) return cached.data;
+
+  const url = `${YAHOO_CHART_URL}/${encodeURIComponent(yahooSymbol)}?range=1mo&interval=1d`;
+  try {
+    const data = await fetchWithProxies(url);
+    const result = data?.chart?.result?.[0];
+    if (!result) return null;
+    const closes = (result.indicators?.quote?.[0]?.close || []).filter(
+      (c) => c !== null && c !== undefined
+    );
+    if (closes.length < 2) return null;
+    const last = closes[closes.length - 1];
+    const weekAgo = closes[Math.max(0, closes.length - 6)];
+    const monthAgo = closes[0];
+    const hist = {
+      weekChange: weekAgo ? ((last / weekAgo) - 1) * 100 : 0,
+      monthChange: monthAgo ? ((last / monthAgo) - 1) * 100 : 0,
+    };
+    _sectorHistCache.set(yahooSymbol, { data: hist, ts: Date.now() });
+    return hist;
+  } catch (e) {
+    console.warn(`[priceService] fetchSectorHistorical failed for ${symbol}:`, e?.message || e);
+    return null;
   }
 };

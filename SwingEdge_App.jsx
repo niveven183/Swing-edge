@@ -38,6 +38,7 @@ import { getTranslations, LANGUAGES, isRTLLang } from "./src/i18n.js";
 import {
   fetchPrices, fmtVolume, fmtMarketCap, searchTickers,
   fetchQuote, getMarketState, getMarketStateBadge, getRefreshInterval, MARKET_STATE,
+  fetchSectorHistorical,
 } from "./src/priceService.js";
 import { analyzeTradeLocal, analyzeTradeLocalText } from "./src/localAI.js";
 import { POPULAR_TICKERS as STATIC_TICKERS, getTickerMeta, searchTickers as searchStaticTickers } from "./src/data/tickers.js";
@@ -1112,6 +1113,8 @@ export default function SwingEdge() {
 
   // Live prices state (global - used everywhere)
   const [livePrices, setLivePrices] = useState({});
+  // Keep ref in sync so fetchSectorData always sees current prices without being a dep
+  useEffect(() => { livePricesRef.current = livePrices; }, [livePrices]);
 
   // Price alerts state
   const [priceAlerts, setPriceAlerts] = useState(() => {
@@ -1128,6 +1131,9 @@ export default function SwingEdge() {
   const [watchlistSearchResults, setWatchlistSearchResults] = useState([]);
   const [watchlistSearching, setWatchlistSearching] = useState(false);
   const watchlistSearchTimeout = useRef(null);
+  // Stable ref to livePrices so fetchSectorData doesn't need it as a useCallback dep
+  // (avoids restarting the 5-min sector interval every 15s price refresh)
+  const livePricesRef = useRef({});
 
   // Watchlist sort state
   const [watchlistSortBy, setWatchlistSortBy] = useState("ticker");
@@ -1303,35 +1309,35 @@ export default function SwingEdge() {
     return () => window.removeEventListener("keydown", onKey);
   }, [showForm, showCloseForm, showEditForm, showProfileDropdown]);
 
-  // Sector data fetch
+  // Sector data — reads current price/dayChange from livePrices (already fetched by the main
+  // price loop, no extra HTTP calls) and fetches historical closes (week/month) via a cached
+  // function in priceService. This eliminates the 8-call hardcoded allorigins.win burst.
+  // Uses livePricesRef so this callback stays stable and doesn't restart the 5-min interval.
   const fetchSectorData = useCallback(async () => {
     setSectorLoading(true);
+    // If main price data isn't loaded yet, wait for first fetch cycle then retry
+    if (Object.keys(livePricesRef.current).length === 0) {
+      setTimeout(fetchSectorData, 3000);
+      setSectorLoading(false);
+      return;
+    }
     try {
+      const lp = livePricesRef.current;
       const results = await Promise.allSettled(
-        SECTOR_ETFS.map(s =>
-          fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(
-            `https://query1.finance.yahoo.com/v8/finance/chart/${s.symbol}?range=1mo&interval=1d`
-          )}`)
-            .then(r => r.json())
-            .then(data => {
-              const result = data?.chart?.result?.[0];
-              if (!result) return null;
-              const closes = (result.indicators?.quote?.[0]?.close || []).filter(c => c !== null && c !== undefined);
-              if (closes.length < 2) return null;
-              const last = closes[closes.length - 1];
-              const prevDay = closes[closes.length - 2];
-              const weekAgo = closes[Math.max(0, closes.length - 6)];
-              const monthAgo = closes[0];
-              return {
-                symbol: s.symbol,
-                name: s.name,
-                price: last,
-                dayChange: ((last / prevDay) - 1) * 100,
-                weekChange: ((last / weekAgo) - 1) * 100,
-                monthChange: ((last / monthAgo) - 1) * 100,
-              };
-            })
-        )
+        SECTOR_ETFS.map(async s => {
+          const lpEntry = lp[s.symbol];
+          const hist = await fetchSectorHistorical(s.symbol);
+          const price = lpEntry?.price ?? null;
+          if (price === null) return null;
+          return {
+            symbol: s.symbol,
+            name: s.name,
+            price,
+            dayChange: lpEntry?.changePct ?? 0,
+            weekChange: hist?.weekChange ?? 0,
+            monthChange: hist?.monthChange ?? 0,
+          };
+        })
       );
       const fetched = results
         .filter(r => r.status === "fulfilled" && r.value !== null)
@@ -1371,13 +1377,15 @@ export default function SwingEdge() {
     } catch {}
   }, [lang, isRTL]);
 
-  // Global live price fetching - fetches for ALL tickers (ribbon + watchlist + open trades + popular)
+  // Global live price fetching - fetches for ALL tickers (ribbon + watchlist + open trades + popular + sector ETFs)
   const RIBBON_TICKERS = ["NVDA", "AAPL", "TSLA", "MSFT", "META", "AMD", "BTC", "SPY"];
+  // Sector ETF symbols included here so fetchSectorData can read from livePrices without separate HTTP calls
+  const SECTOR_TICKERS = SECTOR_ETFS.map(s => s.symbol);
   const fetchLivePrices = useCallback(async () => {
     const openTickers = trades.filter(t => t.status === "OPEN").map(t => t.ticker);
     const watchTickers = watchlistItems.map(w => w.ticker);
     const popularTickers = POPULAR_TICKERS.map(p => p.symbol.replace("-USD", ""));
-    const allTickers = [...new Set([...RIBBON_TICKERS, ...openTickers, ...watchTickers, ...popularTickers])];
+    const allTickers = [...new Set([...RIBBON_TICKERS, ...SECTOR_TICKERS, ...openTickers, ...watchTickers, ...popularTickers])];
     if (allTickers.length === 0) return true;
     setPricesLoading(true);
     let ok = false;
