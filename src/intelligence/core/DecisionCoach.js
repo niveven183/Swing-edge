@@ -186,6 +186,30 @@ const patternMatchCheck = (dna, idea) => {
   return null;
 };
 
+// setup × marketCondition combo — the strongest personal insight:
+// "Breakout in Volatile = 22% win over 9 of your trades."
+const setupMarketComboCheck = (trades, idea) => {
+  if (!idea.setup || !idea.marketCondition) return null;
+  const closed = getClosed(trades).filter(
+    t => t.setup === idea.setup && t.marketCondition === idea.marketCondition
+  );
+  if (closed.length < 3) return null;
+  const wins = closed.filter(isWin).length;
+  const wr = Math.round((wins / closed.length) * 100);
+  const n = closed.length;
+  const s = idea.setup, m = idea.marketCondition;
+  const text = {
+    en: `${s} in ${m}: ${wr}% win over ${n} of your trades.`,
+    he: `${s} ב-${m}: ${wr}% הצלחה ב-${n} עסקאות שלך.`,
+    es: `${s} en ${m}: ${wr}% de aciertos en ${n} de tus operaciones.`,
+    pt: `${s} em ${m}: ${wr}% de acertos em ${n} das suas operações.`,
+    ar: `${s} في ${m}: ${wr}% نجاح في ${n} من صفقاتك.`,
+  };
+  if (wr <= 35) return { icon: "🔴", kind: "skip", weight: -15, text };
+  if (wr >= 60) return { icon: "✅", kind: "go",   weight: 12, text };
+  return { icon: "📊", kind: "info", weight: 0, text };
+};
+
 const emotionalCheck = (dna, idea) => {
   if (!idea.emotionAtEntry) return null;
   if (idea.emotionAtEntry === "FOMO") return {
@@ -273,6 +297,7 @@ export const coachTrade = ({ form, trades = [], dna = null, edges = null, regime
       historicalContext: null,
       edgeMatch: null,
       expectedR: null,
+      sampleSize: getClosed(trades).length,
     };
   }
 
@@ -284,6 +309,7 @@ export const coachTrade = ({ form, trades = [], dna = null, edges = null, regime
     rrCheck(idea),
     stopDistanceCheck(idea, dist),
     patternMatchCheck(dna, idea),
+    setupMarketComboCheck(trades, idea),
     emotionalCheck(dna, idea),
     sequentialCheck(trades),
     regimeCheck(regime, idea),
@@ -349,5 +375,6 @@ export const coachTrade = ({ form, trades = [], dna = null, edges = null, regime
     antiEdgeMatch,
     expectedR,
     idea,
+    sampleSize: getClosed(trades).length,
   };
 };

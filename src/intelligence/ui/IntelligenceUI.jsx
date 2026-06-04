@@ -121,11 +121,11 @@ export const EdgeCard = ({ edge, lang = "he", variant = "edge" }) => {
 export const LiveInsight = ({ insight, lang = "he" }) => {
   if (!insight) return null;
   const colorFor = {
-    go:   "text-emerald-400 border-emerald-500/20 bg-emerald-500/5",
-    warn: "text-amber-400   border-amber-500/20   bg-amber-500/5",
-    skip: "text-rose-400    border-rose-500/20    bg-rose-500/5",
-    info: "text-slate-300   border-white/10       bg-white/3",
-  }[insight.kind] || "text-slate-300 border-white/10 bg-white/3";
+    go:   "text-emerald-700 dark:text-emerald-400 border-emerald-300/60 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/5",
+    warn: "text-amber-700   dark:text-amber-400   border-amber-300/60   dark:border-amber-500/20   bg-amber-50   dark:bg-amber-500/5",
+    skip: "text-rose-700    dark:text-rose-400    border-rose-300/60    dark:border-rose-500/20    bg-rose-50    dark:bg-rose-500/5",
+    info: "text-slate-600   dark:text-slate-300   border-slate-200      dark:border-white/10       bg-slate-50   dark:bg-white/3",
+  }[insight.kind] || "text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/3";
   return (
     <div className={`flex items-start gap-2 px-3 py-2 rounded-lg border ${colorFor} text-[12px] leading-relaxed animate-fade-in`}>
       <span className="text-base leading-none mt-[1px]">{insight.icon}</span>
@@ -135,44 +135,88 @@ export const LiveInsight = ({ insight, lang = "he" }) => {
 };
 
 // ─── DECISION COACH PANEL ────────────────────────────────────────────────────
+const COACH_L = {
+  title: { en: "Decision Coach", he: "מאמן החלטות", es: "Coach de Decisiones", pt: "Coach de Decisões", ar: "مدرّب القرار" },
+  pending: {
+    en: "Enter entry + stop to activate the Decision Coach.",
+    he: "הכנס Entry + Stop כדי להפעיל את ה-Decision Coach.",
+    es: "Ingresa entrada + stop para activar el Coach de Decisiones.",
+    pt: "Insira entrada + stop para ativar o Coach de Decisões.",
+    ar: "أدخل سعر الدخول + وقف الخسارة لتفعيل مدرّب القرار.",
+  },
+};
+const VERDICT_L = {
+  GO:      { en: "GO",      he: "קדימה",  es: "ADELANTE",   pt: "AVANÇAR", ar: "تقدّم" },
+  CAUTION: { en: "CAUTION", he: "זהירות", es: "PRECAUCIÓN", pt: "CAUTELA", ar: "تحذير" },
+  SKIP:    { en: "SKIP",    he: "דלג",    es: "OMITIR",     pt: "PULAR",   ar: "تجاوز" },
+};
+const collectMoreText = (n, lang) => ({
+  en: `Collect more trades for an accurate read (${n}/10).`,
+  he: `אסוף עוד עסקאות לקבלת ניתוח מדויק (${n}/10).`,
+  es: `Reúne más operaciones para un análisis preciso (${n}/10).`,
+  pt: `Reúna mais operações para uma análise precisa (${n}/10).`,
+  ar: `اجمع المزيد من الصفقات للحصول على تحليل دقيق (${n}/10).`,
+}[lang] || `Collect more trades for an accurate read (${n}/10).`);
+const historyText = (hc, lang) => ({
+  en: `Similar trades: ${hc.similarTrades} count, ${hc.successRate}% win, avg ${hc.avgReturn}R.`,
+  he: `בעסקאות דומות: ${hc.similarTrades} עסקאות, ${hc.successRate}% הצלחה, תשואה ממוצעת ${hc.avgReturn}R.`,
+  es: `Operaciones similares: ${hc.similarTrades}, ${hc.successRate}% aciertos, promedio ${hc.avgReturn}R.`,
+  pt: `Operações similares: ${hc.similarTrades}, ${hc.successRate}% acertos, média ${hc.avgReturn}R.`,
+  ar: `صفقات مشابهة: ${hc.similarTrades}، ${hc.successRate}% نجاح، متوسط ${hc.avgReturn}R.`,
+}[lang] || `Similar trades: ${hc.similarTrades} count, ${hc.successRate}% win, avg ${hc.avgReturn}R.`);
+
 export const DecisionCoachPanel = ({ coaching, lang = "he" }) => {
   if (!coaching || coaching.verdict === "PENDING") {
     return (
-      <div className="bg-[#0d1424] border border-white/10 rounded-xl p-4 text-[11px] text-slate-500">
-        {lang === "he" ? "הכנס Entry + Stop כדי להפעיל את ה-Decision Coach." : "Enter entry + stop to activate the Decision Coach."}
+      <div className="bg-white dark:bg-[#0d1424] border border-slate-200 dark:border-white/10 rounded-xl p-4 text-[11px] text-slate-500 dark:text-slate-500">
+        {pick(COACH_L.pending, lang)}
       </div>
     );
   }
+
+  // Low-data gate — under 10 real (closed) trades we hide the score/verdict and
+  // nudge the trader to collect more data instead of showing a noisy verdict.
+  const lowData = coaching.sampleSize != null && coaching.sampleSize < 10;
   const verdictStyle = {
-    GO:      { bg: "bg-emerald-500/10", text: "text-emerald-400", border: "border-emerald-500/30", label: lang === "he" ? "קדימה" : "GO" },
-    CAUTION: { bg: "bg-amber-500/10",   text: "text-amber-400",   border: "border-amber-500/30",   label: lang === "he" ? "זהירות" : "CAUTION" },
-    SKIP:    { bg: "bg-rose-500/10",    text: "text-rose-400",    border: "border-rose-500/30",    label: lang === "he" ? "דלג" : "SKIP" },
-  }[coaching.verdict] || { bg: "bg-white/5", text: "text-slate-300", border: "border-white/10", label: coaching.verdict };
+    GO:      { bg: "bg-emerald-500/10", text: "text-emerald-600 dark:text-emerald-400", border: "border-emerald-400/40 dark:border-emerald-500/30" },
+    CAUTION: { bg: "bg-amber-500/10",   text: "text-amber-600   dark:text-amber-400",   border: "border-amber-400/40   dark:border-amber-500/30" },
+    SKIP:    { bg: "bg-rose-500/10",    text: "text-rose-600    dark:text-rose-400",    border: "border-rose-400/40    dark:border-rose-500/30" },
+  }[coaching.verdict] || { bg: "bg-slate-100 dark:bg-white/5", text: "text-slate-600 dark:text-slate-300", border: "border-slate-200 dark:border-white/10" };
+  const verdictLabel = pick(VERDICT_L[coaching.verdict], lang) || coaching.verdict;
 
   return (
-    <div className="bg-[#0d1424] border border-violet-500/20 rounded-xl p-4 space-y-3">
+    <div className="bg-white dark:bg-[#0d1424] border border-slate-200 dark:border-violet-500/20 rounded-xl p-4 space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Compass size={15} className="text-violet-400" />
-          <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-400">
-            {lang === "he" ? "מאמן החלטות" : "Decision Coach"}
+          <Compass size={15} className="text-violet-500 dark:text-violet-400" />
+          <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 dark:text-slate-400">
+            {pick(COACH_L.title, lang)}
           </span>
         </div>
-        <div className={`flex items-center gap-2 px-3 py-1 rounded-full border ${verdictStyle.border} ${verdictStyle.bg}`}>
-          <span className={`text-xs font-bold ${verdictStyle.text}`}>{verdictStyle.label}</span>
-          <span className="text-[10px] text-slate-500 font-mono">{coaching.confidence}%</span>
-        </div>
+        {!lowData && (
+          <div className={`flex items-center gap-2 px-3 py-1 rounded-full border ${verdictStyle.border} ${verdictStyle.bg}`}>
+            <span className={`text-xs font-bold ${verdictStyle.text}`}>{verdictLabel}</span>
+            <span className="text-[10px] text-slate-500 font-mono">{coaching.confidence}%</span>
+          </div>
+        )}
       </div>
+
+      {lowData && (
+        <div className="flex items-start gap-2 px-3 py-2 rounded-lg border border-amber-300/60 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/5 text-[12px] leading-relaxed text-amber-700 dark:text-amber-400">
+          <span className="text-base leading-none mt-[1px]">📈</span>
+          <span>{collectMoreText(coaching.sampleSize || 0, lang)}</span>
+        </div>
+      )}
+
       <div className="space-y-1.5">
         {coaching.insights.slice(0, 6).map((ins, i) => (
           <LiveInsight key={i} insight={ins} lang={lang} />
         ))}
       </div>
-      {coaching.historicalContext && (
-        <div className="text-[11px] text-slate-500 border-t border-white/5 pt-2">
-          {lang === "he"
-            ? `בעסקאות דומות: ${coaching.historicalContext.similarTrades} עסקאות, ${coaching.historicalContext.successRate}% הצלחה, תשואה ממוצעת ${coaching.historicalContext.avgReturn}R.`
-            : `Similar trades: ${coaching.historicalContext.similarTrades} count, ${coaching.historicalContext.successRate}% win, avg ${coaching.historicalContext.avgReturn}R.`}
+
+      {!lowData && coaching.historicalContext && (
+        <div className="text-[11px] text-slate-500 dark:text-slate-500 border-t border-slate-200 dark:border-white/5 pt-2">
+          {historyText(coaching.historicalContext, lang)}
         </div>
       )}
     </div>

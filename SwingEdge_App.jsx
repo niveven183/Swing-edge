@@ -1562,9 +1562,15 @@ export default function SwingEdge() {
   const aiTilt = useMemo(() => SwingEdgeAI.checkTilt(realTrades), [realTrades, tiltTick]);
 
   // Live Decision Coach analysis for the new-trade form.
+  // Debounced 300ms so typing entry/stop/target doesn't recompute on every keystroke.
+  const [coachForm, setCoachForm] = useState(form);
+  useEffect(() => {
+    const id = setTimeout(() => setCoachForm(form), 300);
+    return () => clearTimeout(id);
+  }, [form]);
   const aiCoach = useMemo(
-    () => SwingEdgeAI.analyzeNewTrade(form, realTrades),
-    [form, realTrades]
+    () => SwingEdgeAI.analyzeNewTrade(coachForm, realTrades),
+    [coachForm, realTrades]
   );
 
   // ─── CENTRAL EQUITY ENGINE ──────────────────────────────────────────────────
