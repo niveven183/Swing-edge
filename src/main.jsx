@@ -1,8 +1,10 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import * as Sentry from "@sentry/react";
 import "./index.css";
 import SwingEdge from "../SwingEdge_App.jsx";
+import LandingGate from "./components/LandingGate.jsx";
 import { ToastProvider, ConfirmProvider } from "./components/ToastProvider.jsx";
 import { ThemeProvider } from "./contexts/ThemeContext.jsx";
 
@@ -22,7 +24,13 @@ createRoot(document.getElementById("root")).render(
       <ThemeProvider>
         <ToastProvider>
           <ConfirmProvider>
-            <SwingEdge />
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<LandingGate />} />
+                <Route path="/app" element={<SwingEdge />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </BrowserRouter>
           </ConfirmProvider>
         </ToastProvider>
       </ThemeProvider>
