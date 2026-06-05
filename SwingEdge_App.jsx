@@ -52,6 +52,9 @@ import { TRADING_TOOLTIPS } from "./src/data/tooltips.js";
 import { TradeCalendar } from "./src/components/TradeCalendar.jsx";
 import { AdaptiveLessons } from "./src/intelligence/core/AdaptiveLessons.js";
 import GrowthPredictor from "./src/components/GrowthPredictor.jsx";
+import MonthlyReportTab from "./src/components/MonthlyReportTab.jsx";
+import MonthlyReportModal from "./src/components/MonthlyReportModal.jsx";
+import { generateMonthlyReport, findBestMonth } from "./src/intelligence/core/MonthlyReport.js";
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const RISK_PCT = 0.01;
 
@@ -931,6 +934,7 @@ const NAV_KEYS = [
   { id: "journal",   key: "journal",        icon: BookOpen },
   { id: "tools",     key: "tools",           icon: Wrench },
   { id: "analytics", key: "analytics",      icon: BarChart2 },
+  { id: "dnaReport", key: "dnaReport",       icon: FileText },
   { id: "intel",     key: "marketIntel",    icon: Rss },
   { id: "feedback",  key: "feedback",       icon: MessageCircle },
 ];
@@ -1498,6 +1502,36 @@ export default function SwingEdge() {
   // ─── MASTER STATS HUB — single source of truth ──────────────────────────────
   const stats = useTradingStats(realTrades, capital, stableCalcTradeMetrics);
   const { totalPnL, winRate, avgR } = stats;
+
+  // ─── MONTHLY REPORT — auto-popup modal (start of month, once) + QA shortcut ──
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [autoReport, setAutoReport] = useState(null);
+  useEffect(() => {
+    try {
+      // QA shortcut: ?testReport=1 forces the modal with the busiest month,
+      // ignoring the date guard and localStorage. Documented for manual testing.
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("testReport") === "1") {
+        const { month, year } = findBestMonth(realTrades, calcTradeMetrics);
+        const report = generateMonthlyReport(realTrades, month, year, calcTradeMetrics);
+        if (report.hasEnoughData) { setAutoReport(report); setShowReportModal(true); }
+        return;
+      }
+      const now = new Date();
+      const prevMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+      const prevYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+      const key = `swingEdgeReportShown:${prevYear}-${prevMonth}`;
+      if (now.getDate() <= 7 && !localStorage.getItem(key)) {
+        const report = generateMonthlyReport(realTrades, prevMonth, prevYear, calcTradeMetrics);
+        if (report.hasEnoughData) {
+          setAutoReport(report);
+          setShowReportModal(true);
+          localStorage.setItem(key, "1");
+        }
+      }
+    } catch { /* non-fatal */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ─── JOURNAL PRO: filtered view + stats ─────────────────────────────────────
   const holdTimeDays = (t) => {
@@ -4926,6 +4960,17 @@ export default function SwingEdge() {
           );
         })()}
 
+        {/* ══════════════ DNA MONTHLY REPORT ══════════════ */}
+        {tab === "dnaReport" && (
+          <MonthlyReportTab
+            trades={realTrades}
+            calcMetrics={calcTradeMetrics}
+            t={t}
+            lang={lang}
+            isRTL={isRTL}
+          />
+        )}
+
         {/* ══════════════ FEEDBACK ══════════════ */}
         {tab === "feedback" && (
           <FeedbackTab user={authUser} />
@@ -5326,6 +5371,18 @@ export default function SwingEdge() {
         lang={lang}
         onClose={() => setShowResetAll(false)}
       />
+
+      {/* ── MONTHLY REPORT AUTO MODAL ── */}
+      {showReportModal && autoReport && (
+        <MonthlyReportModal
+          report={autoReport}
+          t={t}
+          lang={lang}
+          isRTL={isRTL}
+          onClose={() => setShowReportModal(false)}
+          onOpenFull={() => { setTab("dnaReport"); setShowReportModal(false); }}
+        />
+      )}
 
       {/* ── HELP MODAL ── */}
       {showHelpModal && <HelpModal onClose={() => setShowHelpModal(false)} />}
