@@ -14,7 +14,7 @@ import ResetAllModal from "./src/components/ResetAllModal.jsx";
 import ChangePasswordModal from "./src/components/ChangePasswordModal.jsx";
 import { useTheme } from "./src/contexts/ThemeContext.jsx";
 import TradingViewSearch from "./src/components/TradingViewSearch.jsx";
-import { TVTickerTape, TVMarketOverview } from "./src/components/TradingViewWidgets.jsx";
+import { TVTickerTape } from "./src/components/TradingViewWidgets.jsx";
 import { useToast, useConfirm, Tooltip as UiTooltip } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured, tradeForSupabase } from "./src/supabaseClient.js";
 import {
@@ -2435,15 +2435,6 @@ export default function SwingEdge() {
                 )}
               </div>
             )}
-
-            {/* Live Market Overview (TradingView) */}
-            <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Globe size={14} className="text-cyan-400" />
-                <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Live Market Overview</span>
-              </div>
-              <TVMarketOverview height={400} />
-            </div>
 
             {/* Mini Equity + Open Positions */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
