@@ -934,7 +934,6 @@ const NAV_KEYS = [
   { id: "journal",   key: "journal",        icon: BookOpen },
   { id: "tools",     key: "tools",           icon: Wrench },
   { id: "analytics", key: "analytics",      icon: BarChart2 },
-  { id: "dnaReport", key: "dnaReport",       icon: FileText },
   { id: "intel",     key: "marketIntel",    icon: Rss },
   { id: "feedback",  key: "feedback",       icon: MessageCircle },
 ];
@@ -3096,6 +3095,12 @@ export default function SwingEdge() {
             >
               🧮 {lang === 'he' ? 'מחשבון פוזיציה' : 'Position Calculator'}
             </button>
+            <button
+              onClick={() => setToolsTab('report')}
+              className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${toolsTab === 'report' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              📈 {t.dnaReport}
+            </button>
           </div>
         )}
 
@@ -4866,8 +4871,8 @@ export default function SwingEdge() {
           );
         })()}
 
-        {/* ══════════════ DNA MONTHLY REPORT ══════════════ */}
-        {tab === "dnaReport" && (
+        {/* ══════════════ DNA MONTHLY REPORT (Tools → report sub-tab) ══════════════ */}
+        {tab === "tools" && toolsTab === 'report' && (
           <MonthlyReportTab
             trades={realTrades}
             calcMetrics={calcTradeMetrics}
@@ -5286,7 +5291,7 @@ export default function SwingEdge() {
           lang={lang}
           isRTL={isRTL}
           onClose={() => setShowReportModal(false)}
-          onOpenFull={() => { setTab("dnaReport"); setShowReportModal(false); }}
+          onOpenFull={() => { setTab("tools"); setToolsTab("report"); setShowReportModal(false); }}
         />
       )}
 
