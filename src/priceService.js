@@ -260,11 +260,93 @@ export const fmtMarketCap = (cap) => {
 };
 
 // ─── SEARCH CACHE (5 minute TTL) ───────────────────────────────────────────
-const _searchCache = new Map(); // key(lc query) → { ts, items }
+const _searchCache = new Map(); // key(lc query) → { ts, items }  (Yahoo)
+const _tvSearchCache = new Map(); // key(lc query) → { ts, items } (TradingView)
 const SEARCH_TTL_MS = 5 * 60_000;
 
+const stripTags = (s) => String(s || "").replace(/<\/?[^>]+>/g, "");
+
+// Normalize a TradingView result → the app-wide quoteType vocabulary used by
+// toTvSymbol / the watchlist (EQUITY / ETF / CRYPTOCURRENCY / INDEX / ...).
+// TradingView signals crypto/forex via `typespecs`, not `type` (e.g. crypto
+// pairs come back as type "spot" + typespecs ["crypto"]).
+const normalizeTvType = (x) => {
+  const rawType = String(x.type || "").toLowerCase();
+  const specs = Array.isArray(x.typespecs) ? x.typespecs : [];
+  if (specs.includes("crypto") || rawType === "crypto") return "CRYPTOCURRENCY";
+  if (rawType === "futures") return "FUTURE";
+  if (rawType === "forex" || specs.includes("forex")) return "CURRENCY";
+  if (rawType === "fund" || specs.includes("etf")) return "ETF";
+  if (rawType === "index" || rawType === "economic") return "INDEX";
+  return "EQUITY"; // stock, dr, bond, equity-spot
+};
+
 /**
- * Search for ticker symbols (autocomplete).
+ * Professional full-market autocomplete via TradingView's symbol-search
+ * endpoint (proxied server-side at /api/symbol-search to bypass the Referer
+ * gate). Returns items normalized to { symbol, name, type, exchange, ... }.
+ *
+ * Transparent fallback: if the TV proxy errors / is empty, this silently
+ * resolves through Yahoo (`searchTickers`) so the search NEVER breaks for the
+ * user — they can't tell which source answered.
+ *
+ * @param {string} query
+ * @param {AbortSignal} [signal] - cancels stale in-flight requests.
+ */
+export const searchSymbolsTV = async (query, signal) => {
+  const q = String(query || "").trim();
+  if (!q) return [];
+  const key = q.toLowerCase();
+
+  const cached = _tvSearchCache.get(key);
+  if (cached && Date.now() - cached.ts < SEARCH_TTL_MS) return cached.items;
+
+  try {
+    const res = await fetch(
+      `/api/symbol-search?text=${encodeURIComponent(q)}&hl=1&lang=en`,
+      { signal, cache: "no-store" }
+    );
+    if (!res.ok) throw new Error(`proxy HTTP ${res.status}`);
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) throw new Error("empty");
+
+    const seen = new Set();
+    const items = [];
+    for (const x of data) {
+      const symbol = stripTags(x.symbol).toUpperCase();
+      if (!symbol) continue;
+      const exchange = stripTags(x.exchange) || stripTags(x.source_id) || "";
+      const type = normalizeTvType(x);
+      // Crypto pairs repeat across ~10 exchanges (BTCUSD on Coinbase, Binance,
+      // Kraken…). Collapse to one row per symbol; keep the first (TV ranks by
+      // relevance). Everything else dedupes per symbol+exchange.
+      const dedupe = type === "CRYPTOCURRENCY" ? `C:${symbol}` : `${symbol}@${exchange}`;
+      if (seen.has(dedupe)) continue;
+      seen.add(dedupe);
+      items.push({
+        symbol,
+        name: stripTags(x.description) || symbol,
+        type,
+        exchange,
+        currency: x.currency_code || "",
+        country: x.country || "",
+      });
+      if (items.length >= 30) break;
+    }
+    if (items.length === 0) throw new Error("no usable items");
+
+    _tvSearchCache.set(key, { ts: Date.now(), items });
+    return items;
+  } catch (e) {
+    // AbortError → caller cancelled; propagate so it can ignore the stale call.
+    if (e && e.name === "AbortError") throw e;
+    // Any other failure → transparent Yahoo fallback.
+    return searchTickers(q);
+  }
+};
+
+/**
+ * Search for ticker symbols (autocomplete) — Yahoo Finance source.
  * Returns items: { symbol, name, type, exchange }
  * Results are cached per lowercased query for SEARCH_TTL_MS.
  */

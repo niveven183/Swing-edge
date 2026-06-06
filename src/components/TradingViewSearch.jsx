@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, X, RefreshCw } from "lucide-react";
-import { searchTickers, fetchPrices } from "../priceService.js";
+import { Search, X, RefreshCw, AlertCircle } from "lucide-react";
+import { searchSymbolsTV, fetchPrices } from "../priceService.js";
 
 // ─── POPULAR TICKERS (shown immediately on focus) ─────────────────────────
 const POPULAR = [
@@ -14,7 +14,7 @@ const POPULAR = [
   { symbol: "SPY",     name: "SPDR S&P 500 ETF",        exchange: "NYSE",   type: "ETF" },
 ];
 
-// Maps a Yahoo search result → a TradingView-ready symbol string.
+// Maps a search result → a TradingView-ready symbol string.
 export function toTvSymbol(q) {
   if (!q) return "NASDAQ:NVDA";
   const symbol = (q.symbol || "").toUpperCase();
@@ -40,6 +40,8 @@ export function toTvSymbol(q) {
     NYQ: "NYSE",   NYE: "NYSE",   ASE: "AMEX",   PCX: "AMEX",
     LSE: "LSE",    TOR: "TSX",
   };
+  // TradingView already gives clean exchange codes (NASDAQ, NYSE, AMEX, LSE…);
+  // the map only rescues legacy Yahoo codes from the fallback path.
   const tvExch = exchMap[exch] || (exch && /^[A-Z]{2,6}$/.test(exch) ? exch : "NASDAQ");
   return `${tvExch}:${symbol}`;
 }
@@ -64,13 +66,46 @@ function displayExchange(q) {
   return exchMap[exch] || exch || t || "";
 }
 
+// Short, human label for the asset type pill.
+function typeLabel(type) {
+  switch ((type || "").toUpperCase()) {
+    case "CRYPTOCURRENCY": return "Crypto";
+    case "ETF":            return "ETF";
+    case "INDEX":          return "Index";
+    case "CURRENCY":       return "Forex";
+    case "FUTURE":         return "Future";
+    default:               return "Stock";
+  }
+}
+
+// Render a symbol with the matched portion highlighted.
+function Highlighted({ text, query }) {
+  const q = (query || "").trim();
+  if (!q) return <>{text}</>;
+  const idx = text.toUpperCase().indexOf(q.toUpperCase());
+  if (idx === -1) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <span className="text-cyan-300 bg-cyan-500/15 rounded px-0.5">
+        {text.slice(idx, idx + q.length)}
+      </span>
+      {text.slice(idx + q.length)}
+    </>
+  );
+}
+
 export default function TradingViewSearch({ value, onPick, livePrices = {}, setLivePrices, placeholder = "Search symbol..." }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  const [searched, setSearched] = useState(false); // a query-backed search has resolved
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
   const timer = useRef(null);
+  const abortRef = useRef(null);
+  const reqIdRef = useRef(0);
   const wrap = useRef(null);
   const inputRef = useRef(null);
 
@@ -86,6 +121,12 @@ export default function TradingViewSearch({ value, onPick, livePrices = {}, setL
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  // Cleanup any pending timer / in-flight request on unmount.
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+    if (abortRef.current) abortRef.current.abort();
+  }, []);
+
   // Kick live-price prefetch for up to 8 visible result symbols.
   const prefetchPrices = useCallback((items) => {
     if (!setLivePrices || !items || items.length === 0) return;
@@ -97,25 +138,47 @@ export default function TradingViewSearch({ value, onPick, livePrices = {}, setL
     }).catch(() => {});
   }, [setLivePrices]);
 
-  // Debounced search — 150ms for TradingView-like responsiveness, with 1-char min.
-  // `searchTickers` handles its own 5-min cache under the hood.
+  // Debounced search — 250ms, 1-char min. TradingView source with transparent
+  // Yahoo fallback (handled inside searchSymbolsTV). Stale calls are cancelled
+  // via AbortController + a monotonic request id so fast typing never flickers.
   const doSearch = useCallback((q) => {
     if (timer.current) clearTimeout(timer.current);
+    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
+
     if (!q || q.length < 1) {
       setResults(POPULAR);
       setLoading(false);
+      setError(false);
+      setSearched(false);
+      setActiveIdx(-1);
       prefetchPrices(POPULAR);
       return;
     }
+
     setLoading(true);
+    setError(false);
     timer.current = setTimeout(async () => {
-      const r = await searchTickers(q);
-      const final = r.length > 0 ? r : POPULAR;
-      setResults(final);
-      setLoading(false);
-      setActiveIdx(-1);
-      prefetchPrices(final);
-    }, 150);
+      const reqId = ++reqIdRef.current;
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
+      try {
+        const r = await searchSymbolsTV(q, ctrl.signal);
+        if (reqId !== reqIdRef.current) return; // a newer search superseded us
+        setResults(r);
+        setLoading(false);
+        setError(false);
+        setSearched(true);
+        setActiveIdx(-1);
+        prefetchPrices(r);
+      } catch (e) {
+        if (e && e.name === "AbortError") return; // cancelled — ignore
+        if (reqId !== reqIdRef.current) return;
+        setResults([]);
+        setLoading(false);
+        setError(true);
+        setSearched(true);
+      }
+    }, 250);
   }, [prefetchPrices]);
 
   const pick = (r) => {
@@ -124,9 +187,12 @@ export default function TradingViewSearch({ value, onPick, livePrices = {}, setL
     setQuery("");
     setResults([]);
     setOpen(false);
+    setSearched(false);
+    setActiveIdx(-1);
   };
 
   const onKeyDown = (e) => {
+    if (e.key === "Escape") { setOpen(false); return; }
     if (!open || results.length === 0) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -138,10 +204,10 @@ export default function TradingViewSearch({ value, onPick, livePrices = {}, setL
       e.preventDefault();
       const pickIdx = activeIdx >= 0 ? activeIdx : 0;
       if (results[pickIdx]) pick(results[pickIdx]);
-    } else if (e.key === "Escape") {
-      setOpen(false);
     }
   };
+
+  const showEmpty = open && searched && !loading && !error && query && results.length === 0;
 
   return (
     <div ref={wrap} className="relative flex-1 min-w-0">
@@ -154,15 +220,15 @@ export default function TradingViewSearch({ value, onPick, livePrices = {}, setL
           onFocus={() => {
             setOpen(true);
             if (query) doSearch(query);
-            else { setResults(POPULAR); prefetchPrices(POPULAR); }
+            else { setResults(POPULAR); setSearched(false); prefetchPrices(POPULAR); }
           }}
           onKeyDown={onKeyDown}
           placeholder={placeholder}
           className="flex-1 bg-transparent text-xs font-mono text-white placeholder-slate-500 focus:outline-none min-w-0"
         />
         {query && (
-          <button onClick={() => { setQuery(""); setResults(POPULAR); inputRef.current?.focus(); }}
-            className="text-slate-500 hover:text-white transition">
+          <button onClick={() => { setQuery(""); setResults(POPULAR); setSearched(false); setError(false); inputRef.current?.focus(); }}
+            className="text-slate-500 hover:text-white transition" aria-label="clear">
             <X size={12} />
           </button>
         )}
@@ -180,13 +246,27 @@ export default function TradingViewSearch({ value, onPick, livePrices = {}, setL
         )}
       </div>
 
-      {open && results.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-white/10 rounded-lg shadow-2xl z-30 max-h-80 overflow-y-auto animate-slide-down">
-          {!query && (
+      {open && (results.length > 0 || showEmpty || error) && (
+        <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/10 rounded-lg shadow-2xl z-30 max-h-80 overflow-y-auto animate-slide-down">
+          {!query && results.length > 0 && (
             <div className="px-3 py-1.5 text-[9px] text-slate-500 uppercase tracking-widest border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-white/3">
               Popular
             </div>
           )}
+
+          {error && (
+            <div className="flex items-center gap-2 px-3 py-3 text-[11px] text-rose-400">
+              <AlertCircle size={13} className="shrink-0" />
+              <span>Search unavailable — try again</span>
+            </div>
+          )}
+
+          {showEmpty && (
+            <div className="px-3 py-3 text-[11px] text-slate-500 text-center">
+              No results for “{query}”
+            </div>
+          )}
+
           {results.map((r, i) => {
             const ticker = cleanSymbol(r.symbol);
             const lp = livePrices[ticker] || livePrices[r.symbol];
@@ -205,16 +285,19 @@ export default function TradingViewSearch({ value, onPick, livePrices = {}, setL
                 key={`${r.symbol}-${r.exchange}-${i}`}
                 onMouseEnter={() => setActiveIdx(i)}
                 onClick={() => pick(r)}
-                className={`w-full flex items-center gap-3 px-3 py-2 text-xs border-b border-white/[0.04] last:border-0 transition text-left ${active ? "bg-cyan-500/10" : "hover:bg-white/5"}`}
+                className={`w-full flex items-center gap-3 px-3 py-2 text-xs border-b border-[var(--border-subtle)] dark:border-white/[0.04] last:border-0 transition text-left ${active ? "bg-cyan-500/10" : "hover:bg-cyan-500/5"}`}
               >
                 <div className="flex flex-col flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-mono font-bold text-white">{r.symbol}</span>
+                    <span className="font-mono font-bold text-white"><Highlighted text={r.symbol} query={query} /></span>
                     {exch && (
                       <span className="text-[9px] px-1 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
                         {exch}
                       </span>
                     )}
+                    <span className="text-[9px] px-1 py-0.5 rounded bg-violet-500/10 text-violet-300 border border-violet-500/20">
+                      {typeLabel(r.type)}
+                    </span>
                   </div>
                   <span className="text-[10px] text-slate-500 truncate">{r.name}</span>
                 </div>

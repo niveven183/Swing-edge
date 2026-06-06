@@ -1131,10 +1131,6 @@ export default function SwingEdge() {
   const [showAlertInput, setShowAlertInput] = useState(null);
   const [alertInputValue, setAlertInputValue] = useState("");
 
-  // Watchlist search state
-  const [watchlistSearchResults, setWatchlistSearchResults] = useState([]);
-  const [watchlistSearching, setWatchlistSearching] = useState(false);
-  const watchlistSearchTimeout = useRef(null);
   // Stable ref to livePrices so fetchSectorData doesn't need it as a useCallback dep
   // (avoids restarting the 5-min sector interval every 15s price refresh)
   const livePricesRef = useRef({});
@@ -1183,7 +1179,6 @@ export default function SwingEdge() {
       return saved ? JSON.parse(saved) : DEFAULT_WATCHLIST;
     } catch { return DEFAULT_WATCHLIST; }
   });
-  const [watchlistInput, setWatchlistInput] = useState("");
 
   // Journal Pro filters
   const [journalFilters, setJournalFilters] = useState({
@@ -1450,44 +1445,6 @@ export default function SwingEdge() {
       if (retryTimer) clearTimeout(retryTimer);
     };
   }, [fetchLivePrices, marketState]);
-
-  // Watchlist search handler — instant local suggestions + Yahoo Finance fallback
-  const handleWatchlistSearch = useCallback((query) => {
-    setWatchlistInput(query.toUpperCase());
-    if (watchlistSearchTimeout.current) clearTimeout(watchlistSearchTimeout.current);
-    if (query.length < 1) { setWatchlistSearchResults(POPULAR_TICKERS); return; }
-    // Show instant local results immediately (no API wait)
-    const staticResults = searchStaticTickers(query).map(t => ({
-      symbol: t.symbol,
-      name: t.name,
-      type: t.sector === 'Crypto' ? 'CRYPTOCURRENCY' : t.sector === 'ETF' ? 'ETF' : 'EQUITY',
-      exchange: 'NASDAQ',
-    }));
-    if (staticResults.length > 0) setWatchlistSearchResults(staticResults);
-    setWatchlistSearching(true);
-    // Then override with Yahoo Finance results after debounce
-    watchlistSearchTimeout.current = setTimeout(async () => {
-      try {
-        const results = await searchTickers(query);
-        const final = results.length > 0 ? results : (staticResults.length > 0 ? staticResults : POPULAR_TICKERS);
-        setWatchlistSearchResults(final);
-        // Pre-fetch prices for the first few results so each row can show its price
-        const topSyms = final.slice(0, 8).map(r => r.symbol.replace("-USD", ""));
-        if (topSyms.length > 0) {
-          fetchPrices(topSyms).then(priceData => {
-            if (Object.keys(priceData).length > 0) setLivePrices(prev => ({ ...prev, ...priceData }));
-          });
-        }
-      } catch {}
-      setWatchlistSearching(false);
-    }, 300);
-  }, []);
-
-  const handleWatchlistFocus = useCallback(() => {
-    if (!watchlistInput) {
-      setWatchlistSearchResults(POPULAR_TICKERS);
-    }
-  }, [watchlistInput]);
 
   const realTrades = useMemo(() => trades.filter(t => !t.isDemo), [trades]);
   const demoTrades = useMemo(() => trades.filter(t => t.isDemo), [trades]);
@@ -1977,16 +1934,29 @@ export default function SwingEdge() {
     setTab("journal");
   };
 
-  const handleAddWatchlistTicker = () => {
-    const t = watchlistInput.trim().toUpperCase();
-    if (!t || watchlistItems.find(i => i.ticker === t)) { setWatchlistInput(""); return; }
-    const cryptoMap = { BTC: "BINANCE:BTCUSDT", ETH: "BINANCE:ETHUSDT" };
-    const newItem = { ticker: t, price: null, change: null, setup: "Custom", chartSym: cryptoMap[t] || `NASDAQ:${t}` };
-    const updated = [...watchlistItems, newItem];
-    setWatchlistItems(updated);
-    try { localStorage.setItem("swingEdgeWatchlist", JSON.stringify(updated)); } catch {}
-    setWatchlistInput("");
-  };
+  // Unified symbol pick from the professional search: add to watchlist (if new)
+  // AND load it on the chart — one action, one search box.
+  const handleSymbolPick = useCallback((tvSym, r) => {
+    if (!tvSym) return;
+    const type = (r?.type || "").toUpperCase();
+    const isCrypto = type === "CRYPTOCURRENCY";
+    const rawSym = (r?.symbol || tvSym.split(":").pop() || "").toUpperCase();
+    const cleanSym = rawSym.replace(/-USD$/, "").replace(/USDT$/, "");
+    const tickerKey = isCrypto ? cleanSym : rawSym;
+    const setup = isCrypto ? "Crypto"
+      : type === "INDEX" ? "Index"
+      : type === "ETF" ? "ETF"
+      : type === "CURRENCY" ? "Forex"
+      : type === "FUTURE" ? "Future"
+      : "Custom";
+    setWatchlistItems(prev => {
+      if (prev.find(i => i.ticker === tickerKey)) return prev;
+      const updated = [...prev, { ticker: tickerKey, price: null, change: null, setup, chartSym: tvSym }];
+      try { localStorage.setItem("swingEdgeWatchlist", JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+    setChartSymbol(tvSym);
+  }, []);
 
   const handleDeleteWatchlistTicker = (ticker) => {
     const updated = watchlistItems.filter(i => i.ticker !== ticker);
@@ -4206,72 +4176,17 @@ export default function SwingEdge() {
                     <Radio size={12} className="text-cyan-400" />
                   </div>
                 </div>
-                {/* Add ticker input with autocomplete */}
-                <div className="relative mb-3">
-                  <div className="flex gap-1.5">
-                    <input
-                      value={watchlistInput}
-                      onChange={e => handleWatchlistSearch(e.target.value)}
-                      onFocus={handleWatchlistFocus}
-                      onKeyDown={e => { if (e.key === "Enter") { handleAddWatchlistTicker(); setWatchlistSearchResults([]); } }}
-                      placeholder={t.addTicker}
-                      className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none font-mono"
-                    />
-                    <button onClick={() => { handleAddWatchlistTicker(); setWatchlistSearchResults([]); }}
-                      className="px-2.5 py-1.5 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 text-xs font-bold hover:bg-cyan-500/25 transition">
-                      <Plus size={12} />
-                    </button>
-                  </div>
-                  {/* Search autocomplete dropdown */}
-                  {watchlistSearchResults.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-white/10 rounded-lg shadow-2xl z-20 max-h-64 overflow-y-auto">
-                      {!watchlistInput && (
-                        <div className="px-3 py-1.5 text-[9px] text-slate-600 uppercase tracking-widest border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-white/3">
-                          {t.popularTickers}
-                        </div>
-                      )}
-                      {watchlistSearchResults.map(r => {
-                        const cleanSym = r.symbol.replace("-USD", "");
-                        const lp = getLivePrice(cleanSym) || getLivePrice(r.symbol);
-                        const isCrypto = r.type === "CRYPTOCURRENCY";
-                        const chartSym = isCrypto
-                          ? `BINANCE:${cleanSym}USDT`
-                          : r.type === "INDEX" ? r.symbol
-                          : r.type === "CURRENCY" || r.type === "FUTURE" ? r.symbol
-                          : `NASDAQ:${r.symbol}`;
-                        const setup = isCrypto ? "Crypto" : r.type === "INDEX" ? "Index" : r.type === "ETF" ? "ETF" : r.type === "CURRENCY" ? "Forex" : r.type === "FUTURE" ? "Future" : "Custom";
-                        return (
-                          <button key={r.symbol + r.exchange} onClick={() => {
-                            const tickerKey = isCrypto ? cleanSym : r.symbol;
-                            const item = { ticker: tickerKey, price: null, change: null, setup, chartSym };
-                            if (!watchlistItems.find(i => i.ticker === tickerKey)) {
-                              const updated = [...watchlistItems, item];
-                              setWatchlistItems(updated);
-                              try { localStorage.setItem("swingEdgeWatchlist", JSON.stringify(updated)); } catch {}
-                            }
-                            setWatchlistSearchResults([]);
-                            setWatchlistInput("");
-                          }}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/5 transition text-left">
-                            <TickerLogo ticker={cleanSym} size={16} />
-                            <div className="flex flex-col flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-mono font-bold text-white">{r.symbol}</span>
-                                <span className="text-[8px] px-1 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">{r.type}</span>
-                              </div>
-                              <span className="text-[10px] text-slate-500 truncate">{r.name}</span>
-                            </div>
-                            <div className="text-right flex flex-col items-end">
-                              {lp?.price != null && (
-                                <span className="font-mono text-[10px] text-slate-300">${lp.price.toFixed(2)}</span>
-                              )}
-                              <span className="text-[9px] text-slate-600">{r.exchange}</span>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
+                {/* Professional symbol search — full-market autocomplete via
+                    TradingView (Yahoo fallback). Picks add to the watchlist and
+                    load the chart in one action. */}
+                <div className="flex mb-3">
+                  <TradingViewSearch
+                    value={chartSymbol}
+                    onPick={handleSymbolPick}
+                    livePrices={livePrices}
+                    setLivePrices={setLivePrices}
+                    placeholder={t.addTicker}
+                  />
                 </div>
 
                 {/* Sort controls */}
