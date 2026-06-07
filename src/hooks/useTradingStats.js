@@ -204,7 +204,7 @@ function EMPTY_STATS(capital) {
 function groupAndAnalyze(metrics, field) {
   const groups = {};
   metrics.forEach(m => {
-    const key = m[field] || "Unknown";
+    const key = (m[field] ?? "").toString().trim() || "Unknown";
     if (!groups[key]) groups[key] = [];
     groups[key].push(m);
   });
@@ -213,6 +213,7 @@ function groupAndAnalyze(metrics, field) {
     const sumWin  = wins.reduce((s, m) => s + m.pnl, 0);
     const sumLoss = Math.abs(items.filter(m => (m.pnl || 0) < 0).reduce((s, m) => s + m.pnl, 0));
     const totalPnL = items.reduce((s, m) => s + (m.pnl || 0), 0);
+    const totalR   = items.reduce((s, m) => s + (m.rMultiple || 0), 0);
     return {
       name,
       count: items.length,
@@ -220,6 +221,8 @@ function groupAndAnalyze(metrics, field) {
       winRate: (wins.length / items.length) * 100,
       totalPnL,
       avgPnL: totalPnL / items.length,
+      totalR,
+      avgR: totalR / items.length,
       profitFactor: sumLoss > 0 ? sumWin / sumLoss : (sumWin > 0 ? Infinity : 0),
     };
   }).sort((a, b) => b.totalPnL - a.totalPnL);
@@ -230,7 +233,9 @@ function analyzeByDay(metrics) {
   const buckets = days.map(d => ({ name: d, items: [] }));
   metrics.forEach(m => {
     if (!m.date) return;
-    const idx = new Date(m.date).getDay();
+    // Parse at local noon to match the rest of the app and avoid a UTC-midnight
+    // off-by-one weekday in negative-UTC timezones.
+    const idx = new Date(m.date + "T12:00:00").getDay();
     if (idx >= 0 && idx <= 6) buckets[idx].items.push(m);
   });
   return buckets

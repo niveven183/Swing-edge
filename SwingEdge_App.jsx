@@ -478,9 +478,7 @@ const generateEquityCurve = (cap, trades = []) => {
     .filter(t => t.status === "CLOSED")
     .sort((a, b) => new Date(a.date || a.exitDate) - new Date(b.date || b.exitDate));
   sortedTrades.forEach(t => {
-    const pnl = t.side === "LONG"
-      ? (t.exit - t.entry) * t.shares
-      : (t.entry - t.exit) * t.shares;
+    const pnl = calcTradeMetrics(t).pnl || 0;
     balance += pnl;
     const d = t.date || t.exitDate;
     data.push({ date: d, equity: Math.round(balance), ticker: t.ticker, pnl: Math.round(pnl) });
@@ -520,7 +518,10 @@ const exportTradesCSV = (trades) => {
   URL.revokeObjectURL(url);
 };
 
-const exportMonthlyPDF = (trades, capital) => {
+// Aggregates come from useTradingStats (single source): `stats` = all-time,
+// `monthStats` = same hook scoped to the current month. Per-trade rows/equity
+// points stay local (per-trade calcTradeMetrics is the canonical source).
+const exportMonthlyPDF = (trades, capital, stats, monthStats) => {
   const now = new Date();
   const monthName = now.toLocaleString("en-US", { month: "long" });
   const year = now.getFullYear();
@@ -533,12 +534,12 @@ const exportMonthlyPDF = (trades, capital) => {
     return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
   });
 
-  const totalPnL = allClosed.reduce((a, t) => a + (calcTradeMetrics(t).pnl || 0), 0);
-  const monthPnL = monthClosed.reduce((a, t) => a + (calcTradeMetrics(t).pnl || 0), 0);
-  const winRate = allClosed.length ? (allClosed.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length / allClosed.length * 100).toFixed(1) : "0.0";
-  const monthWinRate = monthClosed.length ? (monthClosed.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length / monthClosed.length * 100).toFixed(1) : "0.0";
-  const avgR = allClosed.length ? (allClosed.reduce((a, t) => a + (calcTradeMetrics(t).rMultiple || 0), 0) / allClosed.length).toFixed(2) : "0.00";
-  const curEquity = capital + totalPnL;
+  const totalPnL = stats.totalPnL;
+  const monthPnL = monthStats.totalPnL;
+  const winRate = stats.winRate.toFixed(1);
+  const monthWinRate = monthStats.winRate.toFixed(1);
+  const avgR = stats.avgR.toFixed(2);
+  const curEquity = stats.currentEquity;
 
   // Build equity curve points from all closed trades
   let runBalance = capital;
@@ -656,11 +657,11 @@ const exportMonthlyPDF = (trades, capital) => {
     </div>
     <div class="kpi">
       <div class="kpi-label">Closed Trades</div>
-      <div class="kpi-value" style="color:#0f172a">${allClosed.length}</div>
+      <div class="kpi-value" style="color:#0f172a">${stats.totalTrades}</div>
     </div>
     <div class="kpi">
       <div class="kpi-label">${monthName} Trades</div>
-      <div class="kpi-value" style="color:#0f172a">${monthClosed.length}</div>
+      <div class="kpi-value" style="color:#0f172a">${monthStats.totalTrades}</div>
     </div>
   </div>
 </div>
@@ -1447,6 +1448,19 @@ export default function SwingEdge() {
   // ─── MASTER STATS HUB — single source of truth ──────────────────────────────
   const stats = useTradingStats(realTrades, capital, stableCalcTradeMetrics);
   const { totalPnL, winRate, avgR } = stats;
+
+  // Current-month subset fed through the same hub — powers the monthly PDF export.
+  const currentMonthRealTrades = useMemo(() => {
+    const now = new Date();
+    const m = now.getMonth();
+    const y = now.getFullYear();
+    return realTrades.filter(t => {
+      if (!t.date) return false;
+      const d = new Date(t.date + "T12:00:00");
+      return d.getMonth() === m && d.getFullYear() === y;
+    });
+  }, [realTrades]);
+  const monthStats = useTradingStats(currentMonthRealTrades, capital, stableCalcTradeMetrics);
 
   // ─── MONTHLY REPORT — auto-popup modal (start of month, once) + QA shortcut ──
   const [showReportModal, setShowReportModal] = useState(false);
@@ -3476,9 +3490,9 @@ export default function SwingEdge() {
           <div className="space-y-5 animate-fade-in">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <StatCard label="Total Trades"  value={realTrades.length} sub="All time"      icon={Layers}    accent="cyan"   />
-              <StatCard label={<span className="flex items-center gap-1">Win Rate<InfoTooltip label="Win Rate">{TRADING_TOOLTIPS.winRate[lang]||TRADING_TOOLTIPS.winRate.en}</InfoTooltip></span>} value={`${winRate.toFixed(1)}%`} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length} wins`} icon={CheckCircle} accent="green" />
+              <StatCard label={<span className="flex items-center gap-1">Win Rate<InfoTooltip label="Win Rate">{TRADING_TOOLTIPS.winRate[lang]||TRADING_TOOLTIPS.winRate.en}</InfoTooltip></span>} value={`${winRate.toFixed(1)}%`} sub={`${stats.wins} wins`} icon={CheckCircle} accent="green" />
               <StatCard label={<span className="flex items-center gap-1">Avg R Multiple<InfoTooltip label="Avg R Multiple">{TRADING_TOOLTIPS.avgR[lang]||TRADING_TOOLTIPS.avgR.en}</InfoTooltip></span>} value={fmtR(avgR)} sub="Closed trades" icon={Activity}  accent="purple" />
-              <StatCard label="Total Return"   value={`${(totalPnL/capital*100).toFixed(2)}%`} sub={`$${Math.round(Math.abs(totalPnL)).toLocaleString()} P&L`} icon={TrendingUp} accent={totalPnL>=0?"green":"red"} />
+              <StatCard label="Total Return"   value={`${stats.returnPct.toFixed(2)}%`} sub={`$${Math.round(Math.abs(totalPnL)).toLocaleString()} P&L`} icon={TrendingUp} accent={totalPnL>=0?"green":"red"} />
             </div>
 
             {/* Full Equity Curve */}
@@ -3535,50 +3549,29 @@ export default function SwingEdge() {
             <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
               <h3 className="text-sm font-bold text-white mb-4">Performance by Setup</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {(() => {
-                  const setupMap = {};
-                  closedTrades.forEach(t => {
-                    const key = (t.setup || "").trim() || "Unknown";
-                    if (!setupMap[key]) setupMap[key] = [];
-                    setupMap[key].push(t);
-                  });
-                  return Object.entries(setupMap)
-                    .sort((a, b) => b[1].length - a[1].length)
-                    .map(([setup, s]) => {
-                      const wins = s.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length;
-                      const wr = s.length ? wins / s.length * 100 : 0;
-                      const totalR = s.reduce((a, t) => a + (calcTradeMetrics(t).rMultiple || 0), 0);
-                      return (
-                        <div key={setup} className="bg-white/3 rounded-xl p-3 border border-[var(--border-subtle)] dark:border-white/[0.06]">
-                          <div className="text-xs font-semibold text-violet-400 mb-2 truncate" title={setup}>{setup}</div>
-                          <div className="font-bold text-white text-lg font-mono">{wr.toFixed(0)}%</div>
-                          <div className="text-[10px] text-slate-500">{s.length} trades · {totalR.toFixed(1)}R total</div>
-                          <div className="mt-2 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                            <div className="h-full bg-gradient-to-r from-violet-500 to-cyan-500 rounded-full transition-all" style={{ width: `${wr}%` }} />
-                          </div>
-                        </div>
-                      );
-                    });
-                })()}
+                {[...stats.bySetup]
+                  .sort((a, b) => b.count - a.count)
+                  .map((s) => (
+                    <div key={s.name} className="bg-white/3 rounded-xl p-3 border border-[var(--border-subtle)] dark:border-white/[0.06]">
+                      <div className="text-xs font-semibold text-violet-400 mb-2 truncate" title={s.name}>{s.name}</div>
+                      <div className="font-bold text-white text-lg font-mono">{s.winRate.toFixed(0)}%</div>
+                      <div className="text-[10px] text-slate-500">{s.count} trades · {s.totalR.toFixed(1)}R total</div>
+                      <div className="mt-2 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-violet-500 to-cyan-500 rounded-full transition-all" style={{ width: `${s.winRate}%` }} />
+                      </div>
+                    </div>
+                  ))}
               </div>
             </div>
 
             {/* ── P&L by Day of Week ── */}
             {(() => {
-              const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-              const dayMap = {};
-              closedTrades.forEach(t => {
-                const d = new Date(t.date + "T12:00:00").getDay();
-                const name = DAY_NAMES[d];
-                if (!dayMap[name]) dayMap[name] = { pnl: 0, count: 0 };
-                dayMap[name].pnl += calcTradeMetrics(t).pnl || 0;
-                dayMap[name].count += 1;
-              });
+              const dayLookup = Object.fromEntries(stats.byDayOfWeek.map(d => [d.name, d]));
               const data = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday"].map(day => ({
                 day: day.slice(0, 3),
                 fullDay: day,
-                pnl: Math.round(dayMap[day]?.pnl || 0),
-                count: dayMap[day]?.count || 0,
+                pnl: Math.round(dayLookup[day]?.totalPnL || 0),
+                count: dayLookup[day]?.count || 0,
               }));
               return (
                 <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
@@ -3608,18 +3601,8 @@ export default function SwingEdge() {
 
             {/* ── Win Rate by Setup Bar Chart — dynamic grouping ── */}
             {(() => {
-              const setupMap = {};
-              closedTrades.forEach(t => {
-                const key = (t.setup || "").trim() || "Unknown";
-                if (!setupMap[key]) setupMap[key] = [];
-                setupMap[key].push(t);
-              });
-              const data = Object.entries(setupMap)
-                .map(([setup, s]) => {
-                  const wins = s.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length;
-                  const wr = s.length ? Math.round(wins / s.length * 100) : 0;
-                  return { setup, winRate: wr, count: s.length };
-                })
+              const data = stats.bySetup
+                .map((s) => ({ setup: s.name, winRate: Math.round(s.winRate), count: s.count }))
                 .filter(d => d.count > 0)
                 .sort((a, b) => b.count - a.count);
               const short = name => name.length > 11 ? name.slice(0, 10) + "…" : name;
@@ -3651,37 +3634,24 @@ export default function SwingEdge() {
 
             {/* ── Insight Cards: Best Day / Best Setup / Best Emotion ── */}
             {(() => {
-              const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-              // Best Day
-              const dayMap = {};
-              closedTrades.forEach(t => {
-                const d = new Date(t.date + "T12:00:00").getDay();
-                const name = DAY_NAMES[d];
-                if (!dayMap[name]) dayMap[name] = { pnl: 0, count: 0 };
-                dayMap[name].pnl += calcTradeMetrics(t).pnl || 0;
-                dayMap[name].count += 1;
-              });
-              const bestDayEntry = Object.entries(dayMap).sort((a, b) => b[1].pnl - a[1].pnl)[0];
+              // Best Day — from the hub's day breakdown (single source)
+              const bestDayEntry = [...stats.byDayOfWeek]
+                .sort((a, b) => b.totalPnL - a.totalPnL)
+                .map(d => [d.name, { pnl: d.totalPnL, count: d.count }])[0];
 
-              // Best Setup — dynamic grouping from actual trade data
-              const setupBuckets = {};
-              closedTrades.forEach(t => {
-                const key = (t.setup || "").trim() || "Unknown";
-                if (!setupBuckets[key]) setupBuckets[key] = [];
-                setupBuckets[key].push(t);
-              });
-              const setupStats = Object.entries(setupBuckets).map(([setup, s]) => {
-                const wins = s.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length;
-                const wr = s.length ? wins / s.length * 100 : 0;
-                return { setup, winRate: wr, count: s.length };
-              }).filter(s => s.count > 0).sort((a, b) => b.winRate - a.winRate);
-              const bestSetup = setupStats[0];
+              // Best Setup — from the hub's setup breakdown (single source)
+              const bestSetup = [...stats.bySetup]
+                .filter(s => s.count > 0)
+                .sort((a, b) => b.winRate - a.winRate)
+                .map(s => ({ setup: s.name, winRate: s.winRate, count: s.count }))[0];
 
-              // Best Emotion
+              // Best Emotion — local whitelist aggregation over the hub's enriched
+              // closed metrics (pnl from the single source). Kept local because the
+              // whitelist excludes missing-emotion trades, unlike byEmotion grouping.
               const EMOTIONS = ["Confident","Calm","Patient","Neutral","Hesitant","Nervous","FOMO","Angry"];
               const emotionStats = EMOTIONS.map(em => {
-                const e = closedTrades.filter(t => t.emotionAtEntry === em);
-                const wins = e.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length;
+                const e = stats.closedMetrics.filter(m => m.emotionAtEntry === em);
+                const wins = e.filter(m => (m.pnl || 0) > 0).length;
                 const wr = e.length ? wins / e.length * 100 : 0;
                 return { emotion: em, winRate: wr, count: e.length };
               }).filter(e => e.count > 0).sort((a, b) => b.winRate - a.winRate);
@@ -3812,15 +3782,14 @@ export default function SwingEdge() {
                 .sort((a, b) => a.month.localeCompare(b.month))
                 .map(m => ({ ...m, pnl: Math.round(m.pnl) }));
 
-              // 3. Emotion Performance
+              // 3. Emotion Performance — over the hub's enriched closed metrics
               const emoMap = {};
-              closedTrades.forEach(t => {
-                const e = t.emotionAtEntry || "Neutral";
-                const { pnl } = calcTradeMetrics(t);
+              stats.closedMetrics.forEach(m => {
+                const e = m.emotionAtEntry || "Neutral";
                 if (!emoMap[e]) emoMap[e] = { emotion: e, count: 0, wins: 0, totalPnL: 0 };
                 emoMap[e].count++;
-                if ((pnl ?? 0) > 0) emoMap[e].wins++;
-                emoMap[e].totalPnL += pnl ?? 0;
+                if ((m.pnl ?? 0) > 0) emoMap[e].wins++;
+                emoMap[e].totalPnL += m.pnl ?? 0;
               });
               const emotionStatsArr = Object.values(emoMap).map(e => ({
                 ...e,
@@ -3844,21 +3813,14 @@ export default function SwingEdge() {
               if (cur > 0 && curType) streaks.push({ type: curType, length: cur });
               const maxStreak = streaks.reduce((m, s) => Math.max(m, s.length), 1);
 
-              // 5. Setup Matrix
-              const sMap = {};
-              closedTrades.forEach(t => {
-                const s = (t.setup || "").trim() || "Unknown";
-                const { pnl, rMultiple } = calcTradeMetrics(t);
-                if (!sMap[s]) sMap[s] = { setup: s, count: 0, wins: 0, totalPnL: 0, totalR: 0 };
-                sMap[s].count++;
-                if ((pnl ?? 0) > 0) sMap[s].wins++;
-                sMap[s].totalPnL += pnl ?? 0;
-                sMap[s].totalR += rMultiple ?? 0;
-              });
-              const setupMatrix = Object.values(sMap).map(s => ({
-                ...s,
-                winRate: s.count ? Math.round(s.wins / s.count * 100) : 0,
-                avgR: s.count ? (s.totalR / s.count).toFixed(2) : "0",
+              // 5. Setup Matrix — from the hub's setup breakdown (single source)
+              const setupMatrix = stats.bySetup.map(s => ({
+                setup: s.name,
+                count: s.count,
+                wins: s.wins,
+                totalR: s.totalR,
+                winRate: s.count ? Math.round(s.winRate) : 0,
+                avgR: s.count ? s.avgR.toFixed(2) : "0",
                 totalPnL: Math.round(s.totalPnL),
               })).sort((a, b) => b.totalPnL - a.totalPnL);
 
@@ -4835,7 +4797,7 @@ export default function SwingEdge() {
                       {t.pdfIncludes}
                     </p>
                     <button
-                      onClick={() => exportMonthlyPDF(trades, capital)}
+                      onClick={() => exportMonthlyPDF(realTrades, capital, stats, monthStats)}
                       className="w-full py-2 rounded-lg bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 text-xs font-bold hover:bg-cyan-500/20 transition flex items-center justify-center gap-1.5">
                       <FileText size={12} /> {t.createPdf}
                     </button>
