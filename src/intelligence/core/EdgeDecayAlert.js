@@ -33,8 +33,8 @@ const isRecent = (trade, nowMs) => {
   return nowMs - d.getTime() <= RECENT_DAYS * 86_400_000;
 };
 
-// Expectancy score combining winRate and avgR (E[R] proxy).
-const expectancy = (trades) => {
+// E[R] proxy score: winRate × avgR (not true expectancy — used for relative decay detection).
+const edgeProxyScore = (trades) => {
   if (!trades.length) return 0;
   const wr  = winRate(trades);
   const ar  = avgR(trades);
@@ -108,7 +108,7 @@ export const detectEdgeDecay = (trades = [], nowMs = Date.now()) => {
       recentAvgR:     Number(recentAvgR.toFixed(2)),
       historicalN:    all.length,
       recentN:        recent.length,
-      expectancyDrop: Number((expectancy(all) - expectancy(recent)).toFixed(3)),
+      expectancyDrop: Number((edgeProxyScore(all) - edgeProxyScore(recent)).toFixed(3)),
       message: {
         he: `"${setup}" מראה דעיכת Edge — ממוצע R ירד מ-${historicalAvgR.toFixed(2)} ל-${recentAvgR.toFixed(2)} ב-${recent.length} עסקאות אחרונות (${RECENT_DAYS} יום).`,
         en: `"${setup}" edge is decaying — avg R dropped from ${historicalAvgR.toFixed(2)} to ${recentAvgR.toFixed(2)} over the last ${recent.length} trades (${RECENT_DAYS}d).`,

@@ -39,6 +39,10 @@ export const pnlOf = (t) => calcTradeMetrics(t).pnl || 0;
 export const rOf   = (t) => calcTradeMetrics(t).rMultiple || 0;
 export const isWin = (t) => pnlOf(t) > 0;
 
+// ─── SCALE CONVENTION ─────────────────────────────────────────────────────────
+// All win-rate functions in this module return a fraction (0..1).
+// Intelligence modules (MonthlyReport, EdgeFinder, AntiEdgeLock) convert to
+// 0-100 at their public output boundary before returning to App code.
 export const winRate = (trades) => {
   if (!trades.length) return 0;
   return trades.filter(isWin).length / trades.length;
@@ -113,6 +117,7 @@ export const isSignificant = (wins, n, baseline = 0.5) => {
 export const streaks = (trades) => {
   let curW = 0, curL = 0, bestW = 0, bestL = 0;
   for (const t of trades) {
+    if (pnlOf(t) === 0) continue;
     if (isWin(t)) { curW++; bestW = Math.max(bestW, curW); curL = 0; }
     else          { curL++; bestL = Math.max(bestL, curL); curW = 0; }
   }

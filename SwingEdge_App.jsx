@@ -17,7 +17,7 @@ import TradingViewSearch from "./src/components/TradingViewSearch.jsx";
 import { TVTickerTape } from "./src/components/TradingViewWidgets.jsx";
 import { useToast, useConfirm, Tooltip as UiTooltip } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured, tradeForSupabase } from "./src/supabaseClient.js";
-import { calcTradeMetrics } from "./src/utils.js";
+import { calcTradeMetrics, fmt$, fmtR } from "./src/utils.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell,
@@ -489,14 +489,8 @@ const generateEquityCurve = (cap, trades = []) => {
 };
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
-// calcTradeMetrics is the single source of truth in ./src/utils.js (imported above)
-// — shared by the UI here and the intelligence layer via statisticalModels.js.
-
-const fmt$ = (n) => n >= 0
-  ? `+$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
-  : `-$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
-
-const fmtR = (r) => r >= 0 ? `+${r.toFixed(2)}R` : `${r.toFixed(2)}R`;
+// fmt$, fmtR, and calcTradeMetrics are imported from ./src/utils.js above.
+// fmtDollar (below) is a separate local function used only for HTML export.
 
 // ─── EXPORT HELPERS ───────────────────────────────────────────────────────────
 const exportTradesCSV = (trades) => {
@@ -3841,7 +3835,7 @@ export default function SwingEdge() {
               let cur = 0, curType = null;
               sorted.forEach(t => {
                 const { pnl } = calcTradeMetrics(t);
-                if (pnl == null) return;
+                if (pnl == null || pnl === 0) return;
                 const isWin = pnl > 0;
                 const nt = isWin ? "win" : "loss";
                 if (curType === null || curType === nt) { curType = nt; cur++; }

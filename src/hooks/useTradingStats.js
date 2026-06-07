@@ -35,7 +35,8 @@ export function useTradingStats(trades, capital, calcTradeMetrics) {
     const avgR         = metrics.reduce((s, m) => s + (m.rMultiple || 0), 0) / metrics.length;
     const bestWin      = winners.length ? Math.max(...winners.map(m => m.pnl)) : 0;
     const worstLoss    = losers.length  ? Math.min(...losers.map(m => m.pnl)) : 0;
-    const expectancy   = (winRate / 100) * avgWin - (lossRate / 100) * avgLoss;
+    // Dollar-based expectancy. See src/data/tooltips.js for definition.
+    const expectancyDollar = (winRate / 100) * avgWin - (lossRate / 100) * avgLoss;
 
     // ─── Equity curve + Max Drawdown ───────────────────────────
     const sorted = [...metrics].sort((a, b) => {
@@ -130,7 +131,7 @@ export function useTradingStats(trades, capital, calcTradeMetrics) {
       winRate, lossRate, profitFactor,
 
       // averages
-      avgWin, avgLoss, avgR, bestWin, worstLoss, expectancy,
+      avgWin, avgLoss, avgR, bestWin, worstLoss, expectancyDollar,
 
       // equity
       currentEquity: capital + totalPnL,
@@ -185,7 +186,7 @@ function EMPTY_STATS(capital) {
     totalTrades: 0, total: 0, openTrades: 0, wins: 0, losses: 0,
     totalPnL: 0, totalWin: 0, totalLoss: 0,
     winRate: 0, lossRate: 0, profitFactor: 0,
-    avgWin: 0, avgLoss: 0, avgR: 0, bestWin: 0, worstLoss: 0, expectancy: 0,
+    avgWin: 0, avgLoss: 0, avgR: 0, bestWin: 0, worstLoss: 0, expectancyDollar: 0,
     currentEquity: capital, capital, returnPct: 0,
     equityCurve: [], maxDrawdown: 0, maxDD: 0, currentDrawdown: 0,
     currentStreak: 0, maxWinStreak: 0, maxLossStreak: 0, bestStreak: 0,

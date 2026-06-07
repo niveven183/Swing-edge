@@ -8,7 +8,7 @@
 //   style: { aggression, patience, discipline, tilt },
 //   strengths: { setups:[], emotions:[], markets:[], daysOfWeek:[] },
 //   weaknesses:{ setups:[], emotions:[], markets:[], daysOfWeek:[] },
-//   metrics:   { winRate, avgR, expectancy, profitFactor, sharpe, kelly, streaks },
+//   metrics:   { winRate, avgR, expectancyR, profitFactor, sharpe, kelly, streaks },
 //   updatedAt
 // }
 
@@ -186,7 +186,7 @@ export const calculateTradeDNA = (allTrades = []) => {
     metrics: {
       winRate:      winRate(closed),
       avgR:         avgR(closed),
-      expectancy:   expectedValueR(closed),
+      expectancyR:  expectedValueR(closed),
       profitFactor: profitFactor(closed),
       sharpe:       sharpeR(closed),
       kelly:        kellyFraction(closed),

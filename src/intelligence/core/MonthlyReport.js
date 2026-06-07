@@ -180,7 +180,10 @@ export function generateMonthlyReport(trades, month, year, calcMetrics) {
   // best win streak (chronological)
   const chrono = [...cur].sort((a, b) => (a.date?.getTime() || 0) - (b.date?.getTime() || 0));
   let streak = 0, bestStreak = 0;
-  for (const e of chrono) { if (e.win) { streak++; bestStreak = Math.max(bestStreak, streak); } else streak = 0; }
+  for (const e of chrono) {
+    if (e.pnl === 0) continue;
+    if (e.win) { streak++; bestStreak = Math.max(bestStreak, streak); } else streak = 0;
+  }
 
   // overtrading: trades per day
   const perDay = new Map();
