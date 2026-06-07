@@ -163,18 +163,26 @@ git log --oneline -1
 11. ⏳ Apple Login (Phase 2 — Apple Developer $99)
 12. ⏳ Split `SwingEdge_App.jsx` (5200+ lines) — POST-LAUNCH
 
-## Known Technical Debt (P2/P3 — FIX 2A audit)
+## FIX 2A Math Audit — CLOSED (P1 + P2 + P3 ✅)
 
-### P2 — Formula & Semantic Drift Risks
-- **`fmt$` / `fmtR` duplicated** — defined in both `SwingEdge_App.jsx` and `src/utils.js`. Same drift risk as `calcTradeMetrics` was. Candidate for consolidation: keep in `src/utils.js`, import in App.
-- **`expectancy` semantic split** — two definitions in use: dollar-value vs R-multiple. Needs alignment to one canonical meaning.
-- **`winRate` scale inconsistency** — some paths use 0–100, others 0–1. Standardize.
-- **`breakeven` in streak logic** — treat-as-win vs treat-as-loss inconsistency across calculations.
+The full math audit is complete. Every aggregate metric now flows through a single
+source of truth; no metric is computed in two places.
 
-### P3 — Inline Computation Sprawl
-- **Analytics tab** — computes P&L/R metrics inline instead of going through `useTradingStats` hook.
-- **Export (PDF/CSV)** — same issue; recalculates inline rather than reusing hook output.
-- Long-term: all derived stats should flow exclusively through `useTradingStats`.
+### P1 — Formula Unification ✅
+- `calcTradeMetrics` unified to one canonical formula (`src/utils.js`); `openPnL` exposes missing-price.
+
+### P2 — Formula & Semantic Drift ✅
+- `fmt$` / `fmtR` consolidated in `src/utils.js`, imported in App.
+- `expectancy` aligned to one canonical (dollar-value) definition.
+- `winRate` standardized to 0–100 scale across all paths.
+- `breakeven` semantics unified in streak logic.
+
+### P3 — Inline Computation Sprawl ✅
+- **Analytics tab** now reads setup/day/emotion/matrix aggregates from `useTradingStats` (hub extended with `totalR`/`avgR`).
+- **PDF export** receives `stats` + `monthStats` (hub-scoped current month) instead of recomputing.
+- **Equity curve** uses `calcTradeMetrics` (single pnl formula across hub, Analytics, PDF).
+- CSV export left as raw per-trade dump (each row's `calcTradeMetrics` is canonical — no aggregate).
+- Kept local (per-trade shaping, no aggregate twin): R-distribution, P&L-by-month, streak history, hold-vs-P&L scatter, per-trade bars.
 
 ## Hive Agents Context
 `agents/_base.py` + `core/supervisor.py` — Python orchestrator.
@@ -212,7 +220,7 @@ Constants: `VALID_SETUPS` (30) · `VALID_EMOTIONS` (15) · `VALID_MARKETS` (14) 
 - `TradeDNA.calculateTradeDNA` recomputes O(n) on every edit — memoize by last-trade-id.
 - i18n gaps: `TradeCalendar.jsx:110` hardcoded `עסקאות`; `TiltProtection.js:62–100` hardcoded EN/HE without a lang fallback.
 - A11y: missing `aria-label` on `InfoTooltip` close button, `TradeCalendar` day cells, `AuthScreen` inputs.
-- Unused exports: `closedMetrics` in `useTradingStats`, `toYahooSymbol`/`fromYahooSymbol` in `priceService`.
+- Unused exports: `toYahooSymbol`/`fromYahooSymbol` in `priceService`. (`closedMetrics` now consumed by Analytics emotion blocks.)
 - 9× `console.log` in error paths → switch to `console.warn` for consistency.
 
 ### Audit clean
