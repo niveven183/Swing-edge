@@ -10,15 +10,17 @@ SwingEdge הוא יומן מסחר מקצועי לסוחרי סווינג.
 - **Supabase project:** zicstkfkwhzvmdkzpidm
 
 ## Architecture
-- `SwingEdge_App.jsx` — root component, ~5186 lines (single-file by design, post-launch split planned).
+- `SwingEdge_App.jsx` — root component, ~5200 lines (single-file by design, post-launch split planned).
 - `src/hooks/useTradingStats.js` — single source of truth for all aggregated stats.
 - Auth flow: `AuthScreen` → (optional `ForgotPassword`) → `ResetPassword` (triggered by `?reset=true` in URL).
+- **Routing (react-router-dom@7.17.0):** `main.jsx` wraps in `<BrowserRouter>`. `/` = `LandingGate` (redirects to `/app` if authenticated, else `LandingPage`). `/app` = `SwingEdge_App.jsx`.
 
 ## Tabs Structure (NAV_KEYS)
 `dashboard | journal | tools | analytics | intel | feedback`
 
-⚠️ The `tools` tab has a sub-nav: `'analyzer' | 'calc'`.
+⚠️ The `tools` tab has a sub-nav: `'analyzer' | 'calc' | 'report'`.
 If the URL points to `/analyzer` or `/position`, a `useEffect` routes the user into the `tools` tab automatically.
+The `report` sub-tab renders the Trading DNA Monthly Report.
 
 ## Data Schema
 localStorage key: `swingEdgeTrades`
@@ -47,7 +49,7 @@ Trade = {
 
 🚨 **CRITICAL:** `pnl` and `rMultiple` are **not stored** on the trade.
 Compute via: `const { pnl, rMultiple } = calcTradeMetrics(trade)`
-`calcTradeMetrics` lives in `SwingEdge_App.jsx` around line 327.
+`calcTradeMetrics` lives in **`src/utils.js:4`** — single canonical source. `SwingEdge_App.jsx` imports it from there (line 20). Do not redefine it locally.
 
 ## Key Components
 
@@ -55,6 +57,13 @@ Compute via: `const { pnl, rMultiple } = calcTradeMetrics(trade)`
 - `SwingEdge_App.jsx` — root
 - `src/hooks/useTradingStats.js` — stats aggregation
 - `src/supabaseClient.js` — Supabase client + sync
+- `src/utils.js` — canonical math helpers: `calcTradeMetrics`, `fmt$`, `fmtR`, `CAPITAL`, `RISK_PCT`
+
+### Routing
+- `main.jsx` — `<BrowserRouter>` wraps everything
+- `src/components/LandingGate.jsx` — `/` route: redirects to `/app` if authenticated, else shows `LandingPage`
+- `src/components/LandingPage.jsx` + `LandingPage.css` — public landing / waitlist page
+- `src/hooks/useSupabaseSession.js` — hook for auth session detection used by `LandingGate`
 
 ### Auth
 - `AuthScreen.jsx` — Sign In / Sign Up / Google
@@ -65,6 +74,7 @@ Compute via: `const { pnl, rMultiple } = calcTradeMetrics(trade)`
 ### UI
 - `ui/InfoTooltip.jsx` — tooltip with `position:fixed` + viewport-aware
 - `TradeCalendar.jsx` — monthly calendar with P&L per day. Props: `{ trades, calcMetrics, lang }`
+- `src/components/TradingViewSearch.jsx` — professional symbol autocomplete (debounce, AbortController, keyboard nav)
 
 ### Data
 - `src/data/tooltips.js` — `TRADING_TOOLTIPS` (18 metrics + setup names, bilingual)
@@ -77,7 +87,8 @@ Compute via: `const { pnl, rMultiple } = calcTradeMetrics(trade)`
 - `src/intelligence/core/TradeDNA.js` — 4 dimensions: Risk · Discipline · Consistency · Growth
 
 ### Services
-- `src/priceService.js` — Yahoo Finance + 5min cache + CORS proxy fallbacks
+- `src/priceService.js` — `searchSymbolsTV()` (TradingView via serverless proxy, Yahoo fallback) + quote fetch + 5min cache + CORS proxy fallbacks
+- `api/symbol-search.js` — Vercel serverless function; proxies TradingView symbol search (spoofs `Referer` header). Dev proxy in `vite.config.js`.
 
 ### Vision (legacy, still in repo)
 - `src/vision/ChartVisionEngine.js` — TradingView screenshot parser
@@ -93,9 +104,15 @@ Compute via: `const { pnl, rMultiple } = calcTradeMetrics(trade)`
 - ✅ Adaptive Lessons system (6 patterns)
 - ✅ Analytics 6 new charts: R distribution · P&L by month · Emotion perf · Streaks · Setup matrix · Hold vs P&L
 - ✅ Market Intel: 90+ tickers · instant autocomplete · sector badges · reactive sector trends · emerald quick-jump pills
+- ✅ **Landing page + routing** (a0143e7): `/` = public landing, `/app` = app; auth-aware redirect via `LandingGate`
+- ✅ **Removed Live Market Overview** (341703b): TradingView embed stripped from Dashboard — cleaner UI, fewer API calls
+- ✅ **Professional symbol search** (80439ef): full-market autocomplete via TradingView + Yahoo fallback, serverless proxy in `api/symbol-search.js`
+- ✅ **DNA Report → Tools tab** (fd1c4c5): Trading DNA Monthly Report moved from standalone tab to `tools > report` sub-tab; verified real data via `calcTradeMetrics`
+- ✅ **i18n consistency** (146a4d1): ~60 strings fixed, 30 new keys (he+en); professional terms stay English, rest consistent
+- ✅ **Core formula unified + P&L transparency** (a545e6c): `calcTradeMetrics` consolidated to `src/utils.js` only; `openPnL` now surfaces `missingCount` with amber AlertTriangle warning instead of silent skip
 
 ## Coding Rules (Hive agents + Claude Code)
-1. ❌ NEVER access `trade.pnl` directly — ✅ `const { pnl } = calcTradeMetrics(trade)`
+1. ❌ NEVER access `trade.pnl` directly — ✅ `const { pnl } = calcTradeMetrics(trade)` (import from `./src/utils.js`)
 2. ❌ NEVER use `t.direction` — ✅ `t.side`
 3. ❌ NEVER use `t.reason` / `t.lesson` — ✅ `t.notes` / `t.lessonLearned`
 4. ❌ NEVER add a new `useState` without checking if existing state can be reused
@@ -136,15 +153,28 @@ git log --oneline -1
 1. ⏳ Sentry / error monitoring full setup
 2. ⏳ 30 professional demo trades (prompt: `12-PRO-30-TRADES-PROMPT.md`)
 3. ⏳ Google Analytics / Mixpanel
-4. ⏳ Landing page + Waitlist
+4. ✅ Landing page + Waitlist — done (a0143e7)
 5. ⏳ Stripe (Free / Pro $19 / Team $49)
 6. ⏳ Live Decision Coach
-7. ⏳ Trading DNA monthly report
+7. ✅ Trading DNA monthly report — done (fd1c4c5, moved to Tools > report)
 8. ⏳ Tilt Shield (full)
 9. ⏳ Telegram bot — daily summaries
 10. ⏳ Real-time market API (replace Yahoo)
 11. ⏳ Apple Login (Phase 2 — Apple Developer $99)
-12. ⏳ Split `SwingEdge_App.jsx` (5186+ lines) — POST-LAUNCH
+12. ⏳ Split `SwingEdge_App.jsx` (5200+ lines) — POST-LAUNCH
+
+## Known Technical Debt (P2/P3 — FIX 2A audit)
+
+### P2 — Formula & Semantic Drift Risks
+- **`fmt$` / `fmtR` duplicated** — defined in both `SwingEdge_App.jsx` and `src/utils.js`. Same drift risk as `calcTradeMetrics` was. Candidate for consolidation: keep in `src/utils.js`, import in App.
+- **`expectancy` semantic split** — two definitions in use: dollar-value vs R-multiple. Needs alignment to one canonical meaning.
+- **`winRate` scale inconsistency** — some paths use 0–100, others 0–1. Standardize.
+- **`breakeven` in streak logic** — treat-as-win vs treat-as-loss inconsistency across calculations.
+
+### P3 — Inline Computation Sprawl
+- **Analytics tab** — computes P&L/R metrics inline instead of going through `useTradingStats` hook.
+- **Export (PDF/CSV)** — same issue; recalculates inline rather than reusing hook output.
+- Long-term: all derived stats should flow exclusively through `useTradingStats`.
 
 ## Hive Agents Context
 `agents/_base.py` + `core/supervisor.py` — Python orchestrator.
