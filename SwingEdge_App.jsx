@@ -17,6 +17,7 @@ import TradingViewSearch from "./src/components/TradingViewSearch.jsx";
 import { TVTickerTape } from "./src/components/TradingViewWidgets.jsx";
 import { useToast, useConfirm, Tooltip as UiTooltip } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured, tradeForSupabase } from "./src/supabaseClient.js";
+import { calcTradeMetrics } from "./src/utils.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell,
@@ -488,14 +489,8 @@ const generateEquityCurve = (cap, trades = []) => {
 };
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
-const calcTradeMetrics = (trade) => {
-  if (!trade.exit) return { pnl: null, rMultiple: null };
-  const risk = Math.abs(trade.entry - trade.stop) * trade.shares;
-  const pnl = trade.side === "LONG"
-    ? (trade.exit - trade.entry) * trade.shares
-    : (trade.entry - trade.exit) * trade.shares;
-  return { pnl, rMultiple: risk > 0 ? pnl / risk : 0 };
-};
+// calcTradeMetrics is the single source of truth in ./src/utils.js (imported above)
+// — shared by the UI here and the intelligence layer via statisticalModels.js.
 
 const fmt$ = (n) => n >= 0
   ? `+$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
@@ -1583,19 +1578,23 @@ export default function SwingEdge() {
     return null;
   }, [livePrices]);
 
+  // Live open P&L. Trades missing a live price are NOT silently dropped — they are
+  // counted (missingCount) so the UI can disclose the gap. We never invent a price
+  // or fall back to last-known: transparency over guessing.
   const openPnL = useMemo(() => {
-    return openTrades.reduce((sum, t) => {
+    let value = 0, missingCount = 0;
+    for (const t of openTrades) {
       const lp = getLivePrice(t.ticker);
-      if (!lp) return sum;
-      const pnl = t.side === "LONG"
+      if (!lp) { missingCount++; continue; }
+      value += t.side === "LONG"
         ? (lp.price - t.entry) * t.shares
         : (t.entry - lp.price) * t.shares;
-      return sum + pnl;
-    }, 0);
+    }
+    return { value, missingCount };
   }, [openTrades, getLivePrice]);
 
   const curEquity = useMemo(
-    () => capital + totalPnL + openPnL,
+    () => capital + totalPnL + openPnL.value,
     [capital, totalPnL, openPnL]
   );
 
@@ -1605,7 +1604,7 @@ export default function SwingEdge() {
     const todayClosed = closedTrades.filter(t => t.date === today);
     const closedToday = todayClosed.reduce((s, t) => s + (calcTradeMetrics(t).pnl || 0), 0);
     // Open P&L change today (approximation using current live prices)
-    return closedToday + openPnL;
+    return closedToday + openPnL.value;
   }, [closedTrades, openPnL]);
 
   // Win Streak Counter (delegated to Master Stats Hub).
@@ -2327,6 +2326,14 @@ export default function SwingEdge() {
               <StatCard label={t.dailyPnl} value={fmt$(Math.round(dailyPnL))} sub={t.todayTrades} icon={DollarSign} accent={dailyPnL >= 0 ? "green" : "red"} />
               <StatCard label={t.streakCounter} value={<span className="flex items-center gap-1">{currentStreak > 0 && <Flame size={18} className="text-orange-400" />}{currentStreak}</span>} sub={`${t.bestStreak}: ${bestStreak}`} icon={Zap} accent={currentStreak >= 3 ? "green" : "amber"} />
             </div>
+
+            {/* Missing live-price disclosure — Account Equity & Today's P&L exclude these open trades */}
+            {openPnL.missingCount > 0 && (
+              <div className="mt-2 flex items-center gap-2 text-xs font-semibold text-amber-500 rtl:flex-row-reverse">
+                <AlertTriangle size={14} />
+                <span>{t.missingPriceWarn.replace('{n}', String(openPnL.missingCount))}</span>
+              </div>
+            )}
 
             {/* ══ SWINGEDGE AI — DNA · GROWTH · REGIME ══ */}
             {aiTilt && aiTilt.level > 0 && (
