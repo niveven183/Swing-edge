@@ -2306,15 +2306,15 @@ export default function SwingEdge() {
             {realTrades.length === 0 && (
               <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-2xl p-6 text-center mb-6">
                 <div className="text-5xl mb-3">👋</div>
-                <h2 className="text-white font-bold text-xl mb-2">ברוך הבא ל-SwingEdge!</h2>
+                <h2 className="text-white font-bold text-xl mb-2">{t.welcomeTitle}</h2>
                 <p className="text-slate-400 text-sm mb-4 leading-relaxed">
-                  אתה רואה כרגע <strong className="text-white">עסקאות דמו</strong> לדוגמה.<br/>
-                  הסטטיסטיקות שלך יתחילו להיבנות מהעסקה הראשונה שלך.
+                  {t.welcomeBody1}<br/>
+                  {t.welcomeBody2}
                 </p>
                 <button
                   onClick={() => setTab('journal')}
                   className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2.5 rounded-xl font-semibold transition-all shadow-lg shadow-blue-500/20">
-                  ➕ הוסף עסקה ראשונה
+                  ➕ {t.addFirstTrade}
                 </button>
               </div>
             )}
@@ -2370,12 +2370,12 @@ export default function SwingEdge() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {stats.topEdges.length > 0 && (
                   <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4">
-                    <h3 className="text-emerald-400 font-bold text-sm mb-3 flex items-center gap-1.5">🎯 Top Edges שלך<InfoTooltip label="Edge">{TRADING_TOOLTIPS.edge[lang]||TRADING_TOOLTIPS.edge.en}</InfoTooltip></h3>
+                    <h3 className="text-emerald-400 font-bold text-sm mb-3 flex items-center gap-1.5">🎯 {t.topEdges}<InfoTooltip label="Edge">{TRADING_TOOLTIPS.edge[lang]||TRADING_TOOLTIPS.edge.en}</InfoTooltip></h3>
                     {stats.topEdges.map((edge, i) => (
                       <div key={edge.name || i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                         <div>
                           <div className="text-white font-semibold text-sm">{edge.name}</div>
-                          <div className="text-slate-400 text-xs">{edge.count} עסקאות</div>
+                          <div className="text-slate-400 text-xs">{edge.count} {t.trades}</div>
                         </div>
                         <div className="text-right">
                           <div className="text-emerald-400 font-bold text-sm">{edge.winRate.toFixed(0)}% WR</div>
@@ -2387,12 +2387,12 @@ export default function SwingEdge() {
                 )}
                 {stats.antiEdges.length > 0 && (
                   <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4">
-                    <h3 className="text-rose-400 font-bold text-sm mb-3 flex items-center gap-1.5">⚠️ Anti-Edges — להימנע!<InfoTooltip label="Anti-Edge">{TRADING_TOOLTIPS.antiEdge[lang]||TRADING_TOOLTIPS.antiEdge.en}</InfoTooltip></h3>
+                    <h3 className="text-rose-400 font-bold text-sm mb-3 flex items-center gap-1.5">⚠️ {t.antiEdges}<InfoTooltip label="Anti-Edge">{TRADING_TOOLTIPS.antiEdge[lang]||TRADING_TOOLTIPS.antiEdge.en}</InfoTooltip></h3>
                     {stats.antiEdges.map((edge, i) => (
                       <div key={edge.name || i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                         <div>
                           <div className="text-white font-semibold text-sm">{edge.name}</div>
-                          <div className="text-slate-400 text-xs">{edge.count} עסקאות</div>
+                          <div className="text-slate-400 text-xs">{edge.count} {t.trades}</div>
                         </div>
                         <div className="text-right">
                           <div className="text-rose-400 font-bold text-sm">{edge.winRate.toFixed(0)}% WR</div>
@@ -2568,7 +2568,7 @@ export default function SwingEdge() {
                     <div className="flex items-center gap-3 bg-[#ef4444]/10 border border-[#ef4444]/30 rounded-xl px-4 py-3">
                       <AlertTriangle size={15} className="text-[#ef4444] shrink-0" />
                       <span className="text-xs text-[#ef4444] font-semibold">
-                        אזהרה: סיכון כולל פתוח ({totalRiskPct.toFixed(2)}%) חורג ממגבלת {MAX_RISK_PCT}% — שקול לצמצם פוזיציות
+                        {t.warningRiskOver}
                       </span>
                     </div>
                   )}
@@ -2586,23 +2586,23 @@ export default function SwingEdge() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {/* Total open risk */}
                     <div className={`bg-[var(--bg-elevated)] dark:bg-[#0d1424] border rounded-xl p-4 ${meterColor.border}`}>
-                      <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 block mb-1">סיכון כולל פתוח</span>
+                      <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 block mb-1">{t.totalOpenRisk}</span>
                       <span className={`text-2xl font-bold font-mono ${meterColor.text}`}>{totalRiskPct.toFixed(2)}%</span>
                       <span className="text-xs text-slate-500 block mt-0.5 font-mono">${totalRiskDollar.toFixed(2)}</span>
-                      <span className="text-[10px] text-slate-600 mt-1 block">{openTrades.length} עסקאות פתוחות</span>
+                      <span className="text-[10px] text-slate-600 mt-1 block">{openTrades.length} {t.openTradesCount}</span>
                     </div>
 
                     {/* Max allowed risk */}
                     <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
-                      <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 block mb-1">מקסימום סיכון מותר</span>
+                      <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 block mb-1">{t.maxAllowedRisk}</span>
                       <span className="text-2xl font-bold font-mono text-violet-400">{MAX_RISK_PCT.toFixed(1)}%</span>
                       <span className="text-xs text-slate-500 block mt-0.5 font-mono">${maxRiskDollar.toFixed(2)}</span>
-                      <span className="text-[10px] text-slate-600 mt-1 block">מתוך ${capital.toLocaleString()} הון</span>
+                      <span className="text-[10px] text-slate-600 mt-1 block">{t.fromCapital} ${capital.toLocaleString()}</span>
                     </div>
 
                     {/* Visual risk meter */}
                     <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
-                      <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 block mb-3">מד סיכון</span>
+                      <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 block mb-3">{t.riskMeter}</span>
                       <div className="relative">
                         {/* Meter bar background */}
                         <div className="h-4 bg-white/[0.06] rounded-full overflow-hidden">
@@ -2624,9 +2624,9 @@ export default function SwingEdge() {
                       </div>
                       <div className="mt-2 flex items-baseline gap-1">
                         <span className={`text-lg font-bold font-mono ${meterColor.text}`}>{usedPct.toFixed(0)}%</span>
-                        <span className="text-[10px] text-slate-600">מהמגבלה</span>
+                        <span className="text-[10px] text-slate-600">{t.ofLimit}</span>
                         <span className="ml-auto text-[10px] text-slate-500 font-mono">
-                          נותר: ${Math.max(maxRiskDollar - totalRiskDollar, 0).toFixed(2)}
+                          {t.remaining}: ${Math.max(maxRiskDollar - totalRiskDollar, 0).toFixed(2)}
                         </span>
                       </div>
                     </div>
@@ -2635,7 +2635,7 @@ export default function SwingEdge() {
                   {/* Per-trade risk table */}
                   {openRisks.length > 0 && (
                     <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
-                      <span className="text-xs font-semibold tracking-widest uppercase text-slate-500 block mb-3">סיכון לכל עסקה פתוחה</span>
+                      <span className="text-xs font-semibold tracking-widest uppercase text-slate-500 block mb-3">{t.riskPerTrade}</span>
                       <div className="overflow-x-auto">
                         <table className="w-full text-xs">
                           <thead>
@@ -2958,8 +2958,8 @@ export default function SwingEdge() {
                         className="w-3.5 h-3.5 rounded border border-white/20 bg-white/5 cursor-pointer accent-cyan-500"
                       />
                     </th>
-                    {["Ticker","Date","Side","Entry","Stop","Target","Shares","מחיר נוכחי","P&L חי","Exit","P&L","R","Hold","Setup","Mkt","Emotion","★","Exit Rsn","Plan","Lesson","Status","Action"].map(h => (
-                      <th key={h} className={`p-3 text-left font-semibold whitespace-nowrap ${h==="מחיר נוכחי"||h==="P&L חי" ? "text-cyan-600" : ""}`}>{h}</th>
+                    {["Ticker","Date","Side","Entry","Stop","Target","Shares",t.currentPrice,t.livePnl,"Exit","P&L","R","Hold","Setup","Mkt","Emotion","★","Exit Rsn","Plan","Lesson","Status","Action"].map(h => (
+                      <th key={h} className={`p-3 text-left font-semibold whitespace-nowrap ${h===t.currentPrice||h===t.livePnl ? "text-cyan-600" : ""}`}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -3063,10 +3063,10 @@ export default function SwingEdge() {
                             )}
                             <button onClick={() => handleEditOpen(t)}
                               className="text-[10px] px-1.5 py-1 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 hover:opacity-80 transition"
-                              title="עריכה">✏️</button>
+                              title={lang === "he" ? "עריכה" : "Edit"}>✏️</button>
                             <button onClick={() => handleDeleteTrade(t.id)}
                               className="text-[10px] px-1.5 py-1 rounded bg-slate-500/10 border border-slate-500/20 text-slate-400 hover:text-red-400 hover:border-red-500/30 transition"
-                              title="מחיקה">🗑️</button>
+                              title={lang === "he" ? "מחיקה" : "Delete"}>🗑️</button>
                           </div>
                         </td>
                       </tr>
@@ -3114,7 +3114,7 @@ export default function SwingEdge() {
 
             {/* Input Fields */}
             <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5 space-y-4">
-              <span className="text-[10px] font-semibold tracking-widest uppercase text-slate-500">פרטי העסקה</span>
+              <span className="text-[10px] font-semibold tracking-widest uppercase text-slate-500">{t.tradeDetails}</span>
 
               {/* Row 1: Ticker + Shares */}
               <div className="grid grid-cols-2 gap-3">
@@ -3124,7 +3124,7 @@ export default function SwingEdge() {
                     placeholder="NVDA" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono font-bold tracking-wider" />
                 </div>
                 <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">כמות מניות</label>
+                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{t.sharesToBuy}</label>
                   <input value={analyzerForm.shares} onChange={e => setAnalyzerForm(f => ({ ...f, shares: e.target.value }))}
                     placeholder="10" type="number" min="0" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono" />
                 </div>
@@ -3132,7 +3132,7 @@ export default function SwingEdge() {
 
               {/* Row 2: Entry / Stop / Target */}
               <div className="grid grid-cols-3 gap-3">
-                {[["מחיר כניסה *", "entry", "text-white"], ["סטופ לוס *", "stop", "text-[#ef4444]"], ["יעד", "target", "text-[#10b981]"]].map(([label, key, cls]) => (
+                {[[t.entry, "entry", "text-white"], [t.stopLoss, "stop", "text-[#ef4444]"], [t.target, "target", "text-[#10b981]"]].map(([label, key, cls]) => (
                   <div key={key}>
                     <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{label}</label>
                     <input value={analyzerForm[key]} onChange={e => setAnalyzerForm(f => ({ ...f, [key]: e.target.value }))}
@@ -3151,13 +3151,13 @@ export default function SwingEdge() {
                     </div>
                   </div>
                   <div className="text-center">
-                    <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">סיכון בדולרים</div>
+                    <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">{t.riskInDollars}</div>
                     <div className="text-base font-bold font-mono text-[#ef4444]">
                       {azShares > 0 ? `$${azDollarRisk.toFixed(2)}` : "–"}
                     </div>
                   </div>
                   <div className="text-center">
-                    <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">סיכון מהתיק</div>
+                    <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">{t.riskOfPortfolio}</div>
                     <div className={`text-base font-bold font-mono ${azPortfolioRisk > 2 ? "text-[#ef4444]" : azPortfolioRisk > 1 ? "text-amber-400" : "text-[#10b981]"}`}>
                       {azShares > 0 ? `${azPortfolioRisk.toFixed(2)}%` : "–"}
                     </div>
@@ -3169,16 +3169,16 @@ export default function SwingEdge() {
               {azEntry > 0 && azStop > 0 && azTarget > 0 && (
                 <div className={`flex items-center gap-2 p-2.5 rounded-lg border text-xs ${azRRRatio >= 2 ? "bg-emerald-500/5 border-emerald-500/20 text-[#10b981]" : azRRRatio >= 1 ? "bg-amber-500/5 border-amber-500/20 text-amber-400" : "bg-[#ef4444]/5 border-[#ef4444]/20 text-[#ef4444]"}`}>
                   {azRRRatio >= 2 ? <CheckCircle size={13} /> : <AlertTriangle size={13} />}
-                  <span>{azRRRatio >= 2 ? "R/R מצוין — עובר סף מינימום 2:1" : azRRRatio >= 1 ? "R/R סביר — שקול להרחיב יעד" : "R/R נמוך — הימנע מעסקאות מתחת ל-1:1"}</span>
+                  <span>{azRRRatio >= 2 ? t.rrExcellent : azRRRatio >= 1 ? t.rrFair : t.rrLow}</span>
                 </div>
               )}
 
               {/* Image Upload */}
               <div>
-                <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">תמונה מ-TradingView</label>
+                <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{t.imageFromTradingView}</label>
                 <label className="flex items-center gap-2 cursor-pointer w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-400 hover:border-cyan-500/30 hover:text-cyan-400 transition">
                   <Eye size={12} />
-                  <span>{analyzerImage ? analyzerImage.name : "העלה צילום מסך של גרף..."}</span>
+                  <span>{analyzerImage ? analyzerImage.name : t.uploadChart}</span>
                   <input type="file" accept="image/*" onChange={handleAnalyzerImageUpload} className="hidden" />
                 </label>
               </div>
@@ -3203,7 +3203,7 @@ export default function SwingEdge() {
             {analyzerResult && (
               <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-violet-500/25 rounded-xl p-5 space-y-4">
                 <div className="flex items-center gap-2 text-violet-400 font-semibold text-xs uppercase tracking-wider">
-                  <Cpu size={13} /> תוצאת הניתוח
+                  <Cpu size={13} /> {t.analysisResult}
                 </div>
 
                 {analyzerResult.error ? (
@@ -3219,7 +3219,7 @@ export default function SwingEdge() {
                         analyzerResult.recommendation === "WAIT" ? "bg-amber-500/8 border-amber-500/30" :
                                                                     "bg-[#ef4444]/8 border-[#ef4444]/30"}`}>
                         <div>
-                          <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">המלצה</div>
+                          <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">{t.recommendation}</div>
                           <div className={`text-2xl font-bold font-mono ${
                             analyzerResult.recommendation === "GO"   ? "text-[#10b981]" :
                             analyzerResult.recommendation === "WAIT" ? "text-amber-400" :
@@ -3231,7 +3231,7 @@ export default function SwingEdge() {
                         </div>
                         {analyzerResult.entry_score && (
                           <div className="text-right">
-                            <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">ציון כניסה</div>
+                            <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">{t.entryScore}</div>
                             <div className="text-amber-400 font-mono font-bold text-xl">
                               {"★".repeat(analyzerResult.entry_score)}{"☆".repeat(5 - analyzerResult.entry_score)}
                             </div>
@@ -3246,7 +3246,7 @@ export default function SwingEdge() {
                       {analyzerResult.stop_logic && (
                         <div className="bg-white/3 rounded-xl p-3 border border-[var(--border-subtle)] dark:border-white/[0.06]">
                           <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-1.5 flex items-center gap-1">
-                            <Target size={10} /> סטופ לוס
+                            <Target size={10} /> {t.stopLossLabel}
                           </div>
                           <p className="text-xs text-slate-300 leading-relaxed">{analyzerResult.stop_logic}</p>
                         </div>
@@ -3264,7 +3264,7 @@ export default function SwingEdge() {
                     {/* Explanation */}
                     {analyzerResult.explanation && (
                       <div className="bg-violet-500/5 border border-violet-500/15 rounded-xl p-3">
-                        <div className="text-[10px] text-violet-400 uppercase tracking-widest mb-1.5">הסבר</div>
+                        <div className="text-[10px] text-violet-400 uppercase tracking-widest mb-1.5">{t.explanation}</div>
                         <p className="text-xs text-slate-300 leading-relaxed">{analyzerResult.explanation}</p>
                       </div>
                     )}
@@ -3416,27 +3416,27 @@ export default function SwingEdge() {
               {/* Results */}
               {hasResult ? (
                 <div className="space-y-3">
-                  <span className="text-[10px] font-semibold tracking-widest uppercase text-slate-500">תוצאות חישוב</span>
+                  <span className="text-[10px] font-semibold tracking-widest uppercase text-slate-500">{t.calcResults}</span>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-cyan-500/25 rounded-xl p-4 flex flex-col gap-1">
                       <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase tracking-widest">
-                        <Hash size={10} className="text-cyan-400" /> כמות מניות
+                        <Hash size={10} className="text-cyan-400" /> {t.sharesToBuy}
                       </div>
                       <div className="text-2xl font-bold font-mono text-cyan-400">{shares.toLocaleString()}</div>
-                      <div className="text-xs text-slate-600">shares to buy</div>
+                      <div className="text-xs text-slate-600">{t.sharesToBuyDesc}</div>
                     </div>
 
                     <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[#ef4444]/25 rounded-xl p-4 flex flex-col gap-1">
                       <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase tracking-widest">
-                        <AlertTriangle size={10} className="text-[#ef4444]" /> סיכון בדולרים
+                        <AlertTriangle size={10} className="text-[#ef4444]" /> {t.riskInDollars}
                       </div>
                       <div className="text-2xl font-bold font-mono text-[#ef4444]">${riskDollars.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                      <div className="text-xs text-slate-600">{riskN}% of capital</div>
+                      <div className="text-xs text-slate-600">{riskN}% {t.ofCapital}</div>
                     </div>
 
                     <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[#10b981]/25 rounded-xl p-4 flex flex-col gap-1">
                       <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase tracking-widest">
-                        <DollarSign size={10} className="text-[#10b981]" /> גודל פוזיציה
+                        <DollarSign size={10} className="text-[#10b981]" /> {t.positionSize}
                       </div>
                       <div className="text-2xl font-bold font-mono text-[#10b981]">${posValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                       <div className="text-xs text-slate-600">{shares} × ${entN.toFixed(2)}</div>
@@ -3444,10 +3444,10 @@ export default function SwingEdge() {
 
                     <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-violet-500/25 rounded-xl p-4 flex flex-col gap-1">
                       <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase tracking-widest">
-                        <Percent size={10} className="text-violet-400" /> אחוז מהתיק
+                        <Percent size={10} className="text-violet-400" /> {t.portfolioPct}
                       </div>
                       <div className="text-2xl font-bold font-mono text-violet-400">{portPct.toFixed(1)}%</div>
-                      <div className="text-xs text-slate-600">of ${capN.toLocaleString()} portfolio</div>
+                      <div className="text-xs text-slate-600">{t.ofPortfolio} ${capN.toLocaleString()}</div>
                     </div>
                   </div>
 
@@ -3457,13 +3457,13 @@ export default function SwingEdge() {
                     className="w-full mt-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500/50"
                   >
                     <Copy size={14} />
-                    {posCopied ? "✓ הועתק לטופס עסקה!" : "העתק לטופס עסקה"}
+                    {posCopied ? `✓ ${t.copiedToForm}` : t.copyToTradeForm}
                   </button>
                 </div>
               ) : (
                 <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-8 text-center">
                   <Calculator size={32} className="text-slate-700 mx-auto mb-3" />
-                  <p className="text-sm text-slate-600">הכנס הון תיק, מחיר כניסה וסטופ לוס לחישוב אוטומטי</p>
+                  <p className="text-sm text-slate-600">{t.enterDataToCalc}</p>
                 </div>
               )}
             </div>
@@ -3741,12 +3741,12 @@ export default function SwingEdge() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {stats.topEdges.length > 0 && (
                   <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4">
-                    <h3 className="text-emerald-400 font-bold text-sm mb-3 flex items-center gap-1.5">🎯 Top Edges שלך<InfoTooltip label="Edge">{TRADING_TOOLTIPS.edge[lang]||TRADING_TOOLTIPS.edge.en}</InfoTooltip></h3>
+                    <h3 className="text-emerald-400 font-bold text-sm mb-3 flex items-center gap-1.5">🎯 {t.topEdges}<InfoTooltip label="Edge">{TRADING_TOOLTIPS.edge[lang]||TRADING_TOOLTIPS.edge.en}</InfoTooltip></h3>
                     {stats.topEdges.map((edge, i) => (
                       <div key={edge.name || i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                         <div>
                           <div className="text-white font-semibold text-sm">{edge.name}</div>
-                          <div className="text-slate-400 text-xs">{edge.count} עסקאות</div>
+                          <div className="text-slate-400 text-xs">{edge.count} {t.trades}</div>
                         </div>
                         <div className="text-right">
                           <div className="text-emerald-400 font-bold text-sm">{edge.winRate.toFixed(0)}% WR</div>
@@ -3758,12 +3758,12 @@ export default function SwingEdge() {
                 )}
                 {stats.antiEdges.length > 0 && (
                   <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4">
-                    <h3 className="text-rose-400 font-bold text-sm mb-3 flex items-center gap-1.5">⚠️ Anti-Edges — להימנע!<InfoTooltip label="Anti-Edge">{TRADING_TOOLTIPS.antiEdge[lang]||TRADING_TOOLTIPS.antiEdge.en}</InfoTooltip></h3>
+                    <h3 className="text-rose-400 font-bold text-sm mb-3 flex items-center gap-1.5">⚠️ {t.antiEdges}<InfoTooltip label="Anti-Edge">{TRADING_TOOLTIPS.antiEdge[lang]||TRADING_TOOLTIPS.antiEdge.en}</InfoTooltip></h3>
                     {stats.antiEdges.map((edge, i) => (
                       <div key={edge.name || i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                         <div>
                           <div className="text-white font-semibold text-sm">{edge.name}</div>
-                          <div className="text-slate-400 text-xs">{edge.count} עסקאות</div>
+                          <div className="text-slate-400 text-xs">{edge.count} {t.trades}</div>
                         </div>
                         <div className="text-right">
                           <div className="text-rose-400 font-bold text-sm">{edge.winRate.toFixed(0)}% WR</div>
@@ -4153,9 +4153,9 @@ export default function SwingEdge() {
                     className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-xl backdrop-blur-md bg-gradient-to-r from-cyan-500/20 to-violet-500/20 border border-cyan-500/40 text-cyan-300 hover:from-cyan-500/30 hover:to-violet-500/30 hover:border-cyan-400/60 hover:text-white disabled:opacity-50"
                   >
                     {chartAiLoading && chartAiTarget === "position" ? (
-                      <><RefreshCw size={13} className="animate-spin" /> מחשב...</>
+                      <><RefreshCw size={13} className="animate-spin" /> {t.calculating}</>
                     ) : (
-                      <><Calculator size={13} /> חשב פוזיציה</>
+                      <><Calculator size={13} /> {t.calculatePosition}</>
                     )}
                   </button>
                   <button
@@ -4164,9 +4164,9 @@ export default function SwingEdge() {
                     className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-xl backdrop-blur-md bg-gradient-to-r from-violet-500/20 to-rose-500/20 border border-violet-500/40 text-violet-300 hover:from-violet-500/30 hover:to-rose-500/30 hover:border-violet-400/60 hover:text-white disabled:opacity-50"
                   >
                     {chartAiLoading && chartAiTarget === "journal" ? (
-                      <><RefreshCw size={13} className="animate-spin" /> מעבד...</>
+                      <><RefreshCw size={13} className="animate-spin" /> {t.processing}</>
                     ) : (
-                      <><BookOpen size={13} /> הוסף ליומן</>
+                      <><BookOpen size={13} /> {t.addToJournal}</>
                     )}
                   </button>
                 </div>
@@ -4233,7 +4233,7 @@ export default function SwingEdge() {
                     return (
                       <div key={s.ticker}
                         className={`flex items-center justify-between p-2 bg-white/3 rounded-lg border transition group ${chartSymbol === s.chartSym ? "border-cyan-500/40 bg-cyan-500/5" : "border-[var(--border-subtle)] dark:border-white/[0.06] hover:border-cyan-500/20 hover:bg-cyan-500/3"}`}>
-                        <button type="button" className="flex items-center gap-1.5 flex-1 text-right" onClick={() => setChartSymbol(s.chartSym)} aria-label="בחר מניה">
+                        <button type="button" className="flex items-center gap-1.5 flex-1 text-right" onClick={() => setChartSymbol(s.chartSym)} aria-label={t.selectStock}>
                           <TickerLogo ticker={s.ticker} size={18} />
                           <div>
                             <div className="font-bold text-[11px] text-white font-mono">{s.ticker}</div>
@@ -4559,9 +4559,9 @@ export default function SwingEdge() {
               <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-cyan-500/20 rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-4">
                   <DollarSign size={16} className="text-cyan-400" />
-                  <h3 className="text-sm font-bold text-white">הון תיק</h3>
+                  <h3 className="text-sm font-bold text-white">{t.portfolioCapitalTitle}</h3>
                 </div>
-                <p className="text-xs text-slate-500 mb-3">עדכן את ההון המדויק של תיק ההשקעות שלך. הערך ישפיע על חישובי גודל פוזיציה, סיכון ותשואה באפליקציה.</p>
+                <p className="text-xs text-slate-500 mb-3">{t.updateCapitalDesc}</p>
                 <div className="flex gap-2">
                   <input
                     type="number"
@@ -4580,11 +4580,11 @@ export default function SwingEdge() {
                       }
                     }}
                     className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500/20 to-violet-500/20 border border-cyan-500/30 text-cyan-400 text-xs font-bold hover:opacity-90 transition whitespace-nowrap">
-                    עדכן הון
+                    {t.updateCapital}
                   </button>
                 </div>
                 <p className="text-[10px] text-slate-600 mt-2">
-                  הון נוכחי: <span className="text-cyan-400 font-mono font-bold">${capital.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                  {t.currentCapital}: <span className="text-cyan-400 font-mono font-bold">${capital.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
                 </p>
               </div>
 
@@ -4595,15 +4595,15 @@ export default function SwingEdge() {
                   <h3 className="text-sm font-bold text-white">Demo Trades</h3>
                 </div>
                 <p className="text-xs text-slate-500 mb-3">
-                  טען 30 עסקאות לדוגמה מציאותיות (~22 WIN · ~8 LOSS · Win Rate ~73%) מהתקופה 18 במרץ – 24 באפריל 2026, כולל MAE/MFE, רגש, לקחים וסטאפים מגוונים.
+                  {t.loadDemoLong}
                 </p>
                 <button
                   onClick={handleLoadDemoTrades}
                   className="w-full py-2.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
-                  <Download size={12} /> 📊 טען עסקאות לדוגמה
+                  <Download size={12} /> 📊 {t.loadDemoBtn}
                 </button>
                 <p className="text-[10px] text-slate-700 mt-2">
-                  * העסקאות נשמרות מקומית ומסונכרנות ל-Supabase תחת ה-user_id שלך (אם מוגדר).
+                  {t.loadDemoNote}
                 </p>
               </div>
 
@@ -4612,7 +4612,7 @@ export default function SwingEdge() {
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <Thermometer size={16} style={{ color: tiltColor }} />
-                    <h3 className="text-sm font-bold text-white">Tiltmeter — החודש</h3>
+                    <h3 className="text-sm font-bold text-white">{t.tiltmeter}</h3>
                   </div>
                   <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-semibold border"
                     style={{ color: tiltColor, borderColor: tiltColor + "40", background: tiltColor + "15" }}>
@@ -4623,7 +4623,7 @@ export default function SwingEdge() {
                 {/* Visual gauge */}
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs text-slate-500">Followed Plan = No החודש</span>
+                    <span className="text-xs text-slate-500">{t.followedPlanNo}</span>
                     <span className="text-2xl font-bold font-mono" style={{ color: tiltColor }}>{tiltCount}</span>
                   </div>
                   <div className="h-3 bg-white/5 rounded-full overflow-hidden">
@@ -4654,7 +4654,7 @@ export default function SwingEdge() {
                   <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-lg p-3">
                     <AlertTriangle size={14} className="text-red-400 flex-shrink-0" />
                     <span className="text-xs text-red-300">
-                      אזהרה: חרגת 3 פעמים מהתוכנית החודש. שקול להפחית סייז עסקה ולחזור לבסיס.
+                      {t.tiltWarn3}
                     </span>
                   </div>
                 )}
@@ -4662,18 +4662,18 @@ export default function SwingEdge() {
                   <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
                     <AlertTriangle size={14} className="text-amber-400 flex-shrink-0" />
                     <span className="text-xs text-amber-300">
-                      התראה: הגעת ל-3 חריגות מהתוכנית החודש. עוד אחת — תפנה לאזור האדום.
+                      {t.tiltAlert3}
                     </span>
                   </div>
                 )}
                 {tiltCount === 0 && (
                   <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3">
                     <CheckCircle size={14} className="text-emerald-400 flex-shrink-0" />
-                    <span className="text-xs text-emerald-300">מצוין! עקבת אחר התוכנית בכל עסקאות החודש.</span>
+                    <span className="text-xs text-emerald-300">{t.tiltClean}</span>
                   </div>
                 )}
 
-                <p className="text-[10px] text-slate-700 mt-3">* מחושב מעסקאות סגורות בחודש הנוכחי שסומנו כ-Followed Plan = No</p>
+                <p className="text-[10px] text-slate-700 mt-3">{t.tiltNote}</p>
               </div>
 
               {/* ── PERSONAL PLAYBOOK ── */}
@@ -4685,7 +4685,7 @@ export default function SwingEdge() {
                   </div>
                   <button onClick={() => { setPlaybookForm({ name: "", description: "", imagePreview: null }); setEditingSetupId(null); setShowPlaybookForm(v => !v); }}
                     className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/30 text-violet-400 hover:opacity-90 transition">
-                    <Plus size={11} /> הוסף סטאפ
+                    <Plus size={11} /> {t.addSetup}
                   </button>
                 </div>
 
@@ -4694,23 +4694,23 @@ export default function SwingEdge() {
                   <div className="mb-5 bg-white/3 border border-white/10 rounded-xl p-4 space-y-3">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">שם הסטאפ *</label>
+                        <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{t.setupName}</label>
                         <input value={playbookForm.name} onChange={e => setPlaybookForm(f => ({ ...f, name: e.target.value }))}
                           placeholder="Breakout, Pullback…" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-violet-500/50 focus:outline-none transition" />
                       </div>
                       <div>
-                        <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">תמונה (אופציונלי)</label>
+                        <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{t.imageOptional}</label>
                         <label className="flex items-center gap-2 cursor-pointer w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-400 hover:border-violet-500/30 transition">
                           <Eye size={12} />
-                          <span>{playbookForm.imagePreview ? "תמונה נטענה ✓" : "העלה תמונה..."}</span>
+                          <span>{playbookForm.imagePreview ? `${t.imageLoaded} ✓` : t.uploadImage}</span>
                           <input type="file" accept="image/*" onChange={handlePlaybookImageUpload} className="hidden" />
                         </label>
                       </div>
                     </div>
                     <div>
-                      <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">תיאור</label>
+                      <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{t.description}</label>
                       <textarea value={playbookForm.description} onChange={e => setPlaybookForm(f => ({ ...f, description: e.target.value }))}
-                        placeholder="תנאי כניסה, תנאי יציאה, הערות…" rows={2}
+                        placeholder={t.setupDescPlaceholder} rows={2}
                         className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-violet-500/50 focus:outline-none transition resize-none" />
                     </div>
                     {playbookForm.imagePreview && (
@@ -4725,11 +4725,11 @@ export default function SwingEdge() {
                     <div className="flex gap-2">
                       <button onClick={handlePlaybookSubmit}
                         className="flex-1 py-2 rounded-lg bg-gradient-to-r from-violet-500 to-cyan-500 text-white text-xs font-bold hover:opacity-90 transition">
-                        {editingSetupId !== null ? "עדכן סטאפ" : "שמור סטאפ"}
+                        {editingSetupId !== null ? t.updateSetup : t.saveSetup}
                       </button>
                       <button onClick={() => { setShowPlaybookForm(false); setEditingSetupId(null); }}
                         className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-slate-400 text-xs hover:border-white/20 transition">
-                        ביטול
+                        {t.cancel}
                       </button>
                     </div>
                   </div>
@@ -4739,7 +4739,7 @@ export default function SwingEdge() {
                 {playbookSetups.length === 0 ? (
                   <div className="text-center py-8 text-slate-600 text-xs">
                     <BookMarked size={28} className="mx-auto mb-2 opacity-20" />
-                    <p>אין סטאפים עדיין — לחץ "הוסף סטאפ" כדי להתחיל</p>
+                    <p>{t.noSetupsYet}</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -4777,10 +4777,10 @@ export default function SwingEdge() {
                                   style={{ width: stats ? `${stats.rate}%` : "0%", background: successColor }} />
                               </div>
                               <span className="text-[10px] font-mono font-bold whitespace-nowrap" style={{ color: successColor }}>
-                                {stats ? `${stats.rate}% (${stats.count} עסקאות)` : "אין נתונים ביומן"}
+                                {stats ? `${stats.rate}% (${stats.count} ${t.trades})` : t.noJournalData}
                               </span>
                             </div>
-                            <p className="text-[9px] text-slate-700 mt-1">אחוז הצלחה מחושב אוטומטית מהיומן</p>
+                            <p className="text-[9px] text-slate-700 mt-1">{t.successRateFromJournal}</p>
                           </div>
                         </div>
                       );
@@ -4793,9 +4793,9 @@ export default function SwingEdge() {
               <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-4">
                   <Download size={16} className="text-emerald-400" />
-                  <h3 className="text-sm font-bold text-white">ייצוא נתונים</h3>
+                  <h3 className="text-sm font-bold text-white">{t.dataExport}</h3>
                 </div>
-                <p className="text-xs text-slate-500 mb-5">ייצא את יומן המסחר שלך או צור דוח ביצועים חודשי מפורט.</p>
+                <p className="text-xs text-slate-500 mb-5">{t.exportDesc}</p>
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {/* CSV Export */}
@@ -4805,17 +4805,17 @@ export default function SwingEdge() {
                         <Download size={14} className="text-emerald-400" />
                       </div>
                       <div>
-                        <div className="text-xs font-bold text-white">יומן מסחר — CSV</div>
-                        <div className="text-[10px] text-slate-600">{trades.length} עסקאות</div>
+                        <div className="text-xs font-bold text-white">{t.journalCsv}</div>
+                        <div className="text-[10px] text-slate-600">{trades.length} {t.trades}</div>
                       </div>
                     </div>
                     <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
-                      כל העסקאות כולל Entry, Stop, Target, P&L, R-Multiple, רגש, לקחים ועוד.
+                      {t.csvIncludes}
                     </p>
                     <button
                       onClick={() => exportTradesCSV(trades)}
                       className="w-full py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 transition flex items-center justify-center gap-1.5">
-                      <Download size={12} /> הורד CSV
+                      <Download size={12} /> {t.downloadCsv}
                     </button>
                   </div>
 
@@ -4826,23 +4826,23 @@ export default function SwingEdge() {
                         <FileText size={14} className="text-cyan-400" />
                       </div>
                       <div>
-                        <div className="text-xs font-bold text-white">דוח ביצועים חודשי — PDF</div>
+                        <div className="text-xs font-bold text-white">{t.monthlyPdf}</div>
                         <div className="text-[10px] text-slate-600">{new Date().toLocaleString("en-US",{month:"long",year:"numeric"})}</div>
                       </div>
                     </div>
                     <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
-                      KPIs, גרף עקומת הון, טבלת עסקאות חודשית ולקחים שנרשמו.
+                      {t.pdfIncludes}
                     </p>
                     <button
                       onClick={() => exportMonthlyPDF(trades, capital)}
                       className="w-full py-2 rounded-lg bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 text-xs font-bold hover:bg-cyan-500/20 transition flex items-center justify-center gap-1.5">
-                      <FileText size={12} /> צור דוח PDF
+                      <FileText size={12} /> {t.createPdf}
                     </button>
                   </div>
                 </div>
 
                 <p className="text-[10px] text-slate-700 mt-3">
-                  * דוח ה-PDF נפתח בטאב חדש — לחץ על "Save as PDF" בתוך הדוח כדי לשמור.
+                  {t.pdfNote}
                 </p>
               </div>
 
