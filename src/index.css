@@ -60,12 +60,6 @@ html, body {
 /* ━━━ Custom hex backgrounds used in JSX ━━━ */
 .bg-\[\#0a0f1e\] { background-color: var(--bg); color: var(--text-primary); }
 .bg-\[\#0d1424\] { background-color: var(--surface); color: var(--text-primary); }
-/* Header / nav surfaces — light-mode only. In dark mode keep the Tailwind navy
-   so the SWINGEDGE wordmark (white) stays readable. */
-html:not(.dark) .bg-\[\#0d1424\]\/90 { background-color: rgba(255,255,255,0.95); }
-html:not(.dark) .bg-\[\#0d1424\]\/60 { background-color: rgba(255,255,255,0.90); }
-html.dark .bg-\[\#0d1424\]\/90 { background-color: rgba(13,20,36,0.90); }
-html.dark .bg-\[\#0d1424\]\/60 { background-color: rgba(13,20,36,0.60); }
 
 /* ━━━ Dark surface overrides ━━━ */
 .bg-slate-900, .bg-slate-950,

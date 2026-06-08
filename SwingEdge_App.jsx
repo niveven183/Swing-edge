@@ -489,7 +489,10 @@ const generateEquityCurve = (cap, trades = []) => {
     const d = t.date || t.exitDate;
     data.push({ date: d, equity: Math.round(balance), ticker: t.ticker, pnl: Math.round(pnl) });
   });
-  const anchorDate = sortedTrades[0]?.date || sortedTrades[0]?.exitDate || new Date().toISOString().slice(0, 10);
+  const firstRaw = sortedTrades[0]?.date || sortedTrades[0]?.exitDate;
+  const anchorDate = firstRaw
+    ? new Date(new Date(firstRaw).getTime() - 86_400_000).toISOString().slice(0, 10)
+    : new Date().toISOString().slice(0, 10);
   return [{ date: anchorDate, equity: cap, ticker: "START", pnl: 0 }, ...data];
 };
 
@@ -2171,7 +2174,7 @@ export default function SwingEdge() {
       )}
 
       {/* ── HEADER ── */}
-      <header dir="ltr" className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-[var(--bg-elevated)] dark:bg-[#0d1424]/90 backdrop-blur-md sticky top-0 z-50">
+      <header dir="ltr" className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-[var(--bg-elevated)] sticky top-0 z-50">
         {/* Logo + User Menu (left side, combined) */}
         <div className="relative" ref={profileRef}>
           <button
@@ -2297,7 +2300,7 @@ export default function SwingEdge() {
       <TVTickerTape />
 
       {/* ── NAV ── */}
-      <nav className="flex items-center gap-0 px-5 border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-[var(--bg-elevated)] dark:bg-[#0d1424]/60 overflow-x-auto">
+      <nav className="flex items-center gap-0 px-5 border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-[var(--bg-elevated)] overflow-x-auto">
         {NAV_KEYS.map(({ id, key, icon: Icon }) => (
           <button key={id} onClick={() => setTab(id)}
             className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold tracking-wide transition-all whitespace-nowrap border-b-2
