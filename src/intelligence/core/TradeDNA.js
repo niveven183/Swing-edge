@@ -19,6 +19,7 @@ import {
   MIN_SAMPLE_DNA, MIN_SAMPLE_PATTERNS, MIN_SAMPLE_FORECAST, MIN_SAMPLE_ML,
 } from "../utils/statisticalModels.js";
 import { disciplineRate, emotionPerformance } from "../utils/psychologyPatterns.js";
+import { isFollowedPlan } from "../../utils.js";
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 const maturityFor = (n) => {
@@ -87,7 +88,7 @@ const inferStyle = (trades) => {
   const aggression = to100(Math.min(1, avgRisk / 0.02)); // 2% = fully aggressive
 
   // Patience: prefer to close on plan vs. panic out. Use exitReason & followedPlan.
-  const planCloses = closed.filter(t => t.followedPlan === true).length;
+  const planCloses = closed.filter(t => isFollowedPlan(t.followedPlan)).length;
   const fearCloses = closed.filter(t => t.exitReason === "Fear").length;
   const patience = to100((planCloses - fearCloses) / closed.length + 0.5);
 

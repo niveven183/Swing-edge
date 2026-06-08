@@ -11,6 +11,8 @@
 // localize them; an English `detail` string is included as a safe fallback.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { isFollowedPlan, isOffPlan } from "../../utils.js";
+
 const DOW = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -49,8 +51,8 @@ function enrich(t, calcMetrics) {
     setup: (t.setup || "").trim() || "Unspecified",
     emotion: (t.emotionAtEntry || "").trim() || "Unspecified",
     market: (t.marketCondition || "").trim() || "Unspecified",
-    followedPlan: t.followedPlan === true,
-    offPlan: t.followedPlan === false,
+    followedPlan: isFollowedPlan(t.followedPlan),
+    offPlan: isOffPlan(t.followedPlan),
     date: realizedDate(t),
   };
 }

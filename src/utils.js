@@ -15,3 +15,12 @@ export const fmt$ = (n) => n >= 0
   : `-$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
 export const fmtR = (r) => r >= 0 ? `+${r.toFixed(2)}R` : `${r.toFixed(2)}R`;
+
+// ─── followedPlan NORMALIZATION ───────────────────────────────────────────────
+// `followedPlan` is true | false | "Partially" | null in the UI, but the DB
+// column is text, so after a Supabase round-trip booleans come back as the
+// STRINGS "true" / "false". Read-side normalization only — DB writes untouched.
+// "Partially" is intentionally neutral: it counts as neither followed nor a
+// deviation (preserving the original pre-bug behavior).
+export const isFollowedPlan = (v) => v === true || v === "true";
+export const isOffPlan = (v) => v === false || v === "false";

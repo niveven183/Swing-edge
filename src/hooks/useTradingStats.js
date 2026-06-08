@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { isFollowedPlan, isOffPlan } from "../utils.js";
 
 /**
  * useTradingStats — Master Stats Hub
@@ -85,8 +86,8 @@ export function useTradingStats(trades, capital, calcTradeMetrics) {
     });
 
     // ─── Behavioral ────────────────────────────────────────────
-    const planYes = metrics.filter(m => m.followedPlan === true);
-    const planNo  = metrics.filter(m => m.followedPlan === false);
+    const planYes = metrics.filter(m => isFollowedPlan(m.followedPlan));
+    const planNo  = metrics.filter(m => isOffPlan(m.followedPlan));
     const planFollowedWR = planYes.length
       ? (planYes.filter(m => (m.pnl || 0) > 0).length / planYes.length) * 100
       : 0;

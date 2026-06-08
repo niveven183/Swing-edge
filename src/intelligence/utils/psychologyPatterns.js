@@ -2,6 +2,7 @@
 // Detects emotional / behavioural patterns in trading history.
 
 import { getClosed, isWin, pnlOf, groupBy } from "./statisticalModels.js";
+import { isFollowedPlan, isOffPlan } from "../../utils.js";
 
 // Chronological timestamp for a trade. Prefer createdAt, fall back to date.
 export const tradeTs = (t) => {
@@ -65,11 +66,11 @@ export const tradesToday = (trades, now = new Date()) => {
 export const isOffHours = (hour) => hour != null && (hour < 7 || hour >= 23);
 
 // ─── PLAN DEVIATION ──────────────────────────────────────────────────────────
-// Last N days of closed trades where followedPlan === false.
+// Last N days of closed trades where the plan was NOT followed (off-plan).
 export const planDeviationsInLastDays = (trades, days = 7) => {
   const cutoff = Date.now() - days * 86400000;
   return getClosed(trades).filter(t =>
-    t.followedPlan === false && tradeTs(t) >= cutoff
+    isOffPlan(t.followedPlan) && tradeTs(t) >= cutoff
   ).length;
 };
 
@@ -105,7 +106,7 @@ export const emotionalDrags = (trades) => {
 export const disciplineRate = (trades) => {
   const closed = getClosed(trades).filter(t => t.followedPlan != null);
   if (!closed.length) return null;
-  return closed.filter(t => t.followedPlan === true).length / closed.length;
+  return closed.filter(t => isFollowedPlan(t.followedPlan)).length / closed.length;
 };
 
 // MAE / MFE behavioural flag — trades that went deeply against plan before

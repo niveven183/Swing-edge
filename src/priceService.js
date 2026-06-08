@@ -1,19 +1,11 @@
 // ─── CENTRALIZED LIVE PRICE SERVICE ───────────────────────────────────────────
-// Fetches live prices from Yahoo Finance via v8/chart endpoint (no crumb needed)
-// with pre-/post-market prices and automatic market-state detection.
-// Uses multiple CORS proxy fallbacks with per-call retry for reliability.
+// Fetches live prices from Yahoo Finance via the /api/quote serverless proxy
+// (v8/chart, no crumb needed) with pre-/post-market prices and automatic
+// market-state detection. The proxy spoofs Referer/User-Agent server-side, so
+// there is no browser CORS and no dependency on flaky public CORS proxies.
 // Single source of truth for all pricing data in the app.
 
 import * as Sentry from "@sentry/react";
-
-const CORS_PROXIES = [
-  (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-  (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
-  (u) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
-];
-
-const YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart";
-const YAHOO_SEARCH_URL = "https://query2.finance.yahoo.com/v1/finance/search";
 
 // ─── MARKET STATE DETECTION ─────────────────────────────────────────────────
 // Windows are expressed in US/Eastern (America/New_York).
@@ -102,97 +94,93 @@ const QUOTE_CACHE_TTL_MS = 12_000;
 const _sectorHistCache = new Map(); // yahooSymbol → { data, ts }
 const SECTOR_HIST_CACHE_TTL_MS = 15 * 60_000;
 
-// Fetch a single URL through fallback proxies (tries each proxy in order).
-// Throws if all proxies fail.
-const fetchWithProxies = async (targetUrl) => {
-  let lastErr;
-  for (let i = 0; i < CORS_PROXIES.length; i++) {
-    const wrap = CORS_PROXIES[i];
-    try {
-      const res = await fetch(wrap(targetUrl), { cache: "no-store" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const text = await res.text();
-      if (!text) throw new Error("empty body");
-      if (i > 0) {
-        Sentry.addBreadcrumb({ category: "proxy", message: `proxy[${i}] succeeded after ${i} failure(s)`, level: "warning" });
-      }
-      return JSON.parse(text);
-    } catch (e) {
-      lastErr = e;
-      if (i < CORS_PROXIES.length - 1) {
-        Sentry.addBreadcrumb({ category: "proxy", message: `proxy[${i}] failed (${e?.message}), trying next`, level: "warning" });
-      }
-    }
+// Fetch raw Yahoo chart results for a list of symbols via the /api/quote
+// serverless proxy. Returns a map { YAHOO_SYMBOL: chart.result[0] | null }.
+// Never throws — a transport failure resolves to {} so callers degrade safely.
+const fetchChartResults = async (
+  yahooSymbols,
+  { range = "5d", interval = "1d", includePrePost = true } = {}
+) => {
+  const list = [...new Set(yahooSymbols.map((s) => String(s || "").toUpperCase()))].filter(Boolean);
+  if (list.length === 0) return {};
+
+  const params = new URLSearchParams({ symbols: list.join(","), range, interval });
+  if (includePrePost) params.set("includePrePost", "1");
+
+  try {
+    const res = await fetch(`/api/quote?${params.toString()}`, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return data && typeof data === "object" ? data : {};
+  } catch (e) {
+    Sentry.addBreadcrumb({ category: "quote", message: `/api/quote failed (${e?.message})`, level: "error" });
+    return {};
   }
-  Sentry.addBreadcrumb({ category: "proxy", message: `all ${CORS_PROXIES.length} proxies failed for URL`, level: "error" });
-  throw lastErr || new Error("All proxies failed");
 };
 
-// Fetch quote for ONE symbol via v8/chart (no auth needed).
-// Returns null on failure.  includes pre/post prices via includePrePost=true.
+// Parse one raw Yahoo chart result into the app-wide quote shape.
+// Returns null when the result is missing or has no usable price.
+const parseChartResult = (result, yahooSymbol) => {
+  if (!result) return null;
+  const meta = result.meta || {};
+  const price =
+    typeof meta.regularMarketPrice === "number" ? meta.regularMarketPrice : null;
+  const prevClose =
+    typeof meta.chartPreviousClose === "number"
+      ? meta.chartPreviousClose
+      : typeof meta.previousClose === "number"
+      ? meta.previousClose
+      : null;
+  if (price == null) return null;
+
+  const change = prevClose != null ? price - prevClose : 0;
+  const changePct = prevClose ? (change / prevClose) * 100 : 0;
+  const volumes = result.indicators?.quote?.[0]?.volume || [];
+  const lastVol = [...volumes].reverse().find((v) => v != null) || 0;
+
+  const preMarketPrice = typeof meta.preMarketPrice === "number" ? meta.preMarketPrice : null;
+  const postMarketPrice = typeof meta.postMarketPrice === "number" ? meta.postMarketPrice : null;
+
+  const state = getMarketState();
+  // Display price picks the freshest tick relative to current market state
+  const displayPrice =
+    state === MARKET_STATE.PRE && preMarketPrice != null
+      ? preMarketPrice
+      : state === MARKET_STATE.AFTER && postMarketPrice != null
+      ? postMarketPrice
+      : price;
+
+  return {
+    // primary fields (back-compat)
+    price: displayPrice,
+    change,
+    changePct,
+    volume: meta.regularMarketVolume || lastVol || 0,
+    marketCap: meta.marketCap || 0,
+    high52: meta.fiftyTwoWeekHigh || 0,
+    low52: meta.fiftyTwoWeekLow || 0,
+    name: meta.shortName || meta.longName || fromYahooSymbol(yahooSymbol),
+    // extended fields
+    regularMarketPrice: price,
+    regularMarketOpen: typeof meta.regularMarketOpen === "number" ? meta.regularMarketOpen : null,
+    regularMarketDayHigh: typeof meta.regularMarketDayHigh === "number" ? meta.regularMarketDayHigh : null,
+    regularMarketDayLow: typeof meta.regularMarketDayLow === "number" ? meta.regularMarketDayLow : null,
+    previousClose: prevClose,
+    preMarketPrice,
+    postMarketPrice,
+    marketState: state,
+  };
+};
+
+// Fetch quote for ONE symbol via the serverless proxy. Returns null on failure.
 const fetchOneQuote = async (yahooSymbol) => {
   const cached = _quoteCache.get(yahooSymbol);
   if (cached && Date.now() - cached.ts < QUOTE_CACHE_TTL_MS) return cached.data;
 
-  const url = `${YAHOO_CHART_URL}/${encodeURIComponent(yahooSymbol)}?interval=1d&range=5d&includePrePost=true`;
-  try {
-    const data = await fetchWithProxies(url);
-    const result = data?.chart?.result?.[0];
-    if (!result) return null;
-    const meta = result.meta || {};
-    const price =
-      typeof meta.regularMarketPrice === "number" ? meta.regularMarketPrice : null;
-    const prevClose =
-      typeof meta.chartPreviousClose === "number"
-        ? meta.chartPreviousClose
-        : typeof meta.previousClose === "number"
-        ? meta.previousClose
-        : null;
-    if (price == null) return null;
-
-    const change = prevClose != null ? price - prevClose : 0;
-    const changePct = prevClose ? (change / prevClose) * 100 : 0;
-    const volumes = result.indicators?.quote?.[0]?.volume || [];
-    const lastVol = [...volumes].reverse().find((v) => v != null) || 0;
-
-    const preMarketPrice = typeof meta.preMarketPrice === "number" ? meta.preMarketPrice : null;
-    const postMarketPrice = typeof meta.postMarketPrice === "number" ? meta.postMarketPrice : null;
-
-    const state = getMarketState();
-    // Display price picks the freshest tick relative to current market state
-    const displayPrice =
-      state === MARKET_STATE.PRE && preMarketPrice != null
-        ? preMarketPrice
-        : state === MARKET_STATE.AFTER && postMarketPrice != null
-        ? postMarketPrice
-        : price;
-
-    const quote = {
-      // primary fields (back-compat)
-      price: displayPrice,
-      change,
-      changePct,
-      volume: meta.regularMarketVolume || lastVol || 0,
-      marketCap: meta.marketCap || 0,
-      high52: meta.fiftyTwoWeekHigh || 0,
-      low52: meta.fiftyTwoWeekLow || 0,
-      name: meta.shortName || meta.longName || fromYahooSymbol(yahooSymbol),
-      // extended fields
-      regularMarketPrice: price,
-      regularMarketOpen: typeof meta.regularMarketOpen === "number" ? meta.regularMarketOpen : null,
-      regularMarketDayHigh: typeof meta.regularMarketDayHigh === "number" ? meta.regularMarketDayHigh : null,
-      regularMarketDayLow: typeof meta.regularMarketDayLow === "number" ? meta.regularMarketDayLow : null,
-      previousClose: prevClose,
-      preMarketPrice,
-      postMarketPrice,
-      marketState: state,
-    };
-    _quoteCache.set(yahooSymbol, { data: quote, ts: Date.now() });
-    return quote;
-  } catch (e) {
-    console.warn(`[priceService] fetchOneQuote failed for ${yahooSymbol}:`, e?.message || e);
-    return null;
-  }
+  const map = await fetchChartResults([yahooSymbol]);
+  const quote = parseChartResult(map[yahooSymbol], yahooSymbol);
+  if (quote) _quoteCache.set(yahooSymbol, { data: quote, ts: Date.now() });
+  return quote;
 };
 
 // Fetch with one retry after a short delay if the first attempt returns null.
@@ -215,24 +203,53 @@ const fetchOneQuoteRetry = async (yahooSymbol) => {
 export const fetchPrices = async (tickers) => {
   if (!tickers || tickers.length === 0) return {};
   const unique = [...new Set(tickers.map((t) => String(t).toUpperCase()))];
+  const pairs = unique.map((display) => ({ display, sym: toYahooSymbol(display) }));
 
-  const results = await Promise.all(
-    unique.map(async (display) => {
-      const sym = toYahooSymbol(display);
-      const q = await fetchOneQuoteRetry(sym);
-      return { display, q };
-    })
-  );
+  // Serve fresh cache hits first; batch-fetch only the symbols we actually need.
+  const quotesBySym = {};
+  const need = [];
+  for (const { sym } of pairs) {
+    const cached = _quoteCache.get(sym);
+    if (cached && Date.now() - cached.ts < QUOTE_CACHE_TTL_MS) {
+      quotesBySym[sym] = cached.data;
+    } else if (!need.includes(sym)) {
+      need.push(sym);
+    }
+  }
+
+  const ingest = (syms, map) => {
+    const missing = [];
+    for (const sym of syms) {
+      const q = parseChartResult(map[sym], sym);
+      if (q) {
+        quotesBySym[sym] = q;
+        _quoteCache.set(sym, { data: q, ts: Date.now() });
+      } else {
+        missing.push(sym);
+      }
+    }
+    return missing;
+  };
+
+  if (need.length) {
+    // One batched call for all symbols; retry the stragglers once (preserves the
+    // old per-symbol retry behavior without N round-trips).
+    let missing = ingest(need, await fetchChartResults(need));
+    if (missing.length) {
+      await sleep(1500);
+      ingest(missing, await fetchChartResults(missing));
+    }
+  }
 
   const prices = {};
-  results.forEach(({ display, q }) => {
+  for (const { display, sym } of pairs) {
+    const q = quotesBySym[sym];
     if (q) {
       prices[display] = q;
       // Also index under Yahoo form so callers using either key find it
-      const sym = toYahooSymbol(display);
       if (sym !== display) prices[sym] = q;
     }
-  });
+  }
   return prices;
 };
 
@@ -357,9 +374,10 @@ export const searchTickers = async (query) => {
   const cached = _searchCache.get(key);
   if (cached && Date.now() - cached.ts < SEARCH_TTL_MS) return cached.items;
 
-  const url = `${YAHOO_SEARCH_URL}?q=${encodeURIComponent(q)}&quotesCount=10&newsCount=0`;
   try {
-    const data = await fetchWithProxies(url);
+    const res = await fetch(`/api/quote?search=${encodeURIComponent(q)}`, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
     const SUPPORTED = new Set([
       "EQUITY",
       "ETF",
@@ -407,10 +425,13 @@ export const fetchSectorHistorical = async (symbol) => {
   const cached = _sectorHistCache.get(yahooSymbol);
   if (cached && Date.now() - cached.ts < SECTOR_HIST_CACHE_TTL_MS) return cached.data;
 
-  const url = `${YAHOO_CHART_URL}/${encodeURIComponent(yahooSymbol)}?range=1mo&interval=1d`;
   try {
-    const data = await fetchWithProxies(url);
-    const result = data?.chart?.result?.[0];
+    const map = await fetchChartResults([yahooSymbol], {
+      range: "1mo",
+      interval: "1d",
+      includePrePost: false,
+    });
+    const result = map[yahooSymbol];
     if (!result) return null;
     const closes = (result.indicators?.quote?.[0]?.close || []).filter(
       (c) => c !== null && c !== undefined
@@ -425,8 +446,7 @@ export const fetchSectorHistorical = async (symbol) => {
     };
     _sectorHistCache.set(yahooSymbol, { data: hist, ts: Date.now() });
     return hist;
-  } catch (e) {
-    console.warn(`[priceService] fetchSectorHistorical failed for ${symbol}:`, e?.message || e);
+  } catch {
     return null;
   }
 };
