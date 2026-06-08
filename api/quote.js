@@ -15,8 +15,15 @@
 // The client (src/priceService.js) keeps ALL parsing, so the shape consumed by
 // the UI never changes.
 
-const CHART_BASE = "https://query1.finance.yahoo.com/v8/finance/chart";
-const SEARCH_BASE = "https://query2.finance.yahoo.com/v1/finance/search";
+// Yahoo load-balances across query1 / query2 and rate-limits (HTTP 429) per
+// host intermittently — a no-cookie request that 429s on one host usually
+// succeeds on the other. So we fail over across both hosts for every request.
+// v8/chart needs no crumb when it isn't being rate-limited; the crumb/cookie
+// handshake is unreliable and unnecessary here.
+const YAHOO_HOSTS = [
+  "https://query2.finance.yahoo.com",
+  "https://query1.finance.yahoo.com",
+];
 
 const YAHOO_HEADERS = {
   // Spoofed browser identity — what unlocks the endpoints server-side.
@@ -28,21 +35,30 @@ const YAHOO_HEADERS = {
   Accept: "application/json, text/plain, */*",
 };
 
+// GET a Yahoo path across both hosts, returning the first 200 JSON body.
+// Returns null if every host failed (e.g. all 429).
+async function fetchYahooJson(path) {
+  for (const host of YAHOO_HOSTS) {
+    try {
+      const r = await fetch(host + path, { headers: YAHOO_HEADERS });
+      if (!r.ok) continue; // 429 / 5xx → try the next host
+      return await r.json();
+    } catch {
+      // network error → try the next host
+    }
+  }
+  return null;
+}
+
 // Fetch one Yahoo chart result for a symbol. Returns chart.result[0] or null.
 async function fetchChart(symbol, { range, interval, includePrePost }) {
-  const url =
-    `${CHART_BASE}/${encodeURIComponent(symbol)}` +
+  const path =
+    `/v8/finance/chart/${encodeURIComponent(symbol)}` +
     `?interval=${encodeURIComponent(interval)}` +
     `&range=${encodeURIComponent(range)}` +
     (includePrePost ? "&includePrePost=true" : "");
-  try {
-    const r = await fetch(url, { headers: YAHOO_HEADERS });
-    if (!r.ok) return null;
-    const data = await r.json();
-    return data?.chart?.result?.[0] || null;
-  } catch {
-    return null;
-  }
+  const data = await fetchYahooJson(path);
+  return data?.chart?.result?.[0] || null;
 }
 
 export default async function handler(req, res) {
@@ -60,21 +76,16 @@ export default async function handler(req, res) {
   // ── Search mode ──────────────────────────────────────────────────────────
   const search = String(q.search || "").trim().slice(0, 64);
   if (search) {
-    const url =
-      `${SEARCH_BASE}?q=${encodeURIComponent(search)}` +
+    const path =
+      `/v1/finance/search?q=${encodeURIComponent(search)}` +
       `&quotesCount=10&newsCount=0`;
-    try {
-      const r = await fetch(url, { headers: YAHOO_HEADERS });
-      if (!r.ok) {
-        res.status(502).json({ error: `yahoo_status_${r.status}` });
-        return;
-      }
-      const data = await r.json();
-      res.setHeader("Cache-Control", "public, max-age=60, s-maxage=300");
-      res.status(200).json(data || {});
-    } catch {
+    const data = await fetchYahooJson(path);
+    if (!data) {
       res.status(502).json({ error: "yahoo_search_failed" });
+      return;
     }
+    res.setHeader("Cache-Control", "public, max-age=60, s-maxage=300");
+    res.status(200).json(data);
     return;
   }
 
