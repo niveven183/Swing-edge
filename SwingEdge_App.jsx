@@ -109,6 +109,12 @@ function cleanTrades(trades) {
       ticker: isSimTicker ? t.ticker.replace('SIM-', '') : t.ticker,
       setup: SETUP_MAP[t.setup] || t.setup,
       emotionAtEntry: VALID_EMOTIONS.includes(t.emotionAtEntry) ? t.emotionAtEntry : 'Neutral',
+      // Supabase stores followedPlan as text → reads return "true"/"false".
+      // Normalize to boolean so every `=== true` consumer works. "Partially"/null pass through.
+      followedPlan:
+        t.followedPlan === true  || t.followedPlan === "true"  ? true  :
+        t.followedPlan === false || t.followedPlan === "false" ? false :
+        t.followedPlan,
       isDemo: t.isDemo || isSimTicker || isHiveSetup || false,
     };
   });
@@ -483,7 +489,8 @@ const generateEquityCurve = (cap, trades = []) => {
     const d = t.date || t.exitDate;
     data.push({ date: d, equity: Math.round(balance), ticker: t.ticker, pnl: Math.round(pnl) });
   });
-  return [{ date: "2025-01-01", equity: cap, ticker: "START", pnl: 0 }, ...data];
+  const anchorDate = sortedTrades[0]?.date || sortedTrades[0]?.exitDate || new Date().toISOString().slice(0, 10);
+  return [{ date: anchorDate, equity: cap, ticker: "START", pnl: 0 }, ...data];
 };
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -2329,7 +2336,7 @@ export default function SwingEdge() {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               <StatCard label={t.accountEquity}  value={`$${curEquity.toLocaleString("en-US", {minimumFractionDigits:0})}`} sub={`${t.startedAt} $${capital.toLocaleString()}`} trend={totalPnL/capital*100} icon={DollarSign} accent="cyan" />
               <StatCard label={t.netPnlClosed} value={fmt$(Math.round(totalPnL))} sub={`${closedTrades.length} ${t.closedTrades}`} trend={totalPnL/capital*100} icon={TrendingUp} accent={totalPnL >= 0 ? "green" : "red"} />
-              <StatCard label={<span className="flex items-center gap-1">{t.winRate}<InfoTooltip label="Win Rate">{TRADING_TOOLTIPS.winRate[lang]||TRADING_TOOLTIPS.winRate.en}</InfoTooltip></span>} value={`${winRate.toFixed(0)}%`} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length}W / ${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)<0).length}L`} icon={Target} accent="purple" />
+              <StatCard label={<span className="flex items-center gap-1">{t.winRate}<InfoTooltip label="Win Rate">{TRADING_TOOLTIPS.winRate[lang]||TRADING_TOOLTIPS.winRate.en}</InfoTooltip></span>} value={`${winRate.toFixed(1)}%`} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length}W / ${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)<0).length}L`} icon={Target} accent="purple" />
               <StatCard label={<span className="flex items-center gap-1">{t.avgRMultiple}<InfoTooltip label="Avg R Multiple">{TRADING_TOOLTIPS.avgR[lang]||TRADING_TOOLTIPS.avgR.en}</InfoTooltip></span>} value={fmtR(avgR)} sub={t.perClosedTrade} icon={Activity} accent="amber" />
               <StatCard label={t.dailyPnl} value={fmt$(Math.round(dailyPnL))} sub={t.todayTrades} icon={DollarSign} accent={dailyPnL >= 0 ? "green" : "red"} />
               <StatCard label={t.streakCounter} value={<span className="flex items-center gap-1">{currentStreak > 0 && <Flame size={18} className="text-orange-400" />}{currentStreak}</span>} sub={`${t.bestStreak}: ${bestStreak}`} icon={Zap} accent={currentStreak >= 3 ? "green" : "amber"} />
@@ -2800,7 +2807,7 @@ export default function SwingEdge() {
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600">{lang === "he" ? "הפסד ממוצע" : "Avg Loss"}</div>
-                  <div className="text-sm font-bold font-mono mt-0.5 text-rose-400">{fmt$(Math.round(journalStats.avgLoss))}</div>
+                  <div className="text-sm font-bold font-mono mt-0.5 text-rose-400">{fmt$(-Math.round(journalStats.avgLoss))}</div>
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">Profit Factor<InfoTooltip label="Profit Factor">{TRADING_TOOLTIPS.profitFactor[lang]||TRADING_TOOLTIPS.profitFactor.en}</InfoTooltip></div>
@@ -2808,7 +2815,7 @@ export default function SwingEdge() {
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">Max DD<InfoTooltip label="Max Drawdown">{TRADING_TOOLTIPS.maxDD[lang]||TRADING_TOOLTIPS.maxDD.en}</InfoTooltip></div>
-                  <div className="text-sm font-bold font-mono mt-0.5 text-rose-300">{fmt$(Math.round(journalStats.maxDD))}</div>
+                  <div className="text-sm font-bold font-mono mt-0.5 text-rose-300">{fmt$(-Math.round(journalStats.maxDD))}</div>
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{lang === "he" ? "זמן החזקה" : "Avg Hold"}<InfoTooltip label="Avg Hold">{TRADING_TOOLTIPS.avgHold[lang]||TRADING_TOOLTIPS.avgHold.en}</InfoTooltip></div>
@@ -5287,7 +5294,16 @@ export default function SwingEdge() {
       {/* ── FOOTER STATUS BAR ── */}
       <footer className="flex items-center justify-between px-5 py-2 border-t border-[var(--border-subtle)] dark:border-white/[0.06] bg-[var(--bg-primary)] dark:bg-[#0a0f1e] text-[10px] text-slate-700 font-mono">
         <div className="flex items-center gap-4">
-          <span className="flex items-center gap-1"><span className={`w-1.5 h-1.5 rounded-full ${pulse?"bg-emerald-500":"bg-emerald-800"} transition-colors`}/> {t.marketOpen}</span>
+          {(() => {
+            const fBadge = getMarketStateBadge(marketState);
+            const fOpen = marketState === MARKET_STATE.OPEN;
+            return (
+              <span className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full transition-colors" style={{ backgroundColor: fBadge.color, opacity: fOpen ? (pulse ? 1 : 0.55) : 0.85 }} />
+                <span style={{ color: fBadge.color }}>{fBadge.emoji} {fBadge.label}</span>
+              </span>
+            );
+          })()}
           <span>{t.capital}: ${curEquity.toLocaleString("en-US", {minimumFractionDigits: 2})}</span>
           <span>{t.riskPerTradeFooter}</span>
         </div>
