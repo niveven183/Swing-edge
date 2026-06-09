@@ -1332,8 +1332,8 @@ export default function SwingEdge() {
             name: s.name,
             price,
             dayChange: lpEntry?.changePct ?? 0,
-            weekChange: hist?.weekChange ?? 0,
-            monthChange: hist?.monthChange ?? 0,
+            weekChange: hist != null ? hist.weekChange : null,
+            monthChange: hist != null ? hist.monthChange : null,
           };
         })
       );
