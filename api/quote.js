@@ -169,36 +169,6 @@ export default async function handler(req, res) {
 
   const q = req.query || {};
 
-  // ── Debug mode (temporary) ─────────────────────────────────────────────────
-  // ?debug=1 → report exactly what the handshake sees from Vercel's IP.
-  if (q.debug === "1") {
-    const dbg = { steps: [] };
-    for (const url of ["https://fc.yahoo.com/", "https://finance.yahoo.com/"]) {
-      try {
-        const r = await fetch(url, { headers: { ...YAHOO_HEADERS, Accept: "text/html,*/*" }, redirect: "manual" });
-        dbg.steps.push({ url, status: r.status, cookie: cookieFromResponse(r).slice(0, 80) });
-      } catch (e) {
-        dbg.steps.push({ url, error: String(e).slice(0, 120) });
-      }
-    }
-    const creds = await refreshCreds();
-    dbg.cookieLen = creds.cookie.length;
-    dbg.crumb = creds.crumb;
-    for (const host of YAHOO_HOSTS) {
-      try {
-        const sep = "?";
-        const u = host + "/v8/finance/chart/AAPL?interval=1d&range=5d" + (creds.crumb ? "&crumb=" + encodeURIComponent(creds.crumb) : "");
-        const r = await fetch(u, { headers: creds.cookie ? { ...YAHOO_HEADERS, Cookie: creds.cookie } : YAHOO_HEADERS });
-        const body = await r.text();
-        dbg.steps.push({ host, chartStatus: r.status, body: body.slice(0, 160) });
-      } catch (e) {
-        dbg.steps.push({ host, error: String(e).slice(0, 120) });
-      }
-    }
-    res.status(200).json(dbg);
-    return;
-  }
-
   // ── Search mode ──────────────────────────────────────────────────────────
   const search = String(q.search || "").trim().slice(0, 64);
   if (search) {
