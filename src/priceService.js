@@ -1,7 +1,8 @@
 // ─── CENTRALIZED LIVE PRICE SERVICE ───────────────────────────────────────────
 // Fetches live prices from Yahoo Finance via the /api/quote serverless proxy
-// (v8/chart, no crumb needed) with pre-/post-market prices and automatic
-// market-state detection. The proxy spoofs Referer/User-Agent server-side, so
+// (v8/chart) with pre-/post-market prices and automatic market-state
+// detection. The proxy spoofs Referer/User-Agent + a Yahoo session cookie/crumb
+// server-side, so
 // there is no browser CORS and no dependency on flaky public CORS proxies.
 // Single source of truth for all pricing data in the app.
 

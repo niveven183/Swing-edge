@@ -14,12 +14,16 @@
 //
 // The client (src/priceService.js) keeps ALL parsing, so the shape consumed by
 // the UI never changes.
+//
+// ── Why a cookie + crumb handshake ──────────────────────────────────────────
+// Yahoo now returns HTTP 429 ("Too Many Requests") to header-spoofed requests
+// that carry no session — including from datacenter (Vercel) IPs, so a bare
+// fetch returns null for every symbol. The fix is the same handshake a browser
+// does: grab a session cookie (A1/A3) from fc.yahoo.com, exchange it for a
+// "crumb" at /v1/test/getcrumb, then send Cookie (+ crumb) on every data call.
+// Creds are cached at module scope (survive warm invocations) and refreshed on
+// the first 401/429. We still fail over across query1 / query2 per request.
 
-// Yahoo load-balances across query1 / query2 and rate-limits (HTTP 429) per
-// host intermittently — a no-cookie request that 429s on one host usually
-// succeeds on the other. So we fail over across both hosts for every request.
-// v8/chart needs no crumb when it isn't being rate-limited; the crumb/cookie
-// handshake is unreliable and unnecessary here.
 const YAHOO_HOSTS = [
   "https://query2.finance.yahoo.com",
   "https://query1.finance.yahoo.com",
@@ -35,17 +39,109 @@ const YAHOO_HEADERS = {
   Accept: "application/json, text/plain, */*",
 };
 
-// GET a Yahoo path across both hosts, returning the first 200 JSON body.
-// Returns null if every host failed (e.g. all 429).
-async function fetchYahooJson(path) {
-  for (const host of YAHOO_HOSTS) {
+// ── Session credentials (cookie + crumb) ───────────────────────────────────
+// Cached across warm Lambda invocations; lazily (re)fetched on demand / 429.
+let _creds = { cookie: "", crumb: "", ts: 0 };
+const CREDS_TTL = 30 * 60 * 1000; // 30 min — Yahoo sessions are long-lived.
+
+// Collapse a response's Set-Cookie header(s) into a "name=value; name=value"
+// Cookie string (drops attributes like Path/Expires). undici exposes
+// getSetCookie() for the multi-value case; fall back to the single header.
+function cookieFromResponse(res) {
+  const list =
+    typeof res.headers.getSetCookie === "function"
+      ? res.headers.getSetCookie()
+      : res.headers.get("set-cookie")
+      ? [res.headers.get("set-cookie")]
+      : [];
+  return list
+    .map((c) => c.split(";")[0].trim())
+    .filter(Boolean)
+    .join("; ");
+}
+
+// Perform the cookie → crumb handshake and cache the result.
+async function refreshCreds() {
+  let cookie = "";
+  // fc.yahoo.com 404s but reliably sets the A1/A3 session cookie; finance.* is
+  // a fallback (may 307 to a consent page from EU IPs — harmless server-side).
+  for (const url of ["https://fc.yahoo.com/", "https://finance.yahoo.com/"]) {
     try {
-      const r = await fetch(host + path, { headers: YAHOO_HEADERS });
-      if (!r.ok) continue; // 429 / 5xx → try the next host
-      return await r.json();
+      const r = await fetch(url, {
+        headers: { ...YAHOO_HEADERS, Accept: "text/html,*/*" },
+        redirect: "manual",
+      });
+      const c = cookieFromResponse(r);
+      if (c) {
+        cookie = c;
+        break;
+      }
     } catch {
-      // network error → try the next host
+      // try the next cookie source
     }
+  }
+
+  let crumb = "";
+  if (cookie) {
+    for (const host of YAHOO_HOSTS) {
+      try {
+        const r = await fetch(host + "/v1/test/getcrumb", {
+          headers: { ...YAHOO_HEADERS, Cookie: cookie },
+        });
+        if (!r.ok) continue;
+        const t = (await r.text()).trim();
+        // A real crumb is short and opaque; reject error bodies ("Too Many…").
+        if (t && t.length <= 64 && !/\s/.test(t) && !/<|too many/i.test(t)) {
+          crumb = t;
+          break;
+        }
+      } catch {
+        // try the next host
+      }
+    }
+  }
+
+  _creds = { cookie, crumb, ts: Date.now() };
+  return _creds;
+}
+
+async function getCreds() {
+  if (_creds.cookie && Date.now() - _creds.ts < CREDS_TTL) return _creds;
+  return refreshCreds();
+}
+
+// GET a Yahoo path across both hosts, returning the first 200 JSON body.
+// Sends the session cookie (+ crumb) and, on a 401/429, refreshes the session
+// once and retries. Returns null if every attempt failed.
+async function fetchYahooJson(path) {
+  let creds = await getCreds();
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const sep = path.includes("?") ? "&" : "?";
+    const url = creds.crumb ? path + sep + "crumb=" + encodeURIComponent(creds.crumb) : path;
+    const headers = creds.cookie ? { ...YAHOO_HEADERS, Cookie: creds.cookie } : YAHOO_HEADERS;
+
+    let blocked = false;
+    for (const host of YAHOO_HOSTS) {
+      try {
+        const r = await fetch(host + url, { headers });
+        if (r.status === 401 || r.status === 429) {
+          blocked = true; // stale/missing session → try the other host, then refresh
+          continue;
+        }
+        if (!r.ok) continue; // 5xx / 404 → try the next host
+        return await r.json();
+      } catch {
+        // network error → try the next host
+      }
+    }
+
+    // First pass hit only 401/429 → the session is stale; refresh once and retry.
+    if (blocked && attempt === 0) {
+      creds = await refreshCreds();
+      continue;
+    }
+    break;
   }
   return null;
 }
@@ -110,6 +206,10 @@ export default async function handler(req, res) {
   const range = String(q.range || "5d");
   const interval = String(q.interval || "1d");
   const includePrePost = q.includePrePost === "1" || q.includePrePost === "true";
+
+  // Warm the session once before fanning out, so all symbols share one cookie/
+  // crumb instead of triggering N parallel handshakes on a cold module.
+  await getCreds();
 
   // Yahoo chart is single-symbol (batch needs a crumb), so fan out in parallel
   // server-side. allSettled → one bad symbol never fails the whole batch.
