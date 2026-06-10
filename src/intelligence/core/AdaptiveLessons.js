@@ -6,6 +6,8 @@
 // P&L and R-multiple are NOT stored on the trade object — they are derived per
 // call via the `calcMetrics(trade)` function passed in from the host app.
 
+import { rankSetupEdges, MIN_SAMPLE_EDGE } from '../utils/statisticalModels.js';
+
 const pnlOf = (t, calc) => {
   try { return calc(t)?.pnl ?? 0; } catch { return 0; }
 };
@@ -108,30 +110,17 @@ const PATTERNS = [
   {
     id: 'best_setup_underused',
     severity: 'medium',
-    detect: (trades, calc) => {
-      const bySetup = {};
-      trades.forEach(t => {
-        const s = t.setup || '';
-        if (!s) return;
-        (bySetup[s] = bySetup[s] || []).push(t);
-      });
-      const best = Object.entries(bySetup)
-        .filter(([, ts]) => ts.length >= 3)
-        .map(([setup, ts]) => ({
-          setup,
-          wr: ts.filter(t => pnlOf(t, calc) > 0).length / ts.length,
-          count: ts.length,
-        }))
-        .sort((a, b) => b.wr - a.wr)[0];
-      if (!best || best.wr < 0.70 || best.count > 10) return null;
-      return { setup: best.setup, wr: Math.round(best.wr * 100), count: best.count };
+    detect: (trades) => {
+      const top = rankSetupEdges(trades, { minSample: MIN_SAMPLE_EDGE })[0];
+      if (!top || top.winRate < 55) return null;
+      return { setup: top.setup, wr: top.winRate, count: top.n };
     },
     render: ({ setup, wr, count }, lang) => lang === 'he' ? {
-      title: `${setup} הוא ה-Edge שלך`,
+      title: `${setup} הוא ה-Edge שלך (מאז ומתמיד)`,
       detail: `${wr}% זכייה על פני ${count} עסקאות — הסטאפ החזק ביותר שלך.`,
       action: 'סחור אותו אגרסיבי יותר — תן לו יותר משקל.',
     } : {
-      title: `${setup} is your edge`,
+      title: `${setup} is your edge (all-time)`,
       detail: `${wr}% win rate across ${count} trades — your strongest setup.`,
       action: 'Trade it more aggressively.',
     },

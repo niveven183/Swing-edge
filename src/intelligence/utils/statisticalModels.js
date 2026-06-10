@@ -113,6 +113,39 @@ export const isSignificant = (wins, n, baseline = 0.5) => {
   return wilsonLowerBound(wins, n) > baseline;
 };
 
+// ─── CANONICAL EDGE DEFINITION ───────────────────────────────────────────────
+// Single source of truth for "edge" across Dashboard, Lessons, and Monthly
+// Report. Wilson-lower-bound on win rate × expectancy signal — discounts small
+// samples so a fluke "100% across 3" never outranks a proven setup.
+export const edgeScore = (wins, n, avgRVal = 0) =>
+  wilsonLowerBound(wins, n) * (1 + Math.max(0, avgRVal));
+
+// Rank closed trades by setup using the canonical edge metric.
+// Period is the caller's responsibility (pass month-filtered or all-time trades).
+export const rankSetupEdges = (trades, { minSample = MIN_SAMPLE_EDGE } = {}) => {
+  const bySetup = new Map();
+  for (const t of getClosed(trades)) {
+    const s = t.setup;
+    if (!s) continue;
+    if (!bySetup.has(s)) bySetup.set(s, []);
+    bySetup.get(s).push(t);
+  }
+  const ranked = [];
+  for (const [setup, list] of bySetup) {
+    const n = list.length;
+    if (n < minSample) continue;
+    const wins = list.filter(isWin).length;
+    const aR = avgR(list);
+    ranked.push({
+      setup, n, wins,
+      winRate: Math.round((wins / n) * 100),
+      avgR: Number(aR.toFixed(2)),
+      score: edgeScore(wins, n, aR),
+    });
+  }
+  return ranked.sort((a, b) => b.score - a.score || b.avgR - a.avgR);
+};
+
 // Streaks — longest consecutive wins and losses (chronological order expected).
 export const streaks = (trades) => {
   let curW = 0, curL = 0, bestW = 0, bestL = 0;

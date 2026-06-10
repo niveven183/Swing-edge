@@ -3,7 +3,7 @@
 // R/R } from the closed trade history. Returns Top Edges and Anti-Edges.
 
 import {
-  getClosed, isWin, rOf, avgR, wilsonLowerBound, dayOfWeek, rrBucket,
+  getClosed, isWin, rOf, avgR, wilsonLowerBound, edgeScore, dayOfWeek, rrBucket,
   MIN_SAMPLE_EDGE,
 } from "../utils/statisticalModels.js";
 
@@ -43,8 +43,8 @@ const scorePattern = (list) => {
     wins,
     winRate: n ? wins / n : 0,
     avgR: avgR(list),
-    // Ranking metric: Wilson-lower-bound on win rate × expectancy signal.
-    score: wilsonLowerBound(wins, n) * (1 + Math.max(0, avgR(list))),
+    // Ranking metric: canonical edge definition (Wilson × expectancy signal).
+    score: edgeScore(wins, n, avgR(list)),
     antiScore: (1 - wilsonLowerBound(wins, n)) * (1 + Math.max(0, -avgR(list))),
   };
 };

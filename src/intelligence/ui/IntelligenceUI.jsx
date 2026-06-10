@@ -85,8 +85,8 @@ export const EdgeCard = ({ edge, lang = "he", variant = "edge" }) => {
     ? { border: "border-emerald-500/25", text: "text-emerald-400", bg: "bg-emerald-500/8" }
     : { border: "border-rose-500/25",    text: "text-rose-400",    bg: "bg-rose-500/8" };
   const Icon = good ? Sparkles : AlertTriangle;
-  const titleHe = good ? "ה-Edge שלך" : "דפוס להימנע ממנו";
-  const titleEn = good ? "Your Edge"   : "Pattern to avoid";
+  const titleHe = good ? "ה-Edge שלך · מאז ומתמיד" : "דפוס להימנע ממנו";
+  const titleEn = good ? "Your Edge · all-time"     : "Pattern to avoid";
   return (
     <div className={`${accent.bg} ${accent.border} border rounded-xl p-4 bg-[#0d1424]`}>
       <div className="flex items-center gap-2 mb-2">

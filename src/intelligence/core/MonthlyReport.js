@@ -12,6 +12,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { isFollowedPlan, isOffPlan } from "../../utils.js";
+import { edgeScore } from "../utils/statisticalModels.js";
 
 const DOW = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTHS = [
@@ -86,20 +87,24 @@ function groupBy(list, keyFn, minN = 1) {
   for (const e of list) {
     const k = keyFn(e);
     if (k == null || k === "Unspecified") continue;
-    if (!map.has(k)) map.set(k, { name: k, count: 0, wins: 0, net: 0 });
+    if (!map.has(k)) map.set(k, { name: k, count: 0, wins: 0, net: 0, r: 0 });
     const g = map.get(k);
     g.count++;
     if (e.win) g.wins++;
     g.net += e.pnl;
+    g.r += e.rMultiple;
   }
   return [...map.values()]
     .filter(g => g.count >= minN)
-    .map(g => ({ name: g.name, count: g.count, wins: g.wins, winRate: round((g.wins / g.count) * 100), netPnL: round(g.net, 2) }));
+    .map(g => ({ name: g.name, count: g.count, wins: g.wins, winRate: round((g.wins / g.count) * 100), netPnL: round(g.net, 2), avgR: round(g.r / g.count, 2) }));
 }
 
 function bestWorst(groups) {
   if (!groups.length) return { best: null, worst: null };
-  const sorted = [...groups].sort((a, b) => b.winRate - a.winRate || b.count - a.count);
+  // Rank by the canonical edge metric (Wilson × expectancy) so small samples
+  // (e.g. 2/2) don't outrank proven setups. Same definition as Dashboard/Lessons.
+  const sorted = [...groups].sort((a, b) =>
+    edgeScore(b.wins, b.count, b.avgR) - edgeScore(a.wins, a.count, a.avgR) || b.count - a.count);
   return { best: sorted[0], worst: sorted[sorted.length - 1] };
 }
 
@@ -202,7 +207,7 @@ export function generateMonthlyReport(trades, month, year, calcMetrics) {
   const strengths = [];
   if (patterns.bestSetup && patterns.bestSetup.winRate >= 55) {
     const s = patterns.bestSetup;
-    strengths.push({ tid: "mr_s_bestSetup", cat: "mr_cat_setup", params: { setup: s.name, winRate: s.winRate, trades: s.count }, data: `${s.winRate}% · ${s.count}`, detail: `${s.name} is your edge — ${s.winRate}% win rate over ${s.count} trades` });
+    strengths.push({ tid: "mr_s_bestSetup", cat: "mr_cat_setup", params: { setup: s.name, winRate: s.winRate, trades: s.count }, data: `${s.winRate}% · ${s.count}`, detail: `${s.name} is your edge this month — ${s.winRate}% win rate over ${s.count} trades` });
   }
   if (patterns.bestEmotion && patterns.bestEmotion.winRate >= 55) {
     const s = patterns.bestEmotion;
