@@ -99,7 +99,7 @@ function cleanTrades(trades) {
     '50 EMA Bounce': 'EMA Bounce 50',
     'Revenge Trade': 'Range Breakout'
   };
-  const VALID_EMOTIONS = ['Confident','Calm','FOMO','Angry','Neutral','Hesitant','Patient'];
+  const VALID_EMOTIONS = ['Confident','Calm','FOMO','Angry','Neutral','Hesitant','Patient','Nervous'];
   if (!Array.isArray(trades)) return trades;
   return trades.map(t => {
     const isSimTicker = typeof t.ticker === 'string' && t.ticker.startsWith('SIM-');
@@ -3489,7 +3489,9 @@ export default function SwingEdge() {
               ) : (
                 <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-8 text-center">
                   <Calculator size={32} className="text-slate-700 mx-auto mb-3" />
-                  <p className="text-sm text-slate-600">{t.enterDataToCalc}</p>
+                  <p className="text-sm text-slate-600">
+                    {entN > 0 && stopN > 0 && entN === stopN ? t.stopEqualsEntry : t.enterDataToCalc}
+                  </p>
                 </div>
               )}
             </div>
@@ -4285,7 +4287,7 @@ export default function SwingEdge() {
                       {s.tickers.slice(0, 3).join(", ")}{s.tickers.length > 3 ? ` +${s.tickers.length - 3}` : ""}
                     </div>
                     <div className="text-[9px] font-mono text-slate-600">
-                      {s.count} {lang === "he" ? "ניירות" : "symbol"}{s.count !== 1 ? "s" : ""}
+                      {s.count} {lang === "he" ? "ניירות" : "symbol"}{s.count !== 1 && lang !== "he" ? "s" : ""}
                     </div>
                   </div>
                 );
