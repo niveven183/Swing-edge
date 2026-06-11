@@ -34,7 +34,7 @@ Trade = {
   side: "LONG" | "SHORT",    // ⚠️ NOT t.direction
   status: "OPEN" | "CLOSED",
   setup: string,
-  emotionAtEntry: "FOMO" | "Confident" | "Patient" | "Neutral" | "Hesitant" | "Calm" | "Angry",
+  emotionAtEntry: "FOMO" | "Confident" | "Patient" | "Neutral" | "Hesitant" | "Calm" | "Angry" | "Nervous",
   notes: string,             // ⚠️ NOT t.reason
   lessonLearned: string,     // ⚠️ NOT t.lesson
   followedPlan: true | false | "Partially",
@@ -127,6 +127,9 @@ Always compare with `=== true` / `=== false`; never rely on raw string equality 
 - ✅ **Finnhub + CoinGecko prices** (1d0a887): Yahoo Finance blocked on Vercel IPs → `api/quote.js` now routes stocks/ETFs to Finnhub and crypto to CoinGecko (keyless)
 - ✅ **Sector week/month null fix** (3ccbe2c): Intel tab stores `null` (not `0`) for sectors with no week/month data — prevents misleading "0%" display
 - ✅ **Wilson metric for "Your Edge"** (d4fb060): `edgeScore`/`rankSetupEdges` in `statisticalModels.js` is now the single source of truth for edge scores. Dashboard, Lessons, and Monthly Report all derive from it. Minimum 5 trades + Wilson score + 55% win-rate floor required before a setup is called an "edge". Period labels ("all-time" / "this month") added per screen.
+- ✅ **A11y: aria-label + htmlFor** (cc32b45): All icon buttons now carry bilingual `aria-label` (he/en). All form labels use `htmlFor` associations. WCAG 2.1 AA compliance across Auth + Journal + Tools.
+- ✅ **Nervous emotion + Hebrew plural + calculator guard** (8432258): Added `"Nervous"` to `emotionAtEntry` enum. Hebrew plural strings fixed (e.g. "עסקה" / "עסקאות"). Position calculator now shows a clear message when `entry === stop` (zero-risk guard) instead of silently returning `∞`.
+- ✅ **TradeCalendar dark mode** (2b27dfc): All calendar day cells, headers, and P&L badges now use proper Tailwind dark-mode variants — no more light-grey wash in dark theme.
 
 ## Workflow
 - **Claude chat** (Opus/Sonnet via claude.ai) writes prompts and designs features.
@@ -179,7 +182,7 @@ git log --oneline -1
 2. ⏳ SEO — meta tags, sitemap, og:image
 3. ⏳ Privacy Policy + Terms of Service pages (legal)
 4. ⏳ Stripe (Free / Pro $19 / Team $49)
-5. ⏳ Comprehensive QA pass (in progress)
+5. ✅ Comprehensive QA pass — **CLOSED** (a11y cc32b45, emotions/calc 8432258, calendar dark 2b27dfc)
 
 ### Backlog
 6. ⏳ Sentry / error monitoring full setup
@@ -251,7 +254,7 @@ Constants: `VALID_SETUPS` (30) · `VALID_EMOTIONS` (15) · `VALID_MARKETS` (14) 
 - `useTradingStats.js:176` — function ref in deps array; wrap parent `calcTradeMetrics` in `useCallback`.
 - `TradeDNA.calculateTradeDNA` recomputes O(n) on every edit — memoize by last-trade-id.
 - i18n gaps: `TradeCalendar.jsx:110` hardcoded `עסקאות`; `TiltProtection.js:62–100` hardcoded EN/HE without a lang fallback.
-- A11y: missing `aria-label` on `InfoTooltip` close button, `TradeCalendar` day cells, `AuthScreen` inputs.
+- ✅ A11y: `aria-label` on all icon buttons + `htmlFor` label associations — fixed (cc32b45).
 - Unused exports: `toYahooSymbol`/`fromYahooSymbol` in `priceService`. (`closedMetrics` now consumed by Analytics emotion blocks.)
 - 9× `console.log` in error paths → switch to `console.warn` for consistency.
 
