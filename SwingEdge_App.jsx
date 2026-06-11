@@ -2169,7 +2169,7 @@ export default function SwingEdge() {
             <span className="font-mono font-bold text-white">{alertNotification.ticker}</span>
             <span className="text-xs text-slate-400">reached ${alertNotification.price.toFixed(2)}</span>
           </div>
-          <button onClick={() => setAlertNotification(null)} className="absolute top-2 right-2 rtl:right-auto rtl:left-2 text-slate-500 hover:text-white"><X size={12} /></button>
+          <button onClick={() => setAlertNotification(null)} aria-label={lang === "he" ? "סגור" : "Dismiss"} className="absolute top-2 right-2 rtl:right-auto rtl:left-2 text-slate-500 hover:text-white"><X size={12} /></button>
         </div>
       )}
 
@@ -3211,6 +3211,7 @@ export default function SwingEdge() {
                 <div className="relative rounded-lg overflow-hidden border border-white/10">
                   <img src={analyzerImagePreview} alt="Trade chart" className="w-full h-40 object-cover" />
                   <button onClick={() => { setAnalyzerImage(null); setAnalyzerImagePreview(null); }}
+                    aria-label={lang === "he" ? "הסר תמונה" : "Remove image"}
                     className="absolute top-2 right-2 rtl:right-auto rtl:left-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-slate-300 hover:text-white">
                     <X size={11} />
                   </button>
@@ -4690,6 +4691,7 @@ export default function SwingEdge() {
                       <div className="relative rounded-lg overflow-hidden border border-white/10 h-24">
                         <img src={playbookForm.imagePreview} alt="Setup" className="w-full h-full object-cover" />
                         <button onClick={() => setPlaybookForm(f => ({ ...f, imagePreview: null }))}
+                          aria-label={lang === "he" ? "הסר תמונה" : "Remove image"}
                           className="absolute top-1 right-1 rtl:right-auto rtl:left-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-slate-300 hover:text-white">
                           <X size={10} />
                         </button>
@@ -4893,7 +4895,7 @@ export default function SwingEdge() {
                 </div>
                 <span className="text-sm font-bold text-white">Log New Trade</span>
               </div>
-              <button onClick={()=>setShowForm(false)} className="text-slate-600 hover:text-slate-300 transition">
+              <button onClick={()=>setShowForm(false)} aria-label={lang === "he" ? "סגור" : "Close"} className="text-slate-600 hover:text-slate-300 transition">
                 <X size={16} />
               </button>
             </div>
@@ -4902,8 +4904,8 @@ export default function SwingEdge() {
               {/* Row 1 */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Ticker *</label>
-                  <input value={form.ticker} onChange={e=>setForm(f=>({...f,ticker:e.target.value.toUpperCase()}))}
+                  <label htmlFor="log-ticker" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Ticker *</label>
+                  <input id="log-ticker" value={form.ticker} onChange={e=>setForm(f=>({...f,ticker:e.target.value.toUpperCase()}))}
                     placeholder="NVDA" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono font-bold tracking-wider" />
                 </div>
                 <div>
@@ -4947,6 +4949,7 @@ export default function SwingEdge() {
                         onClick={() => fetchFormQuote(form.ticker, { force: true })}
                         disabled={formQuoteLoading}
                         title="Refresh price"
+                        aria-label={lang === "he" ? "רענן מחיר" : "Refresh price"}
                         className="text-slate-400 hover:text-cyan-400 transition p-1 rounded hover:bg-white/5 disabled:opacity-50"
                       >
                         <RefreshCw size={12} className={formQuoteLoading ? "animate-spin" : ""} />
@@ -4982,8 +4985,8 @@ export default function SwingEdge() {
               <div className="grid grid-cols-3 gap-3">
                 {[["Entry *","entry","text-white"],["Stop Loss *","stop","text-[#ef4444]"],["Target","target","text-[#10b981]"]].map(([label,key,cls])=>(
                   <div key={key}>
-                    <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{label}</label>
-                    <input value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))}
+                    <label htmlFor={`log-${key}`} className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{label}</label>
+                    <input id={`log-${key}`} value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))}
                       placeholder="0.00" className={`w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono ${cls}`} />
                   </div>
                 ))}
@@ -5017,15 +5020,15 @@ export default function SwingEdge() {
               {/* Setup Type + Notes */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Setup Type</label>
-                  <select value={form.setup} onChange={e=>setForm(f=>({...f,setup:e.target.value}))}
+                  <label htmlFor="log-setup" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Setup Type</label>
+                  <select id="log-setup" value={form.setup} onChange={e=>setForm(f=>({...f,setup:e.target.value}))}
                     className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
                     {["Breakout","Pullback","Support Bounce","Resistance Break","Other"].map(s=><option key={s}>{s}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Notes</label>
-                  <input value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}
+                  <label htmlFor="log-notes" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Notes</label>
+                  <input id="log-notes" value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}
                     placeholder="Trade thesis..." className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none transition" />
                 </div>
               </div>
@@ -5033,15 +5036,15 @@ export default function SwingEdge() {
               {/* Market Condition + Emotion */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Market Condition</label>
-                  <select value={form.marketCondition} onChange={e=>setForm(f=>({...f,marketCondition:e.target.value}))}
+                  <label htmlFor="log-market-condition" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Market Condition</label>
+                  <select id="log-market-condition" value={form.marketCondition} onChange={e=>setForm(f=>({...f,marketCondition:e.target.value}))}
                     className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
                     {["Trending Up","Trending Down","Sideways","Volatile"].map(s=><option key={s}>{s}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Emotion at Entry</label>
-                  <select value={form.emotionAtEntry} onChange={e=>setForm(f=>({...f,emotionAtEntry:e.target.value}))}
+                  <label htmlFor="log-emotion" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Emotion at Entry</label>
+                  <select id="log-emotion" value={form.emotionAtEntry} onChange={e=>setForm(f=>({...f,emotionAtEntry:e.target.value}))}
                     className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
                     {["Confident","Calm","Patient","Neutral","Hesitant","Nervous","FOMO","Angry"].map(s=><option key={s}>{s}</option>)}
                   </select>
@@ -5082,6 +5085,7 @@ export default function SwingEdge() {
                 <div className="relative rounded-lg overflow-hidden border border-white/10">
                   <img src={form.tradeImagePreview} alt="Trade chart" className="w-full h-32 object-cover" />
                   <button onClick={() => { setForm(f=>({...f,tradeImage:null,tradeImagePreview:null})); setOcrStatus(null); }}
+                    aria-label={lang === "he" ? "הסר תמונה" : "Remove image"}
                     className="absolute top-1 right-1 rtl:right-auto rtl:left-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-slate-300 hover:text-white">
                     <X size={10} />
                   </button>
@@ -5157,7 +5161,7 @@ export default function SwingEdge() {
                 </div>
                 <span className="text-sm font-bold text-white">Close Trade — <span className="text-[#ef4444] font-mono">{closingTrade.ticker}</span></span>
               </div>
-              <button onClick={()=>{setShowCloseForm(false);setClosingTrade(null);}} className="text-slate-600 hover:text-slate-300 transition">
+              <button onClick={()=>{setShowCloseForm(false);setClosingTrade(null);}} aria-label={lang === "he" ? "סגור" : "Close"} className="text-slate-600 hover:text-slate-300 transition">
                 <X size={16} />
               </button>
             </div>
@@ -5173,13 +5177,13 @@ export default function SwingEdge() {
               {/* Exit Price + Exit Reason */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Exit Price *</label>
-                  <input value={closeForm.exit} onChange={e=>setCloseForm(f=>({...f,exit:e.target.value}))}
+                  <label htmlFor="close-exit" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Exit Price *</label>
+                  <input id="close-exit" value={closeForm.exit} onChange={e=>setCloseForm(f=>({...f,exit:e.target.value}))}
                     placeholder="0.00" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-rose-500/50 focus:outline-none focus:ring-1 focus:ring-rose-500/20 transition font-mono" />
                 </div>
                 <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Exit Reason</label>
-                  <select value={closeForm.exitReason} onChange={e=>setCloseForm(f=>({...f,exitReason:e.target.value}))}
+                  <label htmlFor="close-exit-reason" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Exit Reason</label>
+                  <select id="close-exit-reason" value={closeForm.exitReason} onChange={e=>setCloseForm(f=>({...f,exitReason:e.target.value}))}
                     className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-rose-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
                     {["Hit Target","Hit Stop","Manual Exit","Trailing Stop","Other"].map(s=><option key={s}>{s}</option>)}
                   </select>
@@ -5189,13 +5193,13 @@ export default function SwingEdge() {
               {/* MFE + MAE */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Max Favorable Excursion</label>
-                  <input value={closeForm.maxFavorable} onChange={e=>setCloseForm(f=>({...f,maxFavorable:e.target.value}))}
+                  <label htmlFor="close-mfe" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Max Favorable Excursion</label>
+                  <input id="close-mfe" value={closeForm.maxFavorable} onChange={e=>setCloseForm(f=>({...f,maxFavorable:e.target.value}))}
                     placeholder="Highest price reached" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-[#10b981] placeholder-slate-600 focus:border-emerald-500/50 focus:outline-none transition font-mono" />
                 </div>
                 <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Max Adverse Excursion</label>
-                  <input value={closeForm.maxAdverse} onChange={e=>setCloseForm(f=>({...f,maxAdverse:e.target.value}))}
+                  <label htmlFor="close-mae" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Max Adverse Excursion</label>
+                  <input id="close-mae" value={closeForm.maxAdverse} onChange={e=>setCloseForm(f=>({...f,maxAdverse:e.target.value}))}
                     placeholder="Lowest price reached" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-[#ef4444] placeholder-slate-600 focus:border-rose-500/50 focus:outline-none transition font-mono" />
                 </div>
               </div>
@@ -5219,8 +5223,8 @@ export default function SwingEdge() {
 
               {/* Lesson Learned */}
               <div>
-                <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Lesson Learned</label>
-                <textarea value={closeForm.lessonLearned} onChange={e=>setCloseForm(f=>({...f,lessonLearned:e.target.value}))}
+                <label htmlFor="close-lesson" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Lesson Learned</label>
+                <textarea id="close-lesson" value={closeForm.lessonLearned} onChange={e=>setCloseForm(f=>({...f,lessonLearned:e.target.value}))}
                   rows={3}
                   placeholder="What did this trade teach you?" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-violet-500/50 focus:outline-none transition resize-y" />
               </div>
