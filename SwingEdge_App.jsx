@@ -17,7 +17,7 @@ import TradingViewSearch from "./src/components/TradingViewSearch.jsx";
 import { TVTickerTape } from "./src/components/TradingViewWidgets.jsx";
 import { useToast, useConfirm, Tooltip as UiTooltip } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured, tradeForSupabase } from "./src/supabaseClient.js";
-import { calcTradeMetrics, fmt$, fmtR } from "./src/utils.js";
+import { calcTradeMetrics, fmt$, fmtR, qstars } from "./src/utils.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell,
@@ -41,7 +41,7 @@ import {
   fetchQuote, getMarketState, getMarketStateBadge, getRefreshInterval, MARKET_STATE,
   fetchSectorHistorical,
 } from "./src/priceService.js";
-import { analyzeTradeLocal, analyzeTradeLocalText } from "./src/localAI.js";
+import { analyzeTradeLocal } from "./src/localAI.js";
 import { POPULAR_TICKERS as STATIC_TICKERS, getTickerMeta, searchTickers as searchStaticTickers } from "./src/data/tickers.js";
 import { SwingEdgeAI } from "./src/intelligence/SwingEdgeAI.js";
 import {
@@ -1079,6 +1079,7 @@ export default function SwingEdge() {
   const tvRef = useRef(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ticker: "", side: "LONG", entry: "", stop: "", target: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
+  const [showTradeContext, setShowTradeContext] = useState(false);
   const [ocrStatus, setOcrStatus] = useState(null);
   // Live quote shown in the Add Trade modal (auto-fills Entry Price).
   const [formQuote, setFormQuote] = useState(null);
@@ -1089,8 +1090,6 @@ export default function SwingEdge() {
   const [showCloseForm, setShowCloseForm] = useState(false);
   const [closingTrade, setClosingTrade] = useState(null);
   const [closeForm, setCloseForm] = useState({ exit: "", exitReason: "Hit Target", followedPlan: true, lessonLearned: "", maxFavorable: "", maxAdverse: "" });
-  const [aiAnalysis, setAiAnalysis] = useState(null);
-  const [aiLoading, setAiLoading] = useState(false);
 
   // Trade Analyzer state
   const [analyzerForm, setAnalyzerForm] = useState({ ticker: "", entry: "", stop: "", target: "", shares: "" });
@@ -1700,12 +1699,16 @@ export default function SwingEdge() {
   const entryN  = parseFloat(form.entry)  || 0;
   const stopN   = parseFloat(form.stop)   || 0;
   const targetN = parseFloat(form.target) || 0;
-  const riskPerShare = Math.abs(entryN - stopN);
-  const posSize      = riskPerShare > 0 ? Math.floor((capital * RISK_PCT) / riskPerShare) : 0;
-  const posValue     = posSize * entryN;
-  const potGain      = posSize * Math.abs(targetN - entryN);
-  const potLoss      = posSize * riskPerShare;
-  const rrRatio      = potLoss > 0 ? potGain / potLoss : 0;
+  const riskPerShare   = Math.abs(entryN - stopN);
+  const rewardPerShare = Math.abs(targetN - entryN);
+  const posSize        = riskPerShare > 0 ? Math.floor((capital * RISK_PCT) / riskPerShare) : 0;
+  const posValue       = posSize * entryN;
+  const potLoss        = posSize * riskPerShare;
+  // R/R is a price-only ratio — independent of position size — so the card always
+  // agrees with the Decision Coach even when posSize floors to 0 on a small account.
+  const rrRatio        = riskPerShare > 0 && rewardPerShare > 0 ? rewardPerShare / riskPerShare : 0;
+  // True when the 1%-risk position rounds below a single share (high price / wide stop / small capital).
+  const posSizeTooSmall = riskPerShare > 0 && posSize === 0;
 
   // Analyzer computed values
   const azEntry  = parseFloat(analyzerForm.entry)  || 0;
@@ -1793,7 +1796,6 @@ export default function SwingEdge() {
     }
     setForm({ ticker: "", side: "LONG", entry: "", stop: "", target: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
     setOcrStatus(null);
-    setAiAnalysis(null);
     setShowForm(false);
     setTab("journal");
     toast.success(lang === "he" ? `${newTrade.ticker} נוספה ליומן` : `${newTrade.ticker} added to journal`);
@@ -2019,20 +2021,6 @@ export default function SwingEdge() {
     reader.readAsDataURL(file);
   };
 
-  const analyzeTradeWithAI = () => {
-    setAiLoading(true); setAiAnalysis(null);
-    const text = analyzeTradeLocalText({
-      entry: form.entry,
-      stop: form.stop,
-      target: form.target,
-      side: form.side,
-      capital,
-      shares: posSize,
-    });
-    setAiAnalysis(text);
-    setAiLoading(false);
-  };
-
   const handleAnalyzerImageUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -2111,7 +2099,6 @@ export default function SwingEdge() {
         tradeImage: null,
         tradeImagePreview: null,
       });
-      setAiAnalysis(null);
       setShowForm(true);
     }
 
@@ -3058,7 +3045,7 @@ export default function SwingEdge() {
                         <td className="p-3"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 whitespace-nowrap">{t.setup}</span></td>
                         <td className="p-3 text-slate-500 text-[10px] whitespace-nowrap">{t.marketCondition || "–"}</td>
                         <td className="p-3 text-slate-500 text-[10px] whitespace-nowrap">{t.emotionAtEntry || "–"}</td>
-                        <td className="p-3 text-amber-400 text-xs font-mono">{t.entryQuality ? `${"★".repeat(t.entryQuality)}` : "–"}</td>
+                        <td className="p-3 text-amber-400 text-xs font-mono">{qstars(t.entryQuality) ? `${"★".repeat(qstars(t.entryQuality))}` : "–"}</td>
                         <td className="p-3 text-[10px] text-slate-500 whitespace-nowrap">
                           {t.exitReason
                             ? <span className="px-2 py-0.5 rounded bg-slate-700/40 text-slate-400 border border-[var(--border-subtle)] dark:border-white/[0.06]">{t.exitReason}</span>
@@ -4888,7 +4875,7 @@ export default function SwingEdge() {
       {/* ── TRADE ENTRY MODAL ── */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+          <div className="w-full max-w-2xl bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-gradient-to-r from-cyan-500/5 to-violet-500/5">
               <div className="flex items-center gap-2">
@@ -5016,9 +5003,37 @@ export default function SwingEdge() {
                 </div>
               )}
 
+              {/* Position-too-small hint — explains why Shares/Value/Risk are 0 (R/R stays valid) */}
+              {posSizeTooSmall && (
+                <div className="flex items-center gap-2 p-2.5 rounded-lg border text-xs bg-amber-500/5 border-amber-500/20 text-amber-400">
+                  <AlertTriangle size={13} />
+                  <span>{lang === "he"
+                    ? "בסיכון 1% הסטופ הזה קטן ממניה אחת — הגדל הון או הדק את הסטופ. ה-R/R עדיין תקף."
+                    : "At 1% risk this stop is under a single share — raise capital or tighten the stop. R/R is still valid."}</span>
+                </div>
+              )}
+
               {/* Live Decision Coach — analyses the trade as you type */}
               <DecisionCoachPanel coaching={aiCoach} lang={lang} />
 
+              {/* RR quality indicator — core decision feedback, always visible */}
+              {entryN > 0 && stopN > 0 && targetN > 0 && (
+                <div className={`flex items-center gap-2 p-2.5 rounded-lg border text-xs ${rrRatio>=2?"bg-emerald-500/5 border-emerald-500/20 text-[#10b981]":rrRatio>=1?"bg-amber-500/5 border-amber-500/20 text-amber-400":"bg-[#ef4444]/5 border-[#ef4444]/20 text-[#ef4444]"}`}>
+                  {rrRatio>=2?<CheckCircle size={13}/>:<AlertTriangle size={13}/>}
+                  <span>{rrRatio>=2?"Great setup — R/R exceeds 2:1 minimum":rrRatio>=1?"Acceptable — consider widening target for better R/R":"Below minimum — avoid setups below 1:1 R/R"}</span>
+                </div>
+              )}
+
+              {/* ── Trade context (journaling metadata) — collapsed by default ── */}
+              <button type="button" onClick={()=>setShowTradeContext(v=>!v)}
+                aria-expanded={showTradeContext}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-white/3 border border-[var(--border-subtle)] dark:border-white/[0.06] text-slate-400 hover:text-white hover:border-white/20 transition">
+                <span className="text-[10px] tracking-widest uppercase font-semibold">{lang === "he" ? "הקשר העסקה" : "Trade Context"}</span>
+                <ChevronDown size={14} className={`transition-transform ${showTradeContext ? "rotate-180" : ""}`} />
+              </button>
+
+              {showTradeContext && (
+                <div className="space-y-4 animate-fade-in">
               {/* Setup Type + Notes */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -5079,6 +5094,9 @@ export default function SwingEdge() {
                     <span>{form.tradeImage ? form.tradeImage.name : t.uploadChart}</span>
                     <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
                   </label>
+                  <p className="text-[9px] text-slate-600 mt-1 leading-snug">{lang === "he"
+                    ? "נשמר מקומית להפעלה זו בלבד — עדיין לא נשמר בענן."
+                    : "Saved locally for this session — not stored in the cloud yet."}</p>
                 </div>
               </div>
 
@@ -5111,28 +5129,6 @@ export default function SwingEdge() {
                   }</span>
                 </div>
               )}
-
-              {/* RR quality indicator */}
-              {entryN > 0 && stopN > 0 && targetN > 0 && (
-                <div className={`flex items-center gap-2 p-2.5 rounded-lg border text-xs ${rrRatio>=2?"bg-emerald-500/5 border-emerald-500/20 text-[#10b981]":rrRatio>=1?"bg-amber-500/5 border-amber-500/20 text-amber-400":"bg-[#ef4444]/5 border-[#ef4444]/20 text-[#ef4444]"}`}>
-                  {rrRatio>=2?<CheckCircle size={13}/>:<AlertTriangle size={13}/>}
-                  <span>{rrRatio>=2?"Great setup — R/R exceeds 2:1 minimum":rrRatio>=1?"Acceptable — consider widening target for better R/R":"Below minimum — avoid setups below 1:1 R/R"}</span>
-                </div>
-              )}
-
-              {/* Local Analysis button */}
-              <button onClick={analyzeTradeWithAI} disabled={aiLoading}
-                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-violet-500/20 to-cyan-500/20 border border-violet-500/30 text-violet-300 text-sm font-bold hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-50">
-                {aiLoading ? <><RefreshCw size={13} className="animate-spin" /> {t.analyzing}</> : <><Cpu size={13} /> {t.analyzeTrade}</>}
-              </button>
-
-              {/* Local Analysis result */}
-              {aiAnalysis && (
-                <div className="bg-violet-500/5 border border-violet-500/20 rounded-xl p-3 text-xs text-slate-300 whitespace-pre-wrap leading-relaxed">
-                  <div className="flex items-center gap-1 mb-2 text-violet-400 font-semibold text-[10px] uppercase tracking-wider">
-                    <Cpu size={11} /> {t.localAnalysis}
-                  </div>
-                  {aiAnalysis}
                 </div>
               )}
 
@@ -5142,7 +5138,7 @@ export default function SwingEdge() {
                   className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-white text-sm font-bold hover:opacity-90 transition">
                   Log Trade →
                 </button>
-                <button onClick={()=>{setShowForm(false);setAiAnalysis(null);}} className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm hover:text-white hover:border-white/20 transition">
+                <button onClick={()=>setShowForm(false)} className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm hover:text-white hover:border-white/20 transition">
                   Cancel
                 </button>
               </div>

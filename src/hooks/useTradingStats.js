@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { isFollowedPlan, isOffPlan } from "../utils.js";
+import { isFollowedPlan, isOffPlan, qstars } from "../utils.js";
 
 /**
  * useTradingStats — Master Stats Hub
@@ -101,10 +101,11 @@ export function useTradingStats(trades, capital, calcTradeMetrics) {
     const lastMonth = metrics.filter(m => m.date && new Date(m.date).getTime() >= now - 30 * 86400000);
 
     // ─── Breakdowns ────────────────────────────────────────────
-    const bySetup     = groupAndAnalyze(metrics, "setup");
-    const byEmotion   = groupAndAnalyze(metrics, "emotionAtEntry");
-    const byMarket    = groupAndAnalyze(metrics, "marketCondition");
-    const byDayOfWeek = analyzeByDay(metrics);
+    const bySetup        = groupAndAnalyze(metrics, "setup");
+    const byEmotion      = groupAndAnalyze(metrics, "emotionAtEntry");
+    const byMarket       = groupAndAnalyze(metrics, "marketCondition");
+    const byEntryQuality = groupAndAnalyze(metrics, "entryQuality", m => { const q = qstars(m.entryQuality); return q ? `${q}★` : null; });
+    const byDayOfWeek    = analyzeByDay(metrics);
 
     // ─── Edges ─────────────────────────────────────────────────
     const topEdges  = findEdges(metrics, "top");
@@ -165,7 +166,7 @@ export function useTradingStats(trades, capital, calcTradeMetrics) {
       lastMonthStats: summarize(lastMonth),
 
       // breakdowns
-      bySetup, byEmotion, byMarket, byDayOfWeek,
+      bySetup, byEmotion, byMarket, byEntryQuality, byDayOfWeek,
 
       // edges
       topEdges, antiEdges,
@@ -195,17 +196,18 @@ function EMPTY_STATS(capital) {
     avgHoldHours: 0, avgHold: 0,
     lastWeekStats:  { count: 0, pnl: 0, winRate: 0 },
     lastMonthStats: { count: 0, pnl: 0, winRate: 0 },
-    bySetup: [], byEmotion: [], byMarket: [], byDayOfWeek: [],
+    bySetup: [], byEmotion: [], byMarket: [], byEntryQuality: [], byDayOfWeek: [],
     topEdges: [], antiEdges: [],
     closedMetrics: [],
     isEmpty: true,
   };
 }
 
-function groupAndAnalyze(metrics, field) {
+function groupAndAnalyze(metrics, field, keyFn) {
   const groups = {};
   metrics.forEach(m => {
-    const key = (m[field] ?? "").toString().trim() || "Unknown";
+    const raw = keyFn ? keyFn(m) : m[field];
+    const key = (raw ?? "").toString().trim() || "Unknown";
     if (!groups[key]) groups[key] = [];
     groups[key].push(m);
   });

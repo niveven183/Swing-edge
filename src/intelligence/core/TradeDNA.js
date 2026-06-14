@@ -19,6 +19,7 @@ import {
   MIN_SAMPLE_DNA, MIN_SAMPLE_PATTERNS, MIN_SAMPLE_FORECAST, MIN_SAMPLE_ML,
 } from "../utils/statisticalModels.js";
 import { disciplineRate, emotionPerformance } from "../utils/psychologyPatterns.js";
+import { qstars } from "../../utils.js";
 import { isFollowedPlan } from "../../utils.js";
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -161,10 +162,11 @@ export const calculateTradeDNA = (allTrades = []) => {
   const closed = getClosed(allTrades);
   const n = closed.length;
 
-  const setupsRank      = rankGroups(closed, t => t.setup);
-  const emotionsRank    = rankGroups(closed, t => t.emotionAtEntry);
-  const marketsRank     = rankGroups(closed, t => t.marketCondition);
-  const daysRank        = rankGroups(closed, dayOfWeek, { minN: 2 });
+  const setupsRank       = rankGroups(closed, t => t.setup);
+  const emotionsRank     = rankGroups(closed, t => t.emotionAtEntry);
+  const marketsRank      = rankGroups(closed, t => t.marketCondition);
+  const daysRank         = rankGroups(closed, dayOfWeek, { minN: 2 });
+  const entryQualityRank = rankGroups(closed, t => { const q = qstars(t.entryQuality); return q ? `${q}★` : null; });
 
   const result = {
     sampleSize: n,
@@ -173,16 +175,18 @@ export const calculateTradeDNA = (allTrades = []) => {
     scores: computeScores(closed),
     style: inferStyle(closed),
     strengths: {
-      setups:      setupsRank.strengths,
-      emotions:    emotionsRank.strengths,
-      markets:     marketsRank.strengths,
-      daysOfWeek:  daysRank.strengths,
+      setups:        setupsRank.strengths,
+      emotions:      emotionsRank.strengths,
+      markets:       marketsRank.strengths,
+      daysOfWeek:    daysRank.strengths,
+      entryQuality:  entryQualityRank.strengths,
     },
     weaknesses: {
-      setups:      setupsRank.weaknesses,
-      emotions:    emotionsRank.weaknesses,
-      markets:     marketsRank.weaknesses,
-      daysOfWeek:  daysRank.weaknesses,
+      setups:        setupsRank.weaknesses,
+      emotions:      emotionsRank.weaknesses,
+      markets:       marketsRank.weaknesses,
+      daysOfWeek:    daysRank.weaknesses,
+      entryQuality:  entryQualityRank.weaknesses,
     },
     metrics: {
       winRate:      winRate(closed),

@@ -6,6 +6,7 @@ import {
   getClosed, isWin, rOf, avgR, wilsonLowerBound, edgeScore, dayOfWeek, rrBucket,
   MIN_SAMPLE_EDGE,
 } from "../utils/statisticalModels.js";
+import { qstars } from "../../utils.js";
 
 // The dimensions we explore. Keep the combination space small enough that a
 // single user's history can produce meaningful samples.
@@ -15,6 +16,7 @@ const DIMENSIONS = [
   { key: "emotion",        get: t => t.emotionAtEntry || null },
   { key: "marketCondition",get: t => t.marketCondition || null },
   { key: "rr",             get: t => rrBucket(t) },
+  { key: "entryQuality",   get: t => { const q = qstars(t.entryQuality); return q ? `${q}★` : null; } },
 ];
 
 // Cartesian combinations of 2..N dimensions → keys used for grouping.
