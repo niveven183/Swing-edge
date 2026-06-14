@@ -17,7 +17,7 @@ import TradingViewSearch from "./src/components/TradingViewSearch.jsx";
 import { TVTickerTape } from "./src/components/TradingViewWidgets.jsx";
 import { useToast, useConfirm, Tooltip as UiTooltip } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured, tradeForSupabase } from "./src/supabaseClient.js";
-import { calcTradeMetrics, fmt$, fmtR, qstars } from "./src/utils.js";
+import { calcTradeMetrics, fmt$, fmtR, qstars, priceBasedRR, inferSide } from "./src/utils.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell,
@@ -1706,7 +1706,7 @@ export default function SwingEdge() {
   const potLoss        = posSize * riskPerShare;
   // R/R is a price-only ratio — independent of position size — so the card always
   // agrees with the Decision Coach even when posSize floors to 0 on a small account.
-  const rrRatio        = riskPerShare > 0 && rewardPerShare > 0 ? rewardPerShare / riskPerShare : 0;
+  const rrRatio        = priceBasedRR(entryN, stopN, targetN);
   // True when the 1%-risk position rounds below a single share (high price / wide stop / small capital).
   const posSizeTooSmall = riskPerShare > 0 && posSize === 0;
 
@@ -1718,8 +1718,7 @@ export default function SwingEdge() {
   const azRiskPerShare = azEntry > 0 && azStop > 0 ? Math.abs(azEntry - azStop) : 0;
   const azDollarRisk   = azRiskPerShare * azShares;
   const azPortfolioRisk = capital > 0 ? (azDollarRisk / capital) * 100 : 0;
-  const azPotGain  = azShares * Math.abs(azTarget - azEntry);
-  const azRRRatio  = azDollarRisk > 0 ? azPotGain / azDollarRisk : 0;
+  const azRRRatio  = priceBasedRR(azEntry, azStop, azTarget);
 
   // ─── LIVE QUOTE FOR ADD-TRADE FORM ──────────────────────────────────────────
   // When the form is open and a ticker is entered, fetch a live quote from Yahoo
@@ -2039,7 +2038,7 @@ export default function SwingEdge() {
       entry: azEntry,
       stop: azStop,
       target: azTarget,
-      side: "LONG",
+      side: inferSide(azEntry, azStop, azTarget),
       capital,
       shares: azShares,
     });
@@ -2555,9 +2554,7 @@ export default function SwingEdge() {
               const openRisks = openTrades.map(t => {
                 const riskDollar = Math.abs(t.entry - t.stop) * t.shares;
                 const riskPct = capital > 0 ? (riskDollar / capital) * 100 : 0;
-                const rrRatio = t.target && Math.abs(t.entry - t.stop) > 0
-                  ? Math.abs(t.target - t.entry) / Math.abs(t.entry - t.stop)
-                  : null;
+                const rrRatio = t.target ? priceBasedRR(t.entry, t.stop, t.target) : null;
                 return { ...t, riskDollar, riskPct, rrRatio };
               });
 

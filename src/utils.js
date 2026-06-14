@@ -10,6 +10,23 @@ export const calcTradeMetrics = (trade) => {
   return { pnl, rMultiple: risk > 0 ? pnl / risk : 0 };
 };
 
+// Price-only Reward/Risk ratio for a planned setup — independent of position
+// size, so it stays valid even when shares are unentered or round to 0.
+export const priceBasedRR = (entry, stop, target) => {
+  const risk   = Math.abs(entry - stop);
+  const reward = Math.abs(target - entry);
+  return risk > 0 && reward > 0 ? reward / risk : 0;
+};
+
+// Infer trade direction from the setup geometry. Target above entry = LONG
+// (profit on the way up), below = SHORT. Falls back to stop side only when no
+// target is set, so the analyzer's "stop on wrong side" check stays meaningful.
+export const inferSide = (entry, stop, target) => {
+  if (target > 0 && target !== entry) return target > entry ? "LONG" : "SHORT";
+  if (stop   > 0 && stop   !== entry) return stop  < entry ? "LONG" : "SHORT";
+  return "LONG";
+};
+
 export const fmt$ = (n) => n >= 0
   ? `+$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
   : `-$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
