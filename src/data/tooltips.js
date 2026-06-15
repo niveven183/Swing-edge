@@ -174,4 +174,76 @@ export const TRADING_TOOLTIPS = {
     en: "Trade reversal of overnight move at market open. Counter-trend, requires confirmation.",
     he: "מסחר היפוך של תנועת לילה בפתיחת השוק. נגד המגמה, דורש אישור."
   },
+
+  // ── Added terms (he+en) ──────────────────────────────────────────────────
+
+  rr: {
+    en: "Risk/Reward. Potential profit vs. what you risk. 3:1 = you stand to make 3× what you'd lose.",
+    he: "יחס סיכון-סיכוי. כמה אתה עלול להרוויח מול כמה אתה מסכן. 3:1 = פוטנציאל רווח פי 3 מההפסד."
+  },
+
+  mfeMae: {
+    en: "How far a trade ran in your favor (MFE) and against you (MAE) before it closed. Helps tune stops and targets.",
+    he: "כמה רחוק לטובתך הלכה העסקה (MFE) וכמה נגדך (MAE) לפני הסגירה. עוזר לכוון סטופים ויעדים."
+  },
+
+  wilson: {
+    en: "A cautious estimate of your \"true\" win rate when sample size is small. Stops a short hot streak from fooling you.",
+    he: "אומדן זהיר לאחוז הזכייה ה\"אמיתי\" שלך כשמספר העסקאות קטן. מונע אשליה מסדרה קצרה של ניצחונות."
+  },
+
+  discipline: {
+    en: "Whether you followed your plan — stop, size, target — without emotional deviation. The core of long-term profitability.",
+    he: "האם עקבת אחרי התוכנית: סטופ, גודל פוזיציה ויעד — בלי לסטות מרגש. הליבה של רווחיות לאורך זמן."
+  },
+};
+
+// ─── Short, friendly term labels (he+en) ─────────────────────────────────────
+// Heading shown at the top of a TermTooltip popover. Same single-source file.
+export const TERM_LABELS = {
+  // Metrics
+  winRate:      { en: "Win Rate",        he: "אחוז זכייה" },
+  profitFactor: { en: "Profit Factor",   he: "Profit Factor" },
+  avgR:         { en: "Avg R",           he: "R ממוצע" },
+  expectancy:   { en: "Expectancy",      he: "תוחלת" },
+  sharpe:       { en: "Sharpe Ratio",    he: "יחס שארפ" },
+  maxDD:        { en: "Max Drawdown",    he: "ירידה מקסימלית" },
+  avgHold:      { en: "Avg Hold",        he: "זמן החזקה ממוצע" },
+  equityCurve:  { en: "Equity Curve",    he: "עקומת הון" },
+  rMultiple:    { en: "R-Multiple",      he: "R-Multiple" },
+  rr:           { en: "Risk / Reward",   he: "סיכון / סיכוי · R/R" },
+  mfeMae:       { en: "MFE / MAE",       he: "MFE / MAE" },
+  wilson:       { en: "Wilson Score",    he: "ציון Wilson" },
+  // Concepts
+  dna:          { en: "Trading DNA",     he: "DNA מסחרי" },
+  edge:         { en: "Edge",            he: "Edge" },
+  antiEdge:     { en: "Anti-Edge",       he: "Anti-Edge" },
+  tilt:         { en: "Tilt",            he: "Tilt" },
+  marketRegime: { en: "Market Regime",   he: "מצב שוק" },
+  discipline:   { en: "Discipline",      he: "משמעת" },
+  // Risk
+  riskPerTrade: { en: "Risk per Trade",  he: "סיכון לעסקה" },
+  positionSize: { en: "Position Size",   he: "גודל פוזיציה" },
+  stopLoss:     { en: "Stop Loss",       he: "סטופ לוס" },
+  takeProfit:   { en: "Take Profit",     he: "Take Profit" },
+  // Setups
+  breakout:           { en: "Breakout",            he: "Breakout" },
+  pullback:           { en: "Pullback",            he: "Pullback" },
+  bullFlag:           { en: "Bull Flag",           he: "Bull Flag" },
+  ORBBreakout:        { en: "ORB Breakout",        he: "ORB Breakout" },
+  VWAPReclaim:        { en: "VWAP Reclaim",        he: "VWAP Reclaim" },
+  higherLow:          { en: "Higher Low",          he: "Higher Low" },
+  cupAndHandle:       { en: "Cup & Handle",        he: "Cup & Handle" },
+  failedBreakout:     { en: "Failed Breakout",     he: "Failed Breakout" },
+  overextendedFade:   { en: "Overextended Fade",   he: "Overextended Fade" },
+  EMABounce50:        { en: "50 EMA Bounce",       he: "50 EMA Bounce" },
+  trendContinuation:  { en: "Trend Continuation",  he: "Trend Continuation" },
+  gapAndGo:           { en: "Gap & Go",            he: "Gap & Go" },
+  earningsGapPlay:    { en: "Earnings Gap Play",   he: "Earnings Gap Play" },
+  rangeBreakout:      { en: "Range Breakout",      he: "Range Breakout" },
+  postEarningsStrength:{ en: "Post-Earnings Strength", he: "Post-Earnings Strength" },
+  powerHourBreak:     { en: "Power Hour Break",    he: "Power Hour Break" },
+  MOCFade:            { en: "MOC Fade",            he: "MOC Fade" },
+  overnightHold:      { en: "Overnight Hold",      he: "Overnight Hold" },
+  overnightReversal:  { en: "Overnight Reversal",  he: "Overnight Reversal" },
 };

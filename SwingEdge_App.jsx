@@ -49,6 +49,7 @@ import {
 } from "./src/intelligence/ui/IntelligenceUI.jsx";
 import { useTradingStats } from "./src/hooks/useTradingStats.js";
 import InfoTooltip from "./src/components/ui/InfoTooltip.jsx";
+import TermTooltip from "./src/components/ui/TermTooltip.jsx";
 import { TRADING_TOOLTIPS } from "./src/data/tooltips.js";
 import { TradeCalendar } from "./src/components/TradeCalendar.jsx";
 import { AdaptiveLessons } from "./src/intelligence/core/AdaptiveLessons.js";
@@ -2785,7 +2786,7 @@ export default function SwingEdge() {
                   <div className="text-sm font-bold text-white font-mono mt-0.5">{journalStats.total}</div>
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
-                  <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{lang === "he" ? "אחוז הצלחה" : "Win Rate"}<InfoTooltip label="Win Rate">{TRADING_TOOLTIPS.winRate[lang]||TRADING_TOOLTIPS.winRate.en}</InfoTooltip></div>
+                  <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{lang === "he" ? "אחוז הצלחה" : "Win Rate"}<TermTooltip term="winRate" lang={lang} /></div>
                   <div className="text-sm font-bold font-mono mt-0.5 text-emerald-300">{journalStats.winRate.toFixed(1)}%</div>
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
@@ -4994,7 +4995,7 @@ export default function SwingEdge() {
                     <div className="text-sm font-bold font-mono text-[#ef4444]">${Math.round(potLoss).toLocaleString()}</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">R/R Ratio</div>
+                    <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5 flex items-center justify-center gap-1">R/R Ratio<TermTooltip term="rr" lang={lang} /></div>
                     <div className={`text-sm font-bold font-mono ${rrRatio>=2?"text-[#10b981]":rrRatio>=1?"text-amber-400":"text-[#ef4444]"}`}>{rrRatio.toFixed(2)}:1</div>
                   </div>
                 </div>

@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from "react";
 import InfoTooltip from "../../components/ui/InfoTooltip.jsx";
+import TermTooltip from "../../components/ui/TermTooltip.jsx";
 import { TRADING_TOOLTIPS } from "../../data/tooltips.js";
 import {
   Brain, Sparkles, Shield, Flame, TrendingUp, TrendingDown,
@@ -94,11 +95,7 @@ export const EdgeCard = ({ edge, lang = "he", variant = "edge" }) => {
         <span className={`text-[11px] font-semibold tracking-widest uppercase ${accent.text}`}>
           {lang === "he" ? titleHe : titleEn}
         </span>
-        <InfoTooltip label={good ? "Edge" : "Anti-Edge"}>
-          {good
-            ? (TRADING_TOOLTIPS.edge[lang]||TRADING_TOOLTIPS.edge.en)
-            : (TRADING_TOOLTIPS.antiEdge[lang]||TRADING_TOOLTIPS.antiEdge.en)}
-        </InfoTooltip>
+        <TermTooltip term={good ? "edge" : "antiEdge"} lang={lang} />
       </div>
       <div className="text-sm font-semibold text-white leading-snug">{edge.pattern}</div>
       <div className="mt-2 flex items-center gap-3 text-[11px] font-mono text-slate-400">
