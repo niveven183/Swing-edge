@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { TrendingUp, TrendingDown, CheckCircle, AlertTriangle, Award } from "lucide-react";
 import { generateMonthlyReport, MONTH_NAMES } from "../intelligence/core/MonthlyReport.js";
+import TermTooltip from "./ui/TermTooltip.jsx";
 
 // ── helpers ──
 const interp = (str, params = {}) =>
@@ -158,9 +159,9 @@ export default function MonthlyReportTab({ trades, calcMetrics, t, lang, isRTL }
   }
 
   const { summary, charts } = report;
-  const sCard = (label, value, extra) => (
+  const sCard = (label, value, extra, term) => (
     <div className={`${CARD} p-4`}>
-      <div className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 mb-1">{label}</div>
+      <div className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 mb-1 flex items-center gap-1">{label}{term && <TermTooltip term={term} lang={lang} />}</div>
       <div className="text-xl font-bold font-mono text-slate-900 dark:text-white leading-none">{value}</div>
       <div className="mt-1.5">{extra}</div>
     </div>
@@ -173,9 +174,9 @@ export default function MonthlyReportTab({ trades, calcMetrics, t, lang, isRTL }
       {/* SUMMARY CARDS */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {sCard(t.mr_totalTrades, summary.totalTrades, summary.vsLastMonth.hasPrev ? <Delta value={summary.vsLastMonth.trades} t={t} /> : <span className="text-[10px] text-slate-400">{summary.wins}W / {summary.losses}L</span>)}
-        {sCard(t.mr_winRate, `${summary.winRate}%`, summary.vsLastMonth.hasPrev ? <Delta value={summary.vsLastMonth.winRate} suffix="%" t={t} /> : null)}
+        {sCard(t.mr_winRate, `${summary.winRate}%`, summary.vsLastMonth.hasPrev ? <Delta value={summary.vsLastMonth.winRate} suffix="%" t={t} /> : null, "winRate")}
         {sCard(t.mr_netPnL, <span className={summary.netPnL >= 0 ? "text-emerald-500 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"}>{summary.netPnL >= 0 ? "+" : ""}${summary.netPnL.toLocaleString()}</span>, summary.vsLastMonth.hasPrev ? <Delta value={summary.vsLastMonth.netPnL} money t={t} /> : null)}
-        {sCard(t.mr_avgR, <span className={summary.avgR >= 0 ? "text-emerald-500 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"}>{summary.avgR >= 0 ? "+" : ""}{summary.avgR}R</span>, summary.bestTrade ? <span className="text-[10px] text-slate-400 dark:text-slate-500">{t.mr_best}: {summary.bestTrade.ticker}</span> : null)}
+        {sCard(t.mr_avgR, <span className={summary.avgR >= 0 ? "text-emerald-500 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"}>{summary.avgR >= 0 ? "+" : ""}{summary.avgR}R</span>, summary.bestTrade ? <span className="text-[10px] text-slate-400 dark:text-slate-500">{t.mr_best}: {summary.bestTrade.ticker}</span> : null, "avgR")}
       </div>
 
       {/* STRENGTHS */}

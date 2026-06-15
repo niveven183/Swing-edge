@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { X } from "lucide-react";
+import TermTooltip from "./ui/TermTooltip.jsx";
 
 const SETUPS = ["Breakout", "Pullback", "Support Bounce", "Resistance Break", "Other"];
 const MARKETS = ["Trending Up", "Trending Down", "Sideways", "Volatile"];
@@ -181,12 +182,12 @@ export default function EditTradeModal({ trade, lang, onClose, onSave }) {
           {/* Prices */}
           <div className="grid grid-cols-3 gap-3">
             {[
-              ["Entry", "entry", "text-white"],
-              ["Stop Loss", "stop", "text-[#ef4444]"],
-              ["Target", "target", "text-[#10b981]"],
-            ].map(([label, key, cls]) => (
+              ["Entry", "entry", "text-white", null],
+              ["Stop Loss", "stop", "text-[#ef4444]", "stopLoss"],
+              ["Target", "target", "text-[#10b981]", "takeProfit"],
+            ].map(([label, key, cls, term]) => (
               <div key={key}>
-                <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{label}</label>
+                <label className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">{label}{term && <TermTooltip term={term} lang={lang} />}</label>
                 <input
                   type="number"
                   step="0.01"
@@ -230,7 +231,7 @@ export default function EditTradeModal({ trade, lang, onClose, onSave }) {
           {/* Market + Emotion */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{isHe ? "מצב שוק" : "Market Condition"}</label>
+              <label className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">{isHe ? "מצב שוק" : "Market Condition"}<TermTooltip term="marketRegime" lang={lang} /></label>
               <select
                 value={form.marketCondition}
                 onChange={(e) => setField("marketCondition", e.target.value)}
@@ -324,7 +325,7 @@ export default function EditTradeModal({ trade, lang, onClose, onSave }) {
 
             <div className="grid grid-cols-2 gap-3 mt-3">
               <div>
-                <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">MFE</label>
+                <label className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">MFE<TermTooltip term="mfeMae" lang={lang} /></label>
                 <input
                   type="number"
                   step="0.01"
@@ -335,7 +336,7 @@ export default function EditTradeModal({ trade, lang, onClose, onSave }) {
                 />
               </div>
               <div>
-                <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">MAE</label>
+                <label className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">MAE<TermTooltip term="mfeMae" lang={lang} /></label>
                 <input
                   type="number"
                   step="0.01"

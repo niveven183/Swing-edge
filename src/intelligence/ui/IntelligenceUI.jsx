@@ -57,7 +57,7 @@ export const DNACard = ({ dna, lang = "he" }) => {
         <div className="flex items-center gap-2">
           <Brain size={16} className="text-violet-500 dark:text-violet-400" />
           <span className="text-xs font-semibold tracking-widest uppercase text-slate-500 dark:text-slate-400">{labels.title}</span>
-          <InfoTooltip label="Trading DNA">{TRADING_TOOLTIPS.dna[lang]||TRADING_TOOLTIPS.dna.en}</InfoTooltip>
+          <TermTooltip term="dna" lang={lang} />
         </div>
         <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-500/20 font-mono">
           {labels.maturity[dna.maturity] || dna.maturity} · {dna.sampleSize} {labels.sample}
@@ -368,6 +368,7 @@ export const RegimeIndicator = ({ regime, lang = "he" }) => {
         <span className={`text-xs font-semibold tracking-widest uppercase ${colorMap.text}`}>
           {lang === "he" ? "מצב שוק" : "Market Regime"}
         </span>
+        <TermTooltip term="marketRegime" lang={lang} />
       </div>
       <div className="text-sm font-bold text-white">
         {lang === "he" ? map.labelHe : map.labelEn}
