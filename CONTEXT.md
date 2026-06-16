@@ -9,11 +9,16 @@ SwingEdge הוא יומן מסחר מקצועי לסוחרי סווינג.
 - **Local path:** /Users/nivhareven/Swing-edge
 - **Supabase project:** zicstkfkwhzvmdkzpidm
 
+## Current Build
+- **JS bundle:** `index-BcsUYqwS.js` · **CSS bundle:** `index-BAnW1fG5.css`
+
 ## Architecture
 - `SwingEdge_App.jsx` — root component, ~5200 lines (single-file by design, post-launch split planned).
 - `src/hooks/useTradingStats.js` — single source of truth for all aggregated stats.
 - Auth flow: `AuthScreen` → (optional `ForgotPassword`) → `ResetPassword` (triggered by `?reset=true` in URL).
 - **Routing (react-router-dom@7.17.0):** `main.jsx` wraps in `<BrowserRouter>`. `/` = `LandingGate` (redirects to `/app` if authenticated, else `LandingPage`). `/app` = `SwingEdge_App.jsx`.
+- **R/R (single source):** all screens use `priceBasedRR(entry, stop, target)` + `inferSide(entry, stop, target)` from `src/utils.js`. Side-agnostic; SHORT handled correctly everywhere.
+- **Term accessibility (single source):** `src/data/tooltips.js` = bilingual dictionary (~38 terms, he+en) + `TERM_LABELS`. `TermTooltip` (thin wrapper over `InfoTooltip`) is the only component that should render `?` term tooltips.
 
 ## Tabs Structure (NAV_KEYS)
 `dashboard | journal | tools | analytics | intel | feedback`
@@ -61,7 +66,7 @@ Always compare with `=== true` / `=== false`; never rely on raw string equality 
 - `SwingEdge_App.jsx` — root
 - `src/hooks/useTradingStats.js` — stats aggregation
 - `src/supabaseClient.js` — Supabase client + sync
-- `src/utils.js` — canonical math helpers: `calcTradeMetrics`, `fmt$`, `fmtR`, `CAPITAL`, `RISK_PCT`
+- `src/utils.js` — canonical math helpers: `calcTradeMetrics`, `fmt$`, `fmtR`, `CAPITAL`, `RISK_PCT`, `priceBasedRR(entry,stop,target)`, `inferSide(entry,stop,target)`
 
 ### Routing
 - `main.jsx` — `<BrowserRouter>` wraps everything
@@ -77,12 +82,13 @@ Always compare with `=== true` / `=== false`; never rely on raw string equality 
 
 ### UI
 - `ui/InfoTooltip.jsx` — tooltip with `position:fixed` + viewport-aware
+- `ui/TermTooltip.jsx` — thin wrapper over `InfoTooltip`; looks up term in `TRADING_TOOLTIPS` + renders `TERM_LABELS[term]` as the trigger. Use this for all `?` term tooltips.
 - `TradeCalendar.jsx` — monthly calendar with P&L per day. Props: `{ trades, calcMetrics, lang }`
 - `src/components/TradingViewSearch.jsx` — professional symbol autocomplete (debounce, AbortController, keyboard nav)
 - `src/components/PrivacyModal.jsx` — privacy/security modal (accessible from profile dropdown)
 
 ### Data
-- `src/data/tooltips.js` — `TRADING_TOOLTIPS` (18 metrics + setup names, bilingual)
+- `src/data/tooltips.js` — `TRADING_TOOLTIPS` (~38 terms, bilingual he+en) + `TERM_LABELS` (display labels per term). Single source for all term definitions.
 - `src/data/tickers.js` — 90+ `POPULAR_TICKERS` + `searchTickers()` + `getTickerMeta()`
 
 ### Intelligence
@@ -130,6 +136,13 @@ Always compare with `=== true` / `=== false`; never rely on raw string equality 
 - ✅ **A11y: aria-label + htmlFor** (cc32b45): All icon buttons now carry bilingual `aria-label` (he/en). All form labels use `htmlFor` associations. WCAG 2.1 AA compliance across Auth + Journal + Tools.
 - ✅ **Nervous emotion + Hebrew plural + calculator guard** (8432258): Added `"Nervous"` to `emotionAtEntry` enum. Hebrew plural strings fixed (e.g. "עסקה" / "עסקאות"). Position calculator now shows a clear message when `entry === stop` (zero-risk guard) instead of silently returning `∞`.
 - ✅ **TradeCalendar dark mode** (2b27dfc): All calendar day cells, headers, and P&L badges now use proper Tailwind dark-mode variants — no more light-grey wash in dark theme.
+- ✅ **Shared price-based R/R helper** (1feab31): `priceBasedRR` + `inferSide` added to `src/utils.js`. Analyzer fixed (`azRRRatio` was shares-based, hardcoded LONG); 4 call-sites unified. Position Calculator has no target field → no R/R there.
+- ✅ **Term accessibility infrastructure** (4275fd0): `TermTooltip` component + bilingual glossary expanded in `src/data/tooltips.js` (was ~32 terms; added rr/mfeMae/wilson/discipline + `TERM_LABELS`). rr tooltip is definition-only, no trade recommendation.
+- ✅ **Term accessibility rollout** (876e2e9): 13 old `InfoTooltip` usages → `TermTooltip`; 11 new terms gained `?` across all 6 screens. Entry form kept clean (selective `.map`).
+- ✅ **SEO full** (b93d053): `robots.txt` + `sitemap.xml` in `public/` (served before SPA rewrite, no `vercel.json` change needed). JSON-LD `WebApplication`/`FinanceApplication`, hreflang he/en/x-default, Twitter cards, `og:image` absolute URL.
+- ✅ **Log New Trade redesign + bug fixes** (c429ebd): SHORT bug fixed (root: `posSize` crash, not sign issue). R/R in form moved to price-based. Full window audit + redesign (`max-w-2xl`, Trade Context collapsible). Entry Quality connected to Edge Finder/Trade DNA/stats via `qstars()` (1–10 → 1–5). Local Analysis merged into Decision Coach (button+box removed). OCR retained with "לא בענן" caption.
+- ✅ **R/R card shows "–" until target entered** (7a6c1a6): Consistency with Analyzer and Journal; prevents misleading "10.00:1 green" before target is typed.
+- ✅ **UI polish** (2179c63): Calculator floor hint when shares=0. Max DD tooltip `$`-aligned (was `%`). Avg Win / Avg Loss gained `?` + added to glossary.
 
 ## Workflow
 - **Claude chat** (Opus/Sonnet via claude.ai) writes prompts and designs features.
@@ -178,10 +191,10 @@ git log --oneline -1
 ## Pending Tasks (Roadmap)
 
 ### Sprint 2 — Open
-1. ⏳ GA4 / Analytics integration (Google Analytics 4)
-2. ⏳ SEO — meta tags, sitemap, og:image
-3. ⏳ Privacy Policy + Terms of Service pages (legal)
-4. ⏳ Stripe (Free / Pro $19 / Team $49)
+1. ⏳ GA4 / Analytics integration — **blocked on Niv** (needs Measurement ID G-XXXX from GA4 account)
+2. ✅ SEO — meta tags, sitemap, og:image — **CLOSED** (b93d053)
+3. ⏳ Privacy Policy + Terms of Service pages — **blocked on Niv** (legal review required; blocks Stripe)
+4. ⏳ Stripe (Free / Pro $19 / Team $49) — **blocked on Niv** (identity + bank; after Privacy+ToS)
 5. ✅ Comprehensive QA pass — **CLOSED** (a11y cc32b45, emotions/calc 8432258, calendar dark 2b27dfc)
 
 ### Backlog
@@ -216,6 +229,20 @@ source of truth; no metric is computed in two places.
 - **Equity curve** uses `calcTradeMetrics` (single pnl formula across hub, Analytics, PDF).
 - CSV export left as raw per-trade dump (each row's `calcTradeMetrics` is canonical — no aggregate).
 - Kept local (per-trade shaping, no aggregate twin): R-distribution, P&L-by-month, streak history, hold-vs-P&L scatter, per-trade bars.
+
+## QA Status (2026-06-16 Session)
+
+### Fixed this session
+- **F1** 🟠 R/R card showed "10.00:1 green" before target entered → fixed (7a6c1a6)
+- **F2** 🟡 Calculator floor hint missing when shares=0 → fixed (2179c63)
+- **F3** 🟡 Max DD tooltip showed `%` instead of `$` → fixed (2179c63)
+- **F4** 🟡 Avg Win / Avg Loss had no `?` tooltip → fixed (2179c63)
+
+### Backlog (🔵 non-critical, not yet scheduled)
+- **F5:** Glossary terms `sharpe` + `expectancy` exist in `tooltips.js` but no `?` is wired on any screen.
+- **F6:** TradeDNA 4 dimensions (Risk/Discipline/Consistency/Growth) — umbrella `dna` tooltip exists; individual dimension `?` not added. `discipline` key is in glossary but not connected to a label in any `.map`.
+- **F7:** `✕` close button in `InfoTooltip` uses `right-2` physical offset → incorrect position in RTL (cosmetic only).
+- **F8:** `?` trigger does not open on keyboard `focus` (only `Enter`/`Space` on click) — valid for click-tooltip pattern; optional a11y upgrade.
 
 ## Hive Agents Context
 `agents/_base.py` + `core/supervisor.py` — Python orchestrator.
