@@ -4996,7 +4996,7 @@ export default function SwingEdge() {
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5 flex items-center justify-center gap-1">R/R Ratio<TermTooltip term="rr" lang={lang} /></div>
-                    <div className={`text-sm font-bold font-mono ${rrRatio>=2?"text-[#10b981]":rrRatio>=1?"text-amber-400":"text-[#ef4444]"}`}>{rrRatio.toFixed(2)}:1</div>
+                    <div className={`text-sm font-bold font-mono ${targetN>0?(rrRatio>=2?"text-[#10b981]":rrRatio>=1?"text-amber-400":"text-[#ef4444]"):"text-slate-500"}`}>{targetN>0?`${rrRatio.toFixed(2)}:1`:"–"}</div>
                   </div>
                 </div>
               )}
