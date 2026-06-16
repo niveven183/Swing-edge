@@ -28,8 +28,8 @@ export const TRADING_TOOLTIPS = {
   },
 
   maxDD: {
-    en: "Maximum Drawdown — the largest peak-to-trough decline in your account balance.\n\nBelow 10% = excellent risk management\n10-20% = acceptable\nAbove 25% = needs review\n\nDeep drawdowns are psychologically damaging and hard to recover from mathematically.",
-    he: "ירידה מקסימלית — הירידה הגדולה ביותר מנקודת שיא לנקודת שפל ביתרת החשבון.\n\nמתחת ל-10% = ניהול סיכון מצוין\n10-20% = סביר\nמעל 25% = דורש בדיקה\n\nירידות עמוקות פוגעות פסיכולוגית וקשות להתאוששות מתמטית."
+    en: "Maximum Drawdown — the largest dollar drop from a peak in your account balance to the lowest point before recovery.\n\nA smaller number means fewer large losing streaks and better capital preservation. Deep drawdowns are psychologically damaging and hard to recover from mathematically.",
+    he: "ירידה מקסימלית — הירידה הגדולה ביותר בדולרים מנקודת שיא ביתרת החשבון לנקודת השפל שלפני ההתאוששות.\n\nמספר קטן יותר = פחות רצפי הפסד גדולים ושמירה טובה יותר על הון. ירידות עמוקות פוגעות פסיכולוגית וקשות להתאוששות מתמטית."
   },
 
   avgHold: {
@@ -196,6 +196,16 @@ export const TRADING_TOOLTIPS = {
     en: "Whether you followed your plan — stop, size, target — without emotional deviation. The core of long-term profitability.",
     he: "האם עקבת אחרי התוכנית: סטופ, גודל פוזיציה ויעד — בלי לסטות מרגש. הליבה של רווחיות לאורך זמן."
   },
+
+  avgWin: {
+    en: "Average profit on winning trades.",
+    he: "הרווח הממוצע בעסקאות מנצחות."
+  },
+
+  avgLoss: {
+    en: "Average loss on losing trades.",
+    he: "ההפסד הממוצע בעסקאות מפסידות."
+  },
 };
 
 // ─── Short, friendly term labels (he+en) ─────────────────────────────────────
@@ -208,6 +218,8 @@ export const TERM_LABELS = {
   expectancy:   { en: "Expectancy",      he: "תוחלת" },
   sharpe:       { en: "Sharpe Ratio",    he: "יחס שארפ" },
   maxDD:        { en: "Max Drawdown",    he: "ירידה מקסימלית" },
+  avgWin:       { en: "Avg Win",         he: "רווח ממוצע" },
+  avgLoss:      { en: "Avg Loss",        he: "הפסד ממוצע" },
   avgHold:      { en: "Avg Hold",        he: "זמן החזקה ממוצע" },
   equityCurve:  { en: "Equity Curve",    he: "עקומת הון" },
   rMultiple:    { en: "R-Multiple",      he: "R-Multiple" },

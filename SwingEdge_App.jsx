@@ -2790,11 +2790,11 @@ export default function SwingEdge() {
                   <div className="text-sm font-bold font-mono mt-0.5 text-emerald-300">{journalStats.winRate.toFixed(1)}%</div>
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
-                  <div className="text-[9px] uppercase tracking-widest text-slate-600">{lang === "he" ? "רווח ממוצע" : "Avg Win"}</div>
+                  <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{lang === "he" ? "רווח ממוצע" : "Avg Win"}<TermTooltip term="avgWin" lang={lang} /></div>
                   <div className="text-sm font-bold font-mono mt-0.5 text-emerald-400">{fmt$(Math.round(journalStats.avgWin))}</div>
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
-                  <div className="text-[9px] uppercase tracking-widest text-slate-600">{lang === "he" ? "הפסד ממוצע" : "Avg Loss"}</div>
+                  <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{lang === "he" ? "הפסד ממוצע" : "Avg Loss"}<TermTooltip term="avgLoss" lang={lang} /></div>
                   <div className="text-sm font-bold font-mono mt-0.5 text-rose-400">{fmt$(-Math.round(journalStats.avgLoss))}</div>
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
@@ -3300,6 +3300,7 @@ export default function SwingEdge() {
           const portPct       = capN > 0 ? (posValue / capN) * 100 : 0;
 
           const hasResult = capN > 0 && entN > 0 && stopN > 0 && riskPerShare > 0;
+          const calcPosSizeTooSmall = riskPerShare > 0 && shares === 0;
 
           const handleCopyToForm = () => {
             setForm(f => ({
@@ -3461,6 +3462,16 @@ export default function SwingEdge() {
                       <div className="text-xs text-slate-600">{t.ofPortfolio} ${capN.toLocaleString()}</div>
                     </div>
                   </div>
+
+                  {/* Position-too-small hint — explains why Shares/Value are 0 */}
+                  {calcPosSizeTooSmall && (
+                    <div className="flex items-center gap-2 p-2.5 rounded-lg border text-xs bg-amber-500/5 border-amber-500/20 text-amber-400">
+                      <AlertTriangle size={13} />
+                      <span>{lang === "he"
+                        ? "בסיכון הזה הסטופ רחב מדי ל-1 מניה — הגדל הון או הדק את הסטופ."
+                        : "At this risk level the stop is too wide for even 1 share — raise capital or tighten the stop."}</span>
+                    </div>
+                  )}
 
                   {/* Copy to trade form button */}
                   <button
