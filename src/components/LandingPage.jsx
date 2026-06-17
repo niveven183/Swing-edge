@@ -34,7 +34,7 @@ export default function LandingPage() {
       <nav aria-label="ניווט ראשי">
         <div className="wrap nav-in">
           <a className="logo" href="#" aria-label="SwingEdge — דף הבית">
-            <span className="logo-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M3 17l5-5 4 3 6-8" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" /><circle cx="18" cy="7" r="2.4" fill="#fff" /></svg></span>
+            <span className="logo-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 17.6 L7.1 15.4 L9.4 16.5 L11.6 12.8 L13.9 13.9 L16.1 9.4 L18 10.5 L19.9 5.3" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" /><circle cx="19.9" cy="5.3" r="2.4" fill="#fff" fillOpacity="0.22" /><circle cx="19.9" cy="5.3" r="1.2" fill="#fff" /></svg></span>
             Swing<b>Edge</b>
           </a>
           <div className="nav-links">
@@ -79,7 +79,7 @@ export default function LandingPage() {
             <div className="hero-visual reveal" style={{ animationDelay: ".18s" }} aria-label="הדגמה של מסך מאמן ההחלטות" role="img">
               <div className="app-card">
                 <div className="app-top">
-                  <div className="app-brand"><span className="m" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M3 17l5-5 4 3 6-8" stroke="#fff" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" /></svg></span> SwingEdge</div>
+                  <div className="app-brand"><span className="m" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 17.6 L7.1 15.4 L9.4 16.5 L11.6 12.8 L13.9 13.9 L16.1 9.4 L18 10.5 L19.9 5.3" stroke="#fff" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" /><circle cx="19.9" cy="5.3" r="2.4" fill="#fff" fillOpacity="0.22" /><circle cx="19.9" cy="5.3" r="1.2" fill="#fff" /></svg></span> SwingEdge</div>
                   <span className="app-pro">PRO</span>
                 </div>
                 <div className="app-body">
@@ -302,7 +302,7 @@ export default function LandingPage() {
         <div className="wrap">
           <div className="foot-in">
             <a className="logo" href="#" style={{ color: "#fff" }} aria-label="SwingEdge — דף הבית">
-              <span className="logo-mark" style={{ width: "30px", height: "30px" }} aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M3 17l5-5 4 3 6-8" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+              <span className="logo-mark" style={{ width: "30px", height: "30px" }} aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 17.6 L7.1 15.4 L9.4 16.5 L11.6 12.8 L13.9 13.9 L16.1 9.4 L18 10.5 L19.9 5.3" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" /><circle cx="19.9" cy="5.3" r="2.4" fill="#fff" fillOpacity="0.22" /><circle cx="19.9" cy="5.3" r="1.2" fill="#fff" /></svg></span>
               Swing<b style={{ color: "var(--green)" }}>Edge</b>
             </a>
             <nav className="foot-links" aria-label="ניווט תחתון">

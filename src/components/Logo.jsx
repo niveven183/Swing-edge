@@ -43,32 +43,44 @@ function SwingWaveMark({ size }) {
           <stop offset="50%" stopColor="#00C076" />
           <stop offset="100%" stopColor="#16D687" />
         </linearGradient>
-        <filter id="se-glow" x="-30%" y="-30%" width="160%" height="160%">
-          <feGaussianBlur stdDeviation="1.5" result="blur" />
-          <feMerge>
-            <feMergeNode in="blur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
+        <linearGradient id="se-area" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.42" />
+          <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+        </linearGradient>
+        <clipPath id="se-clip"><rect width="64" height="64" rx="14" /></clipPath>
+        <filter id="se-glow" x="-40%" y="-40%" width="180%" height="180%">
+          <feDropShadow dx="0" dy="0" stdDeviation="1.3" floodColor="#ffffff" floodOpacity="0.5" />
         </filter>
       </defs>
 
       <rect width="64" height="64" rx="14" fill="url(#se-grad)" />
 
-      <line x1="12" y1="46" x2="52" y2="14"
-        stroke="rgba(255,255,255,0.15)" strokeWidth="1" strokeDasharray="3 3" />
+      <g clipPath="url(#se-clip)">
+        <g stroke="#ffffff" strokeOpacity="0.13" strokeWidth="0.8">
+          <line x1="0" y1="22" x2="64" y2="22" />
+          <line x1="0" y1="34" x2="64" y2="34" />
+          <line x1="0" y1="46" x2="64" y2="46" />
+          <line x1="21" y1="0" x2="21" y2="64" />
+          <line x1="32" y1="0" x2="32" y2="64" />
+          <line x1="43" y1="0" x2="43" y2="64" />
+        </g>
+        <path
+          d="M12 47 L19 41 L25 44 L31 34 L37 37 L43 25 L48 28 L53 14 L53 64 L12 64 Z"
+          fill="url(#se-area)"
+        />
+        <path
+          d="M12 47 L19 41 L25 44 L31 34 L37 37 L43 25 L48 28 L53 14"
+          fill="none"
+          stroke="#ffffff"
+          strokeWidth="3.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          filter="url(#se-glow)"
+        />
+      </g>
 
-      <path
-        d="M 12 46 C 16 46 20 36 26 32 C 32 28 36 30 40 24 C 44 18 48 16 52 14"
-        stroke="rgba(255,255,255,0.9)"
-        strokeWidth="3.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-        filter="url(#se-glow)"
-      />
-
-      <circle cx="12" cy="46" r="3.5" fill="#FFFFFF" opacity="0.95" />
-      <circle cx="52" cy="14" r="4" fill="#FFFFFF" />
+      <circle cx="53" cy="14" r="6.4" fill="#ffffff" fillOpacity="0.22" />
+      <circle cx="53" cy="14" r="3.1" fill="#ffffff" />
     </svg>
   );
 }
