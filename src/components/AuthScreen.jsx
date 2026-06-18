@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Mail, Lock, Eye, EyeOff, ShieldCheck, Lock as LockIcon, Zap } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, User } from "lucide-react";
 import { supabase, isSupabaseConfigured } from "../supabaseClient.js";
 import Logo from "./Logo.jsx";
 import ForgotPassword from "./ForgotPassword.jsx";
@@ -11,6 +11,7 @@ const STR = {
   email:         { en: "Email",                    he: "אימייל" },
   password:      { en: "Password",                 he: "סיסמה" },
   confirmPass:   { en: "Confirm password",         he: "אשר סיסמה" },
+  nickname:      { en: "Nickname",                 he: "כינוי" },
   forgot:        { en: "Forgot password?",         he: "שכחת סיסמה?" },
   signInBtn:     { en: "Sign In",                  he: "כניסה" },
   signingIn:     { en: "Signing in…",              he: "מתחבר..." },
@@ -18,15 +19,13 @@ const STR = {
   creating:      { en: "Creating…",                he: "נרשם..." },
   google:        { en: "Continue with Google",     he: "המשך עם Google" },
   or:            { en: "OR",                       he: "או" },
-  tagline:       { en: "Smart Journal for Swing Traders", he: "היומן החכם לסוחרי סווינג" },
-  badgeEncrypted:{ en: "Encrypted",                he: "מוצפן" },
-  badgeBeta:     { en: "Closed Beta",              he: "בטא סגורה" },
-  badgePro:      { en: "Pro v2.1",                 he: "Pro v2.1" },
-  footer:        { en: "🔒 Your data is encrypted and stored securely via Supabase",
-                   he: "🔒 הנתונים שלך מוצפנים ומאוחסנים בצורה מאובטחת" },
+  tagline:       { en: "The smart journal that learns you and coaches you", he: "היומן החכם שלומד אותך ומלמד אותך" },
+  footer:        { en: "🔒 Your data is encrypted",
+                   he: "🔒 הנתונים שלך מוצפנים" },
   errFill:       { en: "Please fill in all fields.", he: "נא למלא את כל השדות." },
   errShort:      { en: "Password must be at least 8 characters.", he: "הסיסמה חייבת להכיל לפחות 8 תווים." },
   errMatch:      { en: "Passwords don't match.",   he: "הסיסמאות לא תואמות." },
+  errNick:       { en: "Nickname must be at least 2 characters.", he: "הכינוי חייב להכיל לפחות 2 תווים." },
   errCreds:      { en: "Invalid email or password.", he: "מייל או סיסמה שגויים." },
   errExists:     { en: "This email is already registered — try signing in.", he: "המייל הזה כבר רשום — נסה להתחבר." },
   errSupabase:   { en: "Supabase is not configured.", he: "Supabase לא מוגדר." },
@@ -43,6 +42,7 @@ export default function AuthScreen() {
   const [email, setEmail]     = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [nickname, setNickname] = useState("");
   const [show, setShow]       = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
@@ -75,12 +75,18 @@ export default function AuthScreen() {
     e.preventDefault();
     resetMsg();
     if (!email || !password) { setError(t("errFill")); return; }
+    if (!nickname || nickname.trim().length < 2) { setError(t("errNick")); return; }
     if (password.length < 8)  { setError(t("errShort")); return; }
     if (password !== confirm) { setError(t("errMatch")); return; }
     if (!isSupabaseConfigured || !supabase) { setError(t("errSupabase")); return; }
     setLoading(true);
     try {
-      const { error: err } = await supabase.auth.signUp({ email: email.trim(), password });
+      const nick = nickname.trim();
+      const { error: err } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: { data: { nickname: nick, full_name: nick } },
+      });
       if (err) throw err;
       setSuccess(t("successSignup"));
     } catch (err) {
@@ -108,8 +114,12 @@ export default function AuthScreen() {
 
   const background = {
     minHeight: "100vh",
-    background:
-      "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,192,118,0.07), transparent 70%), #F8FAF7",
+    backgroundColor: "#0d1117",
+    backgroundImage:
+      "radial-gradient(ellipse 90% 55% at 50% -5%, rgba(0,192,118,0.14), transparent 65%)," +
+      "linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)," +
+      "linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px)",
+    backgroundSize: "100% 100%, 52px 52px, 52px 52px",
   };
 
   return (
@@ -124,20 +134,12 @@ export default function AuthScreen() {
         <div className="flex flex-col items-center mb-6">
           <Logo size={72} showText={false} />
           <h1
-            className="mt-4 text-2xl font-extrabold text-slate-900"
-            style={{ letterSpacing: "0.05em" }}
+            className="mt-4 text-2xl font-extrabold text-center"
+            style={{ letterSpacing: "0.05em", color: "#F8FAFC" }}
           >
             SWING<span style={{ color: "#00C076" }}>EDGE</span>
           </h1>
-          <p className="mt-2 text-sm text-slate-500 text-center">{t("tagline")}</p>
-
-          <div className="mt-4 flex items-center gap-3 text-[11px] text-slate-500 flex-wrap justify-center">
-            <span className="inline-flex items-center gap-1"><LockIcon size={11} /> {t("badgeEncrypted")}</span>
-            <span className="text-slate-300">·</span>
-            <span className="inline-flex items-center gap-1"><ShieldCheck size={11} /> {t("badgeBeta")}</span>
-            <span className="text-slate-300">·</span>
-            <span className="inline-flex items-center gap-1"><Zap size={11} /> {t("badgePro")}</span>
-          </div>
+          <p className="mt-2 text-sm text-center" style={{ color: "#9AA4B2" }}>{t("tagline")}</p>
         </div>
 
         {/* Card */}
@@ -197,6 +199,9 @@ export default function AuthScreen() {
                 </form>
               ) : (
                 <form onSubmit={handleSignUp} className="flex flex-col gap-3">
+                  <Input icon={User} type="text" placeholder={t("nickname")} value={nickname}
+                    onChange={(e) => setNickname(e.target.value)} isRTL={isRTL} autoComplete="nickname"
+                    aria-label={t("nickname")} />
                   <Input icon={Mail} type="email" placeholder={t("email")} value={email}
                     onChange={(e) => setEmail(e.target.value)} isRTL={isRTL} autoComplete="email"
                     aria-label={t("email")} />
@@ -241,7 +246,7 @@ export default function AuthScreen() {
           )}
         </div>
 
-        <p className="mt-6 text-sm text-slate-500 text-center px-4">{t("footer")}</p>
+        <p className="mt-6 text-xs text-center px-4" style={{ color: "#8B95A5" }}>{t("footer")}</p>
       </div>
     </div>
   );
