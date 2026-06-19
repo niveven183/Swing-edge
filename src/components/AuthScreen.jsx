@@ -19,7 +19,7 @@ const STR = {
   creating:      { en: "Creating…",                he: "נרשם..." },
   google:        { en: "Continue with Google",     he: "המשך עם Google" },
   or:            { en: "OR",                       he: "או" },
-  tagline:       { en: "The smart journal that learns you and coaches you", he: "היומן החכם שלומד אותך ומלמד אותך" },
+  tagline:       { en: "Your personal markets coach", he: "המאמן האישי שלך לשוק ההון" },
   footer:        { en: "🔒 Your data is encrypted",
                    he: "🔒 הנתונים שלך מוצפנים" },
   errFill:       { en: "Please fill in all fields.", he: "נא למלא את כל השדות." },
@@ -117,8 +117,8 @@ export default function AuthScreen() {
     backgroundColor: "#0d1117",
     backgroundImage:
       "radial-gradient(ellipse 90% 55% at 50% -5%, rgba(0,192,118,0.14), transparent 65%)," +
-      "linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)," +
-      "linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px)",
+      "linear-gradient(rgba(255,255,255,0.11) 1px, transparent 1px)," +
+      "linear-gradient(90deg, rgba(255,255,255,0.11) 1px, transparent 1px)",
     backgroundSize: "100% 100%, 52px 52px, 52px 52px",
   };
 
