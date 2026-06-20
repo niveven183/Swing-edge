@@ -5004,15 +5004,15 @@ export default function SwingEdge() {
                 <div className="grid grid-cols-4 gap-2 bg-white/3 rounded-xl p-3 border border-[var(--border-subtle)] dark:border-white/[0.06]">
                   <div className="text-center">
                     <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">Shares</div>
-                    <div className={`text-sm font-bold font-mono ${tradeValidity.valid?"text-cyan-400":"text-slate-500"}`}>{tradeValidity.valid?posSize:"—"}</div>
+                    <div className={`text-sm font-bold font-mono ${tradeValidity.valid?(posSizeTooSmall?"text-amber-400":"text-cyan-400"):"text-slate-500"}`}>{tradeValidity.valid?(posSizeTooSmall?"1":posSize):"—"}</div>
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">Pos. Value</div>
-                    <div className={`text-sm font-bold font-mono ${tradeValidity.valid?"text-white":"text-slate-500"}`}>{tradeValidity.valid?`$${posValue.toLocaleString()}`:"—"}</div>
+                    <div className={`text-sm font-bold font-mono ${tradeValidity.valid?"text-white":"text-slate-500"}`}>{tradeValidity.valid?(posSizeTooSmall?`$${entryN.toLocaleString()}`:`$${posValue.toLocaleString()}`):"—"}</div>
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">Max Risk</div>
-                    <div className={`text-sm font-bold font-mono ${tradeValidity.valid?"text-[#ef4444]":"text-slate-500"}`}>{tradeValidity.valid?`$${Math.round(potLoss).toLocaleString()}`:"—"}</div>
+                    <div className={`text-sm font-bold font-mono ${tradeValidity.valid?"text-[#ef4444]":"text-slate-500"}`}>{tradeValidity.valid?(posSizeTooSmall?`$${Math.round(riskPerShare).toLocaleString()}`:`$${Math.round(potLoss).toLocaleString()}`):"—"}</div>
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5 flex items-center justify-center gap-1">R/R Ratio<TermTooltip term="rr" lang={lang} /></div>
@@ -5034,8 +5034,8 @@ export default function SwingEdge() {
                 <div className="flex items-center gap-2 p-2.5 rounded-lg border text-xs bg-amber-500/5 border-amber-500/20 text-amber-400">
                   <AlertTriangle size={13} />
                   <span>{lang === "he"
-                    ? "בסיכון 1% הסטופ הזה קטן ממניה אחת — הגדל הון או הדק את הסטופ. ה-R/R עדיין תקף."
-                    : "At 1% risk this stop is under a single share — raise capital or tighten the stop. R/R is still valid."}</span>
+                    ? "בסיכון 1% הפוזיציה קטנה ממניה אחת — הכרטיסים מציגים מינימום של מניה אחת. הגדל הון או הדק את הסטופ. ה-R/R תקף."
+                    : "At 1% risk the position is under one share — cards show the 1-share minimum. Raise capital or tighten the stop. R/R is valid."}</span>
                 </div>
               )}
 
