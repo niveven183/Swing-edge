@@ -17,7 +17,7 @@ import TradingViewSearch from "./src/components/TradingViewSearch.jsx";
 import { TVTickerTape } from "./src/components/TradingViewWidgets.jsx";
 import { useToast, useConfirm, Tooltip as UiTooltip } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured, tradeForSupabase } from "./src/supabaseClient.js";
-import { calcTradeMetrics, fmt$, fmtR, qstars, priceBasedRR, inferSide } from "./src/utils.js";
+import { calcTradeMetrics, fmt$, fmtR, qstars, priceBasedRR, inferSide, validateTradeInputs } from "./src/utils.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell,
@@ -1710,6 +1710,9 @@ export default function SwingEdge() {
   const rrRatio        = priceBasedRR(entryN, stopN, targetN);
   // True when the 1%-risk position rounds below a single share (high price / wide stop / small capital).
   const posSizeTooSmall = riskPerShare > 0 && posSize === 0;
+  // Geometry validity against the explicitly chosen side — drives the invalid-input
+  // state (cards show "—", a red banner explains why, and save is blocked).
+  const tradeValidity = validateTradeInputs(entryN, stopN, targetN, form.side);
 
   // Analyzer computed values
   const azEntry  = parseFloat(analyzerForm.entry)  || 0;
@@ -1754,6 +1757,12 @@ export default function SwingEdge() {
 
   const handleSubmit = () => {
     if (!form.ticker || !entryN || !stopN) return;
+    // Block geometrically invalid trades from being saved (reversed stop/target).
+    const validity = validateTradeInputs(entryN, stopN, targetN, form.side);
+    if (!validity.valid) {
+      toast.error((lang === "he" ? "קלט לא תקין — " : "Invalid input — ") + (validity.reason?.[lang] || validity.reason?.en));
+      return;
+    }
     // Capture the AI coach's prediction so LearningEngine can grade it at close.
     const predictionSnapshot = {
       verdict: aiCoach?.verdict || null,
@@ -4995,25 +5004,33 @@ export default function SwingEdge() {
                 <div className="grid grid-cols-4 gap-2 bg-white/3 rounded-xl p-3 border border-[var(--border-subtle)] dark:border-white/[0.06]">
                   <div className="text-center">
                     <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">Shares</div>
-                    <div className="text-sm font-bold font-mono text-cyan-400">{posSize}</div>
+                    <div className={`text-sm font-bold font-mono ${tradeValidity.valid?"text-cyan-400":"text-slate-500"}`}>{tradeValidity.valid?posSize:"—"}</div>
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">Pos. Value</div>
-                    <div className="text-sm font-bold font-mono text-white">${posValue.toLocaleString()}</div>
+                    <div className={`text-sm font-bold font-mono ${tradeValidity.valid?"text-white":"text-slate-500"}`}>{tradeValidity.valid?`$${posValue.toLocaleString()}`:"—"}</div>
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">Max Risk</div>
-                    <div className="text-sm font-bold font-mono text-[#ef4444]">${Math.round(potLoss).toLocaleString()}</div>
+                    <div className={`text-sm font-bold font-mono ${tradeValidity.valid?"text-[#ef4444]":"text-slate-500"}`}>{tradeValidity.valid?`$${Math.round(potLoss).toLocaleString()}`:"—"}</div>
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5 flex items-center justify-center gap-1">R/R Ratio<TermTooltip term="rr" lang={lang} /></div>
-                    <div className={`text-sm font-bold font-mono ${targetN>0?(rrRatio>=2?"text-[#10b981]":rrRatio>=1?"text-amber-400":"text-[#ef4444]"):"text-slate-500"}`}>{targetN>0?`${rrRatio.toFixed(2)}:1`:"–"}</div>
+                    <div className={`text-sm font-bold font-mono ${tradeValidity.valid?(targetN>0?(rrRatio>=2?"text-[#10b981]":rrRatio>=1?"text-amber-400":"text-[#ef4444]"):"text-slate-500"):"text-slate-500"}`}>{tradeValidity.valid?(targetN>0?`${rrRatio.toFixed(2)}:1`:"–"):"—"}</div>
                   </div>
                 </div>
               )}
 
+              {/* Invalid-input banner — single red signal when the geometry is wrong for the chosen side */}
+              {entryN > 0 && stopN > 0 && !tradeValidity.valid && (
+                <div className="flex items-center gap-2 p-2.5 rounded-lg border text-xs bg-[#ef4444]/5 border-[#ef4444]/20 text-[#ef4444]">
+                  <AlertTriangle size={13} />
+                  <span>{(lang === "he" ? "קלט לא תקין — " : "Invalid input — ") + (tradeValidity.reason?.[lang] || tradeValidity.reason?.en)}</span>
+                </div>
+              )}
+
               {/* Position-too-small hint — explains why Shares/Value/Risk are 0 (R/R stays valid) */}
-              {posSizeTooSmall && (
+              {tradeValidity.valid && posSizeTooSmall && (
                 <div className="flex items-center gap-2 p-2.5 rounded-lg border text-xs bg-amber-500/5 border-amber-500/20 text-amber-400">
                   <AlertTriangle size={13} />
                   <span>{lang === "he"
@@ -5022,11 +5039,11 @@ export default function SwingEdge() {
                 </div>
               )}
 
-              {/* Live Decision Coach — analyses the trade as you type */}
-              <DecisionCoachPanel coaching={aiCoach} lang={lang} />
+              {/* Live Decision Coach — analyses the trade as you type (only on valid input) */}
+              {tradeValidity.valid && <DecisionCoachPanel coaching={aiCoach} lang={lang} />}
 
               {/* RR quality indicator — core decision feedback, always visible */}
-              {entryN > 0 && stopN > 0 && targetN > 0 && (
+              {tradeValidity.valid && entryN > 0 && stopN > 0 && targetN > 0 && (
                 <div className={`flex items-center gap-2 p-2.5 rounded-lg border text-xs ${rrRatio>=2?"bg-emerald-500/5 border-emerald-500/20 text-[#10b981]":rrRatio>=1?"bg-amber-500/5 border-amber-500/20 text-amber-400":"bg-[#ef4444]/5 border-[#ef4444]/20 text-[#ef4444]"}`}>
                   {rrRatio>=2?<CheckCircle size={13}/>:<AlertTriangle size={13}/>}
                   <span>{rrRatio>=2?"Great setup — R/R exceeds 2:1 minimum":rrRatio>=1?"Acceptable — consider widening target for better R/R":"Below minimum — avoid setups below 1:1 R/R"}</span>

@@ -27,6 +27,43 @@ export const inferSide = (entry, stop, target) => {
   return "LONG";
 };
 
+// Validate a planned trade's geometry against the explicitly chosen side.
+// Single source of truth for input validity — shared by Log New Trade and
+// (later) the Analyzer. Uses the explicit `side` rather than inferSide, which
+// masks reversed input. Returns { valid, reason: { he, en } | null }.
+export const validateTradeInputs = (entry, stop, target, side) => {
+  const e = Number(entry) || 0;
+  const s = Number(stop)  || 0;
+  const t = Number(target) || 0;
+  const isShort = side === "SHORT";
+
+  if (e <= 0 || s <= 0) return {
+    valid: false,
+    reason: { he: "הזן מחיר כניסה וסטופ תקינים.", en: "Enter a valid entry and stop price." },
+  };
+  if (s === e) return {
+    valid: false,
+    reason: { he: "הסטופ זהה לכניסה — אין סיכון מוגדר.", en: "Stop equals entry — no risk defined." },
+  };
+  if (!isShort && s > e) return {
+    valid: false,
+    reason: { he: "ב-LONG הסטופ חייב להיות מתחת לכניסה.", en: "On a LONG the stop must be below entry." },
+  };
+  if (isShort && s < e) return {
+    valid: false,
+    reason: { he: "ב-SHORT הסטופ חייב להיות מעל הכניסה.", en: "On a SHORT the stop must be above entry." },
+  };
+  if (t > 0 && !isShort && t < e) return {
+    valid: false,
+    reason: { he: "ב-LONG היעד חייב להיות מעל הכניסה.", en: "On a LONG the target must be above entry." },
+  };
+  if (t > 0 && isShort && t > e) return {
+    valid: false,
+    reason: { he: "ב-SHORT היעד חייב להיות מתחת לכניסה.", en: "On a SHORT the target must be below entry." },
+  };
+  return { valid: true, reason: null };
+};
+
 export const fmt$ = (n) => n >= 0
   ? `+$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
   : `-$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
