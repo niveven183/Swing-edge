@@ -1092,7 +1092,8 @@ export default function SwingEdge() {
   const [closeForm, setCloseForm] = useState({ exit: "", exitReason: "Hit Target", followedPlan: true, lessonLearned: "", maxFavorable: "", maxAdverse: "" });
 
   // Trade Analyzer state
-  const [analyzerForm, setAnalyzerForm] = useState({ ticker: "", entry: "", stop: "", target: "", shares: "" });
+  const [analyzerForm, setAnalyzerForm] = useState({ ticker: "", entry: "", stop: "", target: "", shares: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3 });
+  const [showAnalyzerContext, setShowAnalyzerContext] = useState(false);
   const [analyzerImage, setAnalyzerImage] = useState(null);
   const [analyzerImagePreview, setAnalyzerImagePreview] = useState(null);
   const [analyzerResult, setAnalyzerResult] = useState(null);
@@ -2083,6 +2084,11 @@ export default function SwingEdge() {
       side: inferSide(azEntry, azStop, azTarget),
       capital,
       shares: azShares,
+      setup: analyzerForm.setup,
+      notes: analyzerForm.notes,
+      marketCondition: analyzerForm.marketCondition,
+      emotionAtEntry: analyzerForm.emotionAtEntry,
+      entryQuality: analyzerForm.entryQuality,
     }, realTrades, lang);
     setAnalyzerResult(result);
     setAnalyzerLoading(false);
@@ -3301,6 +3307,66 @@ export default function SwingEdge() {
                     className="absolute top-2 right-2 rtl:right-auto rtl:left-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-slate-300 hover:text-white">
                     <X size={11} />
                   </button>
+                </div>
+              )}
+
+              {/* ── Trade context (journaling metadata) — collapsed by default. Reuses Log New Trade fields so the smart checks (emotion/setup/market) light up here too. ── */}
+              <button type="button" onClick={()=>setShowAnalyzerContext(v=>!v)}
+                aria-expanded={showAnalyzerContext}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-white/3 border border-[var(--border-subtle)] dark:border-white/[0.06] text-slate-400 hover:text-white hover:border-white/20 transition">
+                <span className="text-[10px] tracking-widest uppercase font-semibold">{lang === "he" ? "הקשר העסקה" : "Trade Context"}</span>
+                <ChevronDown size={14} className={`transition-transform ${showAnalyzerContext ? "rotate-180" : ""}`} />
+              </button>
+
+              {showAnalyzerContext && (
+                <div className="space-y-4 animate-fade-in">
+                  {/* Setup Type + Notes */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label htmlFor="az-setup" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Setup Type</label>
+                      <select id="az-setup" value={analyzerForm.setup} onChange={e=>setAnalyzerForm(f=>({...f,setup:e.target.value}))}
+                        className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
+                        {["Breakout","Pullback","Support Bounce","Resistance Break","Other"].map(s=><option key={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="az-notes" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Notes</label>
+                      <input id="az-notes" value={analyzerForm.notes} onChange={e=>setAnalyzerForm(f=>({...f,notes:e.target.value}))}
+                        placeholder="Trade thesis..." className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none transition" />
+                    </div>
+                  </div>
+
+                  {/* Market Condition + Emotion */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label htmlFor="az-market-condition" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Market Condition</label>
+                      <select id="az-market-condition" value={analyzerForm.marketCondition} onChange={e=>setAnalyzerForm(f=>({...f,marketCondition:e.target.value}))}
+                        className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
+                        {["Trending Up","Trending Down","Sideways","Volatile"].map(s=><option key={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="az-emotion" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Emotion at Entry</label>
+                      <select id="az-emotion" value={analyzerForm.emotionAtEntry} onChange={e=>setAnalyzerForm(f=>({...f,emotionAtEntry:e.target.value}))}
+                        className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
+                        {["Confident","Calm","Patient","Neutral","Hesitant","Nervous","FOMO","Angry"].map(s=><option key={s}>{s}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Entry Quality (stars) */}
+                  <div>
+                    <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Entry Quality</label>
+                    <div className="flex items-center gap-1 mt-1">
+                      {[1,2,3,4,5].map(star => (
+                        <button key={star} type="button" onClick={() => setAnalyzerForm(f=>({...f,entryQuality:star}))}
+                          className={`text-xl transition-transform hover:scale-110 ${analyzerForm.entryQuality >= star ? "text-amber-400" : "text-slate-700"}`}>
+                          ★
+                        </button>
+                      ))}
+                      <span className="text-[10px] text-slate-600 ml-1">{analyzerForm.entryQuality}/5</span>
+                    </div>
+                  </div>
                 </div>
               )}
 
