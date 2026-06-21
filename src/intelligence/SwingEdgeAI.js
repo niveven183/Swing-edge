@@ -7,7 +7,7 @@ import { calculateTradeDNA } from "./core/TradeDNA.js";
 import { findEdges }         from "./core/EdgeFinder.js";
 import { detectMarketRegime }from "./core/MarketRegime.js";
 import { checkTilt, engageCooldown, clearCooldown, acknowledgeWarning } from "./core/TiltProtection.js";
-import { coachTrade }        from "./core/DecisionCoach.js";
+import { coachTrade, coachingToAnalyzerView } from "./core/DecisionCoach.js";
 import {
   reinforceFromTrade, rebuildFromHistory, calibrationReport,
   capabilities, getWeights, resetLearning,
@@ -48,6 +48,32 @@ export const SwingEdgeAI = {
     edges:  SwingEdgeAI.getEdges(trades),
     regime: SwingEdgeAI.getRegime(trades, snapshot),
   }),
+
+  // Standalone Analyzer — runs the SAME coach engine as analyzeNewTrade, then
+  // adapts the rich output to the Analyzer panel's flat shape. Passing `trades`
+  // means the Analyzer now benefits from personal history / DNA / regime too.
+  analyzeStandalone: (input = {}, trades = [], lang = "en") => {
+    const coaching = coachTrade({
+      form: {
+        entry:  input.entry,
+        stop:   input.stop,
+        target: input.target,
+        side:   input.side || "LONG",
+      },
+      trades,
+      dna:    SwingEdgeAI.getDNA(trades),
+      edges:  SwingEdgeAI.getEdges(trades),
+      regime: SwingEdgeAI.getRegime(trades),
+    });
+    return coachingToAnalyzerView(coaching, {
+      entry:   input.entry,
+      stop:    input.stop,
+      target:  input.target,
+      shares:  input.shares,
+      capital: input.capital,
+      lang,
+    });
+  },
 
   // Edge health — decay detection and anti-edge locking.
   getEdgeDecay:    (trades)         => memoize(trades, "edgeDecay",    () => detectEdgeDecay(trades)),

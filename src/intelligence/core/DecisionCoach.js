@@ -378,3 +378,63 @@ export const coachTrade = ({ form, trades = [], dna = null, edges = null, regime
     sampleSize: getClosed(trades).length,
   };
 };
+
+// ─── ANALYZER VIEW ADAPTER ───────────────────────────────────────────────────
+// Maps the rich coachTrade output onto the flat shape the standalone Analyzer
+// panel renders ({ recommendation, entry_score, stop_logic, rr_assessment,
+// explanation }). This lets the Analyzer run on the SAME engine as Log New Trade
+// while keeping its existing display. Dollar/portfolio risk — which the coach's
+// price-only idea doesn't carry — is recomputed here so the Analyzer keeps
+// surfacing it inside the explanation.
+
+const pickInsightText = (insights, re) => {
+  const hit = (insights || []).find(i => i.text && re.test(i.text.en || ""));
+  return hit ? hit.text : null;
+};
+
+const scoreFromConfidence = (c) =>
+  c >= 80 ? 5 : c >= 60 ? 4 : c >= 40 ? 3 : c >= 20 ? 2 : 1;
+
+const portfolioRiskNote = (entry, stop, shares, capital, lang) => {
+  const dollarRisk = Math.abs(Number(entry) - Number(stop)) * (Number(shares) || 0);
+  const cap = Number(capital) || 0;
+  const sh = Number(shares) || 0;
+  const pct = cap > 0 && sh > 0 ? (dollarRisk / cap) * 100 : 0;
+  if (pct <= 0) return "";
+  if (lang === "he") {
+    if (pct > 2)   return ` סיכון תיק ${pct.toFixed(2)}% מעל יעד 1% — הקטן גודל.`;
+    if (pct > 1.2) return ` סיכון תיק ${pct.toFixed(2)}% מעט מעל 1% — סביר.`;
+    return ` סיכון תיק ${pct.toFixed(2)}% בתוך כלל ה-1%.`;
+  }
+  if (pct > 2)   return ` Portfolio risk ${pct.toFixed(2)}% is above 1% target — reduce size.`;
+  if (pct > 1.2) return ` Portfolio risk ${pct.toFixed(2)}% slightly above 1% — acceptable.`;
+  return ` Portfolio risk ${pct.toFixed(2)}% within 1% rule.`;
+};
+
+export const coachingToAnalyzerView = (coaching, { entry, stop, target, shares, capital, lang = "en" } = {}) => {
+  if (!coaching || coaching.verdict === "PENDING") {
+    return { error: lang === "he" ? "חסר מחיר כניסה או סטופ." : "Missing entry or stop price." };
+  }
+  const L = (t) => (t ? (t[lang] || t.en) : null);
+  const insights = coaching.insights || [];
+
+  const recommendation = coaching.verdict === "GO" ? "GO" : coaching.verdict === "SKIP" ? "SKIP" : "WAIT";
+  const entry_score = scoreFromConfidence(coaching.confidence ?? 0);
+
+  const rr_assessment = L(pickInsightText(insights, /R\/R|ratio/i));
+
+  let stop_logic = L(pickInsightText(insights, /\bstop\b/i));
+  if (!stop_logic) {
+    const sp = coaching.idea?.stopPct;
+    stop_logic = sp != null
+      ? (lang === "he"
+          ? `מרחק הסטופ ${sp.toFixed(2)}% — בטווח סביר.`
+          : `Stop distance ${sp.toFixed(2)}% — within a reasonable range.`)
+      : null;
+  }
+
+  const lead = L((insights.find(i => i.kind === "go" || i.kind === "skip") || insights[0] || {}).text) || "";
+  const explanation = (lead + portfolioRiskNote(entry, stop, shares, capital, lang)).trim() || null;
+
+  return { recommendation, entry_score, stop_logic, rr_assessment, explanation };
+};

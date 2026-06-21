@@ -41,7 +41,6 @@ import {
   fetchQuote, getMarketState, getMarketStateBadge, getRefreshInterval, MARKET_STATE,
   fetchSectorHistorical,
 } from "./src/priceService.js";
-import { analyzeTradeLocal } from "./src/localAI.js";
 import { POPULAR_TICKERS as STATIC_TICKERS, getTickerMeta, searchTickers as searchStaticTickers } from "./src/data/tickers.js";
 import { SwingEdgeAI } from "./src/intelligence/SwingEdgeAI.js";
 import {
@@ -2044,14 +2043,14 @@ export default function SwingEdge() {
       return;
     }
     setAnalyzerLoading(true); setAnalyzerResult(null);
-    const result = analyzeTradeLocal({
+    const result = SwingEdgeAI.analyzeStandalone({
       entry: azEntry,
       stop: azStop,
       target: azTarget,
       side: inferSide(azEntry, azStop, azTarget),
       capital,
       shares: azShares,
-    });
+    }, realTrades, lang);
     setAnalyzerResult(result);
     setAnalyzerLoading(false);
   };
