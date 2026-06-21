@@ -1097,6 +1097,10 @@ export default function SwingEdge() {
   const [analyzerImagePreview, setAnalyzerImagePreview] = useState(null);
   const [analyzerResult, setAnalyzerResult] = useState(null);
   const [analyzerLoading, setAnalyzerLoading] = useState(false);
+  // Live quote shown in the Analyzer (auto-fills Entry Price). Mirrors the Add-Trade form mechanism.
+  const [analyzerQuote, setAnalyzerQuote] = useState(null);
+  const [analyzerQuoteLoading, setAnalyzerQuoteLoading] = useState(false);
+  const analyzerQuoteTimer = useRef(null);
 
   // Chart AI extraction state
   const [chartAiLoading, setChartAiLoading] = useState(false);
@@ -1753,6 +1757,35 @@ export default function SwingEdge() {
     formQuoteTimer.current = setTimeout(() => fetchFormQuote(ticker), 250);
     return () => { if (formQuoteTimer.current) clearTimeout(formQuoteTimer.current); };
   }, [form.ticker, showForm, fetchFormQuote]);
+
+  // ─── LIVE QUOTE FOR TRADE ANALYZER ──────────────────────────────────────────
+  // Same mechanism as the Add-Trade form: when the Analyzer tab is active and a
+  // ticker is entered, fetch a live quote (reuses fetchQuote) and auto-fill Entry.
+  const fetchAnalyzerQuote = useCallback(async (ticker, { force = false } = {}) => {
+    if (!ticker) return;
+    setAnalyzerQuoteLoading(true);
+    try {
+      const q = await fetchQuote(ticker);
+      if (!q) return;
+      setAnalyzerQuote({ ...q, ticker: ticker.toUpperCase() });
+      setAnalyzerForm(f => {
+        if (f.ticker.toUpperCase() !== ticker.toUpperCase()) return f;
+        if (!force && f.entry) return f;
+        return { ...f, entry: String(q.price.toFixed(2)) };
+      });
+    } finally {
+      setAnalyzerQuoteLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!(tab === "tools" && toolsTab === "analyzer")) return;
+    if (analyzerQuoteTimer.current) clearTimeout(analyzerQuoteTimer.current);
+    const ticker = analyzerForm.ticker.trim();
+    if (!ticker) { setAnalyzerQuote(null); return; }
+    analyzerQuoteTimer.current = setTimeout(() => fetchAnalyzerQuote(ticker), 250);
+    return () => { if (analyzerQuoteTimer.current) clearTimeout(analyzerQuoteTimer.current); };
+  }, [analyzerForm.ticker, tab, toolsTab, fetchAnalyzerQuote]);
 
   const handleSubmit = () => {
     if (!form.ticker || !entryN || !stopN) return;
@@ -3147,6 +3180,66 @@ export default function SwingEdge() {
                     placeholder="10" type="number" min="0" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono" />
                 </div>
               </div>
+
+              {/* Live quote badge + Open/High/Low/Pre/After (reuses Add-Trade form mechanism) */}
+              {analyzerForm.ticker && (() => {
+                const badge = getMarketStateBadge(analyzerQuote?.marketState || marketState);
+                const q = analyzerQuote;
+                const marketOpen = (analyzerQuote?.marketState || marketState) === MARKET_STATE.OPEN;
+                return (
+                  <div className="bg-white/3 border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="text-[10px] font-bold tracking-wider px-2 py-0.5 rounded-full border"
+                          style={{ color: badge.color, borderColor: badge.color + "40", background: badge.color + "15" }}
+                        >
+                          {badge.emoji} {marketOpen ? "LIVE" : q ? "LAST CLOSE" : badge.label}
+                        </span>
+                        {q?.price != null && (
+                          <span className="text-sm font-mono font-bold text-white">${q.price.toFixed(2)}</span>
+                        )}
+                        {q?.changePct != null && (
+                          <span className={`text-[11px] font-mono ${q.changePct >= 0 ? "text-[#10b981]" : "text-[#ef4444]"}`}>
+                            {q.changePct >= 0 ? "+" : ""}{q.changePct.toFixed(2)}%
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => fetchAnalyzerQuote(analyzerForm.ticker, { force: true })}
+                        disabled={analyzerQuoteLoading}
+                        title="Refresh price"
+                        aria-label={lang === "he" ? "רענן מחיר" : "Refresh price"}
+                        className="text-slate-400 hover:text-cyan-400 transition p-1 rounded hover:bg-white/5 disabled:opacity-50"
+                      >
+                        <RefreshCw size={12} className={analyzerQuoteLoading ? "animate-spin" : ""} />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-5 gap-1 text-[9px] text-slate-500">
+                      <div className="text-center">
+                        <div className="uppercase tracking-wider">Open</div>
+                        <div className="font-mono text-slate-300">{q?.regularMarketOpen != null ? q.regularMarketOpen.toFixed(2) : "—"}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="uppercase tracking-wider">High</div>
+                        <div className="font-mono text-[#10b981]">{q?.regularMarketDayHigh != null ? q.regularMarketDayHigh.toFixed(2) : "—"}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="uppercase tracking-wider">Low</div>
+                        <div className="font-mono text-[#ef4444]">{q?.regularMarketDayLow != null ? q.regularMarketDayLow.toFixed(2) : "—"}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="uppercase tracking-wider">Pre</div>
+                        <div className="font-mono text-amber-400">{q?.preMarketPrice != null ? q.preMarketPrice.toFixed(2) : "—"}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="uppercase tracking-wider">After</div>
+                        <div className="font-mono text-orange-400">{q?.postMarketPrice != null ? q.postMarketPrice.toFixed(2) : "—"}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Row 2: Entry / Stop / Target */}
               <div className="grid grid-cols-3 gap-3">
