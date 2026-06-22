@@ -2,14 +2,13 @@
 // Reads a trading-chart screenshot with Claude Vision and returns the trade
 // levels as clean JSON.
 //
-// B-deterministic: the model READS components off a TradingView Long/Short
-// Position tool — the entry PRICE plus the stop/target DISTANCES (deltas) and
-// their percents — and THIS CODE does the arithmetic. The tool shows stop/target
-// as a distance from entry, not an absolute price ("Stop: 4.39 (5.871%)"), so the
-// old "read the prices" prompt produced a ~16x error. We compute stop/target from
-// entry ± delta, take side from the read direction (body.side as fallback), and
-// cross-check each delta against its own percent and against the R/R ratio; a
-// misread number fails the check and is dropped rather than surfaced.
+// B-deterministic: the model READS deltas and percents off a TradingView Long/Short
+// Position tool ("Stop: 4.39 (5.871%)"), and THIS CODE derives all prices. Entry is
+// computed as delta/(percent/100) — deterministic math, no Vision reading required.
+// Stop/target are then entry ± delta. Vision's read entry is used only as a cross-check
+// signal that adjusts confidence, never as a price source. Side is read from the tool
+// direction (body.side as fallback). Failed validation nulls the specific field rather
+// than surfacing a guess; low confidence or a suspect Vision entry nulls all prices.
 //
 //   POST /api/ocr
 //   body : { image: "<base64 or data:...;base64,...>", side: "LONG"|"SHORT" }
@@ -106,10 +105,39 @@ function computeLevels(entry, stopDelta, targetDelta, side) {
   };
 }
 
+// Derive entry deterministically from delta/percent pairs.
+// The Position tool encodes percent = (delta / entry) × 100, so:
+//   entry = delta / (percent / 100)
+// This identity is direction-agnostic — SHORT and LONG use the same formula
+// because the label always shows the unsigned distance and its percentage.
+// Returns { value, source: "both"|"stop"|"target"|"none", converged: bool|null }
+function computeEntry(stopDelta, stopPercent, targetDelta, targetPercent) {
+  const eFromStop =
+    stopDelta > 0 && stopPercent > 0
+      ? tidy(stopDelta / (stopPercent / 100))
+      : null;
+  const eFromTarget =
+    targetDelta > 0 && targetPercent > 0
+      ? tidy(targetDelta / (targetPercent / 100))
+      : null;
+
+  if (eFromStop !== null && eFromTarget !== null) {
+    const relDiff =
+      Math.abs(eFromStop - eFromTarget) / Math.max(eFromStop, eFromTarget);
+    if (relDiff <= 0.003)
+      return { value: tidy((eFromStop + eFromTarget) / 2), source: "both", converged: true };
+    // Legs disagree beyond rounding — prefer stop (more prominent label)
+    return { value: eFromStop, source: "stop", converged: false };
+  }
+  if (eFromStop   !== null) return { value: eFromStop,   source: "stop",   converged: null };
+  if (eFromTarget !== null) return { value: eFromTarget, source: "target", converged: null };
+  return { value: null, source: "none", converged: null };
+}
+
 // Double cross-check. Each leg's delta must agree with its own percent
 // (delta/entry*100), and targetDelta/stopDelta must agree with the R/R ratio.
-// A leg without a percent is "unchecked" → it passes but is not evidence, so it
-// can't on its own condemn the entry (see bothLegsFail in the handler).
+// When entry was computed FROM a leg, that leg's check is tautological — pass
+// entrySource to mark it unchecked so it can't contribute to bothLegsFail.
 function validate({
   entry,
   stopDelta,
@@ -117,10 +145,12 @@ function validate({
   targetDelta,
   targetPercent,
   rrRatio,
+  entrySource = "none",
 }) {
-  const stopChecked = entry > 0 && stopDelta !== null && stopPercent !== null;
-  const targetChecked =
-    entry > 0 && targetDelta !== null && targetPercent !== null;
+  const stopTauto   = entrySource === "stop"   || entrySource === "both";
+  const targetTauto = entrySource === "target" || entrySource === "both";
+  const stopChecked   = !stopTauto   && entry > 0 && stopDelta   !== null && stopPercent   !== null;
+  const targetChecked = !targetTauto && entry > 0 && targetDelta !== null && targetPercent !== null;
   const stopOk = stopChecked
     ? Math.abs((stopDelta / entry) * 100 - stopPercent) <= PCT_TOL
     : true;
@@ -153,9 +183,11 @@ function buildPrompt() {
     "NOT prices — IGNORE them completely. Never return the percent, the tick count, or the Amount",
     "as the delta. The delta is always the first number.",
     "",
-    "The ENTRY is different: it is an absolute PRICE, shown on the entry line or in the tool's",
-    "panel. The panel shows BUY for a long position or SELL for a short position. The entry is a",
-    "full price (e.g. 75.00), much larger than the deltas.",
+    "The ENTRY is different: it is an absolute PRICE on the Position tool's horizontal entry line —",
+    "the price level at which the trade would be entered. Read it from the label on that line itself.",
+    "Do NOT read it from the OHLC bar header at the top of the chart, and NOT from the current price",
+    "shown in the price scale or live price panel. The panel header says BUY (long) or SELL (short).",
+    "The entry price is a full price (e.g. 75.00), much larger than the deltas.",
     "",
     "Read the actual numbers off the chart and return:",
     "- ticker          : instrument symbol, uppercase, no exchange prefix (e.g. AFRM, BTCUSD), else null.",
@@ -300,12 +332,17 @@ export default async function handler(req, res) {
       return;
     }
 
-    const entry = num(parsed.entry);
+    const visionEntry = num(parsed.entry);         // Vision-read entry — cross-check only
     const stopDelta = num(parsed.stopDelta);
     const targetDelta = num(parsed.targetDelta);
     const stopPercent = num(parsed.stopPercent);
     const targetPercent = num(parsed.targetPercent);
     const rrRatioRead = num(parsed.rrRatio);
+
+    // Compute entry deterministically from delta/percent pairs (direction-agnostic).
+    // Falls back to visionEntry when no percents are available (source="none").
+    const computed = computeEntry(stopDelta, stopPercent, targetDelta, targetPercent);
+    const entry = computed.value !== null ? computed.value : visionEntry;
 
     // Side: the read direction wins; the UI hint (body.side) is the fallback.
     const visionDir =
@@ -321,12 +358,14 @@ export default async function handler(req, res) {
       targetDelta,
       targetPercent,
       rrRatio: rrRatioRead,
+      entrySource: computed.source,
     });
 
-    // entry is suspect only when BOTH legs were actually checked and both fail
-    // (their shared divisor is the culprit). A single failed checked leg nulls
-    // only itself — never the whole result on one piece of evidence.
+    // bothLegsFail is only meaningful when entry came from Vision (source="none").
+    // With a computed entry the source legs are marked unchecked, so
+    // stopChecked/targetChecked are false → gate always evaluates false (correct).
     const bothLegsFail =
+      computed.source === "none" &&
       stopChecked && targetChecked && !stopOk && !targetOk;
 
     // Floor / suspect-entry gate → surface no prices, keeping badge<40 honest.
@@ -343,19 +382,25 @@ export default async function handler(req, res) {
       return;
     }
 
-    let { stop, target } = computeLevels(
-      entry,
-      stopDelta,
-      targetDelta,
-      resolvedSide
-    );
+    let { stop, target } = computeLevels(entry, stopDelta, targetDelta, resolvedSide);
     if (!stopOk) stop = null;
     if (!targetOk) target = null;
 
-    // R/R mismatch (legs self-consistent but the shown ratio disagrees) trims
-    // trust to the medium band, but stays ≥ floor so surfaced values and the
-    // badge remain consistent.
-    const confidence = rrOk ? modelConf : Math.max(MIN_CONFIDENCE, modelConf - 15);
+    // Confidence: aggregate signals from computed-entry quality and R/R agreement,
+    // then clamp to [MIN_CONFIDENCE, 100]. A Vision-entry mismatch lowers confidence
+    // but never zeros the computed entry — the computation is the trusted source.
+    let confAdj = 0;
+    if (computed.value !== null) {
+      if (computed.converged === true)  confAdj += 5;    // both legs agree
+      if (computed.converged === false) confAdj -= 10;   // legs disagree
+      if (visionEntry !== null) {
+        const relDiff = Math.abs(computed.value - visionEntry) / computed.value;
+        confAdj += relDiff <= 0.01 ? 5 : -5;            // Vision agrees / disagrees
+      }
+    }
+    if (!rrOk) confAdj -= 15;
+
+    const confidence = Math.max(MIN_CONFIDENCE, Math.min(100, modelConf + confAdj));
 
     // Prefer the deterministic ratio from the trusted deltas over the read one.
     const rrRatio =
