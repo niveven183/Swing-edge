@@ -18,7 +18,17 @@ SwingEdge הוא יומן מסחר מקצועי לסוחרי סווינג.
 - Auth flow: `AuthScreen` → (optional `ForgotPassword`) → `ResetPassword` (triggered by `?reset=true` in URL).
 - **Routing (react-router-dom@7.17.0):** `main.jsx` wraps in `<BrowserRouter>`. `/` = `LandingGate` (redirects to `/app` if authenticated, else `LandingPage`). `/app` = `SwingEdge_App.jsx`.
 - **R/R (single source):** all screens use `priceBasedRR(entry, stop, target)` + `inferSide(entry, stop, target)` from `src/utils.js`. Side-agnostic; SHORT handled correctly everywhere.
+  - ⚠️ `inferSide` *infers* direction from price geometry, so it masks reversed/garbage input (a SHORT typed as LONG still "looks" valid). For validation and analysis pass the **explicit `side`** — do not rely on `inferSide`.
 - **Term accessibility (single source):** `src/data/tooltips.js` = bilingual dictionary (~38 terms, he+en) + `TERM_LABELS`. `TermTooltip` (thin wrapper over `InfoTooltip`) is the only component that should render `?` term tooltips.
+
+## Unified Analysis Engine (canonical — single source)
+Both the **Log New Trade** form and the standalone **Trade Analyzer** run on one engine, `coachTrade`. There is no second analysis path.
+- `coachTrade({ form, trades, dna, edges, regime })` — `src/intelligence/core/DecisionCoach.js:291`. Builds the `checks[]` array, aggregates a 0–100 confidence band, returns rich coaching output.
+- `ideaFromForm(form)` — `DecisionCoach.js:14`. Maps `side / setup / emotionAtEntry / marketCondition / entryQuality` (+ entry/stop/target geometry) into the `idea` object every check consumes.
+- **Log New Trade** entry point: `SwingEdgeAI.analyzeNewTrade(form, trades, snapshot)` — `src/intelligence/SwingEdgeAI.js:44`.
+- **Trade Analyzer** entry point: `SwingEdgeAI.analyzeStandalone(input, trades, lang)` — `SwingEdgeAI.js:55` → `coachTrade` → `coachingToAnalyzerView(coaching, { entry, stop, target, shares, capital, lang })` adapter (`DecisionCoach.js:414`) flattens the rich output onto the flat shape the Analyzer view expects (`$risk` preserved in `explanation`).
+- **Approach A (Adapter):** the Analyzer was unified *onto* `coachTrade` via the adapter — `coachTrade` itself was not modified, so Log New Trade behavior is byte-identical to before the unification.
+- **Input validation (single source):** `validateTradeInputs(entry, stop, target, side)` — `src/utils.js:34`. Bilingual, LONG+SHORT, uses the **explicit `side`**. Invalid input → position cards render `"—"`, a red banner shows, and `handleSubmit` blocks the save (no garbage metrics persisted).
 
 ## Tabs Structure (NAV_KEYS)
 `dashboard | journal | tools | analytics | intel | feedback`
@@ -111,6 +121,14 @@ Always compare with `=== true` / `=== false`; never rely on raw string equality 
 - `src/vision/readers/*` — image preprocessing + price-axis reader
 
 ## Features Built (Recent Updates)
+- ✅ **Stage 1 — shared input validation + invalid-input state** (034beff): `validateTradeInputs(entry,stop,target,side)` in `src/utils.js:34`. Bilingual, LONG+SHORT, uses the explicit `side` (not `inferSide`, which masks reversed input). Invalid input → cards show `"—"` + red banner + `handleSubmit` blocks the save.
+- ✅ **Stage 1.5 — position cards single-share baseline** (18d1bed): when input is *valid* but `posSize` floors to 0 (default account $2,500 + 1% risk → `posSizeTooSmall` at `SwingEdge_App.jsx:1716`), cards fall back to a single-share baseline — `SHARES=1` (amber), `POS=$entry`, `MAX RISK=$riskPerShare` (rendered `SwingEdge_App.jsx:5165–5173`). R/R unchanged; sharpened amber banner.
+- ✅ **Stage 2 — unified analysis engine** (160098a): Approach A (Adapter). Both Log New Trade and the Analyzer now run on `coachTrade`. Analyzer goes `analyzeStandalone` → `coachingToAnalyzerView` (`DecisionCoach.js:414`); gains history/DNA + bilingual; `$risk` preserved in `explanation`. `coachTrade` untouched → Log New Trade identical.
+- ✅ **Stage 3a — live price in Trade Analyzer** (611bef0): reuses `fetchQuote` (`priceService.js:258`, Finnhub/CoinGecko via `api/quote.js`). 250ms debounce, gated on the Analyzer sub-tab being active; auto-fills `entry` only when empty.
+- ✅ **Stage 3b — rich Trade Context in Analyzer** (0ada3d5): Analyzer form (`SwingEdge_App.jsx:1095`) gained `setup / notes / marketCondition / emotionAtEntry / entryQuality` (reusing Log New Trade UI). Fed to the engine via `analyzeStandalone` → `ideaFromForm`, which lights up checks that were dormant in the Analyzer path (it never supplied those fields): `emotionalCheck`, `setupMarketComboCheck`, `patternMatchCheck`, `regimeCheck`.
+- ✅ **Landing page** (2940a67): `src/components/LandingPage.jsx`, bilingual he/en, hero + bento features + pricing; CTAs → `AuthScreen`.
+- ✅ **Auth screen redesign** (b99230a, 8dd3a85): `src/components/AuthScreen.jsx` — dark grid background, required `nickname` (Supabase `user_metadata`), tagline "המאמן האישי שלך לשוק ההון".
+- ✅ **New green logo** (20ae7f0): zigzag price-curve logo across favicon set + `src/components/Logo.jsx` + LandingPage.
 - ✅ InfoTooltips on all metrics (Dashboard + Analytics + Tools)
 - ✅ Tools tab — Trade Analyzer + Position Calculator unified
 - ✅ New SVG Logo (swing wave + S)
@@ -149,6 +167,12 @@ Always compare with `=== true` / `=== false`; never rely on raw string equality 
 - **Claude Code** (this session, Sonnet) executes: reads files, edits code, runs build, commits, pushes.
 - **Vercel** auto-deploys from `main` — deployment is the final validation step.
 - Hive agents (Python) write `PROPOSALS.md` / `TASKS.md` prompts overnight; Claude Code implements them.
+
+### Working procedures (handoff-critical)
+- **One task per prompt.** Split large tasks into sub-stages (Stage 3 → 3a / 3b / 3c / 3d). Keeps each diff reviewable and each deploy verifiable.
+- **Verify live deploys via Claude chat + the Vercel connector — not `curl`.** `curl` hits the "Vercel Security Checkpoint" anti-bot wall (`x-vercel-mitigated: challenge`) and fails. The local build hash will **always** differ from the deployed one (Vercel rebuilds independently); what matters is that the bundle *rolled*, not that the hashes match.
+- **Prompt structure:** header (model / plan-mode / session / connectors) → "read, don't change" guardrail → diagnosis → Plan → execute → mandatory git block.
+- **`src/index.css` override layer** (~L86–100): a restyle layer that remaps Tailwind text-color utilities (`.text-white`, `.text-slate-*`, etc.) to CSS variables. Dark screens fight this layer — prefer inline colors over Tailwind text utilities there.
 
 ## Coding Rules (Hive agents + Claude Code)
 1. ❌ NEVER access `trade.pnl` directly — ✅ `const { pnl } = calcTradeMetrics(trade)` (import from `./src/utils.js`)
@@ -243,6 +267,19 @@ source of truth; no metric is computed in two places.
 - **F6:** TradeDNA 4 dimensions (Risk/Discipline/Consistency/Growth) — umbrella `dna` tooltip exists; individual dimension `?` not added. `discipline` key is in glossary but not connected to a label in any `.map`.
 - **F7:** `✕` close button in `InfoTooltip` uses `right-2` physical offset → incorrect position in RTL (cosmetic only).
 - **F8:** `?` trigger does not open on keyboard `focus` (only `Enter`/`Space` on click) — valid for click-tooltip pattern; optional a11y upgrade.
+
+## Stage 4 — Coach Upgrade (open gaps, identified 2026-06-22)
+After the engine unification (Stage 2) and the Analyzer rich-context wiring (Stage 3b), these coach-quality gaps surfaced and are the focus of Stage 4:
+- **English insights under a Hebrew UI** — coach output is still English while the surrounding interface is Hebrew. Needs a full bilingual pass on the coach strings.
+- **Duplicate message** — "You tend to lose under Neutral" appears twice (once as ⚠️, once as 💡). De-dup needed.
+- **Contradictory insights** — a positive edge ("Matches top edge 100% win") is shown alongside a warning ("tend to lose under Neutral") for the *same* trade. Needs prioritization / conflict resolution before display.
+- **`notes` / `lessonLearned` not analyzed** — both are persisted but the coach never reads them.
+- **`entryQuality` consumed only in the Analyzer path** — pre-3b it was read but unused; Stage 3b wired it into the Analyzer, but coverage is still partial.
+
+## Roadmap — On the axis (next)
+- **Stage 3c** — X / reset control for the uploaded image and the calculator in the Analyzer.
+- **Stage 3d** — image that actually analyzes (gated on the OCR decision in Stage 5).
+- **Stage 5 — OCR architecture decision.** `src/vision/ChartVisionEngine.js` uses Tesseract.js, which is architecturally too weak for a dark TradingView chart. `handleAnalyzerImageUpload` currently only calls `setPreview` — the upload is decorative until OCR is resolved.
 
 ## Hive Agents Context
 `agents/_base.py` + `core/supervisor.py` — Python orchestrator.
