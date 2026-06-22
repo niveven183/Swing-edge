@@ -9,6 +9,7 @@ import { tradesToday, trailingLossRun, isRevengeWindow } from "../utils/psycholo
 import { matchIdeaToEdge, matchIdeaToAntiEdge } from "./EdgeFinder.js";
 import { getPersonalizedRecommendations } from "./TradeDNA.js";
 import { isSetupCompatible } from "./MarketRegime.js";
+import { qstars } from "../../utils.js";
 
 // Utility — build a derived "idea" from the raw trade form fields.
 const ideaFromForm = (form) => {
@@ -230,12 +231,44 @@ const emotionalCheck = (dna, idea) => {
     const weak = (dna.weaknesses?.emotions || []).find(e => e.key === idea.emotionAtEntry);
     if (weak) return {
       icon: "⚠️", kind: "warn", weight: -6,
+      dedup: `emotion:${idea.emotionAtEntry}`,
       text: {
         en: `You tend to lose trading under "${idea.emotionAtEntry}".`,
         he: `אתה נוטה להפסיד כשאתה במצב "${idea.emotionAtEntry}".`,
       },
     };
   }
+  return null;
+};
+
+// entryQuality is the trader's own 1–5 star read of the setup (legacy trades use
+// 1–10; qstars normalises both to 1–5). We only speak up at the extremes so the
+// default middle rating stays silent.
+const entryQualityCheck = (idea) => {
+  const q = qstars(idea.entryQuality);
+  if (!q) return null;
+  const rr = idea._rrNum || 0;
+  if (q <= 2 && rr > 0 && rr < 2) return {
+    icon: "⚠️", kind: "warn", weight: -6,
+    text: {
+      en: `Low entry quality (${q}/5) with a marginal R/R — wait for a cleaner setup.`,
+      he: `איכות כניסה נמוכה (${q}/5) עם R/R גבולי — חכה לסטאפ נקי יותר.`,
+    },
+  };
+  if (q <= 2) return {
+    icon: "⚠️", kind: "warn", weight: -4,
+    text: {
+      en: `You rated this entry ${q}/5 — double-check your trigger before committing.`,
+      he: `דירגת את הכניסה ${q}/5 — ודא את הטריגר לפני שאתה נכנס.`,
+    },
+  };
+  if (q >= 5 && rr >= 2) return {
+    icon: "✨", kind: "go", weight: 4,
+    text: {
+      en: `Top entry quality (${q}/5) backing a strong R/R — clean setup.`,
+      he: `איכות כניסה מעולה (${q}/5) עם R/R חזק — סטאפ נקי.`,
+    },
+  };
   return null;
 };
 
@@ -286,6 +319,30 @@ const verdictFrom = (score) => {
   return "SKIP";
 };
 
+// ─── INSIGHT MERGE (display only — never touches the score) ───────────────────
+// De-dup: collapse insights that share a `dedup` key (e.g. two generators firing
+// on the same weak emotion) to a single line, keeping the one tagged `_prefer`.
+const dedupeInsights = (list) => {
+  const slot = new Map(); // dedup key → index in result
+  const result = [];
+  for (const ins of list) {
+    if (!ins.dedup) { result.push(ins); continue; }
+    const at = slot.get(ins.dedup);
+    if (at == null) { slot.set(ins.dedup, result.length); result.push(ins); }
+    else if (ins._prefer && !result[at]._prefer) result[at] = ins;
+  }
+  return result;
+};
+
+// Prioritise: surface blockers first, confirmations last — so warnings and
+// positives don't interleave randomly. skip → warn → go → info, then by |weight|.
+const KIND_RANK = { skip: 0, warn: 1, go: 2, info: 3 };
+const prioritizeInsights = (list) =>
+  [...list].sort((a, b) =>
+    ((KIND_RANK[a.kind] ?? 9) - (KIND_RANK[b.kind] ?? 9)) ||
+    (Math.abs(b.weight || 0) - Math.abs(a.weight || 0))
+  );
+
 // ─── PUBLIC API ──────────────────────────────────────────────────────────────
 // coachTrade: { form, trades, dna, edges, regime, lang }
 export const coachTrade = ({ form, trades = [], dna = null, edges = null, regime = null } = {}) => {
@@ -311,6 +368,7 @@ export const coachTrade = ({ form, trades = [], dna = null, edges = null, regime
     patternMatchCheck(dna, idea),
     setupMarketComboCheck(trades, idea),
     emotionalCheck(dna, idea),
+    entryQualityCheck(idea),
     sequentialCheck(trades),
     regimeCheck(regime, idea),
   ].filter(Boolean);
@@ -345,11 +403,16 @@ export const coachTrade = ({ form, trades = [], dna = null, edges = null, regime
   // Personalised DNA advice (adds informational bullets only).
   const dnaRecs = getPersonalizedRecommendations(dna, idea) || [];
   for (const r of dnaRecs) {
+    const isEmotion = r.key === "emotion";
     checks.push({
       icon: r.kind === "weakness" ? "⚠️" : r.kind === "strength" ? "⭐" : "💡",
       kind: r.kind === "weakness" ? "warn" : "info",
       weight: 0,
       text: { en: r.en, he: r.he },
+      // Same emotion can also surface via emotionalCheck — tag both so the merge
+      // keeps a single line. This DNA rec carries the actionable "pause" wording,
+      // so it wins the de-dup.
+      ...(isEmotion ? { dedup: `emotion:${idea.emotionAtEntry}`, _prefer: true } : {}),
     });
   }
 
@@ -366,10 +429,13 @@ export const coachTrade = ({ form, trades = [], dna = null, edges = null, regime
     });
   }
 
+  // Merge for display only — score/verdict were already locked above.
+  const insights = prioritizeInsights(dedupeInsights(checks));
+
   return {
     verdict,
     confidence: Math.round(confidence),
-    insights: checks,
+    insights,
     historicalContext: history,
     edgeMatch,
     antiEdgeMatch,

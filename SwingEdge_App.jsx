@@ -5204,7 +5204,9 @@ export default function SwingEdge() {
               {tradeValidity.valid && entryN > 0 && stopN > 0 && targetN > 0 && (
                 <div className={`flex items-center gap-2 p-2.5 rounded-lg border text-xs ${rrRatio>=2?"bg-emerald-500/5 border-emerald-500/20 text-[#10b981]":rrRatio>=1?"bg-amber-500/5 border-amber-500/20 text-amber-400":"bg-[#ef4444]/5 border-[#ef4444]/20 text-[#ef4444]"}`}>
                   {rrRatio>=2?<CheckCircle size={13}/>:<AlertTriangle size={13}/>}
-                  <span>{rrRatio>=2?"Great setup — R/R exceeds 2:1 minimum":rrRatio>=1?"Acceptable — consider widening target for better R/R":"Below minimum — avoid setups below 1:1 R/R"}</span>
+                  <span>{lang==="he"
+                    ? (rrRatio>=2?"סטאפ מצוין — ה-R/R עובר את הרף של 2:1":rrRatio>=1?"סביר — שקול להרחיב את היעד ל-R/R טוב יותר":"מתחת לרף — הימנע מסטאפים מתחת ל-1:1")
+                    : (rrRatio>=2?"Great setup — R/R exceeds 2:1 minimum":rrRatio>=1?"Acceptable — consider widening target for better R/R":"Below minimum — avoid setups below 1:1 R/R")}</span>
                 </div>
               )}
 
