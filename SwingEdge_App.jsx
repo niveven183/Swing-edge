@@ -1097,6 +1097,10 @@ export default function SwingEdge() {
   const [analyzerImage, setAnalyzerImage] = useState(null);
   const [analyzerImagePreview, setAnalyzerImagePreview] = useState(null);
   const [analyzerResult, setAnalyzerResult] = useState(null);
+  // OCR (Claude Vision via /api/ocr): chosen side disambiguates stop vs target;
+  // analyzerOcrResult drives the confidence badge. { status, confidence }.
+  const [analyzerOcrSide, setAnalyzerOcrSide] = useState("LONG");
+  const [analyzerOcrResult, setAnalyzerOcrResult] = useState(null);
   const [analyzerLoading, setAnalyzerLoading] = useState(false);
   // Live quote shown in the Analyzer (auto-fills Entry Price). Mirrors the Add-Trade form mechanism.
   const [analyzerQuote, setAnalyzerQuote] = useState(null);
@@ -2067,7 +2071,45 @@ export default function SwingEdge() {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => { setAnalyzerImage(file); setAnalyzerImagePreview(ev.target.result); };
+    reader.onload = async (ev) => {
+      const dataURL = ev.target.result;
+      setAnalyzerImage(file);
+      setAnalyzerImagePreview(dataURL);
+      setAnalyzerOcrResult({ status: "processing", confidence: 0 });
+      // Vision can take 3–8s; bail out at 15s so the UI never hangs.
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
+      try {
+        const res = await fetch("/api/ocr", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: dataURL, side: analyzerOcrSide }),
+          signal: controller.signal,
+        });
+        clearTimeout(timer);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          setAnalyzerOcrResult({
+            status: err.error === "config_error" ? "config_error" : "error",
+            confidence: 0,
+          });
+          return;
+        }
+        const result = await res.json();
+        // Never overwrite a field the trader already filled by hand.
+        setAnalyzerForm(f => ({
+          ...f,
+          ticker: f.ticker || result.ticker || f.ticker,
+          entry:  f.entry  || (result.entry  != null ? String(result.entry)  : f.entry),
+          stop:   f.stop   || (result.stop   != null ? String(result.stop)   : f.stop),
+          target: f.target || (result.target != null ? String(result.target) : f.target),
+        }));
+        setAnalyzerOcrResult({ status: "ok", confidence: result.confidence ?? 0 });
+      } catch {
+        clearTimeout(timer);
+        setAnalyzerOcrResult({ status: "error", confidence: 0 });
+      }
+    };
     reader.readAsDataURL(file);
   };
 
@@ -2080,6 +2122,8 @@ export default function SwingEdge() {
     setAnalyzerImage(null);
     setAnalyzerImagePreview(null);
     setAnalyzerResult(null);
+    setAnalyzerOcrSide("LONG");
+    setAnalyzerOcrResult(null);
   };
 
   const analyzeTradeStandalone = () => {
@@ -3304,16 +3348,57 @@ export default function SwingEdge() {
               {/* Image Upload */}
               <div>
                 <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{t.imageFromTradingView}</label>
+                {/* Direction tells Vision which line is the stop vs the target before reading the chart. */}
+                <div className="flex gap-1.5 mb-2">
+                  {["LONG", "SHORT"].map((s) => (
+                    <button key={s} type="button" onClick={() => setAnalyzerOcrSide(s)}
+                      aria-pressed={analyzerOcrSide === s}
+                      className={`flex-1 px-3 py-1.5 rounded-lg text-[11px] font-semibold tracking-wide uppercase border transition ${
+                        analyzerOcrSide === s
+                          ? (s === "LONG"
+                              ? "bg-emerald-500/10 border-emerald-500/40 text-[#10b981]"
+                              : "bg-[#ef4444]/10 border-[#ef4444]/40 text-[#ef4444]")
+                          : "bg-white/5 border-white/10 text-slate-500 hover:text-slate-300"
+                      }`}>
+                      {s === "LONG" ? (lang === "he" ? "לונג" : "Long") : (lang === "he" ? "שורט" : "Short")}
+                    </button>
+                  ))}
+                </div>
                 <label className="flex items-center gap-2 cursor-pointer w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-400 hover:border-cyan-500/30 hover:text-cyan-400 transition">
                   <Eye size={12} />
                   <span>{analyzerImage ? analyzerImage.name : t.uploadChart}</span>
                   <input type="file" accept="image/*" onChange={handleAnalyzerImageUpload} className="hidden" />
                 </label>
               </div>
+              {/* OCR confidence badge */}
+              {analyzerOcrResult && (() => {
+                const { status, confidence } = analyzerOcrResult;
+                const ok = status === "ok";
+                const high = ok && confidence >= 70;
+                const mid = ok && confidence >= 40 && confidence < 70;
+                const low = ok && confidence < 40;
+                const tone =
+                  status === "processing" ? "bg-cyan-500/5 border-cyan-500/20 text-cyan-300" :
+                  high ? "bg-emerald-500/5 border-emerald-500/20 text-[#10b981]" :
+                  mid  ? "bg-amber-500/5 border-amber-500/20 text-amber-400" :
+                         "bg-[#ef4444]/5 border-[#ef4444]/20 text-[#ef4444]";
+                let icon, text;
+                if (status === "processing") { icon = <RefreshCw size={12} className="animate-spin" />; text = lang === "he" ? "קורא גרף…" : "Reading chart…"; }
+                else if (status === "config_error") { icon = <AlertTriangle size={12} />; text = lang === "he" ? "מפתח API חסר — פנה לאדמין" : "API key missing — contact admin"; }
+                else if (status === "error") { icon = <AlertTriangle size={12} />; text = lang === "he" ? "שגיאת OCR — נסה שוב" : "OCR failed — try again"; }
+                else if (high) { icon = <CheckCircle size={12} />; text = `OCR ✓ ${confidence}%`; }
+                else if (mid)  { icon = <CheckCircle size={12} />; text = `OCR ~ ${confidence}%`; }
+                else { icon = <AlertTriangle size={12} />; text = lang === "he" ? "לא זוהה — ודא ידנית" : "Not detected — verify manually"; }
+                return (
+                  <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-[11px] ${tone}`}>
+                    {icon}<span>{text}</span>
+                  </div>
+                );
+              })()}
               {analyzerImagePreview && (
                 <div className="relative rounded-lg overflow-hidden border border-white/10">
                   <img src={analyzerImagePreview} alt="Trade chart" className="w-full h-40 object-cover" />
-                  <button onClick={() => { setAnalyzerImage(null); setAnalyzerImagePreview(null); }}
+                  <button onClick={() => { setAnalyzerImage(null); setAnalyzerImagePreview(null); setAnalyzerOcrResult(null); }}
                     aria-label={lang === "he" ? "הסר תמונה" : "Remove image"}
                     className="absolute top-2 right-2 rtl:right-auto rtl:left-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-slate-300 hover:text-white">
                     <X size={11} />
