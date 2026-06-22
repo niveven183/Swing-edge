@@ -2071,6 +2071,17 @@ export default function SwingEdge() {
     reader.readAsDataURL(file);
   };
 
+  const handleAnalyzerReset = () => {
+    setAnalyzerForm({ ticker: "", entry: "", stop: "", target: "", shares: "",
+      setup: "Breakout", notes: "", marketCondition: "Trending Up",
+      emotionAtEntry: "Neutral", entryQuality: 3 });
+    setAnalyzerQuote(null);
+    setAnalyzerQuoteLoading(false);
+    setAnalyzerImage(null);
+    setAnalyzerImagePreview(null);
+    setAnalyzerResult(null);
+  };
+
   const analyzeTradeStandalone = () => {
     if (!analyzerForm.ticker || !azEntry || !azStop) {
       setAnalyzerResult({ error: "⚠️ Fill at least: Ticker, Entry and Stop Loss." });
@@ -3370,11 +3381,18 @@ export default function SwingEdge() {
                 </div>
               )}
 
-              {/* Analyze button */}
-              <button onClick={analyzeTradeStandalone} disabled={analyzerLoading}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-500/25 to-cyan-500/25 border border-violet-500/35 text-violet-200 text-sm font-bold hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-50">
-                {analyzerLoading ? <><RefreshCw size={14} className="animate-spin" /> {t.analyzing}</> : <><Cpu size={14} /> {t.analyzeTrade}</>}
-              </button>
+              {/* Analyze button + Reset */}
+              <div className="flex gap-2">
+                <button onClick={analyzeTradeStandalone} disabled={analyzerLoading}
+                  className="flex-1 py-3 rounded-xl bg-gradient-to-r from-violet-500/25 to-cyan-500/25 border border-violet-500/35 text-violet-200 text-sm font-bold hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-50">
+                  {analyzerLoading ? <><RefreshCw size={14} className="animate-spin" /> {t.analyzing}</> : <><Cpu size={14} /> {t.analyzeTrade}</>}
+                </button>
+                <button onClick={handleAnalyzerReset} disabled={analyzerLoading}
+                  aria-label={lang === "he" ? "איפוס" : "Reset"}
+                  className="py-3 px-5 rounded-xl border border-white/10 text-slate-400 text-sm font-semibold hover:text-white hover:border-white/20 hover:bg-white/5 transition disabled:opacity-50">
+                  {lang === "he" ? "איפוס" : "Reset"}
+                </button>
+              </div>
             </div>
 
             {/* Analysis Result */}
