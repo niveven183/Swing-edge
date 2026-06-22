@@ -3588,6 +3588,11 @@ export default function SwingEdge() {
             setTimeout(() => setPosCopied(false), 2000);
           };
 
+          const handlePosCalcReset = () => {
+            setPosCalc({ capital: "", risk: "1", entry: "", stop: "", ticker: "" });
+            setPosCopied(false);
+          };
+
           // Auto-load live price when ticker changes (variant-safe)
           const tickerPrice = posCalc.ticker ? getLivePrice(posCalc.ticker)?.price ?? null : null;
 
@@ -3602,7 +3607,14 @@ export default function SwingEdge() {
 
               {/* Inputs */}
               <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5 space-y-4">
-                <span className="text-[10px] font-semibold tracking-widest uppercase text-slate-500">{t.riskParams}</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-semibold tracking-widest uppercase text-slate-500">{t.riskParams}</span>
+                  <button onClick={handlePosCalcReset}
+                    aria-label={lang === "he" ? "איפוס" : "Reset"}
+                    className="text-[10px] tracking-widest uppercase text-slate-500 hover:text-white transition">
+                    {lang === "he" ? "איפוס" : "Reset"}
+                  </button>
+                </div>
 
                 {/* Ticker field for auto price loading */}
                 <div>
@@ -5429,6 +5441,15 @@ export default function SwingEdge() {
                 <button onClick={handleSubmit}
                   className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-white text-sm font-bold hover:opacity-90 transition">
                   Log Trade →
+                </button>
+                <button onClick={() => {
+                    setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null });
+                    setOcrStatus(null);
+                    setFormQuote(null);
+                    setFormQuoteLoading(false);
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm hover:text-white hover:border-white/20 transition">
+                  {lang === "he" ? "איפוס" : "Reset"}
                 </button>
                 <button onClick={()=>setShowForm(false)} className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm hover:text-white hover:border-white/20 transition">
                   Cancel
