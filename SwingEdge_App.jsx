@@ -1305,7 +1305,7 @@ export default function SwingEdge() {
       if (isTyping) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const k = e.key.toLowerCase();
-      if (k === "n") { e.preventDefault(); setShowForm(true); }
+      if (k === "n") { e.preventDefault(); setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null }); setOcrStatus(null); setShowForm(true); }
       else if (k === "j") { e.preventDefault(); setTab("journal"); }
       else if (k === "d") { e.preventDefault(); setTab("dashboard"); }
       else if (k === "a") { e.preventDefault(); setTab("analyzer"); }
@@ -2034,7 +2034,7 @@ export default function SwingEdge() {
     const reader = new FileReader();
     reader.onload = async (ev) => {
       const dataURL = ev.target.result;
-      setForm(f => ({ ...f, tradeImage: file, tradeImagePreview: dataURL }));
+      setForm(f => ({ ...f, ticker: "", entry: "", stop: "", target: "", tradeImage: file, tradeImagePreview: dataURL }));
       setOcrStatus("processing");
       try {
         const { analyzeChart } = await import('./src/vision/ChartVisionEngine');
@@ -3004,7 +3004,7 @@ export default function SwingEdge() {
                 <h3 className="text-sm font-bold text-white mb-2">{lang === "he" ? "אין עדיין עסקאות" : "No trades yet"}</h3>
                 <p className="text-xs text-slate-500 mb-4">{lang === "he" ? "התחל את היומן שלך — הוסף עסקה ראשונה או טען 30 עסקאות לדוגמה" : "Start journaling — add a trade or load 30 demo trades"}</p>
                 <div className="flex flex-wrap items-center justify-center gap-2">
-                  <button onClick={() => setShowForm(true)}
+                  <button onClick={() => { setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null }); setOcrStatus(null); setShowForm(true); }}
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500 text-black font-bold text-xs hover:bg-cyan-400 transition">
                     <Plus size={13} /> {lang === "he" ? "עסקה ראשונה" : "Add First Trade"}
                   </button>
@@ -3579,7 +3579,10 @@ export default function SwingEdge() {
               entry: posCalc.entry,
               stop:  posCalc.stop,
               shares: String(shares),
+              tradeImage: null,
+              tradeImagePreview: null,
             }));
+            setOcrStatus(null);
             setShowForm(true);
             setPosCopied(true);
             setTimeout(() => setPosCopied(false), 2000);
@@ -5577,7 +5580,7 @@ export default function SwingEdge() {
 
       {/* ── FLOATING NEW TRADE BUTTON ── */}
       <button
-        onClick={() => setShowForm(true)}
+        onClick={() => { setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null }); setOcrStatus(null); setShowForm(true); }}
         className="fixed bottom-6 right-6 rtl:right-auto rtl:left-6 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-violet-500 text-white shadow-2xl shadow-cyan-500/25 flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
         aria-label="New trade"
         title="New Trade"
