@@ -2034,34 +2034,39 @@ export default function SwingEdge() {
     const reader = new FileReader();
     reader.onload = async (ev) => {
       const dataURL = ev.target.result;
+      const sideAtUpload = form.side; // capture before async — avoids a stale form.side from an older closure
+      // Reset prior read before analyzing a new image.
       setForm(f => ({ ...f, ticker: "", entry: "", stop: "", target: "", tradeImage: file, tradeImagePreview: dataURL }));
-      setOcrStatus("processing");
+      setOcrStatus({ status: "processing", confidence: 0 });
+      // Vision can take 3–8s; bail out at 15s so the UI never hangs.
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
       try {
-        const { analyzeChart } = await import('./src/vision/ChartVisionEngine');
-        const tickerKey = (form.ticker || "").toUpperCase();
-        const livePrice = tickerKey ? (getLivePrice(tickerKey)?.price ?? null) : null;
-
-        const result = await analyzeChart(dataURL, {
-          side: form.side,
-          livePrice,
+        const res = await fetch("/api/ocr", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: dataURL, side: sideAtUpload }),
+          signal: controller.signal,
         });
-
-        if (!result.success || (!result.ticker && !result.entry && !result.stop && !result.target)) {
-          setOcrStatus("failed");
+        clearTimeout(timer);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          setOcrStatus({ status: err.error === "config_error" ? "config_error" : "error", confidence: 0 });
           return;
         }
-
+        const result = await res.json();
+        // Never overwrite a field the trader already filled by hand.
         setForm(f => ({
           ...f,
-          ticker: f.ticker || result.ticker,
-          entry:  f.entry  || result.entry,
-          stop:   f.stop   || result.stop,
-          target: f.target || result.target,
+          ticker: f.ticker || result.ticker || f.ticker,
+          entry:  f.entry  || (result.entry  != null ? String(result.entry)  : f.entry),
+          stop:   f.stop   || (result.stop   != null ? String(result.stop)   : f.stop),
+          target: f.target || (result.target != null ? String(result.target) : f.target),
         }));
-        setOcrStatus("success");
-      } catch (err) {
-        console.error('Vision error:', err);
-        setOcrStatus("failed");
+        setOcrStatus({ status: "ok", confidence: result.confidence ?? 0 });
+      } catch {
+        clearTimeout(timer);
+        setOcrStatus({ status: "error", confidence: 0 });
       }
     };
     reader.readAsDataURL(file);
@@ -2073,6 +2078,7 @@ export default function SwingEdge() {
     const reader = new FileReader();
     reader.onload = async (ev) => {
       const dataURL = ev.target.result;
+      const sideAtUpload = analyzerOcrSide; // capture before async — avoids a stale side from an older closure
       setAnalyzerImage(file);
       setAnalyzerImagePreview(dataURL);
       setAnalyzerOcrResult({ status: "processing", confidence: 0 });
@@ -2083,7 +2089,7 @@ export default function SwingEdge() {
         const res = await fetch("/api/ocr", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: dataURL, side: analyzerOcrSide }),
+          body: JSON.stringify({ image: dataURL, side: sideAtUpload }),
           signal: controller.signal,
         });
         clearTimeout(timer);
@@ -5416,23 +5422,30 @@ export default function SwingEdge() {
                 </div>
               )}
 
-              {/* OCR status pill */}
-              {ocrStatus && (
-                <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-[11px] ${
-                  ocrStatus === "processing" ? "bg-cyan-500/5 border-cyan-500/20 text-cyan-300" :
-                  ocrStatus === "success" ? "bg-emerald-500/5 border-emerald-500/20 text-[#10b981]" :
-                  "bg-amber-500/5 border-amber-500/20 text-amber-400"
-                }`}>
-                  {ocrStatus === "processing" && <RefreshCw size={12} className="animate-spin" />}
-                  {ocrStatus === "success" && <CheckCircle size={12} />}
-                  {ocrStatus === "failed" && <AlertTriangle size={12} />}
-                  <span>{
-                    ocrStatus === "processing" ? t.ocrProcessing :
-                    ocrStatus === "success" ? t.ocrSuccess :
-                    t.ocrFailed
-                  }</span>
-                </div>
-              )}
+              {/* OCR confidence badge — graded, mirrors the Analyzer */}
+              {ocrStatus && (() => {
+                const { status, confidence } = ocrStatus;
+                const ok = status === "ok";
+                const high = ok && confidence >= 70;
+                const mid  = ok && confidence >= 40 && confidence < 70;
+                const tone =
+                  status === "processing" ? "bg-cyan-500/5 border-cyan-500/20 text-cyan-300" :
+                  high ? "bg-emerald-500/5 border-emerald-500/20 text-[#10b981]" :
+                  mid  ? "bg-amber-500/5 border-amber-500/20 text-amber-400" :
+                         "bg-[#ef4444]/5 border-[#ef4444]/20 text-[#ef4444]";
+                let icon, text;
+                if (status === "processing") { icon = <RefreshCw size={12} className="animate-spin" />; text = lang === "he" ? "קורא גרף…" : "Reading chart…"; }
+                else if (status === "config_error") { icon = <AlertTriangle size={12} />; text = lang === "he" ? "מפתח API חסר — פנה לאדמין" : "API key missing — contact admin"; }
+                else if (status === "error") { icon = <AlertTriangle size={12} />; text = lang === "he" ? "שגיאת OCR — נסה שוב" : "OCR failed — try again"; }
+                else if (high) { icon = <CheckCircle size={12} />; text = `OCR ✓ ${confidence}%`; }
+                else if (mid)  { icon = <CheckCircle size={12} />; text = `OCR ~ ${confidence}%`; }
+                else { icon = <AlertTriangle size={12} />; text = lang === "he" ? "לא זוהה — ודא ידנית" : "Not detected — verify manually"; }
+                return (
+                  <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-[11px] ${tone}`}>
+                    {icon}<span>{text}</span>
+                  </div>
+                );
+              })()}
                 </div>
               )}
 
