@@ -2059,9 +2059,9 @@ export default function SwingEdge() {
         setForm(f => ({
           ...f,
           ticker: f.ticker || result.ticker || f.ticker,
-          entry:  f.entry  || (result.entry  != null ? String(result.entry)  : f.entry),
-          stop:   f.stop   || (result.stop   != null ? String(result.stop)   : f.stop),
-          target: f.target || (result.target != null ? String(result.target) : f.target),
+          entry:  f.entry  || (result.entry  != null ? String(result.entry.toFixed(2))  : f.entry),
+          stop:   f.stop   || (result.stop   != null ? String(result.stop.toFixed(2))   : f.stop),
+          target: f.target || (result.target != null ? String(result.target.toFixed(2)) : f.target),
         }));
         setOcrStatus({ status: "ok", confidence: result.confidence ?? 0 });
       } catch {
@@ -2106,9 +2106,9 @@ export default function SwingEdge() {
         setAnalyzerForm(f => ({
           ...f,
           ticker: f.ticker || result.ticker || f.ticker,
-          entry:  f.entry  || (result.entry  != null ? String(result.entry)  : f.entry),
-          stop:   f.stop   || (result.stop   != null ? String(result.stop)   : f.stop),
-          target: f.target || (result.target != null ? String(result.target) : f.target),
+          entry:  f.entry  || (result.entry  != null ? String(result.entry.toFixed(2))  : f.entry),
+          stop:   f.stop   || (result.stop   != null ? String(result.stop.toFixed(2))   : f.stop),
+          target: f.target || (result.target != null ? String(result.target.toFixed(2)) : f.target),
         }));
         setAnalyzerOcrResult({ status: "ok", confidence: result.confidence ?? 0 });
       } catch {
