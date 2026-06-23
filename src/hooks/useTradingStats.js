@@ -135,7 +135,10 @@ export function useTradingStats(trades, capital, calcTradeMetrics) {
       // averages
       avgWin, avgLoss, avgR, bestWin, worstLoss, expectancyDollar,
 
-      // equity
+      // equity — CLOSED baseline only (single source for realized equity).
+      // Full Account Equity = currentEquity + live open P&L, assembled once at
+      // the consumer (SwingEdge_App curEquity); open P&L needs live prices,
+      // which are component state and must not enter this pure stats hub.
       currentEquity: capital + totalPnL,
       capital,
       returnPct: capital ? (totalPnL / capital) * 100 : 0,

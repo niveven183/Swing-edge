@@ -531,7 +531,7 @@ const exportTradesCSV = (trades) => {
 // Aggregates come from useTradingStats (single source): `stats` = all-time,
 // `monthStats` = same hook scoped to the current month. Per-trade rows/equity
 // points stay local (per-trade calcTradeMetrics is the canonical source).
-const exportMonthlyPDF = (trades, capital, stats, monthStats) => {
+const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity) => {
   const now = new Date();
   const monthName = now.toLocaleString("en-US", { month: "long" });
   const year = now.getFullYear();
@@ -549,7 +549,9 @@ const exportMonthlyPDF = (trades, capital, stats, monthStats) => {
   const winRate = stats.winRate.toFixed(1);
   const monthWinRate = monthStats.winRate.toFixed(1);
   const avgR = stats.avgR.toFixed(2);
-  const curEquity = stats.currentEquity;
+  // Unified full Account Equity (closed + live open P&L), passed from the
+  // component so the report matches the dashboard exactly.
+  const curEquity = accountEquity;
 
   // Build equity curve points from all closed trades
   let runBalance = capital;
@@ -1619,9 +1621,12 @@ export default function SwingEdge() {
     return { value, missingCount };
   }, [openTrades, getLivePrice]);
 
+  // Single source of truth for full Account Equity: realized closed equity
+  // (from the stats hub) + live open P&L. Every consumer — Header, StatCard,
+  // Footer, and the PDF export — reads this one value.
   const curEquity = useMemo(
-    () => capital + totalPnL + openPnL.value,
-    [capital, totalPnL, openPnL]
+    () => stats.currentEquity + openPnL.value,
+    [stats.currentEquity, openPnL]
   );
 
   // Daily P&L calculation
@@ -2433,7 +2438,7 @@ export default function SwingEdge() {
             {/* KPI Row */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               <StatCard label={t.accountEquity}  value={`$${curEquity.toLocaleString("en-US", {minimumFractionDigits:0})}`} sub={`${t.startedAt} $${capital.toLocaleString()}`} trend={totalPnL/capital*100} icon={DollarSign} accent="cyan" />
-              <StatCard label={t.netPnlClosed} value={fmt$(Math.round(totalPnL))} sub={`${closedTrades.length} ${t.closedTrades}`} trend={totalPnL/capital*100} icon={TrendingUp} accent={totalPnL >= 0 ? "green" : "red"} />
+              <StatCard label={t.netPnlClosed} value={fmt$(Math.round(totalPnL * 100) / 100)} sub={`${closedTrades.length} ${t.closedTrades}`} trend={totalPnL/capital*100} icon={TrendingUp} accent={totalPnL >= 0 ? "green" : "red"} />
               <StatCard label={<span className="flex items-center gap-1">{t.winRate}<TermTooltip term="winRate" lang={lang} /></span>} value={`${winRate.toFixed(1)}%`} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length}W / ${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)<0).length}L`} icon={Target} accent="purple" />
               <StatCard label={<span className="flex items-center gap-1">{t.avgRMultiple}<TermTooltip term="avgR" lang={lang} /></span>} value={fmtR(avgR)} sub={t.perClosedTrade} icon={Activity} accent="amber" />
               <StatCard label={t.dailyPnl} value={fmt$(Math.round(dailyPnL))} sub={t.todayTrades} icon={DollarSign} accent={dailyPnL >= 0 ? "green" : "red"} />
@@ -3802,7 +3807,7 @@ export default function SwingEdge() {
                   <h3 className="text-sm font-bold text-white flex items-center gap-1.5">Equity Curve<TermTooltip term="equityCurve" lang={lang} /></h3>
                   <p className="text-xs text-slate-600">Account balance over time · starting capital ${capital.toLocaleString()}</p>
                 </div>
-                <span className={`text-sm font-bold font-mono ${totalPnL>=0?"text-[#10b981]":"text-[#ef4444]"}`}>{fmt$(Math.round(totalPnL))}</span>
+                <span className={`text-sm font-bold font-mono ${totalPnL>=0?"text-[#10b981]":"text-[#ef4444]"}`}>{fmt$(Math.round(totalPnL * 100) / 100)}</span>
               </div>
               <ResponsiveContainer width="100%" height={280}>
                 <AreaChart data={equityCurve} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
@@ -5098,7 +5103,7 @@ export default function SwingEdge() {
                       {t.pdfIncludes}
                     </p>
                     <button
-                      onClick={() => exportMonthlyPDF(realTrades, capital, stats, monthStats)}
+                      onClick={() => exportMonthlyPDF(realTrades, capital, stats, monthStats, curEquity)}
                       className="w-full py-2 rounded-lg bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 text-xs font-bold hover:bg-cyan-500/20 transition flex items-center justify-center gap-1.5">
                       <FileText size={12} /> {t.createPdf}
                     </button>
