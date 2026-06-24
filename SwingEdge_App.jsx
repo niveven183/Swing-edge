@@ -5345,6 +5345,57 @@ export default function SwingEdge() {
                 </div>
               )}
 
+              {/* TradingView screenshot → OCR auto-fill (top-level, mirrors the Analyzer) */}
+              <div>
+                <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{t.imageFromTradingView}</label>
+                <label className="flex items-center gap-2 cursor-pointer w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-400 hover:border-cyan-500/30 hover:text-cyan-400 transition">
+                  <Eye size={12} />
+                  <span>{form.tradeImage ? form.tradeImage.name : t.uploadChart}</span>
+                  <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                </label>
+                <p className="text-[10px] text-slate-500 mt-1 leading-snug">{t.ocrTooltip}</p>
+                <p className="text-[9px] text-slate-600 mt-1 leading-snug">{lang === "he"
+                  ? "נשמר מקומית להפעלה זו בלבד — עדיין לא נשמר בענן."
+                  : "Saved locally for this session — not stored in the cloud yet."}</p>
+              </div>
+
+              {/* Image preview */}
+              {form.tradeImagePreview && (
+                <div className="relative rounded-lg overflow-hidden border border-white/10">
+                  <img src={form.tradeImagePreview} alt="Trade chart" className="w-full h-32 object-cover" />
+                  <button onClick={() => { setForm(f=>({...f,tradeImage:null,tradeImagePreview:null})); setOcrStatus(null); }}
+                    aria-label={lang === "he" ? "הסר תמונה" : "Remove image"}
+                    className="absolute top-1 right-1 rtl:right-auto rtl:left-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-slate-300 hover:text-white">
+                    <X size={10} />
+                  </button>
+                </div>
+              )}
+
+              {/* OCR confidence badge — graded, mirrors the Analyzer */}
+              {ocrStatus && (() => {
+                const { status, confidence } = ocrStatus;
+                const ok = status === "ok";
+                const high = ok && confidence >= 70;
+                const mid  = ok && confidence >= 40 && confidence < 70;
+                const tone =
+                  status === "processing" ? "bg-cyan-500/5 border-cyan-500/20 text-cyan-300" :
+                  high ? "bg-emerald-500/5 border-emerald-500/20 text-[#10b981]" :
+                  mid  ? "bg-amber-500/5 border-amber-500/20 text-amber-400" :
+                         "bg-[#ef4444]/5 border-[#ef4444]/20 text-[#ef4444]";
+                let icon, text;
+                if (status === "processing") { icon = <RefreshCw size={12} className="animate-spin" />; text = lang === "he" ? "קורא גרף…" : "Reading chart…"; }
+                else if (status === "config_error") { icon = <AlertTriangle size={12} />; text = lang === "he" ? "מפתח API חסר — פנה לאדמין" : "API key missing — contact admin"; }
+                else if (status === "error") { icon = <AlertTriangle size={12} />; text = lang === "he" ? "שגיאת OCR — נסה שוב" : "OCR failed — try again"; }
+                else if (high) { icon = <CheckCircle size={12} />; text = `OCR ✓ ${confidence}%`; }
+                else if (mid)  { icon = <CheckCircle size={12} />; text = `OCR ~ ${confidence}%`; }
+                else { icon = <AlertTriangle size={12} />; text = lang === "he" ? "לא זוהה — ודא ידנית" : "Not detected — verify manually"; }
+                return (
+                  <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-[11px] ${tone}`}>
+                    {icon}<span>{text}</span>
+                  </div>
+                );
+              })()}
+
               {/* ── Trade context (journaling metadata) — collapsed by default ── */}
               <button type="button" onClick={()=>setShowTradeContext(v=>!v)}
                 aria-expanded={showTradeContext}
@@ -5389,74 +5440,19 @@ export default function SwingEdge() {
                 </div>
               </div>
 
-              {/* Entry Quality (stars) + Trade Image */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Entry Quality</label>
-                  <div className="flex items-center gap-1 mt-1">
-                    {[1,2,3,4,5].map(star => (
-                      <button key={star} type="button" onClick={() => setForm(f=>({...f,entryQuality:star}))}
-                        className={`text-xl transition-transform hover:scale-110 ${form.entryQuality >= star ? "text-amber-400" : "text-slate-700"}`}>
-                        ★
-                      </button>
-                    ))}
-                    <span className="text-[10px] text-slate-600 ml-1">{form.entryQuality}/5</span>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">
-                    <span>{t.tradeImage}</span>
-                    <InfoTooltip label={t.tradeImage}>
-                      <div className="normal-case whitespace-pre-line">{t.ocrTooltip}</div>
-                    </InfoTooltip>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-400 hover:border-cyan-500/30 hover:text-cyan-400 transition">
-                    <Eye size={12} />
-                    <span>{form.tradeImage ? form.tradeImage.name : t.uploadChart}</span>
-                    <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-                  </label>
-                  <p className="text-[9px] text-slate-600 mt-1 leading-snug">{lang === "he"
-                    ? "נשמר מקומית להפעלה זו בלבד — עדיין לא נשמר בענן."
-                    : "Saved locally for this session — not stored in the cloud yet."}</p>
+              {/* Entry Quality (stars) */}
+              <div>
+                <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Entry Quality</label>
+                <div className="flex items-center gap-1 mt-1">
+                  {[1,2,3,4,5].map(star => (
+                    <button key={star} type="button" onClick={() => setForm(f=>({...f,entryQuality:star}))}
+                      className={`text-xl transition-transform hover:scale-110 ${form.entryQuality >= star ? "text-amber-400" : "text-slate-700"}`}>
+                      ★
+                    </button>
+                  ))}
+                  <span className="text-[10px] text-slate-600 ml-1">{form.entryQuality}/5</span>
                 </div>
               </div>
-
-              {/* Image preview */}
-              {form.tradeImagePreview && (
-                <div className="relative rounded-lg overflow-hidden border border-white/10">
-                  <img src={form.tradeImagePreview} alt="Trade chart" className="w-full h-32 object-cover" />
-                  <button onClick={() => { setForm(f=>({...f,tradeImage:null,tradeImagePreview:null})); setOcrStatus(null); }}
-                    aria-label={lang === "he" ? "הסר תמונה" : "Remove image"}
-                    className="absolute top-1 right-1 rtl:right-auto rtl:left-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-slate-300 hover:text-white">
-                    <X size={10} />
-                  </button>
-                </div>
-              )}
-
-              {/* OCR confidence badge — graded, mirrors the Analyzer */}
-              {ocrStatus && (() => {
-                const { status, confidence } = ocrStatus;
-                const ok = status === "ok";
-                const high = ok && confidence >= 70;
-                const mid  = ok && confidence >= 40 && confidence < 70;
-                const tone =
-                  status === "processing" ? "bg-cyan-500/5 border-cyan-500/20 text-cyan-300" :
-                  high ? "bg-emerald-500/5 border-emerald-500/20 text-[#10b981]" :
-                  mid  ? "bg-amber-500/5 border-amber-500/20 text-amber-400" :
-                         "bg-[#ef4444]/5 border-[#ef4444]/20 text-[#ef4444]";
-                let icon, text;
-                if (status === "processing") { icon = <RefreshCw size={12} className="animate-spin" />; text = lang === "he" ? "קורא גרף…" : "Reading chart…"; }
-                else if (status === "config_error") { icon = <AlertTriangle size={12} />; text = lang === "he" ? "מפתח API חסר — פנה לאדמין" : "API key missing — contact admin"; }
-                else if (status === "error") { icon = <AlertTriangle size={12} />; text = lang === "he" ? "שגיאת OCR — נסה שוב" : "OCR failed — try again"; }
-                else if (high) { icon = <CheckCircle size={12} />; text = `OCR ✓ ${confidence}%`; }
-                else if (mid)  { icon = <CheckCircle size={12} />; text = `OCR ~ ${confidence}%`; }
-                else { icon = <AlertTriangle size={12} />; text = lang === "he" ? "לא זוהה — ודא ידנית" : "Not detected — verify manually"; }
-                return (
-                  <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-[11px] ${tone}`}>
-                    {icon}<span>{text}</span>
-                  </div>
-                );
-              })()}
                 </div>
               )}
 
