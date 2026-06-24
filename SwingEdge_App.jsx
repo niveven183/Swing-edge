@@ -15,7 +15,7 @@ import ChangePasswordModal from "./src/components/ChangePasswordModal.jsx";
 import { useTheme } from "./src/contexts/ThemeContext.jsx";
 import TradingViewSearch from "./src/components/TradingViewSearch.jsx";
 import { TVTickerTape } from "./src/components/TradingViewWidgets.jsx";
-import { useToast, useConfirm, Tooltip as UiTooltip } from "./src/components/ToastProvider.jsx";
+import { useToast, useConfirm } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured, tradeForSupabase } from "./src/supabaseClient.js";
 import { calcTradeMetrics, fmt$, fmtR, qstars, priceBasedRR, inferSide, validateTradeInputs } from "./src/utils.js";
 import {
@@ -4415,28 +4415,34 @@ export default function SwingEdge() {
 
                 {/* ── Floating AI Trade Buttons ── */}
                 <div className="absolute bottom-4 right-4 rtl:right-auto rtl:left-4 z-10 flex flex-col gap-2">
-                  <button
-                    onClick={() => handleChartAiExtract("position")}
-                    disabled={chartAiLoading}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-xl backdrop-blur-md bg-gradient-to-r from-cyan-500/20 to-violet-500/20 border border-cyan-500/40 text-cyan-300 hover:from-cyan-500/30 hover:to-violet-500/30 hover:border-cyan-400/60 hover:text-white disabled:opacity-50"
-                  >
-                    {chartAiLoading && chartAiTarget === "position" ? (
-                      <><RefreshCw size={13} className="animate-spin" /> {t.calculating}</>
-                    ) : (
-                      <><Calculator size={13} /> {t.calculatePosition}</>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => handleChartAiExtract("journal")}
-                    disabled={chartAiLoading}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-xl backdrop-blur-md bg-gradient-to-r from-violet-500/20 to-rose-500/20 border border-violet-500/40 text-violet-300 hover:from-violet-500/30 hover:to-rose-500/30 hover:border-violet-400/60 hover:text-white disabled:opacity-50"
-                  >
-                    {chartAiLoading && chartAiTarget === "journal" ? (
-                      <><RefreshCw size={13} className="animate-spin" /> {t.processing}</>
-                    ) : (
-                      <><BookOpen size={13} /> {t.addToJournal}</>
-                    )}
-                  </button>
+                  <div className="flex items-center justify-end gap-1.5">
+                    <TermTooltip term="chartCalcPosition" lang={lang} />
+                    <button
+                      onClick={() => handleChartAiExtract("position")}
+                      disabled={chartAiLoading}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-xl backdrop-blur-md bg-gradient-to-r from-cyan-500/20 to-violet-500/20 border border-cyan-500/40 text-cyan-300 hover:from-cyan-500/30 hover:to-violet-500/30 hover:border-cyan-400/60 hover:text-white disabled:opacity-50"
+                    >
+                      {chartAiLoading && chartAiTarget === "position" ? (
+                        <><RefreshCw size={13} className="animate-spin" /> {t.calculating}</>
+                      ) : (
+                        <><Calculator size={13} /> {t.calculatePosition}</>
+                      )}
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-end gap-1.5">
+                    <TermTooltip term="chartAddToJournal" lang={lang} />
+                    <button
+                      onClick={() => handleChartAiExtract("journal")}
+                      disabled={chartAiLoading}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-xl backdrop-blur-md bg-gradient-to-r from-violet-500/20 to-rose-500/20 border border-violet-500/40 text-violet-300 hover:from-violet-500/30 hover:to-rose-500/30 hover:border-violet-400/60 hover:text-white disabled:opacity-50"
+                    >
+                      {chartAiLoading && chartAiTarget === "journal" ? (
+                        <><RefreshCw size={13} className="animate-spin" /> {t.processing}</>
+                      ) : (
+                        <><BookOpen size={13} /> {t.addToJournal}</>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -5400,9 +5406,9 @@ export default function SwingEdge() {
                 <div>
                   <label className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">
                     <span>{t.tradeImage}</span>
-                    <UiTooltip label={t.ocrTooltip} position="top">
-                      <HelpCircle size={11} className="text-slate-500 hover:text-cyan-400 cursor-help" />
-                    </UiTooltip>
+                    <InfoTooltip label={t.tradeImage}>
+                      <div className="normal-case whitespace-pre-line">{t.ocrTooltip}</div>
+                    </InfoTooltip>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-400 hover:border-cyan-500/30 hover:text-cyan-400 transition">
                     <Eye size={12} />

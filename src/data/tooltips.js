@@ -101,6 +101,18 @@ export const TRADING_TOOLTIPS = {
     he: "R-Multiple = (יציאה − כניסה) ÷ סיכון ראשוני\n\nדוגמאות:\n+2R = הרווחת פי 2 ממה שסיכנת ✓\n+1R = הרווחת בדיוק מה שסיכנת ✓\n-1R = הפסדת את הסיכון המתוכנן (נורמלי)\n-2R = הסטופ לא כובד (בעיה)\n\nמעקב אחר R-Multiple מסיר הטיית דולר ומאפשר השוואה אובייקטיבית בין עסקאות."
   },
 
+  // ── Market Intel chart actions (he+en) ───────────────────────────────────
+
+  chartCalcPosition: {
+    en: "Auto-fills the Position Calculator from the current chart — ticker, live price as entry, a protective stop and a 2:1 target — then opens it so you can size the trade in one click.",
+    he: "ממלא אוטומטית את מחשבון הפוזיציה מהגרף הנוכחי — טיקר, מחיר חי ככניסה, סטופ מגן ויעד 2:1 — ופותח אותו כדי לחשב גודל עסקה בלחיצה אחת."
+  },
+
+  chartAddToJournal: {
+    en: "Starts a new journal trade from the current chart — ticker, live price, a suggested stop and a 2:1 target pre-filled — ready for you to review and save.",
+    he: "פותח עסקה חדשה ביומן מהגרף הנוכחי — טיקר, מחיר חי, סטופ מוצע ויעד 2:1 ממולאים מראש — מוכן לבדיקה ושמירה."
+  },
+
   // ── Setup names (preserved from original) ────────────────────────────────
 
   breakout: {
@@ -244,6 +256,9 @@ export const TERM_LABELS = {
   positionSize: { en: "Position Size",   he: "גודל פוזיציה" },
   stopLoss:     { en: "Stop Loss",       he: "סטופ לוס" },
   takeProfit:   { en: "Take Profit",     he: "Take Profit" },
+  // Market Intel chart actions
+  chartCalcPosition: { en: "Calculate Position", he: "חשב פוזיציה" },
+  chartAddToJournal: { en: "Add to Journal",     he: "הוסף ליומן" },
   // Setups
   breakout:           { en: "Breakout",            he: "Breakout" },
   pullback:           { en: "Pullback",            he: "Pullback" },

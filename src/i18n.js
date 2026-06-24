@@ -999,6 +999,10 @@ const es = {
   sort: "Ordenar",
   error: "Error",
   loadingSwingEdge: "Cargando SwingEdge…",
+  calculatePosition: "Calcular Posición",
+  addToJournal: "Añadir al Diario",
+  calculating: "Calculando…",
+  processing: "Procesando…",
 };
 
 const pt = {
@@ -1308,6 +1312,10 @@ const pt = {
   sort: "Ordenar",
   error: "Erro",
   loadingSwingEdge: "Carregando SwingEdge…",
+  calculatePosition: "Calcular Posição",
+  addToJournal: "Adicionar ao Diário",
+  calculating: "Calculando…",
+  processing: "Processando…",
 };
 
 const ar = {
@@ -1617,6 +1625,10 @@ const ar = {
   sort: "ترتيب",
   error: "خطأ",
   loadingSwingEdge: "جاري تحميل SwingEdge…",
+  calculatePosition: "احسب الحجم",
+  addToJournal: "أضف إلى المجلة",
+  calculating: "جارٍ الحساب…",
+  processing: "جارٍ المعالجة…",
 };
 
 const translations = { en, he, es, pt, ar };

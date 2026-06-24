@@ -127,6 +127,7 @@ export default function InfoTooltip({ children, label = 'More info', side = 'aut
             zIndex: 9999,
           }}
           className="
+            normal-case
             bg-white dark:bg-slate-900
             rounded-xl
             border border-slate-200 dark:border-white/[0.08]
