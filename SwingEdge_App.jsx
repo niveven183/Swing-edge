@@ -5604,7 +5604,7 @@ export default function SwingEdge() {
       )}
 
       {/* ── HELP MODAL ── */}
-      {showHelpModal && <HelpModal onClose={() => setShowHelpModal(false)} />}
+      {showHelpModal && <HelpModal onClose={() => setShowHelpModal(false)} t={t} demoCount={DEMO_TRADES.length} />}
 
       {/* ── PRIVACY MODAL ── */}
       {showPrivacyModal && <PrivacyModal onClose={() => setShowPrivacyModal(false)} />}

@@ -345,6 +345,22 @@ const en = {
   calculatePosition: "Calculate Position",
   processing: "Processing…",
   addToJournal: "Add to Journal",
+  // Help & Documentation modal
+  helpTitle: "Help & Documentation",
+  helpQuickStartLabel: "Quick start:",
+  helpQuickStartPre: "Press",
+  helpQuickStartPost: "to open the new-trade form.",
+  helpRiskLabel: "Risk:",
+  helpRisk: "SwingEdge sizes positions at 1% portfolio risk. Update your capital in Settings.",
+  helpDemoLabel: "Demo data:",
+  helpDemo: "Settings → \"Load Demo Trades\" loads {n} realistic trades for testing.",
+  helpLiveLabel: "Live data:",
+  helpLive: "Header tape and charts use TradingView feeds (24/7 incl. pre/post-market).",
+  helpTipTitle: "Tip: Enable \"Always show stats\"",
+  helpTipBody: "Double-click the tool → Display → check ✅ \"Always show stats\".",
+  helpBugReportPre: "For bug reports, use the",
+  helpBugReportLink: "Send Feedback",
+  helpBugReportPost: "menu item.",
 };
 
 const he = {
@@ -690,6 +706,22 @@ const he = {
   calculatePosition: "חשב פוזיציה",
   processing: "מעבד…",
   addToJournal: "הוסף ליומן",
+  // Help & Documentation modal
+  helpTitle: "עזרה ותיעוד",
+  helpQuickStartLabel: "התחלה מהירה:",
+  helpQuickStartPre: "הקש",
+  helpQuickStartPost: "לפתיחת טופס עסקה חדשה.",
+  helpRiskLabel: "סיכון:",
+  helpRisk: "SwingEdge מחשב גודל פוזיציה לפי 1% סיכון מהתיק. עדכן את ההון בהגדרות.",
+  helpDemoLabel: "נתוני דמו:",
+  helpDemo: "הגדרות → \"טען עסקאות לדוגמה\" טוען {n} עסקאות מציאותיות לבדיקה.",
+  helpLiveLabel: "נתונים חיים:",
+  helpLive: "סרט הכותרת והגרפים מבוססים על נתוני TradingView (24/7, כולל לפני/אחרי המסחר).",
+  helpTipTitle: "טיפ: הפעל \"Always show stats\"",
+  helpTipBody: "לחץ פעמיים על הכלי → Display → סמן ✅ \"Always show stats\".",
+  helpBugReportPre: "לדיווח על באגים, השתמש ב־",
+  helpBugReportLink: "שלח משוב",
+  helpBugReportPost: "בתפריט.",
 };
 
 const es = {
