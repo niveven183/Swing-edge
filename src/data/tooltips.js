@@ -76,6 +76,11 @@ export const TRADING_TOOLTIPS = {
     he: "סיכון מקסימלי לעסקה כאחוז מהחשבון הכולל.\n\nסטנדרט מקצועי:\n• 1% לעסקה = שמרני, בר-קיימא\n• 2% לעסקה = מתון, עדיין מקובל\n• 5%+ לעסקה = טריטוריית הימור\n\n'סיכון פשיטת רגל' עולה באופן מעריכי מעל 2% לעסקה."
   },
 
+  riskLimits: {
+    en: "Two separate limits work together:\n\n• Risk/Trade (1%) — the most you risk on a single position.\n• Max Allowed Risk (3%) — the most you risk across ALL open positions combined.\n\nSo you can hold roughly 3 full-size trades at once before hitting your portfolio risk cap.",
+    he: "שתי תקרות נפרדות שעובדות יחד:\n\n• סיכון/עסקה (1%) — המקסימום שאתה מסכן בפוזיציה בודדת.\n• מקסימום סיכון מותר (3%) — המקסימום שאתה מסכן בכל הפוזיציות הפתוחות יחד.\n\nכלומר אפשר להחזיק בערך 3 עסקאות בגודל מלא בו-זמנית לפני שמגיעים לתקרת הסיכון של התיק."
+  },
+
   positionSize: {
     en: "Position Size = (Account Size × Risk %) ÷ (Entry − Stop Loss)\n\nExample: $10,000 account, 1% risk, $100 entry, $97 stop:\nPosition = $100 ÷ $3 = 33 shares\n\nAlways calculate before entry. Never size by feel.",
     he: "גודל פוזיציה = (גודל חשבון × % סיכון) ÷ (כניסה − סטופ לוס)\n\nדוגמה: חשבון $10,000, סיכון 1%, כניסה $100, סטופ $97:\nפוזיציה = $100 ÷ $3 = 33 מניות\n\nתמיד חשב לפני כניסה. לעולם אל תסיז לפי תחושה."
@@ -235,6 +240,7 @@ export const TERM_LABELS = {
   discipline:   { en: "Discipline",      he: "משמעת" },
   // Risk
   riskPerTrade: { en: "Risk per Trade",  he: "סיכון לעסקה" },
+  riskLimits:   { en: "Risk Limits",     he: "תקרות סיכון" },
   positionSize: { en: "Position Size",   he: "גודל פוזיציה" },
   stopLoss:     { en: "Stop Loss",       he: "סטופ לוס" },
   takeProfit:   { en: "Take Profit",     he: "Take Profit" },

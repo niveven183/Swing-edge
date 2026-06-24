@@ -2717,7 +2717,7 @@ export default function SwingEdge() {
 
                     {/* Max allowed risk */}
                     <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
-                      <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 block mb-1">{t.maxAllowedRisk}</span>
+                      <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mb-1 flex items-center gap-1">{t.maxAllowedRisk}<TermTooltip term="riskLimits" lang={lang} /></span>
                       <span className="text-2xl font-bold font-mono text-violet-400">{MAX_RISK_PCT.toFixed(1)}%</span>
                       <span className="text-xs text-slate-500 block mt-0.5 font-mono">${maxRiskDollar.toFixed(2)}</span>
                       <span className="text-[10px] text-slate-600 mt-1 block">{t.fromCapital} ${capital.toLocaleString()}</span>
@@ -3611,7 +3611,7 @@ export default function SwingEdge() {
             <div className="space-y-5 animate-fade-in max-w-2xl mx-auto">
               <div>
                 <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Calculator size={15} className="text-cyan-400" /> {t.positionCalculator}
+                  <Calculator size={15} className="text-cyan-400" /> {t.positionCalculator}<TermTooltip term="positionSize" lang={lang} />
                 </h2>
                 <p className="text-xs text-slate-600 mt-0.5">{t.posCalcSubtitle}</p>
               </div>
@@ -3674,7 +3674,7 @@ export default function SwingEdge() {
                   </div>
                   <div>
                     <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1 flex items-center gap-1">
-                      <Percent size={10} /> {t.riskPercent}
+                      <Percent size={10} /> {t.riskPercent}<TermTooltip term="riskPerTrade" lang={lang} />
                     </label>
                     <input
                       value={posCalc.risk}
@@ -5640,7 +5640,7 @@ export default function SwingEdge() {
               </span>
             );
           })()}
-          <span>{t.capital}: ${curEquity.toLocaleString("en-US", {minimumFractionDigits: 2})}</span>
+          <span>{t.accountEquity}: ${curEquity.toLocaleString("en-US", {minimumFractionDigits: 2})}</span>
           <span>{t.riskPerTradeFooter}</span>
         </div>
         <div className="flex items-center gap-4">
