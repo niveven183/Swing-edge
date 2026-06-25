@@ -6,6 +6,7 @@ import HelpModal from "./src/components/HelpModal.jsx";
 import PrivacyModal from "./src/components/PrivacyModal.jsx";
 import BillingModal from "./src/components/BillingModal.jsx";
 import BetaWelcome from "./src/components/BetaWelcome.jsx";
+import OnboardingTour from "./src/components/OnboardingTour.jsx";
 import FeedbackTab from "./src/components/FeedbackTab.jsx";
 import IOSInstallBanner from "./src/components/IOSInstallBanner.jsx";
 import AdminPanel from "./src/components/AdminPanel.jsx";
@@ -940,6 +941,18 @@ const NAV_KEYS = [
   { id: "feedback",  key: "feedback",       icon: MessageCircle },
 ];
 
+// ─── ONBOARDING TOUR STEPS (wave 3a) ───────────────────────────────────────────
+// All anchors live on the dashboard / always-visible nav, so the tour runs without
+// driving the UI into modals. Tilt Shield has no anchor (it only renders during an
+// active tilt) — an anchorless centered bubble explains the concept instead.
+const buildTourSteps = (t) => [
+  { anchor: '[data-tour="main-nav"]',    title: t.tourNavTitle,   body: t.tourNavBody },
+  { anchor: '[data-tour="trading-dna"]', title: t.tourDnaTitle,   body: t.tourDnaBody },
+  { anchor: null,                        title: t.tourTiltTitle,  body: t.tourTiltBody },
+  { anchor: '[data-tour-tab="journal"]', title: t.tourCoachTitle, body: t.tourCoachBody },
+  { anchor: '[data-tour-tab="journal"]', title: t.tourOcrTitle,   body: t.tourOcrBody },
+];
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function SwingEdge() {
   const [showOnboarding, setShowOnboarding] = useState(() => {
@@ -1008,10 +1021,26 @@ export default function SwingEdge() {
     } catch {}
   }, [authUser?.id]);
 
+  // Guided tour — runs once, right after BetaWelcome is dismissed (wave 3a).
+  // Default false so plain reloads and existing users never auto-trigger; only
+  // dismissBetaWelcome (brand-new flow) or a manual Help launch sets it true.
+  const [showTour, setShowTour] = useState(false);
+  const completeTour = useCallback(() => {
+    try { localStorage.setItem("swingEdgeTourDone", "1"); } catch {}
+    setShowTour(false);
+  }, []);
+  const startTour = useCallback(() => {
+    setTab("dashboard");
+    setShowTour(true);
+  }, []);
+
   const dismissBetaWelcome = useCallback(() => {
     if (!authUser) return;
     try { localStorage.setItem(`swingEdgeBetaWelcome:${authUser.id}`, "1"); } catch {}
     setShowBetaWelcome(false);
+    try {
+      if (!localStorage.getItem("swingEdgeTourDone")) { setTab("dashboard"); setShowTour(true); }
+    } catch {}
   }, [authUser?.id]);
 
   const [capital, setCapital] = useState(() => {
@@ -2254,6 +2283,11 @@ export default function SwingEdge() {
         />
       )}
 
+      {/* ── GUIDED TOUR (once, after BetaWelcome — wave 3a) ── */}
+      {showTour && (
+        <OnboardingTour steps={buildTourSteps(t)} onClose={completeTour} t={t} isRTL={isRTL} />
+      )}
+
       {/* ── iOS INSTALL BANNER ── */}
       <IOSInstallBanner />
 
@@ -2400,9 +2434,9 @@ export default function SwingEdge() {
       <TVTickerTape />
 
       {/* ── NAV ── */}
-      <nav className="flex items-center gap-0 px-5 border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-[var(--bg-elevated)] overflow-x-auto">
+      <nav data-tour="main-nav" className="flex items-center gap-0 px-5 border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-[var(--bg-elevated)] overflow-x-auto">
         {NAV_KEYS.map(({ id, key, icon: Icon }) => (
-          <button key={id} onClick={() => setTab(id)}
+          <button key={id} data-tour-tab={id} onClick={() => setTab(id)}
             className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold tracking-wide transition-all whitespace-nowrap border-b-2
               ${tab === id
                 ? "text-white border-cyan-400"
@@ -2464,7 +2498,7 @@ export default function SwingEdge() {
               />
             )}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <DNACard dna={aiDNA} lang={lang} />
+              <div data-tour="trading-dna"><DNACard dna={aiDNA} lang={lang} /></div>
               <GrowthChart
                 evolution={aiEvolution}
                 current={aiGrowth.total}
@@ -5604,7 +5638,7 @@ export default function SwingEdge() {
       )}
 
       {/* ── HELP MODAL ── */}
-      {showHelpModal && <HelpModal onClose={() => setShowHelpModal(false)} t={t} demoCount={DEMO_TRADES.length} />}
+      {showHelpModal && <HelpModal onClose={() => setShowHelpModal(false)} onStartTour={() => { setShowHelpModal(false); startTour(); }} t={t} demoCount={DEMO_TRADES.length} />}
 
       {/* ── PRIVACY MODAL ── */}
       {showPrivacyModal && <PrivacyModal onClose={() => setShowPrivacyModal(false)} />}

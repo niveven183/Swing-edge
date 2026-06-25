@@ -361,6 +361,23 @@ const en = {
   helpBugReportPre: "For bug reports, use the",
   helpBugReportLink: "Send Feedback",
   helpBugReportPost: "menu item.",
+
+  // ── Onboarding tour (wave 3a) ──
+  tourNext: "Next",
+  tourBack: "Back",
+  tourDone: "Got it",
+  tourSkip: "Skip",
+  tourLaunch: "Take the quick tour",
+  tourNavTitle: "Main navigation",
+  tourNavBody: "These tabs move you between sections: Dashboard, Journal, Tools, Analytics, Market Intel and Feedback.",
+  tourDnaTitle: "Your Trading DNA",
+  tourDnaBody: "Your statistical fingerprint — win rate, R-multiple and discipline. It sharpens as you log more trades.",
+  tourTiltTitle: "Tilt Shield",
+  tourTiltBody: "When risky emotional patterns appear (revenge or over-trading), the Shield surfaces here on the dashboard and offers a cooldown.",
+  tourCoachTitle: "Journal & Decision Coach",
+  tourCoachBody: "Log trades from the Journal tab. As you enter a setup, the Decision Coach scores it against your edge.",
+  tourOcrTitle: "Screenshot upload (OCR)",
+  tourOcrBody: "Inside \"Log New Trade\" you can upload a TradingView screenshot and OCR auto-fills the prices for you.",
 };
 
 const he = {
@@ -722,6 +739,23 @@ const he = {
   helpBugReportPre: "לדיווח על באגים, השתמש ב־",
   helpBugReportLink: "שלח משוב",
   helpBugReportPost: "בתפריט.",
+
+  // ── Onboarding tour (wave 3a) ──
+  tourNext: "הבא",
+  tourBack: "הקודם",
+  tourDone: "הבנתי",
+  tourSkip: "דלג",
+  tourLaunch: "התחל סיור מהיר",
+  tourNavTitle: "ניווט ראשי",
+  tourNavBody: "הטאבים האלה מעבירים אותך בין החלקים: דשבורד, יומן, כלים, אנליטיקה, מודיעין שוק ומשוב.",
+  tourDnaTitle: "ה‑DNA המסחרי שלך",
+  tourDnaBody: "טביעת האצבע הסטטיסטית שלך — אחוז הצלחה, יחס R ומשמעת. מתחדד ככל שאתה מתעד יותר עסקאות.",
+  tourTiltTitle: "מגן הטילט",
+  tourTiltBody: "כשמזוהות תבניות רגשיות מסוכנות (מסחר נקמה או מסחר יתר), המגן מופיע כאן בדשבורד ומציע הפסקת צינון.",
+  tourCoachTitle: "יומן ומאמן ההחלטות",
+  tourCoachBody: "מתעדים עסקאות מטאב היומן. תוך כדי הזנת הסטאפ, מאמן ההחלטות מנקד אותו מול ה‑Edge שלך.",
+  tourOcrTitle: "העלאת צילום (OCR)",
+  tourOcrBody: "בתוך \"תיעוד עסקה חדשה\" אפשר להעלות צילום מ‑TradingView וה‑OCR ימלא עבורך את המחירים אוטומטית.",
 };
 
 const es = {

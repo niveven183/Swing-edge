@@ -1,5 +1,5 @@
-import { HelpCircle, X } from "lucide-react";
-export default function HelpModal({ onClose, t, demoCount }) {
+import { HelpCircle, X, Compass } from "lucide-react";
+export default function HelpModal({ onClose, onStartTour, t, demoCount }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" role="presentation" onClick={onClose}>
       <button type="button" className="bg-[#131a2c] border border-[var(--border-subtle)] dark:border-white/[0.08] rounded-2xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
@@ -23,6 +23,16 @@ export default function HelpModal({ onClose, t, demoCount }) {
             </div>
           </div>
           <p className="pt-2 text-xs text-slate-500">{t.helpBugReportPre} <span className="text-violet-400">{t.helpBugReportLink}</span> {t.helpBugReportPost}</p>
+          {onStartTour && (
+            <button
+              type="button"
+              onClick={onStartTour}
+              className="mt-1 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-600 hover:from-cyan-400 hover:to-violet-500 text-white font-semibold text-sm py-2.5 transition"
+            >
+              <Compass size={15} />
+              {t.tourLaunch}
+            </button>
+          )}
         </div>
       </button>
     </div>
