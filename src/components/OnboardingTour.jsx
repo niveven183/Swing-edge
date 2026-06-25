@@ -99,7 +99,7 @@ export default function OnboardingTour({ steps = [], onClose, t, isRTL }) {
       {rect ? (
         <div className="rounded-xl ring-2 ring-cyan-400 pointer-events-none transition-all duration-200" style={spotStyle} />
       ) : (
-        <div className="absolute inset-0 bg-[#030712]/72 pointer-events-none" />
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "rgba(3,7,18,0.72)" }} />
       )}
 
       {/* Bubble */}
