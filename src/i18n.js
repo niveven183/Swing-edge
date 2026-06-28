@@ -1069,6 +1069,23 @@ const es = {
   addToJournal: "Añadir al Diario",
   calculating: "Calculando…",
   processing: "Procesando…",
+
+  // ── Onboarding tour (wave 3b) ──
+  tourNext: "Siguiente",
+  tourBack: "Atrás",
+  tourDone: "Entendido",
+  tourSkip: "Omitir",
+  tourLaunch: "Hacer el tour rápido",
+  tourNavTitle: "Navegación principal",
+  tourNavBody: "Estas pestañas te mueven entre secciones: Panel de Control, Diario de Trading, Herramientas, Análisis, Inteligencia de Mercado y Comentarios.",
+  tourDnaTitle: "Tu DNA de Trading",
+  tourDnaBody: "Tu huella estadística — tasa de aciertos, Múltiplo R y disciplina. Se afina a medida que registras más operaciones.",
+  tourTiltTitle: "Escudo Anti-Tilt",
+  tourTiltBody: "Cuando aparecen patrones emocionales de riesgo (trading de venganza o sobreoperar), el Escudo surge aquí en el Panel de Control y te ofrece una pausa de enfriamiento.",
+  tourCoachTitle: "Diario de Trading y Coach de Decisiones",
+  tourCoachBody: "Registra operaciones desde la pestaña Diario de Trading. Mientras ingresas un setup, el Coach de Decisiones lo evalúa frente a tu ventaja.",
+  tourOcrTitle: "Subir captura (OCR)",
+  tourOcrBody: "Dentro de \"Registrar Nueva Operación\" puedes subir una captura de TradingView y el OCR auto-completa los precios por ti.",
 };
 
 const pt = {
@@ -1382,6 +1399,23 @@ const pt = {
   addToJournal: "Adicionar ao Diário",
   calculating: "Calculando…",
   processing: "Processando…",
+
+  // ── Onboarding tour (wave 3b) ──
+  tourNext: "Próximo",
+  tourBack: "Voltar",
+  tourDone: "Entendi",
+  tourSkip: "Pular",
+  tourLaunch: "Fazer o tour rápido",
+  tourNavTitle: "Navegação principal",
+  tourNavBody: "Estas abas levam você entre as seções: Painel, Diário de Trading, Ferramentas, Análises, Inteligência de Mercado e Feedback.",
+  tourDnaTitle: "Seu DNA de Trading",
+  tourDnaBody: "Sua impressão digital estatística — taxa de acertos, Múltiplo R e disciplina. Fica mais precisa conforme você registra mais operações.",
+  tourTiltTitle: "Escudo Anti-Tilt",
+  tourTiltBody: "Quando surgem padrões emocionais de risco (trading de vingança ou operar demais), o Escudo aparece aqui no Painel e oferece uma pausa para esfriar.",
+  tourCoachTitle: "Diário de Trading e Coach de Decisões",
+  tourCoachBody: "Registre operações na aba Diário de Trading. Enquanto você insere um setup, o Coach de Decisões o avalia em relação à sua vantagem.",
+  tourOcrTitle: "Enviar captura (OCR)",
+  tourOcrBody: "Dentro de \"Registrar Nova Operação\" você pode enviar uma captura do TradingView e o OCR preenche os preços automaticamente para você.",
 };
 
 const ar = {
@@ -1695,6 +1729,23 @@ const ar = {
   addToJournal: "أضف إلى المجلة",
   calculating: "جارٍ الحساب…",
   processing: "جارٍ المعالجة…",
+
+  // ── Onboarding tour (wave 3b) ──
+  tourNext: "التالي",
+  tourBack: "السابق",
+  tourDone: "فهمت",
+  tourSkip: "تخطّي",
+  tourLaunch: "ابدأ الجولة السريعة",
+  tourNavTitle: "التنقّل الرئيسي",
+  tourNavBody: "هذه التبويبات تنقلك بين الأقسام: لوحة التحكم، مجلة التداول، الأدوات، التحليلات، ذكاء السوق، والملاحظات.",
+  tourDnaTitle: "بصمتك التداولية (DNA)",
+  tourDnaBody: "بصمتك الإحصائية — نسبة النجاح، مضاعف R، والانضباط. تزداد دقّتها كلما سجّلت المزيد من الصفقات.",
+  tourTiltTitle: "درع التيلت",
+  tourTiltBody: "عند ظهور أنماط عاطفية خطرة (تداول انتقامي أو الإفراط في التداول)، يظهر الدرع هنا في لوحة التحكم ويقترح فترة تهدئة.",
+  tourCoachTitle: "مجلة التداول ومدرب القرارات",
+  tourCoachBody: "سجّل صفقاتك من تبويب مجلة التداول. وأثناء إدخالك للإعداد، يقيّمه مدرب القرارات مقابل ميزتك.",
+  tourOcrTitle: "رفع لقطة شاشة (OCR)",
+  tourOcrBody: "داخل \"تسجيل صفقة جديدة\" يمكنك رفع لقطة شاشة من TradingView وسيملأ الـ OCR الأسعار تلقائياً نيابةً عنك.",
 };
 
 const translations = { en, he, es, pt, ar };

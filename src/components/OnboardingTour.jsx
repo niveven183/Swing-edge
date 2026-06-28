@@ -13,9 +13,19 @@ const SPOT_PAD = 8;
 export default function OnboardingTour({ steps = [], onClose, t, isRTL }) {
   const [i, setI] = useState(0);
   const [rect, setRect] = useState(null);
+  const [vp, setVp] = useState(() => ({
+    w: typeof window !== "undefined" ? window.innerWidth : 1280,
+    h: typeof window !== "undefined" ? window.innerHeight : 800,
+  }));
   const total = steps.length;
   const step = steps[i];
   const anchor = step?.anchor || null;
+
+  // Respect the OS "reduce motion" setting: skip smooth scroll + spotlight transition.
+  const reduceMotion =
+    typeof window !== "undefined" && window.matchMedia
+      ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      : false;
 
   const recompute = useCallback(() => {
     if (!anchor) { setRect(null); return; }
@@ -28,20 +38,23 @@ export default function OnboardingTour({ steps = [], onClose, t, isRTL }) {
   // On step change: bring the anchor into view, then measure (after smooth scroll).
   useLayoutEffect(() => {
     const el = anchor ? document.querySelector(anchor) : null;
-    if (el) { try { el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" }); } catch {} }
+    if (el) { try { el.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center", inline: "center" }); } catch {} }
     recompute();
     const id = setTimeout(recompute, 340);
     return () => clearTimeout(id);
   }, [i, anchor, recompute]);
 
   // Keep the bubble glued to the anchor while the page scrolls/resizes.
+  // On resize we also refresh the viewport so the anchorless (centered) bubble
+  // re-centers — recompute() alone bails out (setRect(null) is a no-op) for it.
   useEffect(() => {
-    const onWin = () => recompute();
-    window.addEventListener("resize", onWin);
-    window.addEventListener("scroll", onWin, true); // capture: catches inner scroll containers too
+    const onResize = () => { setVp({ w: window.innerWidth, h: window.innerHeight }); recompute(); };
+    const onScroll = () => recompute();
+    window.addEventListener("resize", onResize);
+    window.addEventListener("scroll", onScroll, true); // capture: catches inner scroll containers too
     return () => {
-      window.removeEventListener("resize", onWin);
-      window.removeEventListener("scroll", onWin, true);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("scroll", onScroll, true);
     };
   }, [recompute]);
 
@@ -58,8 +71,8 @@ export default function OnboardingTour({ steps = [], onClose, t, isRTL }) {
   const next = () => (last ? onClose?.() : setI(v => Math.min(v + 1, total - 1)));
   const back = () => setI(v => Math.max(v - 1, 0));
 
-  const vw = typeof window !== "undefined" ? window.innerWidth : 1280;
-  const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+  const vw = vp.w;
+  const vh = vp.h;
 
   let spotStyle = null;
   let bubbleStyle;
@@ -97,7 +110,7 @@ export default function OnboardingTour({ steps = [], onClose, t, isRTL }) {
 
       {/* Dim: spotlight box-shadow when anchored, full screen otherwise */}
       {rect ? (
-        <div className="rounded-xl ring-2 ring-cyan-400 pointer-events-none transition-all duration-200" style={spotStyle} />
+        <div className={`rounded-xl ring-2 ring-cyan-400 pointer-events-none${reduceMotion ? "" : " transition-all duration-200"}`} style={spotStyle} />
       ) : (
         <div className="absolute inset-0 pointer-events-none" style={{ background: "rgba(3,7,18,0.72)" }} />
       )}
