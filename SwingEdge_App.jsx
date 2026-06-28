@@ -45,7 +45,7 @@ import {
 import { POPULAR_TICKERS as STATIC_TICKERS, getTickerMeta, searchTickers as searchStaticTickers } from "./src/data/tickers.js";
 import { SwingEdgeAI } from "./src/intelligence/SwingEdgeAI.js";
 import {
-  DNACard, EdgeCard, DecisionCoachPanel, TiltShield, GrowthChart, RegimeIndicator,
+  DNACard, EdgeCard, DecisionCoachPanel, TiltShield, GrowthChart, RegimeIndicator, PatternTags,
 } from "./src/intelligence/ui/IntelligenceUI.jsx";
 import { useTradingStats } from "./src/hooks/useTradingStats.js";
 import InfoTooltip from "./src/components/ui/InfoTooltip.jsx";
@@ -2533,7 +2533,7 @@ export default function SwingEdge() {
                     {stats.topEdges.map((edge, i) => (
                       <div key={edge.name || i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                         <div>
-                          <div className="text-white font-semibold text-sm">{edge.name}</div>
+                          <PatternTags parts={[{ dim: "setup", value: edge.setup }, { dim: "emotion", value: edge.emotion }]} />
                           <div className="text-slate-400 text-xs">{edge.count} {t.trades}</div>
                         </div>
                         <div className="text-right">
@@ -2550,7 +2550,7 @@ export default function SwingEdge() {
                     {stats.antiEdges.map((edge, i) => (
                       <div key={edge.name || i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                         <div>
-                          <div className="text-white font-semibold text-sm">{edge.name}</div>
+                          <PatternTags parts={[{ dim: "setup", value: edge.setup }, { dim: "emotion", value: edge.emotion }]} />
                           <div className="text-slate-400 text-xs">{edge.count} {t.trades}</div>
                         </div>
                         <div className="text-right">
@@ -4055,7 +4055,7 @@ export default function SwingEdge() {
                     {stats.topEdges.map((edge, i) => (
                       <div key={edge.name || i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                         <div>
-                          <div className="text-white font-semibold text-sm">{edge.name}</div>
+                          <PatternTags parts={[{ dim: "setup", value: edge.setup }, { dim: "emotion", value: edge.emotion }]} />
                           <div className="text-slate-400 text-xs">{edge.count} {t.trades}</div>
                         </div>
                         <div className="text-right">
@@ -4072,7 +4072,7 @@ export default function SwingEdge() {
                     {stats.antiEdges.map((edge, i) => (
                       <div key={edge.name || i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                         <div>
-                          <div className="text-white font-semibold text-sm">{edge.name}</div>
+                          <PatternTags parts={[{ dim: "setup", value: edge.setup }, { dim: "emotion", value: edge.emotion }]} />
                           <div className="text-slate-400 text-xs">{edge.count} {t.trades}</div>
                         </div>
                         <div className="text-right">

@@ -282,6 +282,8 @@ function findEdges(metrics, type) {
       const wins = items.filter(m => (m.pnl || 0) > 0);
       return {
         name,
+        setup: items[0].setup || "?",
+        emotion: items[0].emotionAtEntry || "?",
         count: items.length,
         winRate: (wins.length / items.length) * 100,
         totalPnL: items.reduce((s, m) => s + (m.pnl || 0), 0),

@@ -78,6 +78,47 @@ export const DNACard = ({ dna, lang = "he" }) => {
   );
 };
 
+// ─── PATTERN TAGS ────────────────────────────────────────────────────────────
+// Renders a pattern (setup × emotion × day × …) as separate classified chips
+// instead of a mechanical "X + Y" string. Each dimension gets its own colour so
+// the combo reads as language, not a database label — and the literal " + " (which
+// the bidi algorithm breaks in RTL) disappears entirely.
+const TAG_TONES = {
+  setup:           "bg-violet-100 dark:bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-500/20",
+  emotion:         "bg-amber-100  dark:bg-amber-500/10  text-amber-700  dark:text-amber-300  border-amber-200  dark:border-amber-500/20",
+  day:             "bg-slate-100  dark:bg-white/[0.06]  text-slate-600  dark:text-slate-300  border-slate-200  dark:border-white/10",
+  marketCondition: "bg-cyan-100   dark:bg-cyan-500/10   text-cyan-700   dark:text-cyan-300   border-cyan-200   dark:border-cyan-500/20",
+  rr:              "bg-teal-100   dark:bg-teal-500/10   text-teal-700   dark:text-teal-300   border-teal-200   dark:border-teal-500/20",
+  entryQuality:    "bg-yellow-100 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-500/20",
+};
+
+// Parse an EdgeFinder key ("setup:Bull Flag + emotion:Neutral") into typed parts.
+// groupKey joins with " + " and values never contain ":", so this is lossless.
+export const parsePatternKey = (key = "") =>
+  String(key).split(" + ").map((p) => {
+    const idx = p.indexOf(":");
+    return idx === -1 ? { dim: "day", value: p } : { dim: p.slice(0, idx), value: p.slice(idx + 1) };
+  });
+
+export const PatternTags = ({ parts = [], className = "" }) => {
+  const list = (parts || []).filter(p => p && p.value != null && p.value !== "");
+  if (!list.length) return null;
+  // dir="ltr" keeps the Latin-valued chips in a stable left-to-right order even
+  // inside an RTL container; flex-wrap prevents overflow on narrow cards.
+  return (
+    <div dir="ltr" className={`flex flex-wrap items-center gap-1.5 ${className}`}>
+      {list.map((p, i) => (
+        <span
+          key={`${p.dim}:${p.value}:${i}`}
+          className={`text-[11px] px-2 py-0.5 rounded-full border font-semibold whitespace-nowrap ${TAG_TONES[p.dim] || TAG_TONES.day}`}
+        >
+          {p.value}
+        </span>
+      ))}
+    </div>
+  );
+};
+
 // ─── EDGE CARD ───────────────────────────────────────────────────────────────
 export const EdgeCard = ({ edge, lang = "he", variant = "edge" }) => {
   if (!edge) return null;
@@ -97,7 +138,7 @@ export const EdgeCard = ({ edge, lang = "he", variant = "edge" }) => {
         </span>
         <TermTooltip term={good ? "edge" : "antiEdge"} lang={lang} />
       </div>
-      <div className="text-sm font-semibold text-white leading-snug">{edge.pattern}</div>
+      <PatternTags parts={parsePatternKey(edge.key)} className="leading-snug" />
       <div className="mt-2 flex items-center gap-3 text-[11px] font-mono text-slate-400">
         <span className="text-slate-300"><b className="text-white">{edge.winRate}%</b> WR</span>
         <span>·</span>

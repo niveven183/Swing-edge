@@ -35,7 +35,10 @@ const groupKey = (trade, dims) =>
     ? null
     : dims.map(d => `${d.key}:${d.get(trade)}`).join(" + ");
 
-const prettyPattern = (key) => key.split(" + ").map(s => s.split(":")[1]).join(" + ");
+// Soft comma joiner — used only for prose (Top-Edge / Anti-Edge sentences and the
+// Decision Coach). The card UI renders typed chips from the raw key instead, so a
+// mechanical " + " never reaches the screen (it also breaks under RTL bidi).
+const prettyPattern = (key) => key.split(" + ").map(s => s.split(":")[1]).join(", ");
 
 const scorePattern = (list) => {
   const wins = list.filter(isWin).length;
