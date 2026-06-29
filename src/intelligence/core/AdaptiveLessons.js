@@ -116,7 +116,7 @@ const PATTERNS = [
       return { setup: top.setup, wr: top.winRate, count: top.n };
     },
     render: ({ setup, wr, count }, lang) => lang === 'he' ? {
-      title: `${setup} הוא ה-Edge שלך (מאז ומתמיד)`,
+      title: `${setup} — ה-Edge החזק שלך`,
       detail: `${wr}% זכייה על פני ${count} עסקאות — הסטאפ החזק ביותר שלך.`,
       action: 'סחור אותו אגרסיבי יותר — תן לו יותר משקל.',
     } : {

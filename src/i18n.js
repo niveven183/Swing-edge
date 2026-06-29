@@ -563,7 +563,7 @@ const he = {
 
   // Analytics
   totalTrades: "סה\"כ עסקאות",
-  allTime: "כל הזמן",
+  allTime: "כל התקופה",
   wins: "ניצחונות",
   totalReturn: "תשואה כוללת",
   pnlByTrade: "רווח/הפסד לפי עסקה",
@@ -696,7 +696,7 @@ const he = {
   welcomeBody2: "הסטטיסטיקות שלך יתחילו להיבנות מהעסקה הראשונה שלך.",
   addFirstTrade: "הוסף עסקה ראשונה",
   topEdges: "ה-Edges שלך",
-  antiEdges: "Anti-Edges — להימנע!",
+  antiEdges: "דפוסים להימנע מהם",
   tradeDetails: "פרטי העסקה",
   riskOfPortfolio: "סיכון מהתיק",
   rrExcellent: "R/R מצוין — עובר סף מינימום של 2:1",

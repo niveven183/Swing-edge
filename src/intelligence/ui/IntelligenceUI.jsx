@@ -127,7 +127,7 @@ export const EdgeCard = ({ edge, lang = "he", variant = "edge" }) => {
     ? { border: "border-emerald-500/25", text: "text-emerald-400", bg: "bg-emerald-500/8" }
     : { border: "border-rose-500/25",    text: "text-rose-400",    bg: "bg-rose-500/8" };
   const Icon = good ? Sparkles : AlertTriangle;
-  const titleHe = good ? "ה-Edge שלך · מאז ומתמיד" : "דפוס להימנע ממנו";
+  const titleHe = good ? "ה-Edge שלך · לאורך זמן" : "דפוס מפסיד";
   const titleEn = good ? "Your Edge · all-time"     : "Pattern to avoid";
   return (
     <div className={`${accent.bg} ${accent.border} border rounded-xl p-4 bg-[#0d1424]`}>
@@ -471,7 +471,7 @@ export const EdgeDecayCard = ({ edgeDecay, lang = "he" }) => {
             </p>
             <div className="flex items-center gap-3 text-[10px] font-mono text-slate-500 pt-0.5">
               <span>
-                {lang === "he" ? "כל הזמן" : "All-time"}: <b className="text-slate-300">{alert.historicalAvgR}R</b>
+                {lang === "he" ? "כל התקופה" : "All-time"}: <b className="text-slate-300">{alert.historicalAvgR}R</b>
               </span>
               <span>→</span>
               <span>
