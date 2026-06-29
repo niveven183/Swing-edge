@@ -51,7 +51,7 @@ import {
 import { useTradingStats } from "./src/hooks/useTradingStats.js";
 import InfoTooltip from "./src/components/ui/InfoTooltip.jsx";
 import TermTooltip from "./src/components/ui/TermTooltip.jsx";
-import { TRADING_TOOLTIPS } from "./src/data/tooltips.js";
+import { TRADING_TOOLTIPS, resolveSetupKey } from "./src/data/tooltips.js";
 import { TradeCalendar } from "./src/components/TradeCalendar.jsx";
 import { AdaptiveLessons } from "./src/intelligence/core/AdaptiveLessons.js";
 import GrowthPredictor from "./src/components/GrowthPredictor.jsx";
@@ -4257,6 +4257,19 @@ export default function SwingEdge() {
                           </Bar>
                         </BarChart>
                       </ResponsiveContainer>
+                      {/* Named legend — canonical "?" home for each emotion (chart axis can't host tooltips) */}
+                      <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-3 pt-3 border-t border-white/[0.06]">
+                        {emotionStatsArr.map((e) => {
+                          const emoKey = `emotion${e.emotion}`;
+                          return (
+                            <span key={e.emotion} className="inline-flex items-center gap-1 text-[11px] text-slate-400">
+                              <span className={`w-2 h-2 rounded-full ${e.totalPnL >= 0 ? "bg-emerald-500" : "bg-rose-500"}`} />
+                              {e.emotion}
+                              {TRADING_TOOLTIPS[emoKey] && <TermTooltip term={emoKey} lang={lang} />}
+                            </span>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     {/* Streak History */}
@@ -4315,7 +4328,12 @@ export default function SwingEdge() {
                         <tbody>
                           {setupMatrix.map(s => (
                             <tr key={s.setup} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
-                              <td className="py-2.5 font-semibold text-white">{s.setup}</td>
+                              <td className="py-2.5 font-semibold text-white">
+                                <span className="inline-flex items-center gap-1">
+                                  {s.setup}
+                                  {resolveSetupKey(s.setup) && <TermTooltip term={resolveSetupKey(s.setup)} lang={lang} />}
+                                </span>
+                              </td>
                               <td className="py-2.5 text-center text-slate-400 font-mono">{s.count}</td>
                               <td className="py-2.5 text-center">
                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${

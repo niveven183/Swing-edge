@@ -108,16 +108,22 @@ export const PatternTags = ({ parts = [], className = "", lang = "en" }) => {
   // inside an RTL container; flex-wrap prevents overflow on narrow cards.
   return (
     <div dir="ltr" className={`flex flex-wrap items-center gap-1.5 ${className}`}>
-      {list.map((p, i) => (
-        <span
-          key={`${p.dim}:${p.value}:${i}`}
-          className={`text-[11px] px-2 py-0.5 rounded-full border font-semibold whitespace-nowrap ${TAG_TONES[p.dim] || TAG_TONES.day}`}
-        >
-          {/* Day-dimension values are display-translated (e.g. "Sun" → "א׳");
-              every other dimension renders its raw English value unchanged. */}
-          {p.dim === "day" ? dayLabel(p.value, lang) : p.value}
-        </span>
-      ))}
+      {list.map((p, i) => {
+        // Canonical "?" home for the R/R "3+" band — the only rr value with glossary
+        // copy. Other bands (<1, 1-2, 2-3) intentionally render no tooltip.
+        const showRRHelp = p.dim === "rr" && p.value === "3+" && TRADING_TOOLTIPS.rrBucket3plus;
+        return (
+          <span
+            key={`${p.dim}:${p.value}:${i}`}
+            className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border font-semibold whitespace-nowrap ${TAG_TONES[p.dim] || TAG_TONES.day}`}
+          >
+            {/* Day-dimension values are display-translated (e.g. "Sun" → "א׳");
+                every other dimension renders its raw English value unchanged. */}
+            {p.dim === "day" ? dayLabel(p.value, lang) : p.value}
+            {showRRHelp && <TermTooltip term="rrBucket3plus" lang={lang} />}
+          </span>
+        );
+      })}
     </div>
   );
 };

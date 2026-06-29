@@ -1,5 +1,6 @@
 import InfoTooltip from './InfoTooltip.jsx';
 import { TRADING_TOOLTIPS, TERM_LABELS } from '../../data/tooltips.js';
+import { isRTLLang } from '../../i18n.js';
 
 // Thin, lang-aware wrapper over the accessible InfoTooltip primitive.
 // Reads copy from the central glossary (single source: data/tooltips.js).
@@ -11,16 +12,22 @@ export default function TermTooltip({ term, lang = 'he', label, children }) {
 
   if (!desc) return children ?? null;
 
+  // Resolve direction from the active language (he/ar = RTL; en/es/pt = LTR),
+  // not a hard-coded assumption — keeps copy readable for every language.
+  const dir = isRTLLang(lang) ? 'rtl' : 'ltr';
+
   return (
     <>
       {children != null && <span>{children}</span>}
       <InfoTooltip label={heading || term}>
-        {heading && (
-          <div className="font-bold text-emerald-600 dark:text-emerald-400 mb-1.5 text-[13px]">
-            {heading}
-          </div>
-        )}
-        <div className="whitespace-pre-line">{desc}</div>
+        <div lang={lang} dir={dir} style={{ direction: dir, textAlign: 'start' }}>
+          {heading && (
+            <div className="font-bold text-emerald-600 dark:text-emerald-400 mb-1.5 text-[13px]">
+              {heading}
+            </div>
+          )}
+          <div className="whitespace-pre-line">{desc}</div>
+        </div>
       </InfoTooltip>
     </>
   );

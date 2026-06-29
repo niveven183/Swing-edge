@@ -120,8 +120,11 @@ export const TRADING_TOOLTIPS = {
     he: "מחיר פורץ מעל רמת התנגדות חשובה עם נפח. עובד טוב בשוק מגמתי."
   },
   pullback: {
-    en: "Pullback to 20 EMA in an uptrend. High probability entry when buyers return at support.",
-    he: "תיקון אל 20 EMA במגמה עולה. נקודת כניסה בהסתברות גבוהה כשקונים חוזרים בתמיכה."
+    en: "Buying when an uptrending price temporarily retraces toward support — a moving average, a prior breakout level, or a trendline — then resumes higher. Entering on the dip gives a better price and a tighter stop than chasing.",
+    he: "קנייה כשמחיר במגמת עלייה נסוג זמנית לעבר תמיכה — ממוצע נע, רמת פריצה קודמת, או קו מגמה — ואז ממשיך לעלות. כניסה בתיקון נותנת מחיר טוב יותר ו-stop צמוד יותר מאשר מרדף.",
+    es: "Comprar cuando un precio en tendencia alcista retrocede temporalmente hacia un soporte —una media móvil, un nivel de ruptura previo o una línea de tendencia— y luego retoma el alza. Entrar en el retroceso da mejor precio y un stop más ajustado que perseguir.",
+    pt: "Comprar quando um preço em tendência de alta recua temporariamente em direção a um suporte — uma média móvel, um nível de rompimento anterior ou uma linha de tendência — e depois retoma a alta. Entrar no recuo dá melhor preço e um stop mais apertado do que perseguir.",
+    ar: "الشراء عندما يتراجع سعر في اتجاه صاعد مؤقتاً نحو دعم — متوسط متحرك، أو مستوى اختراق سابق، أو خط اتجاه — ثم يستأنف صعوده. الدخول عند التراجع يمنح سعراً أفضل ووقف خسارة أضيق من المطاردة."
   },
   bullFlag: {
     en: "Tight consolidation after sharp move up. Volume should contract during the flag.",
@@ -223,6 +226,186 @@ export const TRADING_TOOLTIPS = {
     en: "Average loss on losing trades.",
     he: "ההפסד הממוצע בעסקאות מפסידות."
   },
+
+  // ── Emotions (5 languages) ───────────────────────────────────────────────
+  emotionConfident: {
+    en: "Confidence grounded in analysis, not bravado. When based on a valid setup it drives disciplined execution; when it tips into overconfidence after a win streak, it becomes risky.",
+    he: "ביטחון מבוסס ניתוח, לא יוהרה. כשהוא נשען על setup תקף — מוביל לביצוע ממושמע. כשהוא הופך לביטחון-יתר אחרי רצף נצחונות, הוא מסוכן.",
+    es: "Confianza basada en el análisis, no en la arrogancia. Sobre un setup válido impulsa una ejecución disciplinada; si se convierte en exceso de confianza tras una racha ganadora, se vuelve peligrosa.",
+    pt: "Confiança baseada na análise, não em arrogância. Sobre um setup válido gera execução disciplinada; se virar excesso de confiança após uma sequência de vitórias, torna-se arriscada.",
+    ar: "ثقة مبنية على التحليل وليست غروراً. عندما تستند إلى نموذج دخول صحيح تؤدي إلى تنفيذ منضبط؛ وعندما تتحول إلى ثقة مفرطة بعد سلسلة انتصارات تصبح خطيرة."
+  },
+  emotionCalm: {
+    en: "The optimal emotional state for a trader. Calm lets you follow your plan without chasing or panicking. Trades opened calmly tend to respect their stop and target.",
+    he: "המצב הרגשי האופטימלי לסוחר. שלווה מאפשרת לעקוב אחרי התוכנית בלי לרדוף או להיבהל. עסקאות שנפתחות ברוגע נוטות לדבוק ב-stop וב-target.",
+    es: "El estado emocional óptimo para un trader. La calma te permite seguir tu plan sin perseguir ni entrar en pánico. Las operaciones abiertas con calma tienden a respetar su stop y objetivo.",
+    pt: "O estado emocional ideal para um trader. A calma permite seguir o seu plano sem perseguir nem entrar em pânico. Operações abertas com calma tendem a respeitar o stop e o alvo.",
+    ar: "الحالة العاطفية المثلى للمتداول. الهدوء يتيح لك اتّباع خطتك دون مطاردة أو ذعر. الصفقات التي تُفتح بهدوء تميل إلى احترام وقف الخسارة والهدف."
+  },
+  emotionPatient: {
+    en: "Waiting for a setup that genuinely meets your criteria instead of entering every move. Patience is often what separates a profitable trader from a losing one — it filters out low-quality trades.",
+    he: "המתנה ל-setup שבאמת עומד בקריטריונים, במקום להיכנס לכל תנועה. סבלנות היא לרוב ההבדל בין סוחר רווחי למפסיד — היא מסננת עסקאות באיכות נמוכה.",
+    es: "Esperar un setup que realmente cumpla tus criterios en lugar de entrar en cada movimiento. La paciencia suele ser lo que separa a un trader rentable de uno perdedor: filtra las operaciones de baja calidad.",
+    pt: "Esperar por um setup que realmente cumpra os seus critérios em vez de entrar em cada movimento. A paciência costuma ser o que separa um trader lucrativo de um perdedor — filtra operações de baixa qualidade.",
+    ar: "انتظار نموذج دخول يستوفي معاييرك فعلاً بدلاً من الدخول في كل حركة. الصبر غالباً ما يفصل بين المتداول الرابح والخاسر، فهو يُصفّي الصفقات منخفضة الجودة."
+  },
+  emotionNeutral: {
+    en: "Entering with no emotional charge — neither excited nor fearful. A stable state that allows objective, data-driven decisions. A solid baseline, even if less sharp than \"Calm\".",
+    he: "כניסה ללא מטען רגשי — לא נלהב ולא חושש. מצב יציב שמאפשר החלטות אובייקטיביות לפי הנתונים בלבד. בסיס טוב, גם אם פחות חד מ-\"רגוע\".",
+    es: "Entrar sin carga emocional, ni eufórico ni temeroso. Un estado estable que permite decisiones objetivas basadas en datos. Una buena base, aunque menos afilada que \"Calm\".",
+    pt: "Entrar sem carga emocional — nem eufórico nem receoso. Um estado estável que permite decisões objetivas e baseadas em dados. Uma boa base, ainda que menos afiada que \"Calm\".",
+    ar: "الدخول دون شحنة عاطفية، لا متحمّس ولا خائف. حالة مستقرة تتيح قرارات موضوعية مبنية على البيانات. أساس جيّد، وإن كان أقل حدّة من \"Calm\"."
+  },
+  emotionHesitant: {
+    en: "Hesitation at entry — usually a sign the setup isn't clear or confidence is low. Hesitant entries tend to mean entering late, placing the stop too tight, or exiting early out of fear.",
+    he: "היסוס בכניסה — לרוב סימן ש-setup לא ברור או שביטחון העצמי נמוך. כניסות מהוססות נוטות לכניסה מאוחרת, stop קרוב מדי, או יציאה מוקדמת מפחד.",
+    es: "Vacilación en la entrada, normalmente señal de que el setup no está claro o la confianza es baja. Las entradas vacilantes suelen implicar entrar tarde, poner el stop demasiado ajustado o salir antes por miedo.",
+    pt: "Hesitação na entrada — geralmente sinal de que o setup não está claro ou a confiança está baixa. Entradas hesitantes tendem a significar entrar tarde, colocar o stop apertado demais ou sair cedo por medo.",
+    ar: "التردّد عند الدخول، وغالباً ما يكون علامة على أن نموذج الدخول غير واضح أو أن الثقة منخفضة. الدخول المتردّد يميل إلى التأخّر في الدخول، أو وضع وقف خسارة ضيّق جداً، أو الخروج مبكراً بدافع الخوف."
+  },
+  emotionNervous: {
+    en: "Tension that clouds decision-making. Nervousness leads to obsessive price-checking, moving the stop, and impulsive exits. Often a sign the position is too large or the setup isn't trusted.",
+    he: "מתח שמקשה על קבלת החלטות. עצבנות מובילה לבדיקת מחיר אובססיבית, הזזת stop, ויציאות פזיזות. לרוב מעידה על פוזיציה גדולה מדי או חוסר ביטחון ב-setup.",
+    es: "Tensión que nubla la toma de decisiones. El nerviosismo lleva a revisar el precio de forma obsesiva, mover el stop y salir impulsivamente. Suele indicar una posición demasiado grande o falta de confianza en el setup.",
+    pt: "Tensão que prejudica a tomada de decisão. O nervosismo leva a verificar o preço de forma obsessiva, mexer no stop e sair por impulso. Costuma indicar uma posição grande demais ou falta de confiança no setup.",
+    ar: "توتّر يُشوّش اتخاذ القرار. العصبية تؤدي إلى مراقبة السعر بهوس، وتحريك وقف الخسارة، والخروج المتسرّع. وغالباً ما تدل على أن حجم الصفقة كبير جداً أو عدم الثقة في نموذج الدخول."
+  },
+  emotionFOMO: {
+    en: "\"Fear Of Missing Out\" — entering a trade just because price moved sharply, with no valid setup. One of the most destructive patterns: late entry, chasing price, and a distant stop. A red flag.",
+    he: "\"פחד מהחמצה\" — כניסה לעסקה רק כי המחיר זז בחדות, בלי setup תקף. אחד הדפוסים ההפסדיים ביותר: כניסה מאוחרת, מרדף אחרי המחיר, ו-stop רחוק. דגל אזהרה.",
+    es: "\"Miedo a quedarse fuera\" — entrar en una operación solo porque el precio se movió con fuerza, sin un setup válido. Uno de los patrones más destructivos: entrada tardía, perseguir el precio y un stop lejano. Una señal de alerta.",
+    pt: "\"Medo de ficar de fora\" — entrar numa operação só porque o preço se moveu com força, sem um setup válido. Um dos padrões mais destrutivos: entrada tardia, perseguir o preço e um stop distante. Um sinal de alerta.",
+    ar: "\"الخوف من تفويت الفرصة\" — الدخول في صفقة لمجرّد أن السعر تحرّك بحدّة، دون نموذج دخول صحيح. من أكثر الأنماط تدميراً: دخول متأخّر، ومطاردة السعر، ووقف خسارة بعيد. علامة تحذير."
+  },
+  emotionAngry: {
+    en: "Anger after a loss — the fuel of \"revenge trading\". In this state a trader tries to win back a loss immediately, raises risk, and takes bad trades. This is how accounts blow up. Stop.",
+    he: "כעס אחרי הפסד — הדלק של \"מסחר נקמה\". במצב הזה הסוחר מנסה להחזיר הפסד מיד, מגדיל סיכון, ונכנס לעסקאות גרועות. זה המצב שבו מאבדים חשבונות. עצור.",
+    es: "Ira tras una pérdida — el combustible del \"trading de venganza\". En este estado el trader intenta recuperar la pérdida de inmediato, aumenta el riesgo y entra en malas operaciones. Así se revientan las cuentas. Detente.",
+    pt: "Raiva após uma perda — o combustível do \"trading de vingança\". Nesse estado o trader tenta recuperar a perda de imediato, aumenta o risco e faz operações ruins. É assim que se destroem contas. Pare.",
+    ar: "الغضب بعد الخسارة — وقود \"التداول الانتقامي\". في هذه الحالة يحاول المتداول استعادة خسارته فوراً، فيرفع المخاطرة ويدخل صفقات سيئة. هكذا تُدمَّر الحسابات. توقّف."
+  },
+
+  // ── Market conditions (5 languages) ──────────────────────────────────────
+  marketTrendingUp: {
+    en: "An uptrending market: higher highs and higher lows. Long setups work best here; trading against the trend is risky.",
+    he: "שוק במגמת עלייה: שיאים גבוהים יותר ושפלים גבוהים יותר. ה-setups של מסחר-לונג עובדים הכי טוב כאן; מסחר נגד המגמה מסוכן.",
+    es: "Un mercado en tendencia alcista: máximos y mínimos más altos. Los setups en largo funcionan mejor aquí; operar contra la tendencia es arriesgado.",
+    pt: "Um mercado em tendência de alta: máximos e mínimos mais altos. Setups comprados funcionam melhor aqui; operar contra a tendência é arriscado.",
+    ar: "سوق في اتجاه صاعد: قمم أعلى وقيعان أعلى. نماذج الشراء تعمل بأفضل شكل هنا؛ والتداول عكس الاتجاه محفوف بالمخاطر."
+  },
+  marketTrendingDown: {
+    en: "A downtrending market: lower highs and lower lows. Short setups work best; \"catching a falling knife\" with a long is dangerous.",
+    he: "שוק במגמת ירידה: שיאים נמוכים יותר ושפלים נמוכים יותר. setups של שורט עובדים הכי טוב; \"תפיסת סכין נופלת\" בלונג מסוכנת.",
+    es: "Un mercado en tendencia bajista: máximos y mínimos más bajos. Los setups en corto funcionan mejor; \"atrapar un cuchillo que cae\" en largo es peligroso.",
+    pt: "Um mercado em tendência de baixa: máximos e mínimos mais baixos. Setups vendidos funcionam melhor; \"agarrar uma faca a cair\" comprado é perigoso.",
+    ar: "سوق في اتجاه هابط: قمم أدنى وقيعان أدنى. نماذج البيع تعمل بأفضل شكل؛ و\"إمساك السكين الساقط\" بصفقة شراء أمر خطير."
+  },
+  marketSideways: {
+    en: "A market with no clear trend, moving horizontally between support and resistance. Trend setups fail here; range trading (buy support, sell resistance) fits better.",
+    he: "שוק ללא מגמה ברורה, נע בטווח אופקי בין תמיכה להתנגדות. setups של מגמה נכשלים כאן; מסחר בטווח (קנייה בתמיכה, מכירה בהתנגדות) מתאים יותר.",
+    es: "Un mercado sin tendencia clara, que se mueve horizontalmente entre soporte y resistencia. Los setups de tendencia fallan aquí; el trading de rango (comprar en soporte, vender en resistencia) encaja mejor.",
+    pt: "Um mercado sem tendência clara, movendo-se horizontalmente entre suporte e resistência. Setups de tendência falham aqui; o trading de range (comprar no suporte, vender na resistência) encaixa melhor.",
+    ar: "سوق بلا اتجاه واضح، يتحرك أفقياً بين الدعم والمقاومة. نماذج الاتجاه تفشل هنا؛ والتداول ضمن النطاق (شراء عند الدعم، بيع عند المقاومة) أنسب."
+  },
+  marketVolatile: {
+    en: "A market with sharp, fast price swings in both directions. Stops get hit easily, and position size should be smaller. Big opportunities but high risk.",
+    he: "שוק עם תנודות מחיר חדות ומהירות לשני הכיוונים. ה-stops נפגעים בקלות, גודל הפוזיציה צריך להיות קטן יותר. הזדמנויות גדולות אך סיכון גבוה.",
+    es: "Un mercado con oscilaciones de precio bruscas y rápidas en ambas direcciones. Los stops saltan con facilidad y el tamaño de la posición debe ser menor. Grandes oportunidades pero alto riesgo.",
+    pt: "Um mercado com oscilações de preço bruscas e rápidas nos dois sentidos. Os stops são atingidos com facilidade e o tamanho da posição deve ser menor. Grandes oportunidades, mas risco elevado.",
+    ar: "سوق بتقلّبات سعرية حادّة وسريعة في الاتجاهين. تُضرب أوامر وقف الخسارة بسهولة، وينبغي تصغير حجم الصفقة. فرص كبيرة لكن مخاطرة عالية."
+  },
+
+  // ── Setups added (5 languages) ───────────────────────────────────────────
+  supportBounce: {
+    en: "Buying when price drops to a known support level and reverses up. The logic: buyers defend the level. The stop sits below support — if it breaks, the thesis is void.",
+    he: "קנייה כשהמחיר יורד לרמת תמיכה ידועה ומתהפך כלפי מעלה. ההיגיון: קונים מגנים על הרמה. ה-stop יושב מתחת לתמיכה — אם היא נשברת, הניתוח בטל.",
+    es: "Comprar cuando el precio cae a un nivel de soporte conocido y rebota al alza. La lógica: los compradores defienden el nivel. El stop va debajo del soporte; si se rompe, la tesis queda anulada.",
+    pt: "Comprar quando o preço cai a um nível de suporte conhecido e reverte para cima. A lógica: os compradores defendem o nível. O stop fica abaixo do suporte; se romper, a tese é anulada.",
+    ar: "الشراء عندما يهبط السعر إلى مستوى دعم معروف ثم ينعكس صعوداً. المنطق: المشترون يدافعون عن المستوى. يوضع وقف الخسارة أسفل الدعم — وإذا انكسر، تسقط الفكرة."
+  },
+  resistanceBreak: {
+    en: "Entering when price breaks above a resistance level that previously capped it, ideally on high volume. The break signals buyers have taken control. Differs from a generic Breakout by targeting one specific level.",
+    he: "כניסה כשהמחיר פורץ מעל רמת התנגדות שבלמה אותו בעבר, רצוי בנפח גבוה. הפריצה מסמנת שקונים השתלטו. שונה מ-Breakout כללי בכך שהיא ממוקדת ברמה ספציפית.",
+    es: "Entrar cuando el precio rompe por encima de un nivel de resistencia que antes lo frenaba, idealmente con volumen alto. La ruptura indica que los compradores tomaron el control. Se diferencia de un Breakout genérico por enfocarse en un nivel específico.",
+    pt: "Entrar quando o preço rompe acima de um nível de resistência que antes o travava, idealmente com volume alto. O rompimento sinaliza que os compradores assumiram o controlo. Difere de um Breakout genérico por focar num nível específico.",
+    ar: "الدخول عندما يخترق السعر مستوى مقاومة كان يكبحه سابقاً، ويُفضّل بحجم تداول عالٍ. الاختراق يشير إلى أن المشترين سيطروا. يختلف عن الـ Breakout العام بتركيزه على مستوى محدّد."
+  },
+  pullback20EMA: {
+    en: "Buying when an uptrending price pulls back to the 20-period moving average and bounces. The 20 EMA acts as dynamic support; this setup combines trend with a precise entry point.",
+    he: "קנייה כשמחיר במגמת עלייה נסוג אל הממוצע הנע של 20 תקופות ומתהפך משם. ה-20 EMA משמש כתמיכה דינמית; הסטאפ מצרף מגמה + נקודת כניסה מדויקת.",
+    es: "Comprar cuando un precio en tendencia alcista retrocede a la media móvil de 20 períodos y rebota. La 20 EMA actúa como soporte dinámico; este setup combina tendencia con un punto de entrada preciso.",
+    pt: "Comprar quando um preço em tendência de alta recua à média móvel de 20 períodos e ressalta. A 20 EMA atua como suporte dinâmico; este setup combina tendência com um ponto de entrada preciso.",
+    ar: "الشراء عندما يرتد سعر في اتجاه صاعد إلى المتوسط المتحرك لـ 20 فترة ثم يرتدّ منه. يعمل الـ 20 EMA كدعم ديناميكي؛ ويجمع هذا النموذج بين الاتجاه ونقطة دخول دقيقة."
+  },
+
+  // ── DNA sub-scores (5 languages) ─────────────────────────────────────────
+  dnaRisk: {
+    en: "Measures how consistent you are at managing risk: uniform position size, respecting stops, and not exceeding your planned per-trade risk. A low score means inconsistent risk — the single biggest threat to an account.",
+    he: "מודד עד כמה אתה עקבי בניהול סיכון: גודל פוזיציה אחיד, הקפדה על stop, ואי-חריגה מהסיכון המתוכנן לעסקה. ציון נמוך = סיכון לא עקבי, הסכנה הגדולה ביותר לחשבון.",
+    es: "Mide cuán consistente eres gestionando el riesgo: tamaño de posición uniforme, respetar los stops y no superar el riesgo planificado por operación. Una puntuación baja significa riesgo inconsistente, la mayor amenaza para una cuenta.",
+    pt: "Mede o quão consistente você é na gestão de risco: tamanho de posição uniforme, respeitar os stops e não exceder o risco planeado por operação. Uma pontuação baixa significa risco inconsistente — a maior ameaça a uma conta.",
+    ar: "يقيس مدى اتّساقك في إدارة المخاطر: حجم صفقة موحّد، واحترام أوامر وقف الخسارة، وعدم تجاوز المخاطرة المخطّطة لكل صفقة. الدرجة المنخفضة تعني مخاطرة غير متّسقة — وهي أكبر تهديد للحساب."
+  },
+  dnaConsistency: {
+    en: "Measures the stability of your performance over time: are results uniform, or dependent on a few huge trades. High consistency means a method you can rely on; low means random results.",
+    he: "מודד את יציבות הביצועים לאורך זמן: האם התוצאות אחידות, או תלויות בכמה עסקאות ענק. עקביות גבוהה = שיטה שניתן לסמוך עליה; נמוכה = תוצאות אקראיות.",
+    es: "Mide la estabilidad de tu rendimiento a lo largo del tiempo: si los resultados son uniformes o dependen de unas pocas operaciones enormes. Alta consistencia es un método fiable; baja, resultados aleatorios.",
+    pt: "Mede a estabilidade do seu desempenho ao longo do tempo: se os resultados são uniformes ou dependem de poucas operações enormes. Alta consistência é um método confiável; baixa, resultados aleatórios.",
+    ar: "يقيس استقرار أدائك عبر الزمن: هل النتائج متّسقة أم تعتمد على عدد قليل من الصفقات الضخمة. الاتّساق العالي يعني منهجاً يمكن الاعتماد عليه؛ والمنخفض يعني نتائج عشوائية."
+  },
+  dnaGrowth: {
+    en: "Measures your improvement trend: are you learning from the data and getting better over time, or repeating the same mistakes. A rising score is the right curve for a developing trader.",
+    he: "מודד את מגמת השיפור שלך: האם אתה לומד מהנתונים ומשתפר לאורך זמן, או חוזר על אותן טעויות. ציון עולה = העקומה הנכונה לסוחר מתפתח.",
+    es: "Mide tu tendencia de mejora: si aprendes de los datos y mejoras con el tiempo, o repites los mismos errores. Una puntuación creciente es la curva correcta para un trader en desarrollo.",
+    pt: "Mede a sua tendência de melhoria: se aprende com os dados e melhora ao longo do tempo, ou repete os mesmos erros. Uma pontuação crescente é a curva certa para um trader em desenvolvimento.",
+    ar: "يقيس اتجاه تحسّنك: هل تتعلّم من البيانات وتتحسّن مع الوقت، أم تكرّر الأخطاء نفسها. الدرجة المتصاعدة هي المنحنى الصحيح للمتداول الذي يتطوّر."
+  },
+
+  // ── Metrics added (5 languages) ──────────────────────────────────────────
+  totalReturn: {
+    en: "Your total profit or loss since you started, as a percentage of starting capital. The headline performance number — but without risk context it doesn't tell the whole story.",
+    he: "הרווח או ההפסד הכולל מאז תחילת המסחר, באחוזים מההון ההתחלתי. מדד-העל לביצועים — אבל בלי הקשר של סיכון הוא לא מספר את כל הסיפור.",
+    es: "Tu ganancia o pérdida total desde que empezaste, como porcentaje del capital inicial. La cifra principal de rendimiento, pero sin contexto de riesgo no cuenta toda la historia.",
+    pt: "O seu lucro ou prejuízo total desde que começou, como percentagem do capital inicial. O número principal de desempenho — mas sem contexto de risco não conta a história toda.",
+    ar: "إجمالي ربحك أو خسارتك منذ البداية، كنسبة مئوية من رأس المال الابتدائي. الرقم الرئيسي للأداء — لكنه دون سياق المخاطرة لا يروي القصة كاملة."
+  },
+  winStreak: {
+    en: "The number of profitable trades in a row. A winning streak builds confidence — but it's also the most dangerous time for overconfidence and undisciplined risk-taking.",
+    he: "מספר העסקאות הרווחיות ברצף. רצף נצחונות בונה ביטחון — אך גם הזמן המסוכן ביותר לביטחון-יתר ולהגדלת סיכון לא ממושמעת.",
+    es: "El número de operaciones ganadoras seguidas. Una racha ganadora genera confianza, pero también es el momento más peligroso para el exceso de confianza y un riesgo indisciplinado.",
+    pt: "O número de operações vencedoras seguidas. Uma sequência de vitórias gera confiança — mas também é o momento mais perigoso para o excesso de confiança e o risco indisciplinado.",
+    ar: "عدد الصفقات الرابحة المتتالية. سلسلة الانتصارات تبني الثقة — لكنها أيضاً أخطر وقت للثقة المفرطة والمخاطرة غير المنضبطة."
+  },
+  streakHistory: {
+    en: "A record of your winning and losing streaks over time. It reveals emotional patterns: does a losing streak make you trade worse (tilt), or do you recover with discipline.",
+    he: "תיעוד רצפי הנצחונות וההפסדים שלך לאורך זמן. חושף דפוסים רגשיים: האם רצף הפסדים גורם לך לסחור גרוע יותר (tilt), או להתאושש במשמעת.",
+    es: "Un registro de tus rachas ganadoras y perdedoras a lo largo del tiempo. Revela patrones emocionales: ¿una racha perdedora te hace operar peor (tilt) o te recuperas con disciplina?",
+    pt: "Um registo das suas sequências de vitórias e derrotas ao longo do tempo. Revela padrões emocionais: uma sequência de perdas faz você operar pior (tilt), ou você recupera com disciplina?",
+    ar: "سجلّ لسلاسل انتصاراتك وخسائرك عبر الزمن. يكشف الأنماط العاطفية: هل تجعلك سلسلة الخسائر تتداول بشكل أسوأ (tilt)، أم تتعافى بانضباط؟"
+  },
+  grade: {
+    en: "A weighted score (A–F) summarizing your trading quality for the month: a blend of win rate, R-multiple, discipline and consistency. A quick snapshot — not a substitute for digging into the details.",
+    he: "ציון משוקלל (A–F) שמסכם את איכות המסחר שלך לחודש: שילוב של אחוז הצלחה, יחס R, משמעת ועקביות. תמונת-על מהירה — לא תחליף לצלילה לפרטים.",
+    es: "Una puntuación ponderada (A–F) que resume la calidad de tu trading del mes: una mezcla de tasa de aciertos, múltiplo R, disciplina y consistencia. Una instantánea rápida, no un sustituto de analizar los detalles.",
+    pt: "Uma pontuação ponderada (A–F) que resume a qualidade do seu trading no mês: uma mistura de taxa de acertos, múltiplo R, disciplina e consistência. Um retrato rápido — não substitui analisar os detalhes.",
+    ar: "درجة مرجّحة (A–F) تلخّص جودة تداولك خلال الشهر: مزيج من نسبة النجاح ومضاعف R والانضباط والاتّساق. لقطة سريعة — لا تُغني عن التعمّق في التفاصيل."
+  },
+  entryQuality: {
+    en: "A (star) rating of how well your entry matched the planned setup: timing, price, and confirmation. A consistently high rating signals discipline — even when the trade itself loses.",
+    he: "דירוג (כוכבים) של עד כמה הכניסה תאמה ל-setup המתוכנן: עיתוי, מחיר, ואישור. דירוג גבוה עקבי הוא סימן למשמעת — גם כשהעסקה עצמה מפסידה.",
+    es: "Una calificación (estrellas) de cuán bien tu entrada coincidió con el setup planificado: timing, precio y confirmación. Una calificación alta y constante indica disciplina, incluso cuando la operación pierde.",
+    pt: "Uma classificação (estrelas) de quão bem a sua entrada correspondeu ao setup planeado: timing, preço e confirmação. Uma classificação alta e constante indica disciplina — mesmo quando a operação perde.",
+    ar: "تقييم (بالنجوم) لمدى مطابقة دخولك للنموذج المخطّط: التوقيت، والسعر، والتأكيد. التقييم العالي المتّسق يدل على الانضباط — حتى عندما تخسر الصفقة نفسها."
+  },
+
+  // ── R/R band "3+" (5 languages) ──────────────────────────────────────────
+  rrBucket3plus: {
+    en: "A group of trades with a risk/reward ratio of 3 or higher — the potential reward is at least 3× the risk. These are the highest-quality trades by ratio: even with a low win rate, winning a fraction of them is enough to be profitable.",
+    he: "קבוצת עסקאות עם יחס סיכון/סיכוי של 3 ומעלה: הרווח הפוטנציאלי גדול פי 3 לפחות מהסיכון. אלה העסקאות האיכותיות ביותר מבחינת יחס — גם אם אחוז ההצלחה נמוך, מספיק לנצח בחלקן כדי להיות רווחי.",
+    es: "Un grupo de operaciones con una relación riesgo/beneficio de 3 o más: la recompensa potencial es al menos 3× el riesgo. Son las operaciones de mayor calidad por ratio: incluso con una tasa de aciertos baja, ganar una fracción basta para ser rentable.",
+    pt: "Um grupo de operações com uma relação risco/retorno de 3 ou mais: o retorno potencial é pelo menos 3× o risco. São as operações de maior qualidade por rácio: mesmo com uma taxa de acertos baixa, ganhar uma fração já basta para ser lucrativo.",
+    ar: "مجموعة صفقات بنسبة مخاطرة/عائد تبلغ 3 أو أكثر: العائد المحتمل لا يقل عن 3 أضعاف المخاطرة. هذه أعلى الصفقات جودةً من حيث النسبة: حتى مع نسبة نجاح منخفضة، يكفي الربح في جزء منها لتحقيق الربحية."
+  },
 };
 
 // ─── Short, friendly term labels (he+en) ─────────────────────────────────────
@@ -279,4 +462,93 @@ export const TERM_LABELS = {
   MOCFade:            { en: "MOC Fade",            he: "MOC Fade" },
   overnightHold:      { en: "Overnight Hold",      he: "Overnight Hold" },
   overnightReversal:  { en: "Overnight Reversal",  he: "Overnight Reversal" },
+
+  // ── Emotions (5 languages) ───────────────────────────────────────────────
+  emotionConfident:  { en: "Confident",  he: "Confident",  es: "Confident",  pt: "Confident",  ar: "Confident" },
+  emotionCalm:       { en: "Calm",       he: "Calm",       es: "Calm",       pt: "Calm",       ar: "Calm" },
+  emotionPatient:    { en: "Patient",    he: "Patient",    es: "Patient",    pt: "Patient",    ar: "Patient" },
+  emotionNeutral:    { en: "Neutral",    he: "Neutral",    es: "Neutral",    pt: "Neutral",    ar: "Neutral" },
+  emotionHesitant:   { en: "Hesitant",   he: "Hesitant",   es: "Hesitant",   pt: "Hesitant",   ar: "Hesitant" },
+  emotionNervous:    { en: "Nervous",    he: "Nervous",    es: "Nervous",    pt: "Nervous",    ar: "Nervous" },
+  emotionFOMO:       { en: "FOMO",       he: "FOMO",       es: "FOMO",       pt: "FOMO",       ar: "FOMO" },
+  emotionAngry:      { en: "Angry",      he: "Angry",      es: "Angry",      pt: "Angry",      ar: "Angry" },
+
+  // ── Market conditions (5 languages) ──────────────────────────────────────
+  marketTrendingUp:   { en: "Trending Up",   he: "Trending Up",   es: "Trending Up",   pt: "Trending Up",   ar: "Trending Up" },
+  marketTrendingDown: { en: "Trending Down", he: "Trending Down", es: "Trending Down", pt: "Trending Down", ar: "Trending Down" },
+  marketSideways:     { en: "Sideways",      he: "Sideways",      es: "Sideways",      pt: "Sideways",      ar: "Sideways" },
+  marketVolatile:     { en: "Volatile",      he: "Volatile",      es: "Volatile",      pt: "Volatile",      ar: "Volatile" },
+
+  // ── Setups added (5 languages) ───────────────────────────────────────────
+  supportBounce:   { en: "Support Bounce",    he: "Support Bounce",    es: "Support Bounce",    pt: "Support Bounce",    ar: "Support Bounce" },
+  resistanceBreak: { en: "Resistance Break",  he: "Resistance Break",  es: "Resistance Break",  pt: "Resistance Break",  ar: "Resistance Break" },
+  pullback20EMA:   { en: "Pullback to 20 EMA", he: "Pullback to 20 EMA", es: "Pullback to 20 EMA", pt: "Pullback to 20 EMA", ar: "Pullback to 20 EMA" },
+
+  // ── DNA sub-scores (5 languages) ─────────────────────────────────────────
+  dnaRisk:        { en: "Risk",        he: "Risk",        es: "Risk",        pt: "Risk",        ar: "Risk" },
+  dnaConsistency: { en: "Consistency", he: "Consistency", es: "Consistency", pt: "Consistency", ar: "Consistency" },
+  dnaGrowth:      { en: "Growth",      he: "Growth",      es: "Growth",      pt: "Growth",      ar: "Growth" },
+
+  // ── Metrics added (5 languages) ──────────────────────────────────────────
+  totalReturn:   { en: "Total Return",   he: "Total Return",   es: "Total Return",   pt: "Total Return",   ar: "Total Return" },
+  winStreak:     { en: "Win Streak",     he: "Win Streak",     es: "Win Streak",     pt: "Win Streak",     ar: "Win Streak" },
+  streakHistory: { en: "Streak History", he: "Streak History", es: "Streak History", pt: "Streak History", ar: "Streak History" },
+  grade:         { en: "Grade",          he: "Grade",          es: "Grade",          pt: "Grade",          ar: "Grade" },
+  entryQuality:  { en: "Entry Quality",  he: "Entry Quality",  es: "Entry Quality",  pt: "Entry Quality",  ar: "Entry Quality" },
+
+  // ── R/R band "3+" (5 languages) ──────────────────────────────────────────
+  rrBucket3plus: { en: "R/R 3+", he: "R/R 3+", es: "R/R 3+", pt: "R/R 3+", ar: "R/R 3+" },
 };
+
+// ─── Setup display-name → glossary-key normalizer ────────────────────────────
+// The Setup Matrix renders human display strings ("Cup and Handle", "Gap and Go",
+// "EMA Bounce 50", …) but glossary keys are camelCase ("cupAndHandle", "gapAndGo",
+// "EMABounce50"). This maps display → key so the canonical SETUP-column "?" resolves.
+// Display-only mapping; statistical grouping on the raw trade.setup string is untouched.
+// Anything not listed returns null → no "?" is rendered (no broken tooltips).
+const SETUP_KEY_ALIASES = {
+  'breakout':                'breakout',
+  'pullback':                'pullback',
+  'pullback to 20 ema':      'pullback20EMA',
+  'bull flag':               'bullFlag',
+  'orb breakout':            'ORBBreakout',
+  'vwap reclaim':            'VWAPReclaim',
+  'higher low':              'higherLow',
+  'cup and handle':          'cupAndHandle',
+  'failed breakout':         'failedBreakout',
+  'overextended fade':       'overextendedFade',
+  'ema bounce 50':           'EMABounce50',
+  '50 ema bounce':           'EMABounce50',
+  'trend continuation':      'trendContinuation',
+  'gap and go':              'gapAndGo',
+  'earnings gap play':       'earningsGapPlay',
+  'range breakout':          'rangeBreakout',
+  'post earnings strength':  'postEarningsStrength',
+  'power hour break':        'powerHourBreak',
+  'moc fade':                'MOCFade',
+  'overnight hold':          'overnightHold',
+  'overnight reversal':      'overnightReversal',
+  'support bounce':          'supportBounce',
+  'resistance break':        'resistanceBreak',
+  // Intentionally unmapped → resolveSetupKey() returns null (no "?"):
+  //   'Crypto'  — asset class, not a real setup
+  //   'Other'   — catch-all bucket
+  //   'Retest', 'Breakdown' — scanner-only, never a trade.setup
+};
+
+function normalizeSetupName(name) {
+  return String(name)
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+// Returns the glossary key for a Setup-Matrix display name, or null when none
+// exists (so the caller renders no "?"). Guarded by TRADING_TOOLTIPS membership.
+export function resolveSetupKey(displayName) {
+  if (!displayName) return null;
+  const key = SETUP_KEY_ALIASES[normalizeSetupName(displayName)];
+  return key && TRADING_TOOLTIPS[key] ? key : null;
+}
