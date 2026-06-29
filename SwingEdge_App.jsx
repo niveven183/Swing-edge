@@ -44,6 +44,7 @@ import {
 } from "./src/priceService.js";
 import { POPULAR_TICKERS as STATIC_TICKERS, getTickerMeta, searchTickers as searchStaticTickers } from "./src/data/tickers.js";
 import { SwingEdgeAI } from "./src/intelligence/SwingEdgeAI.js";
+import { dayLabel } from "./src/intelligence/utils/statisticalModels.js";
 import {
   DNACard, EdgeCard, DecisionCoachPanel, TiltShield, GrowthChart, RegimeIndicator, PatternTags,
 } from "./src/intelligence/ui/IntelligenceUI.jsx";
@@ -3866,7 +3867,7 @@ export default function SwingEdge() {
 
             {/* Per-trade P&L bars */}
             <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
-              <h3 className="text-sm font-bold text-white mb-4">P&amp;L by Trade</h3>
+              <h3 className="text-sm font-bold text-white mb-4">{t.pnlByTrade}</h3>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={closedTrades.map(t => ({ name: t.ticker, pnl: Math.round(calcTradeMetrics(t).pnl || 0) }))}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
@@ -3886,7 +3887,7 @@ export default function SwingEdge() {
 
             {/* Setup breakdown — dynamic grouping from actual trade data */}
             <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
-              <h3 className="text-sm font-bold text-white mb-4">Performance by Setup</h3>
+              <h3 className="text-sm font-bold text-white mb-4">{t.perfBySetup}</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[...stats.bySetup]
                   .sort((a, b) => b.count - a.count)
@@ -3894,7 +3895,7 @@ export default function SwingEdge() {
                     <div key={s.name} className="bg-white/3 rounded-xl p-3 border border-[var(--border-subtle)] dark:border-white/[0.06]">
                       <div className="text-xs font-semibold text-violet-400 mb-2 truncate" title={s.name}>{s.name}</div>
                       <div className="font-bold text-white text-lg font-mono">{s.winRate.toFixed(0)}%</div>
-                      <div className="text-[10px] text-slate-500">{s.count} trades · {s.totalR.toFixed(1)}R total</div>
+                      <div className="text-[10px] text-slate-500">{s.count} {t.trades} · {s.totalR.toFixed(1)}R {t.rTotal}</div>
                       <div className="mt-2 h-1.5 bg-white/5 rounded-full overflow-hidden">
                         <div className="h-full bg-gradient-to-r from-violet-500 to-cyan-500 rounded-full transition-all" style={{ width: `${s.winRate}%` }} />
                       </div>
@@ -3914,17 +3915,19 @@ export default function SwingEdge() {
               }));
               return (
                 <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
-                  <h3 className="text-sm font-bold text-white mb-1">P&amp;L by Day of Week</h3>
-                  <p className="text-xs text-slate-600 mb-4">Total profit/loss per trading day</p>
+                  <h3 className="text-sm font-bold text-white mb-1">{t.pnlByDay}</h3>
+                  <p className="text-xs text-slate-600 mb-4">{t.pnlByDaySubtitle}</p>
                   <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
-                      <XAxis dataKey="day" tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} />
+                      <XAxis dataKey="day" tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v => dayLabel(v, lang)} />
                       <YAxis tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
                       <Tooltip
                         contentStyle={{ background: "#0d1424", border: "1px solid #162032", borderRadius: 10, fontSize: 11 }}
-                        formatter={(v, n, p) => [`${fmt$(v)} · ${p.payload.count} trade${p.payload.count !== 1 ? "s" : ""}`, "P&L"]}
-                        labelFormatter={l => `${["Sun","Mon","Tue","Wed","Thu","Fri"].includes(l) ? ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday"][["Sun","Mon","Tue","Wed","Thu","Fri"].indexOf(l)] : l}`}
+                        formatter={(v, n, p) => [`${fmt$(v)} · ${p.payload.count} ${t.trades}`, "P&L"]}
+                        labelFormatter={l => lang === "he"
+                          ? dayLabel(l, "he")
+                          : (["Sun","Mon","Tue","Wed","Thu","Fri"].includes(l) ? ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday"][["Sun","Mon","Tue","Wed","Thu","Fri"].indexOf(l)] : l)}
                       />
                       <ReferenceLine y={0} stroke="#334155" />
                       <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
@@ -3947,8 +3950,8 @@ export default function SwingEdge() {
               const short = name => name.length > 11 ? name.slice(0, 10) + "…" : name;
               return (
                 <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
-                  <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">Win Rate by Setup<InfoTooltip label="Win Rate by Setup">{lang === 'he' ? 'אחוז הזכייה לכל סטאפ. עמודות סגולות = מעל 50% WR. עמודות אפורות = מתחת ל-50%. גובה העמודה = מספר עסקאות.' : 'Win rate per setup. Purple bars = above 50% WR. Gray bars = below 50%. Bar height = trade count.'}</InfoTooltip></h3>
-                  <p className="text-xs text-slate-600 mb-4">Success % per setup · bar label = trade count</p>
+                  <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">{t.winRateBySetup}<InfoTooltip label="Win Rate by Setup">{lang === 'he' ? 'אחוז הזכייה לכל סטאפ. עמודות סגולות = מעל 50% WR. עמודות אפורות = מתחת ל-50%. גובה העמודה = מספר עסקאות.' : 'Win rate per setup. Purple bars = above 50% WR. Gray bars = below 50%. Bar height = trade count.'}</InfoTooltip></h3>
+                  <p className="text-xs text-slate-600 mb-4">{t.winRateBySetupSubtitle}</p>
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={data} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
@@ -3956,7 +3959,7 @@ export default function SwingEdge() {
                       <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`} />
                       <Tooltip
                         contentStyle={{ background: "#0d1424", border: "1px solid #162032", borderRadius: 10, fontSize: 11 }}
-                        formatter={(v, n, p) => [`${v}% · ${p.payload.count} trade${p.payload.count !== 1 ? "s" : ""}`, "Win Rate"]}
+                        formatter={(v, n, p) => [`${v}% · ${p.payload.count} ${t.trades}`, "Win Rate"]}
                         labelFormatter={l => l}
                       />
                       <ReferenceLine y={50} stroke="#475569" strokeDasharray="4 4" label={{ value: "50%", position: "insideTopRight", fontSize: 9, fill: "#475569" }} />
@@ -4001,45 +4004,45 @@ export default function SwingEdge() {
                   {/* Best Day */}
                   <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-emerald-500/20 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs font-semibold tracking-widest uppercase text-emerald-400 flex items-center gap-1">Best Day<InfoTooltip label="Best Day">{lang === 'he' ? 'יום השבוע שבו הרווחת הכי הרבה מבחינת P&L כולל ומספר עסקאות.' : 'The weekday where you made the most total P&L and traded most successfully.'}</InfoTooltip></span>
+                      <span className="text-xs font-semibold tracking-widest uppercase text-emerald-400 flex items-center gap-1">{t.bestDay}<InfoTooltip label="Best Day">{lang === 'he' ? 'יום השבוע שבו הרווחת הכי הרבה מבחינת P&L כולל ומספר עסקאות.' : 'The weekday where you made the most total P&L and traded most successfully.'}</InfoTooltip></span>
                     </div>
                     {bestDayEntry ? (
                       <>
-                        <div className="text-2xl font-bold text-white font-mono">{bestDayEntry[0]}</div>
-                        <div className="text-xs text-slate-500 mt-1">{fmt$(Math.round(bestDayEntry[1].pnl))} · {bestDayEntry[1].count} trade{bestDayEntry[1].count !== 1 ? "s" : ""}</div>
+                        <div className="text-2xl font-bold text-white font-mono">{dayLabel(bestDayEntry[0], lang)}</div>
+                        <div className="text-xs text-slate-500 mt-1">{fmt$(Math.round(bestDayEntry[1].pnl))} · {bestDayEntry[1].count} {t.trades}</div>
                       </>
                     ) : (
-                      <div className="text-sm text-slate-600">Log closed trades to see insights</div>
+                      <div className="text-sm text-slate-600">{t.logClosedForInsights}</div>
                     )}
                   </div>
 
                   {/* Best Setup */}
                   <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-violet-500/20 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs font-semibold tracking-widest uppercase text-violet-400 flex items-center gap-1">Best Setup<InfoTooltip label="Best Setup">{lang === 'he' ? 'הסטאפ הרווחי ביותר שלך לפי P&L כולל ואחוז זכייה. זה ה-Edge שלך — תסחור אותו יותר.' : 'Your most profitable setup by total P&L and win rate. This is your edge — trade it more.'}</InfoTooltip></span>
+                      <span className="text-xs font-semibold tracking-widest uppercase text-violet-400 flex items-center gap-1">{t.bestSetup}<InfoTooltip label="Best Setup">{lang === 'he' ? 'הסטאפ הרווחי ביותר שלך לפי P&L כולל ואחוז זכייה. זה ה-Edge שלך — תסחור אותו יותר.' : 'Your most profitable setup by total P&L and win rate. This is your edge — trade it more.'}</InfoTooltip></span>
                     </div>
                     {bestSetup ? (
                       <>
                         <div className="text-2xl font-bold text-white font-mono">{bestSetup.setup}</div>
-                        <div className="text-xs text-slate-500 mt-1">{bestSetup.winRate.toFixed(0)}% win rate · {bestSetup.count} trade{bestSetup.count !== 1 ? "s" : ""}</div>
+                        <div className="text-xs text-slate-500 mt-1">{bestSetup.winRate.toFixed(0)}% {t.winRate} · {bestSetup.count} {t.trades}</div>
                       </>
                     ) : (
-                      <div className="text-sm text-slate-600">Log closed trades to see insights</div>
+                      <div className="text-sm text-slate-600">{t.logClosedForInsights}</div>
                     )}
                   </div>
 
                   {/* Best Emotion */}
                   <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-amber-500/20 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs font-semibold tracking-widest uppercase text-amber-400 flex items-center gap-1">Best Emotion<InfoTooltip label="Best Emotion">{lang === 'he' ? 'המצב הרגשי שבו אתה מניב הכי טוב. כשאתה מרגיש ככה — הביצועים שלך חדים יותר.' : 'The emotional state where you perform best. When you feel this way, your trading is sharper.'}</InfoTooltip></span>
+                      <span className="text-xs font-semibold tracking-widest uppercase text-amber-400 flex items-center gap-1">{t.bestEmotion}<InfoTooltip label="Best Emotion">{lang === 'he' ? 'המצב הרגשי שבו אתה מניב הכי טוב. כשאתה מרגיש ככה — הביצועים שלך חדים יותר.' : 'The emotional state where you perform best. When you feel this way, your trading is sharper.'}</InfoTooltip></span>
                     </div>
                     {bestEmotion ? (
                       <>
                         <div className="text-2xl font-bold text-white font-mono">{bestEmotion.emotion}</div>
-                        <div className="text-xs text-slate-500 mt-1">{bestEmotion.winRate.toFixed(0)}% win rate · {bestEmotion.count} trade{bestEmotion.count !== 1 ? "s" : ""}</div>
+                        <div className="text-xs text-slate-500 mt-1">{bestEmotion.winRate.toFixed(0)}% {t.winRate} · {bestEmotion.count} {t.trades}</div>
                       </>
                     ) : (
-                      <div className="text-sm text-slate-600">Log closed trades to see insights</div>
+                      <div className="text-sm text-slate-600">{t.logClosedForInsights}</div>
                     )}
                   </div>
                 </div>

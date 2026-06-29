@@ -386,7 +386,7 @@ export const coachTrade = ({ form, trades = [], dna = null, edges = null, regime
       icon: "🎯", kind: "go", weight: 10,
       text: {
         en: `Matches your top edge: ${edgeMatch.edge.pattern} (${edgeMatch.edge.winRate}% win).`,
-        he: `תואם ל-Edge המוביל שלך: ${edgeMatch.edge.pattern} (${edgeMatch.edge.winRate}% הצלחה).`,
+        he: `תואם ל-Edge המוביל שלך: ${edgeMatch.edge.patternHe || edgeMatch.edge.pattern} (${edgeMatch.edge.winRate}% הצלחה).`,
       },
     });
   }
@@ -395,7 +395,7 @@ export const coachTrade = ({ form, trades = [], dna = null, edges = null, regime
       icon: "☠️", kind: "skip", weight: -15,
       text: {
         en: `Matches a losing pattern: ${antiEdgeMatch.antiEdge.pattern} (${antiEdgeMatch.antiEdge.winRate}% win).`,
-        he: `תואם לדפוס מפסיד: ${antiEdgeMatch.antiEdge.pattern} (${antiEdgeMatch.antiEdge.winRate}% הצלחה).`,
+        he: `תואם לדפוס מפסיד: ${antiEdgeMatch.antiEdge.patternHe || antiEdgeMatch.antiEdge.pattern} (${antiEdgeMatch.antiEdge.winRate}% הצלחה).`,
       },
     });
   }

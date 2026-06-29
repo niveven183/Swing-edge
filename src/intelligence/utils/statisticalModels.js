@@ -190,6 +190,16 @@ export const dayOfWeek = (trade) => {
   return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()];
 };
 
+// ─── DISPLAY-ONLY day label ──────────────────────────────────────────────────
+// Translates a day name to Hebrew short form for rendering. Accepts BOTH the
+// short ("Sun") and full ("Sunday") English forms. NEVER use the result as a
+// key or lookup — statistical grouping must keep running on the English value.
+const HE_DAY_SHORT = { Sun:"א׳", Mon:"ב׳", Tue:"ג׳", Wed:"ד׳", Thu:"ה׳", Fri:"ו׳", Sat:"ש׳" };
+export const dayLabel = (day, lang = "en") => {
+  if (lang !== "he" || day == null) return day;
+  return HE_DAY_SHORT[String(day).slice(0, 3)] || day;
+};
+
 export const hourOfDay = (trade) => {
   const ts = trade.createdAt;
   if (!ts) return null;

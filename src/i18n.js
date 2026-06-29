@@ -196,6 +196,9 @@ const en = {
   bestSetup: "Best Setup",
   bestEmotion: "Best Emotion",
   logClosedForInsights: "Log closed trades to see insights",
+  rTotal: "total",
+  pnlByDaySubtitle: "Total profit/loss per trading day",
+  winRateBySetupSubtitle: "Success % per setup · bar label = trade count",
 
   // Settings
   profileAndSettings: "Profile & Settings",
@@ -574,6 +577,9 @@ const he = {
   bestSetup: "סטאפ הכי טוב",
   bestEmotion: "רגש הכי טוב",
   logClosedForInsights: "סגור עסקאות כדי לראות תובנות",
+  rTotal: "סה\"כ",
+  pnlByDaySubtitle: "רווח/הפסד כולל לכל יום מסחר",
+  winRateBySetupSubtitle: "אחוז הצלחה לכל סטאפ · תווית העמודה = מספר עסקאות",
 
   // Settings
   profileAndSettings: "פרופיל והגדרות",

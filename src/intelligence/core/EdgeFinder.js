@@ -3,7 +3,7 @@
 // R/R } from the closed trade history. Returns Top Edges and Anti-Edges.
 
 import {
-  getClosed, isWin, rOf, avgR, wilsonLowerBound, edgeScore, dayOfWeek, rrBucket,
+  getClosed, isWin, rOf, avgR, wilsonLowerBound, edgeScore, dayOfWeek, dayLabel, rrBucket,
   MIN_SAMPLE_EDGE,
 } from "../utils/statisticalModels.js";
 import { qstars } from "../../utils.js";
@@ -38,7 +38,14 @@ const groupKey = (trade, dims) =>
 // Soft comma joiner — used only for prose (Top-Edge / Anti-Edge sentences and the
 // Decision Coach). The card UI renders typed chips from the raw key instead, so a
 // mechanical " + " never reaches the screen (it also breaks under RTL bidi).
-const prettyPattern = (key) => key.split(" + ").map(s => s.split(":")[1]).join(", ");
+// `lang` translates day-dimension VALUES for display only (e.g. "Sun" → "א׳").
+// All other dimensions and the underlying key are left untouched.
+const prettyPattern = (key, lang = "en") => key.split(" + ").map(s => {
+  const i = s.indexOf(":");
+  if (i === -1) return s;
+  const dim = s.slice(0, i), value = s.slice(i + 1);
+  return dim === "day" ? dayLabel(value, lang) : value;
+}).join(", ");
 
 const scorePattern = (list) => {
   const wins = list.filter(isWin).length;
@@ -83,17 +90,18 @@ const enumeratePatterns = (trades, dimSize = 3) => {
 
 // Build a human message from the pattern result, in both languages.
 const messagesFor = (result, sign) => {
-  const pretty = prettyPattern(result.key);
+  const prettyEn = prettyPattern(result.key, "en");
+  const prettyHe = prettyPattern(result.key, "he");
   const wr = Math.round(result.winRate * 100);
   if (sign === "edge") {
     return {
-      en: `Pattern "${pretty}" → ${wr}% win rate, avg ${result.avgR.toFixed(2)}R across ${result.n} trades. Lean into it.`,
-      he: `הדפוס "${pretty}" → ${wr}% הצלחה, ${result.avgR.toFixed(2)}R ממוצע ב-${result.n} עסקאות. זה ה-Edge שלך.`,
+      en: `Pattern "${prettyEn}" → ${wr}% win rate, avg ${result.avgR.toFixed(2)}R across ${result.n} trades. Lean into it.`,
+      he: `הדפוס "${prettyHe}" → ${wr}% הצלחה, ${result.avgR.toFixed(2)}R ממוצע ב-${result.n} עסקאות. זה ה-Edge שלך.`,
     };
   }
   return {
-    en: `Avoid "${pretty}" — ${wr}% win rate, ${result.avgR.toFixed(2)}R avg across ${result.n} trades.`,
-    he: `הימנע מ-"${pretty}" — ${wr}% הצלחה, ${result.avgR.toFixed(2)}R ב-${result.n} עסקאות.`,
+    en: `Avoid "${prettyEn}" — ${wr}% win rate, ${result.avgR.toFixed(2)}R avg across ${result.n} trades.`,
+    he: `הימנע מ-"${prettyHe}" — ${wr}% הצלחה, ${result.avgR.toFixed(2)}R ב-${result.n} עסקאות.`,
   };
 };
 
@@ -106,7 +114,8 @@ export const findEdges = (trades, { topK = 3 } = {}) => {
     .sort((a, b) => b.score - a.score || b.avgR - a.avgR)
     .slice(0, topK)
     .map(r => ({
-      pattern: prettyPattern(r.key),
+      pattern: prettyPattern(r.key, "en"),
+      patternHe: prettyPattern(r.key, "he"),
       key: r.key,
       winRate: Math.round(r.winRate * 100),
       trades: r.n,
@@ -120,7 +129,8 @@ export const findEdges = (trades, { topK = 3 } = {}) => {
     .filter(r => r.winRate < 0.5 || r.avgR < 0)
     .slice(0, topK)
     .map(r => ({
-      pattern: prettyPattern(r.key),
+      pattern: prettyPattern(r.key, "en"),
+      patternHe: prettyPattern(r.key, "he"),
       key: r.key,
       winRate: Math.round(r.winRate * 100),
       trades: r.n,

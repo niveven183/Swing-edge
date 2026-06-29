@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import InfoTooltip from "../../components/ui/InfoTooltip.jsx";
 import TermTooltip from "../../components/ui/TermTooltip.jsx";
 import { TRADING_TOOLTIPS } from "../../data/tooltips.js";
+import { dayLabel } from "../utils/statisticalModels.js";
 import {
   Brain, Sparkles, Shield, Flame, TrendingUp, TrendingDown,
   AlertTriangle, Activity, Target, Compass, Zap, Timer,
@@ -100,7 +101,7 @@ export const parsePatternKey = (key = "") =>
     return idx === -1 ? { dim: "day", value: p } : { dim: p.slice(0, idx), value: p.slice(idx + 1) };
   });
 
-export const PatternTags = ({ parts = [], className = "" }) => {
+export const PatternTags = ({ parts = [], className = "", lang = "en" }) => {
   const list = (parts || []).filter(p => p && p.value != null && p.value !== "");
   if (!list.length) return null;
   // dir="ltr" keeps the Latin-valued chips in a stable left-to-right order even
@@ -112,7 +113,9 @@ export const PatternTags = ({ parts = [], className = "" }) => {
           key={`${p.dim}:${p.value}:${i}`}
           className={`text-[11px] px-2 py-0.5 rounded-full border font-semibold whitespace-nowrap ${TAG_TONES[p.dim] || TAG_TONES.day}`}
         >
-          {p.value}
+          {/* Day-dimension values are display-translated (e.g. "Sun" → "א׳");
+              every other dimension renders its raw English value unchanged. */}
+          {p.dim === "day" ? dayLabel(p.value, lang) : p.value}
         </span>
       ))}
     </div>
@@ -138,7 +141,7 @@ export const EdgeCard = ({ edge, lang = "he", variant = "edge" }) => {
         </span>
         <TermTooltip term={good ? "edge" : "antiEdge"} lang={lang} />
       </div>
-      <PatternTags parts={parsePatternKey(edge.key)} className="leading-snug" />
+      <PatternTags parts={parsePatternKey(edge.key)} className="leading-snug" lang={lang} />
       <div className="mt-2 flex items-center gap-3 text-[11px] font-mono text-slate-400">
         <span className="text-slate-300"><b className="text-white">{edge.winRate}%</b> WR</span>
         <span>·</span>
