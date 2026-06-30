@@ -4,120 +4,186 @@ export const TRADING_TOOLTIPS = {
 
   winRate: {
     en: "Win Rate is the percentage of your closed trades that ended in profit.\n\nAbove 55% is solid. But win rate alone doesn't determine success — a trader with 40% WR can be profitable with strong risk-reward ratios. Focus on Profit Factor too.",
-    he: "אחוז הזכייה הוא האחוז מהעסקאות הסגורות שהסתיימו ברווח.\n\nמעל 55% זה טוב. אבל אחוז זכייה לבד לא קובע הצלחה — סוחר עם 40% יכול להיות רווחי אם יחס הסיכון-סיכוי שלו גבוה. תסתכל גם על Profit Factor."
+    he: "אחוז הזכייה הוא האחוז מהעסקאות הסגורות שהסתיימו ברווח.\n\nמעל 55% זה טוב. אבל אחוז זכייה לבד לא קובע הצלחה — סוחר עם 40% יכול להיות רווחי אם יחס הסיכון-סיכוי שלו גבוה. תסתכל גם על Profit Factor.",
+    es: "La Win Rate es el porcentaje de tus operaciones cerradas que terminaron en ganancia.\n\nPor encima del 55% es sólido. Pero la win rate por sí sola no determina el éxito — un trader con 40% puede ser rentable con buenas relaciones riesgo-beneficio. Fíjate también en el Profit Factor.",
+    pt: "A Win Rate é a percentagem das tuas operações fechadas que terminaram em lucro.\n\nAcima de 55% é sólido. Mas a win rate sozinha não determina o sucesso — um trader com 40% pode ser lucrativo com boas relações risco-retorno. Repara também no Profit Factor.",
+    ar: "نسبة الربح (Win Rate) هي النسبة المئوية لصفقاتك المغلقة التي انتهت بربح.\n\nأعلى من 55% جيّدة. لكن نسبة الربح وحدها لا تحدّد النجاح — فمتداول بنسبة 40% قد يكون رابحاً إذا كانت نسب المخاطرة/العائد قوية. انظر أيضاً إلى Profit Factor."
   },
 
   profitFactor: {
     en: "Profit Factor = Total Gross Wins ÷ Total Gross Losses.\n\n• Above 1.0 = profitable\n• Above 1.5 = healthy edge\n• Above 2.0 = professional level\n• Above 3.0 = exceptional\n\nThis is one of the most important metrics in trading.",
-    he: "Profit Factor = סה״כ רווחים גולמיים ÷ סה״כ הפסדים גולמיים.\n\n• מעל 1.0 = רווחי\n• מעל 1.5 = Edge בריא\n• מעל 2.0 = רמה מקצועית\n• מעל 3.0 = יוצא דופן\n\nזה אחד המדדים החשובים ביותר במסחר."
+    he: "Profit Factor = סה״כ רווחים גולמיים ÷ סה״כ הפסדים גולמיים.\n\n• מעל 1.0 = רווחי\n• מעל 1.5 = Edge בריא\n• מעל 2.0 = רמה מקצועית\n• מעל 3.0 = יוצא דופן\n\nזה אחד המדדים החשובים ביותר במסחר.",
+    es: "Profit Factor = Ganancias Brutas Totales ÷ Pérdidas Brutas Totales.\n\n• Por encima de 1.0 = rentable\n• Por encima de 1.5 = ventaja sana\n• Por encima de 2.0 = nivel profesional\n• Por encima de 3.0 = excepcional\n\nEs una de las métricas más importantes en el trading.",
+    pt: "Profit Factor = Lucros Brutos Totais ÷ Perdas Brutas Totais.\n\n• Acima de 1.0 = lucrativo\n• Acima de 1.5 = vantagem saudável\n• Acima de 2.0 = nível profissional\n• Acima de 3.0 = excecional\n\nÉ uma das métricas mais importantes no trading.",
+    ar: "Profit Factor = إجمالي الأرباح ÷ إجمالي الخسائر.\n\n• أعلى من 1.0 = رابح\n• أعلى من 1.5 = أفضلية صحّية\n• أعلى من 2.0 = مستوى احترافي\n• أعلى من 3.0 = استثنائي\n\nمن أهم المقاييس في التداول."
   },
 
   avgR: {
     en: "Average R-Multiple per closed trade.\n\nR = (Exit Price − Entry Price) ÷ Initial Risk Per Share.\n\n+1.0R means you made exactly what you risked. Aim for +0.3R or higher as a minimum average. Elite traders average +1.5R to +2.5R.",
-    he: "ממוצע R-Multiple לעסקה סגורה.\n\nR = (מחיר יציאה − מחיר כניסה) ÷ סיכון ראשוני למניה.\n\n+1.0R אומר שהרווחת בדיוק כמה שסיכנת. שאף ל-+0.3R לפחות כממוצע. סוחרים עילית מגיעים ל-+1.5R עד +2.5R."
+    he: "ממוצע R-Multiple לעסקה סגורה.\n\nR = (מחיר יציאה − מחיר כניסה) ÷ סיכון ראשוני למניה.\n\n+1.0R אומר שהרווחת בדיוק כמה שסיכנת. שאף ל-+0.3R לפחות כממוצע. סוחרים עילית מגיעים ל-+1.5R עד +2.5R.",
+    es: "R-Multiple promedio por operación cerrada.\n\nR = (Precio de Salida − Precio de Entrada) ÷ Riesgo Inicial por Acción.\n\n+1.0R significa que ganaste exactamente lo que arriesgaste. Apunta a +0.3R o más como promedio mínimo. Los traders de élite promedian +1.5R a +2.5R.",
+    pt: "R-Multiple médio por operação fechada.\n\nR = (Preço de Saída − Preço de Entrada) ÷ Risco Inicial por Ação.\n\n+1.0R significa que ganhaste exatamente o que arriscaste. Aponta para +0.3R ou mais como média mínima. Traders de elite têm média de +1.5R a +2.5R.",
+    ar: "متوسّط R-Multiple لكل صفقة مغلقة.\n\nR = (سعر الخروج − سعر الدخول) ÷ المخاطرة الأوّلية للسهم.\n\n+1.0R يعني أنك ربحت تماماً ما خاطرت به. استهدف +0.3R أو أعلى كحدّ أدنى للمتوسّط. متداولو النخبة يحقّقون متوسّط +1.5R إلى +2.5R."
   },
 
   expectancy: {
     en: "Expectancy = (Win% × Avg Win) − (Loss% × Avg Loss).\n\nTells you the expected dollar profit per trade on average. Positive = your system has edge. Negative = you're losing money over time regardless of individual wins.",
-    he: "תוחלת = (אחוז זכייה × רווח ממוצע) − (אחוז הפסד × הפסד ממוצע).\n\nמראה כמה דולר אתה מצפה לרוויח בממוצע לעסקה. חיובי = יש לך Edge. שלילי = אתה מפסיד לאורך זמן בלי קשר לניצחונות בודדים."
+    he: "תוחלת = (אחוז זכייה × רווח ממוצע) − (אחוז הפסד × הפסד ממוצע).\n\nמראה כמה דולר אתה מצפה לרוויח בממוצע לעסקה. חיובי = יש לך Edge. שלילי = אתה מפסיד לאורך זמן בלי קשר לניצחונות בודדים.",
+    es: "Expectativa = (% Ganancias × Ganancia Media) − (% Pérdidas × Pérdida Media).\n\nTe dice el beneficio esperado en dólares por operación en promedio. Positiva = tu sistema tiene ventaja. Negativa = pierdes dinero con el tiempo sin importar las ganancias individuales.",
+    pt: "Expectativa = (% Ganhos × Ganho Médio) − (% Perdas × Perda Média).\n\nDiz-te o lucro esperado em dólares por operação em média. Positiva = o teu sistema tem vantagem. Negativa = perdes dinheiro ao longo do tempo independentemente dos ganhos individuais.",
+    ar: "التوقّع = (نسبة الربح × متوسّط الربح) − (نسبة الخسارة × متوسّط الخسارة).\n\nيخبرك بالربح المتوقّع بالدولار لكل صفقة في المتوسّط. موجب = نظامك يملك أفضلية. سالب = تخسر المال مع الوقت بغضّ النظر عن المكاسب الفردية."
   },
 
   sharpe: {
     en: "Sharpe Ratio measures risk-adjusted return.\n\n• Above 1.0 = good\n• Above 2.0 = excellent\n• Above 3.0 = exceptional (hedge fund level)\n\nA high Sharpe means consistent returns without wild swings. More important than raw profit for evaluating system quality.",
-    he: "יחס שארפ מודד תשואה מותאמת לסיכון.\n\n• מעל 1.0 = טוב\n• מעל 2.0 = מצוין\n• מעל 3.0 = יוצא דופן (רמת קרן גידור)\n\nשארפ גבוה = תשואות עקביות בלי תנודות חריפות. חשוב יותר מרווח גולמי להערכת איכות המערכת."
+    he: "יחס שארפ מודד תשואה מותאמת לסיכון.\n\n• מעל 1.0 = טוב\n• מעל 2.0 = מצוין\n• מעל 3.0 = יוצא דופן (רמת קרן גידור)\n\nשארפ גבוה = תשואות עקביות בלי תנודות חריפות. חשוב יותר מרווח גולמי להערכת איכות המערכת.",
+    es: "El Ratio de Sharpe mide el rendimiento ajustado al riesgo.\n\n• Por encima de 1.0 = bueno\n• Por encima de 2.0 = excelente\n• Por encima de 3.0 = excepcional (nivel de hedge fund)\n\nUn Sharpe alto significa rendimientos consistentes sin oscilaciones bruscas. Más importante que el beneficio bruto para evaluar la calidad del sistema.",
+    pt: "O Rácio de Sharpe mede o retorno ajustado ao risco.\n\n• Acima de 1.0 = bom\n• Acima de 2.0 = excelente\n• Acima de 3.0 = excecional (nível de hedge fund)\n\nUm Sharpe alto significa retornos consistentes sem oscilações bruscas. Mais importante que o lucro bruto para avaliar a qualidade do sistema.",
+    ar: "يقيس مقياس شارب (Sharpe) العائد المعدّل حسب المخاطرة.\n\n• أعلى من 1.0 = جيّد\n• أعلى من 2.0 = ممتاز\n• أعلى من 3.0 = استثنائي (مستوى صناديق التحوّط)\n\nشارب المرتفع يعني عوائد متّسقة دون تقلّبات حادّة. أهمّ من الربح الخام لتقييم جودة النظام."
   },
 
   maxDD: {
     en: "Maximum Drawdown — the largest dollar drop from a peak in your account balance to the lowest point before recovery.\n\nA smaller number means fewer large losing streaks and better capital preservation. Deep drawdowns are psychologically damaging and hard to recover from mathematically.",
-    he: "ירידה מקסימלית — הירידה הגדולה ביותר בדולרים מנקודת שיא ביתרת החשבון לנקודת השפל שלפני ההתאוששות.\n\nמספר קטן יותר = פחות רצפי הפסד גדולים ושמירה טובה יותר על הון. ירידות עמוקות פוגעות פסיכולוגית וקשות להתאוששות מתמטית."
+    he: "ירידה מקסימלית — הירידה הגדולה ביותר בדולרים מנקודת שיא ביתרת החשבון לנקודת השפל שלפני ההתאוששות.\n\nמספר קטן יותר = פחות רצפי הפסד גדולים ושמירה טובה יותר על הון. ירידות עמוקות פוגעות פסיכולוגית וקשות להתאוששות מתמטית.",
+    es: "Drawdown Máximo — la mayor caída en dólares desde un pico en el saldo de tu cuenta hasta el punto más bajo antes de recuperarse.\n\nUn número menor significa menos rachas perdedoras grandes y mejor preservación del capital. Los drawdowns profundos son psicológicamente dañinos y difíciles de recuperar matemáticamente.",
+    pt: "Drawdown Máximo — a maior queda em dólares desde um pico no saldo da tua conta até ao ponto mais baixo antes da recuperação.\n\nUm número menor significa menos sequências perdedoras grandes e melhor preservação de capital. Drawdowns profundos são psicologicamente prejudiciais e difíceis de recuperar matematicamente.",
+    ar: "أقصى تراجع (Max Drawdown) — أكبر هبوط بالدولار من قمّة في رصيد حسابك إلى أدنى نقطة قبل التعافي.\n\nالرقم الأصغر يعني سلاسل خسائر كبيرة أقل وحفاظاً أفضل على رأس المال. التراجعات العميقة مؤذية نفسياً وصعبة التعافي رياضياً."
   },
 
   avgHold: {
     en: "Average holding period per closed trade (in days).\n\nSwing trading typically targets 2-10 day holds. Very short holds (< 1 day) often indicate cutting trades too early. Very long holds (> 20 days) may suggest avoiding stop-losses.",
-    he: "זמן החזקה ממוצע לעסקה סגורה (בימים).\n\nמסחר סווינג מכוון בדרך כלל ל-2-10 ימים. החזקות קצרות מאוד (< 1 יום) מעידות לעיתים על יציאה מוקדמת מדי. החזקות ארוכות מאוד (> 20 ימים) עשויות להצביע על הימנעות מסטופ לוס."
+    he: "זמן החזקה ממוצע לעסקה סגורה (בימים).\n\nמסחר סווינג מכוון בדרך כלל ל-2-10 ימים. החזקות קצרות מאוד (< 1 יום) מעידות לעיתים על יציאה מוקדמת מדי. החזקות ארוכות מאוד (> 20 ימים) עשויות להצביע על הימנעות מסטופ לוס.",
+    es: "Periodo medio de mantenimiento por operación cerrada (en días).\n\nEl swing trading suele apuntar a mantener 2-10 días. Mantenimientos muy cortos (< 1 día) a menudo indican cerrar operaciones demasiado pronto. Mantenimientos muy largos (> 20 días) pueden sugerir evitar los stop-loss.",
+    pt: "Período médio de manutenção por operação fechada (em dias).\n\nO swing trading costuma apontar para manter 2-10 dias. Manutenções muito curtas (< 1 dia) muitas vezes indicam fechar operações cedo demais. Manutenções muito longas (> 20 dias) podem sugerir evitar os stop-loss.",
+    ar: "متوسّط فترة الاحتفاظ لكل صفقة مغلقة (بالأيام).\n\nيستهدف التداول المتأرجح عادةً الاحتفاظ 2-10 أيام. فترات الاحتفاظ القصيرة جداً (< يوم واحد) كثيراً ما تعني إغلاق الصفقات مبكراً. والطويلة جداً (> 20 يوماً) قد تعني تجنّب أوامر وقف الخسارة."
   },
 
   equityCurve: {
     en: "Your Equity Curve shows account balance over time.\n\nA smooth, steadily rising curve = consistent edge and good risk management.\nJagged spikes = inconsistent position sizing or emotional trading.\nLong flat periods = overtrading without edge.",
-    he: "עקומת ההון מציגה את יתרת החשבון לאורך זמן.\n\nעקומה חלקה ועולה באופן עקבי = Edge עקבי וניהול סיכון טוב.\nקפיצות חדות = גודל פוזיציה לא עקבי או מסחר רגשי.\nתקופות שטוחות ארוכות = מסחר יתר ללא Edge."
+    he: "עקומת ההון מציגה את יתרת החשבון לאורך זמן.\n\nעקומה חלקה ועולה באופן עקבי = Edge עקבי וניהול סיכון טוב.\nקפיצות חדות = גודל פוזיציה לא עקבי או מסחר רגשי.\nתקופות שטוחות ארוכות = מסחר יתר ללא Edge.",
+    es: "Tu Curva de Capital muestra el saldo de la cuenta a lo largo del tiempo.\n\nUna curva suave y en ascenso constante = ventaja consistente y buena gestión del riesgo.\nPicos irregulares = tamaño de posición inconsistente o trading emocional.\nLargos periodos planos = sobreoperar sin ventaja.",
+    pt: "A tua Curva de Capital mostra o saldo da conta ao longo do tempo.\n\nUma curva suave e em ascensão constante = vantagem consistente e boa gestão de risco.\nPicos irregulares = tamanho de posição inconsistente ou trading emocional.\nLongos períodos planos = operar em excesso sem vantagem.",
+    ar: "تُظهر منحنى رأس المال رصيد حسابك عبر الزمن.\n\nمنحنى سلس وصاعد بثبات = أفضلية متّسقة وإدارة مخاطر جيّدة.\nقفزات حادّة = حجم صفقات غير متّسق أو تداول عاطفي.\nفترات مسطّحة طويلة = إفراط في التداول دون أفضلية."
   },
 
   // ── AI & Analytics (rich content) ────────────────────────────────────────
 
   dna: {
     en: "Your Trading DNA measures 4 core dimensions of your trading personality:\n\n• Risk Management (0-100): How well you control losses\n• Discipline (0-100): Do you follow your rules?\n• Consistency (0-100): Stable results across different conditions\n• Growth (0-100): Are you improving over time?\n\nBased on your actual trade history — not self-assessment.",
-    he: "ה-DNA המסחרי שלך מודד 4 ממדים מרכזיים:\n\n• ניהול סיכון (0-100): כמה טוב אתה שולט בהפסדים\n• משמעת (0-100): האם אתה עוקב אחר הכללים שלך?\n• עקביות (0-100): תוצאות יציבות בתנאים שונים\n• צמיחה (0-100): האם אתה משתפר לאורך זמן?\n\nמבוסס על היסטוריית העסקאות האמיתית שלך — לא הערכה עצמית."
+    he: "ה-DNA המסחרי שלך מודד 4 ממדים מרכזיים:\n\n• ניהול סיכון (0-100): כמה טוב אתה שולט בהפסדים\n• משמעת (0-100): האם אתה עוקב אחר הכללים שלך?\n• עקביות (0-100): תוצאות יציבות בתנאים שונים\n• צמיחה (0-100): האם אתה משתפר לאורך זמן?\n\nמבוסס על היסטוריית העסקאות האמיתית שלך — לא הערכה עצמית.",
+    es: "Tu Trading DNA mide 4 dimensiones centrales de tu personalidad como trader:\n\n• Gestión de Riesgo (0-100): Qué tan bien controlas las pérdidas\n• Disciplina (0-100): ¿Sigues tus reglas?\n• Consistencia (0-100): Resultados estables en distintas condiciones\n• Crecimiento (0-100): ¿Estás mejorando con el tiempo?\n\nBasado en tu historial real de operaciones — no en autoevaluación.",
+    pt: "O teu Trading DNA mede 4 dimensões centrais da tua personalidade como trader:\n\n• Gestão de Risco (0-100): Quão bem controlas as perdas\n• Disciplina (0-100): Segues as tuas regras?\n• Consistência (0-100): Resultados estáveis em diferentes condições\n• Crescimento (0-100): Estás a melhorar com o tempo?\n\nBaseado no teu histórico real de operações — não em autoavaliação.",
+    ar: "يقيس Trading DNA الخاص بك 4 أبعاد أساسية لشخصيتك كمتداول:\n\n• إدارة المخاطر (0-100): مدى تحكّمك في الخسائر\n• الانضباط (0-100): هل تتّبع قواعدك؟\n• الاتّساق (0-100): نتائج مستقرّة عبر ظروف مختلفة\n• النموّ (0-100): هل تتحسّن مع الوقت؟\n\nمبني على سجلّ صفقاتك الحقيقي — لا على التقييم الذاتي."
   },
 
   edge: {
     en: "Your Edge — setups where you have a statistically significant advantage based on your actual trade history.\n\nHigh win rate + positive average R = real edge. These are the setups you should trade most. The market is paying you to do these.",
-    he: "ה-Edge שלך — סטאפים שבהם יש לך יתרון סטטיסטי משמעותי לפי היסטוריית העסקאות האמיתית שלך.\n\nאחוז זכייה גבוה + R ממוצע חיובי = Edge אמיתי. אלה הסטאפים שעליך לסחור הכי הרבה. השוק משלם לך על אלה."
+    he: "ה-Edge שלך — סטאפים שבהם יש לך יתרון סטטיסטי משמעותי לפי היסטוריית העסקאות האמיתית שלך.\n\nאחוז זכייה גבוה + R ממוצע חיובי = Edge אמיתי. אלה הסטאפים שעליך לסחור הכי הרבה. השוק משלם לך על אלה.",
+    es: "Tu Edge — setups donde tienes una ventaja estadísticamente significativa según tu historial real de operaciones.\n\nAlta win rate + R promedio positivo = edge real. Estos son los setups que más deberías operar. El mercado te paga por hacerlos.",
+    pt: "O teu Edge — setups onde tens uma vantagem estatisticamente significativa segundo o teu histórico real de operações.\n\nWin rate alta + R médio positivo = edge real. Estes são os setups que mais deves operar. O mercado paga-te para os fazeres.",
+    ar: "الـ Edge الخاص بك — نماذج دخول تملك فيها أفضلية ذات دلالة إحصائية بناءً على سجلّ صفقاتك الحقيقي.\n\nنسبة ربح عالية + متوسّط R موجب = أفضلية حقيقية. هذه النماذج هي التي يجب أن تتداولها أكثر. السوق يدفع لك مقابل تنفيذها."
   },
 
   antiEdge: {
     en: "Anti-Edge — setups where you consistently lose money based on your trade history.\n\nLow win rate + negative R = your personal anti-edge. Either fix these setups (study why they fail for you) or stop trading them entirely.\n\nAvoiding anti-edges is as important as exploiting edges.",
-    he: "Anti-Edge — סטאפים שבהם אתה מפסיד כסף באופן עקבי לפי היסטוריית העסקאות שלך.\n\nאחוז זכייה נמוך + R שלילי = ה-Anti-Edge האישי שלך. תתקן אותם (תלמד למה הם נכשלים עבורך) או תפסיק לסחור אותם לחלוטין.\n\nהימנעות מ-Anti-Edge חשובה כמו ניצול Edge."
+    he: "Anti-Edge — סטאפים שבהם אתה מפסיד כסף באופן עקבי לפי היסטוריית העסקאות שלך.\n\nאחוז זכייה נמוך + R שלילי = ה-Anti-Edge האישי שלך. תתקן אותם (תלמד למה הם נכשלים עבורך) או תפסיק לסחור אותם לחלוטין.\n\nהימנעות מ-Anti-Edge חשובה כמו ניצול Edge.",
+    es: "Anti-Edge — setups donde pierdes dinero de forma consistente según tu historial de operaciones.\n\nWin rate baja + R negativo = tu anti-edge personal. O corriges estos setups (estudia por qué te fallan) o dejas de operarlos por completo.\n\nEvitar los anti-edges es tan importante como explotar los edges.",
+    pt: "Anti-Edge — setups onde perdes dinheiro de forma consistente segundo o teu histórico de operações.\n\nWin rate baixa + R negativo = o teu anti-edge pessoal. Ou corriges estes setups (estuda por que te falham) ou deixas de os operar por completo.\n\nEvitar os anti-edges é tão importante como explorar os edges.",
+    ar: "Anti-Edge — نماذج دخول تخسر فيها المال باستمرار بناءً على سجلّ صفقاتك.\n\nنسبة ربح منخفضة + R سالب = الأنتي-إيدج الشخصي لديك. إمّا أن تُصلح هذه النماذج (ادرس لماذا تفشل معك) أو تتوقّف عن تداولها نهائياً.\n\nتجنّب الأنتي-إيدج لا يقلّ أهمية عن استغلال الإيدج."
   },
 
   tilt: {
     en: "Tilt — emotional state that causes you to deviate from your trading rules.\n\nCommon after: large losses, missing a big move, or a string of wins creating overconfidence.\n\nSigns: increasing position size, trading more frequently, ignoring stops.\n\nPrevention: mandatory break after 2+ consecutive losses.",
-    he: "Tilt — מצב רגשי שגורם לסטייה מכללי המסחר שלך.\n\nנפוץ אחרי: הפסדים גדולים, פספוס תנועה גדולה, או סדרת ניצחונות שיוצרת בטחון יתר.\n\nסימנים: הגדלת גודל פוזיציה, מסחר תכוף יותר, התעלמות מסטופים.\n\nמניעה: הפסקה חובה אחרי 2+ הפסדים רצופים."
+    he: "Tilt — מצב רגשי שגורם לסטייה מכללי המסחר שלך.\n\nנפוץ אחרי: הפסדים גדולים, פספוס תנועה גדולה, או סדרת ניצחונות שיוצרת בטחון יתר.\n\nסימנים: הגדלת גודל פוזיציה, מסחר תכוף יותר, התעלמות מסטופים.\n\nמניעה: הפסקה חובה אחרי 2+ הפסדים רצופים.",
+    es: "Tilt — estado emocional que te hace desviarte de tus reglas de trading.\n\nComún tras: grandes pérdidas, perderte un gran movimiento, o una racha de ganancias que genera exceso de confianza.\n\nSeñales: aumentar el tamaño de posición, operar con más frecuencia, ignorar los stops.\n\nPrevención: pausa obligatoria tras 2+ pérdidas consecutivas.",
+    pt: "Tilt — estado emocional que te faz desviar das tuas regras de trading.\n\nComum após: grandes perdas, perder um grande movimento, ou uma sequência de ganhos que gera excesso de confiança.\n\nSinais: aumentar o tamanho de posição, operar com mais frequência, ignorar os stops.\n\nPrevenção: pausa obrigatória após 2+ perdas consecutivas.",
+    ar: "Tilt — حالة عاطفية تجعلك تنحرف عن قواعد تداولك.\n\nشائعة بعد: خسائر كبيرة، أو تفويت حركة كبيرة، أو سلسلة انتصارات تولّد ثقة مفرطة.\n\nالعلامات: زيادة حجم الصفقة، التداول بوتيرة أعلى، تجاهل أوامر الوقف.\n\nالوقاية: استراحة إلزامية بعد خسارتين متتاليتين أو أكثر."
   },
 
   marketRegime: {
     en: "Market Regime — current market environment that affects which setups work best.\n\n• Bull Trend: Momentum, breakouts, pullback entries work best\n• Bear Trend: Short setups, fade the rip, reduce size\n• Sideways/Range: Mean-reversion, avoid breakouts\n• Volatile: Reduce size by 50%, widen stops",
-    he: "מצב שוק — סביבת השוק הנוכחית שמשפיעה על אילו סטאפים עובדים הכי טוב.\n\n• מגמה שורית: מומנטום, פריצות, כניסות בתיקון עובדות הכי טוב\n• מגמה דובית: סטאפי שורט, פייד של עליות, הקטן גודל\n• עצור/טווח: היפוך ממוצע, הימנע מפריצות\n• תנודתי: הקטן גודל ב-50%, הרחב סטופים"
+    he: "מצב שוק — סביבת השוק הנוכחית שמשפיעה על אילו סטאפים עובדים הכי טוב.\n\n• מגמה שורית: מומנטום, פריצות, כניסות בתיקון עובדות הכי טוב\n• מגמה דובית: סטאפי שורט, פייד של עליות, הקטן גודל\n• עצור/טווח: היפוך ממוצע, הימנע מפריצות\n• תנודתי: הקטן גודל ב-50%, הרחב סטופים",
+    es: "Régimen de Mercado — el entorno de mercado actual que afecta qué setups funcionan mejor.\n\n• Tendencia Alcista: Momentum, breakouts, entradas en pullback funcionan mejor\n• Tendencia Bajista: Setups en corto, fade del rebote, reduce tamaño\n• Lateral/Rango: Reversión a la media, evita breakouts\n• Volátil: Reduce tamaño 50%, amplía stops",
+    pt: "Regime de Mercado — o ambiente de mercado atual que afeta quais setups funcionam melhor.\n\n• Tendência de Alta: Momentum, breakouts, entradas em pullback funcionam melhor\n• Tendência de Baixa: Setups vendidos, fade do repique, reduz tamanho\n• Lateral/Range: Reversão à média, evita breakouts\n• Volátil: Reduz tamanho 50%, amplia stops",
+    ar: "نظام السوق — بيئة السوق الحالية التي تؤثّر على أي النماذج تعمل بأفضل شكل.\n\n• اتجاه صاعد: الزخم والاختراقات والدخول عند التراجع تعمل بأفضل شكل\n• اتجاه هابط: نماذج البيع، fade الارتداد، قلّل الحجم\n• عرضي/نطاق: العودة للمتوسّط، تجنّب الاختراقات\n• متقلّب: قلّل الحجم 50%، وسّع أوامر الوقف"
   },
 
   // ── Risk management (rich content) ───────────────────────────────────────
 
   riskPerTrade: {
     en: "Maximum risk per trade as % of total account.\n\nProfessional standard:\n• 1% per trade = conservative, sustainable\n• 2% per trade = moderate, still acceptable\n• 5%+ per trade = gambling territory\n\n'Risk of ruin' increases exponentially above 2% per trade.",
-    he: "סיכון מקסימלי לעסקה כאחוז מהחשבון הכולל.\n\nסטנדרט מקצועי:\n• 1% לעסקה = שמרני, בר-קיימא\n• 2% לעסקה = מתון, עדיין מקובל\n• 5%+ לעסקה = טריטוריית הימור\n\n'סיכון פשיטת רגל' עולה באופן מעריכי מעל 2% לעסקה."
+    he: "סיכון מקסימלי לעסקה כאחוז מהחשבון הכולל.\n\nסטנדרט מקצועי:\n• 1% לעסקה = שמרני, בר-קיימא\n• 2% לעסקה = מתון, עדיין מקובל\n• 5%+ לעסקה = טריטוריית הימור\n\n'סיכון פשיטת רגל' עולה באופן מעריכי מעל 2% לעסקה.",
+    es: "Riesgo máximo por operación como % del total de la cuenta.\n\nEstándar profesional:\n• 1% por operación = conservador, sostenible\n• 2% por operación = moderado, aún aceptable\n• 5%+ por operación = territorio de apuestas\n\nEl 'riesgo de ruina' aumenta exponencialmente por encima del 2% por operación.",
+    pt: "Risco máximo por operação como % do total da conta.\n\nPadrão profissional:\n• 1% por operação = conservador, sustentável\n• 2% por operação = moderado, ainda aceitável\n• 5%+ por operação = território de apostas\n\nO 'risco de ruína' aumenta exponencialmente acima de 2% por operação.",
+    ar: "أقصى مخاطرة لكل صفقة كنسبة % من إجمالي الحساب.\n\nالمعيار الاحترافي:\n• 1% لكل صفقة = متحفّظ، مستدام\n• 2% لكل صفقة = معتدل، لا يزال مقبولاً\n• 5%+ لكل صفقة = منطقة مقامرة\n\n'مخاطر الإفلاس' ترتفع أُسّياً فوق 2% لكل صفقة."
   },
 
   riskLimits: {
     en: "Two separate limits work together:\n\n• Risk/Trade (1%) — the most you risk on a single position.\n• Max Allowed Risk (3%) — the most you risk across ALL open positions combined.\n\nSo you can hold roughly 3 full-size trades at once before hitting your portfolio risk cap.",
-    he: "שתי תקרות נפרדות שעובדות יחד:\n\n• סיכון/עסקה (1%) — המקסימום שאתה מסכן בפוזיציה בודדת.\n• מקסימום סיכון מותר (3%) — המקסימום שאתה מסכן בכל הפוזיציות הפתוחות יחד.\n\nכלומר אפשר להחזיק בערך 3 עסקאות בגודל מלא בו-זמנית לפני שמגיעים לתקרת הסיכון של התיק."
+    he: "שתי תקרות נפרדות שעובדות יחד:\n\n• סיכון/עסקה (1%) — המקסימום שאתה מסכן בפוזיציה בודדת.\n• מקסימום סיכון מותר (3%) — המקסימום שאתה מסכן בכל הפוזיציות הפתוחות יחד.\n\nכלומר אפשר להחזיק בערך 3 עסקאות בגודל מלא בו-זמנית לפני שמגיעים לתקרת הסיכון של התיק.",
+    es: "Dos límites separados funcionan juntos:\n\n• Riesgo/Operación (1%) — lo máximo que arriesgas en una sola posición.\n• Riesgo Máximo Permitido (3%) — lo máximo que arriesgas en TODAS las posiciones abiertas combinadas.\n\nAsí puedes mantener unas 3 operaciones de tamaño completo a la vez antes de alcanzar tu tope de riesgo de cartera.",
+    pt: "Dois limites separados funcionam juntos:\n\n• Risco/Operação (1%) — o máximo que arriscas numa única posição.\n• Risco Máximo Permitido (3%) — o máximo que arriscas em TODAS as posições abertas combinadas.\n\nAssim podes manter cerca de 3 operações de tamanho completo ao mesmo tempo antes de atingir o teto de risco da carteira.",
+    ar: "حدّان منفصلان يعملان معاً:\n\n• المخاطرة/الصفقة (1%) — أقصى ما تخاطر به في صفقة واحدة.\n• أقصى مخاطرة مسموحة (3%) — أقصى ما تخاطر به في جميع الصفقات المفتوحة مجتمعةً.\n\nأي يمكنك الاحتفاظ بنحو 3 صفقات بحجم كامل في آنٍ واحد قبل بلوغ سقف مخاطر المحفظة."
   },
 
   positionSize: {
     en: "Position Size = (Account Size × Risk %) ÷ (Entry − Stop Loss)\n\nExample: $10,000 account, 1% risk, $100 entry, $97 stop:\nPosition = $100 ÷ $3 = 33 shares\n\nAlways calculate before entry. Never size by feel.",
-    he: "גודל פוזיציה = (גודל חשבון × % סיכון) ÷ (כניסה − סטופ לוס)\n\nדוגמה: חשבון $10,000, סיכון 1%, כניסה $100, סטופ $97:\nפוזיציה = $100 ÷ $3 = 33 מניות\n\nתמיד חשב לפני כניסה. לעולם אל תסיז לפי תחושה."
+    he: "גודל פוזיציה = (גודל חשבון × % סיכון) ÷ (כניסה − סטופ לוס)\n\nדוגמה: חשבון $10,000, סיכון 1%, כניסה $100, סטופ $97:\nפוזיציה = $100 ÷ $3 = 33 מניות\n\nתמיד חשב לפני כניסה. לעולם אל תסיז לפי תחושה.",
+    es: "Tamaño de Posición = (Tamaño de Cuenta × % Riesgo) ÷ (Entrada − Stop Loss)\n\nEjemplo: cuenta de $10,000, 1% de riesgo, entrada $100, stop $97:\nPosición = $100 ÷ $3 = 33 acciones\n\nCalcula siempre antes de entrar. Nunca dimensiones por intuición.",
+    pt: "Tamanho de Posição = (Tamanho da Conta × % Risco) ÷ (Entrada − Stop Loss)\n\nExemplo: conta de $10,000, 1% de risco, entrada $100, stop $97:\nPosição = $100 ÷ $3 = 33 ações\n\nCalcula sempre antes de entrar. Nunca dimensiones por intuição.",
+    ar: "حجم الصفقة = (حجم الحساب × % المخاطرة) ÷ (الدخول − وقف الخسارة)\n\nمثال: حساب $10,000، مخاطرة 1%، دخول $100، وقف $97:\nالصفقة = $100 ÷ $3 = 33 سهماً\n\nاحسب دائماً قبل الدخول. لا تحدّد الحجم بالإحساس أبداً."
   },
 
   stopLoss: {
     en: "Stop Loss — the price level where you exit a losing trade to prevent larger losses.\n\nPlace at a logical technical level:\n• Below key support (long trades)\n• Above key resistance (short trades)\n• Never arbitrary (e.g., 'just $0.50 below entry')\n\nA stop loss is not optional — it's the foundation of risk management.",
-    he: "סטופ לוס — רמת המחיר שבה יוצאים מעסקה מפסידה כדי למנוע הפסדים גדולים יותר.\n\nהצב ברמה טכנית הגיונית:\n• מתחת לתמיכה מרכזית (עסקאות לונג)\n• מעל להתנגדות מרכזית (עסקאות שורט)\n• לעולם לא שרירותי (למשל 'רק $0.50 מתחת לכניסה')\n\nסטופ לוס הוא לא אופציונלי — הוא הבסיס של ניהול הסיכון."
+    he: "סטופ לוס — רמת המחיר שבה יוצאים מעסקה מפסידה כדי למנוע הפסדים גדולים יותר.\n\nהצב ברמה טכנית הגיונית:\n• מתחת לתמיכה מרכזית (עסקאות לונג)\n• מעל להתנגדות מרכזית (עסקאות שורט)\n• לעולם לא שרירותי (למשל 'רק $0.50 מתחת לכניסה')\n\nסטופ לוס הוא לא אופציונלי — הוא הבסיס של ניהול הסיכון.",
+    es: "Stop Loss — el nivel de precio donde sales de una operación perdedora para evitar pérdidas mayores.\n\nColócalo en un nivel técnico lógico:\n• Por debajo de un soporte clave (operaciones largas)\n• Por encima de una resistencia clave (operaciones cortas)\n• Nunca arbitrario (p. ej., 'solo $0.50 bajo la entrada')\n\nUn stop loss no es opcional — es la base de la gestión del riesgo.",
+    pt: "Stop Loss — o nível de preço onde sais de uma operação perdedora para evitar perdas maiores.\n\nColoca-o num nível técnico lógico:\n• Abaixo de um suporte chave (operações compradas)\n• Acima de uma resistência chave (operações vendidas)\n• Nunca arbitrário (ex.: 'só $0.50 abaixo da entrada')\n\nUm stop loss não é opcional — é a base da gestão de risco.",
+    ar: "Stop Loss — مستوى السعر الذي تخرج عنده من صفقة خاسرة لتفادي خسائر أكبر.\n\nضعه عند مستوى فنّي منطقي:\n• أسفل دعم رئيسي (صفقات الشراء)\n• أعلى مقاومة رئيسية (صفقات البيع)\n• ليس عشوائياً أبداً (مثلاً 'فقط $0.50 تحت الدخول')\n\nوقف الخسارة ليس اختيارياً — إنه أساس إدارة المخاطر."
   },
 
   takeProfit: {
     en: "Take Profit — your target price for exiting a winning trade.\n\nMinimum rule: Target must be at least 1.5× your risk (1.5R).\n\nBest practice:\n• Scale out: take 50% at 1R, hold rest to target\n• Use technical levels (resistance, prior highs)\n• Never move target lower when winning",
-    he: "Take Profit — מחיר היעד שלך לסגירת עסקה מנצחת.\n\nכלל מינימום: היעד חייב להיות לפחות 1.5× הסיכון שלך (1.5R).\n\nשיטה טובה:\n• צאת חלקית: קח 50% ב-1R, החזק שאר עד היעד\n• השתמש ברמות טכניות (התנגדות, שיאים קודמים)\n• לעולם אל תזיז יעד למטה בזמן שמנצחים"
+    he: "Take Profit — מחיר היעד שלך לסגירת עסקה מנצחת.\n\nכלל מינימום: היעד חייב להיות לפחות 1.5× הסיכון שלך (1.5R).\n\nשיטה טובה:\n• צאת חלקית: קח 50% ב-1R, החזק שאר עד היעד\n• השתמש ברמות טכניות (התנגדות, שיאים קודמים)\n• לעולם אל תזיז יעד למטה בזמן שמנצחים",
+    es: "Take Profit — tu precio objetivo para salir de una operación ganadora.\n\nRegla mínima: El objetivo debe ser al menos 1.5× tu riesgo (1.5R).\n\nBuena práctica:\n• Salida escalonada: toma 50% en 1R, mantén el resto hasta el objetivo\n• Usa niveles técnicos (resistencia, máximos previos)\n• Nunca muevas el objetivo más abajo cuando vas ganando",
+    pt: "Take Profit — o teu preço-alvo para sair de uma operação vencedora.\n\nRegra mínima: O alvo deve ser pelo menos 1.5× o teu risco (1.5R).\n\nBoa prática:\n• Saída escalonada: tira 50% em 1R, mantém o resto até ao alvo\n• Usa níveis técnicos (resistência, máximos anteriores)\n• Nunca movas o alvo para baixo quando estás a ganhar",
+    ar: "Take Profit — السعر المستهدف للخروج من صفقة رابحة.\n\nالقاعدة الدنيا: يجب أن يكون الهدف 1.5× مخاطرتك على الأقل (1.5R).\n\nأفضل ممارسة:\n• خروج تدريجي: خذ 50% عند 1R، واحتفظ بالباقي حتى الهدف\n• استخدم مستويات فنّية (مقاومة، قمم سابقة)\n• لا تحرّك الهدف للأسفل أبداً وأنت رابح"
   },
 
   rMultiple: {
     en: "R-Multiple = (Exit − Entry) ÷ Initial Risk\n\nExamples:\n+2R = you made 2× what you risked ✓\n+1R = made exactly what you risked ✓\n-1R = lost your planned risk (normal)\n-2R = stop was not honored (problem)\n\nTracking R-Multiple eliminates dollar bias and lets you compare trades objectively.",
-    he: "R-Multiple = (יציאה − כניסה) ÷ סיכון ראשוני\n\nדוגמאות:\n+2R = הרווחת פי 2 ממה שסיכנת ✓\n+1R = הרווחת בדיוק מה שסיכנת ✓\n-1R = הפסדת את הסיכון המתוכנן (נורמלי)\n-2R = הסטופ לא כובד (בעיה)\n\nמעקב אחר R-Multiple מסיר הטיית דולר ומאפשר השוואה אובייקטיבית בין עסקאות."
+    he: "R-Multiple = (יציאה − כניסה) ÷ סיכון ראשוני\n\nדוגמאות:\n+2R = הרווחת פי 2 ממה שסיכנת ✓\n+1R = הרווחת בדיוק מה שסיכנת ✓\n-1R = הפסדת את הסיכון המתוכנן (נורמלי)\n-2R = הסטופ לא כובד (בעיה)\n\nמעקב אחר R-Multiple מסיר הטיית דולר ומאפשר השוואה אובייקטיבית בין עסקאות.",
+    es: "R-Multiple = (Salida − Entrada) ÷ Riesgo Inicial\n\nEjemplos:\n+2R = ganaste 2× lo que arriesgaste ✓\n+1R = ganaste exactamente lo que arriesgaste ✓\n-1R = perdiste tu riesgo planificado (normal)\n-2R = el stop no se respetó (problema)\n\nSeguir el R-Multiple elimina el sesgo del dólar y te permite comparar operaciones objetivamente.",
+    pt: "R-Multiple = (Saída − Entrada) ÷ Risco Inicial\n\nExemplos:\n+2R = ganhaste 2× o que arriscaste ✓\n+1R = ganhaste exatamente o que arriscaste ✓\n-1R = perdeste o teu risco planeado (normal)\n-2R = o stop não foi respeitado (problema)\n\nAcompanhar o R-Multiple elimina o viés do dólar e permite comparar operações objetivamente.",
+    ar: "R-Multiple = (الخروج − الدخول) ÷ المخاطرة الأوّلية\n\nأمثلة:\n+2R = ربحت 2× ما خاطرت به ✓\n+1R = ربحت تماماً ما خاطرت به ✓\n-1R = خسرت مخاطرتك المخطّطة (طبيعي)\n-2R = لم يُحترم وقف الخسارة (مشكلة)\n\nتتبّع R-Multiple يزيل انحياز الدولار ويتيح لك مقارنة الصفقات موضوعياً."
   },
 
   // ── Market Intel chart actions (he+en) ───────────────────────────────────
 
   chartCalcPosition: {
     en: "Auto-fills the Position Calculator from the current chart — ticker, live price as entry, a protective stop and a 2:1 target — then opens it so you can size the trade in one click.",
-    he: "ממלא אוטומטית את מחשבון הפוזיציה מהגרף הנוכחי — טיקר, מחיר חי ככניסה, סטופ מגן ויעד 2:1 — ופותח אותו כדי לחשב גודל עסקה בלחיצה אחת."
+    he: "ממלא אוטומטית את מחשבון הפוזיציה מהגרף הנוכחי — טיקר, מחיר חי ככניסה, סטופ מגן ויעד 2:1 — ופותח אותו כדי לחשב גודל עסקה בלחיצה אחת.",
+    es: "Rellena automáticamente la Calculadora de Posición desde el gráfico actual — ticker, precio en vivo como entrada, un stop protector y un objetivo 2:1 — y luego la abre para que dimensiones la operación en un clic.",
+    pt: "Preenche automaticamente a Calculadora de Posição a partir do gráfico atual — ticker, preço ao vivo como entrada, um stop protetor e um alvo 2:1 — e depois abre-a para dimensionares a operação num clique.",
+    ar: "يملأ تلقائياً حاسبة الصفقة من الرسم الحالي — الرمز، السعر الحي كدخول، وقف حماية وهدف 2:1 — ثم يفتحها لتحدّد حجم الصفقة بنقرة واحدة."
   },
 
   chartAddToJournal: {
     en: "Starts a new journal trade from the current chart — ticker, live price, a suggested stop and a 2:1 target pre-filled — ready for you to review and save.",
-    he: "פותח עסקה חדשה ביומן מהגרף הנוכחי — טיקר, מחיר חי, סטופ מוצע ויעד 2:1 ממולאים מראש — מוכן לבדיקה ושמירה."
+    he: "פותח עסקה חדשה ביומן מהגרף הנוכחי — טיקר, מחיר חי, סטופ מוצע ויעד 2:1 ממולאים מראש — מוכן לבדיקה ושמירה.",
+    es: "Inicia una nueva operación en el diario desde el gráfico actual — ticker, precio en vivo, un stop sugerido y un objetivo 2:1 pre-rellenados — lista para que la revises y guardes.",
+    pt: "Inicia uma nova operação no diário a partir do gráfico atual — ticker, preço ao vivo, um stop sugerido e um alvo 2:1 pré-preenchidos — pronta para reveres e guardares.",
+    ar: "يبدأ صفقة جديدة في اليوميّة من الرسم الحالي — الرمز، السعر الحي، وقف مقترح وهدف 2:1 مملوءة مسبقاً — جاهزة لمراجعتك وحفظك."
   },
 
   // ── Setup names (preserved from original) ────────────────────────────────
 
   breakout: {
     en: "Price breaking above a key resistance level with volume. Best in trending markets.",
-    he: "מחיר פורץ מעל רמת התנגדות חשובה עם נפח. עובד טוב בשוק מגמתי."
+    he: "מחיר פורץ מעל רמת התנגדות חשובה עם נפח. עובד טוב בשוק מגמתי.",
+    es: "Precio rompiendo por encima de un nivel de resistencia clave con volumen. Funciona mejor en mercados con tendencia.",
+    pt: "Preço rompendo acima de um nível de resistência chave com volume. Funciona melhor em mercados com tendência.",
+    ar: "السعر يخترق فوق مستوى مقاومة رئيسي مع حجم تداول. يعمل بأفضل شكل في الأسواق ذات الاتجاه."
   },
   pullback: {
     en: "Buying when an uptrending price temporarily retraces toward support — a moving average, a prior breakout level, or a trendline — then resumes higher. Entering on the dip gives a better price and a tighter stop than chasing.",
@@ -128,103 +194,172 @@ export const TRADING_TOOLTIPS = {
   },
   bullFlag: {
     en: "Tight consolidation after sharp move up. Volume should contract during the flag.",
-    he: "התכנסות צרה אחרי תנועה חדה למעלה. נפח חייב להצטמצם בזמן הדגל."
+    he: "התכנסות צרה אחרי תנועה חדה למעלה. נפח חייב להצטמצם בזמן הדגל.",
+    es: "Consolidación estrecha tras un movimiento brusco al alza. El volumen debe contraerse durante la bandera.",
+    pt: "Consolidação estreita após um movimento brusco de alta. O volume deve contrair durante a bandeira.",
+    ar: "تماسك ضيّق بعد حركة صعودية حادّة. يجب أن ينكمش حجم التداول أثناء تكوّن العلم."
   },
   ORBBreakout: {
     en: "Opening Range Breakout — first 15-30 min high/low break. Strong on trend days.",
-    he: "פריצת טווח פתיחה — שבירת שיא/שפל של 15-30 הדקות הראשונות. חזק בימי מגמה."
+    he: "פריצת טווח פתיחה — שבירת שיא/שפל של 15-30 הדקות הראשונות. חזק בימי מגמה.",
+    es: "Opening Range Breakout — ruptura del máximo/mínimo de los primeros 15-30 min. Fuerte en días de tendencia.",
+    pt: "Opening Range Breakout — rompimento da máxima/mínima dos primeiros 15-30 min. Forte em dias de tendência.",
+    ar: "Opening Range Breakout — اختراق قمة/قاع أول 15-30 دقيقة. قوي في أيام الاتجاه."
   },
   VWAPReclaim: {
     en: "Price reclaiming VWAP after morning dip with volume. Indicates institutional buying.",
-    he: "מחיר חוזר מעל VWAP אחרי ירידה עם נפח. מעיד על קנייה מוסדית."
+    he: "מחיר חוזר מעל VWAP אחרי ירידה עם נפח. מעיד על קנייה מוסדית.",
+    es: "El precio recupera el VWAP tras una caída matinal con volumen. Indica compra institucional.",
+    pt: "O preço recupera o VWAP após uma queda matinal com volume. Indica compra institucional.",
+    ar: "السعر يستعيد الـ VWAP بعد هبوط صباحي مع حجم تداول. يشير إلى شراء مؤسّسي."
   },
   higherLow: {
     en: "Each pullback makes a higher low than the previous. Cleanest setup in uptrend.",
-    he: "כל תיקון יוצר שפל גבוה יותר מהקודם. הסטאפ הנקי ביותר במגמה עולה."
+    he: "כל תיקון יוצר שפל גבוה יותר מהקודם. הסטאפ הנקי ביותר במגמה עולה.",
+    es: "Cada retroceso forma un mínimo más alto que el anterior. El setup más limpio en tendencia alcista.",
+    pt: "Cada recuo forma um mínimo mais alto que o anterior. O setup mais limpo em tendência de alta.",
+    ar: "كل تراجع يصنع قاعاً أعلى من السابق. أنظف نموذج في الاتجاه الصاعد."
   },
   cupAndHandle: {
     en: "U-shaped consolidation with tight handle on right. Classic continuation pattern.",
-    he: "התכנסות בצורת U עם ידית צרה מימין. תבנית המשך קלאסית."
+    he: "התכנסות בצורת U עם ידית צרה מימין. תבנית המשך קלאסית.",
+    es: "Consolidación en forma de U con un asa estrecha a la derecha. Patrón de continuación clásico.",
+    pt: "Consolidação em forma de U com uma alça estreita à direita. Padrão de continuação clássico.",
+    ar: "تماسك على شكل حرف U مع مقبض ضيّق على اليمين. نموذج استمرار كلاسيكي."
   },
   failedBreakout: {
     en: "Breakout that quickly reverses. Trap for late buyers — short on reclaim of breakout level.",
-    he: "פריצה שמתהפכת מהר. מלכודת לקונים מאוחרים — שורט בחזרה מתחת לרמת הפריצה."
+    he: "פריצה שמתהפכת מהר. מלכודת לקונים מאוחרים — שורט בחזרה מתחת לרמת הפריצה.",
+    es: "Ruptura que se revierte rápidamente. Trampa para compradores tardíos — corto al recuperar el nivel de ruptura.",
+    pt: "Rompimento que se reverte rapidamente. Armadilha para compradores atrasados — vendido ao recuperar o nível de rompimento.",
+    ar: "اختراق ينعكس بسرعة. فخّ للمشترين المتأخّرين — بيع عند العودة تحت مستوى الاختراق."
   },
   overextendedFade: {
     en: "Counter-trend trade when price is 8%+ above 20 EMA with high RSI. Requires patience.",
-    he: "עסקה נגד המגמה כשהמחיר 8%+ מעל 20 EMA עם RSI גבוה. דורש סבלנות."
+    he: "עסקה נגד המגמה כשהמחיר 8%+ מעל 20 EMA עם RSI גבוה. דורש סבלנות.",
+    es: "Operación contra-tendencia cuando el precio está 8%+ sobre la 20 EMA con RSI alto. Requiere paciencia.",
+    pt: "Operação contra-tendência quando o preço está 8%+ acima da 20 EMA com RSI alto. Exige paciência.",
+    ar: "صفقة عكس الاتجاه عندما يكون السعر أعلى بـ 8%+ من الـ 20 EMA مع RSI مرتفع. تتطلّب صبراً."
   },
   EMABounce50: {
     en: "Pullback to 50 EMA on daily chart. Major support in strong uptrends.",
-    he: "תיקון אל 50 EMA בגרף יומי. תמיכה משמעותית במגמות עולות חזקות."
+    he: "תיקון אל 50 EMA בגרף יומי. תמיכה משמעותית במגמות עולות חזקות.",
+    es: "Retroceso a la 50 EMA en gráfico diario. Soporte importante en tendencias alcistas fuertes.",
+    pt: "Recuo à 50 EMA no gráfico diário. Suporte importante em tendências de alta fortes.",
+    ar: "تراجع إلى الـ 50 EMA على الرسم اليومي. دعم مهم في الاتجاهات الصاعدة القوية."
   },
   trendContinuation: {
     en: "Entry on shallow pullback to 9 EMA in established trend. Tight stops, high R.",
-    he: "כניסה בתיקון רדוד אל 9 EMA במגמה מבוססת. סטופים צרים, R גבוה."
+    he: "כניסה בתיקון רדוד אל 9 EMA במגמה מבוססת. סטופים צרים, R גבוה.",
+    es: "Entrada en un retroceso superficial a la 9 EMA en una tendencia establecida. Stops ajustados, R alto.",
+    pt: "Entrada num recuo superficial à 9 EMA numa tendência estabelecida. Stops apertados, R alto.",
+    ar: "الدخول عند تراجع سطحي إلى الـ 9 EMA في اتجاه راسخ. أوامر وقف ضيّقة، R مرتفع."
   },
   gapAndGo: {
     en: "Stock gaps up at open and continues higher without filling. Best with news catalyst.",
-    he: "מניה פותחת בפער מעלה וממשיכה בלי למלא. הכי טוב עם קטליזטור חדשותי."
+    he: "מניה פותחת בפער מעלה וממשיכה בלי למלא. הכי טוב עם קטליזטור חדשותי.",
+    es: "La acción abre con hueco al alza y continúa sin rellenarlo. Mejor con un catalizador de noticias.",
+    pt: "A ação abre com gap de alta e continua sem preenchê-lo. Melhor com um catalisador de notícias.",
+    ar: "يفتح السهم بفجوة صعودية ويواصل دون ملئها. أفضل مع محفّز إخباري."
   },
   earningsGapPlay: {
     en: "Trade the gap reaction post-earnings. Hold winners, cover into first sign of buying.",
-    he: "סחר בתגובת הפער אחרי דוחות. החזק זוכים, כסה בסימן הראשון של קנייה."
+    he: "סחר בתגובת הפער אחרי דוחות. החזק זוכים, כסה בסימן הראשון של קנייה.",
+    es: "Operar la reacción del hueco tras resultados. Mantén las ganadoras, cubre a la primera señal de compra.",
+    pt: "Operar a reação do gap após resultados. Mantenha as vencedoras, cubra ao primeiro sinal de compra.",
+    ar: "تداول رد فعل الفجوة بعد نتائج الأرباح. احتفظ بالرابحة، وأغلق عند أول إشارة شراء."
   },
   rangeBreakout: {
     en: "Price breaking out of multi-day/week range. Most reliable when volume expands.",
-    he: "מחיר שובר מטווח של ימים/שבועות. הכי אמין כשהנפח מתרחב."
+    he: "מחיר שובר מטווח של ימים/שבועות. הכי אמין כשהנפח מתרחב.",
+    es: "El precio rompe un rango de varios días/semanas. Más fiable cuando el volumen se expande.",
+    pt: "O preço rompe um range de vários dias/semanas. Mais confiável quando o volume se expande.",
+    ar: "السعر يكسر نطاقاً امتدّ أياماً/أسابيع. أكثر موثوقية عندما يتوسّع حجم التداول."
   },
   postEarningsStrength: {
     en: "Stock holds above gap-up after earnings beat. Institutional accumulation signal.",
-    he: "מניה מחזיקה מעל פער-כלפי-מעלה אחרי דוחות חיוביים. סימן של צבירה מוסדית."
+    he: "מניה מחזיקה מעל פער-כלפי-מעלה אחרי דוחות חיוביים. סימן של צבירה מוסדית.",
+    es: "La acción se mantiene sobre el hueco alcista tras superar resultados. Señal de acumulación institucional.",
+    pt: "A ação mantém-se acima do gap de alta após superar resultados. Sinal de acumulação institucional.",
+    ar: "يحافظ السهم على البقاء فوق الفجوة الصعودية بعد تجاوز التوقّعات. إشارة تجميع مؤسّسي."
   },
   powerHourBreak: {
     en: "Breakout in last hour (3-4pm ET). Institutional positioning into close.",
-    he: "פריצה בשעה האחרונה (15:00-16:00 ET). מיצוב מוסדי לקראת סגירה."
+    he: "פריצה בשעה האחרונה (15:00-16:00 ET). מיצוב מוסדי לקראת סגירה.",
+    es: "Ruptura en la última hora (15:00-16:00 ET). Posicionamiento institucional hacia el cierre.",
+    pt: "Rompimento na última hora (15:00-16:00 ET). Posicionamento institucional rumo ao fecho.",
+    ar: "اختراق في الساعة الأخيرة (15:00-16:00 ET). تموضع مؤسّسي قبيل الإغلاق."
   },
   MOCFade: {
     en: "Market-On-Close fade. Trade against extended moves into close for next-day reversal.",
-    he: "פייד של MOC. מסחר נגד תנועות קיצוניות לקראת סגירה לקראת היפוך למחרת."
+    he: "פייד של MOC. מסחר נגד תנועות קיצוניות לקראת סגירה לקראת היפוך למחרת.",
+    es: "Fade de Market-On-Close. Operar contra movimientos extendidos hacia el cierre para un giro al día siguiente.",
+    pt: "Fade de Market-On-Close. Operar contra movimentos estendidos rumo ao fecho para uma reversão no dia seguinte.",
+    ar: "Fade على إغلاق السوق. التداول عكس الحركات الممتدّة قبيل الإغلاق توقّعاً لانعكاس في اليوم التالي."
   },
   overnightHold: {
     en: "Trade held overnight. Higher reward potential but exposed to gap risk.",
-    he: "עסקה המוחזקת ללילה. פוטנציאל רווח גבוה יותר אך חשופה לסיכון פער."
+    he: "עסקה המוחזקת ללילה. פוטנציאל רווח גבוה יותר אך חשופה לסיכון פער.",
+    es: "Operación mantenida toda la noche. Mayor potencial de recompensa pero expuesta al riesgo de hueco.",
+    pt: "Operação mantida durante a noite. Maior potencial de retorno mas exposta ao risco de gap.",
+    ar: "صفقة محتفظ بها طوال الليل. إمكانية ربح أعلى لكنها معرّضة لمخاطر الفجوة."
   },
   overnightReversal: {
     en: "Trade reversal of overnight move at market open. Counter-trend, requires confirmation.",
-    he: "מסחר היפוך של תנועת לילה בפתיחת השוק. נגד המגמה, דורש אישור."
+    he: "מסחר היפוך של תנועת לילה בפתיחת השוק. נגד המגמה, דורש אישור.",
+    es: "Operar el giro del movimiento nocturno en la apertura. Contra-tendencia, requiere confirmación.",
+    pt: "Operar a reversão do movimento noturno na abertura. Contra-tendência, exige confirmação.",
+    ar: "تداول انعكاس حركة الليل عند افتتاح السوق. عكس الاتجاه، يتطلّب تأكيداً."
   },
 
   // ── Added terms (he+en) ──────────────────────────────────────────────────
 
   rr: {
     en: "Risk/Reward. Potential profit vs. what you risk. 3:1 = you stand to make 3× what you'd lose.",
-    he: "יחס סיכון-סיכוי. כמה אתה עלול להרוויח מול כמה אתה מסכן. 3:1 = פוטנציאל רווח פי 3 מההפסד."
+    he: "יחס סיכון-סיכוי. כמה אתה עלול להרוויח מול כמה אתה מסכן. 3:1 = פוטנציאל רווח פי 3 מההפסד.",
+    es: "Riesgo/Beneficio. Beneficio potencial vs. lo que arriesgas. 3:1 = puedes ganar 3× lo que perderías.",
+    pt: "Risco/Retorno. Lucro potencial vs. o que arriscas. 3:1 = podes ganhar 3× o que perderias.",
+    ar: "المخاطرة/العائد. الربح المحتمل مقابل ما تخاطر به. 3:1 = يمكنك ربح 3× ما قد تخسره."
   },
 
   mfeMae: {
     en: "How far a trade ran in your favor (MFE) and against you (MAE) before it closed. Helps tune stops and targets.",
-    he: "כמה רחוק לטובתך הלכה העסקה (MFE) וכמה נגדך (MAE) לפני הסגירה. עוזר לכוון סטופים ויעדים."
+    he: "כמה רחוק לטובתך הלכה העסקה (MFE) וכמה נגדך (MAE) לפני הסגירה. עוזר לכוון סטופים ויעדים.",
+    es: "Cuán lejos llegó una operación a tu favor (MFE) y en tu contra (MAE) antes de cerrarse. Ayuda a afinar stops y objetivos.",
+    pt: "Quão longe uma operação foi a teu favor (MFE) e contra ti (MAE) antes de fechar. Ajuda a afinar stops e alvos.",
+    ar: "إلى أي مدى تحرّكت الصفقة لصالحك (MFE) وضدّك (MAE) قبل إغلاقها. يساعد في ضبط أوامر الوقف والأهداف."
   },
 
   wilson: {
     en: "A cautious estimate of your \"true\" win rate when sample size is small. Stops a short hot streak from fooling you.",
-    he: "אומדן זהיר לאחוז הזכייה ה\"אמיתי\" שלך כשמספר העסקאות קטן. מונע אשליה מסדרה קצרה של ניצחונות."
+    he: "אומדן זהיר לאחוז הזכייה ה\"אמיתי\" שלך כשמספר העסקאות קטן. מונע אשליה מסדרה קצרה של ניצחונות.",
+    es: "Una estimación cautelosa de tu win rate \"real\" cuando el tamaño de muestra es pequeño. Evita que una racha corta te engañe.",
+    pt: "Uma estimativa cautelosa da tua win rate \"real\" quando o tamanho da amostra é pequeno. Evita que uma sequência curta te engane.",
+    ar: "تقدير حذِر لنسبة ربحك \"الحقيقية\" عندما يكون حجم العيّنة صغيراً. يمنع سلسلة قصيرة ساخنة من خداعك."
   },
 
   discipline: {
     en: "Whether you followed your plan — stop, size, target — without emotional deviation. The core of long-term profitability.",
-    he: "האם עקבת אחרי התוכנית: סטופ, גודל פוזיציה ויעד — בלי לסטות מרגש. הליבה של רווחיות לאורך זמן."
+    he: "האם עקבת אחרי התוכנית: סטופ, גודל פוזיציה ויעד — בלי לסטות מרגש. הליבה של רווחיות לאורך זמן.",
+    es: "Si seguiste tu plan — stop, tamaño, objetivo — sin desviación emocional. El núcleo de la rentabilidad a largo plazo.",
+    pt: "Se seguiste o teu plano — stop, tamanho, alvo — sem desvio emocional. O núcleo da rentabilidade a longo prazo.",
+    ar: "ما إذا كنت اتّبعت خطّتك — وقف الخسارة، الحجم، الهدف — دون انحراف عاطفي. جوهر الربحية على المدى الطويل."
   },
 
   avgWin: {
     en: "Average profit on winning trades.",
-    he: "הרווח הממוצע בעסקאות מנצחות."
+    he: "הרווח הממוצע בעסקאות מנצחות.",
+    es: "Beneficio promedio en operaciones ganadoras.",
+    pt: "Lucro médio em operações vencedoras.",
+    ar: "متوسّط الربح في الصفقات الرابحة."
   },
 
   avgLoss: {
     en: "Average loss on losing trades.",
-    he: "ההפסד הממוצע בעסקאות מפסידות."
+    he: "ההפסד הממוצע בעסקאות מפסידות.",
+    es: "Pérdida promedio en operaciones perdedoras.",
+    pt: "Perda média em operações perdedoras.",
+    ar: "متوسّط الخسارة في الصفقات الخاسرة."
   },
 
   // ── Emotions (5 languages) ───────────────────────────────────────────────
@@ -412,56 +547,56 @@ export const TRADING_TOOLTIPS = {
 // Heading shown at the top of a TermTooltip popover. Same single-source file.
 export const TERM_LABELS = {
   // Metrics
-  winRate:      { en: "Win Rate",        he: "אחוז זכייה" },
-  profitFactor: { en: "Profit Factor",   he: "Profit Factor" },
-  avgR:         { en: "Avg R",           he: "R ממוצע" },
-  expectancy:   { en: "Expectancy",      he: "תוחלת" },
-  sharpe:       { en: "Sharpe Ratio",    he: "יחס שארפ" },
-  maxDD:        { en: "Max Drawdown",    he: "ירידה מקסימלית" },
-  avgWin:       { en: "Avg Win",         he: "רווח ממוצע" },
-  avgLoss:      { en: "Avg Loss",        he: "הפסד ממוצע" },
-  avgHold:      { en: "Avg Hold",        he: "זמן החזקה ממוצע" },
-  equityCurve:  { en: "Equity Curve",    he: "עקומת הון" },
-  rMultiple:    { en: "R-Multiple",      he: "R-Multiple" },
-  rr:           { en: "Risk / Reward",   he: "סיכון / סיכוי · R/R" },
-  mfeMae:       { en: "MFE / MAE",       he: "MFE / MAE" },
-  wilson:       { en: "Wilson Score",    he: "ציון Wilson" },
+  winRate:      { en: "Win Rate",        he: "אחוז זכייה", es: "Tasa de Acierto", pt: "Taxa de Acerto", ar: "نسبة الربح" },
+  profitFactor: { en: "Profit Factor",   he: "Profit Factor", es: "Profit Factor", pt: "Profit Factor", ar: "Profit Factor" },
+  avgR:         { en: "Avg R",           he: "R ממוצע", es: "R Promedio", pt: "R Médio", ar: "متوسّط R" },
+  expectancy:   { en: "Expectancy",      he: "תוחלת", es: "Expectativa", pt: "Expectativa", ar: "التوقّع" },
+  sharpe:       { en: "Sharpe Ratio",    he: "יחס שארפ", es: "Ratio de Sharpe", pt: "Rácio de Sharpe", ar: "مقياس شارب" },
+  maxDD:        { en: "Max Drawdown",    he: "ירידה מקסימלית", es: "Drawdown Máximo", pt: "Drawdown Máximo", ar: "أقصى تراجع" },
+  avgWin:       { en: "Avg Win",         he: "רווח ממוצע", es: "Ganancia Media", pt: "Ganho Médio", ar: "متوسّط الربح" },
+  avgLoss:      { en: "Avg Loss",        he: "הפסד ממוצע", es: "Pérdida Media", pt: "Perda Média", ar: "متوسّط الخسارة" },
+  avgHold:      { en: "Avg Hold",        he: "זמן החזקה ממוצע", es: "Tiempo Medio", pt: "Tempo Médio", ar: "متوسّط مدّة الاحتفاظ" },
+  equityCurve:  { en: "Equity Curve",    he: "עקומת הון", es: "Curva de Capital", pt: "Curva de Capital", ar: "منحنى رأس المال" },
+  rMultiple:    { en: "R-Multiple",      he: "R-Multiple", es: "R-Multiple", pt: "R-Multiple", ar: "R-Multiple" },
+  rr:           { en: "Risk / Reward",   he: "סיכון / סיכוי · R/R", es: "Riesgo / Beneficio · R/R", pt: "Risco / Retorno · R/R", ar: "المخاطرة / العائد · R/R" },
+  mfeMae:       { en: "MFE / MAE",       he: "MFE / MAE", es: "MFE / MAE", pt: "MFE / MAE", ar: "MFE / MAE" },
+  wilson:       { en: "Wilson Score",    he: "ציון Wilson", es: "Wilson Score", pt: "Wilson Score", ar: "Wilson Score" },
   // Concepts
-  dna:          { en: "Trading DNA",     he: "DNA מסחרי" },
-  edge:         { en: "Edge",            he: "Edge" },
-  antiEdge:     { en: "Anti-Edge",       he: "Anti-Edge" },
-  tilt:         { en: "Tilt",            he: "Tilt" },
-  marketRegime: { en: "Market Regime",   he: "מצב שוק" },
-  discipline:   { en: "Discipline",      he: "משמעת" },
+  dna:          { en: "Trading DNA",     he: "DNA מסחרי", es: "Trading DNA", pt: "Trading DNA", ar: "Trading DNA" },
+  edge:         { en: "Edge",            he: "Edge", es: "Edge", pt: "Edge", ar: "Edge" },
+  antiEdge:     { en: "Anti-Edge",       he: "Anti-Edge", es: "Anti-Edge", pt: "Anti-Edge", ar: "Anti-Edge" },
+  tilt:         { en: "Tilt",            he: "Tilt", es: "Tilt", pt: "Tilt", ar: "Tilt" },
+  marketRegime: { en: "Market Regime",   he: "מצב שוק", es: "Régimen de Mercado", pt: "Regime de Mercado", ar: "نظام السوق" },
+  discipline:   { en: "Discipline",      he: "משמעת", es: "Disciplina", pt: "Disciplina", ar: "الانضباط" },
   // Risk
-  riskPerTrade: { en: "Risk per Trade",  he: "סיכון לעסקה" },
-  riskLimits:   { en: "Risk Limits",     he: "תקרות סיכון" },
-  positionSize: { en: "Position Size",   he: "גודל פוזיציה" },
-  stopLoss:     { en: "Stop Loss",       he: "סטופ לוס" },
-  takeProfit:   { en: "Take Profit",     he: "Take Profit" },
+  riskPerTrade: { en: "Risk per Trade",  he: "סיכון לעסקה", es: "Riesgo por Operación", pt: "Risco por Operação", ar: "المخاطرة لكل صفقة" },
+  riskLimits:   { en: "Risk Limits",     he: "תקרות סיכון", es: "Límites de Riesgo", pt: "Limites de Risco", ar: "حدود المخاطرة" },
+  positionSize: { en: "Position Size",   he: "גודל פוזיציה", es: "Tamaño de Posición", pt: "Tamanho de Posição", ar: "حجم الصفقة" },
+  stopLoss:     { en: "Stop Loss",       he: "סטופ לוס", es: "Stop Loss", pt: "Stop Loss", ar: "Stop Loss" },
+  takeProfit:   { en: "Take Profit",     he: "Take Profit", es: "Take Profit", pt: "Take Profit", ar: "Take Profit" },
   // Market Intel chart actions
-  chartCalcPosition: { en: "Calculate Position", he: "חשב פוזיציה" },
-  chartAddToJournal: { en: "Add to Journal",     he: "הוסף ליומן" },
+  chartCalcPosition: { en: "Calculate Position", he: "חשב פוזיציה", es: "Calcular Posición", pt: "Calcular Posição", ar: "احسب الصفقة" },
+  chartAddToJournal: { en: "Add to Journal",     he: "הוסף ליומן", es: "Añadir al Diario", pt: "Adicionar ao Diário", ar: "أضف إلى اليوميّة" },
   // Setups
-  breakout:           { en: "Breakout",            he: "Breakout" },
-  pullback:           { en: "Pullback",            he: "Pullback" },
-  bullFlag:           { en: "Bull Flag",           he: "Bull Flag" },
-  ORBBreakout:        { en: "ORB Breakout",        he: "ORB Breakout" },
-  VWAPReclaim:        { en: "VWAP Reclaim",        he: "VWAP Reclaim" },
-  higherLow:          { en: "Higher Low",          he: "Higher Low" },
-  cupAndHandle:       { en: "Cup & Handle",        he: "Cup & Handle" },
-  failedBreakout:     { en: "Failed Breakout",     he: "Failed Breakout" },
-  overextendedFade:   { en: "Overextended Fade",   he: "Overextended Fade" },
-  EMABounce50:        { en: "50 EMA Bounce",       he: "50 EMA Bounce" },
-  trendContinuation:  { en: "Trend Continuation",  he: "Trend Continuation" },
-  gapAndGo:           { en: "Gap & Go",            he: "Gap & Go" },
-  earningsGapPlay:    { en: "Earnings Gap Play",   he: "Earnings Gap Play" },
-  rangeBreakout:      { en: "Range Breakout",      he: "Range Breakout" },
-  postEarningsStrength:{ en: "Post-Earnings Strength", he: "Post-Earnings Strength" },
-  powerHourBreak:     { en: "Power Hour Break",    he: "Power Hour Break" },
-  MOCFade:            { en: "MOC Fade",            he: "MOC Fade" },
-  overnightHold:      { en: "Overnight Hold",      he: "Overnight Hold" },
-  overnightReversal:  { en: "Overnight Reversal",  he: "Overnight Reversal" },
+  breakout:           { en: "Breakout",            he: "Breakout", es: "Breakout", pt: "Breakout", ar: "Breakout" },
+  pullback:           { en: "Pullback",            he: "Pullback", es: "Pullback", pt: "Pullback", ar: "Pullback" },
+  bullFlag:           { en: "Bull Flag",           he: "Bull Flag", es: "Bull Flag", pt: "Bull Flag", ar: "Bull Flag" },
+  ORBBreakout:        { en: "ORB Breakout",        he: "ORB Breakout", es: "ORB Breakout", pt: "ORB Breakout", ar: "ORB Breakout" },
+  VWAPReclaim:        { en: "VWAP Reclaim",        he: "VWAP Reclaim", es: "VWAP Reclaim", pt: "VWAP Reclaim", ar: "VWAP Reclaim" },
+  higherLow:          { en: "Higher Low",          he: "Higher Low", es: "Higher Low", pt: "Higher Low", ar: "Higher Low" },
+  cupAndHandle:       { en: "Cup & Handle",        he: "Cup & Handle", es: "Cup & Handle", pt: "Cup & Handle", ar: "Cup & Handle" },
+  failedBreakout:     { en: "Failed Breakout",     he: "Failed Breakout", es: "Failed Breakout", pt: "Failed Breakout", ar: "Failed Breakout" },
+  overextendedFade:   { en: "Overextended Fade",   he: "Overextended Fade", es: "Overextended Fade", pt: "Overextended Fade", ar: "Overextended Fade" },
+  EMABounce50:        { en: "50 EMA Bounce",       he: "50 EMA Bounce", es: "50 EMA Bounce", pt: "50 EMA Bounce", ar: "50 EMA Bounce" },
+  trendContinuation:  { en: "Trend Continuation",  he: "Trend Continuation", es: "Trend Continuation", pt: "Trend Continuation", ar: "Trend Continuation" },
+  gapAndGo:           { en: "Gap & Go",            he: "Gap & Go", es: "Gap & Go", pt: "Gap & Go", ar: "Gap & Go" },
+  earningsGapPlay:    { en: "Earnings Gap Play",   he: "Earnings Gap Play", es: "Earnings Gap Play", pt: "Earnings Gap Play", ar: "Earnings Gap Play" },
+  rangeBreakout:      { en: "Range Breakout",      he: "Range Breakout", es: "Range Breakout", pt: "Range Breakout", ar: "Range Breakout" },
+  postEarningsStrength:{ en: "Post-Earnings Strength", he: "Post-Earnings Strength", es: "Post-Earnings Strength", pt: "Post-Earnings Strength", ar: "Post-Earnings Strength" },
+  powerHourBreak:     { en: "Power Hour Break",    he: "Power Hour Break", es: "Power Hour Break", pt: "Power Hour Break", ar: "Power Hour Break" },
+  MOCFade:            { en: "MOC Fade",            he: "MOC Fade", es: "MOC Fade", pt: "MOC Fade", ar: "MOC Fade" },
+  overnightHold:      { en: "Overnight Hold",      he: "Overnight Hold", es: "Overnight Hold", pt: "Overnight Hold", ar: "Overnight Hold" },
+  overnightReversal:  { en: "Overnight Reversal",  he: "Overnight Reversal", es: "Overnight Reversal", pt: "Overnight Reversal", ar: "Overnight Reversal" },
 
   // ── Emotions (5 languages) ───────────────────────────────────────────────
   emotionConfident:  { en: "Confident",  he: "Confident",  es: "Confident",  pt: "Confident",  ar: "Confident" },
