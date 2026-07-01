@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { X } from "lucide-react";
 import TermTooltip from "./ui/TermTooltip.jsx";
+import InfoTooltip from "./ui/InfoTooltip.jsx";
+import SmartSelect from "./ui/SmartSelect.jsx";
+import { getTradeSelectProps, CATEGORY_TOOLTIP } from "../data/tradeOptions.jsx";
 
-const SETUPS = ["Breakout", "Pullback", "Support Bounce", "Resistance Break", "Other"];
-const MARKETS = ["Trending Up", "Trending Down", "Sideways", "Volatile"];
-const EMOTIONS = ["Confident", "Calm", "Patient", "Neutral", "Hesitant", "Nervous", "FOMO", "Angry"];
 const EXIT_REASONS = ["Hit Target", "Hit Stop", "Manual Exit", "Trailing Stop", "Other"];
 
 /**
@@ -214,47 +214,41 @@ export default function EditTradeModal({ trade, lang, onClose, onSave }) {
               />
             </div>
             <div>
-              <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{isHe ? "סוג Setup" : "Setup Type"}</label>
-              <select
+              <label htmlFor="edit-setup" className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">{isHe ? "סוג Setup" : "Setup Type"}<InfoTooltip label={isHe ? "סוג Setup" : "Setup Type"}>{isHe ? CATEGORY_TOOLTIP.setup.he : CATEGORY_TOOLTIP.setup.en}</InfoTooltip></label>
+              <SmartSelect
+                id="edit-setup"
+                ariaLabel={isHe ? "סוג Setup" : "Setup Type"}
                 value={form.setup}
-                onChange={(e) => setField("setup", e.target.value)}
-                className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none"
-                style={{ background: "#0d1424" }}
-              >
-                {SETUPS.map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
+                onChange={(v) => setField("setup", v)}
+                dir={isHe ? "rtl" : "ltr"}
+                {...getTradeSelectProps("setup", lang)}
+              />
             </div>
           </div>
 
           {/* Market + Emotion */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">{isHe ? "מצב שוק" : "Market Condition"}<TermTooltip term="marketRegime" lang={lang} /></label>
-              <select
+              <label htmlFor="edit-market" className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">{isHe ? "מצב שוק" : "Market Condition"}<TermTooltip term="marketRegime" lang={lang} /></label>
+              <SmartSelect
+                id="edit-market"
+                ariaLabel={isHe ? "מצב שוק" : "Market Condition"}
                 value={form.marketCondition}
-                onChange={(e) => setField("marketCondition", e.target.value)}
-                className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none"
-                style={{ background: "#0d1424" }}
-              >
-                {MARKETS.map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
+                onChange={(v) => setField("marketCondition", v)}
+                dir={isHe ? "rtl" : "ltr"}
+                {...getTradeSelectProps("market", lang)}
+              />
             </div>
             <div>
-              <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{isHe ? "רגש בכניסה" : "Emotion at Entry"}</label>
-              <select
+              <label htmlFor="edit-emotion" className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">{isHe ? "רגש בכניסה" : "Emotion at Entry"}<InfoTooltip label={isHe ? "רגש בכניסה" : "Emotion at Entry"}>{isHe ? CATEGORY_TOOLTIP.emotion.he : CATEGORY_TOOLTIP.emotion.en}</InfoTooltip></label>
+              <SmartSelect
+                id="edit-emotion"
+                ariaLabel={isHe ? "רגש בכניסה" : "Emotion at Entry"}
                 value={form.emotionAtEntry}
-                onChange={(e) => setField("emotionAtEntry", e.target.value)}
-                className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none"
-                style={{ background: "#0d1424" }}
-              >
-                {EMOTIONS.map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
+                onChange={(v) => setField("emotionAtEntry", v)}
+                dir={isHe ? "rtl" : "ltr"}
+                {...getTradeSelectProps("emotion", lang)}
+              />
             </div>
           </div>
 

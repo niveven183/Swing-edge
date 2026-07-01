@@ -51,6 +51,8 @@ import {
 import { useTradingStats } from "./src/hooks/useTradingStats.js";
 import InfoTooltip from "./src/components/ui/InfoTooltip.jsx";
 import TermTooltip from "./src/components/ui/TermTooltip.jsx";
+import SmartSelect from "./src/components/ui/SmartSelect.jsx";
+import { getTradeSelectProps, CATEGORY_TOOLTIP, EMOTION_VALUES } from "./src/data/tradeOptions.jsx";
 import { TRADING_TOOLTIPS, resolveSetupKey } from "./src/data/tooltips.js";
 import { TradeCalendar } from "./src/components/TradeCalendar.jsx";
 import { AdaptiveLessons } from "./src/intelligence/core/AdaptiveLessons.js";
@@ -101,7 +103,7 @@ function cleanTrades(trades) {
     '50 EMA Bounce': 'EMA Bounce 50',
     'Revenge Trade': 'Range Breakout'
   };
-  const VALID_EMOTIONS = ['Confident','Calm','FOMO','Angry','Neutral','Hesitant','Patient','Nervous'];
+  const VALID_EMOTIONS = EMOTION_VALUES;
   if (!Array.isArray(trades)) return trades;
   return trades.map(t => {
     const isSimTicker = typeof t.ticker === 'string' && t.ticker.startsWith('SIM-');
@@ -3476,11 +3478,8 @@ export default function SwingEdge() {
                   {/* Setup Type + Notes */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label htmlFor="az-setup" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Setup Type</label>
-                      <select id="az-setup" value={analyzerForm.setup} onChange={e=>setAnalyzerForm(f=>({...f,setup:e.target.value}))}
-                        className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
-                        {["Breakout","Pullback","Support Bounce","Resistance Break","Other"].map(s=><option key={s}>{s}</option>)}
-                      </select>
+                      <label htmlFor="az-setup" className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">Setup Type<InfoTooltip label="Setup Type">{lang === 'he' ? CATEGORY_TOOLTIP.setup.he : CATEGORY_TOOLTIP.setup.en}</InfoTooltip></label>
+                      <SmartSelect id="az-setup" ariaLabel="Setup Type" value={analyzerForm.setup} onChange={v=>setAnalyzerForm(f=>({...f,setup:v}))} dir={isRTL?'rtl':'ltr'} {...getTradeSelectProps('setup', lang)} />
                     </div>
                     <div>
                       <label htmlFor="az-notes" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Notes</label>
@@ -3492,18 +3491,12 @@ export default function SwingEdge() {
                   {/* Market Condition + Emotion */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label htmlFor="az-market-condition" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Market Condition</label>
-                      <select id="az-market-condition" value={analyzerForm.marketCondition} onChange={e=>setAnalyzerForm(f=>({...f,marketCondition:e.target.value}))}
-                        className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
-                        {["Trending Up","Trending Down","Sideways","Volatile"].map(s=><option key={s}>{s}</option>)}
-                      </select>
+                      <label htmlFor="az-market-condition" className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">Market Condition<InfoTooltip label="Market Condition">{lang === 'he' ? CATEGORY_TOOLTIP.market.he : CATEGORY_TOOLTIP.market.en}</InfoTooltip></label>
+                      <SmartSelect id="az-market-condition" ariaLabel="Market Condition" value={analyzerForm.marketCondition} onChange={v=>setAnalyzerForm(f=>({...f,marketCondition:v}))} dir={isRTL?'rtl':'ltr'} {...getTradeSelectProps('market', lang)} />
                     </div>
                     <div>
-                      <label htmlFor="az-emotion" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Emotion at Entry</label>
-                      <select id="az-emotion" value={analyzerForm.emotionAtEntry} onChange={e=>setAnalyzerForm(f=>({...f,emotionAtEntry:e.target.value}))}
-                        className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
-                        {["Confident","Calm","Patient","Neutral","Hesitant","Nervous","FOMO","Angry"].map(s=><option key={s}>{s}</option>)}
-                      </select>
+                      <label htmlFor="az-emotion" className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">Emotion at Entry<InfoTooltip label="Emotion at Entry">{lang === 'he' ? CATEGORY_TOOLTIP.emotion.he : CATEGORY_TOOLTIP.emotion.en}</InfoTooltip></label>
+                      <SmartSelect id="az-emotion" ariaLabel="Emotion at Entry" value={analyzerForm.emotionAtEntry} onChange={v=>setAnalyzerForm(f=>({...f,emotionAtEntry:v}))} dir={isRTL?'rtl':'ltr'} {...getTradeSelectProps('emotion', lang)} />
                     </div>
                   </div>
 
@@ -5507,11 +5500,8 @@ export default function SwingEdge() {
               {/* Setup Type + Notes */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="log-setup" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Setup Type</label>
-                  <select id="log-setup" value={form.setup} onChange={e=>setForm(f=>({...f,setup:e.target.value}))}
-                    className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
-                    {["Breakout","Pullback","Support Bounce","Resistance Break","Other"].map(s=><option key={s}>{s}</option>)}
-                  </select>
+                  <label htmlFor="log-setup" className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">Setup Type<InfoTooltip label="Setup Type">{lang === 'he' ? CATEGORY_TOOLTIP.setup.he : CATEGORY_TOOLTIP.setup.en}</InfoTooltip></label>
+                  <SmartSelect id="log-setup" ariaLabel="Setup Type" value={form.setup} onChange={v=>setForm(f=>({...f,setup:v}))} dir={isRTL?'rtl':'ltr'} {...getTradeSelectProps('setup', lang)} />
                 </div>
                 <div>
                   <label htmlFor="log-notes" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Notes</label>
@@ -5523,18 +5513,12 @@ export default function SwingEdge() {
               {/* Market Condition + Emotion */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="log-market-condition" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Market Condition</label>
-                  <select id="log-market-condition" value={form.marketCondition} onChange={e=>setForm(f=>({...f,marketCondition:e.target.value}))}
-                    className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
-                    {["Trending Up","Trending Down","Sideways","Volatile"].map(s=><option key={s}>{s}</option>)}
-                  </select>
+                  <label htmlFor="log-market-condition" className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">Market Condition<InfoTooltip label="Market Condition">{lang === 'he' ? CATEGORY_TOOLTIP.market.he : CATEGORY_TOOLTIP.market.en}</InfoTooltip></label>
+                  <SmartSelect id="log-market-condition" ariaLabel="Market Condition" value={form.marketCondition} onChange={v=>setForm(f=>({...f,marketCondition:v}))} dir={isRTL?'rtl':'ltr'} {...getTradeSelectProps('market', lang)} />
                 </div>
                 <div>
-                  <label htmlFor="log-emotion" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Emotion at Entry</label>
-                  <select id="log-emotion" value={form.emotionAtEntry} onChange={e=>setForm(f=>({...f,emotionAtEntry:e.target.value}))}
-                    className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
-                    {["Confident","Calm","Patient","Neutral","Hesitant","Nervous","FOMO","Angry"].map(s=><option key={s}>{s}</option>)}
-                  </select>
+                  <label htmlFor="log-emotion" className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">Emotion at Entry<InfoTooltip label="Emotion at Entry">{lang === 'he' ? CATEGORY_TOOLTIP.emotion.he : CATEGORY_TOOLTIP.emotion.en}</InfoTooltip></label>
+                  <SmartSelect id="log-emotion" ariaLabel="Emotion at Entry" value={form.emotionAtEntry} onChange={v=>setForm(f=>({...f,emotionAtEntry:v}))} dir={isRTL?'rtl':'ltr'} {...getTradeSelectProps('emotion', lang)} />
                 </div>
               </div>
 
