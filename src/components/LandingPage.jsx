@@ -18,63 +18,65 @@ const STR = {
     ],
     ctaStart: "התחל חינם",
     ctaDemo: "ראה איך זה עובד",
-    heroBadge: "מאמן AI אישי · בזמן אמת",
+    heroBadge: "ה-AI שמכיר את הטריידינג שלך · בזמן אמת",
     heroPre: "היומן ש", heroHi: "לומד אותך", heroPost: " ומלמד אותך",
-    heroSub: "כל המוצרים בשוק רק מספרים לך מה כבר קרה. SwingEdge מנתח כל עסקה לפני הכניסה — על בסיס הנתונים וההיסטוריה האישית שלך — ונותן את דעתו המקצועית.",
-    heroTrust: "ללא כרטיס אשראי · 30 שניות · עברית מלאה",
+    heroSub: "היומן היחיד שקורא את ההיסטוריה שלך, תופס את הדפוסים שחוזרים אצלך שוב ושוב, ומראה לך בזמן אמת מה עובד לך ומה שורף לך את החשבון — עוד לפני שלחצת Enter.",
+    heroTrust: "בלי כרטיס אשראי · נרשמים ב-30 שניות · הכל בעברית",
     coachTitle: "Decision Coach", coachLive: "Live", coachTrade: "NVDA · Long", coachRR: "R/R 1:2.4",
     statWinLabel: "Win Rate", statScoreLabel: "ציון החודש",
     problemKicker: "הבעיה האמיתית",
-    problemTitlePre: "לא חסר לך מידע. ", problemTitleHi: "חסר לך מראה מקצועית.",
+    problemTitlePre: "לא חסר לך עוד אינדיקטור. ", problemTitleHi: "חסרה לך מראה.",
     problemCards: [
       { icon: "↻", title: "אותה טעות, שוב ושוב", body: "אתה חוזר על אותו דפוס מפסיד ולא שם לב — כי אין מי שיעצור אותך ברגע הנכון." },
-      { icon: "?", title: "אין לך מושג מה ה-Edge שלך", body: "אילו setups באמת עובדים לך? באילו שעות? עם או בלי יחס R/R לטובתך? בלי ניתוח אישי זה רק ניחוש." },
+      { icon: "?", title: "אתה לא באמת יודע מה ה-Edge שלך", body: "ה-Edge = הסטאפים שבהם אתה סטטיסטית מרוויח. רוב הסוחרים פשוט מנחשים." },
       { icon: "✕", title: "יומנים = ארכיון מת", body: "Excel מתעד את העבר. הוא לא מזהיר אותך, לא לומד אותך, ולא משפר אותך." },
     ],
-    featKicker: "שלושת המנועים",
+    featKicker: "שלושה מנועים שעושים את העבודה",
     featTitlePre: "לא תיאוריות גנריות — ", featTitleHi: "ה-DNA שלך.",
     featCoachTag: "LIVE DECISION COACH",
     featCoachTitle: "ניתוח חי לפני שאתה נכנס לעסקה",
-    featCoachBody: "ברגע שאתה רושם setup, ה-Coach משווה אותו לכל ההיסטוריה שלך ומסמן: דפוס מנצח, אזהרה, או מלכודת מוכרת.",
+    featCoachBody: "לפני שאתה נכנס לעסקה, המערכת בודקת אותה מול ההיסטוריה שלך ואומרת לך: את הסטאפ הזה אתה מנצח, או שאתה נכנס לבור שכבר נפלת אליו.",
     featDnaTag: "TRADE DNA",
     featDnaTitle: "הפרופיל שלך ב-5 ממדים",
-    featDnaBody: "סיכון, משמעת, עקביות, צמיחה ועוד — תמונה מלאה של מי אתה כסוחר, עם דוח חודשי.",
+    featDnaBody: "הפרופיל המלא שלך כטריידר — משמעת, ניהול סיכון, עקביות, צמיחה. לא מה שאתה חושב שאתה. מה שהמספרים אומרים שאתה.",
     featEdgeTag: "EDGE FINDER",
-    featEdgeTitle: "מוצא את הזהב שלך",
-    featEdgeBody: "מגלה אוטומטית את ה-setups והשעות הכי רווחיים שלך.",
+    featEdgeTitle: "ה-Edge שלך, שחור על לבן",
+    featEdgeBody: "אילו סטאפים באמת מכניסים לך כסף, ואילו רק נראים טוב. שחור על גבי לבן — מהעסקאות שלך, לא מהתחושה.",
     featReportTag: "דוח חודשי",
     featReportTitle: "התקדמות שרואים",
-    featReportBody: "סיכום חודשי עם הטרנדים, החוזקות והנקודות לשיפור.",
+    featReportBody: "פעם בחודש: איפה השתפרת, איפה דימית, ומה לתקן. כמו אימון וידאו אחרי משחק — רק על התיק שלך.",
     featTiltTag: "TILT PROTECTION",
     featTiltTitle: "נעילה כשמזוהה tilt",
-    featTiltBody: "כשהמערכת מזהה מסחר רגשי — היא עוצרת אותך לפני הנזק.",
-    howKicker: "פשוט להתחיל",
+    featTiltBody: "כשהמערכת מזהה שאתה על tilt — מסחר נקמה, הגדלת פוזיציות, רדיפה אחרי הפסד — היא נועלת אותך ל-30 דקות. הצלת חשבון אמיתית.",
+    howKicker: "שלושה צעדים. זה הכל.",
     howTitle: "שלושה צעדים לסוחר טוב יותר",
     steps: [
-      { n: "01", title: "תכניס עסקה חדשה", body: "הזן setup חדש בקלילות ובנוחות. Vision OCR קולט צילום מסך אוטומטית." },
-      { n: "02", title: "קבל ניתוח חי", body: "ה-Decision Coach מסמן מיד אם זה דפוס מנצח או מלכודת מוכרת." },
-      { n: "03", title: "השתפר מהדוחות והניתוחים", body: "המערכת יוצרת עבורך דוחות וניתוחים שמאיצים את עקומת הלמידה שלך — ומראים בדיוק על מה לעבוד." },
+      { n: "01", title: "רושם את העסקה", body: "סטאפ, כניסה, סטופ, יעד — 30 שניות וסיימת. גם מצילום מסך של הצ'ארט." },
+      { n: "02", title: "המערכת לומדת אותך", body: "כל עסקה מלמדת את ה-AI מי אתה — הדפוסים, החוזקות, והמקומות שאתה נופל בהם שוב ושוב." },
+      { n: "03", title: "מקבל את המראה", body: "בזמן אמת, על כל עסקה: מה עבד לך היסטורית, ומה שרף. אתה מחליט — עם דאטה, לא עם תחושת בטן." },
     ],
     quote: "תוך חודש הבנתי שאני מפסיד תמיד באותה שעה ובאותו setup. SwingEdge הראה לי את זה במראה. הפסקתי — ה-Win Rate קפץ.",
     quoteName: "סוחר סווינג", quoteRole: "Beta · 3 חודשים",
     pricingKicker: "מחירים",
     pricingTitle: "התחל חינם. שדרג כשמוכנים.",
     freeName: "Free", freePrice: "0₪", freePer: "לתמיד",
+    freeSub: "כל מה שצריך כדי להתחיל לראות את עצמך באמת.",
     freeCta: "התחל עכשיו",
     freeFeatures: ["יומן עסקאות מלא", "Decision Coach בסיסי", "Trade DNA — תמונת מצב"],
     proBadge: "הכי פופולרי", proName: "Pro", proPrice: "$5", proPer: "לחודש",
+    proSub: "למי שרציני. כל המנועים, בלי תקרה.",
     proCta: "שדרג ל-Pro",
     proFeatures: ["כל מה שב-Free", "דוח חודשי מלא", "Vision OCR — קליטה מצילום מסך", "Edge Finder מתקדם", "Tilt Protection", "דוחות מעמיקים + ייצוא", "תמיכה מועדפת"],
-    finalTitle: "הסוחר הבא שלך מתחיל היום",
+    finalTitle: "הגרסה הבאה שלך כטריידר מתחילה עכשיו",
     finalSub: "הצטרף לסוחרים שכבר מפסיקים לחזור על אותן טעויות — ומתחילים לראות את ה-Edge שלהם.",
     footerTag: "היומן שלומד אותך ומלמד אותך בזמן אמת.",
     footerCols: [
-      { title: "מוצר", links: ["תכונות", "מחירים", "איך זה עובד"] },
-      { title: "חברה", links: ["אודות", "בלוג", "צור קשר"] },
-      { title: "משאבים", links: ["מדריך", "שאלות נפוצות", "קהילה"] },
+      { title: "מוצר", links: [{ label: "תכונות", href: "#features" }, { label: "מחירים", href: "#pricing" }, { label: "איך זה עובד", href: "#how" }] },
+      { title: "חברה", links: [{ label: "אודות" }, { label: "בלוג" }, { label: "צור קשר" }] },
+      { title: "משאבים", links: [{ label: "מדריך" }, { label: "שאלות נפוצות" }, { label: "קהילה" }] },
     ],
     copyright: "© 2026 SwingEdge. כל הזכויות שמורות.",
-    privacy: "פרטיות", terms: "תנאי שימוש",
+    privacy: "פרטיות", terms: "תנאי שימוש", soon: "בקרוב",
     disclaimer: "SwingEdge הוא כלי לניהול וניתוח יומן מסחר בלבד. אין לראות בתוכן באפליקציה או בדף זה ייעוץ השקעות, המלצה לרכישה או מכירה של נייר ערך כלשהו, או תחליף לייעוץ פיננסי מקצועי. מסחר בשוק ההון כרוך בסיכון להפסד הון. ביצועי עבר אינם מעידים על ביצועים עתידיים. כל החלטת מסחר היא באחריות המשתמש בלבד.",
   },
   en: {
@@ -86,63 +88,65 @@ const STR = {
     ],
     ctaStart: "Start free",
     ctaDemo: "See how it works",
-    heroBadge: "Personal AI coach · Real-time",
+    heroBadge: "The AI that knows your trading · Real-time",
     heroPre: "The journal that ", heroHi: "learns you", heroPost: " — and teaches you",
-    heroSub: "Every product out there just tells you what already happened. SwingEdge analyzes each trade before you enter — based on your own data and history — and gives its professional take.",
-    heroTrust: "No credit card · 30 seconds · Full Hebrew & English",
+    heroSub: "The only journal that reads your history, catches the patterns you repeat over and over, and shows you in real time what works for you and what's burning your account — before you ever hit Enter.",
+    heroTrust: "No credit card · Sign up in 30 seconds · Hebrew & English",
     coachTitle: "Decision Coach", coachLive: "Live", coachTrade: "NVDA · Long", coachRR: "R/R 1:2.4",
     statWinLabel: "Win Rate", statScoreLabel: "This month",
     problemKicker: "The real problem",
-    problemTitlePre: "You're not missing data. ", problemTitleHi: "You're missing a mirror.",
+    problemTitlePre: "You're not missing another indicator. ", problemTitleHi: "You're missing a mirror.",
     problemCards: [
       { icon: "↻", title: "The same mistake, again", body: "You repeat the same losing pattern without noticing — because nothing stops you at the right moment." },
-      { icon: "?", title: "You don't know your Edge", body: "Which setups actually work for you? At which hours? With or without R/R in your favor? Without personal analysis it's just a guess." },
+      { icon: "?", title: "You don't really know your Edge", body: "Your Edge = the setups where you're statistically profitable. Most traders are just guessing." },
       { icon: "✕", title: "Journals are dead archives", body: "Excel records the past. It never warns you, learns you, or makes you better." },
     ],
-    featKicker: "The three engines",
+    featKicker: "Three engines that do the work",
     featTitlePre: "Not generic theory — ", featTitleHi: "your DNA.",
     featCoachTag: "LIVE DECISION COACH",
     featCoachTitle: "Live analysis before you enter the trade",
-    featCoachBody: "The moment you log a setup, the Coach compares it to your entire history and flags it: winning pattern, warning, or familiar trap.",
+    featCoachBody: "Before you enter a trade, the system checks it against your history and tells you: this setup you win, or you're walking into a hole you've already fallen into.",
     featDnaTag: "TRADE DNA",
     featDnaTitle: "Your profile across 5 dimensions",
-    featDnaBody: "Risk, discipline, consistency, growth and more — a full picture of who you are as a trader, with a monthly report.",
+    featDnaBody: "Your full profile as a trader — discipline, risk management, consistency, growth. Not who you think you are. Who the numbers say you are.",
     featEdgeTag: "EDGE FINDER",
-    featEdgeTitle: "Finds your gold",
-    featEdgeBody: "Automatically surfaces your most profitable setups and hours.",
+    featEdgeTitle: "Your Edge, in black and white",
+    featEdgeBody: "Which setups actually make you money, and which just look good. In black and white — from your trades, not your gut.",
     featReportTag: "MONTHLY REPORT",
     featReportTitle: "Progress you can see",
-    featReportBody: "A monthly recap of your trends, strengths and areas to improve.",
+    featReportBody: "Once a month: where you improved, where you bled, and what to fix. Like game film after the match — only on your book.",
     featTiltTag: "TILT PROTECTION",
     featTiltTitle: "Locks you out on tilt",
-    featTiltBody: "When the system detects emotional trading — it stops you before the damage.",
-    howKicker: "Easy to start",
+    featTiltBody: "When the system detects you're on tilt — revenge trading, sizing up, chasing losses — it locks you out for 30 minutes. A real account-saver.",
+    howKicker: "Three steps. That's it.",
     howTitle: "Three steps to a sharper trader",
     steps: [
-      { n: "01", title: "Log a trade", body: "Enter a setup in a few taps. Vision OCR reads a screenshot automatically." },
-      { n: "02", title: "Get live analysis", body: "The Decision Coach instantly flags whether it's a winning pattern or a familiar trap." },
-      { n: "03", title: "Improve from the report", body: "The monthly report shows exactly what to work on — and whether you're improving." },
+      { n: "01", title: "Log the trade", body: "Setup, entry, stop, target — 30 seconds and you're done. Even from a screenshot of the chart." },
+      { n: "02", title: "The system learns you", body: "Every trade teaches the AI who you are — the patterns, the strengths, and the places you fall into again and again." },
+      { n: "03", title: "Get the mirror", body: "In real time, on every trade: what worked for you historically, and what burned. You decide — with data, not a gut feeling." },
     ],
     quote: "Within a month I realized I always lose at the same hour, on the same setup. SwingEdge held up the mirror. I stopped — my Win Rate jumped.",
     quoteName: "Swing trader", quoteRole: "Beta · 3 months",
     pricingKicker: "Pricing",
     pricingTitle: "Start free. Upgrade when you're ready.",
     freeName: "Free", freePrice: "$0", freePer: "forever",
+    freeSub: "Everything you need to start really seeing yourself.",
     freeCta: "Start now",
     freeFeatures: ["Full trade journal", "Basic Decision Coach", "Trade DNA — snapshot"],
     proBadge: "Most popular", proName: "Pro", proPrice: "$5", proPer: "per month",
+    proSub: "For those who are serious. All the engines, no ceiling.",
     proCta: "Upgrade to Pro",
     proFeatures: ["Everything in Free", "Full monthly report", "Vision OCR — read from screenshots", "Advanced Edge Finder", "Tilt Protection", "Deep reports + export", "Priority support"],
-    finalTitle: "Your next trade starts today",
+    finalTitle: "Your next version as a trader starts now",
     finalSub: "Join traders who've stopped repeating the same mistakes — and started seeing their real Edge.",
     footerTag: "The journal that learns you and teaches you in real time.",
     footerCols: [
-      { title: "Product", links: ["Features", "Pricing", "How it works"] },
-      { title: "Company", links: ["About", "Blog", "Contact"] },
-      { title: "Resources", links: ["Guide", "FAQ", "Community"] },
+      { title: "Product", links: [{ label: "Features", href: "#features" }, { label: "Pricing", href: "#pricing" }, { label: "How it works", href: "#how" }] },
+      { title: "Company", links: [{ label: "About" }, { label: "Blog" }, { label: "Contact" }] },
+      { title: "Resources", links: [{ label: "Guide" }, { label: "FAQ" }, { label: "Community" }] },
     ],
     copyright: "© 2026 SwingEdge. All rights reserved.",
-    privacy: "Privacy", terms: "Terms",
+    privacy: "Privacy", terms: "Terms", soon: "Soon",
     disclaimer: "SwingEdge is a tool for managing and analyzing a trading journal only. Nothing in the app or on this page constitutes investment advice, a recommendation to buy or sell any security, or a substitute for professional financial advice. Trading the capital markets involves risk of loss of capital. Past performance is not indicative of future results. Every trading decision is the sole responsibility of the user.",
   },
 };
@@ -542,6 +546,7 @@ export default function LandingPage() {
             {/* Free */}
             <div data-reveal="" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", borderRadius: 24, padding: 32, display: "flex", flexDirection: "column" }}>
               <div style={{ fontWeight: 800, fontSize: 18, color: "#fff", marginBottom: 6 }}>{L.freeName}</div>
+              <div style={{ color: "#8F9D94", fontSize: 13.5, fontWeight: 600, lineHeight: 1.45, marginBottom: 16 }}>{L.freeSub}</div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 7, marginBottom: 22 }}><span style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, fontSize: 42 }}>{L.freePrice}</span><span style={{ color: "#8F9D94", fontSize: 14, fontWeight: 600 }}>{L.freePer}</span></div>
               <button onClick={goApp} style={{ cursor: "pointer", display: "block", width: "100%", textAlign: "center", padding: 13, borderRadius: 12, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.16)", color: "#fff", fontWeight: 800, fontSize: 15, marginBottom: 24, fontFamily: "'Heebo',sans-serif" }}>{L.freeCta}</button>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -555,6 +560,7 @@ export default function LandingPage() {
             <div data-reveal="" style={{ position: "relative", background: "linear-gradient(165deg,#0E2A20,#0B1712)", border: "1.5px solid rgba(0,192,118,0.45)", borderRadius: 24, padding: 32, display: "flex", flexDirection: "column", boxShadow: "0 30px 70px rgba(0,160,100,0.18)" }}>
               <span style={{ position: "absolute", top: -13, insetInlineStart: 32, padding: "5px 13px", borderRadius: 999, background: "#00C076", color: "#06281C", fontSize: 12, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace" }}>{L.proBadge}</span>
               <div style={{ fontWeight: 800, fontSize: 18, color: "#fff", marginBottom: 6 }}>{L.proName}</div>
+              <div style={{ color: "#8F9D94", fontSize: 13.5, fontWeight: 600, lineHeight: 1.45, marginBottom: 16 }}>{L.proSub}</div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 7, marginBottom: 22 }}><span style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, fontSize: 42, color: "#16D687" }}>{L.proPrice}</span><span style={{ color: "#8F9D94", fontSize: 14, fontWeight: 600 }}>{L.proPer}</span></div>
               <button onClick={goApp} style={{ cursor: "pointer", display: "block", width: "100%", textAlign: "center", padding: 13, borderRadius: 12, background: "#00C076", color: "#06281C", fontWeight: 800, fontSize: 15, marginBottom: 24, boxShadow: "0 10px 26px rgba(0,192,118,0.35)", border: "none", fontFamily: "'Heebo',sans-serif" }}>{L.proCta}</button>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -594,7 +600,11 @@ export default function LandingPage() {
                 <div style={{ fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", color: "#7E8E83", marginBottom: 14 }}>{col.title}</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {col.links.map((lnk) => (
-                    <a key={lnk} href="#top" style={{ textDecoration: "none", color: "#C4CFC9", fontSize: 14, fontWeight: 500 }}>{lnk}</a>
+                    lnk.href ? (
+                      <a key={lnk.label} href={lnk.href} style={{ textDecoration: "none", color: "#C4CFC9", fontSize: 14, fontWeight: 500 }}>{lnk.label}</a>
+                    ) : (
+                      <span key={lnk.label} style={{ color: "#6C7A72", fontSize: 14, fontWeight: 500, cursor: "default" }}>{lnk.label} · {L.soon}</span>
+                    )
                   ))}
                 </div>
               </div>
@@ -608,8 +618,8 @@ export default function LandingPage() {
         <div style={{ maxWidth: 1100, margin: "24px auto 0", paddingTop: 24, borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "space-between", alignItems: "center", fontSize: 13, color: "#8A9890" }}>
           <span>{L.copyright}</span>
           <div style={{ display: "flex", gap: 22 }}>
-            <a href="#top" style={{ textDecoration: "none", color: "#8F9D94", fontWeight: 500 }}>{L.privacy}</a>
-            <a href="#top" style={{ textDecoration: "none", color: "#8F9D94", fontWeight: 500 }}>{L.terms}</a>
+            <span style={{ color: "#6C7A72", fontWeight: 500, cursor: "default" }}>{L.privacy} · {L.soon}</span>
+            <span style={{ color: "#6C7A72", fontWeight: 500, cursor: "default" }}>{L.terms} · {L.soon}</span>
           </div>
         </div>
       </footer>
