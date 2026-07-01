@@ -2966,7 +2966,7 @@ export default function SwingEdge() {
                 <div>
                   <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">Ticker</label>
                   <input value={journalFilters.ticker} onChange={e => setJournalFilters(f => ({ ...f, ticker: e.target.value }))}
-                    placeholder="NVDA" className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-mono text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none" />
+                    placeholder="e.g. AAPL" className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-mono text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none" />
                 </div>
                 <div>
                   <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">Setup</label>
@@ -3279,7 +3279,7 @@ export default function SwingEdge() {
                 <div>
                   <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Ticker *</label>
                   <input value={analyzerForm.ticker} onChange={e => setAnalyzerForm(f => ({ ...f, ticker: e.target.value.toUpperCase() }))}
-                    placeholder="NVDA" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono font-bold tracking-wider" />
+                    placeholder="e.g. AAPL" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono font-bold tracking-wider" />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{t.sharesToBuy}</label>
@@ -3677,7 +3677,7 @@ export default function SwingEdge() {
                           setPosCalc(f => ({ ...f, ticker: tk, entry: String(lp) }));
                         }
                       }}
-                      placeholder="NVDA"
+                      placeholder="e.g. AAPL"
                       className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none transition font-mono font-bold tracking-wider"
                     />
                     {tickerPrice && (
@@ -5261,7 +5261,7 @@ export default function SwingEdge() {
                 <div>
                   <label htmlFor="log-ticker" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Ticker *</label>
                   <input id="log-ticker" value={form.ticker} onChange={e=>setForm(f=>({...f,ticker:e.target.value.toUpperCase()}))}
-                    placeholder="NVDA" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono font-bold tracking-wider" />
+                    placeholder="e.g. AAPL" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono font-bold tracking-wider" />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Direction</label>
@@ -5349,7 +5349,15 @@ export default function SwingEdge() {
 
               {/* Calculated metrics */}
               {entryN > 0 && stopN > 0 && (
-                <div className="grid grid-cols-4 gap-2 bg-white/3 rounded-xl p-3 border border-[var(--border-subtle)] dark:border-white/[0.06]">
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      <Shield size={12} className="text-cyan-400/70" />
+                      <span className="text-[10px] font-semibold tracking-widest uppercase text-slate-500">{t.riskMgmtSuggestion}</span>
+                    </div>
+                    <span className="block text-[9px] text-slate-600">{t.riskMgmtSuggestionHint}</span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 bg-white/3 rounded-xl p-3 border border-[var(--border-subtle)] dark:border-white/[0.06]">
                   <div className="text-center">
                     <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">Shares</div>
                     <div className={`text-sm font-bold font-mono ${tradeValidity.valid?(posSizeTooSmall?"text-amber-400":"text-cyan-400"):"text-slate-500"}`}>{tradeValidity.valid?(posSizeTooSmall?"1":posSize):"—"}</div>
@@ -5365,6 +5373,7 @@ export default function SwingEdge() {
                   <div className="text-center">
                     <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5 flex items-center justify-center gap-1">R/R Ratio<TermTooltip term="rr" lang={lang} /></div>
                     <div className={`text-sm font-bold font-mono ${tradeValidity.valid?(targetN>0?(rrRatio>=2?"text-[#10b981]":rrRatio>=1?"text-amber-400":"text-[#ef4444]"):"text-slate-500"):"text-slate-500"}`}>{tradeValidity.valid?(targetN>0?`${rrRatio.toFixed(2)}:1`:"–"):"—"}</div>
+                  </div>
                   </div>
                 </div>
               )}
