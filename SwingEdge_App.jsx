@@ -34,7 +34,7 @@ import {
   Settings, BookMarked, Thermometer, Trash2, User,
   Download, FileText, Bell, Flame, Globe, LogOut, MessageCircle,
   Shield, Filter, Save, BarChart3, ChevronDown, HelpCircle, Lock,
-  CreditCard, Smartphone, Wrench, Sun, Moon, Monitor, KeyRound, ExternalLink
+  CreditCard, Smartphone, Wrench, Sun, Moon, Monitor, KeyRound, ExternalLink, RotateCcw
 } from "lucide-react";
 import { getTranslations, LANGUAGES, isRTLLang } from "./src/i18n.js";
 import {
@@ -1110,7 +1110,7 @@ export default function SwingEdge() {
   const [chartStyle, setChartStyle] = useState("1");
   const tvRef = useRef(null);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ ticker: "", side: "LONG", entry: "", stop: "", target: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
+  const [form, setForm] = useState({ ticker: "", side: "LONG", entry: "", stop: "", target: "", shares: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
   const [showTradeContext, setShowTradeContext] = useState(false);
   const [ocrStatus, setOcrStatus] = useState(null);
   // Live quote shown in the Add Trade modal (auto-fills Entry Price).
@@ -1756,6 +1756,17 @@ export default function SwingEdge() {
   // Geometry validity against the explicitly chosen side — drives the invalid-input
   // state (cards show "—", a red banner explains why, and save is blocked).
   const tradeValidity = validateTradeInputs(entryN, stopN, targetN, form.side);
+  // Editable shares: `form.shares` is a manual override (raw positive-int string, "" = untouched).
+  // suggestedShares mirrors the 1%-risk value the card shows today (1 when posSizeTooSmall).
+  // effShares drives Pos.Value / Max Risk so an override recomputes them live; R/R stays price-only.
+  // Sticky by design — changing entry/stop recomputes the suggestion but leaves the override in place.
+  const suggestedShares   = posSizeTooSmall ? 1 : posSize;
+  const sharesOverrideStr = (form.shares ?? "").toString();
+  const sharesOverrideN   = parseInt(sharesOverrideStr, 10);
+  const hasSharesOverride = sharesOverrideStr !== "" && sharesOverrideN > 0 && sharesOverrideN !== suggestedShares;
+  const effShares   = sharesOverrideStr !== "" && sharesOverrideN > 0 ? sharesOverrideN : suggestedShares;
+  const effPosValue = effShares * entryN;
+  const effPotLoss  = effShares * riskPerShare;
 
   // Analyzer computed values
   const azEntry  = parseFloat(analyzerForm.entry)  || 0;
@@ -1859,7 +1870,7 @@ export default function SwingEdge() {
       createdAt: new Date().toISOString(),
       side: form.side,
       entry: entryN, stop: stopN, target: targetN,
-      shares: posSize, status: "OPEN", exit: null,
+      shares: effShares, status: "OPEN", exit: null,
       setup: form.setup, notes: form.notes,
       marketCondition: form.marketCondition,
       emotionAtEntry: form.emotionAtEntry,
@@ -1875,7 +1886,7 @@ export default function SwingEdge() {
       supabase.from("trades").insert(tradeForSupabase({ ...newTrade, user_id: authUser.id, is_demo: false }))
         .then(({ error }) => { if (error) console.error("Supabase insert failed:", error); });
     }
-    setForm({ ticker: "", side: "LONG", entry: "", stop: "", target: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
+    setForm({ ticker: "", side: "LONG", entry: "", stop: "", target: "", shares: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
     setOcrStatus(null);
     setShowForm(false);
     setTab("journal");
@@ -5360,21 +5371,39 @@ export default function SwingEdge() {
                   <div className="grid grid-cols-4 gap-2 bg-white/3 rounded-xl p-3 border border-[var(--border-subtle)] dark:border-white/[0.06]">
                   <div className="text-center">
                     <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">Shares</div>
-                    <div className={`text-sm font-bold font-mono ${tradeValidity.valid?(posSizeTooSmall?"text-amber-400":"text-cyan-400"):"text-slate-500"}`}>{tradeValidity.valid?(posSizeTooSmall?"1":posSize):"—"}</div>
+                    {tradeValidity.valid ? (
+                      <input
+                        type="text" inputMode="numeric" aria-label={t.sharesEditable}
+                        value={sharesOverrideStr !== "" ? sharesOverrideStr : String(suggestedShares)}
+                        onChange={e => {
+                          const v = e.target.value.replace(/[^0-9]/g, "").replace(/^0+/, "");
+                          setForm(f => ({ ...f, shares: v }));
+                        }}
+                        className={`w-full min-w-0 text-center text-sm font-bold font-mono !bg-transparent rounded px-0.5 focus:outline-none ${posSizeTooSmall?"!text-amber-400":"!text-cyan-400"}`}
+                      />
+                    ) : (
+                      <div className="text-sm font-bold font-mono text-slate-500">—</div>
+                    )}
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">Pos. Value</div>
-                    <div className={`text-sm font-bold font-mono ${tradeValidity.valid?"text-white":"text-slate-500"}`}>{tradeValidity.valid?(posSizeTooSmall?`$${entryN.toLocaleString()}`:`$${posValue.toLocaleString()}`):"—"}</div>
+                    <div className={`text-sm font-bold font-mono truncate ${tradeValidity.valid?"text-white":"text-slate-500"}`}>{tradeValidity.valid?`$${effPosValue.toLocaleString()}`:"—"}</div>
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">Max Risk</div>
-                    <div className={`text-sm font-bold font-mono ${tradeValidity.valid?"text-[#ef4444]":"text-slate-500"}`}>{tradeValidity.valid?(posSizeTooSmall?`$${Math.round(riskPerShare).toLocaleString()}`:`$${Math.round(potLoss).toLocaleString()}`):"—"}</div>
+                    <div className={`text-sm font-bold font-mono truncate ${tradeValidity.valid?"text-[#ef4444]":"text-slate-500"}`}>{tradeValidity.valid?`$${Math.round(effPotLoss).toLocaleString()}`:"—"}</div>
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5 flex items-center justify-center gap-1">R/R Ratio<TermTooltip term="rr" lang={lang} /></div>
                     <div className={`text-sm font-bold font-mono ${tradeValidity.valid?(targetN>0?(rrRatio>=2?"text-[#10b981]":rrRatio>=1?"text-amber-400":"text-[#ef4444]"):"text-slate-500"):"text-slate-500"}`}>{tradeValidity.valid?(targetN>0?`${rrRatio.toFixed(2)}:1`:"–"):"—"}</div>
                   </div>
                   </div>
+                  {hasSharesOverride && (
+                    <button type="button" onClick={() => setForm(f => ({ ...f, shares: "" }))}
+                      className="flex items-center gap-1 mx-auto text-[10px] text-slate-500 hover:text-cyan-400 transition-colors">
+                      <RotateCcw size={10} /> {t.resetToSuggested}
+                    </button>
+                  )}
                 </div>
               )}
 
