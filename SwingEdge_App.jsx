@@ -3887,7 +3887,7 @@ export default function SwingEdge() {
 
             {/* Setup breakdown — dynamic grouping from actual trade data */}
             <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
-              <h3 className="text-sm font-bold text-white mb-4">{t.perfBySetup}</h3>
+              <h3 className="text-sm font-bold text-white mb-4">{t.perfBySetup}<TermTooltip term="performanceBySetup" lang={lang} /></h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[...stats.bySetup]
                   .sort((a, b) => b.count - a.count)
@@ -3915,7 +3915,7 @@ export default function SwingEdge() {
               }));
               return (
                 <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
-                  <h3 className="text-sm font-bold text-white mb-1">{t.pnlByDay}</h3>
+                  <h3 className="text-sm font-bold text-white mb-1">{t.pnlByDay}<TermTooltip term="dayOfWeek" lang={lang} /></h3>
                   <p className="text-xs text-slate-600 mb-4">{t.pnlByDaySubtitle}</p>
                   <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>

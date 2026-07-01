@@ -541,6 +541,20 @@ export const TRADING_TOOLTIPS = {
     pt: "Um grupo de operações com uma relação risco/retorno de 3 ou mais: o retorno potencial é pelo menos 3× o risco. São as operações de maior qualidade por rácio: mesmo com uma taxa de acertos baixa, ganhar uma fração já basta para ser lucrativo.",
     ar: "مجموعة صفقات بنسبة مخاطرة/عائد تبلغ 3 أو أكثر: العائد المحتمل لا يقل عن 3 أضعاف المخاطرة. هذه أعلى الصفقات جودةً من حيث النسبة: حتى مع نسبة نجاح منخفضة، يكفي الربح في جزء منها لتحقيق الربحية."
   },
+  dayOfWeek: {
+    en: "Your profit/loss broken down by day of the week. Reveals which days you consistently make or lose money — many traders have a hidden edge (or leak) tied to specific days like Mondays or Fridays.",
+    he: "הרווח/הפסד שלך מחולק לפי ימי השבוע. חושף באילו ימים אתה עקבית מרוויח או מפסיד — לרבים יש Edge נסתר (או דליפה) שקשור לימים מסוימים כמו שני או שישי.",
+    es: "Tu ganancia/pérdida desglosada por día de la semana. Revela en qué días ganas o pierdes dinero de forma consistente — muchos traders tienen un edge oculto (o una fuga) ligado a días concretos como lunes o viernes.",
+    pt: "O teu lucro/perda discriminado por dia da semana. Revela em que dias ganhas ou perdes dinheiro de forma consistente — muitos traders têm um edge oculto (ou uma fuga) ligado a dias específicos como segundas ou sextas.",
+    ar: "أرباحك/خسائرك موزّعة حسب أيام الأسبوع. تكشف في أي الأيام تربح أو تخسر باستمرار — كثير من المتداولين لديهم أفضلية خفية (أو تسريب) مرتبط بأيام محدّدة كالإثنين أو الجمعة."
+  },
+  performanceBySetup: {
+    en: "A breakdown of every setup you trade — win rate, total R, and number of trades. Shows at a glance which setups carry your account and which drain it. Your edges and anti-edges, side by side.",
+    he: "פירוט של כל setup שאתה סוחר — אחוז זכייה, R כולל, ומספר עסקאות. מראה במבט אחד אילו סטאפים נושאים את החשבון שלך ואילו מנקזים אותו. ה-Edges וה-Anti-Edges שלך, זה לצד זה.",
+    es: "Un desglose de cada setup que operas — win rate, R total y número de operaciones. Muestra de un vistazo qué setups sostienen tu cuenta y cuáles la drenan. Tus edges y anti-edges, lado a lado.",
+    pt: "Uma discriminação de cada setup que operas — win rate, R total e número de operações. Mostra num relance quais setups sustentam a tua conta e quais a drenam. Os teus edges e anti-edges, lado a lado.",
+    ar: "تفصيل لكل setup تتداوله — نسبة الربح، إجمالي R، وعدد الصفقات. يُظهر بنظرة واحدة أي النماذج تحمل حسابك وأيّها يستنزفه. أفضلياتك وأنتي-أفضلياتك، جنباً إلى جنب."
+  },
 };
 
 // ─── Short, friendly term labels (he+en) ─────────────────────────────────────
@@ -633,6 +647,10 @@ export const TERM_LABELS = {
 
   // ── R/R band "3+" (5 languages) ──────────────────────────────────────────
   rrBucket3plus: { en: "R/R 3+", he: "R/R 3+", es: "R/R 3+", pt: "R/R 3+", ar: "R/R 3+" },
+
+  // ── Analytics section headings (reused verbatim from src/i18n.js) ───────
+  dayOfWeek: { en: "P&L by Day of Week", he: "רווח/הפסד לפי יום בשבוע", es: "G/P por Día de la Semana", pt: "L/P por Dia da Semana", ar: "الربح/الخسارة حسب يوم الأسبوع" },
+  performanceBySetup: { en: "Performance by Setup", he: "ביצועים לפי סטאפ", es: "Rendimiento por Setup", pt: "Desempenho por Setup", ar: "الأداء حسب السيناريو" },
 };
 
 // ─── Setup display-name → glossary-key normalizer ────────────────────────────
