@@ -34,7 +34,7 @@ import {
   Settings, BookMarked, Thermometer, Trash2, User,
   Download, FileText, Bell, Flame, Globe, LogOut, MessageCircle,
   Shield, Filter, Save, BarChart3, ChevronDown, HelpCircle, Lock,
-  CreditCard, Smartphone, Wrench, Sun, Moon, Monitor, KeyRound, ExternalLink, RotateCcw
+  CreditCard, Smartphone, Wrench, Sun, Moon, Monitor, KeyRound, ExternalLink, RotateCcw, Pencil
 } from "lucide-react";
 import { getTranslations, LANGUAGES, isRTLLang } from "./src/i18n.js";
 import {
@@ -5369,18 +5369,23 @@ export default function SwingEdge() {
                     <span className="block text-[9px] text-slate-600">{t.riskMgmtSuggestionHint}</span>
                   </div>
                   <div className="grid grid-cols-4 gap-2 bg-white/3 rounded-xl p-3 border border-[var(--border-subtle)] dark:border-white/[0.06]">
-                  <div className="text-center">
+                  <div className="text-center group">
                     <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">Shares</div>
                     {tradeValidity.valid ? (
-                      <input
-                        type="text" inputMode="numeric" aria-label={t.sharesEditable}
-                        value={sharesOverrideStr !== "" ? sharesOverrideStr : String(suggestedShares)}
-                        onChange={e => {
-                          const v = e.target.value.replace(/[^0-9]/g, "").replace(/^0+/, "");
-                          setForm(f => ({ ...f, shares: v }));
-                        }}
-                        className={`w-full min-w-0 text-center text-sm font-bold font-mono !bg-transparent rounded px-0.5 focus:outline-none ${posSizeTooSmall?"!text-amber-400":"!text-cyan-400"}`}
-                      />
+                      <div className="flex items-center justify-center gap-1">
+                        <Pencil size={10} aria-hidden className="shrink-0 text-slate-600 group-hover:text-slate-400 transition-colors pointer-events-none" />
+                        <input
+                          type="text" inputMode="numeric" aria-label={t.sharesEditable}
+                          value={sharesOverrideStr !== "" ? sharesOverrideStr : String(suggestedShares)}
+                          onFocus={e => e.target.select()}
+                          onChange={e => {
+                            const v = e.target.value.replace(/[^0-9]/g, "").replace(/^0+/, "");
+                            setForm(f => ({ ...f, shares: v }));
+                          }}
+                          style={{ width: `${Math.max((sharesOverrideStr !== "" ? sharesOverrideStr : String(suggestedShares)).length, 1) + 1}ch` }}
+                          className={`min-w-0 text-center text-sm font-bold font-mono !bg-transparent rounded px-0.5 focus:outline-none ${posSizeTooSmall?"!text-amber-400":"!text-cyan-400"}`}
+                        />
+                      </div>
                     ) : (
                       <div className="text-sm font-bold font-mono text-slate-500">—</div>
                     )}
