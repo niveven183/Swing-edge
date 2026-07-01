@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useId, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import Logo from "./Logo.jsx";
 import "./LandingPage.css";
@@ -205,6 +206,229 @@ const TRUST = {
   ],
 };
 
+/* ============================================================
+   Trading-term glossary + inline highlighter.
+   Terms that appear in the landing copy get a subtle emphasis
+   (bold + accent + dotted underline, SAME font size so line
+   layout is untouched) plus a hover/click tooltip explaining
+   the essence of the term. Bilingual (he / en).
+   ============================================================ */
+const TERMS = {
+  edge: {
+    title: { he: "Edge", en: "Edge" },
+    desc: {
+      he: "הסטאפים שבהם יש לך יתרון סטטיסטי אמיתי — לפי היסטוריית העסקאות שלך, לא לפי תחושה.",
+      en: "The setups where you hold a real statistical advantage — based on your actual trade history, not a hunch.",
+    },
+  },
+  tilt: {
+    title: { he: "Tilt", en: "Tilt" },
+    desc: {
+      he: "מצב רגשי שמוציא אותך מהכללים: מסחר נקמה, הגדלת פוזיציות, רדיפה אחרי הפסד. הרוצח השקט של חשבונות.",
+      en: "The emotional state that breaks your rules: revenge trading, sizing up, chasing losses. The silent account-killer.",
+    },
+  },
+  setup: {
+    title: { he: "סטאפ (Setup)", en: "Setup" },
+    desc: {
+      he: "תבנית הכניסה לעסקה — התנאים המדויקים שבהם אתה נכנס לפוזיציה (למשל פריצה, פולבק, דגל).",
+      en: "Your entry pattern — the exact conditions under which you take a position (e.g. breakout, pullback, flag).",
+    },
+  },
+  rr: {
+    title: { he: "R/R — סיכון / סיכוי", en: "R/R — Risk / Reward" },
+    desc: {
+      he: "יחס סיכון-סיכוי: כמה אתה עלול להרוויח מול כמה אתה מסכן. 1:2.4 = פוטנציאל רווח פי 2.4 מההפסד.",
+      en: "Risk/Reward: potential profit vs. what you risk. 1:2.4 = you stand to make 2.4× what you'd lose.",
+    },
+  },
+  winRate: {
+    title: { he: "Win Rate — אחוז זכייה", en: "Win Rate" },
+    desc: {
+      he: "האחוז מהעסקאות הסגורות שהסתיימו ברווח. מעל 55% זה טוב — אבל לבד זה לא כל הסיפור.",
+      en: "The share of your closed trades that ended in profit. Above 55% is solid — but on its own it's not the whole story.",
+    },
+  },
+  rMultiple: {
+    title: { he: "R-Multiple", en: "R-Multiple" },
+    desc: {
+      he: "מודד רווח/הפסד ביחידות של הסיכון: ‎+2R = הרווחת פי 2 מהסיכון, ‎−1R = הפסד מתוכנן. מנטרל את גודל הסכום.",
+      en: "Measures P&L in units of risk: +2R = you made 2× your risk, −1R = a planned loss. Removes dollar-size bias.",
+    },
+  },
+  visionOcr: {
+    title: { he: "Vision OCR", en: "Vision OCR" },
+    desc: {
+      he: "קליטת עסקה אוטומטית מצילום מסך של הצ'ארט — במקום להקליד ידנית.",
+      en: "Auto-captures a trade straight from a screenshot of your chart — instead of typing it in by hand.",
+    },
+  },
+};
+
+// Surface forms (as they literally appear in the copy) → glossary key.
+// Latin terms are guarded with (?<![A-Za-z]) … (?![A-Za-z]) so e.g. the
+// "Edge" inside "SwingEdge" is never highlighted. Ordered longest-first
+// so multi-word terms win over their fragments.
+const TERM_PATTERN =
+  /R-Multiple|Vision OCR|Win Rate|(?<![A-Za-z])Setup(?![A-Za-z])|(?<![A-Za-z])setup(?![A-Za-z])|סטאפים|סטאפ|R\/R|(?<![A-Za-z])Edge(?![A-Za-z])|(?<![A-Za-z])Tilt(?![A-Za-z])|(?<![A-Za-z])tilt(?![A-Za-z])/g;
+const SURFACE_KEY = {
+  "r-multiple": "rMultiple",
+  "vision ocr": "visionOcr",
+  "win rate": "winRate",
+  setup: "setup",
+  "סטאפים": "setup",
+  "סטאפ": "setup",
+  "r/r": "rr",
+  edge: "edge",
+  tilt: "tilt",
+};
+
+const TERM_TONES = {
+  light: { color: "#039E26", underline: "rgba(3,158,38,0.45)" },
+  dark: { color: "#7CF3C0", underline: "rgba(124,243,192,0.5)" },
+  onGreen: { color: "#ffffff", underline: "rgba(255,255,255,0.7)" },
+};
+
+/* Single highlighted term: bold + accent + dotted underline (same size),
+   with an accessible popover that escapes any overflow:hidden / animated-
+   transform ancestor via a portal to <body>. */
+function Term({ children, tone = "light", title, desc, lang = "he" }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const ref = useRef(null);
+  const popRef = useRef(null);
+  const id = useId();
+  const palette = TERM_TONES[tone] || TERM_TONES.light;
+
+  const recalc = useCallback(() => {
+    const t = ref.current?.getBoundingClientRect();
+    if (!t) return;
+    const W = 260;
+    const popH = popRef.current?.getBoundingClientRect().height || 120;
+    const M = 8;
+    let left = t.left + t.width / 2 - W / 2;
+    left = Math.max(M, Math.min(left, window.innerWidth - W - M));
+    const top =
+      t.top >= popH + M ? t.top - popH - M : t.bottom + M;
+    setPos({ top, left });
+  }, []);
+
+  useEffect(() => {
+    if (open) requestAnimationFrame(recalc);
+  }, [open, recalc]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    const onDoc = (e) => {
+      if (!ref.current?.contains(e.target) && !popRef.current?.contains(e.target)) setOpen(false);
+    };
+    const close = () => setOpen(false);
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("touchstart", onDoc);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", recalc);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("touchstart", onDoc);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", recalc);
+    };
+  }, [open, recalc]);
+
+  return (
+    <>
+      <span
+        ref={ref}
+        role="button"
+        tabIndex={0}
+        aria-label={title}
+        aria-expanded={open}
+        aria-describedby={open ? id : undefined}
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen((v) => !v); }
+        }}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => {
+          setTimeout(() => { if (!popRef.current?.matches(":hover")) setOpen(false); }, 140);
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        style={{
+          fontWeight: 800,
+          color: palette.color,
+          textDecoration: "underline dotted",
+          textDecorationColor: palette.underline,
+          textUnderlineOffset: "3px",
+          textDecorationThickness: "1.5px",
+          whiteSpace: "nowrap",
+          cursor: "help",
+        }}
+      >
+        {children}
+      </span>
+
+      {open && createPortal(
+        <div
+          ref={popRef}
+          id={id}
+          role="tooltip"
+          dir={lang === "he" ? "rtl" : "ltr"}
+          onMouseEnter={() => setOpen(true)}
+          onMouseLeave={() => setOpen(false)}
+          style={{
+            position: "fixed",
+            top: pos.top,
+            left: pos.left,
+            width: 260,
+            zIndex: 9999,
+            background: "#0B1712",
+            border: "1px solid rgba(0,192,118,0.35)",
+            borderRadius: 14,
+            padding: "13px 15px",
+            boxShadow: "0 18px 44px rgba(7,13,10,0.4)",
+            textAlign: "start",
+            fontFamily: "'Heebo',sans-serif",
+            animation: "seReveal 0.16s ease both",
+          }}
+        >
+          <div style={{ fontWeight: 800, color: "#16D687", fontSize: 13.5, marginBottom: 6 }}>{title}</div>
+          <div style={{ fontSize: 13, lineHeight: 1.55, color: "#C4CFC9", whiteSpace: "pre-line" }}>{desc}</div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+/* Scan a plain copy string and wrap any known trading term in <Term>.
+   Returns the original string when no term is present (keeps JSX clean). */
+function renderTerms(text, lang, tone = "light") {
+  if (typeof text !== "string") return text;
+  const parts = [];
+  let last = 0;
+  let key = 0;
+  let m;
+  TERM_PATTERN.lastIndex = 0;
+  while ((m = TERM_PATTERN.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    const surface = m[0];
+    const def = TERMS[SURFACE_KEY[surface.toLowerCase()]];
+    parts.push(
+      <Term key={key++} tone={tone} lang={lang} title={def.title[lang]} desc={def.desc[lang]}>
+        {surface}
+      </Term>
+    );
+    last = m.index + surface.length;
+  }
+  if (parts.length === 0) return text;
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
+}
+
 /* Logo mark in the design's rounded, shadowed wrapper. */
 function LogoMark({ size = 34, shadow = true }) {
   return (
@@ -370,8 +594,8 @@ export default function LandingPage() {
             {L.problemCards.map((c) => (
               <div key={c.title} data-reveal="" style={{ background: "#fff", border: "1px solid rgba(21,32,26,0.07)", borderRadius: 20, padding: 28, boxShadow: "0 1px 3px rgba(21,32,26,0.04)" }}>
                 <div style={{ width: 42, height: 42, borderRadius: 12, background: "rgba(229,72,77,0.10)", display: "flex", alignItems: "center", justifyContent: "center", color: "#E5484D", fontSize: 20, fontWeight: 800, marginBottom: 18 }}>{c.icon}</div>
-                <h3 style={{ fontSize: 19, fontWeight: 800, letterSpacing: "-0.01em", margin: "0 0 9px" }}>{c.title}</h3>
-                <p style={{ fontSize: 15, lineHeight: 1.6, color: "#5b6b62", margin: 0 }}>{c.body}</p>
+                <h3 style={{ fontSize: 19, fontWeight: 800, letterSpacing: "-0.01em", margin: "0 0 9px" }}>{renderTerms(c.title, lang, "light")}</h3>
+                <p style={{ fontSize: 15, lineHeight: 1.6, color: "#5b6b62", margin: 0 }}>{renderTerms(c.body, lang, "light")}</p>
               </div>
             ))}
           </div>
@@ -393,7 +617,7 @@ export default function LandingPage() {
               <div style={{ position: "relative" }}>
                 <span style={{ display: "inline-block", padding: "5px 12px", borderRadius: 999, background: "rgba(0,192,118,0.16)", color: "#7CF3C0", fontSize: 12, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.03em", marginBottom: 18 }}>{L.featCoachTag}</span>
                 <h3 style={{ fontSize: "clamp(24px,2.7vw,32px)", fontWeight: 800, letterSpacing: "-0.02em", margin: "0 0 12px", maxWidth: 440 }}>{L.featCoachTitle}</h3>
-                <p style={{ fontSize: 16, lineHeight: 1.6, color: "#A9B7AF", maxWidth: 430, margin: 0 }}>{L.featCoachBody}</p>
+                <p style={{ fontSize: 16, lineHeight: 1.6, color: "#A9B7AF", maxWidth: 430, margin: 0 }}>{renderTerms(L.featCoachBody, lang, "dark")}</p>
               </div>
               <div style={{ position: "relative", display: "flex", gap: 10, flexWrap: "wrap", marginTop: 24 }}>
                 {signalChips.map((c) => (
@@ -423,8 +647,8 @@ export default function LandingPage() {
             <div data-reveal="" style={{ gridColumn: "span 2", background: "#039E26", color: "#fff", borderRadius: 24, padding: 26, position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
               <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,255,255,0.10) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.10) 1px,transparent 1px)", backgroundSize: "30px 30px", opacity: 0.5 }} />
               <span style={{ position: "relative", display: "inline-block", alignSelf: "flex-start", padding: "5px 12px", borderRadius: 999, background: "rgba(255,255,255,0.18)", fontSize: 12, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", marginBottom: "auto" }}>{L.featEdgeTag}</span>
-              <h3 style={{ position: "relative", fontSize: 20, fontWeight: 800, letterSpacing: "-0.01em", margin: "14px 0 6px" }}>{L.featEdgeTitle}</h3>
-              <p style={{ position: "relative", fontSize: 14, lineHeight: 1.5, color: "rgba(255,255,255,0.95)", margin: 0 }}>{L.featEdgeBody}</p>
+              <h3 style={{ position: "relative", fontSize: 20, fontWeight: 800, letterSpacing: "-0.01em", margin: "14px 0 6px" }}>{renderTerms(L.featEdgeTitle, lang, "onGreen")}</h3>
+              <p style={{ position: "relative", fontSize: 14, lineHeight: 1.5, color: "rgba(255,255,255,0.95)", margin: 0 }}>{renderTerms(L.featEdgeBody, lang, "onGreen")}</p>
             </div>
 
             {/* Monthly Report */}
@@ -445,8 +669,8 @@ export default function LandingPage() {
             <div data-reveal="" style={{ gridColumn: "span 2", background: "#15201A", color: "#fff", borderRadius: 24, padding: 26, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
               <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", alignSelf: "flex-start", width: 40, height: 40, borderRadius: 11, background: "rgba(229,72,77,0.18)", color: "#FF7A7E", fontSize: 19, marginBottom: "auto" }}>⏻</span>
               <span style={{ display: "inline-block", alignSelf: "flex-start", padding: "4px 11px", borderRadius: 999, background: "rgba(229,72,77,0.16)", color: "#FF9C9F", fontSize: 11.5, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", margin: "14px 0 8px" }}>{L.featTiltTag}</span>
-              <h3 style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-0.01em", margin: "0 0 5px" }}>{L.featTiltTitle}</h3>
-              <p style={{ fontSize: 13.5, lineHeight: 1.5, color: "#A9B7AF", margin: 0 }}>{L.featTiltBody}</p>
+              <h3 style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-0.01em", margin: "0 0 5px" }}>{renderTerms(L.featTiltTitle, lang, "dark")}</h3>
+              <p style={{ fontSize: 13.5, lineHeight: 1.5, color: "#A9B7AF", margin: 0 }}>{renderTerms(L.featTiltBody, lang, "dark")}</p>
             </div>
           </div>
         </div>
@@ -467,8 +691,8 @@ export default function LandingPage() {
                 <div key={step.n} data-reveal="" style={{ display: "flex", gap: 18, padding: "22px 0", borderBottom: "1px solid rgba(21,32,26,0.08)" }}>
                   <span style={{ flex: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", width: 42, height: 42, borderRadius: 12, background: "rgba(0,192,118,0.10)", border: "1px solid rgba(0,192,118,0.22)", color: "#039E26", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, fontSize: 15 }}>{step.n}</span>
                   <div>
-                    <h3 style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-0.01em", margin: "0 0 6px" }}>{step.title}</h3>
-                    <p style={{ fontSize: 15, lineHeight: 1.6, color: "#5b6b62", margin: 0 }}>{step.body}</p>
+                    <h3 style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-0.01em", margin: "0 0 6px" }}>{renderTerms(step.title, lang, "light")}</h3>
+                    <p style={{ fontSize: 15, lineHeight: 1.6, color: "#5b6b62", margin: 0 }}>{renderTerms(step.body, lang, "light")}</p>
                   </div>
                 </div>
               ))}
@@ -524,7 +748,7 @@ export default function LandingPage() {
       <section style={{ padding: "clamp(64px,8vw,110px) clamp(16px,4vw,40px)" }}>
         <div data-reveal="" style={{ maxWidth: 900, margin: "0 auto", textAlign: "center" }}>
           <div style={{ fontSize: 60, lineHeight: 0.6, color: "#00C076", fontWeight: 800, marginBottom: 10 }}>”</div>
-          <blockquote style={{ fontSize: "clamp(22px,3.2vw,36px)", lineHeight: 1.32, letterSpacing: "-0.02em", fontWeight: 800, margin: "0 0 26px", color: "#15201A" }}>{L.quote}</blockquote>
+          <blockquote style={{ fontSize: "clamp(22px,3.2vw,36px)", lineHeight: 1.32, letterSpacing: "-0.02em", fontWeight: 800, margin: "0 0 26px", color: "#15201A" }}>{renderTerms(L.quote, lang, "light")}</blockquote>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 12 }}>
             <span style={{ width: 42, height: 42, borderRadius: "50%", background: "linear-gradient(135deg,#00C076,#4F46E5)" }} />
             <span style={{ textAlign: "start" }}>
@@ -551,7 +775,7 @@ export default function LandingPage() {
               <button onClick={goApp} style={{ cursor: "pointer", display: "block", width: "100%", textAlign: "center", padding: 13, borderRadius: 12, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.16)", color: "#fff", fontWeight: 800, fontSize: 15, marginBottom: 24, fontFamily: "'Heebo',sans-serif" }}>{L.freeCta}</button>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {L.freeFeatures.map((f) => (
-                  <div key={f} style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 14.5, color: "#C4CFC9" }}><span style={{ color: "#16D687", fontWeight: 800, flex: "none" }}>✓</span><span>{f}</span></div>
+                  <div key={f} style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 14.5, color: "#C4CFC9" }}><span style={{ color: "#16D687", fontWeight: 800, flex: "none" }}>✓</span><span>{renderTerms(f, lang, "dark")}</span></div>
                 ))}
               </div>
             </div>
@@ -565,7 +789,7 @@ export default function LandingPage() {
               <button onClick={goApp} style={{ cursor: "pointer", display: "block", width: "100%", textAlign: "center", padding: 13, borderRadius: 12, background: "#00C076", color: "#06281C", fontWeight: 800, fontSize: 15, marginBottom: 24, boxShadow: "0 10px 26px rgba(0,192,118,0.35)", border: "none", fontFamily: "'Heebo',sans-serif" }}>{L.proCta}</button>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {L.proFeatures.map((f) => (
-                  <div key={f} style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 14.5, color: "#E1EAE5" }}><span style={{ color: "#16D687", fontWeight: 800, flex: "none" }}>✓</span><span>{f}</span></div>
+                  <div key={f} style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 14.5, color: "#E1EAE5" }}><span style={{ color: "#16D687", fontWeight: 800, flex: "none" }}>✓</span><span>{renderTerms(f, lang, "dark")}</span></div>
                 ))}
               </div>
             </div>
