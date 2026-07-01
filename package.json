@@ -4,6 +4,7 @@
   "version": "1.0.1",
   "type": "module",
   "scripts": {
+    "glossary": "node scripts/extract-tooltips.mjs && node scripts/build-glossary.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
