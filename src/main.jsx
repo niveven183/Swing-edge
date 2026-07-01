@@ -13,7 +13,38 @@ Sentry.init({
   environment: import.meta.env.MODE,
   tracesSampleRate: 0.1,
   replaysOnErrorSampleRate: 1.0,
-  integrations: [Sentry.browserTracingIntegration()],
+  integrations: [
+    Sentry.browserTracingIntegration(),
+    // Drop errors whose stack is made up EXCLUSIVELY of non-first-party frames
+    // (browser extensions / injected <anonymous> scripts). Matches against the
+    // `applicationKey` embedded at build time by @sentry/vite-plugin, so it only
+    // ever discards code that isn't ours — a real app error, even one that passes
+    // through a third-party frame, is kept.
+    Sentry.thirdPartyErrorFilterIntegration({
+      filterKeys: ["swing-edge"],
+      behaviour: "drop-error-if-exclusively-contains-third-party-frames",
+    }),
+  ],
+  // Belt-and-suspenders runtime net (works even without module metadata):
+  // silence the exact injected-script signature we diagnosed plus common
+  // browser-extension / third-party noise.
+  ignoreErrors: [
+    "Cannot read properties of undefined (reading 'getBoundingClientRect')",
+    "Can't find variable: getBoundingClientRect",
+    "ResizeObserver loop limit exceeded",
+    "ResizeObserver loop completed with undelivered notifications",
+    /^Non-Error promise rejection captured/,
+    /extension context invalidated/i,
+  ],
+  // Errors whose top frame originates from a browser extension or an injected
+  // <anonymous> script are never ours — never report them.
+  denyUrls: [
+    /extensions\//i,
+    /^chrome-extension:\/\//i,
+    /^moz-extension:\/\//i,
+    /^safari-web-extension:\/\//i,
+    /^<anonymous>$/,
+  ],
 });
 
 console.info('[SwingEdge] Build v1.0.1 — ' + new Date().toISOString());

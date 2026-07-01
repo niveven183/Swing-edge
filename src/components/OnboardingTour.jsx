@@ -30,8 +30,8 @@ export default function OnboardingTour({ steps = [], onClose, t, isRTL }) {
   const recompute = useCallback(() => {
     if (!anchor) { setRect(null); return; }
     const el = document.querySelector(anchor);
-    if (!el) { setRect(null); return; }
-    const r = el.getBoundingClientRect();
+    const r = el?.getBoundingClientRect();
+    if (!r) { setRect(null); return; }
     setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
   }, [anchor]);
 

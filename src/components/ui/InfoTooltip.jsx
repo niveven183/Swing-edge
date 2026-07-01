@@ -8,11 +8,10 @@ export default function InfoTooltip({ children, label = 'More info', side = 'aut
   const tooltipId = useId();
 
   const recalcPosition = useCallback(() => {
-    if (!triggerRef.current || !popoverRef.current) return;
-
-    const trigger = triggerRef.current.getBoundingClientRect();
+    const trigger = triggerRef.current?.getBoundingClientRect();
+    if (!trigger) return;
     const POPOVER_W = 280;
-    const POPOVER_H = popoverRef.current.getBoundingClientRect().height || 160;
+    const POPOVER_H = popoverRef.current?.getBoundingClientRect().height || 160;
     const MARGIN = 8;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
