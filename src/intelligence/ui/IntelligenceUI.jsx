@@ -8,6 +8,7 @@ import InfoTooltip from "../../components/ui/InfoTooltip.jsx";
 import TermTooltip from "../../components/ui/TermTooltip.jsx";
 import { TRADING_TOOLTIPS } from "../../data/tooltips.js";
 import { dayLabel } from "../utils/statisticalModels.js";
+import { nTrades } from "../../i18n.js";
 import {
   Brain, Sparkles, Shield, Flame, TrendingUp, TrendingDown,
   AlertTriangle, Activity, Target, Compass, Zap, Timer,
@@ -151,7 +152,7 @@ export const EdgeCard = ({ edge, lang = "he", variant = "edge" }) => {
       <div className="mt-2 flex items-center gap-3 text-[11px] font-mono text-slate-400">
         <span className="text-slate-300"><b className="text-white">{edge.winRate}%</b> WR</span>
         <span>·</span>
-        <span>{edge.trades} {lang === "he" ? "עסקאות" : "trades"}</span>
+        <span>{nTrades(edge.trades, lang)}</span>
         <span>·</span>
         <span className={edge.avgR >= 0 ? "text-emerald-400" : "text-rose-400"}>
           {edge.avgR >= 0 ? "+" : ""}{edge.avgR}R
@@ -565,7 +566,7 @@ export const AntiEdgeLockCard = ({ antiEdgeLocks, onUnlock, onRelock, lang = "he
         <span>·</span>
         <span>WR <b className="text-slate-300">{s.overallWR}%</b></span>
         <span>·</span>
-        <span>{s.totalTrades} {lang === "he" ? "עסקאות" : "trades"}</span>
+        <span>{nTrades(s.totalTrades, lang)}</span>
       </div>
     </div>
   );

@@ -15,6 +15,10 @@ const rOf = (t, calc) => {
   try { return calc(t)?.rMultiple ?? 0; } catch { return 0; }
 };
 
+// "overnight_hold" → "Overnight Hold". Safe on already-clean labels ("Breakout").
+const snakeToTitle = (s) =>
+  String(s || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
 const SEVERITY_TO_TYPE = {
   critical: 'warning',
   high: 'warning',
@@ -59,7 +63,7 @@ const PATTERNS = [
     },
     render: ({ wr, allWR }, lang) => lang === 'he' ? {
       title: 'יום שישי מחליש אותך',
-      detail: `אחוז זכייה ביום שישי ${wr}% — נמוך ב-${allWR - wr}% מהממוצע.`,
+      detail: `אחוז הצלחה ביום שישי ${wr}% — נמוך ב-${allWR - wr}% מהממוצע.`,
       action: 'שקול להפחית סחר בימי שישי או לדלג עליהם.',
     } : {
       title: 'Friday is your weakest day',
@@ -116,11 +120,11 @@ const PATTERNS = [
       return { setup: top.setup, wr: top.winRate, count: top.n };
     },
     render: ({ setup, wr, count }, lang) => lang === 'he' ? {
-      title: `${setup} — ה-Edge החזק שלך`,
-      detail: `${wr}% זכייה על פני ${count} עסקאות — הסטאפ החזק ביותר שלך.`,
+      title: `${snakeToTitle(setup)} — ה-Edge החזק שלך`,
+      detail: `${wr}% הצלחה על פני ${count} עסקאות — הסטאפ החזק ביותר שלך.`,
       action: 'סחור אותו אגרסיבי יותר — תן לו יותר משקל.',
     } : {
-      title: `${setup} is your edge (all-time)`,
+      title: `${snakeToTitle(setup)} is your edge (all-time)`,
       detail: `${wr}% win rate across ${count} trades — your strongest setup.`,
       action: 'Trade it more aggressively.',
     },
@@ -141,7 +145,7 @@ const PATTERNS = [
     },
     render: ({ improvement }, lang) => lang === 'he' ? {
       title: 'אתה משתפר',
-      detail: `אחוז הזכייה שלך עלה ב-${improvement}% בעסקאות האחרונות.`,
+      detail: `אחוז ההצלחה שלך עלה ב-${improvement}% בעסקאות האחרונות.`,
       action: 'אתה מפתח Edge אמיתי — המשך באותו קצב.',
     } : {
       title: 'You are improving',

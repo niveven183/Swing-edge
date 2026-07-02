@@ -8,19 +8,21 @@ import {
   Sparkles,
 } from "lucide-react";
 import { supabase, isSupabaseConfigured } from "../supabaseClient.js";
+import { getTranslations } from "../i18n.js";
 
 const EMAILJS_SERVICE_ID = "service_jxkivjs";
 const EMAILJS_TEMPLATE_ID = "template_q0u4f7c";
 const EMAILJS_PUBLIC_KEY = "ZAh-yUGwSDqZztQOE";
 
 const FEEDBACK_TYPES = [
-  { value: "bug", emoji: "🐛", label: "באג / משהו לא עבד" },
-  { value: "idea", emoji: "💡", label: "רעיון לשיפור" },
-  { value: "love", emoji: "⭐", label: "משהו שאהבתי" },
-  { value: "question", emoji: "❓", label: "שאלה" },
+  { value: "bug", emoji: "🐛", labelKey: "fb_type_bug" },
+  { value: "idea", emoji: "💡", labelKey: "fb_type_idea" },
+  { value: "love", emoji: "⭐", labelKey: "fb_type_love" },
+  { value: "question", emoji: "❓", labelKey: "fb_type_question" },
 ];
 
-export default function FeedbackTab({ user }) {
+export default function FeedbackTab({ user, lang = "he" }) {
+  const t = getTranslations(lang);
   const [selectedType, setSelectedType] = useState("bug");
   const [feedbackText, setFeedbackText] = useState("");
   const [sending, setSending] = useState(false);
@@ -80,20 +82,14 @@ export default function FeedbackTab({ user }) {
     setSending(false);
 
     if (supabaseOk || emailOk) {
-      setStatus({
-        kind: "success",
-        msg: "תודה! הדיווח התקבל ויבחן על ידי הצוות 🙌",
-      });
+      setStatus({ kind: "success", msg: t.fb_success });
       reset();
     } else {
-      setStatus({
-        kind: "error",
-        msg: "לא הצלחנו לשלוח את הדיווח. בדוק חיבור לאינטרנט ונסה שוב.",
-      });
+      setStatus({ kind: "error", msg: t.fb_error });
     }
   };
 
-  const selected = FEEDBACK_TYPES.find((t) => t.value === selectedType);
+  const selected = FEEDBACK_TYPES.find((ft) => ft.value === selectedType);
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -106,15 +102,14 @@ export default function FeedbackTab({ user }) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl md:text-2xl font-extrabold text-white">
-                עזור לנו להשתפר 🚀
+                {t.fb_hero_title}
               </h1>
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 text-[10px] font-bold tracking-widest uppercase border border-cyan-500/20">
                 <Sparkles size={10} /> Beta
               </span>
             </div>
             <p className="mt-2 text-sm text-slate-400 leading-relaxed">
-              כל דיווח שלך מגיע ישירות לצוות. אנחנו קוראים הכל — ובונים את
-              SwingEdge על סמך מה שחשוב לך.
+              {t.fb_hero_body}
             </p>
           </div>
         </div>
@@ -128,7 +123,7 @@ export default function FeedbackTab({ user }) {
         {/* Type selector as cards */}
         <div>
           <label className="block text-[11px] font-bold tracking-widest uppercase text-slate-400 mb-2">
-            סוג הדיווח
+            {t.fb_type_label}
           </label>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             {FEEDBACK_TYPES.map((type) => {
@@ -138,7 +133,7 @@ export default function FeedbackTab({ user }) {
                   key={type.value}
                   type="button"
                   onClick={() => setSelectedType(type.value)}
-                  className={`rounded-xl border px-3 py-3 text-right transition ${
+                  className={`rounded-xl border px-3 py-3 text-start transition ${
                     active
                       ? "border-cyan-400/60 bg-gradient-to-br from-cyan-500/15 to-violet-500/10 text-white shadow-inner"
                       : "border-[var(--border-subtle)] dark:border-white/[0.08] bg-white/[0.02] text-slate-300 hover:border-white/20 hover:bg-white/[0.04]"
@@ -146,7 +141,7 @@ export default function FeedbackTab({ user }) {
                 >
                   <div className="text-xl mb-1">{type.emoji}</div>
                   <div className="text-xs font-semibold leading-tight">
-                    {type.label}
+                    {t[type.labelKey]}
                   </div>
                 </button>
               );
@@ -154,7 +149,7 @@ export default function FeedbackTab({ user }) {
           </div>
           {/* Accessible native select fallback for SR users / narrow UI */}
           <label className="sr-only" htmlFor="feedback-type-select">
-            סוג הדיווח
+            {t.fb_type_label}
           </label>
           <select
             id="feedback-type-select"
@@ -162,9 +157,9 @@ export default function FeedbackTab({ user }) {
             onChange={(e) => setSelectedType(e.target.value)}
             className="sr-only"
           >
-            {FEEDBACK_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.emoji} {t.label}
+            {FEEDBACK_TYPES.map((type) => (
+              <option key={type.value} value={type.value}>
+                {type.emoji} {t[type.labelKey]}
               </option>
             ))}
           </select>
@@ -176,7 +171,7 @@ export default function FeedbackTab({ user }) {
             htmlFor="feedback-text"
             className="block text-[11px] font-bold tracking-widest uppercase text-slate-400 mb-2"
           >
-            {selected?.emoji} תאר בפירוט
+            {selected?.emoji} {t.fb_describe}
           </label>
           <textarea
             id="feedback-text"
@@ -184,12 +179,12 @@ export default function FeedbackTab({ user }) {
             onChange={(e) => setFeedbackText(e.target.value)}
             rows={6}
             maxLength={2000}
-            placeholder="ספר לנו מה קרה, מה אהבת, או מה היית רוצה שיהיה אחרת..."
+            placeholder={t.fb_placeholder}
             className="w-full rounded-xl bg-white/[0.03] border border-[var(--border-subtle)] dark:border-white/[0.08] px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-cyan-400/50 focus:bg-white/[0.05] transition leading-relaxed resize-y"
             required
           />
           <div className="flex items-center justify-between mt-1.5 text-[11px] text-slate-500">
-            <span>הדיווח נשלח ישירות לצוות SwingEdge</span>
+            <span>{t.fb_sent_to_team}</span>
             <span className="font-mono">{feedbackText.length}/2000</span>
           </div>
         </div>
@@ -197,7 +192,7 @@ export default function FeedbackTab({ user }) {
         {/* Sender preview */}
         {user?.email && (
           <div className="text-[11px] text-slate-500 border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg bg-white/[0.02] px-3 py-2">
-            <span className="text-slate-400 font-semibold">נשלח מטעם:</span>{" "}
+            <span className="text-slate-400 font-semibold">{t.fb_sent_from}</span>{" "}
             <span className="font-mono text-cyan-300">{user.email}</span>
           </div>
         )}
@@ -228,14 +223,14 @@ export default function FeedbackTab({ user }) {
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-600 hover:from-cyan-400 hover:to-violet-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm px-5 py-3 transition shadow-lg shadow-cyan-500/20"
           >
             <Send size={15} />
-            {sending ? "שולח..." : "שלח דיווח"}
+            {sending ? t.fb_sending : t.fb_send}
           </button>
         </div>
       </form>
 
       {/* Footer note */}
       <p className="text-center text-[11px] text-slate-500">
-        💡 טיפ: ככל שתכתוב בפירוט יותר — כך נוכל לעזור לך מהר יותר.
+        {t.fb_tip}
       </p>
     </div>
   );

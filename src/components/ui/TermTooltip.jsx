@@ -16,10 +16,16 @@ export default function TermTooltip({ term, lang = 'he', label, children }) {
   // not a hard-coded assumption — keeps copy readable for every language.
   const dir = isRTLLang(lang) ? 'rtl' : 'ltr';
 
+  // Accessible name for the "?" trigger: keep the (often proper-noun) term but
+  // translate the wrapper so RTL screen-reader users don't hear English.
+  const triggerLabel = heading
+    ? (dir === 'rtl' ? `מידע על ${heading}` : `More info: ${heading}`)
+    : (dir === 'rtl' ? 'מידע נוסף' : 'More info');
+
   return (
     <>
       {children != null && <span>{children}</span>}
-      <InfoTooltip label={heading || term}>
+      <InfoTooltip label={triggerLabel}>
         <div lang={lang} dir={dir} style={{ direction: dir, textAlign: 'start' }}>
           {heading && (
             <div className="font-bold text-emerald-600 dark:text-emerald-400 mb-1.5 text-[13px]">

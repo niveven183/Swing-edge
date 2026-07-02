@@ -73,6 +73,7 @@ const en = {
 
   // Header
   account: "Account",
+  openUserMenu: "Open user menu",
   live: "LIVE",
   lastUpdated: "Last updated",
   pro: "Pro",
@@ -131,6 +132,22 @@ const en = {
   smartLessons: "Smart Lessons",
   lessonsSubtitle: "Insights from your closed trades",
   noLessonsYet: "Close more trades with lessons to see insights here",
+  fb_hero_title: "Help us improve 🚀",
+  fb_hero_body: "Every report goes straight to the team. We read everything — and build SwingEdge around what matters to you.",
+  fb_type_label: "Report Type",
+  fb_type_bug: "Bug / something broke",
+  fb_type_idea: "Improvement idea",
+  fb_type_love: "Something I loved",
+  fb_type_question: "Question",
+  fb_describe: "Describe in detail",
+  fb_placeholder: "Tell us what happened, what you loved, or what you'd want to be different...",
+  fb_sent_to_team: "Sent directly to the SwingEdge team",
+  fb_sent_from: "Sent from:",
+  fb_send: "Send report",
+  fb_sending: "Sending...",
+  fb_tip: "💡 Tip: the more detail you write — the faster we can help you.",
+  fb_success: "Thanks! Your report was received and will be reviewed by the team 🙌",
+  fb_error: "We couldn't send your report. Check your connection and try again.",
   filters: "Filters",
   clearFilters: "Clear Filters",
   csvExported: "CSV exported",
@@ -458,6 +475,7 @@ const he = {
 
   // Header
   account: "חשבון",
+  openUserMenu: "פתח תפריט משתמש",
   live: "LIVE",
   lastUpdated: "עודכן לאחרונה",
   pro: "פרו",
@@ -516,6 +534,22 @@ const he = {
   smartLessons: "לקחים חכמים",
   lessonsSubtitle: "תובנות מהעסקאות הסגורות שלך",
   noLessonsYet: "סגור עוד עסקאות עם לקחים כדי לראות תובנות כאן",
+  fb_hero_title: "עזור לנו להשתפר 🚀",
+  fb_hero_body: "כל דיווח שלך מגיע ישירות לצוות. אנחנו קוראים הכל — ובונים את SwingEdge על סמך מה שחשוב לך.",
+  fb_type_label: "סוג הדיווח",
+  fb_type_bug: "באג / משהו לא עבד",
+  fb_type_idea: "רעיון לשיפור",
+  fb_type_love: "משהו שאהבתי",
+  fb_type_question: "שאלה",
+  fb_describe: "תאר בפירוט",
+  fb_placeholder: "ספר לנו מה קרה, מה אהבת, או מה היית רוצה שיהיה אחרת...",
+  fb_sent_to_team: "הדיווח נשלח ישירות לצוות SwingEdge",
+  fb_sent_from: "נשלח מטעם:",
+  fb_send: "שלח דיווח",
+  fb_sending: "שולח...",
+  fb_tip: "💡 טיפ: ככל שתכתוב בפירוט יותר — כך נוכל לעזור לך מהר יותר.",
+  fb_success: "תודה! הדיווח התקבל ויבחן על ידי הצוות 🙌",
+  fb_error: "לא הצלחנו לשלוח את הדיווח. בדוק חיבור לאינטרנט ונסה שוב.",
   filters: "מסננים",
   clearFilters: "נקה מסננים",
   csvExported: "יוצא כ-CSV",
@@ -843,6 +877,7 @@ const es = {
 
   // Header
   account: "Cuenta",
+  openUserMenu: "Abrir menú de usuario",
   live: "EN VIVO",
   lastUpdated: "Última actualización",
   pro: "Pro",
@@ -1173,6 +1208,7 @@ const pt = {
 
   // Header
   account: "Conta",
+  openUserMenu: "Abrir menu do usuário",
   live: "AO VIVO",
   lastUpdated: "Última atualização",
   pro: "Pro",
@@ -1503,6 +1539,7 @@ const ar = {
 
   // Header
   account: "الحساب",
+  openUserMenu: "فتح قائمة المستخدم",
   live: "مباشر",
   lastUpdated: "آخر تحديث",
   pro: "برو",
@@ -1778,6 +1815,14 @@ export const RTL_LANGS = new Set(LANGUAGES.filter(l => l.rtl).map(l => l.code));
 export const isRTLLang = (code) => RTL_LANGS.has(code);
 
 export const getTranslations = (lang) => translations[lang] || translations.en;
+
+// Count-based plural selector. English and Hebrew both use the singular form for
+// exactly 1; callers pass the language-appropriate singular/plural words.
+export const pluralize = (n, one, other) => (n === 1 ? one : other);
+
+// Localized "N trade(s)" — the app's most common count+noun pairing.
+export const nTrades = (n, lang) =>
+  lang === 'he' ? `${n} ${pluralize(n, 'עסקה', 'עסקאות')}` : `${n} ${pluralize(n, 'trade', 'trades')}`;
 
 // Multi-language string picker for inline strings (toasts, confirms, etc.).
 // Falls back through en when a non-tier-1 lang is active.

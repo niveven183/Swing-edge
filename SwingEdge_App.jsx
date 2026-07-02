@@ -36,7 +36,7 @@ import {
   Shield, Filter, Save, BarChart3, ChevronDown, HelpCircle, Lock,
   CreditCard, Smartphone, Wrench, Sun, Moon, Monitor, KeyRound, ExternalLink, RotateCcw, Pencil
 } from "lucide-react";
-import { getTranslations, LANGUAGES, isRTLLang } from "./src/i18n.js";
+import { getTranslations, LANGUAGES, isRTLLang, nTrades } from "./src/i18n.js";
 import {
   fetchPrices, fmtVolume, fmtMarketCap, searchTickers,
   fetchQuote, getMarketState, getMarketStateBadge, getRefreshInterval, MARKET_STATE,
@@ -773,8 +773,13 @@ const TickerLogo = ({ ticker, size = 20, className = "" }) => {
 };
 
 // ─── SMART LESSONS GENERATOR ─────────────────────────────────────────────────
-const generateSmartLessons = (closedTrades, calcFn) => {
+// "overnight_hold" → "Overnight Hold". Safe on already-clean labels ("Breakout").
+const snakeToTitle = (s) =>
+  String(s || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+const generateSmartLessons = (closedTrades, calcFn, lang = 'he') => {
   if (closedTrades.length < 2) return [];
+  const he = lang === 'he';
   const lessons = [];
 
   // Analyze patterns
@@ -800,17 +805,29 @@ const generateSmartLessons = (closedTrades, calcFn) => {
   })[0];
 
   if (bestSetup && bestSetup[1].wins + bestSetup[1].losses >= 2) {
-    const wr = Math.round(bestSetup[1].wins / (bestSetup[1].wins + bestSetup[1].losses) * 100);
-    lessons.push({
+    const n = bestSetup[1].wins + bestSetup[1].losses;
+    const wr = Math.round(bestSetup[1].wins / n * 100);
+    const setup = snakeToTitle(bestSetup[0]);
+    lessons.push(he ? {
       type: "strength",
-      title: `${bestSetup[0]} is your best setup`,
-      detail: `${wr}% win rate across ${bestSetup[1].wins + bestSetup[1].losses} trades. Focus more on this pattern.`,
-      action: `Look for more ${bestSetup[0]} setups and increase position size when confidence is high.`,
+      title: `${setup} הוא הסטאפ החזק ביותר שלך`,
+      detail: `${wr}% הצלחה על פני ${n} עסקאות. התמקד יותר בתבנית הזו.`,
+      action: `חפש עוד סטאפים של ${setup} והגדל את גודל הפוזיציה כשהביטחון גבוה.`,
+    } : {
+      type: "strength",
+      title: `${setup} is your best setup`,
+      detail: `${wr}% win rate across ${n} trades. Focus more on this pattern.`,
+      action: `Look for more ${setup} setups and increase position size when confidence is high.`,
     });
   }
 
   if (followedPlanLosers.length >= 2) {
-    lessons.push({
+    lessons.push(he ? {
+      type: "warning",
+      title: "סטייה מהתוכנית עולה לך כסף",
+      detail: `${followedPlanLosers.length} הפסדים נבעו מאי-עמידה בתוכנית המסחר שלך.`,
+      action: "לפני כל עסקה, כתוב את התוכנית שלך. אחרי הכניסה, עקוב אחריה בצורה מכנית.",
+    } : {
       type: "warning",
       title: "Plan deviation costs you money",
       detail: `${followedPlanLosers.length} losses came from not following your trading plan.`,
@@ -820,7 +837,12 @@ const generateSmartLessons = (closedTrades, calcFn) => {
 
   if (fomoTrades.length >= 2 && fomoLosers.length > 0) {
     const fomoLossRate = Math.round(fomoLosers.length / fomoTrades.length * 100);
-    lessons.push({
+    lessons.push(he ? {
+      type: "warning",
+      title: "עסקאות FOMO פוגעות בך",
+      detail: `${fomoLossRate}% מכניסות ה-FOMO שלך הסתיימו בהפסד.`,
+      action: "כשאתה מרגיש FOMO, חכה 15 דקות. אם הסטאפ עדיין נראה טוב, היכנס בגודל קטן יותר.",
+    } : {
       type: "warning",
       title: "FOMO trades are hurting you",
       detail: `${fomoLossRate}% of your FOMO entries resulted in losses.`,
@@ -833,7 +855,12 @@ const generateSmartLessons = (closedTrades, calcFn) => {
     const avgWin = winners.reduce((s, t) => s + (calcFn(t).pnl || 0), 0) / winners.length;
     const avgLoss = Math.abs(losers.reduce((s, t) => s + (calcFn(t).pnl || 0), 0) / losers.length);
     if (avgLoss > avgWin * 1.5) {
-      lessons.push({
+      lessons.push(he ? {
+        type: "insight",
+        title: "ההפסדים שלך גדולים מהרווחים",
+        detail: `רווח ממוצע: $${Math.round(avgWin)} מול הפסד ממוצע: $${Math.round(avgLoss)}.`,
+        action: "הדק את הסטופים או הרחב את היעדים. שאף ליחס סיכון-סיכוי של לפחות 2:1.",
+      } : {
         type: "insight",
         title: "Your losses are bigger than your wins",
         detail: `Average win: $${Math.round(avgWin)} vs average loss: $${Math.round(avgLoss)}.`,
@@ -846,11 +873,16 @@ const generateSmartLessons = (closedTrades, calcFn) => {
   const recentLessons = closedTrades.filter(t => t.lessonLearned && t.lessonLearned.trim()).slice(-3);
   if (recentLessons.length > 0 && lessons.length < 3) {
     const latest = recentLessons[recentLessons.length - 1];
-    lessons.push({
+    lessons.push(he ? {
+      type: "personal",
+      title: `התובנה האחרונה שלך (${latest.ticker})`,
+      detail: latest.lessonLearned,
+      action: "עבור על זה לפני העסקה הבאה שלך.",
+    } : {
       type: "personal",
       title: `Your latest insight (${latest.ticker})`,
       detail: latest.lessonLearned,
-      action: "Review this before your next trade to avoid repeating the same mistake.",
+      action: "Review this before your next trade.",
     });
   }
 
@@ -1692,7 +1724,7 @@ export default function SwingEdge() {
 
   // Smart lessons
   const smartLessons = useMemo(() => {
-    const base = generateSmartLessons(closedTrades, calcTradeMetrics) || [];
+    const base = generateSmartLessons(closedTrades, calcTradeMetrics, lang) || [];
     const adaptive = AdaptiveLessons.generate(closedTrades, calcTradeMetrics, lang) || [];
     const seen = new Set(base.map(l => l.id).filter(Boolean));
     const merged = [...base];
@@ -2351,7 +2383,7 @@ export default function SwingEdge() {
           <button
             onClick={() => setShowProfileDropdown(v => !v)}
             className="flex items-center gap-2 hover:bg-white/[0.04] active:bg-white/[0.07] rounded-lg px-2 py-1 transition whitespace-nowrap shrink-0"
-            aria-label="Open user menu"
+            aria-label={t.openUserMenu}
           >
             <Logo size={28} showText={false} />
             <span className="font-bold text-sm tracking-wider text-white whitespace-nowrap">SWING<span className="text-emerald-400">EDGE</span></span>
@@ -2461,7 +2493,7 @@ export default function SwingEdge() {
             )}
           </div>
           <div className="text-right hidden sm:block">
-            <div className="text-xs text-slate-500">Account</div>
+            <div className="text-xs text-slate-500">{t.account}</div>
             <div className="text-sm font-bold font-mono text-cyan-400">${curEquity.toLocaleString("en-US", { minimumFractionDigits: 2 })}</div>
           </div>
         </div>
@@ -2571,7 +2603,7 @@ export default function SwingEdge() {
                       <div key={edge.name || i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                         <div>
                           <PatternTags parts={[{ dim: "setup", value: edge.setup }, { dim: "emotion", value: edge.emotion }]} />
-                          <div className="text-slate-400 text-xs">{edge.count} {t.trades}</div>
+                          <div className="text-slate-400 text-xs">{nTrades(edge.count, lang)}</div>
                         </div>
                         <div className="text-right">
                           <div className="text-emerald-400 font-bold text-sm">{formatPct(edge.winRate)} WR</div>
@@ -2588,7 +2620,7 @@ export default function SwingEdge() {
                       <div key={edge.name || i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                         <div>
                           <PatternTags parts={[{ dim: "setup", value: edge.setup }, { dim: "emotion", value: edge.emotion }]} />
-                          <div className="text-slate-400 text-xs">{edge.count} {t.trades}</div>
+                          <div className="text-slate-400 text-xs">{nTrades(edge.count, lang)}</div>
                         </div>
                         <div className="text-right">
                           <div className="text-rose-400 font-bold text-sm">{formatPct(edge.winRate)} WR</div>
@@ -3922,7 +3954,7 @@ export default function SwingEdge() {
                     <div key={s.name} className="bg-white/3 rounded-xl p-3 border border-[var(--border-subtle)] dark:border-white/[0.06]">
                       <div className="text-xs font-semibold text-violet-400 mb-2 truncate" title={s.name}>{s.name}</div>
                       <div className="font-bold text-white text-lg font-mono">{formatPct(s.winRate)}</div>
-                      <div className="text-[10px] text-slate-500">{s.count} {t.trades} · {s.totalR.toFixed(1)}R {t.rTotal}</div>
+                      <div className="text-[10px] text-slate-500">{nTrades(s.count, lang)} · {s.totalR.toFixed(1)}R {t.rTotal}</div>
                       <div className="mt-2 h-1.5 bg-white/5 rounded-full overflow-hidden">
                         <div className="h-full bg-gradient-to-r from-violet-500 to-cyan-500 rounded-full transition-all" style={{ width: `${s.winRate}%` }} />
                       </div>
@@ -3951,7 +3983,7 @@ export default function SwingEdge() {
                       <YAxis tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
                       <Tooltip
                         contentStyle={{ background: "#0d1424", border: "1px solid #162032", borderRadius: 10, fontSize: 11 }}
-                        formatter={(v, n, p) => [`${fmt$(v)} · ${p.payload.count} ${t.trades}`, "P&L"]}
+                        formatter={(v, n, p) => [`${fmt$(v)} · ${nTrades(p.payload.count, lang)}`, "P&L"]}
                         labelFormatter={l => lang === "he"
                           ? dayLabel(l, "he")
                           : (["Sun","Mon","Tue","Wed","Thu","Fri"].includes(l) ? ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday"][["Sun","Mon","Tue","Wed","Thu","Fri"].indexOf(l)] : l)}
@@ -3986,7 +4018,7 @@ export default function SwingEdge() {
                       <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`} />
                       <Tooltip
                         contentStyle={{ background: "#0d1424", border: "1px solid #162032", borderRadius: 10, fontSize: 11 }}
-                        formatter={(v, n, p) => [`${v}% · ${p.payload.count} ${t.trades}`, "Win Rate"]}
+                        formatter={(v, n, p) => [`${v}% · ${nTrades(p.payload.count, lang)}`, "Win Rate"]}
                         labelFormatter={l => l}
                       />
                       <ReferenceLine y={50} stroke="#475569" strokeDasharray="4 4" label={{ value: "50%", position: "insideTopRight", fontSize: 9, fill: "#475569" }} />
@@ -4036,7 +4068,7 @@ export default function SwingEdge() {
                     {bestDayEntry ? (
                       <>
                         <div className="text-2xl font-bold text-white font-mono">{dayLabel(bestDayEntry[0], lang)}</div>
-                        <div className="text-xs text-slate-500 mt-1">{fmt$(Math.round(bestDayEntry[1].pnl))} · {bestDayEntry[1].count} {t.trades}</div>
+                        <div className="text-xs text-slate-500 mt-1">{fmt$(Math.round(bestDayEntry[1].pnl))} · {nTrades(bestDayEntry[1].count, lang)}</div>
                       </>
                     ) : (
                       <div className="text-sm text-slate-600">{t.logClosedForInsights}</div>
@@ -4046,12 +4078,12 @@ export default function SwingEdge() {
                   {/* Best Setup */}
                   <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-violet-500/20 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs font-semibold tracking-widest uppercase text-violet-400 flex items-center gap-1">{t.bestSetup}<InfoTooltip label="Best Setup">{lang === 'he' ? 'הסטאפ הרווחי ביותר שלך לפי P&L כולל ואחוז זכייה. זה ה-Edge שלך — תסחור אותו יותר.' : 'Your most profitable setup by total P&L and win rate. This is your edge — trade it more.'}</InfoTooltip></span>
+                      <span className="text-xs font-semibold tracking-widest uppercase text-violet-400 flex items-center gap-1">{t.bestSetup}<InfoTooltip label="Best Setup">{lang === 'he' ? 'הסטאפ הרווחי ביותר שלך לפי P&L כולל ואחוז הצלחה. זה ה-Edge שלך — תסחור אותו יותר.' : 'Your most profitable setup by total P&L and win rate. This is your edge — trade it more.'}</InfoTooltip></span>
                     </div>
                     {bestSetup ? (
                       <>
                         <div className="text-2xl font-bold text-white font-mono">{bestSetup.setup}</div>
-                        <div className="text-xs text-slate-500 mt-1">{formatPct(bestSetup.winRate)} {t.winRate} · {bestSetup.count} {t.trades}</div>
+                        <div className="text-xs text-slate-500 mt-1">{formatPct(bestSetup.winRate)} {t.winRate} · {nTrades(bestSetup.count, lang)}</div>
                       </>
                     ) : (
                       <div className="text-sm text-slate-600">{t.logClosedForInsights}</div>
@@ -4066,7 +4098,7 @@ export default function SwingEdge() {
                     {bestEmotion ? (
                       <>
                         <div className="text-2xl font-bold text-white font-mono">{bestEmotion.emotion}</div>
-                        <div className="text-xs text-slate-500 mt-1">{formatPct(bestEmotion.winRate)} {t.winRate} · {bestEmotion.count} {t.trades}</div>
+                        <div className="text-xs text-slate-500 mt-1">{formatPct(bestEmotion.winRate)} {t.winRate} · {nTrades(bestEmotion.count, lang)}</div>
                       </>
                     ) : (
                       <div className="text-sm text-slate-600">{t.logClosedForInsights}</div>
@@ -4086,7 +4118,7 @@ export default function SwingEdge() {
                       <div key={edge.name || i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                         <div>
                           <PatternTags parts={[{ dim: "setup", value: edge.setup }, { dim: "emotion", value: edge.emotion }]} />
-                          <div className="text-slate-400 text-xs">{edge.count} {t.trades}</div>
+                          <div className="text-slate-400 text-xs">{nTrades(edge.count, lang)}</div>
                         </div>
                         <div className="text-right">
                           <div className="text-emerald-400 font-bold text-sm">{formatPct(edge.winRate)} WR</div>
@@ -4103,7 +4135,7 @@ export default function SwingEdge() {
                       <div key={edge.name || i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                         <div>
                           <PatternTags parts={[{ dim: "setup", value: edge.setup }, { dim: "emotion", value: edge.emotion }]} />
-                          <div className="text-slate-400 text-xs">{edge.count} {t.trades}</div>
+                          <div className="text-slate-400 text-xs">{nTrades(edge.count, lang)}</div>
                         </div>
                         <div className="text-right">
                           <div className="text-rose-400 font-bold text-sm">{formatPct(edge.winRate)} WR</div>
@@ -4391,7 +4423,7 @@ export default function SwingEdge() {
                             : "Each dot = one trade. Reveals if longer holds pay off."}
                         </InfoTooltip>
                       </h3>
-                      <p className="text-xs text-slate-600 mb-4">{lang === "he" ? `${holdScatter.length} עסקאות` : `${holdScatter.length} trades`}</p>
+                      <p className="text-xs text-slate-600 mb-4">{nTrades(holdScatter.length, lang)}</p>
                       <ResponsiveContainer width="100%" height={280}>
                         <ScatterChart margin={{ top: 10, right: 16, left: 0, bottom: 10 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
@@ -5134,7 +5166,7 @@ export default function SwingEdge() {
                                   style={{ width: stats ? `${stats.rate}%` : "0%", background: successColor }} />
                               </div>
                               <span className="text-[10px] font-mono font-bold whitespace-nowrap" style={{ color: successColor }}>
-                                {stats ? `${stats.rate}% (${stats.count} ${t.trades})` : t.noJournalData}
+                                {stats ? `${stats.rate}% (${nTrades(stats.count, lang)})` : t.noJournalData}
                               </span>
                             </div>
                             <p className="text-[9px] text-slate-700 mt-1">{t.successRateFromJournal}</p>
@@ -5163,7 +5195,7 @@ export default function SwingEdge() {
                       </div>
                       <div>
                         <div className="text-xs font-bold text-white">{t.journalCsv}</div>
-                        <div className="text-[10px] text-slate-600">{trades.length} {t.trades}</div>
+                        <div className="text-[10px] text-slate-600">{nTrades(trades.length, lang)}</div>
                       </div>
                     </div>
                     <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
@@ -5241,7 +5273,7 @@ export default function SwingEdge() {
 
         {/* ══════════════ FEEDBACK ══════════════ */}
         {tab === "feedback" && (
-          <FeedbackTab user={authUser} />
+          <FeedbackTab user={authUser} lang={lang} />
         )}
 
         {/* ══════════════ ADMIN (niveven183@gmail.com only) ══════════════ */}
@@ -5719,8 +5751,8 @@ export default function SwingEdge() {
       <button
         onClick={() => { setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null }); setOcrStatus(null); setShowForm(true); }}
         className="fixed bottom-6 right-6 rtl:right-auto rtl:left-6 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-violet-500 text-white shadow-2xl shadow-cyan-500/25 flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
-        aria-label="New trade"
-        title="New Trade"
+        aria-label={t.newTrade}
+        title={t.newTrade}
       >
         <Plus size={24} />
       </button>

@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import { supabase, isSupabaseConfigured } from "../supabaseClient.js";
 import { useToast, useConfirm } from "./ToastProvider.jsx";
+import { pluralize } from "../i18n.js";
 
 const ADMIN_EMAIL = "niveven183@gmail.com";
 
@@ -183,7 +184,7 @@ function isWithinDays(ts, days) {
 //  Local UI primitives
 // ════════════════════════════════════════════════════════════════════════════
 
-function KpiCard({ label, value, sub, accent = "cyan", icon: Icon }) {
+function KpiCard({ label, value, sub, accent = "cyan", icon: Icon, loading = false }) {
   const tone = {
     cyan: "from-cyan-500/15 to-cyan-500/0 border-cyan-500/20 text-cyan-300",
     violet: "from-violet-500/15 to-violet-500/0 border-violet-500/20 text-violet-300",
@@ -195,10 +196,14 @@ function KpiCard({ label, value, sub, accent = "cyan", icon: Icon }) {
   return (
     <div className={`bg-gradient-to-br ${tone} border rounded-2xl p-4 backdrop-blur`}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[10px] font-semibold tracking-widest uppercase opacity-70">{label}</span>
+        <span className="text-[10px] font-semibold tracking-widest uppercase text-slate-300">{label}</span>
         {Icon && <Icon size={14} className="opacity-50" />}
       </div>
-      <div className="text-2xl font-extrabold font-mono text-white tabular-nums">{value}</div>
+      {loading ? (
+        <div className="skeleton h-7 w-20" />
+      ) : (
+        <div className="text-2xl font-extrabold font-mono text-white tabular-nums">{value}</div>
+      )}
       {sub && <div className="text-[10px] mt-1 opacity-60">{sub}</div>}
     </div>
   );
@@ -371,7 +376,7 @@ export default function AdminPanel() {
   const [authUser, setAuthUser] = useState(null);
   const [trades, setTrades] = useState([]);
   const [feedback, setFeedback] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [supaUp, setSupaUp] = useState(null);
   const toast = useToast();
 
@@ -387,7 +392,7 @@ export default function AdminPanel() {
 
   // Initial data load (trades + feedback) — shared across tabs
   const loadAll = useCallback(async () => {
-    if (!isSupabaseConfigured || !supabase) { setSupaUp(false); return; }
+    if (!isSupabaseConfigured || !supabase) { setSupaUp(false); setLoading(false); return; }
     setLoading(true);
     try {
       const [tr, fb] = await Promise.all([
@@ -437,7 +442,7 @@ export default function AdminPanel() {
               <Badge tone="rose">Restricted</Badge>
             </h1>
             <p className="text-[11px] text-slate-500 mt-0.5">
-              {authUser?.email || "—"} · {trades.length} trades · {users.length} users · {feedback.length} feedback
+              {authUser?.email || "—"} · {trades.length} {pluralize(trades.length, "trade", "trades")} · {users.length} {pluralize(users.length, "user", "users")} · {feedback.length} feedback
             </p>
           </div>
         </div>
@@ -521,12 +526,12 @@ function OverviewTab({ trades, feedback, users, loading }) {
       </header>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <KpiCard label="Total users" value={totalUsers} accent="cyan" icon={UsersIcon} sub="distinct accounts" />
-        <KpiCard label="Active (30d)" value={activeUsers} accent="emerald" icon={Activity} sub={`${totalUsers > 0 ? ((activeUsers / totalUsers) * 100).toFixed(0) : 0}% of all`} />
-        <KpiCard label="Total trades" value={totalTrades.toLocaleString()} accent="violet" icon={BookOpen} />
-        <KpiCard label="Avg trades / user" value={avgTradesPerUser} accent="amber" icon={TrendingUp} />
-        <KpiCard label="New users this week" value={newUsersThisWeek} accent="rose" icon={Calendar} />
-        <KpiCard label="Trades this week" value={tradesThisWeek} accent="slate" icon={Zap} sub="replaces 'avg session' (anon-key limit)" />
+        <KpiCard label="Total users" value={totalUsers} accent="cyan" icon={UsersIcon} sub="distinct accounts" loading={loading} />
+        <KpiCard label="Active (30d)" value={activeUsers} accent="emerald" icon={Activity} sub={`${totalUsers > 0 ? ((activeUsers / totalUsers) * 100).toFixed(0) : 0}% of all`} loading={loading} />
+        <KpiCard label="Total trades" value={totalTrades.toLocaleString()} accent="violet" icon={BookOpen} loading={loading} />
+        <KpiCard label="Avg trades / user" value={avgTradesPerUser} accent="amber" icon={TrendingUp} loading={loading} />
+        <KpiCard label="New users this week" value={newUsersThisWeek} accent="rose" icon={Calendar} loading={loading} />
+        <KpiCard label="Trades this week" value={tradesThisWeek} accent="slate" icon={Zap} loading={loading} />
       </div>
 
       <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-2xl p-4">

@@ -561,7 +561,7 @@ export const TRADING_TOOLTIPS = {
 // Heading shown at the top of a TermTooltip popover. Same single-source file.
 export const TERM_LABELS = {
   // Metrics
-  winRate:      { en: "Win Rate",        he: "אחוז זכייה", es: "Tasa de Acierto", pt: "Taxa de Acerto", ar: "نسبة الربح" },
+  winRate:      { en: "Win Rate",        he: "אחוז הצלחה", es: "Tasa de Acierto", pt: "Taxa de Acerto", ar: "نسبة الربح" },
   profitFactor: { en: "Profit Factor",   he: "Profit Factor", es: "Profit Factor", pt: "Profit Factor", ar: "Profit Factor" },
   avgR:         { en: "Avg R",           he: "R ממוצע", es: "R Promedio", pt: "R Médio", ar: "متوسّط R" },
   expectancy:   { en: "Expectancy",      he: "תוחלת", es: "Expectativa", pt: "Expectativa", ar: "التوقّع" },

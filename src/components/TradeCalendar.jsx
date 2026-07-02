@@ -6,6 +6,7 @@ import {
 } from 'date-fns';
 import { he as heLocale } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { nTrades } from '../i18n.js';
 
 // trades: array of trade objects (closed trades preferred — open trades show 0 P&L).
 // calcMetrics: function(trade) -> { pnl, rMultiple }. P&L/R are NOT stored on the trade.
@@ -108,7 +109,7 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he' }) {
 
         <div className="flex gap-2 flex-wrap">
           <span className="px-3 py-1 bg-slate-100 dark:bg-white/[0.08] text-slate-600 dark:text-slate-300 rounded-full text-xs">
-            {monthSummary.count} {lang === 'he' ? 'עסקאות' : 'trades'}
+            {nTrades(monthSummary.count, lang)}
           </span>
           {monthSummary.count > 0 && (
             <>
@@ -151,7 +152,7 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he' }) {
               key={key}
               type="button"
               onClick={() => setSelectedDate(isSelected ? null : day)}
-              aria-label={`${format(day, lang === 'he' ? 'dd/MM/yyyy' : 'MMMM d, yyyy', { locale })}${hasTrades ? ` — ${dayTrades.length} ${lang === 'he' ? 'עסקאות' : 'trades'}` : ''}`}
+              aria-label={`${format(day, lang === 'he' ? 'dd/MM/yyyy' : 'MMMM d, yyyy', { locale })}${hasTrades ? ` — ${nTrades(dayTrades.length, lang)}` : ''}`}
               aria-pressed={isSelected ? true : false}
               className={`
                 relative min-h-[56px] p-1.5 border-b border-r border-slate-100 dark:border-white/[0.06]
