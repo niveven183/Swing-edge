@@ -2076,6 +2076,25 @@ export default function SwingEdge() {
     try { localStorage.setItem("swingEdgeWatchlist", JSON.stringify(updated)); } catch {}
   };
 
+  // POST an image to the OCR endpoint with the caller's Supabase JWT attached.
+  // The serverless function rejects anonymous calls to protect its paid Vision
+  // key; every user here is logged in (the app sits behind AuthScreen).
+  const postOcr = async (dataURL, side, signal) => {
+    let token = null;
+    try {
+      const { data } = await supabase.auth.getSession();
+      token = data?.session?.access_token || null;
+    } catch {}
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    return fetch("/api/ocr", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ image: dataURL, side }),
+      signal,
+    });
+  };
+
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -2090,12 +2109,7 @@ export default function SwingEdge() {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 15000);
       try {
-        const res = await fetch("/api/ocr", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: dataURL, side: sideAtUpload }),
-          signal: controller.signal,
-        });
+        const res = await postOcr(dataURL, sideAtUpload, controller.signal);
         clearTimeout(timer);
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
@@ -2134,12 +2148,7 @@ export default function SwingEdge() {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 15000);
       try {
-        const res = await fetch("/api/ocr", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: dataURL, side: sideAtUpload }),
-          signal: controller.signal,
-        });
+        const res = await postOcr(dataURL, sideAtUpload, controller.signal);
         clearTimeout(timer);
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));

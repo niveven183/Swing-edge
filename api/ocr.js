@@ -212,17 +212,114 @@ function buildPrompt() {
   ].join("\n");
 }
 
+// ─── Access control ─────────────────────────────────────────────────────────
+// This endpoint spends a paid Anthropic key, so it must not be open to the
+// public. Two layers: (1) require a valid Supabase JWT — only logged-in users
+// can reach it (the whole SPA already sits behind AuthScreen, so every real
+// caller has a session); (2) a best-effort in-memory per-user rate limit as
+// defense against an abusive logged-in user.
+// Reuse the SPA's Supabase env — the VITE_-prefixed vars are present at function
+// runtime on Vercel; prefer unprefixed names if they are ever defined.
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
+const SUPABASE_ANON_KEY =
+  process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
+
+// Allow only the app's own origins to consume the endpoint cross-origin. Prod +
+// previews are *.vercel.app; local dev is localhost. Same-origin calls (the SPA
+// hitting its own /api/ocr) never hit CORS. Add custom domains here if adopted.
+function resolveOrigin(origin) {
+  if (!origin) return null;
+  try {
+    const host = new URL(origin).hostname;
+    const ok =
+      host === "localhost" || host === "127.0.0.1" || host.endsWith(".vercel.app");
+    return ok ? origin : null;
+  } catch {
+    return null;
+  }
+}
+
+// Verify a Supabase access token by asking GoTrue who it belongs to. Returns the
+// user object on success, null on any failure (missing / expired / invalid).
+async function verifyUser(req) {
+  const header = req.headers.authorization || req.headers.Authorization || "";
+  const m = /^Bearer\s+(.+)$/i.exec(String(header));
+  if (!m) return null;
+  const token = m[1].trim();
+  if (!token) return null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { Authorization: `Bearer ${token}`, apikey: SUPABASE_ANON_KEY },
+    });
+    if (!r.ok) return null;
+    const u = await r.json();
+    return u && u.id ? u : null;
+  } catch {
+    return null;
+  }
+}
+
+// Best-effort per-user rate limit. In-memory → scoped to one warm instance and
+// reset on cold start; Vercel may run several instances, so this is a speed bump,
+// not a hard cap. The JWT gate above is the real control. Generous ceiling so a
+// trader analyzing several charts back-to-back is never blocked.
+const RL_WINDOW_MS = 60 * 1000;
+const RL_MAX = 30;
+const rlHits = new Map(); // userId -> number[] (recent request timestamps)
+
+function rateLimitOk(userId) {
+  const now = Date.now();
+  // Bound memory on long-lived warm instances by sweeping stale entries.
+  if (rlHits.size > 1000) {
+    for (const [k, v] of rlHits) {
+      const fresh = v.filter((t) => now - t < RL_WINDOW_MS);
+      if (fresh.length) rlHits.set(k, fresh);
+      else rlHits.delete(k);
+    }
+  }
+  const arr = (rlHits.get(userId) || []).filter((t) => now - t < RL_WINDOW_MS);
+  if (arr.length >= RL_MAX) {
+    rlHits.set(userId, arr);
+    return false;
+  }
+  arr.push(now);
+  rlHits.set(userId, arr);
+  return true;
+}
+
 export default async function handler(req, res) {
-  // CORS — permissive so the SPA can consume it from any origin.
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  // CORS — restricted to the app's own origins (localhost + *.vercel.app).
+  // Same-origin SPA calls are unaffected; this blocks cross-origin abuse of the
+  // paid Vision endpoint. Authorization must be allowed so the browser can send
+  // the Supabase bearer token on any cross-origin call.
+  const allowedOrigin = resolveOrigin(req.headers.origin);
+  if (allowedOrigin) res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+  res.setHeader("Vary", "Origin");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   if (req.method === "OPTIONS") {
     res.status(204).end();
     return;
   }
   if (req.method !== "POST") {
     res.status(405).json({ error: "method_not_allowed" });
+    return;
+  }
+
+  // Auth gate — verify the Supabase JWT before doing any paid work. Missing
+  // Supabase env is a deploy misconfig (surface as config_error, not 401).
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    res.status(500).json({ error: "config_error" });
+    return;
+  }
+  const user = await verifyUser(req);
+  if (!user) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  // Defense-in-depth: per-user rate limit (best-effort, see note above).
+  if (!rateLimitOk(user.id)) {
+    res.status(429).json({ error: "rate_limited" });
     return;
   }
 
