@@ -4,7 +4,9 @@
 // A/B, encouraging (never negative) for C/D/F. "See full report" opens the tab.
 // ─────────────────────────────────────────────────────────────────────────────
 import { X, Award, CheckCircle, AlertTriangle, ArrowRight, Sparkles } from "lucide-react";
+import { useId } from "react";
 import { MONTH_NAMES } from "../intelligence/core/MonthlyReport.js";
+import useModalA11y from "../hooks/useModalA11y.js";
 
 const interp = (str, params = {}) =>
   String(str || "").replace(/\{(\w+)\}/g, (_, k) => (params[k] != null ? params[k] : `{${k}}`));
@@ -18,6 +20,8 @@ const GRADE_RING = {
 };
 
 export default function MonthlyReportModal({ report, t, lang, isRTL, onClose, onOpenFull }) {
+  const titleId = useId();
+  const modalRef = useModalA11y({ active: !!(report && report.hasEnoughData), onClose });
   if (!report || !report.hasEnoughData) return null;
 
   const celebrate = report.grade === "A" || report.grade === "B";
@@ -39,12 +43,17 @@ export default function MonthlyReportModal({ report, t, lang, isRTL, onClose, on
       dir={isRTL ? "rtl" : "ltr"}
     >
       <div
-        className="bg-white dark:bg-[#131a2c] border border-slate-200 dark:border-white/[0.08] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="bg-white dark:bg-[#131a2c] border border-slate-200 dark:border-white/[0.08] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden focus:outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className={`relative px-5 py-4 bg-gradient-to-br ${GRADE_RING[report.grade] || GRADE_RING.C}`}>
-          <button onClick={onClose} className="absolute top-3 ltr:right-3 rtl:left-3 text-white/80 hover:text-white transition"><X size={18} /></button>
+          <button onClick={onClose} aria-label={t?.close || "Close"} className="absolute top-3 ltr:right-3 rtl:left-3 text-white/80 hover:text-white transition"><X size={18} /></button>
           <div className="flex items-center gap-3">
             <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center shrink-0">
               <span className="text-3xl font-black text-white">{report.grade}</span>
@@ -53,7 +62,7 @@ export default function MonthlyReportModal({ report, t, lang, isRTL, onClose, on
               <div className="flex items-center gap-1.5 text-white/90 text-[11px] font-semibold tracking-wide uppercase">
                 {celebrate ? <Sparkles size={12} /> : <Award size={12} />} {t.dnaReport}
               </div>
-              <div className="text-white font-bold text-lg leading-tight">{label}</div>
+              <div id={titleId} className="text-white font-bold text-lg leading-tight">{label}</div>
               <div className="text-white/85 text-xs">{celebrate ? t.mr_modalCelebrate : t.mr_modalEncourage}</div>
             </div>
           </div>

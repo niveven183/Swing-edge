@@ -1,14 +1,18 @@
 import { HelpCircle, X, Compass } from "lucide-react";
+import { useId } from "react";
+import useModalA11y from "../hooks/useModalA11y.js";
 export default function HelpModal({ onClose, onStartTour, t, demoCount }) {
+  const titleId = useId();
+  const modalRef = useModalA11y({ active: true, onClose });
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" role="presentation" onClick={onClose}>
-      <button type="button" className="bg-[#131a2c] border border-[var(--border-subtle)] dark:border-white/[0.08] rounded-2xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="bg-[#131a2c] border border-[var(--border-subtle)] dark:border-white/[0.08] rounded-2xl w-full max-w-lg shadow-2xl focus:outline-none" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-subtle)] dark:border-white/[0.06]">
           <div className="flex items-center gap-2">
             <HelpCircle size={16} className="text-blue-400" />
-            <h3 className="text-sm font-bold text-white">{t.helpTitle}</h3>
+            <h3 id={titleId} className="text-sm font-bold text-white">{t.helpTitle}</h3>
           </div>
-          <button onClick={onClose} className="text-slate-500 hover:text-white transition"><X size={16} /></button>
+          <button onClick={onClose} aria-label={t?.close || "Close"} className="text-slate-500 hover:text-white transition"><X size={16} /></button>
         </div>
         <div className="p-5 space-y-3 text-sm text-slate-300">
           <p><span className="font-bold text-white">{t.helpQuickStartLabel}</span> {t.helpQuickStartPre} <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-[11px] font-mono">N</kbd> {t.helpQuickStartPost}</p>
@@ -34,7 +38,7 @@ export default function HelpModal({ onClose, onStartTour, t, demoCount }) {
             </button>
           )}
         </div>
-      </button>
+      </div>
     </div>
   );
 }

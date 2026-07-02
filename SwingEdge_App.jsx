@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, useId } from "react";
 import OnboardingScreen from "./src/components/OnboardingScreen.jsx";
 import AuthScreen from "./src/components/AuthScreen.jsx";
 import Logo from "./src/components/Logo.jsx";
@@ -52,6 +52,7 @@ import { useTradingStats } from "./src/hooks/useTradingStats.js";
 import InfoTooltip from "./src/components/ui/InfoTooltip.jsx";
 import TermTooltip from "./src/components/ui/TermTooltip.jsx";
 import SmartSelect from "./src/components/ui/SmartSelect.jsx";
+import useModalA11y from "./src/hooks/useModalA11y.js";
 import { getTradeSelectProps, CATEGORY_TOOLTIP, EMOTION_VALUES } from "./src/data/tradeOptions.jsx";
 import { TRADING_TOOLTIPS, resolveSetupKey } from "./src/data/tooltips.js";
 import { TradeCalendar } from "./src/components/TradeCalendar.jsx";
@@ -1123,6 +1124,14 @@ export default function SwingEdge() {
   const [tickerIdx, setTickerIdx] = useState(0);
   const [showCloseForm, setShowCloseForm] = useState(false);
   const [closingTrade, setClosingTrade] = useState(null);
+
+  // Accessible-dialog behavior (focus-in, focus-trap, focus-restore, Esc) for the
+  // two inline modals. Esc is bubble-phase so SmartSelect's capture-phase Esc still
+  // closes an open dropdown first, then the modal.
+  const logTitleId = useId();
+  const closeTitleId = useId();
+  const logModalRef = useModalA11y({ active: showForm, onClose: () => setShowForm(false) });
+  const closeModalRef = useModalA11y({ active: showCloseForm, onClose: () => { setShowCloseForm(false); setClosingTrade(null); } });
   const [closeForm, setCloseForm] = useState({ exit: "", exitReason: "Hit Target", followedPlan: true, lessonLearned: "", maxFavorable: "", maxAdverse: "" });
 
   // Trade Analyzer state
@@ -5259,14 +5268,14 @@ export default function SwingEdge() {
       {/* ── TRADE ENTRY MODAL ── */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-2xl bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+          <div ref={logModalRef} role="dialog" aria-modal="true" aria-labelledby={logTitleId} tabIndex={-1} className="w-full max-w-2xl bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col focus:outline-none">
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-gradient-to-r from-cyan-500/5 to-violet-500/5">
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-cyan-400 to-violet-500 flex items-center justify-center">
                   <Plus size={12} className="text-white" />
                 </div>
-                <span className="text-sm font-bold text-white">Log New Trade</span>
+                <span id={logTitleId} className="text-sm font-bold text-white">Log New Trade</span>
               </div>
               <button onClick={()=>setShowForm(false)} aria-label={lang === "he" ? "סגור" : "Close"} className="text-slate-600 hover:text-slate-300 transition">
                 <X size={16} />
@@ -5545,7 +5554,8 @@ export default function SwingEdge() {
               {/* Actions */}
               <div className="flex gap-2 pt-1">
                 <button onClick={handleSubmit}
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-white text-sm font-bold hover:opacity-90 transition">
+                  disabled={!form.ticker || !entryN || !stopN}
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-white text-sm font-bold hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:opacity-40">
                   Log Trade →
                 </button>
                 <button onClick={() => {
@@ -5569,14 +5579,14 @@ export default function SwingEdge() {
       {/* ── CLOSE TRADE MODAL ── */}
       {showCloseForm && closingTrade && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+          <div ref={closeModalRef} role="dialog" aria-modal="true" aria-labelledby={closeTitleId} tabIndex={-1} className="w-full max-w-md bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden focus:outline-none">
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-gradient-to-r from-rose-500/5 to-violet-500/5">
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-rose-400 to-violet-500 flex items-center justify-center">
                   <X size={12} className="text-white" />
                 </div>
-                <span className="text-sm font-bold text-white">Close Trade — <span className="text-[#ef4444] font-mono">{closingTrade.ticker}</span></span>
+                <span id={closeTitleId} className="text-sm font-bold text-white">Close Trade — <span className="text-[#ef4444] font-mono">{closingTrade.ticker}</span></span>
               </div>
               <button onClick={()=>{setShowCloseForm(false);setClosingTrade(null);}} aria-label={lang === "he" ? "סגור" : "Close"} className="text-slate-600 hover:text-slate-300 transition">
                 <X size={16} />
@@ -5693,10 +5703,10 @@ export default function SwingEdge() {
       {showHelpModal && <HelpModal onClose={() => setShowHelpModal(false)} onStartTour={() => { setShowHelpModal(false); startTour(); }} t={t} demoCount={DEMO_TRADES.length} />}
 
       {/* ── PRIVACY MODAL ── */}
-      {showPrivacyModal && <PrivacyModal onClose={() => setShowPrivacyModal(false)} />}
+      {showPrivacyModal && <PrivacyModal onClose={() => setShowPrivacyModal(false)} t={t} />}
 
       {/* ── BILLING MODAL ── */}
-      {showBillingModal && <BillingModal onClose={() => setShowBillingModal(false)} />}
+      {showBillingModal && <BillingModal onClose={() => setShowBillingModal(false)} t={t} />}
 
       {/* ── CHANGE PASSWORD MODAL ── */}
       <ChangePasswordModal

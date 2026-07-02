@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { X, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { supabase, isSupabaseConfigured } from "../supabaseClient.js";
+import useModalA11y from "../hooks/useModalA11y.js";
 
 /**
  * Three-step destructive "wipe my journal" flow.
@@ -51,17 +52,13 @@ export default function ResetAllModal({ open, tradesCount = 0, lang, onClose }) 
     return () => { cancelled = true; };
   }, [step, isHe]);
 
-  // ESC closes only when not mid-operation
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e) => {
-      if (e.key !== "Escape") return;
-      if (working || step === "done") return;
-      onClose?.();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, working, step, onClose]);
+  // Accessible dialog: focus-in, focus-trap, focus-restore, and Esc — but Esc
+  // (like the × button) must not close mid-operation or on the success screen.
+  const titleId = useId();
+  const modalRef = useModalA11y({
+    active: open,
+    onClose: () => { if (!working && step !== "done") onClose?.(); },
+  });
 
   if (!open) return null;
 
@@ -113,17 +110,18 @@ export default function ResetAllModal({ open, tradesCount = 0, lang, onClose }) 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-rose-500/30 rounded-2xl shadow-2xl overflow-hidden">
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="w-full max-w-md bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-rose-500/30 rounded-2xl shadow-2xl overflow-hidden focus:outline-none">
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-rose-500/5">
           <div className="flex items-center gap-2">
             <AlertTriangle size={16} className="text-rose-400" />
-            <span className="text-sm font-bold text-rose-200">
+            <span id={titleId} className="text-sm font-bold text-rose-200">
               {isHe ? "אזור מסוכן — איפוס יומן" : "Danger Zone — Reset Journal"}
             </span>
           </div>
           <button
             onClick={() => { if (!working && step !== "done") onClose?.(); }}
             disabled={working || step === "done"}
+            aria-label={isHe ? "סגור" : "Close"}
             className="text-slate-500 hover:text-slate-200 transition disabled:opacity-30 disabled:cursor-not-allowed"
           >
             <X size={16} />

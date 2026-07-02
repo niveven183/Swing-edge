@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useId } from "react";
 import { X } from "lucide-react";
 import TermTooltip from "./ui/TermTooltip.jsx";
 import InfoTooltip from "./ui/InfoTooltip.jsx";
 import SmartSelect from "./ui/SmartSelect.jsx";
+import useModalA11y from "../hooks/useModalA11y.js";
 import { getTradeSelectProps, CATEGORY_TOOLTIP } from "../data/tradeOptions.jsx";
 import { qstars } from "../utils.js";
 
@@ -27,13 +28,9 @@ export default function EditTradeModal({ trade, lang, onClose, onSave }) {
     setError(null);
   }, [trade?.id]);
 
-  // ESC to close
-  useEffect(() => {
-    if (!trade) return;
-    const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [trade, onClose]);
+  // Accessible dialog: focus-in, focus-trap, Esc, focus-restore
+  const titleId = useId();
+  const modalRef = useModalA11y({ active: !!trade, onClose });
 
   const showExitFields = useMemo(
     () => (form.exit !== "" && form.exit != null) || form.status === "CLOSED",
@@ -108,16 +105,17 @@ export default function EditTradeModal({ trade, lang, onClose, onSave }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="w-full max-w-lg bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col focus:outline-none">
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-gradient-to-r from-cyan-500/5 to-violet-500/5">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-white">
+            <span id={titleId} className="text-sm font-bold text-white">
               ✏️ {isHe ? "עריכת עסקה" : "Edit Trade"} —{" "}
               <span className="text-cyan-400 font-mono">{trade.ticker}</span>
             </span>
           </div>
           <button
             onClick={onClose}
+            aria-label={isHe ? "סגור" : "Close"}
             className="text-slate-600 hover:text-slate-300 transition"
             title={isHe ? "סגור (Esc)" : "Close (Esc)"}
           >
