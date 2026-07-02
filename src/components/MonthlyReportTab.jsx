@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { TrendingUp, TrendingDown, CheckCircle, AlertTriangle, Award } from "lucide-react";
 import { generateMonthlyReport, MONTH_NAMES } from "../intelligence/core/MonthlyReport.js";
+import { formatPct } from "../utils.js";
 import TermTooltip from "./ui/TermTooltip.jsx";
 
 // ── helpers ──
@@ -174,7 +175,7 @@ export default function MonthlyReportTab({ trades, calcMetrics, t, lang, isRTL }
       {/* SUMMARY CARDS */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {sCard(t.mr_totalTrades, summary.totalTrades, summary.vsLastMonth.hasPrev ? <Delta value={summary.vsLastMonth.trades} t={t} /> : <span className="text-[10px] text-slate-400">{summary.wins}W / {summary.losses}L</span>)}
-        {sCard(t.mr_winRate, `${summary.winRate}%`, summary.vsLastMonth.hasPrev ? <Delta value={summary.vsLastMonth.winRate} suffix="%" t={t} /> : null, "winRate")}
+        {sCard(t.mr_winRate, formatPct(summary.winRate), summary.vsLastMonth.hasPrev ? <Delta value={summary.vsLastMonth.winRate} suffix="%" t={t} /> : null, "winRate")}
         {sCard(t.mr_netPnL, <span className={summary.netPnL >= 0 ? "text-emerald-500 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"}>{summary.netPnL >= 0 ? "+" : ""}${summary.netPnL.toLocaleString()}</span>, summary.vsLastMonth.hasPrev ? <Delta value={summary.vsLastMonth.netPnL} money t={t} /> : null)}
         {sCard(t.mr_avgR, <span className={summary.avgR >= 0 ? "text-emerald-500 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"}>{summary.avgR >= 0 ? "+" : ""}{summary.avgR}R</span>, summary.bestTrade ? <span className="text-[10px] text-slate-400 dark:text-slate-500">{t.mr_best}: {summary.bestTrade.ticker}</span> : null, "avgR")}
       </div>
@@ -239,7 +240,7 @@ export default function MonthlyReportTab({ trades, calcMetrics, t, lang, isRTL }
               <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
               <XAxis dataKey="week" tick={axisTick} axisLine={false} tickLine={false} />
               <YAxis domain={[0, 100]} tick={axisTick} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} />
-              <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${v}%`, t.mr_winRate]} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v) => [formatPct(v), t.mr_winRate]} />
               <Line type="monotone" dataKey="rate" stroke="#8B5CF6" strokeWidth={2} dot={{ r: 3, fill: "#8B5CF6" }} activeDot={{ r: 5 }} />
             </LineChart>
           </ResponsiveContainer>
@@ -254,7 +255,7 @@ export default function MonthlyReportTab({ trades, calcMetrics, t, lang, isRTL }
             <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} horizontal={false} />
             <XAxis type="number" domain={[0, 100]} tick={axisTick} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} />
             <YAxis type="category" dataKey="setup" tick={axisTick} axisLine={false} tickLine={false} width={90} />
-            <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(34,211,238,0.06)" }} formatter={(v, n, p) => [`${v}% · ${p.payload.count} ${t.mr_tradesShort}`, t.mr_winRate]} />
+            <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(34,211,238,0.06)" }} formatter={(v, n, p) => [`${formatPct(v)} · ${p.payload.count} ${t.mr_tradesShort}`, t.mr_winRate]} />
             <Bar dataKey="winRate" radius={[0, 4, 4, 0]}>
               {charts.setupBreakdown.map((d, i) => (
                 <Cell key={i} fill={d.winRate >= 50 ? "#22d3ee" : "#fb923c"} />

@@ -207,11 +207,11 @@ export function generateMonthlyReport(trades, month, year, calcMetrics) {
   const strengths = [];
   if (patterns.bestSetup && patterns.bestSetup.winRate >= 55) {
     const s = patterns.bestSetup;
-    strengths.push({ tid: "mr_s_bestSetup", cat: "mr_cat_setup", params: { setup: s.name, winRate: s.winRate, trades: s.count }, data: `${s.winRate}% · ${s.count}`, detail: `${s.name} is your edge this month — ${s.winRate}% win rate over ${s.count} trades` });
+    strengths.push({ tid: "mr_s_bestSetup", cat: "mr_cat_setup", params: { setup: s.name, winRate: Math.round(s.winRate), trades: s.count }, data: `${Math.round(s.winRate)}% · ${s.count}`, detail: `${s.name} is your edge this month — ${Math.round(s.winRate)}% win rate over ${s.count} trades` });
   }
   if (patterns.bestEmotion && patterns.bestEmotion.winRate >= 55) {
     const s = patterns.bestEmotion;
-    strengths.push({ tid: "mr_s_bestEmotion", cat: "mr_cat_emotion", params: { emotion: s.name, winRate: s.winRate }, data: `${s.winRate}%`, detail: `You trade best when ${s.name} — ${s.winRate}% win rate` });
+    strengths.push({ tid: "mr_s_bestEmotion", cat: "mr_cat_emotion", params: { emotion: s.name, winRate: Math.round(s.winRate) }, data: `${Math.round(s.winRate)}%`, detail: `You trade best when ${s.name} — ${Math.round(s.winRate)}% win rate` });
   }
   if (disciplineRatio >= 0.7) {
     const pct = Math.round(disciplineRatio * 100);
@@ -233,11 +233,11 @@ export function generateMonthlyReport(trades, month, year, calcMetrics) {
   const weaknesses = [];
   if (patterns.worstSetup && patterns.worstSetup.winRate <= 45 && patterns.worstSetup !== patterns.bestSetup) {
     const w = patterns.worstSetup;
-    weaknesses.push({ tid: "mr_w_worstSetup", cat: "mr_cat_setup", params: { setup: w.name, winRate: w.winRate, trades: w.count }, data: `${w.winRate}% · ${w.count}`, detail: `${w.name} struggled — only ${w.winRate}% win rate over ${w.count} trades` });
+    weaknesses.push({ tid: "mr_w_worstSetup", cat: "mr_cat_setup", params: { setup: w.name, winRate: Math.round(w.winRate), trades: w.count }, data: `${Math.round(w.winRate)}% · ${w.count}`, detail: `${w.name} struggled — only ${Math.round(w.winRate)}% win rate over ${w.count} trades` });
   }
   if (patterns.worstEmotion && patterns.worstEmotion.winRate <= 45 && patterns.worstEmotion !== patterns.bestEmotion) {
     const w = patterns.worstEmotion;
-    weaknesses.push({ tid: "mr_w_worstEmotion", cat: "mr_cat_emotion", params: { emotion: w.name, winRate: w.winRate }, data: `${w.winRate}%`, detail: `Trading while ${w.name} hurt results — ${w.winRate}% win rate` });
+    weaknesses.push({ tid: "mr_w_worstEmotion", cat: "mr_cat_emotion", params: { emotion: w.name, winRate: Math.round(w.winRate) }, data: `${Math.round(w.winRate)}%`, detail: `Trading while ${w.name} hurt results — ${Math.round(w.winRate)}% win rate` });
   }
   if (maxDay >= 4 && maxDay >= avgDay * 2) {
     weaknesses.push({ tid: "mr_w_overtrading", cat: "mr_cat_overtrading", params: { max: maxDay, avg: avgDay }, data: `${maxDay}/day`, detail: `Heavy day detected — ${maxDay} trades in one day vs ${avgDay} average` });
@@ -257,7 +257,7 @@ export function generateMonthlyReport(trades, month, year, calcMetrics) {
   // ── ACTION ITEMS (3) ──
   const actionItems = [];
   if (patterns.worstSetup && patterns.worstSetup.winRate <= 45 && patterns.worstSetup !== patterns.bestSetup) {
-    actionItems.push({ priority: "high", tid: "mr_a_avoidSetup", params: { setup: patterns.worstSetup.name }, action: `Pause or refine ${patterns.worstSetup.name}`, reason: `Low win rate this month (${patterns.worstSetup.winRate}%)` });
+    actionItems.push({ priority: "high", tid: "mr_a_avoidSetup", params: { setup: patterns.worstSetup.name }, action: `Pause or refine ${patterns.worstSetup.name}`, reason: `Low win rate this month (${Math.round(patterns.worstSetup.winRate)}%)` });
   }
   if (tiltLosses >= 2) {
     actionItems.push({ priority: "high", tid: "mr_a_tilt", params: {}, action: "Cut size after a loss", reason: `${tiltLosses} losses came from tilt/off-plan trades` });
@@ -266,10 +266,10 @@ export function generateMonthlyReport(trades, month, year, calcMetrics) {
     actionItems.push({ priority: "medium", tid: "mr_a_discipline", params: {}, action: "Follow your written plan on every entry", reason: `Plan adherence was ${Math.round(disciplineRatio * 100)}%` });
   }
   if (patterns.bestSetup) {
-    actionItems.push({ priority: "medium", tid: "mr_a_leanSetup", params: { setup: patterns.bestSetup.name }, action: `Lean into ${patterns.bestSetup.name}`, reason: `Your strongest setup (${patterns.bestSetup.winRate}%)` });
+    actionItems.push({ priority: "medium", tid: "mr_a_leanSetup", params: { setup: patterns.bestSetup.name }, action: `Lean into ${patterns.bestSetup.name}`, reason: `Your strongest setup (${Math.round(patterns.bestSetup.winRate)}%)` });
   }
   if (patterns.worstEmotion && patterns.worstEmotion.winRate <= 45) {
-    actionItems.push({ priority: "low", tid: "mr_a_manageEmotion", params: { emotion: patterns.worstEmotion.name }, action: `Add a check before entering while ${patterns.worstEmotion.name}`, reason: `Weakest mindset (${patterns.worstEmotion.winRate}%)` });
+    actionItems.push({ priority: "low", tid: "mr_a_manageEmotion", params: { emotion: patterns.worstEmotion.name }, action: `Add a check before entering while ${patterns.worstEmotion.name}`, reason: `Weakest mindset (${Math.round(patterns.worstEmotion.winRate)}%)` });
   }
   actionItems.push({ priority: "low", tid: "mr_a_consistency", params: {}, action: "Keep journaling every trade", reason: "Consistency compounds your edge" });
   const topActions = actionItems.slice(0, 3);

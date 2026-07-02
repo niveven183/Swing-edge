@@ -4,6 +4,7 @@ import TermTooltip from "./ui/TermTooltip.jsx";
 import InfoTooltip from "./ui/InfoTooltip.jsx";
 import SmartSelect from "./ui/SmartSelect.jsx";
 import { getTradeSelectProps, CATEGORY_TOOLTIP } from "../data/tradeOptions.jsx";
+import { qstars } from "../utils.js";
 
 const EXIT_REASONS = ["Hit Target", "Hit Stop", "Manual Exit", "Trailing Stop", "Other"];
 
@@ -427,7 +428,7 @@ function initForm(trade) {
     notes: trade.notes || "",
     marketCondition: trade.marketCondition || "Trending Up",
     emotionAtEntry: trade.emotionAtEntry || "Neutral",
-    entryQuality: trade.entryQuality || 3,
+    entryQuality: qstars(trade.entryQuality) || 3,
     status: trade.status || "OPEN",
     exit: trade.exit != null ? String(trade.exit) : "",
     exitReason: trade.exitReason || "Hit Target",

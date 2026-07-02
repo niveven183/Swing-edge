@@ -18,7 +18,7 @@ const ideaFromForm = (form) => {
   const target = Number(form.target) || 0;
   const risk    = Math.abs(entry - stop);
   const reward  = target ? Math.abs(target - entry) : 0;
-  const rrNum   = risk > 0 && reward > 0 ? reward / risk : 0;
+  const rrNum   = risk > 0 && reward > 0 ? Math.round((reward / risk) * 100) / 100 : 0;
   const stopPct = entry > 0 && risk > 0 ? (risk / entry) * 100 : 0;
   const rrBand  = rrNum > 0 ? (rrNum < 1 ? "<1" : rrNum < 2 ? "1-2" : rrNum < 3 ? "2-3" : "3+") : null;
 

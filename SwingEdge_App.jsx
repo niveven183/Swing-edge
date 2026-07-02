@@ -1272,45 +1272,50 @@ export default function SwingEdge() {
     try { localStorage.setItem("swingEdgeWatchlist", JSON.stringify(watchlistItems)); } catch {}
   }, [watchlistItems]);
 
-  // TradingView widget
+  // TradingView Advanced Chart — modern embed. The legacy tv.js widget mounted
+  // but served no candle data (black chart, OHLC ∅); this embed reads its JSON
+  // config from the script's text content and renders into the container.
   useEffect(() => {
     if (tab !== "intel" || !tvRef.current) return;
     const container = tvRef.current;
     container.innerHTML = "";
-    const widgetId = "tv_widget_" + Date.now();
-    const inner = document.createElement("div");
-    inner.id = widgetId;
-    inner.style.height = "100%";
-    container.appendChild(inner);
 
     const intervalMap = { "1m": "1", "5m": "5", "15m": "15", "1H": "60", "4H": "240", "1D": "D", "1W": "W" };
     const tvInterval = intervalMap[chartInterval] || chartInterval;
 
+    const wrapper = document.createElement("div");
+    wrapper.className = "tradingview-widget-container";
+    wrapper.style.height = "100%";
+    wrapper.style.width = "100%";
+    const widget = document.createElement("div");
+    widget.className = "tradingview-widget-container__widget";
+    widget.style.height = "100%";
+    widget.style.width = "100%";
+    wrapper.appendChild(widget);
+
     const script = document.createElement("script");
     script.type = "text/javascript";
-    script.src = "https://s3.tradingview.com/tv.js";
+    script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
     script.async = true;
-    script.onload = () => {
-      if (!window.TradingView) return;
-      new window.TradingView.widget({
-        autosize: true,
-        symbol: chartSymbol,
-        interval: tvInterval,
-        timezone: "America/New_York",
-        theme: "dark",
-        style: chartStyle || "1",
-        locale: "en",
-        toolbar_bg: "#0d1424",
-        backgroundColor: "#0a0f1e",
-        enable_publishing: false,
-        allow_symbol_change: true,
-        hide_side_toolbar: false,
-        studies: ["Volume@tv-basicstudies"],
-        container_id: widgetId,
-      });
-    };
-    document.head.appendChild(script);
-    return () => { try { document.head.removeChild(script); } catch {} };
+    script.innerHTML = JSON.stringify({
+      autosize: true,
+      symbol: chartSymbol,
+      interval: tvInterval,
+      timezone: "America/New_York",
+      theme: "dark",
+      style: chartStyle || "1",
+      locale: "en",
+      toolbar_bg: "#0d1424",
+      enable_publishing: false,
+      allow_symbol_change: true,
+      hide_side_toolbar: false,
+      studies: ["Volume@tv-basicstudies"],
+      support_host: "https://www.tradingview.com",
+    });
+    wrapper.appendChild(script);
+    container.appendChild(wrapper);
+
+    return () => { try { container.innerHTML = ""; } catch {} };
   }, [tab, chartSymbol, chartInterval, chartStyle]);
 
   // Close profile dropdown on outside click
@@ -5434,16 +5439,6 @@ export default function SwingEdge() {
 
               {/* Live Decision Coach — analyses the trade as you type (only on valid input) */}
               {tradeValidity.valid && <DecisionCoachPanel coaching={aiCoach} lang={lang} />}
-
-              {/* RR quality indicator — core decision feedback, always visible */}
-              {tradeValidity.valid && entryN > 0 && stopN > 0 && targetN > 0 && (
-                <div className={`flex items-center gap-2 p-2.5 rounded-lg border text-xs ${rrRatio>=2?"bg-emerald-500/5 border-emerald-500/20 text-[#10b981]":rrRatio>=1?"bg-amber-500/5 border-amber-500/20 text-amber-400":"bg-[#ef4444]/5 border-[#ef4444]/20 text-[#ef4444]"}`}>
-                  {rrRatio>=2?<CheckCircle size={13}/>:<AlertTriangle size={13}/>}
-                  <span>{lang==="he"
-                    ? (rrRatio>=2?"סטאפ מצוין — ה-R/R עובר את הרף של 2:1":rrRatio>=1?"סביר — שקול להרחיב את היעד ל-R/R טוב יותר":"מתחת לרף — הימנע מסטאפים מתחת ל-1:1")
-                    : (rrRatio>=2?"Great setup — R/R exceeds 2:1 minimum":rrRatio>=1?"Acceptable — consider widening target for better R/R":"Below minimum — avoid setups below 1:1 R/R")}</span>
-                </div>
-              )}
 
               {/* TradingView screenshot → OCR auto-fill (top-level, mirrors the Analyzer) */}
               <div>
