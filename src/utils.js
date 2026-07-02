@@ -70,6 +70,10 @@ export const fmt$ = (n) => n >= 0
 
 export const fmtR = (r) => r >= 0 ? `+${r.toFixed(2)}R` : `${r.toFixed(2)}R`;
 
+// Win-rate (and any 0..100 percentage) display — single source of truth for
+// percentage rounding, so the same value renders identically everywhere.
+export const formatPct = (v) => `${Math.round(Number(v) || 0)}%`;
+
 // ─── followedPlan NORMALIZATION ───────────────────────────────────────────────
 // `followedPlan` is true | false | "Partially" | null in the UI, but the DB
 // column is text, so after a Supabase round-trip booleans come back as the

@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { isFollowedPlan, isOffPlan, qstars } from "../utils.js";
+import { edgeScore, wilsonLowerBound } from "../intelligence/utils/statisticalModels.js";
 
 /**
  * useTradingStats — Master Stats Hub
@@ -36,8 +37,6 @@ export function useTradingStats(trades, capital, calcTradeMetrics) {
     const avgR         = metrics.reduce((s, m) => s + (m.rMultiple || 0), 0) / metrics.length;
     const bestWin      = winners.length ? Math.max(...winners.map(m => m.pnl)) : 0;
     const worstLoss    = losers.length  ? Math.min(...losers.map(m => m.pnl)) : 0;
-    // Dollar-based expectancy. See src/data/tooltips.js for definition.
-    const expectancyDollar = (winRate / 100) * avgWin - (lossRate / 100) * avgLoss;
 
     // ─── Equity curve + Max Drawdown ───────────────────────────
     const sorted = [...metrics].sort((a, b) => {
@@ -133,7 +132,7 @@ export function useTradingStats(trades, capital, calcTradeMetrics) {
       winRate, lossRate, profitFactor,
 
       // averages
-      avgWin, avgLoss, avgR, bestWin, worstLoss, expectancyDollar,
+      avgWin, avgLoss, avgR, bestWin, worstLoss,
 
       // equity — CLOSED baseline only (single source for realized equity).
       // Full Account Equity = currentEquity + live open P&L, assembled once at
@@ -191,7 +190,7 @@ function EMPTY_STATS(capital) {
     totalTrades: 0, total: 0, openTrades: 0, wins: 0, losses: 0,
     totalPnL: 0, totalWin: 0, totalLoss: 0,
     winRate: 0, lossRate: 0, profitFactor: 0,
-    avgWin: 0, avgLoss: 0, avgR: 0, bestWin: 0, worstLoss: 0, expectancyDollar: 0,
+    avgWin: 0, avgLoss: 0, avgR: 0, bestWin: 0, worstLoss: 0,
     currentEquity: capital, capital, returnPct: 0,
     equityCurve: [], maxDrawdown: 0, maxDD: 0, currentDrawdown: 0,
     currentStreak: 0, maxWinStreak: 0, maxLossStreak: 0, bestStreak: 0,
@@ -267,6 +266,12 @@ function summarize(metrics) {
   };
 }
 
+// Best/worst setup×emotion combos, ranked by the canonical edge definition
+// (Wilson × expectancy signal) — the same formula EdgeFinder uses, so the
+// Dashboard's Top-Edges list and the AI EdgeCard never disagree on what an
+// "edge" is. Anti-edges mirror EdgeFinder: ranked by antiScore and filtered to
+// genuinely weak combos (win rate < 50% or negative avg R), rather than a hard
+// win-rate cutoff that lets small-sample noise masquerade as an edge.
 function findEdges(metrics, type) {
   const combos = {};
   metrics.forEach(m => {
@@ -275,21 +280,31 @@ function findEdges(metrics, type) {
     combos[key].push(m);
   });
   const minCount = type === "top" ? 3 : 2;
-  const wrFilter = type === "top" ? wr => wr >= 70 : wr => wr <= 30;
-  return Object.entries(combos)
+  const scored = Object.entries(combos)
     .filter(([, items]) => items.length >= minCount)
     .map(([name, items]) => {
-      const wins = items.filter(m => (m.pnl || 0) > 0);
+      const wins = items.filter(m => (m.pnl || 0) > 0).length;
+      const n = items.length;
+      const avgR = items.reduce((s, m) => s + (m.rMultiple || 0), 0) / n;
       return {
         name,
         setup: items[0].setup || "?",
         emotion: items[0].emotionAtEntry || "?",
-        count: items.length,
-        winRate: (wins.length / items.length) * 100,
+        count: n,
+        winRate: (wins / n) * 100,
         totalPnL: items.reduce((s, m) => s + (m.pnl || 0), 0),
+        avgR,
+        score: edgeScore(wins, n, avgR),
+        antiScore: (1 - wilsonLowerBound(wins, n)) * (1 + Math.max(0, -avgR)),
       };
-    })
-    .filter(c => wrFilter(c.winRate))
-    .sort((a, b) => type === "top" ? b.totalPnL - a.totalPnL : a.totalPnL - b.totalPnL)
+    });
+  if (type === "top") {
+    return scored
+      .sort((a, b) => b.score - a.score || b.avgR - a.avgR)
+      .slice(0, 5);
+  }
+  return scored
+    .filter(c => c.winRate < 50 || c.avgR < 0)
+    .sort((a, b) => b.antiScore - a.antiScore || a.avgR - b.avgR)
     .slice(0, 5);
 }

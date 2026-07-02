@@ -18,7 +18,7 @@ import TradingViewSearch from "./src/components/TradingViewSearch.jsx";
 import { TVTickerTape } from "./src/components/TradingViewWidgets.jsx";
 import { useToast, useConfirm } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured, tradeForSupabase } from "./src/supabaseClient.js";
-import { calcTradeMetrics, fmt$, fmtR, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL } from "./src/utils.js";
+import { calcTradeMetrics, fmt$, fmtR, formatPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL } from "./src/utils.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell,
@@ -550,8 +550,8 @@ const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity) => 
 
   const totalPnL = stats.totalPnL;
   const monthPnL = monthStats.totalPnL;
-  const winRate = stats.winRate.toFixed(1);
-  const monthWinRate = monthStats.winRate.toFixed(1);
+  const winRate = formatPct(stats.winRate);
+  const monthWinRate = formatPct(monthStats.winRate);
   const avgR = stats.avgR.toFixed(2);
   // Unified full Account Equity (closed + live open P&L), passed from the
   // component so the report matches the dashboard exactly.
@@ -661,11 +661,11 @@ const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity) => 
     </div>
     <div class="kpi">
       <div class="kpi-label">Win Rate (All Time)</div>
-      <div class="kpi-value" style="color:#0f172a">${winRate}%</div>
+      <div class="kpi-value" style="color:#0f172a">${winRate}</div>
     </div>
     <div class="kpi">
       <div class="kpi-label">${monthName} Win Rate</div>
-      <div class="kpi-value" style="color:#0f172a">${monthWinRate}%</div>
+      <div class="kpi-value" style="color:#0f172a">${monthWinRate}</div>
     </div>
     <div class="kpi">
       <div class="kpi-label">Avg R-Multiple</div>
@@ -2496,7 +2496,7 @@ export default function SwingEdge() {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               <StatCard label={t.accountEquity}  value={`$${curEquity.toLocaleString("en-US", {minimumFractionDigits:0})}`} sub={`${t.startedAt} $${capital.toLocaleString()}`} trend={totalPnL/capital*100} icon={DollarSign} accent="cyan" />
               <StatCard label={t.netPnlClosed} value={fmt$(Math.round(totalPnL * 100) / 100)} sub={`${closedTrades.length} ${t.closedTrades}`} trend={totalPnL/capital*100} icon={TrendingUp} accent={totalPnL >= 0 ? "green" : "red"} />
-              <StatCard label={<span className="flex items-center gap-1">{t.winRate}<TermTooltip term="winRate" lang={lang} /></span>} value={`${winRate.toFixed(1)}%`} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length}W / ${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)<0).length}L`} icon={Target} accent="purple" />
+              <StatCard label={<span className="flex items-center gap-1">{t.winRate}<TermTooltip term="winRate" lang={lang} /></span>} value={formatPct(winRate)} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length}W / ${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)<0).length}L`} icon={Target} accent="purple" />
               <StatCard label={<span className="flex items-center gap-1">{t.avgRMultiple}<TermTooltip term="avgR" lang={lang} /></span>} value={fmtR(avgR)} sub={t.perClosedTrade} icon={Activity} accent="amber" />
               <StatCard label={t.dailyPnl} value={fmt$(Math.round(dailyPnL))} sub={t.todayTrades} icon={DollarSign} accent={dailyPnL >= 0 ? "green" : "red"} />
               <StatCard label={t.streakCounter} value={<span className="flex items-center gap-1">{currentStreak > 0 && <Flame size={18} className="text-orange-400" />}{currentStreak}</span>} sub={`${t.bestStreak}: ${bestStreak}`} icon={Zap} accent={currentStreak >= 3 ? "green" : "amber"} />
@@ -2560,7 +2560,7 @@ export default function SwingEdge() {
                           <div className="text-slate-400 text-xs">{edge.count} {t.trades}</div>
                         </div>
                         <div className="text-right">
-                          <div className="text-emerald-400 font-bold text-sm">{edge.winRate.toFixed(0)}% WR</div>
+                          <div className="text-emerald-400 font-bold text-sm">{formatPct(edge.winRate)} WR</div>
                           <div className="text-slate-300 text-xs">${edge.totalPnL.toFixed(0)}</div>
                         </div>
                       </div>
@@ -2577,7 +2577,7 @@ export default function SwingEdge() {
                           <div className="text-slate-400 text-xs">{edge.count} {t.trades}</div>
                         </div>
                         <div className="text-right">
-                          <div className="text-rose-400 font-bold text-sm">{edge.winRate.toFixed(0)}% WR</div>
+                          <div className="text-rose-400 font-bold text-sm">{formatPct(edge.winRate)} WR</div>
                           <div className="text-slate-300 text-xs">${edge.totalPnL.toFixed(0)}</div>
                         </div>
                       </div>
@@ -2957,7 +2957,7 @@ export default function SwingEdge() {
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{lang === "he" ? "אחוז הצלחה" : "Win Rate"}<TermTooltip term="winRate" lang={lang} /></div>
-                  <div className="text-sm font-bold font-mono mt-0.5 text-emerald-300">{journalStats.winRate.toFixed(1)}%</div>
+                  <div className="text-sm font-bold font-mono mt-0.5 text-emerald-300">{formatPct(journalStats.winRate)}</div>
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{lang === "he" ? "רווח ממוצע" : "Avg Win"}<TermTooltip term="avgWin" lang={lang} /></div>
@@ -3843,7 +3843,7 @@ export default function SwingEdge() {
           <div className="space-y-5 animate-fade-in">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <StatCard label="Total Trades"  value={realTrades.length} sub="All time"      icon={Layers}    accent="cyan"   />
-              <StatCard label={<span className="flex items-center gap-1">Win Rate<TermTooltip term="winRate" lang={lang} /></span>} value={`${winRate.toFixed(1)}%`} sub={`${stats.wins} wins`} icon={CheckCircle} accent="green" />
+              <StatCard label={<span className="flex items-center gap-1">Win Rate<TermTooltip term="winRate" lang={lang} /></span>} value={formatPct(winRate)} sub={`${stats.wins} wins`} icon={CheckCircle} accent="green" />
               <StatCard label={<span className="flex items-center gap-1">Avg R Multiple<TermTooltip term="avgR" lang={lang} /></span>} value={fmtR(avgR)} sub="Closed trades" icon={Activity}  accent="purple" />
               <StatCard label="Total Return"   value={`${stats.returnPct.toFixed(2)}%`} sub={`$${Math.round(Math.abs(totalPnL)).toLocaleString()} P&L`} icon={TrendingUp} accent={totalPnL>=0?"green":"red"} />
             </div>
@@ -3907,7 +3907,7 @@ export default function SwingEdge() {
                   .map((s) => (
                     <div key={s.name} className="bg-white/3 rounded-xl p-3 border border-[var(--border-subtle)] dark:border-white/[0.06]">
                       <div className="text-xs font-semibold text-violet-400 mb-2 truncate" title={s.name}>{s.name}</div>
-                      <div className="font-bold text-white text-lg font-mono">{s.winRate.toFixed(0)}%</div>
+                      <div className="font-bold text-white text-lg font-mono">{formatPct(s.winRate)}</div>
                       <div className="text-[10px] text-slate-500">{s.count} {t.trades} · {s.totalR.toFixed(1)}R {t.rTotal}</div>
                       <div className="mt-2 h-1.5 bg-white/5 rounded-full overflow-hidden">
                         <div className="h-full bg-gradient-to-r from-violet-500 to-cyan-500 rounded-full transition-all" style={{ width: `${s.winRate}%` }} />
@@ -4037,7 +4037,7 @@ export default function SwingEdge() {
                     {bestSetup ? (
                       <>
                         <div className="text-2xl font-bold text-white font-mono">{bestSetup.setup}</div>
-                        <div className="text-xs text-slate-500 mt-1">{bestSetup.winRate.toFixed(0)}% {t.winRate} · {bestSetup.count} {t.trades}</div>
+                        <div className="text-xs text-slate-500 mt-1">{formatPct(bestSetup.winRate)} {t.winRate} · {bestSetup.count} {t.trades}</div>
                       </>
                     ) : (
                       <div className="text-sm text-slate-600">{t.logClosedForInsights}</div>
@@ -4052,7 +4052,7 @@ export default function SwingEdge() {
                     {bestEmotion ? (
                       <>
                         <div className="text-2xl font-bold text-white font-mono">{bestEmotion.emotion}</div>
-                        <div className="text-xs text-slate-500 mt-1">{bestEmotion.winRate.toFixed(0)}% {t.winRate} · {bestEmotion.count} {t.trades}</div>
+                        <div className="text-xs text-slate-500 mt-1">{formatPct(bestEmotion.winRate)} {t.winRate} · {bestEmotion.count} {t.trades}</div>
                       </>
                     ) : (
                       <div className="text-sm text-slate-600">{t.logClosedForInsights}</div>
@@ -4075,7 +4075,7 @@ export default function SwingEdge() {
                           <div className="text-slate-400 text-xs">{edge.count} {t.trades}</div>
                         </div>
                         <div className="text-right">
-                          <div className="text-emerald-400 font-bold text-sm">{edge.winRate.toFixed(0)}% WR</div>
+                          <div className="text-emerald-400 font-bold text-sm">{formatPct(edge.winRate)} WR</div>
                           <div className="text-slate-300 text-xs">${edge.totalPnL.toFixed(0)}</div>
                         </div>
                       </div>
@@ -4092,7 +4092,7 @@ export default function SwingEdge() {
                           <div className="text-slate-400 text-xs">{edge.count} {t.trades}</div>
                         </div>
                         <div className="text-right">
-                          <div className="text-rose-400 font-bold text-sm">{edge.winRate.toFixed(0)}% WR</div>
+                          <div className="text-rose-400 font-bold text-sm">{formatPct(edge.winRate)} WR</div>
                           <div className="text-slate-300 text-xs">${edge.totalPnL.toFixed(0)}</div>
                         </div>
                       </div>
@@ -4261,7 +4261,7 @@ export default function SwingEdge() {
                           <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
                           <XAxis dataKey="emotion" tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} />
                           <YAxis tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
-                          <Tooltip contentStyle={darkTooltip} formatter={(v, n, p) => [`${fmt$(v)} · ${p.payload.winRate}% WR`, "P&L"]} />
+                          <Tooltip contentStyle={darkTooltip} formatter={(v, n, p) => [`${fmt$(v)} · ${formatPct(p.payload.winRate)} WR`, "P&L"]} />
                           <ReferenceLine y={0} stroke="#334155" />
                           <Bar dataKey="totalPnL" radius={[4, 4, 0, 0]}>
                             {emotionStatsArr.map((e, i) => (
@@ -4353,7 +4353,7 @@ export default function SwingEdge() {
                                   s.winRate >= 60 ? "bg-emerald-500/15 text-emerald-400"
                                   : s.winRate >= 40 ? "bg-amber-500/15 text-amber-400"
                                   : "bg-rose-500/15 text-rose-400"
-                                }`}>{s.winRate}%</span>
+                                }`}>{formatPct(s.winRate)}</span>
                               </td>
                               <td className="py-2.5 text-center font-mono text-slate-300">{s.avgR}R</td>
                               <td className={`py-2.5 text-right font-mono font-bold ${s.totalPnL >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
