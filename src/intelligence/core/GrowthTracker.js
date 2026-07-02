@@ -7,6 +7,7 @@ import {
 } from "../utils/statisticalModels.js";
 import { disciplineRate } from "../utils/psychologyPatterns.js";
 import { matchIdeaToEdge } from "./EdgeFinder.js";
+import { DEFAULT_CAPITAL } from "../../utils.js";
 
 // Weights as specified: 30/25/20/15/10.
 const WEIGHTS = {
@@ -23,7 +24,7 @@ const disciplineScore = (trades) => {
   return dRate == null ? 50 : to100(dRate);
 };
 
-const riskMgmtScore = (trades, capitalAtEntryDefault = 25000) => {
+const riskMgmtScore = (trades, capitalAtEntryDefault = DEFAULT_CAPITAL) => {
   const closed = getClosed(trades);
   if (!closed.length) return 50;
   const pcts = closed.map(t => {

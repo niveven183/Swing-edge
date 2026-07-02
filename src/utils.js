@@ -1,4 +1,4 @@
-export const CAPITAL = 25000;
+export const DEFAULT_CAPITAL = 2500;
 export const RISK_PCT = 0.01;
 
 export const calcTradeMetrics = (trade) => {

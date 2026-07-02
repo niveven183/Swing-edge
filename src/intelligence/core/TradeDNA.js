@@ -19,7 +19,7 @@ import {
   MIN_SAMPLE_DNA, MIN_SAMPLE_PATTERNS, MIN_SAMPLE_FORECAST, MIN_SAMPLE_ML,
 } from "../utils/statisticalModels.js";
 import { disciplineRate, emotionPerformance } from "../utils/psychologyPatterns.js";
-import { qstars } from "../../utils.js";
+import { qstars, DEFAULT_CAPITAL } from "../../utils.js";
 import { isFollowedPlan } from "../../utils.js";
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -81,7 +81,7 @@ const inferStyle = (trades) => {
       const shares = Number(t.shares);
       if (!Number.isFinite(entry) || !Number.isFinite(stop) || !Number.isFinite(shares)) return 0;
       const riskPerShare = Math.abs(entry - stop);
-      const capital = Number(t._capitalAtEntry) || 25000;
+      const capital = Number(t._capitalAtEntry) || DEFAULT_CAPITAL;
       return capital > 0 ? (riskPerShare * shares) / capital : 0;
     })
     .filter(r => r > 0 && Number.isFinite(r));
@@ -119,7 +119,7 @@ const computeScores = (trades) => {
       const stop = Number(t.stop);
       const shares = Number(t.shares);
       if (!Number.isFinite(entry) || !Number.isFinite(stop) || !Number.isFinite(shares)) return 0;
-      const capital = Number(t._capitalAtEntry) || 25000;
+      const capital = Number(t._capitalAtEntry) || DEFAULT_CAPITAL;
       const rd = Math.abs(entry - stop) * shares;
       return capital > 0 ? rd / capital : 0;
     })

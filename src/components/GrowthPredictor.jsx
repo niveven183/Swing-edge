@@ -19,6 +19,7 @@ import {
   CartesianGrid,
   ReferenceLine,
 } from "recharts";
+import { DEFAULT_CAPITAL } from "../utils.js";
 
 // ─── i18n strings ────────────────────────────────────────────────────────────
 const STR = {
@@ -226,7 +227,7 @@ export default function GrowthPredictor({ trades = [], stats = {}, capital = 0, 
   );
 
   // ── Effective capital ──
-  const effectiveCapital = capital && capital > 0 ? capital : 5000;
+  const effectiveCapital = capital && capital > 0 ? capital : DEFAULT_CAPITAL;
 
   // ── Monthly return calc ──
   const { monthlyReturn, monthsOfData } = useMemo(() => {

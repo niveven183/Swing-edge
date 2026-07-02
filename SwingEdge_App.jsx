@@ -18,7 +18,7 @@ import TradingViewSearch from "./src/components/TradingViewSearch.jsx";
 import { TVTickerTape } from "./src/components/TradingViewWidgets.jsx";
 import { useToast, useConfirm } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured, tradeForSupabase } from "./src/supabaseClient.js";
-import { calcTradeMetrics, fmt$, fmtR, qstars, priceBasedRR, inferSide, validateTradeInputs } from "./src/utils.js";
+import { calcTradeMetrics, fmt$, fmtR, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL } from "./src/utils.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell,
@@ -1047,7 +1047,7 @@ export default function SwingEdge() {
   }, [authUser?.id]);
 
   const [capital, setCapital] = useState(() => {
-    try { return parseFloat(localStorage.getItem("swingEdgeCapital")) || 2500; } catch { return 2500; }
+    try { return parseFloat(localStorage.getItem("swingEdgeCapital")) || DEFAULT_CAPITAL; } catch { return DEFAULT_CAPITAL; }
   });
   const [capitalInput, setCapitalInput] = useState("");
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
