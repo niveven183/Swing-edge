@@ -890,7 +890,7 @@ const generateSmartLessons = (closedTrades, calcFn, lang = 'he') => {
 };
 
 // ─── STAT CARD ────────────────────────────────────────────────────────────────
-const StatCard = ({ label, value, sub, trend, icon: Icon, accent = "cyan" }) => {
+const StatCard = ({ label, value, sub, trend, icon: Icon, accent = "cyan", info }) => {
   const accents = {
     cyan:   { border: "border-cyan-500/25", iconColor: "text-cyan-400", bg: "bg-cyan-500/8" },
     green:  { border: "border-[#10b981]/25", iconColor: "text-[#10b981]", bg: "bg-[#10b981]/8" },
@@ -904,7 +904,10 @@ const StatCard = ({ label, value, sub, trend, icon: Icon, accent = "cyan" }) => 
       <div className={`absolute top-3 right-3 rtl:right-auto rtl:left-3 opacity-15 ${iconColor}`}>
         <Icon size={26} />
       </div>
-      <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500">{label}</span>
+      <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 flex items-center gap-1">
+        {label}
+        {info && <InfoTooltip label={typeof label === "string" ? label : "info"}>{info}</InfoTooltip>}
+      </span>
       <span className={`text-2xl font-bold font-mono ${iconColor}`}>{value}</span>
       {sub && <span className="text-xs text-slate-600">{sub}</span>}
       {trend !== undefined && (
@@ -2503,10 +2506,10 @@ export default function SwingEdge() {
       <TVTickerTape />
 
       {/* ── NAV ── */}
-      <nav data-tour="main-nav" className="flex items-center gap-0 px-5 border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-[var(--bg-elevated)] overflow-x-auto">
+      <nav data-tour="main-nav" className="flex flex-wrap sm:flex-nowrap items-center justify-center sm:justify-start gap-0 px-2 sm:px-5 border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-[var(--bg-elevated)] sm:overflow-x-auto">
         {NAV_KEYS.map(({ id, key, icon: Icon }) => (
           <button key={id} data-tour-tab={id} onClick={() => setTab(id)}
-            className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold tracking-wide transition-all whitespace-nowrap border-b-2
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-3 text-xs font-semibold tracking-wide transition-all whitespace-nowrap border-b-2 shrink-0
               ${tab === id
                 ? "text-white border-cyan-400"
                 : "text-slate-500 border-transparent hover:text-slate-300 hover:border-slate-600"}`}>
@@ -2540,7 +2543,10 @@ export default function SwingEdge() {
             )}
             {/* KPI Row */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              <StatCard label={t.accountEquity}  value={`$${curEquity.toLocaleString("en-US", {minimumFractionDigits:0})}`} sub={`${t.startedAt} $${capital.toLocaleString()}`} trend={totalPnL/capital*100} icon={DollarSign} accent="cyan" />
+              <StatCard label={t.accountEquity}  value={`$${curEquity.toLocaleString("en-US", {minimumFractionDigits:0})}`} sub={`${t.startedAt} $${capital.toLocaleString()}`} trend={totalPnL/capital*100} icon={DollarSign} accent="cyan"
+                info={lang === "he"
+                  ? `הון = בסיס ההון שהגדרת ($${capital.toLocaleString()}) בתוספת P&L מצטבר מעסקאות סגורות ופתוחות. הסיכון לכל עסקה מחושב תמיד מבסיס ההון הקבוע — לא מההון הנוכחי.`
+                  : `Equity = your capital base ($${capital.toLocaleString()}) plus cumulative P&L from closed & open trades. Per-trade risk is always sized from your fixed capital base — not current equity.`} />
               <StatCard label={t.netPnlClosed} value={fmt$(Math.round(totalPnL * 100) / 100)} sub={`${closedTrades.length} ${t.closedTrades}`} trend={totalPnL/capital*100} icon={TrendingUp} accent={totalPnL >= 0 ? "green" : "red"} />
               <StatCard label={<span className="flex items-center gap-1">{t.winRate}<TermTooltip term="winRate" lang={lang} /></span>} value={formatPct(winRate)} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length}W / ${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)<0).length}L`} icon={Target} accent="purple" />
               <StatCard label={<span className="flex items-center gap-1">{t.avgRMultiple}<TermTooltip term="avgR" lang={lang} /></span>} value={fmtR(avgR)} sub={t.perClosedTrade} icon={Activity} accent="amber" />
@@ -3647,13 +3653,27 @@ export default function SwingEdge() {
                       )}
                     </div>
 
-                    {/* Explanation */}
-                    {analyzerResult.explanation && (
-                      <div className="bg-violet-500/5 border border-violet-500/15 rounded-xl p-3">
-                        <div className="text-[10px] text-violet-400 uppercase tracking-widest mb-1.5">{t.explanation}</div>
-                        <p className="text-xs text-slate-300 leading-relaxed">{analyzerResult.explanation}</p>
-                      </div>
-                    )}
+                    {/* Explanation — strips any sentence already shown in the Stop or R/R box
+                        so the panel never repeats a line (the reported duplication). No info is
+                        lost: the stripped text still lives in its own box above. Box hides if
+                        nothing incremental remains. */}
+                    {(() => {
+                      const rr = (analyzerResult.rr_assessment || "").trim();
+                      const stop = (analyzerResult.stop_logic || "").trim();
+                      let exp = (analyzerResult.explanation || "").trim();
+                      if (!exp) return null;
+                      for (const dup of [rr, stop]) {
+                        if (dup && exp.includes(dup)) exp = exp.split(dup).join(" ");
+                      }
+                      exp = exp.replace(/\s{2,}/g, " ").replace(/^[\s.,—–-]+/, "").trim();
+                      if (exp.length < 6) return null;
+                      return (
+                        <div className="bg-violet-500/5 border border-violet-500/15 rounded-xl p-3">
+                          <div className="text-[10px] text-violet-400 uppercase tracking-widest mb-1.5">{t.explanation}</div>
+                          <p className="text-xs text-slate-300 leading-relaxed">{exp}</p>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
@@ -4856,8 +4876,8 @@ export default function SwingEdge() {
                             : "border-white/10 hover:border-white/20"
                         }`}
                       >
-                        <Icon size={18} className={isActive ? "text-emerald-400" : "text-slate-400"} />
-                        <span className={`text-xs font-semibold ${isActive ? "text-emerald-300" : "text-slate-300"}`}>
+                        <Icon size={18} className={isActive ? "text-emerald-700 dark:text-emerald-400" : "text-slate-400"} />
+                        <span className={`text-xs font-semibold ${isActive ? "text-emerald-700 dark:text-emerald-300" : "text-slate-300"}`}>
                           {opt.label}
                         </span>
                         {opt.desc && (

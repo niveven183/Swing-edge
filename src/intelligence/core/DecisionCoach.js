@@ -499,7 +499,12 @@ export const coachingToAnalyzerView = (coaching, { entry, stop, target, shares, 
       : null;
   }
 
-  const lead = L((insights.find(i => i.kind === "go" || i.kind === "skip") || insights[0] || {}).text) || "";
+  // The lead insight often IS the R/R (or stop) line — which already has its own
+  // box above. Repeating it verbatim in the explanation is the duplication users
+  // reported, so when the lead matches a boxed line we carry only the incremental
+  // portfolio-risk note (and hide the box entirely if nothing else remains).
+  const leadRaw = L((insights.find(i => i.kind === "go" || i.kind === "skip") || insights[0] || {}).text) || "";
+  const lead = (leadRaw && (leadRaw === rr_assessment || leadRaw === stop_logic)) ? "" : leadRaw;
   const explanation = (lead + portfolioRiskNote(entry, stop, shares, capital, lang)).trim() || null;
 
   return { recommendation, entry_score, stop_logic, rr_assessment, explanation };

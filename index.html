@@ -75,9 +75,48 @@
       }
     }
     </script>
+
+    <!-- Pre-paint theme resolver: apply the saved theme before first paint so the boot
+         loader (and app) never flash the wrong background. Mirrors ThemeContext logic. -->
+    <script>
+      (function () {
+        try {
+          var m = localStorage.getItem('swingedge-theme-mode');
+          if (m !== 'light' && m !== 'dark' && m !== 'auto') {
+            var lg = localStorage.getItem('swingEdgeLightMode');
+            m = lg === 'true' ? 'light' : lg === 'false' ? 'dark' : 'auto';
+          }
+          var dark = m === 'dark' ||
+            (m === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) document.documentElement.classList.add('dark');
+        } catch (e) {}
+      })();
+    </script>
+
+    <!-- Boot loader styling: shown inside #root while the JS bundle loads so the page is
+         never a blank white/dark rectangle. React clears #root on mount, removing it. -->
+    <style>
+      :root { --se-boot-bg:#F8FAF7; --se-boot-accent:#00C805; --se-boot-track:rgba(0,200,5,0.16); --se-boot-fg:#0B1F12; }
+      html.dark { --se-boot-bg:#0d1424; --se-boot-accent:#10B981; --se-boot-track:rgba(16,185,129,0.18); --se-boot-fg:#E8F0EA; }
+      #se-boot { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; background:var(--se-boot-bg); z-index:2147483647; }
+      #se-boot .se-boot__spin { width:34px; height:34px; border-radius:50%; border:3px solid var(--se-boot-track); border-top-color:var(--se-boot-accent); animation:se-boot-spin .8s linear infinite; }
+      #se-boot .se-boot__mark { font-family:'General Sans','Inter',system-ui,-apple-system,sans-serif; font-weight:700; font-size:19px; letter-spacing:.01em; color:var(--se-boot-fg); animation:se-boot-pulse 1.4s ease-in-out infinite; }
+      #se-boot .se-boot__mark b { color:var(--se-boot-accent); font-weight:700; }
+      @keyframes se-boot-spin { to { transform:rotate(360deg); } }
+      @keyframes se-boot-pulse { 0%,100% { opacity:.5; } 50% { opacity:1; } }
+      @media (prefers-reduced-motion: reduce) {
+        #se-boot .se-boot__spin { animation-duration:1.6s; }
+        #se-boot .se-boot__mark { animation:none; opacity:.85; }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="se-boot" role="status" aria-live="polite" aria-label="Loading SwingEdge">
+        <div class="se-boot__spin"></div>
+        <div class="se-boot__mark">Swing<b>Edge</b></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
