@@ -89,12 +89,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const _quoteCache = new Map(); // yahooSymbol → { data, ts }
 const QUOTE_CACHE_TTL_MS = 12_000;
 
-// ─── SECTOR HISTORICAL CACHE (15 min TTL) ──────────────────────────────────
-// Caches 1-month daily closes for sector ETFs. Week/month % changes are
-// slow-moving; no need to refetch more than once per 15 minutes.
-const _sectorHistCache = new Map(); // yahooSymbol → { data, ts }
-const SECTOR_HIST_CACHE_TTL_MS = 15 * 60_000;
-
 // Fetch raw Yahoo chart results for a list of symbols via the /api/quote
 // serverless proxy. Returns a map { YAHOO_SYMBOL: chart.result[0] | null }.
 // Never throws — a transport failure resolves to {} so callers degrade safely.
@@ -410,44 +404,5 @@ export const getMarketStateBadge = (state = getMarketState()) => {
     case MARKET_STATE.PRE:   return { label: "PRE-MARKET",  emoji: "🟡", color: "#f59e0b" };
     case MARKET_STATE.AFTER: return { label: "AFTER-HOURS", emoji: "🟠", color: "#fb923c" };
     default:                 return { label: "CLOSED",      emoji: "⚫", color: "#64748b" };
-  }
-};
-
-/**
- * Fetch 1-month daily closes for a sector ETF symbol.
- * Used to compute weekChange and monthChange percentages.
- * Results are cached for SECTOR_HIST_CACHE_TTL_MS (15 minutes) to avoid
- * repeated HTTP calls — sector historical data changes slowly.
- *
- * Returns: { weekChange, monthChange } or null on failure.
- */
-export const fetchSectorHistorical = async (symbol) => {
-  const yahooSymbol = toYahooSymbol(symbol);
-  const cached = _sectorHistCache.get(yahooSymbol);
-  if (cached && Date.now() - cached.ts < SECTOR_HIST_CACHE_TTL_MS) return cached.data;
-
-  try {
-    const map = await fetchChartResults([yahooSymbol], {
-      range: "1mo",
-      interval: "1d",
-      includePrePost: false,
-    });
-    const result = map[yahooSymbol];
-    if (!result) return null;
-    const closes = (result.indicators?.quote?.[0]?.close || []).filter(
-      (c) => c !== null && c !== undefined
-    );
-    if (closes.length < 2) return null;
-    const last = closes[closes.length - 1];
-    const weekAgo = closes[Math.max(0, closes.length - 6)];
-    const monthAgo = closes[0];
-    const hist = {
-      weekChange: weekAgo ? ((last / weekAgo) - 1) * 100 : 0,
-      monthChange: monthAgo ? ((last / monthAgo) - 1) * 100 : 0,
-    };
-    _sectorHistCache.set(yahooSymbol, { data: hist, ts: Date.now() });
-    return hist;
-  } catch {
-    return null;
   }
 };

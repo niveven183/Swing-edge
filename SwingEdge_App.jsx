@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef, useId } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, useId, memo } from "react";
 import OnboardingScreen from "./src/components/OnboardingScreen.jsx";
 import AuthScreen from "./src/components/AuthScreen.jsx";
 import Logo from "./src/components/Logo.jsx";
@@ -40,7 +40,6 @@ import { getTranslations, LANGUAGES, isRTLLang, nTrades } from "./src/i18n.js";
 import {
   fetchPrices, fmtVolume, fmtMarketCap, searchTickers,
   fetchQuote, getMarketState, getMarketStateBadge, getRefreshInterval, MARKET_STATE,
-  fetchSectorHistorical,
 } from "./src/priceService.js";
 import { POPULAR_TICKERS as STATIC_TICKERS, getTickerMeta, searchTickers as searchStaticTickers } from "./src/data/tickers.js";
 import { SwingEdgeAI } from "./src/intelligence/SwingEdgeAI.js";
@@ -63,17 +62,6 @@ import MonthlyReportModal from "./src/components/MonthlyReportModal.jsx";
 import { generateMonthlyReport, findBestMonth } from "./src/intelligence/core/MonthlyReport.js";
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const RISK_PCT = 0.01;
-
-const SECTOR_ETFS = [
-  { symbol: "XLE", name: "Energy" },
-  { symbol: "XLK", name: "Technology" },
-  { symbol: "BTC-USD", name: "Crypto" },
-  { symbol: "XLF", name: "Financials" },
-  { symbol: "XLV", name: "Healthcare" },
-  { symbol: "XLY", name: "Consumer" },
-  { symbol: "XLI", name: "Industrials" },
-  { symbol: "XLU", name: "Utilities" },
-];
 
 const MOCK_TRADES = [];
 
@@ -992,6 +980,28 @@ const buildTourSteps = (t) => [
   { anchor: '[data-tour-tab="journal"]', title: t.tourOcrTitle,   body: t.tourOcrBody },
 ];
 
+// Hoisted to module scope. Previously defined inside the Market Intel render IIFE,
+// which minted a new component type on every render → React unmounted/remounted all
+// cards (mount paint + recharts re-animation read as a flicker every ~1.5–2s). Stable
+// module-level identity means pulse/ticker re-renders now reconcile in place; memo
+// skips re-render unless the `s`/`lang` props actually change (~15s price refresh).
+const SectorCard = memo(({ s, lang }) => (
+  <div className={`rounded-xl border p-3 ${s.avgChange >= 0 ? "bg-[#10b981]/5 border-[#10b981]/15" : "bg-[#ef4444]/5 border-[#ef4444]/15"}`}>
+    <div className="flex items-center justify-between mb-1.5">
+      <span className="text-xs font-bold text-white">{s.sector}</span>
+      <span className={`text-[10px] font-mono font-bold ${s.avgChange >= 0 ? "text-[#10b981]" : "text-[#ef4444]"}`}>
+        {s.avgChange >= 0 ? "+" : ""}{s.avgChange.toFixed(2)}%
+      </span>
+    </div>
+    <div className="text-[10px] text-slate-500 mb-1.5 truncate">
+      {s.tickers.slice(0, 3).join(", ")}{s.tickers.length > 3 ? ` +${s.tickers.length - 3}` : ""}
+    </div>
+    <div className="text-[9px] font-mono text-slate-600">
+      {s.count} {lang === "he" ? "ניירות" : "symbol"}{s.count !== 1 && lang !== "he" ? "s" : ""}
+    </div>
+  </div>
+));
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function SwingEdge() {
   const [showOnboarding, setShowOnboarding] = useState(() => {
@@ -1112,10 +1122,6 @@ export default function SwingEdge() {
     setShowProfileDropdown(false);
   }, [pwaPromptEvent]);
 
-  const [sectorData, setSectorData] = useState([]);
-  const [sectorLoading, setSectorLoading] = useState(false);
-  const [sectorLastUpdated, setSectorLastUpdated] = useState(null);
-
   const [tab, setTab] = useState(() => {
     try {
       const path = (window.location.pathname || "").toLowerCase();
@@ -1202,8 +1208,6 @@ export default function SwingEdge() {
 
   // Live prices state (global - used everywhere)
   const [livePrices, setLivePrices] = useState({});
-  // Keep ref in sync so fetchSectorData always sees current prices without being a dep
-  useEffect(() => { livePricesRef.current = livePrices; }, [livePrices]);
 
   // Price alerts state
   const [priceAlerts, setPriceAlerts] = useState(() => {
@@ -1215,10 +1219,6 @@ export default function SwingEdge() {
   const [alertNotification, setAlertNotification] = useState(null);
   const [showAlertInput, setShowAlertInput] = useState(null);
   const [alertInputValue, setAlertInputValue] = useState("");
-
-  // Stable ref to livePrices so fetchSectorData doesn't need it as a useCallback dep
-  // (avoids restarting the 5-min sector interval every 15s price refresh)
-  const livePricesRef = useRef({});
 
   // Watchlist sort state
   const [watchlistSortBy, setWatchlistSortBy] = useState("ticker");
@@ -1398,54 +1398,6 @@ export default function SwingEdge() {
     return () => window.removeEventListener("keydown", onKey);
   }, [showForm, showCloseForm, showEditForm, showProfileDropdown]);
 
-  // Sector data — reads current price/dayChange from livePrices (already fetched by the main
-  // price loop, no extra HTTP calls) and fetches historical closes (week/month) via a cached
-  // function in priceService. This eliminates the 8-call hardcoded allorigins.win burst.
-  // Uses livePricesRef so this callback stays stable and doesn't restart the 5-min interval.
-  const fetchSectorData = useCallback(async () => {
-    setSectorLoading(true);
-    // If main price data isn't loaded yet, wait for first fetch cycle then retry
-    if (Object.keys(livePricesRef.current).length === 0) {
-      setTimeout(fetchSectorData, 3000);
-      setSectorLoading(false);
-      return;
-    }
-    try {
-      const lp = livePricesRef.current;
-      const results = await Promise.allSettled(
-        SECTOR_ETFS.map(async s => {
-          const lpEntry = lp[s.symbol];
-          const hist = await fetchSectorHistorical(s.symbol);
-          const price = lpEntry?.price ?? null;
-          if (price === null) return null;
-          return {
-            symbol: s.symbol,
-            name: s.name,
-            price,
-            dayChange: lpEntry?.changePct ?? 0,
-            weekChange: hist != null ? hist.weekChange : null,
-            monthChange: hist != null ? hist.monthChange : null,
-          };
-        })
-      );
-      const fetched = results
-        .filter(r => r.status === "fulfilled" && r.value !== null)
-        .map(r => r.value);
-      if (fetched.length > 0) {
-        setSectorData(fetched);
-        setSectorLastUpdated(new Date());
-      }
-    } catch (e) { console.warn("Sector data fetch failed:", e); }
-    setSectorLoading(false);
-  }, []);
-
-  useEffect(() => {
-    if (tab !== "intel") return;
-    if (sectorData.length === 0) fetchSectorData();
-    const interval = setInterval(fetchSectorData, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [tab, fetchSectorData, sectorData.length]);
-
   // Persist price alerts
   useEffect(() => {
     try { localStorage.setItem("swingEdgePriceAlerts", JSON.stringify(priceAlerts)); } catch {}
@@ -1466,15 +1418,13 @@ export default function SwingEdge() {
     } catch {}
   }, [lang, isRTL]);
 
-  // Global live price fetching - fetches for ALL tickers (ribbon + watchlist + open trades + popular + sector ETFs)
+  // Global live price fetching - fetches for ALL tickers (ribbon + watchlist + open trades + popular)
   const RIBBON_TICKERS = ["NVDA", "AAPL", "TSLA", "MSFT", "META", "AMD", "BTC", "SPY"];
-  // Sector ETF symbols included here so fetchSectorData can read from livePrices without separate HTTP calls
-  const SECTOR_TICKERS = SECTOR_ETFS.map(s => s.symbol);
   const fetchLivePrices = useCallback(async () => {
     const openTickers = trades.filter(t => t.status === "OPEN").map(t => t.ticker);
     const watchTickers = watchlistItems.map(w => w.ticker);
     const popularTickers = POPULAR_TICKERS.map(p => p.symbol.replace("-USD", ""));
-    const allTickers = [...new Set([...RIBBON_TICKERS, ...SECTOR_TICKERS, ...openTickers, ...watchTickers, ...popularTickers])];
+    const allTickers = [...new Set([...RIBBON_TICKERS, ...openTickers, ...watchTickers, ...popularTickers])];
     if (allTickers.length === 0) return true;
     setPricesLoading(true);
     let ok = false;
@@ -4664,23 +4614,6 @@ export default function SwingEdge() {
                 const declining = [...sectorTrendsData].filter(s => s.avgChange <= 0).reverse();
                 const barData = sectorTrendsData.map(s => ({ name: s.sector, dayChange: s.avgChange }));
 
-                const SectorCard = ({ s }) => (
-                  <div className={`rounded-xl border p-3 ${s.avgChange >= 0 ? "bg-[#10b981]/5 border-[#10b981]/15" : "bg-[#ef4444]/5 border-[#ef4444]/15"}`}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs font-bold text-white">{s.sector}</span>
-                      <span className={`text-[10px] font-mono font-bold ${s.avgChange >= 0 ? "text-[#10b981]" : "text-[#ef4444]"}`}>
-                        {s.avgChange >= 0 ? "+" : ""}{s.avgChange.toFixed(2)}%
-                      </span>
-                    </div>
-                    <div className="text-[10px] text-slate-500 mb-1.5 truncate">
-                      {s.tickers.slice(0, 3).join(", ")}{s.tickers.length > 3 ? ` +${s.tickers.length - 3}` : ""}
-                    </div>
-                    <div className="text-[9px] font-mono text-slate-600">
-                      {s.count} {lang === "he" ? "ניירות" : "symbol"}{s.count !== 1 && lang !== "he" ? "s" : ""}
-                    </div>
-                  </div>
-                );
-
                 return (
                   <div className="space-y-4">
                     {/* Comparison bar chart */}
@@ -4696,7 +4629,7 @@ export default function SwingEdge() {
                             contentStyle={{ background: "#0d1424", border: "1px solid #1e293b", borderRadius: 8, fontSize: 11 }}
                             formatter={(v) => [`${Number(v).toFixed(2)}%`, "Avg Change"]}
                           />
-                          <Bar dataKey="dayChange" radius={[3, 3, 0, 0]}>
+                          <Bar dataKey="dayChange" radius={[3, 3, 0, 0]} isAnimationActive={false}>
                             {barData.map((s, i) => (
                               <Cell key={i} fill={s.dayChange >= 0 ? "#10b981" : "#ef4444"} fillOpacity={0.8} />
                             ))}
@@ -4713,7 +4646,7 @@ export default function SwingEdge() {
                           <span className="text-[10px] font-bold tracking-widest uppercase text-[#10b981]">Hot Now</span>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                          {hot.map(s => <SectorCard key={s.sector} s={s} />)}
+                          {hot.map(s => <SectorCard key={s.sector} s={s} lang={lang} />)}
                         </div>
                       </div>
                     )}
@@ -4726,7 +4659,7 @@ export default function SwingEdge() {
                           <span className="text-[10px] font-bold tracking-widest uppercase text-[#ef4444]">Declining Now</span>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                          {declining.map(s => <SectorCard key={s.sector} s={s} />)}
+                          {declining.map(s => <SectorCard key={s.sector} s={s} lang={lang} />)}
                         </div>
                       </div>
                     )}
