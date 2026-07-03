@@ -4499,25 +4499,6 @@ export default function SwingEdge() {
         {tab === "intel" && (
           <div className="space-y-4 animate-fade-in">
 
-            {/* Quick Ticker Buttons */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[10px] font-semibold tracking-widest uppercase text-slate-600 mr-1">Quick Jump:</span>
-              {watchlistItems.slice(0, 7).map(item => {
-                const active = chartSymbol === item.chartSym;
-                return (
-                  <button key={item.ticker} onClick={() => setChartSymbol(item.chartSym)}
-                    title={getTickerMeta(item.ticker)?.name ?? item.ticker}
-                    className={`text-xs font-mono font-bold px-3 py-1.5 rounded-lg border transition ${
-                      active
-                        ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-                        : "bg-white/3 text-slate-400 border-[var(--border-subtle)] dark:border-white/[0.06] hover:bg-emerald-500/10 hover:text-emerald-400 hover:border-emerald-500/20"
-                    }`}>
-                    {item.ticker}
-                  </button>
-                );
-              })}
-            </div>
-
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* TradingView Chart */}
               <div className="md:col-span-2 bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl overflow-hidden relative" style={{ height: 520 }}>
