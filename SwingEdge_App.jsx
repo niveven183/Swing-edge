@@ -1194,6 +1194,13 @@ export default function SwingEdge() {
   // Chart AI extraction state
   const [chartAiLoading, setChartAiLoading] = useState(false);
   const [chartAiTarget, setChartAiTarget] = useState(null); // "position" | "journal"
+  // Screenshot → OCR (mirrors handleImageUpload). chartOcrStatus drives the badge
+  // beside the chart buttons; the refs survive the async screen-picker / native
+  // file dialog so the fallback path routes to the right target with the right side.
+  const [chartOcrStatus, setChartOcrStatus] = useState(null); // { status, confidence } | null
+  const chartFileRef = useRef(null);   // hidden fallback <input type=file>
+  const chartTargetRef = useRef(null); // "position" | "journal"
+  const chartSideRef = useRef("LONG"); // side hint captured at click (avoids stale closure)
 
   // Position Calculator state
   const [posCalc, setPosCalc] = useState({ capital: "", risk: "1", entry: "", stop: "", ticker: "" });
@@ -2211,65 +2218,180 @@ export default function SwingEdge() {
     setAnalyzerLoading(false);
   };
 
-  // ─── CHART QUICK ACTIONS ─────────────────────────────────────────────────
-  // Uses the local rule engine to suggest a sensible stop (2% below entry for
-  // LONG / above for SHORT) and a 2:1 R/R target based on the live chart price.
-  // No external AI required. Emotion/notes/lesson fields are intentionally
-  // left empty for the trader to fill in.
-  const handleChartAiExtract = (target) => {
-    setChartAiTarget(target);
-    setChartAiLoading(true);
+  // ─── CHART QUICK ACTIONS — screenshot → OCR ──────────────────────────────
+  // The two floating chart buttons capture ONE frame of the current tab and send
+  // it to /api/ocr, which reads the real TradingView Long/Short Position tool.
+  // The TradingView iframe is cross-origin (its DOM is unreadable) but pixel
+  // capture via getDisplayMedia is allowed — that is the whole point. The result
+  // routes to the journal form or the position calculator. Where screen capture
+  // is unavailable (iOS/Safari/mobile) or the user cancels the picker, we fall
+  // back to the existing file/camera input — never to a hard-coded template.
 
-    let ticker = chartSymbol.includes(":") ? chartSymbol.split(":")[1] : chartSymbol;
-    ticker = ticker.replace(/USDT$|USD$/, "") || ticker;
-    const tickerUpper = ticker.toUpperCase();
+  // Draw one frame of a display-capture stream to a canvas and return a JPEG data
+  // URL, downscaled to ≤2000px wide and kept under the endpoint's 6MB ceiling.
+  // The CALLER stops the stream's tracks (see handleChartAiExtract) — this only reads.
+  const grabChartFrame = (stream) =>
+    new Promise((resolve, reject) => {
+      const video = document.createElement("video");
+      video.muted = true;
+      video.playsInline = true;
+      video.srcObject = stream;
+      const fail = (e) => reject(e instanceof Error ? e : new Error("capture_failed"));
+      video.onerror = () => fail(new Error("video_error"));
+      video.onloadedmetadata = () => {
+        video.play().then(() => {
+          // One rAF lets the first frame paint before we read pixels.
+          requestAnimationFrame(() => {
+            try {
+              let w = video.videoWidth;
+              let h = video.videoHeight;
+              if (!w || !h) { fail(new Error("empty_frame")); return; }
+              if (w > 2000) { h = Math.round((h * 2000) / w); w = 2000; }
+              const canvas = document.createElement("canvas");
+              canvas.width = w;
+              canvas.height = h;
+              canvas.getContext("2d").drawImage(video, 0, 0, w, h);
+              let dataURL = canvas.toDataURL("image/jpeg", 0.92);
+              // Safety net vs the /api/ocr 6MB cap (base64 ≈ 4/3 of raw bytes).
+              if (dataURL.length * 0.75 > 6 * 1024 * 1024) {
+                dataURL = canvas.toDataURL("image/jpeg", 0.8);
+              }
+              resolve(dataURL);
+            } catch (e) { fail(e); }
+          });
+        }).catch(fail);
+      };
+    });
 
-    const livePrice = getLivePrice(tickerUpper)?.price ?? null;
-    const entry = livePrice != null ? Number(livePrice.toFixed(2)) : null;
-
-    // Local AI: stop 2% below entry, target at 2:1 R/R
-    const side = "LONG";
-    const stop = entry != null ? Number((entry * 0.98).toFixed(2)) : null;
-    const targetPrice = entry != null && stop != null
-      ? Number((entry + (entry - stop) * 2).toFixed(2))
-      : null;
-
-    const entryStr = entry != null ? String(entry) : "";
-    const stopStr = stop != null ? String(stop) : "";
-    const targetStr = targetPrice != null ? String(targetPrice) : "";
-
+  // Route an OCR result to the journal form or the position calculator. Never
+  // overwrites a field the trader already filled by hand (mirrors handleImageUpload).
+  const routeChartOcr = (result, target, dataURL) => {
+    const confidence = result.confidence ?? 0;
     if (target === "position") {
       setPosCalc(f => ({
         ...f,
-        ticker: tickerUpper,
+        ticker: result.ticker || f.ticker,
         capital: f.capital || String(capital),
         risk: f.risk || "1",
-        entry: entryStr || f.entry,
-        stop: stopStr || f.stop,
+        entry: result.entry != null ? String(result.entry.toFixed(2)) : f.entry,
+        stop:  result.stop  != null ? String(result.stop.toFixed(2))  : f.stop,
       }));
       setTab("position");
-    } else if (target === "journal") {
-      setForm({
-        ticker: tickerUpper,
-        side,
-        entry: entryStr,
-        stop: stopStr,
-        target: targetStr,
-        setup: "Breakout",
-        notes: "",
-        marketCondition: "Trending Up",
-        emotionAtEntry: "Neutral",
-        entryQuality: 3,
-        tradeImage: null,
-        tradeImagePreview: null,
-      });
+    } else {
+      setForm(f => ({
+        ...f,
+        ticker: f.ticker || result.ticker || f.ticker,
+        entry:  f.entry  || (result.entry  != null ? String(result.entry.toFixed(2))  : f.entry),
+        stop:   f.stop   || (result.stop   != null ? String(result.stop.toFixed(2))   : f.stop),
+        target: f.target || (result.target != null ? String(result.target.toFixed(2)) : f.target),
+        tradeImagePreview: f.tradeImagePreview || dataURL, // show the captured frame for verification
+      }));
+      setOcrStatus({ status: "ok", confidence }); // journal-modal badge, matches handleImageUpload
       setShowForm(true);
     }
+    setChartOcrStatus({ status: "ok", confidence });
+  };
 
-    setTimeout(() => {
+  // Shared OCR call for BOTH the capture path and the file-fallback path. Mirrors
+  // handleImageUpload: 15s abort, config_error vs error, then route by target.
+  const runChartOcr = async (dataURL, target, sideHint) => {
+    setChartOcrStatus({ status: "processing", confidence: 0 });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    try {
+      const res = await postOcr(dataURL, sideHint, controller.signal);
+      clearTimeout(timer);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setChartOcrStatus({ status: err.error === "config_error" ? "config_error" : "error", confidence: 0 });
+        return;
+      }
+      const result = await res.json();
+      routeChartOcr(result, target, dataURL);
+    } catch {
+      clearTimeout(timer);
+      setChartOcrStatus({ status: "error", confidence: 0 });
+    } finally {
       setChartAiLoading(false);
       setChartAiTarget(null);
-    }, 250);
+    }
+  };
+
+  // Graceful fallback: open the file/camera picker. Clearing the loading flag
+  // BEFORE the native dialog matters — a cancelled file dialog fires no event, so
+  // a spinner tied to it would hang. handleChartFileFallback re-arms it if a file
+  // is actually chosen.
+  const openChartFallback = () => {
+    setChartAiLoading(false);
+    setChartAiTarget(null);
+    chartFileRef.current?.click();
+  };
+
+  // onChange for the hidden fallback input — runs the same OCR → route pipeline.
+  // Reads target/side from refs because this fires long after the original click.
+  const handleChartFileFallback = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file later
+    if (!file) return;
+    const target = chartTargetRef.current || "journal";
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setChartAiTarget(target);
+      setChartAiLoading(true);
+      runChartOcr(ev.target.result, target, chartSideRef.current);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Click handler for the two floating chart buttons.
+  const handleChartAiExtract = async (target, ev) => {
+    if (chartAiLoading) return;              // guard the double-click race
+    const btn = ev?.currentTarget || null;   // capture now — currentTarget is nulled after the event
+    const sideHint = target === "journal" ? form.side : "LONG"; // side snapshot (API reads direction anyway)
+    chartTargetRef.current = target;
+    chartSideRef.current = sideHint;
+    setChartAiTarget(target);
+    setChartAiLoading(true);
+
+    const md = navigator.mediaDevices;
+    if (!md || typeof md.getDisplayMedia !== "function") {
+      // No screen capture (iOS/Safari/mobile). This runs synchronously inside the
+      // click gesture, so the file/camera dialog is allowed to open.
+      openChartFallback();
+      return;
+    }
+
+    let stream;
+    try {
+      stream = await md.getDisplayMedia({
+        video: { width: { ideal: 2560 }, height: { ideal: 1440 } },
+        audio: false,
+        preferCurrentTab: true,
+        selfBrowserSurface: "include",
+      });
+    } catch {
+      // Cancelled / denied is NOT an error — fall back to the file input.
+      btn?.focus();
+      openChartFallback();
+      return;
+    }
+
+    let dataURL;
+    try {
+      dataURL = await grabChartFrame(stream);
+    } catch {
+      setChartOcrStatus({ status: "error", confidence: 0 });
+      setChartAiLoading(false);
+      setChartAiTarget(null);
+      return;
+    } finally {
+      // Stop the capture the instant we have the frame — BEFORE the OCR round trip
+      // — so the screen is never shared during the network call (privacy + memory).
+      stream.getTracks().forEach(tr => tr.stop());
+      btn?.focus(); // return focus to the button now the picker has closed
+    }
+
+    await runChartOcr(dataURL, target, sideHint);
   };
 
   // Auth gate — block app until we know session state
@@ -4454,13 +4576,39 @@ export default function SwingEdge() {
               <div className="md:col-span-2 bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl overflow-hidden relative" style={{ height: 520 }}>
                 <div ref={tvRef} style={{ height: "100%" }} />
 
-                {/* ── Floating AI Trade Buttons ── */}
+                {/* ── Floating AI Trade Buttons (screenshot → OCR) ── */}
                 <div className="absolute bottom-4 right-4 rtl:right-auto rtl:left-4 z-10 flex flex-col gap-2">
+                  {/* Capture/OCR status — announced to assistive tech */}
+                  {chartOcrStatus && (() => {
+                    const { status, confidence } = chartOcrStatus;
+                    const ok = status === "ok";
+                    const high = ok && confidence >= 70;
+                    const mid  = ok && confidence >= 40 && confidence < 70;
+                    const tone =
+                      status === "processing" ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-200" :
+                      high ? "bg-emerald-500/10 border-emerald-500/30 text-[#10b981]" :
+                      mid  ? "bg-amber-500/10 border-amber-500/30 text-amber-300" :
+                             "bg-[#ef4444]/10 border-[#ef4444]/30 text-[#fca5a5]";
+                    let icon, text;
+                    if (status === "processing") { icon = <RefreshCw size={12} className="animate-spin" />; text = t.ocrProcessing; }
+                    else if (status === "config_error") { icon = <AlertTriangle size={12} />; text = t.ocrConfigError; }
+                    else if (status === "error") { icon = <AlertTriangle size={12} />; text = t.ocrError; }
+                    else if (high) { icon = <CheckCircle size={12} />; text = `OCR ✓ ${confidence}%`; }
+                    else if (mid)  { icon = <CheckCircle size={12} />; text = `OCR ~ ${confidence}%`; }
+                    else { icon = <AlertTriangle size={12} />; text = t.ocrLowConfidence; }
+                    return (
+                      <div role="status" aria-live="polite" className={`flex items-center justify-center gap-2 px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold shadow-xl backdrop-blur-md ${tone}`}>
+                        {icon}<span>{text}</span>
+                      </div>
+                    );
+                  })()}
                   <div className="flex items-center justify-end gap-1.5">
                     <TermTooltip term="chartCalcPosition" lang={lang} />
                     <button
-                      onClick={() => handleChartAiExtract("position")}
+                      onClick={(e) => handleChartAiExtract("position", e)}
                       disabled={chartAiLoading}
+                      aria-label={t.chartCapturePositionAria}
+                      aria-busy={chartAiLoading && chartAiTarget === "position"}
                       className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-xl backdrop-blur-md bg-gradient-to-r from-cyan-500/20 to-violet-500/20 border border-cyan-500/40 text-cyan-300 hover:from-cyan-500/30 hover:to-violet-500/30 hover:border-cyan-400/60 hover:text-white disabled:opacity-50"
                     >
                       {chartAiLoading && chartAiTarget === "position" ? (
@@ -4473,8 +4621,10 @@ export default function SwingEdge() {
                   <div className="flex items-center justify-end gap-1.5">
                     <TermTooltip term="chartAddToJournal" lang={lang} />
                     <button
-                      onClick={() => handleChartAiExtract("journal")}
+                      onClick={(e) => handleChartAiExtract("journal", e)}
                       disabled={chartAiLoading}
+                      aria-label={t.chartCaptureJournalAria}
+                      aria-busy={chartAiLoading && chartAiTarget === "journal"}
                       className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-xl backdrop-blur-md bg-gradient-to-r from-violet-500/20 to-rose-500/20 border border-violet-500/40 text-violet-300 hover:from-violet-500/30 hover:to-rose-500/30 hover:border-violet-400/60 hover:text-white disabled:opacity-50"
                     >
                       {chartAiLoading && chartAiTarget === "journal" ? (
@@ -4484,6 +4634,8 @@ export default function SwingEdge() {
                       )}
                     </button>
                   </div>
+                  {/* Graceful fallback: file / camera picker when screen capture is unavailable or cancelled */}
+                  <input ref={chartFileRef} type="file" accept="image/*" capture="environment" onChange={handleChartFileFallback} className="hidden" aria-hidden="true" tabIndex={-1} />
                 </div>
               </div>
 
