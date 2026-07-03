@@ -4502,31 +4502,7 @@ export default function SwingEdge() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* TradingView Chart */}
               <div className="md:col-span-2 bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl overflow-hidden relative" style={{ height: 520 }}>
-                <div className="flex flex-col gap-2 px-4 py-3 border-b border-[var(--border-subtle)] dark:border-white/[0.06]">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex gap-1 flex-wrap">
-                      {["1m","5m","15m","1H","4H","1D","1W"].map(tf => (
-                        <button key={tf} onClick={() => setChartInterval(tf)}
-                          className={`text-[10px] px-2 py-1 rounded transition font-mono font-bold ${chartInterval === tf ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30" : "bg-white/5 text-slate-400 border border-transparent hover:bg-cyan-500/10 hover:text-cyan-400"}`}>
-                          {tf}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="flex gap-1">
-                      {[
-                        { id: "1", label: "Candles" },
-                        { id: "3", label: "Line" },
-                        { id: "0", label: "Bars" },
-                      ].map(st => (
-                        <button key={st.id} onClick={() => setChartStyle(st.id)}
-                          className={`text-[10px] px-2 py-1 rounded transition font-semibold ${chartStyle === st.id ? "bg-violet-500/20 text-violet-300 border border-violet-500/30" : "bg-white/5 text-slate-400 border border-transparent hover:bg-violet-500/10 hover:text-violet-300"}`}>
-                          {st.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <div ref={tvRef} style={{ height: "calc(100% - 110px)" }} />
+                <div ref={tvRef} style={{ height: "100%" }} />
 
                 {/* ── Floating AI Trade Buttons ── */}
                 <div className="absolute bottom-4 right-4 rtl:right-auto rtl:left-4 z-10 flex flex-col gap-2">
