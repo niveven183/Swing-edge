@@ -5824,6 +5824,16 @@ export default function SwingEdge() {
         <Plus size={24} />
       </button>
 
+      {/* ── LEGAL DISCLAIMER ROW ── */}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-5 py-1.5 border-t border-[var(--border-subtle)] dark:border-white/[0.06] bg-[var(--bg-primary)] dark:bg-[#0a0f1e] text-[10px] text-slate-600 dark:text-slate-400 font-mono">
+        <a href="/terms" target="_blank" rel="noopener noreferrer" className="hover:underline">{t.footerDisclaimer}</a>
+        <span className="flex items-center gap-2">
+          <a href="/terms" target="_blank" rel="noopener noreferrer" className="hover:underline">{t.footerTerms}</a>
+          <span aria-hidden="true">·</span>
+          <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:underline">{t.footerPrivacy}</a>
+        </span>
+      </div>
+
       {/* ── FOOTER STATUS BAR ── */}
       <footer className="flex items-center justify-between px-5 py-2 border-t border-[var(--border-subtle)] dark:border-white/[0.06] bg-[var(--bg-primary)] dark:bg-[#0a0f1e] text-[10px] text-slate-700 font-mono">
         <div className="flex items-center gap-4">

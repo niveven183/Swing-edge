@@ -30,6 +30,11 @@ const STR = {
   errExists:     { en: "This email is already registered — try signing in.", he: "המייל הזה כבר רשום — נסה להתחבר." },
   errSupabase:   { en: "Supabase is not configured.", he: "Supabase לא מוגדר." },
   successSignup: { en: "Account created! Check your email to confirm.", he: "נרשמת בהצלחה! בדוק את האימייל לאישור." },
+  agreePre:      { en: "I have read and agree to the ", he: "קראתי ואני מסכים ל" },
+  agreeTerms:    { en: "Terms of Use",                  he: "תנאי השימוש" },
+  agreeMid:      { en: " and ",                         he: " ול" },
+  agreePrivacy:  { en: "Privacy Policy",                he: "מדיניות הפרטיות" },
+  errConsent:    { en: "You must agree to the Terms of Use and Privacy Policy.", he: "יש לאשר את תנאי השימוש ומדיניות הפרטיות." },
 };
 
 export default function AuthScreen() {
@@ -47,6 +52,7 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
   const [success, setSuccess] = useState("");
+  const [agree, setAgree]     = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -78,6 +84,7 @@ export default function AuthScreen() {
     if (!nickname || nickname.trim().length < 2) { setError(t("errNick")); return; }
     if (password.length < 8)  { setError(t("errShort")); return; }
     if (password !== confirm) { setError(t("errMatch")); return; }
+    if (!agree) { setError(t("errConsent")); return; }
     if (!isSupabaseConfigured || !supabase) { setError(t("errSupabase")); return; }
     setLoading(true);
     try {
@@ -159,7 +166,7 @@ export default function AuthScreen() {
                 <TabBtn active={tab === "signin"} onClick={() => { setTab("signin"); resetMsg(); }}>
                   {t("signIn")}
                 </TabBtn>
-                <TabBtn active={tab === "signup"} onClick={() => { setTab("signup"); resetMsg(); }}>
+                <TabBtn active={tab === "signup"} onClick={() => { setTab("signup"); resetMsg(); setAgree(false); }}>
                   {t("signUp")}
                 </TabBtn>
               </div>
@@ -215,9 +222,24 @@ export default function AuthScreen() {
                     autoComplete="new-password"
                     aria-label={t("confirmPass")} />
 
+                  <label className="flex items-start gap-2 text-xs leading-snug cursor-pointer" style={{ color: "#5b6b62" }}>
+                    <input
+                      type="checkbox"
+                      checked={agree}
+                      onChange={(e) => setAgree(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 shrink-0 accent-emerald-500"
+                    />
+                    <span>
+                      {t("agreePre")}
+                      <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-emerald-600 font-medium underline">{t("agreeTerms")}</a>
+                      {t("agreeMid")}
+                      <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-emerald-600 font-medium underline">{t("agreePrivacy")}</a>
+                    </span>
+                  </label>
+
                   <FeedbackArea error={error} success={success} />
 
-                  <PrimaryBtn loading={loading}>
+                  <PrimaryBtn loading={loading} disabled={!agree}>
                     {loading ? t("creating") : t("create")}
                   </PrimaryBtn>
 
@@ -297,11 +319,11 @@ function Input({ icon: Icon, rightIcon: RightIcon, onRightClick, isRTL, ...rest 
   );
 }
 
-function PrimaryBtn({ loading, children }) {
+function PrimaryBtn({ loading, disabled, children }) {
   return (
     <button
       type="submit"
-      disabled={loading}
+      disabled={loading || disabled}
       className="w-full h-12 rounded-[12px] font-semibold text-white text-sm transition-all active:scale-[0.98] hover:-translate-y-px disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       style={{
         background: "linear-gradient(135deg, #00C076 0%, #16D687 100%)",

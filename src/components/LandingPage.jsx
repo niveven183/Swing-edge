@@ -78,6 +78,7 @@ const STR = {
     ],
     copyright: "© 2026 SwingEdge. כל הזכויות שמורות.",
     privacy: "פרטיות", terms: "תנאי שימוש", soon: "בקרוב",
+    heroDisclaimer: "SwingEdge אינו ייעוץ השקעות. מסחר כרוך בסיכון לאובדן כספך — כל החלטה באחריותך בלבד.",
     disclaimer: "SwingEdge הוא כלי לניהול וניתוח יומן מסחר בלבד. אין לראות בתוכן באפליקציה או בדף זה ייעוץ השקעות, המלצה לרכישה או מכירה של נייר ערך כלשהו, או תחליף לייעוץ פיננסי מקצועי. מסחר בשוק ההון כרוך בסיכון להפסד הון. ביצועי עבר אינם מעידים על ביצועים עתידיים. כל החלטת מסחר היא באחריות המשתמש בלבד.",
   },
   en: {
@@ -148,6 +149,7 @@ const STR = {
     ],
     copyright: "© 2026 SwingEdge. All rights reserved.",
     privacy: "Privacy", terms: "Terms", soon: "Soon",
+    heroDisclaimer: "SwingEdge is not investment advice. Trading involves risk of losing your money — every decision is your responsibility alone.",
     disclaimer: "SwingEdge is a tool for managing and analyzing a trading journal only. Nothing in the app or on this page constitutes investment advice, a recommendation to buy or sell any security, or a substitute for professional financial advice. Trading the capital markets involves risk of loss of capital. Past performance is not indicative of future results. Every trading decision is the sole responsibility of the user.",
   },
 };
@@ -567,6 +569,9 @@ export default function LandingPage() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, color: "#7E8E85", fontSize: 14, fontWeight: 600, fontStyle: "italic" }}>
               <span style={{ color: "#00E08A" }}>✓</span>{L.heroTrust}
             </div>
+            <a href="/terms" style={{ display: "block", maxWidth: 560, margin: "18px auto 0", color: "#7E8E85", fontSize: 12.5, lineHeight: 1.6, textDecoration: "none" }}>
+              {L.heroDisclaimer}
+            </a>
           </div>
         </div>
       </header>
@@ -842,8 +847,8 @@ export default function LandingPage() {
         <div style={{ maxWidth: 1100, margin: "24px auto 0", paddingTop: 24, borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "space-between", alignItems: "center", fontSize: 13, color: "#8A9890" }}>
           <span>{L.copyright}</span>
           <div style={{ display: "flex", gap: 22 }}>
-            <span style={{ color: "#6C7A72", fontWeight: 500, cursor: "default" }}>{L.privacy} · {L.soon}</span>
-            <span style={{ color: "#6C7A72", fontWeight: 500, cursor: "default" }}>{L.terms} · {L.soon}</span>
+            <a href="/privacy" style={{ color: "#C4CFC9", fontWeight: 500, textDecoration: "none" }}>{L.privacy}</a>
+            <a href="/terms" style={{ color: "#C4CFC9", fontWeight: 500, textDecoration: "none" }}>{L.terms}</a>
           </div>
         </div>
       </footer>

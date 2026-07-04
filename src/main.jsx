@@ -5,6 +5,7 @@ import * as Sentry from "@sentry/react";
 import "./index.css";
 import SwingEdge from "../SwingEdge_App.jsx";
 import LandingGate from "./components/LandingGate.jsx";
+import { TermsPage, PrivacyPage } from "./components/LegalPages.jsx";
 import { ToastProvider, ConfirmProvider } from "./components/ToastProvider.jsx";
 import { ThemeProvider } from "./contexts/ThemeContext.jsx";
 import { inject } from "@vercel/analytics";
@@ -62,6 +63,8 @@ createRoot(document.getElementById("root")).render(
               <Routes>
                 <Route path="/" element={<LandingGate />} />
                 <Route path="/app" element={<SwingEdge />} />
+                <Route path="/terms" element={<TermsPage />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </BrowserRouter>

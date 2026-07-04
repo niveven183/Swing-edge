@@ -323,6 +323,9 @@ const en = {
   marketOpen: "Market Open",
   capital: "Capital",
   riskPerTradeFooter: "Risk/Trade: 1%",
+  footerDisclaimer: "SwingEdge is not investment advice. Trading involves risk of losing your money — every decision is your responsibility alone.",
+  footerTerms: "Terms",
+  footerPrivacy: "Privacy",
 
   // Common
   delete: "Delete",
@@ -757,6 +760,9 @@ const he = {
   marketOpen: "שוק פתוח",
   capital: "הון",
   riskPerTradeFooter: "סיכון/עסקה: 1%",
+  footerDisclaimer: "SwingEdge אינו ייעוץ השקעות. מסחר כרוך בסיכון לאובדן כספך — כל החלטה באחריותך בלבד.",
+  footerTerms: "תנאי שימוש",
+  footerPrivacy: "פרטיות",
 
   // Common
   delete: "מחק",
