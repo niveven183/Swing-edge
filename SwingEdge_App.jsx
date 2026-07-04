@@ -1520,19 +1520,24 @@ export default function SwingEdge() {
     };
   }, [fetchLivePrices, marketState]);
 
-  // Weekly Market Overview (indices + sectors/themes). Cadence tracks market state
-  // (5 min open → 30 min closed); re-arms on state transitions. The service keeps a
-  // last-known-good accumulator, so partial cold-start responses converge without
-  // ever blanking a populated card. On failure, retry once after 15s.
-  const [marketOverview, setMarketOverview] = useState(null);
+  // Market Overview (indices + sectors/themes) over a selectable range: 1D / 1W /
+  // 1M, default 1W. Cadence tracks market state (5 min open → 30 min closed);
+  // re-arms on state transitions AND range switches, and only the ACTIVE range
+  // polls. Data is cached per-range in state, so switching back to a visited range
+  // renders instantly (no spinner, no flicker); the service keeps a per-range
+  // last-known-good accumulator so partial cold-start responses converge. Retry
+  // once after 15s on failure.
+  const [moRange, setMoRange] = useState(7); // 1 | 7 | 30
+  const [moByRange, setMoByRange] = useState({}); // { [days]: overviewData }
+  const marketOverview = moByRange[moRange] ?? null;
   useEffect(() => {
     let cancelled = false;
     let retryTimer = null;
 
     const run = async () => {
       try {
-        const data = await fetchMarketOverview();
-        if (!cancelled && data) setMarketOverview(data);
+        const data = await fetchMarketOverview(moRange);
+        if (!cancelled && data) setMoByRange((prev) => ({ ...prev, [moRange]: data }));
       } catch {
         if (!cancelled) retryTimer = setTimeout(() => { if (!cancelled) run(); }, 15000);
       }
@@ -1545,7 +1550,7 @@ export default function SwingEdge() {
       clearInterval(interval);
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [marketState]);
+  }, [marketState, moRange]);
 
   const realTrades = useMemo(() => trades.filter(t => !t.isDemo), [trades]);
   const demoTrades = useMemo(() => trades.filter(t => t.isDemo), [trades]);
@@ -4781,7 +4786,17 @@ export default function SwingEdge() {
               <div className="flex items-center gap-2 mb-4">
                 <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">{t.mo_title}</span>
                 <span className={`w-1.5 h-1.5 rounded-full ${pulse ? "bg-emerald-400" : "bg-emerald-700"} transition-colors`} />
-                <span className="text-[10px] text-slate-700">{t.mo_weekly}</span>
+                <span className="text-[10px] text-slate-700">
+                  {moRange === 1 ? t.mo_change1d : moRange === 30 ? t.mo_change1m : t.mo_change1w}
+                </span>
+                <div className="flex items-center gap-1 ms-auto">
+                  {[[1, "1D"], [7, "1W"], [30, "1M"]].map(([days, label]) => (
+                    <button key={days} onClick={() => setMoRange(days)}
+                      className={`text-[9px] px-1.5 py-0.5 rounded ${moRange === days ? "bg-cyan-500/20 text-cyan-400" : "text-slate-600 hover:text-slate-400"} transition`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {!marketOverview || (marketOverview.indices.length === 0 && marketOverview.sectorsThemes.length === 0) ? (

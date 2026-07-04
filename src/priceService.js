@@ -465,13 +465,28 @@ export const getOverviewRefreshInterval = (state = getMarketState()) => {
   return 30 * 60_000;                                                              // 30 min closed
 };
 
-// Last-known-good accumulator (module scope). The serverless side fills at most
-// 8 symbols per cold invocation, so any single response may be a *different
-// partial*. Merging valid entries here (and NEVER letting null overwrite a known
-// value) makes the client the stable accumulator: coverage converges to all 19
-// across a few polls and known cards never flicker back to blank.
-const _overviewLKG = new Map(); // SYM → { sym, key, price, weekChangePct, closes }
-let _overviewInflight = null;   // dedupe concurrent fetches (double-mount / race)
+// Accepted ranges (days). The panel offers 1D / 1W / 1M; the proxy 400s anything
+// else, so we clamp to 1W defensively before ever hitting the network.
+export const OVERVIEW_RANGES = [1, 7, 30];
+const _validDays = (days) => (OVERVIEW_RANGES.includes(days) ? days : 7);
+
+// Last-known-good accumulator (module scope), PARTITIONED BY RANGE. The
+// serverless side fills at most 8 symbols per cold invocation, so any single
+// response may be a *different partial*. Merging valid entries here (and NEVER
+// letting null overwrite a known value) makes the client the stable accumulator:
+// coverage converges to all 19 across a few polls and known cards never flicker.
+// Keying by range keeps 1D/1W/1M closes from ever cross-polluting each other.
+const _overviewLKG = new Map();      // days → Map(SYM → { sym, key, price, weekChangePct, closes })
+const _overviewInflight = new Map(); // days → promise (dedupe concurrent fetches per range)
+
+const _lkgFor = (days) => {
+  let m = _overviewLKG.get(days);
+  if (!m) {
+    m = new Map();
+    _overviewLKG.set(days, m);
+  }
+  return m;
+};
 
 const _overviewEntries = () => [
   ...MARKET_OVERVIEW.indices,
@@ -479,8 +494,9 @@ const _overviewEntries = () => [
   ...MARKET_OVERVIEW.themes,
 ];
 
-const _buildOverview = () => {
-  const pick = (list) => list.map(({ sym }) => _overviewLKG.get(sym.toUpperCase())).filter(Boolean);
+const _buildOverview = (days) => {
+  const lkg = _lkgFor(days);
+  const pick = (list) => list.map(({ sym }) => lkg.get(sym.toUpperCase())).filter(Boolean);
   return {
     indices: pick(MARKET_OVERVIEW.indices),
     sectorsThemes: pick([...MARKET_OVERVIEW.sectors, ...MARKET_OVERVIEW.themes]).sort(
@@ -490,27 +506,33 @@ const _buildOverview = () => {
 };
 
 /**
- * Fetch weekly closes for all 19 overview tickers in one batched history call,
- * merge valid results into the last-known-good map, and return the panel data:
- *   { indices: [...≤5], sectorsThemes: [...≤14 sorted by weekChangePct desc] }
+ * Fetch first→last closes for all 19 overview tickers over `days` (1|7|30) in one
+ * batched history call, merge valid results into that range's last-known-good
+ * map, and return the panel data:
+ *   { indices: [...≤5], sectorsThemes: [...≤14 sorted by change desc] }
+ * `weekChangePct` here is a generic first→last % for the selected range (the name
+ * predates the multi-range panel; kept to avoid churning its consumers).
  * Symbols not yet known are simply absent (UI shows placeholders until they fill).
- * Never throws — degrades to whatever is currently accumulated.
+ * Never throws — degrades to whatever is currently accumulated for that range.
  */
-export const fetchMarketOverview = async () => {
-  if (_overviewInflight) return _overviewInflight;
+export const fetchMarketOverview = async (days = 7) => {
+  days = _validDays(days);
+  const existing = _overviewInflight.get(days);
+  if (existing) return existing;
 
   const entries = _overviewEntries();
   const keyBySym = new Map(entries.map((e) => [e.sym.toUpperCase(), e.key]));
   const syms = entries.map((e) => e.sym);
+  const lkg = _lkgFor(days);
 
   const run = (async () => {
-    const map = await fetchChartResults(syms, { history: true, days: 7 });
+    const map = await fetchChartResults(syms, { history: true, days });
     for (const sym of syms) {
       const up = sym.toUpperCase();
       const q = parseChartResult(map[up] ?? map[sym], sym);
       // null / invalid / <2 closes NEVER overwrites a previously-known value.
       if (q && Array.isArray(q.closes) && q.closes.length >= 2) {
-        _overviewLKG.set(up, {
+        lkg.set(up, {
           sym: up,
           key: keyBySym.get(up),
           price: q.price,
@@ -519,13 +541,13 @@ export const fetchMarketOverview = async () => {
         });
       }
     }
-    return _buildOverview();
+    return _buildOverview(days);
   })();
 
-  _overviewInflight = run;
+  _overviewInflight.set(days, run);
   try {
     return await run;
   } finally {
-    if (_overviewInflight === run) _overviewInflight = null;
+    if (_overviewInflight.get(days) === run) _overviewInflight.delete(days);
   }
 };

@@ -158,7 +158,28 @@ function mapFinnhubType(type) {
 // invocations) for ~60 min — daily closes finalize once/day, so this is plenty
 // fresh for a *weekly* panel and slashes upstream calls.
 const HIST_TTL = 60 * 60 * 1000; // 60 min
-const _histCache = new Map(); // SYM (upper) → { result, ts }
+const _histCache = new Map(); // `${SYM}:${days}` → { result, ts }
+
+// Range → provider knobs. `out` = Twelve Data outputsize (trading sessions);
+// 1D→2 (yesterday+today), 1W→6, 1M→23. Only these three days are ever accepted.
+const RANGE = {
+  1: { out: 2 },
+  7: { out: 6 },
+  30: { out: 23 },
+};
+const VALID_DAYS = new Set([1, 7, 30]);
+
+// Keep first & last, plus evenly-spaced samples in between, down to `target`
+// points. Used for the 1D crypto sparkline: CoinGecko returns ~288 5-min points
+// for days=1, which we thin so the client draws a light line, not a dense blob.
+function downsample(arr, target) {
+  if (arr.length <= target) return arr;
+  const out = [arr[0]];
+  const step = (arr.length - 1) / (target - 1);
+  for (let i = 1; i < target - 1; i++) out.push(arr[Math.round(i * step)]);
+  out.push(arr[arr.length - 1]);
+  return out;
+}
 
 // Fisher–Yates in place. Used to randomize which stale symbols we fetch each
 // invocation so single-user cold-start traffic still covers all tickers over
@@ -196,11 +217,11 @@ function buildEquityHistoryResult(sym, entry) {
 // Batch up to 8 equity symbols in ONE Twelve Data call (1 credit/symbol; free
 // tier is 8/min). Normalizes both response shapes: single-symbol returns a bare
 // { meta, values, status }; multi-symbol returns { SYM: {...}, ... }.
-async function fetchEquityHistory(symbols, key) {
+async function fetchEquityHistory(symbols, key, outputsize) {
   if (!key || symbols.length === 0) return {};
   const url =
     `${TWELVEDATA_BASE}/time_series?symbol=${encodeURIComponent(symbols.join(","))}` +
-    `&interval=1day&outputsize=6&apikey=${key}`;
+    `&interval=1day&outputsize=${outputsize}&apikey=${key}`;
   const r = await fetch(url, { headers: { Accept: "application/json" } });
   if (!r.ok) return {};
   const data = await r.json();
@@ -216,20 +237,24 @@ async function fetchEquityHistory(symbols, key) {
   return out;
 }
 
-// Weekly crypto closes from CoinGecko (keyless). prices are [ts, price] pairs,
-// already chronological. Reuses the CRYPTO registry via cryptoMeta.
-async function fetchCryptoHistory(sym) {
+// Crypto closes from CoinGecko (keyless) for the given range. prices are
+// [ts, price] pairs, already chronological. Reuses the CRYPTO registry via
+// cryptoMeta. 1W/1M use daily granularity; 1D omits interval (CoinGecko returns
+// ~5-min data) and gets thinned to a handful of points for the sparkline.
+async function fetchCryptoHistory(sym, days) {
   const meta = cryptoMeta(sym);
   if (!meta) return null;
+  const daily = days !== 1;
   const url =
     `${COINGECKO_BASE}/coins/${meta.id}/market_chart` +
-    `?vs_currency=usd&days=7&interval=daily`;
+    `?vs_currency=usd&days=${days}${daily ? "&interval=daily" : ""}`;
   const r = await fetch(url, { headers: { Accept: "application/json" } });
   if (!r.ok) return null;
   const data = await r.json();
-  const closes = (Array.isArray(data?.prices) ? data.prices : [])
+  let closes = (Array.isArray(data?.prices) ? data.prices : [])
     .map((p) => Number(p?.[1]))
     .filter((n) => Number.isFinite(n) && n > 0);
+  if (!daily) closes = downsample(closes, 8); // 1D: first/last + sampled points
   if (closes.length < 2) return null;
   const lastClose = closes[closes.length - 1];
   const prevClose = closes[closes.length - 2];
@@ -248,14 +273,16 @@ async function fetchCryptoHistory(sym) {
 // Resolve the weekly-history request. Serves fresh cache, then fetches at most
 // 8 (shuffled) stale equities + any stale crypto; unresolved symbols → null so
 // the client's last-known-good accumulator refills them on the next poll.
-async function handleHistory(symbols, mdKey, res) {
+async function handleHistory(symbols, mdKey, days, res) {
   const now = Date.now();
   const out = {};
   const staleEquities = [];
   const staleCrypto = [];
+  // Cache slots are per-range so closes for 1D/1W/1M never mix.
+  const ck = (sym) => `${sym}:${days}`;
 
   for (const sym of symbols) {
-    const c = _histCache.get(sym);
+    const c = _histCache.get(ck(sym));
     if (c && now - c.ts < HIST_TTL) {
       out[sym] = c.result;
       continue;
@@ -267,10 +294,10 @@ async function handleHistory(symbols, mdKey, res) {
   const tasks = [];
   if (pick.length && mdKey) {
     tasks.push(
-      fetchEquityHistory(pick, mdKey).then((byS) => {
+      fetchEquityHistory(pick, mdKey, RANGE[days].out).then((byS) => {
         for (const sym of pick) {
           const result = byS[sym] || null;
-          if (result) _histCache.set(sym, { result, ts: now });
+          if (result) _histCache.set(ck(sym), { result, ts: now });
           out[sym] = result;
         }
       })
@@ -278,8 +305,8 @@ async function handleHistory(symbols, mdKey, res) {
   }
   for (const sym of staleCrypto) {
     tasks.push(
-      fetchCryptoHistory(sym).then((result) => {
-        if (result) _histCache.set(sym, { result, ts: now });
+      fetchCryptoHistory(sym, days).then((result) => {
+        if (result) _histCache.set(ck(sym), { result, ts: now });
         out[sym] = result || null;
       })
     );
@@ -353,7 +380,12 @@ export default async function handler(req, res) {
   // ── History mode (weekly daily-closes for the Market Overview panel) ──────
   // Same { SYM: <result> } shape as chart mode, but a multi-day close array.
   if (String(q.history) === "1") {
-    await handleHistory(symbols, KEY_MD, res);
+    const days = q.days == null || q.days === "" ? 7 : Number(q.days);
+    if (!VALID_DAYS.has(days)) {
+      res.status(400).json({ error: "invalid_days" });
+      return;
+    }
+    await handleHistory(symbols, KEY_MD, days, res);
     return;
   }
 
