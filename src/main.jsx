@@ -7,6 +7,9 @@ import SwingEdge from "../SwingEdge_App.jsx";
 import LandingGate from "./components/LandingGate.jsx";
 import { ToastProvider, ConfirmProvider } from "./components/ToastProvider.jsx";
 import { ThemeProvider } from "./contexts/ThemeContext.jsx";
+import { inject } from "@vercel/analytics";
+
+inject();
 
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN,
