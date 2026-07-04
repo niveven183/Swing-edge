@@ -993,6 +993,7 @@ const MarketPulseCard = memo(({ item, t }) => {
                   <stop offset="100%" stopColor={color} stopOpacity={0} />
                 </linearGradient>
               </defs>
+              <YAxis hide domain={['dataMin', 'dataMax']} />
               <Area type="monotone" dataKey="c" stroke={color} strokeWidth={1.5} fill={`url(#${gid})`} dot={false} isAnimationActive={false} />
             </AreaChart>
           </ResponsiveContainer>
