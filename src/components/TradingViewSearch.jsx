@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Search, X, RefreshCw, AlertCircle } from "lucide-react";
 import { searchSymbolsTV, fetchPrices } from "../priceService.js";
+import TickerLogo from "./TickerLogo.jsx";
 
 // ─── POPULAR TICKERS (shown immediately on focus) ─────────────────────────
 const POPULAR = [
@@ -287,6 +288,7 @@ export default function TradingViewSearch({ value, onPick, livePrices = {}, setL
                 onClick={() => pick(r)}
                 className={`w-full flex items-center gap-3 px-3 py-2 text-xs border-b border-[var(--border-subtle)] dark:border-white/[0.04] last:border-0 transition text-left ${active ? "bg-cyan-500/10" : "hover:bg-cyan-500/5"}`}
               >
+                <TickerLogo ticker={r.symbol} size={20} />
                 <div className="flex flex-col flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="font-mono font-bold text-white"><Highlighted text={r.symbol} query={query} /></span>

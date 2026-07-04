@@ -19,6 +19,7 @@
 
 const FINNHUB_BASE = "https://finnhub.io/api/v1";
 const COINGECKO_BASE = "https://api.coingecko.com/api/v3";
+const TWELVEDATA_BASE = "https://api.twelvedata.com";
 
 // ── Crypto registry ─────────────────────────────────────────────────────────
 // base ticker → { id: coingecko id, name: display }. Crypto reaches us in two
@@ -148,6 +149,149 @@ function mapFinnhubType(type) {
   return "EQUITY";
 }
 
+// ── History (weekly daily-closes) ────────────────────────────────────────────
+// Powers the Market Overview panel. Finnhub's free tier has no candle endpoint,
+// so equities come from Twelve Data /time_series and crypto from CoinGecko
+// /market_chart. Both synthesize the SAME Yahoo-chart shape the chart mode uses,
+// but with a MULTI-day close array so the client can derive weekly % + draw
+// sparklines. Results are cached per-symbol (module scope, survives warm
+// invocations) for ~60 min — daily closes finalize once/day, so this is plenty
+// fresh for a *weekly* panel and slashes upstream calls.
+const HIST_TTL = 60 * 60 * 1000; // 60 min
+const _histCache = new Map(); // SYM (upper) → { result, ts }
+
+// Fisher–Yates in place. Used to randomize which stale symbols we fetch each
+// invocation so single-user cold-start traffic still covers all tickers over
+// time (a deterministic "first 8" would refetch the same 8 forever).
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// Build a Yahoo-chart-shaped result from one Twelve Data time_series entry.
+// values are newest-first strings → reverse to chronological + Number().
+function buildEquityHistoryResult(sym, entry) {
+  if (!entry || entry.status === "error" || !Array.isArray(entry.values)) return null;
+  const closes = entry.values
+    .map((v) => Number(v?.close))
+    .filter((n) => Number.isFinite(n) && n > 0)
+    .reverse();
+  if (closes.length < 2) return null;
+  const lastClose = closes[closes.length - 1];
+  const prevClose = closes[closes.length - 2];
+  return {
+    meta: {
+      regularMarketPrice: lastClose,
+      chartPreviousClose: prevClose,
+      previousClose: prevClose,
+      shortName: sym,
+    },
+    indicators: { quote: [{ close: closes }] },
+  };
+}
+
+// Batch up to 8 equity symbols in ONE Twelve Data call (1 credit/symbol; free
+// tier is 8/min). Normalizes both response shapes: single-symbol returns a bare
+// { meta, values, status }; multi-symbol returns { SYM: {...}, ... }.
+async function fetchEquityHistory(symbols, key) {
+  if (!key || symbols.length === 0) return {};
+  const url =
+    `${TWELVEDATA_BASE}/time_series?symbol=${encodeURIComponent(symbols.join(","))}` +
+    `&interval=1day&outputsize=6&apikey=${key}`;
+  const r = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!r.ok) return {};
+  const data = await r.json();
+  if (!data || typeof data !== "object") return {};
+  if (data.status === "error") return {}; // whole-request failure (bad key / rate limit)
+
+  let bySym;
+  if (Array.isArray(data.values)) bySym = { [symbols[0]]: data }; // single-symbol shape
+  else bySym = data; // multi-symbol map, keyed by ticker
+
+  const out = {};
+  for (const sym of symbols) out[sym] = buildEquityHistoryResult(sym, bySym[sym]);
+  return out;
+}
+
+// Weekly crypto closes from CoinGecko (keyless). prices are [ts, price] pairs,
+// already chronological. Reuses the CRYPTO registry via cryptoMeta.
+async function fetchCryptoHistory(sym) {
+  const meta = cryptoMeta(sym);
+  if (!meta) return null;
+  const url =
+    `${COINGECKO_BASE}/coins/${meta.id}/market_chart` +
+    `?vs_currency=usd&days=7&interval=daily`;
+  const r = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!r.ok) return null;
+  const data = await r.json();
+  const closes = (Array.isArray(data?.prices) ? data.prices : [])
+    .map((p) => Number(p?.[1]))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  if (closes.length < 2) return null;
+  const lastClose = closes[closes.length - 1];
+  const prevClose = closes[closes.length - 2];
+  return {
+    meta: {
+      regularMarketPrice: lastClose,
+      chartPreviousClose: prevClose,
+      previousClose: prevClose,
+      shortName: meta.name,
+      currency: "USD",
+    },
+    indicators: { quote: [{ close: closes }] },
+  };
+}
+
+// Resolve the weekly-history request. Serves fresh cache, then fetches at most
+// 8 (shuffled) stale equities + any stale crypto; unresolved symbols → null so
+// the client's last-known-good accumulator refills them on the next poll.
+async function handleHistory(symbols, mdKey, res) {
+  const now = Date.now();
+  const out = {};
+  const staleEquities = [];
+  const staleCrypto = [];
+
+  for (const sym of symbols) {
+    const c = _histCache.get(sym);
+    if (c && now - c.ts < HIST_TTL) {
+      out[sym] = c.result;
+      continue;
+    }
+    (cryptoMeta(sym) ? staleCrypto : staleEquities).push(sym);
+  }
+
+  const pick = shuffle(staleEquities.slice()).slice(0, 8);
+  const tasks = [];
+  if (pick.length && mdKey) {
+    tasks.push(
+      fetchEquityHistory(pick, mdKey).then((byS) => {
+        for (const sym of pick) {
+          const result = byS[sym] || null;
+          if (result) _histCache.set(sym, { result, ts: now });
+          out[sym] = result;
+        }
+      })
+    );
+  }
+  for (const sym of staleCrypto) {
+    tasks.push(
+      fetchCryptoHistory(sym).then((result) => {
+        if (result) _histCache.set(sym, { result, ts: now });
+        out[sym] = result || null;
+      })
+    );
+  }
+  await Promise.allSettled(tasks);
+
+  for (const sym of symbols) if (!(sym in out)) out[sym] = null;
+
+  res.setHeader("Cache-Control", "public, max-age=120, s-maxage=240");
+  res.status(200).json(out);
+}
+
 export default async function handler(req, res) {
   // CORS — permissive so the SPA can consume it from any origin.
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -160,6 +304,7 @@ export default async function handler(req, res) {
 
   const q = req.query || {};
   const KEY = process.env.FINNHUB_API_KEY || "";
+  const KEY_MD = process.env.MARKETDATA_API_KEY || ""; // Twelve Data (weekly history)
 
   // ── Search mode (fallback path; TradingView proxy is the primary source) ──
   const search = String(q.search || "").trim().slice(0, 64);
@@ -202,6 +347,13 @@ export default async function handler(req, res) {
 
   if (symbols.length === 0) {
     res.status(200).json({});
+    return;
+  }
+
+  // ── History mode (weekly daily-closes for the Market Overview panel) ──────
+  // Same { SYM: <result> } shape as chart mode, but a multi-day close array.
+  if (String(q.history) === "1") {
+    await handleHistory(symbols, KEY_MD, res);
     return;
   }
 

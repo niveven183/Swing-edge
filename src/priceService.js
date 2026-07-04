@@ -94,13 +94,17 @@ const QUOTE_CACHE_TTL_MS = 12_000;
 // Never throws — a transport failure resolves to {} so callers degrade safely.
 const fetchChartResults = async (
   yahooSymbols,
-  { range = "5d", interval = "1d", includePrePost = true } = {}
+  { range = "5d", interval = "1d", includePrePost = true, history = false, days = 7 } = {}
 ) => {
   const list = [...new Set(yahooSymbols.map((s) => String(s || "").toUpperCase()))].filter(Boolean);
   if (list.length === 0) return {};
 
   const params = new URLSearchParams({ symbols: list.join(","), range, interval });
   if (includePrePost) params.set("includePrePost", "1");
+  if (history) {
+    params.set("history", "1");
+    params.set("days", String(days));
+  }
 
   try {
     const res = await fetch(`/api/quote?${params.toString()}`, { cache: "no-store" });
@@ -133,6 +137,16 @@ const parseChartResult = (result, yahooSymbol) => {
   const volumes = result.indicators?.quote?.[0]?.volume || [];
   const lastVol = [...volumes].reverse().find((v) => v != null) || 0;
 
+  // Weekly-history fields (only populated in history mode; single-point quotes
+  // yield closes=[price] → weekChangePct=0, which only the overview panel reads).
+  const closes = (result.indicators?.quote?.[0]?.close || []).filter(
+    (c) => typeof c === "number" && Number.isFinite(c)
+  );
+  const firstValidClose = closes.length ? closes[0] : null;
+  const weekChangePct = firstValidClose
+    ? ((price - firstValidClose) / firstValidClose) * 100
+    : 0;
+
   const preMarketPrice = typeof meta.preMarketPrice === "number" ? meta.preMarketPrice : null;
   const postMarketPrice = typeof meta.postMarketPrice === "number" ? meta.postMarketPrice : null;
 
@@ -164,6 +178,8 @@ const parseChartResult = (result, yahooSymbol) => {
     preMarketPrice,
     postMarketPrice,
     marketState: state,
+    closes,
+    weekChangePct,
   };
 };
 
@@ -404,5 +420,112 @@ export const getMarketStateBadge = (state = getMarketState()) => {
     case MARKET_STATE.PRE:   return { label: "PRE-MARKET",  emoji: "🟡", color: "#f59e0b" };
     case MARKET_STATE.AFTER: return { label: "AFTER-HOURS", emoji: "🟠", color: "#fb923c" };
     default:                 return { label: "CLOSED",      emoji: "⚫", color: "#64748b" };
+  }
+};
+
+// ─── MARKET OVERVIEW (weekly panel) ─────────────────────────────────────────
+// Fixed roster for the Market Intel "Market Overview" panel — 5 index "pulse"
+// tickers + 9 sectors + 5 themes (19 total). `key` is an i18n key resolved by
+// the UI; display names are translated there, not hardcoded here. BTC-USD is
+// passed literally to the history proxy (cryptoMeta strips -USD → CoinGecko);
+// it never touches fetchPrices/toYahooSymbol, so live pricing is unaffected.
+export const MARKET_OVERVIEW = {
+  indices: [
+    { sym: "SPY", key: "mo_SPY" },
+    { sym: "QQQ", key: "mo_QQQ" },
+    { sym: "DIA", key: "mo_DIA" },
+    { sym: "IWM", key: "mo_IWM" },
+    { sym: "BTC-USD", key: "mo_BTC" },
+  ],
+  sectors: [
+    { sym: "XLF", key: "mo_XLF" },
+    { sym: "XLK", key: "mo_XLK" },
+    { sym: "XLE", key: "mo_XLE" },
+    { sym: "XLV", key: "mo_XLV" },
+    { sym: "XLI", key: "mo_XLI" },
+    { sym: "XLP", key: "mo_XLP" },
+    { sym: "XLU", key: "mo_XLU" },
+    { sym: "XLB", key: "mo_XLB" },
+    { sym: "XLC", key: "mo_XLC" },
+  ],
+  themes: [
+    { sym: "SMH", key: "mo_SMH" },
+    { sym: "XBI", key: "mo_XBI" },
+    { sym: "IGV", key: "mo_IGV" },
+    { sym: "URA", key: "mo_URA" },
+    { sym: "GLD", key: "mo_GLD" },
+  ],
+};
+
+// Refresh cadence for the weekly overview — far slower than live prices, since
+// the underlying data is daily closes that only change once per day.
+export const getOverviewRefreshInterval = (state = getMarketState()) => {
+  if (state === MARKET_STATE.OPEN) return 5 * 60_000;                              // 5 min
+  if (state === MARKET_STATE.PRE || state === MARKET_STATE.AFTER) return 10 * 60_000; // 10 min
+  return 30 * 60_000;                                                              // 30 min closed
+};
+
+// Last-known-good accumulator (module scope). The serverless side fills at most
+// 8 symbols per cold invocation, so any single response may be a *different
+// partial*. Merging valid entries here (and NEVER letting null overwrite a known
+// value) makes the client the stable accumulator: coverage converges to all 19
+// across a few polls and known cards never flicker back to blank.
+const _overviewLKG = new Map(); // SYM → { sym, key, price, weekChangePct, closes }
+let _overviewInflight = null;   // dedupe concurrent fetches (double-mount / race)
+
+const _overviewEntries = () => [
+  ...MARKET_OVERVIEW.indices,
+  ...MARKET_OVERVIEW.sectors,
+  ...MARKET_OVERVIEW.themes,
+];
+
+const _buildOverview = () => {
+  const pick = (list) => list.map(({ sym }) => _overviewLKG.get(sym.toUpperCase())).filter(Boolean);
+  return {
+    indices: pick(MARKET_OVERVIEW.indices),
+    sectorsThemes: pick([...MARKET_OVERVIEW.sectors, ...MARKET_OVERVIEW.themes]).sort(
+      (a, b) => b.weekChangePct - a.weekChangePct
+    ),
+  };
+};
+
+/**
+ * Fetch weekly closes for all 19 overview tickers in one batched history call,
+ * merge valid results into the last-known-good map, and return the panel data:
+ *   { indices: [...≤5], sectorsThemes: [...≤14 sorted by weekChangePct desc] }
+ * Symbols not yet known are simply absent (UI shows placeholders until they fill).
+ * Never throws — degrades to whatever is currently accumulated.
+ */
+export const fetchMarketOverview = async () => {
+  if (_overviewInflight) return _overviewInflight;
+
+  const entries = _overviewEntries();
+  const keyBySym = new Map(entries.map((e) => [e.sym.toUpperCase(), e.key]));
+  const syms = entries.map((e) => e.sym);
+
+  const run = (async () => {
+    const map = await fetchChartResults(syms, { history: true, days: 7 });
+    for (const sym of syms) {
+      const up = sym.toUpperCase();
+      const q = parseChartResult(map[up] ?? map[sym], sym);
+      // null / invalid / <2 closes NEVER overwrites a previously-known value.
+      if (q && Array.isArray(q.closes) && q.closes.length >= 2) {
+        _overviewLKG.set(up, {
+          sym: up,
+          key: keyBySym.get(up),
+          price: q.price,
+          weekChangePct: q.weekChangePct,
+          closes: q.closes,
+        });
+      }
+    }
+    return _buildOverview();
+  })();
+
+  _overviewInflight = run;
+  try {
+    return await run;
+  } finally {
+    if (_overviewInflight === run) _overviewInflight = null;
   }
 };

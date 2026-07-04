@@ -15,6 +15,7 @@ import ResetAllModal from "./src/components/ResetAllModal.jsx";
 import ChangePasswordModal from "./src/components/ChangePasswordModal.jsx";
 import { useTheme } from "./src/contexts/ThemeContext.jsx";
 import TradingViewSearch from "./src/components/TradingViewSearch.jsx";
+import TickerLogo from "./src/components/TickerLogo.jsx";
 import { TVTickerTape } from "./src/components/TradingViewWidgets.jsx";
 import { useToast, useConfirm } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured, tradeForSupabase } from "./src/supabaseClient.js";
@@ -40,6 +41,7 @@ import { getTranslations, LANGUAGES, isRTLLang, nTrades } from "./src/i18n.js";
 import {
   fetchPrices, fmtVolume, fmtMarketCap, searchTickers,
   fetchQuote, getMarketState, getMarketStateBadge, getRefreshInterval, MARKET_STATE,
+  fetchMarketOverview, getOverviewRefreshInterval,
 } from "./src/priceService.js";
 import { POPULAR_TICKERS as STATIC_TICKERS, getTickerMeta, searchTickers as searchStaticTickers } from "./src/data/tickers.js";
 import { SwingEdgeAI } from "./src/intelligence/SwingEdgeAI.js";
@@ -737,29 +739,6 @@ const fmtTimeAgo = (dateStr) => {
   return `${Math.floor(hours / 24)}d ago`;
 };
 
-// ─── TICKER LOGO ─────────────────────────────────────────────────────────────
-const TickerLogo = ({ ticker, size = 20, className = "" }) => {
-  const [imgError, setImgError] = useState(false);
-  const cleanTicker = (ticker || "").replace("-USD", "").toUpperCase();
-  if (imgError || !cleanTicker) {
-    return (
-      <div className={`rounded-full bg-gradient-to-br from-cyan-500/20 to-violet-500/20 border border-white/10 flex items-center justify-center text-[8px] font-bold text-cyan-400 font-mono flex-shrink-0 ${className}`}
-        style={{ width: size, height: size }}>
-        {cleanTicker.slice(0, 2)}
-      </div>
-    );
-  }
-  return (
-    <img
-      src={`https://financialmodelingprep.com/image-stock/${cleanTicker}.png`}
-      alt={cleanTicker}
-      className={`rounded-full bg-white/5 object-cover flex-shrink-0 ${className}`}
-      style={{ width: size, height: size }}
-      onError={() => setImgError(true)}
-    />
-  );
-};
-
 // ─── SMART LESSONS GENERATOR ─────────────────────────────────────────────────
 // "overnight_hold" → "Overnight Hold". Safe on already-clean labels ("Breakout").
 const snakeToTitle = (s) =>
@@ -980,27 +959,74 @@ const buildTourSteps = (t) => [
   { anchor: '[data-tour-tab="journal"]', title: t.tourOcrTitle,   body: t.tourOcrBody },
 ];
 
-// Hoisted to module scope. Previously defined inside the Market Intel render IIFE,
-// which minted a new component type on every render → React unmounted/remounted all
-// cards (mount paint + recharts re-animation read as a flicker every ~1.5–2s). Stable
-// module-level identity means pulse/ticker re-renders now reconcile in place; memo
-// skips re-render unless the `s`/`lang` props actually change (~15s price refresh).
-const SectorCard = memo(({ s, lang }) => (
-  <div className={`rounded-xl border p-3 ${s.avgChange >= 0 ? "bg-[#10b981]/5 border-[#10b981]/15" : "bg-[#ef4444]/5 border-[#ef4444]/15"}`}>
-    <div className="flex items-center justify-between mb-1.5">
-      <span className="text-xs font-bold text-white">{s.sector}</span>
-      <span className={`text-[10px] font-mono font-bold ${s.avgChange >= 0 ? "text-[#10b981]" : "text-[#ef4444]"}`}>
-        {s.avgChange >= 0 ? "+" : ""}{s.avgChange.toFixed(2)}%
-      </span>
+// Module-scope + memo (not defined inside the render IIFE): stable component identity
+// means the ~5-min overview refresh reconciles cards in place instead of remounting
+// them, so the sparklines/bars never flash. Both read i18n names via the `t` prop.
+const moFmtPrice = (p) =>
+  typeof p !== "number" || !Number.isFinite(p)
+    ? "—"
+    : p >= 1000
+    ? p.toLocaleString("en-US", { maximumFractionDigits: 0 })
+    : p.toFixed(2);
+
+// One index "pulse" card: name, latest close, weekly % with arrow, and a sparkline.
+const MarketPulseCard = memo(({ item, t }) => {
+  const up = item.weekChangePct >= 0;
+  const color = up ? "#10b981" : "#ef4444";
+  const data = (item.closes || []).map((c, i) => ({ i, c }));
+  const gid = `mo-spark-${item.sym}`;
+  return (
+    <div className="rounded-xl border border-[var(--border-subtle)] dark:border-white/[0.06] bg-white/[0.02] p-3">
+      <div className="text-[11px] font-bold text-white truncate">{t[item.key] || item.sym}</div>
+      <div className="text-sm font-mono font-bold text-slate-100 mt-0.5">${moFmtPrice(item.price)}</div>
+      <div className="text-[11px] font-mono font-semibold flex items-center gap-0.5 mt-0.5" style={{ color }}>
+        {up ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
+        {up ? "+" : ""}{item.weekChangePct.toFixed(2)}%
+      </div>
+      {data.length >= 2 && (
+        <div className="mt-1.5 h-8 -mx-1">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={data} margin={{ top: 2, right: 2, left: 2, bottom: 0 }}>
+              <defs>
+                <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={color} stopOpacity={0.35} />
+                  <stop offset="100%" stopColor={color} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <Area type="monotone" dataKey="c" stroke={color} strokeWidth={1.5} fill={`url(#${gid})`} dot={false} isAnimationActive={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </div>
-    <div className="text-[10px] text-slate-500 mb-1.5 truncate">
-      {s.tickers.slice(0, 3).join(", ")}{s.tickers.length > 3 ? ` +${s.tickers.length - 3}` : ""}
+  );
+});
+
+// One sector/theme card: name, weekly % with arrow, and a proportional bar scaled to
+// the strongest mover (maxAbs). Bar width anchors to the reading edge, so it's RTL-safe.
+const SectorThemeCard = memo(({ item, t, maxAbs }) => {
+  const up = item.weekChangePct >= 0;
+  const color = up ? "#10b981" : "#ef4444";
+  const pct = maxAbs > 0 ? Math.min(100, (Math.abs(item.weekChangePct) / maxAbs) * 100) : 0;
+  const name = t[item.key] || item.sym;
+  return (
+    <div
+      className="rounded-lg border border-[var(--border-subtle)] dark:border-white/[0.06] bg-white/[0.02] p-2.5"
+      aria-label={`${name}: ${up ? "+" : ""}${item.weekChangePct.toFixed(2)}%`}
+    >
+      <div className="flex items-center justify-between gap-1 mb-1.5">
+        <span className="text-[11px] font-bold text-white truncate">{name}</span>
+        <span className="text-[10px] font-mono font-bold flex items-center gap-0.5 shrink-0" style={{ color }}>
+          {up ? <ArrowUpRight size={9} /> : <ArrowDownRight size={9} />}
+          {up ? "+" : ""}{item.weekChangePct.toFixed(2)}%
+        </span>
+      </div>
+      <div className="h-1.5 rounded-full bg-white/[0.04] overflow-hidden">
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
+      </div>
     </div>
-    <div className="text-[9px] font-mono text-slate-600">
-      {s.count} {lang === "he" ? "ניירות" : "symbol"}{s.count !== 1 && lang !== "he" ? "s" : ""}
-    </div>
-  </div>
-));
+  );
+});
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function SwingEdge() {
@@ -1493,6 +1519,33 @@ export default function SwingEdge() {
     };
   }, [fetchLivePrices, marketState]);
 
+  // Weekly Market Overview (indices + sectors/themes). Cadence tracks market state
+  // (5 min open → 30 min closed); re-arms on state transitions. The service keeps a
+  // last-known-good accumulator, so partial cold-start responses converge without
+  // ever blanking a populated card. On failure, retry once after 15s.
+  const [marketOverview, setMarketOverview] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    let retryTimer = null;
+
+    const run = async () => {
+      try {
+        const data = await fetchMarketOverview();
+        if (!cancelled && data) setMarketOverview(data);
+      } catch {
+        if (!cancelled) retryTimer = setTimeout(() => { if (!cancelled) run(); }, 15000);
+      }
+    };
+
+    run();
+    const interval = setInterval(run, getOverviewRefreshInterval(marketState));
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [marketState]);
+
   const realTrades = useMemo(() => trades.filter(t => !t.isDemo), [trades]);
   const demoTrades = useMemo(() => trades.filter(t => t.isDemo), [trades]);
   const equityCurve = useMemo(() => generateEquityCurve(capital, realTrades), [realTrades, capital]);
@@ -1714,28 +1767,6 @@ export default function SwingEdge() {
       };
     });
   }, [livePrices]);
-
-  // Reactive sector trends derived from watchlist + live prices (no external API needed)
-  const sectorTrendsData = useMemo(() => {
-    if (!watchlistItems || watchlistItems.length === 0) return [];
-    const sectors = {};
-    watchlistItems.forEach(item => {
-      const meta = getTickerMeta(item.ticker);
-      const sector = meta?.sector || 'Other';
-      if (!sectors[sector]) sectors[sector] = { sector, count: 0, tickers: [], totalChange: 0, hasChange: 0 };
-      sectors[sector].count++;
-      sectors[sector].tickers.push(item.ticker);
-      const raw = item.ticker.replace('-USD', '');
-      const lp = livePrices[raw] || livePrices[item.ticker] || livePrices[raw + '-USD'];
-      if (lp?.changePct != null) {
-        sectors[sector].totalChange += parseFloat(lp.changePct) || 0;
-        sectors[sector].hasChange++;
-      }
-    });
-    return Object.values(sectors)
-      .map(s => ({ ...s, avgChange: s.hasChange > 0 ? (s.totalChange / s.hasChange) : 0 }))
-      .sort((a, b) => b.avgChange - a.avgChange);
-  }, [watchlistItems, livePrices]);
 
   useEffect(() => {
     const t = setInterval(() => setTickerIdx(i => (i + 1) % Math.max(tickerTapeItems.length, 1)), 2000);
@@ -4744,80 +4775,53 @@ export default function SwingEdge() {
               </div>
             </div>
 
-            {/* ── SECTOR TRENDS ── reactive from watchlist */}
+            {/* ── MARKET OVERVIEW ── weekly change across indices, sectors & themes */}
             <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
               <div className="flex items-center gap-2 mb-4">
-                <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Sector Trends</span>
+                <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">{t.mo_title}</span>
                 <span className={`w-1.5 h-1.5 rounded-full ${pulse ? "bg-emerald-400" : "bg-emerald-700"} transition-colors`} />
-                <span className="text-[10px] text-slate-700">Live from watchlist</span>
+                <span className="text-[10px] text-slate-700">{t.mo_weekly}</span>
               </div>
 
-              {sectorTrendsData.length === 0 ? (
+              {!marketOverview || (marketOverview.indices.length === 0 && marketOverview.sectorsThemes.length === 0) ? (
                 <div className="flex flex-col items-center justify-center py-8 gap-2 text-slate-600">
-                  <BarChart2 size={24} />
-                  <p className="text-xs text-center">
-                    {lang === "he"
-                      ? "הוסף ניירות ערך לרשימת המעקב לצפייה בטרנדים"
-                      : "Add tickers to your watchlist to see sector trends"}
-                  </p>
+                  <RefreshCw size={20} className="animate-spin" />
+                  <p className="text-xs text-center">{t.mo_loading}</p>
                 </div>
-              ) : (() => {
-                const hot = sectorTrendsData.filter(s => s.avgChange > 0);
-                const declining = [...sectorTrendsData].filter(s => s.avgChange <= 0).reverse();
-                const barData = sectorTrendsData.map(s => ({ name: s.sector, dayChange: s.avgChange }));
-
-                return (
-                  <div className="space-y-4">
-                    {/* Comparison bar chart */}
+              ) : (
+                <div className="space-y-4">
+                  {/* Row 1 — Market Pulse (indices) */}
+                  {marketOverview.indices.length > 0 && (
                     <div>
-                      <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-600 mb-2">Avg % Change by Sector</p>
-                      <ResponsiveContainer width="100%" height={120}>
-                        <BarChart data={barData} margin={{ top: 4, right: 4, left: 0, bottom: 4 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" vertical={false} />
-                          <XAxis dataKey="name" tick={{ fontSize: 9, fill: "#64748b" }} tickLine={false} axisLine={false} />
-                          <YAxis tick={{ fontSize: 9, fill: "#64748b" }} tickLine={false} axisLine={false} tickFormatter={v => `${v.toFixed(1)}%`} />
-                          <ReferenceLine y={0} stroke="#334155" strokeWidth={1} />
-                          <Tooltip
-                            contentStyle={{ background: "#0d1424", border: "1px solid #1e293b", borderRadius: 8, fontSize: 11 }}
-                            formatter={(v) => [`${Number(v).toFixed(2)}%`, "Avg Change"]}
-                          />
-                          <Bar dataKey="dayChange" radius={[3, 3, 0, 0]} isAnimationActive={false}>
-                            {barData.map((s, i) => (
-                              <Cell key={i} fill={s.dayChange >= 0 ? "#10b981" : "#ef4444"} fillOpacity={0.8} />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
+                      <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-600 mb-2">{t.mo_pulse}</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                        {marketOverview.indices.map(item => (
+                          <MarketPulseCard key={item.sym} item={item} t={t} />
+                        ))}
+                      </div>
                     </div>
+                  )}
 
-                    {/* Hot sectors */}
-                    {hot.length > 0 && (
+                  {/* Row 2 — Sectors & Themes, sorted best → worst */}
+                  {marketOverview.sectorsThemes.length > 0 && (() => {
+                    const st = marketOverview.sectorsThemes;
+                    const maxAbs = Math.max(...st.map(s => Math.abs(s.weekChangePct)), 0.01);
+                    const top = st[0], bottom = st[st.length - 1];
+                    const fmt = (s) => `${t[s.key] || s.sym} ${s.weekChangePct >= 0 ? "+" : ""}${s.weekChangePct.toFixed(1)}%`;
+                    return (
                       <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <TrendingUp size={12} className="text-[#10b981]" />
-                          <span className="text-[10px] font-bold tracking-widest uppercase text-[#10b981]">Hot Now</span>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                          {hot.map(s => <SectorCard key={s.sector} s={s} lang={lang} />)}
+                        <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-600 mb-2">{t.mo_sectorsThemes}</p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2"
+                          role="img" aria-label={`${t.mo_ariaMovers}. ${fmt(top)}, ${fmt(bottom)}`}>
+                          {st.map(item => (
+                            <SectorThemeCard key={item.sym} item={item} t={t} maxAbs={maxAbs} />
+                          ))}
                         </div>
                       </div>
-                    )}
-
-                    {/* Declining sectors */}
-                    {declining.length > 0 && (
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <TrendingDown size={12} className="text-[#ef4444]" />
-                          <span className="text-[10px] font-bold tracking-widest uppercase text-[#ef4444]">Declining Now</span>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                          {declining.map(s => <SectorCard key={s.sector} s={s} lang={lang} />)}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
+                    );
+                  })()}
+                </div>
+              )}
             </div>
           </div>
         )}
