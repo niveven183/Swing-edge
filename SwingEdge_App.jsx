@@ -1530,6 +1530,10 @@ export default function SwingEdge() {
   const [moRange, setMoRange] = useState(7); // 1 | 7 | 30
   const [moByRange, setMoByRange] = useState({}); // { [days]: overviewData }
   const marketOverview = moByRange[moRange] ?? null;
+  // Market regime always reads the 30-day (≈23-session) window so its 20-SMA /
+  // realized-vol / structure criteria are computable regardless of the card's
+  // visible 1D/1W/1M toggle.
+  const regimeOverview = moByRange[30] ?? null;
   useEffect(() => {
     let cancelled = false;
     let retryTimer = null;
@@ -1550,6 +1554,23 @@ export default function SwingEdge() {
       clearInterval(interval);
       if (retryTimer) clearTimeout(retryTimer);
     };
+  }, [marketState, moRange]);
+
+  // Keep the 30-day overview warm for regime detection even when the visible
+  // toggle is 1D/1W. Rides the same cached fetch (server caches history ~60min;
+  // in-flight requests dedupe) — no extra API budget.
+  useEffect(() => {
+    if (moRange === 30) return; // already fetched by the effect above
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const data = await fetchMarketOverview(30);
+        if (!cancelled && data) setMoByRange((prev) => ({ ...prev, 30: data }));
+      } catch { /* degrades to trade-tag fallback until data lands */ }
+    };
+    run();
+    const interval = setInterval(run, getOverviewRefreshInterval(marketState));
+    return () => { cancelled = true; clearInterval(interval); };
   }, [marketState, moRange]);
 
   const realTrades = useMemo(() => trades.filter(t => !t.isDemo), [trades]);
@@ -1658,7 +1679,7 @@ export default function SwingEdge() {
   // internal WeakMap cache so repeated reads are effectively free.
   const aiDNA          = useMemo(() => SwingEdgeAI.getDNA(realTrades),          [realTrades]);
   const aiEdges        = useMemo(() => SwingEdgeAI.getEdges(realTrades),        [realTrades]);
-  const aiRegime       = useMemo(() => SwingEdgeAI.getRegime(realTrades),       [realTrades]);
+  const aiRegime       = useMemo(() => SwingEdgeAI.getRegime(realTrades, { marketData: regimeOverview }), [realTrades, regimeOverview]);
   const aiGrowth       = useMemo(() => SwingEdgeAI.getGrowth(realTrades),       [realTrades]);
   const aiEvolution    = useMemo(() => SwingEdgeAI.getEvolution(realTrades, 6), [realTrades]);
   const aiGrowthReport = useMemo(() => SwingEdgeAI.getGrowthReport(realTrades), [realTrades]);
@@ -1679,8 +1700,8 @@ export default function SwingEdge() {
     return () => clearTimeout(id);
   }, [form]);
   const aiCoach = useMemo(
-    () => SwingEdgeAI.analyzeNewTrade(coachForm, realTrades),
-    [coachForm, realTrades]
+    () => SwingEdgeAI.analyzeNewTrade(coachForm, realTrades, { marketData: regimeOverview }),
+    [coachForm, realTrades, regimeOverview]
   );
 
   // ─── CENTRAL EQUITY ENGINE ──────────────────────────────────────────────────
@@ -2250,7 +2271,7 @@ export default function SwingEdge() {
       marketCondition: analyzerForm.marketCondition,
       emotionAtEntry: analyzerForm.emotionAtEntry,
       entryQuality: analyzerForm.entryQuality,
-    }, realTrades, lang);
+    }, realTrades, lang, { marketData: regimeOverview });
     setAnalyzerResult(result);
     setAnalyzerLoading(false);
   };

@@ -391,16 +391,28 @@ export const GrowthChart = ({ evolution, current, delta, lang = "he" }) => {
 };
 
 // ─── MARKET REGIME INDICATOR ─────────────────────────────────────────────────
+const REGIME_BIAS_LABEL = {
+  bull:  { en: "Bull",  he: "שורי", es: "Alcista", pt: "Alta",  ar: "صاعد" },
+  bear:  { en: "Bear",  he: "דובי", es: "Bajista", pt: "Baixa", ar: "هابط" },
+  range: { en: "Range", he: "טווח", es: "Rango",   pt: "Range", ar: "نطاق" },
+};
+const REGIME_CONF_LABEL = {
+  high:         { en: "High",              he: "גבוה",             es: "Alta",                pt: "Alta",                ar: "عالٍ" },
+  medium:       { en: "Medium",            he: "בינוני",           es: "Media",               pt: "Média",               ar: "متوسط" },
+  low:          { en: "Low",               he: "נמוך",             es: "Baja",                pt: "Baixa",               ar: "منخفض" },
+  insufficient: { en: "Insufficient data", he: "נתונים לא מספיקים", es: "Datos insuficientes", pt: "Dados insuficientes", ar: "بيانات غير كافية" },
+};
 export const RegimeIndicator = ({ regime, lang = "he" }) => {
   if (!regime) return null;
+  const UNKNOWN = { color: "slate", Icon: Compass, label: { en: "Unknown", he: "לא ברור", es: "Desconocido", pt: "Desconhecido", ar: "غير معروف" } };
   const map = {
-    BULL_TREND:      { color: "emerald", Icon: TrendingUp,   labelHe: "שוק עולה",     labelEn: "Bull Trend" },
-    BEAR_TREND:      { color: "rose",    Icon: TrendingDown, labelHe: "שוק יורד",     labelEn: "Bear Trend" },
-    CHOPPY:          { color: "amber",   Icon: Activity,     labelHe: "שוק צדדי",     labelEn: "Choppy" },
-    HIGH_VOLATILITY: { color: "violet",  Icon: Zap,          labelHe: "תנודתיות גבוהה", labelEn: "High Volatility" },
-    LOW_VOLATILITY:  { color: "cyan",    Icon: Shield,       labelHe: "תנודתיות נמוכה", labelEn: "Low Volatility" },
-    UNKNOWN:         { color: "slate",   Icon: Compass,      labelHe: "לא ברור",       labelEn: "Unknown" },
-  }[regime.regime] || { color: "slate", Icon: Compass, labelHe: "לא ברור", labelEn: "Unknown" };
+    BULL_TREND:      { color: "emerald", Icon: TrendingUp,   label: { en: "Bull Trend",      he: "שוק עולה",       es: "Tendencia Alcista", pt: "Tendência de Alta",   ar: "اتجاه صاعد" } },
+    BEAR_TREND:      { color: "rose",    Icon: TrendingDown, label: { en: "Bear Trend",      he: "שוק יורד",       es: "Tendencia Bajista", pt: "Tendência de Baixa",  ar: "اتجاه هابط" } },
+    CHOPPY:          { color: "amber",   Icon: Activity,     label: { en: "Choppy",          he: "שוק צדדי",       es: "Lateral",           pt: "Lateral",             ar: "عرضي" } },
+    HIGH_VOLATILITY: { color: "violet",  Icon: Zap,          label: { en: "High Volatility", he: "תנודתיות גבוהה", es: "Alta Volatilidad",  pt: "Alta Volatilidade",   ar: "تقلب عالٍ" } },
+    LOW_VOLATILITY:  { color: "cyan",    Icon: Shield,       label: { en: "Low Volatility",  he: "תנודתיות נמוכה", es: "Baja Volatilidad",  pt: "Baixa Volatilidade",  ar: "تقلب منخفض" } },
+    UNKNOWN,
+  }[regime.regime] || UNKNOWN;
 
   const { Icon } = map;
   const colorMap = {
@@ -422,11 +434,21 @@ export const RegimeIndicator = ({ regime, lang = "he" }) => {
         <TermTooltip term="marketRegime" lang={lang} />
       </div>
       <div className="text-sm font-bold text-white">
-        {lang === "he" ? map.labelHe : map.labelEn}
+        {pick(map.label, lang)}
       </div>
       <div className="mt-1.5 text-[11px] text-slate-400 leading-relaxed">
         {pick(regime.advice, lang)}
       </div>
+      {regime.regime === "HIGH_VOLATILITY" && (regime.trendBias === "bull" || regime.trendBias === "bear") && (
+        <div className="mt-1 text-[10px] text-slate-500">
+          {lang === "he" ? "מגמת רקע" : "Underlying"}: {pick(REGIME_BIAS_LABEL[regime.trendBias], lang)}
+        </div>
+      )}
+      {regime.confidence && (
+        <div className="mt-2 text-[10px] font-mono text-slate-500">
+          {lang === "he" ? "ביטחון" : "Confidence"}: {pick(REGIME_CONF_LABEL[regime.confidence] || REGIME_CONF_LABEL.low, lang)}
+        </div>
+      )}
       {regime.advice?.sizing != null && regime.advice.sizing !== 1 && (
         <div className="mt-2 text-[10px] font-mono text-slate-500">
           {lang === "he" ? "גודל פוזיציה מומלץ" : "Suggested sizing"}: {(regime.advice.sizing * 100).toFixed(0)}%

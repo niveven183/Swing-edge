@@ -34,25 +34,34 @@ export const SwingEdgeAI = {
   // Core reports. All are pure functions of `trades` (+ optional snapshot).
   getDNA: (trades)                     => memoize(trades, "dna",    () => calculateTradeDNA(trades)),
   getEdges: (trades)                   => memoize(trades, "edges",  () => findEdges(trades)),
-  getRegime: (trades, snapshot = null) => memoize(trades, snapshot ? "regime:snap" : "regime", () => detectMarketRegime(trades, snapshot)),
+  // opts: { marketData, snapshot }. A bare snapshot object is tolerated. When
+  // live marketData is present we compute fresh — the trades-identity memo can't
+  // see market changes, and the dashboard already memoizes on the overview object.
+  getRegime: (trades, opts = null) => {
+    const isOpts = opts && typeof opts === "object" && ("marketData" in opts || "snapshot" in opts);
+    const marketData = isOpts ? (opts.marketData ?? null) : null;
+    const snapshot   = isOpts ? (opts.snapshot ?? null) : (opts || null);
+    if (marketData) return detectMarketRegime(trades, { marketData, snapshot });
+    return memoize(trades, snapshot ? "regime:snap" : "regime", () => detectMarketRegime(trades, { snapshot }));
+  },
   getGrowth: (trades)                  => memoize(trades, "growth", () => calculateGrowthScore(trades, SwingEdgeAI.getEdges(trades))),
   getGrowthReport: (trades)            => memoize(trades, "growthReport", () => generateGrowthReport(trades, SwingEdgeAI.getEdges(trades))),
   getEvolution:  (trades, months = 6)  => memoize(trades, `evo:${months}`, () => dnaEvolutionSeries(trades, SwingEdgeAI.getEdges(trades), months)),
 
   // Real-time coaching on a candidate trade. Not memoised — the form state
   // changes on every keystroke.
-  analyzeNewTrade: (form, trades = [], snapshot = null) => coachTrade({
+  analyzeNewTrade: (form, trades = [], opts = null) => coachTrade({
     form,
     trades,
     dna:    SwingEdgeAI.getDNA(trades),
     edges:  SwingEdgeAI.getEdges(trades),
-    regime: SwingEdgeAI.getRegime(trades, snapshot),
+    regime: SwingEdgeAI.getRegime(trades, opts),
   }),
 
   // Standalone Analyzer — runs the SAME coach engine as analyzeNewTrade, then
   // adapts the rich output to the Analyzer panel's flat shape. Passing `trades`
   // means the Analyzer now benefits from personal history / DNA / regime too.
-  analyzeStandalone: (input = {}, trades = [], lang = "en") => {
+  analyzeStandalone: (input = {}, trades = [], lang = "en", opts = null) => {
     const coaching = coachTrade({
       form: {
         entry:  input.entry,
@@ -67,7 +76,7 @@ export const SwingEdgeAI = {
       trades,
       dna:    SwingEdgeAI.getDNA(trades),
       edges:  SwingEdgeAI.getEdges(trades),
-      regime: SwingEdgeAI.getRegime(trades),
+      regime: SwingEdgeAI.getRegime(trades, opts),
     });
     return coachingToAnalyzerView(coaching, {
       entry:   input.entry,
