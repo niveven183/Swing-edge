@@ -8,6 +8,18 @@ import { he as heLocale } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { nTrades } from '../i18n.js';
 
+// Day a CLOSED trade belongs to = the day it was closed (its realized P&L lands then).
+// `closedAt` is a full ISO timestamp written on close; `date`/`exitDate` may be a plain
+// 'YYYY-MM-DD'. Demo/legacy trades carry only `date` (entry) → fall back to it. Returns a
+// LOCAL 'YYYY-MM-DD' so a late-evening close doesn't roll into the next UTC day.
+function dayKeyOf(t) {
+  const raw = t.closedAt || t.exitDate || t.date || t.openDate || t.createdAt;
+  if (!raw) return null;
+  if (typeof raw === 'string' && raw.length === 10 && raw[4] === '-') return raw;
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? null : format(d, 'yyyy-MM-dd');
+}
+
 // trades: array of trade objects (closed trades preferred — open trades show 0 P&L).
 // calcMetrics: function(trade) -> { pnl, rMultiple }. P&L/R are NOT stored on the trade.
 // lang: "he" | "en"
@@ -29,10 +41,8 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he' }) {
   const tradesByDate = useMemo(() => {
     const map = {};
     trades.forEach(t => {
-      const raw = t.date || t.openDate || t.createdAt;
-      if (!raw || typeof raw !== 'string') return;
-      const key = raw.slice(0, 10);
-      if (!key || key === 'null' || key === 'undefined') return;
+      const key = dayKeyOf(t);
+      if (!key) return;
       if (!map[key]) map[key] = [];
       map[key].push(t);
     });
@@ -59,9 +69,7 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he' }) {
   // monthly summary
   const monthSummary = useMemo(() => {
     const prefix = format(currentMonth, 'yyyy-MM');
-    const monthTrades = trades.filter(t =>
-      String(t.date || t.openDate || '').startsWith(prefix)
-    );
+    const monthTrades = trades.filter(t => (dayKeyOf(t) || '').startsWith(prefix));
     const pnl = monthTrades.reduce((s, t) => s + (metricsOf(t).pnl || 0), 0);
     const wins = monthTrades.filter(t => (metricsOf(t).pnl || 0) > 0).length;
     return {
