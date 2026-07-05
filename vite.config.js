@@ -1,8 +1,18 @@
+import { readFileSync } from "node:fs";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { sentryVitePlugin } from "@sentry/vite-plugin";
 
+const pkg = JSON.parse(
+  readFileSync(new URL("./package.json", import.meta.url), "utf-8")
+);
+
 export default defineConfig({
+  // Expose the package version to the client bundle (used by the feedback tab's
+  // context auto-attach). Only the version string is injected — not all of pkg.
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   plugins: [
     react(),
     // Embed an application key into every first-party bundle so the runtime

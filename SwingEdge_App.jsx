@@ -1157,6 +1157,14 @@ export default function SwingEdge() {
     } catch {}
     return "dashboard";
   });
+
+  // Remember the last non-feedback tab, so the Feedback tab can attach it as
+  // context (once Feedback is open, the "current" tab is always "feedback").
+  const feedbackOriginRef = useRef("dashboard");
+  useEffect(() => {
+    if (tab !== "feedback") feedbackOriginRef.current = tab;
+  }, [tab]);
+
   useEffect(() => {
     try { localStorage.removeItem("swingEdgeDashboardVariant"); } catch {}
   }, []);
@@ -5381,7 +5389,7 @@ export default function SwingEdge() {
 
         {/* ══════════════ FEEDBACK ══════════════ */}
         {tab === "feedback" && (
-          <FeedbackTab user={authUser} lang={lang} />
+          <FeedbackTab user={authUser} lang={lang} originTab={feedbackOriginRef.current} />
         )}
 
         {/* ══════════════ ADMIN (niveven183@gmail.com only) ══════════════ */}
