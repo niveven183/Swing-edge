@@ -4973,8 +4973,7 @@ export default function SwingEdge() {
                   value={lang}
                   onChange={e => setLang(e.target.value)}
                   dir="ltr"
-                  className="w-full border border-violet-500/30 rounded-lg px-3 py-2.5 text-sm text-white focus:border-violet-500/60 focus:outline-none transition font-semibold"
-                  style={{ background: "#0d1424" }}
+                  className="w-full bg-white/5 border border-violet-500/30 rounded-lg px-3 py-2.5 text-sm text-white focus:border-violet-500/60 focus:outline-none transition font-semibold"
                 >
                   {LANGUAGES.map(l => (
                     <option key={l.code} value={l.code}>
@@ -5731,7 +5730,7 @@ export default function SwingEdge() {
                 <div>
                   <label htmlFor="close-exit-reason" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Exit Reason</label>
                   <select id="close-exit-reason" value={closeForm.exitReason} onChange={e=>setCloseForm(f=>({...f,exitReason:e.target.value}))}
-                    className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-rose-500/50 focus:outline-none transition appearance-none" style={{background:"#0d1424"}}>
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-rose-500/50 focus:outline-none focus:ring-1 focus:ring-rose-500/20 transition">
                     {["Hit Target","Hit Stop","Manual Exit","Trailing Stop","Other"].map(s=><option key={s}>{s}</option>)}
                   </select>
                 </div>
