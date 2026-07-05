@@ -92,14 +92,16 @@ async function main() {
   const has = (...names) => names.every((n) => cols.has(n));
   const notDemo = cols.has("is_demo") ? "is_demo IS NOT TRUE" : "true";
 
-  // WHERE fragments per check (only wired if their columns exist).
+  // Each check exposes a `body` = the `FROM ... WHERE ...` portion of a query, so
+  // `SELECT count(*) <body>` and `SELECT id <body> LIMIT 3` both work uniformly.
+  // Wired only when the columns a check needs actually exist (schema-drift safe).
   const specs = [];
 
   if (has("status", "closedAt", "exit")) {
     specs.push({
       key: "closed_missing",
       severity: "high",
-      where: `${notDemo} AND status = 'CLOSED' AND ("closedAt" IS NULL OR exit IS NULL)`,
+      body: `FROM trades WHERE ${notDemo} AND status = 'CLOSED' AND ("closedAt" IS NULL OR exit IS NULL)`,
     });
   }
 
@@ -107,8 +109,8 @@ async function main() {
     specs.push({
       key: "bad_risk_geometry",
       severity: "high",
-      where:
-        `${notDemo} AND stop IS NOT NULL AND entry IS NOT NULL AND (` +
+      body:
+        `FROM trades WHERE ${notDemo} AND stop IS NOT NULL AND entry IS NOT NULL AND (` +
         `(side = 'LONG' AND stop >= entry) OR (side = 'SHORT' AND stop <= entry))`,
     });
   }
@@ -119,23 +121,44 @@ async function main() {
     specs.push({
       key: "pnl_sign_mismatch",
       severity: "medium",
-      where:
-        `${notDemo} AND status = 'CLOSED' AND entry IS NOT NULL AND exit IS NOT NULL AND (` +
+      body:
+        `FROM trades WHERE ${notDemo} AND status = 'CLOSED' AND entry IS NOT NULL AND exit IS NOT NULL AND (` +
         `("exitReason" ILIKE '%target%' AND ((side = 'LONG' AND exit < entry) OR (side = 'SHORT' AND exit > entry))) ` +
         `OR ("exitReason" ILIKE '%stop%' AND ((side = 'LONG' AND exit > entry) OR (side = 'SHORT' AND exit < entry))))`,
     });
   }
 
   if (has("date", "closedAt", "createdAt")) {
+    // `date` is free text. Postgres does NOT guarantee left-to-right AND evaluation,
+    // so a regex guard can't protect a `date::date` cast from a bad value. Instead a
+    // CASE (guaranteed short-circuit) runs `to_date` only on YYYY-MM-DD shapes, and
+    // `OFFSET 0` fences the outer date comparisons from being pushed below the CASE.
     specs.push({
       key: "impossible_dates",
       severity: "high",
-      where:
-        `${notDemo} AND (` +
-        `("closedAt" IS NOT NULL AND ${DATE_OK} AND "closedAt"::date < date::date) ` +
-        `OR (${DATE_OK} AND date::date > current_date) ` +
-        `OR ("closedAt" IS NOT NULL AND "closedAt" > now()) ` +
-        `OR ("createdAt" IS NOT NULL AND "createdAt" > now()))`,
+      body:
+        `FROM (SELECT id, "closedAt" AS ca, "createdAt" AS cta, ` +
+        `CASE WHEN ${DATE_OK} THEN to_date(date, 'YYYY-MM-DD') END AS d ` +
+        `FROM trades WHERE ${notDemo} OFFSET 0) s ` +
+        `WHERE (s.ca IS NOT NULL AND s.d IS NOT NULL AND s.ca::date < s.d) ` +
+        `OR (s.d IS NOT NULL AND s.d > current_date) ` +
+        `OR (s.ca IS NOT NULL AND s.ca > now()) ` +
+        `OR (s.cta IS NOT NULL AND s.cta > now())`,
+    });
+  }
+
+  if (has("ticker", "entry", "date")) {
+    // Duplicate suspects: same ticker + entry + date (grouped members).
+    const dupInner =
+      `SELECT ticker, entry, date FROM trades ` +
+      `WHERE ${notDemo} AND ticker IS NOT NULL AND entry IS NOT NULL AND date IS NOT NULL ` +
+      `GROUP BY ticker, entry, date HAVING count(*) > 1`;
+    specs.push({
+      key: "duplicate_suspects",
+      severity: "low",
+      body:
+        `FROM trades WHERE ${notDemo} AND ticker IS NOT NULL AND entry IS NOT NULL AND date IS NOT NULL ` +
+        `AND (ticker, entry, date) IN (${dupInner})`,
     });
   }
 
@@ -143,33 +166,15 @@ async function main() {
 
   for (const spec of specs) {
     try {
-      const count = Number(psqlScalar(`SELECT count(*) FROM trades WHERE ${spec.where}`));
+      const count = Number(psqlScalar(`SELECT count(*) ${spec.body}`));
       if (count > 0) {
-        const ids = psqlRows(`SELECT id FROM trades WHERE ${spec.where} LIMIT 3`).map((r) => r[0]);
+        const ids = psqlRows(`SELECT id ${spec.body} LIMIT 3`).map((r) => r[0]);
         findings.push({ check: spec.key, severity: spec.severity, count, sample_ids: ids });
       }
     } catch (e) {
-      console.error(`::warning::check ${spec.key} could not run — skipped.`);
-    }
-  }
-
-  // Duplicate suspects: same ticker + entry + date (grouped, not a plain WHERE).
-  if (has("ticker", "entry", "date")) {
-    const dupInner =
-      `SELECT ticker, entry, date FROM trades ` +
-      `WHERE ${notDemo} AND ticker IS NOT NULL AND entry IS NOT NULL AND date IS NOT NULL ` +
-      `GROUP BY ticker, entry, date HAVING count(*) > 1`;
-    const dupWhere =
-      `${notDemo} AND ticker IS NOT NULL AND entry IS NOT NULL AND date IS NOT NULL ` +
-      `AND (ticker, entry, date) IN (${dupInner})`;
-    try {
-      const count = Number(psqlScalar(`SELECT count(*) FROM trades WHERE ${dupWhere}`));
-      if (count > 0) {
-        const ids = psqlRows(`SELECT id FROM trades WHERE ${dupWhere} LIMIT 3`).map((r) => r[0]);
-        findings.push({ check: "duplicate_suspects", severity: "low", count, sample_ids: ids });
-      }
-    } catch (e) {
-      console.error("::warning::check duplicate_suspects could not run — skipped.");
+      // Surface the real psql error (never silently swallow) but keep the run green.
+      const detail = (e?.stderr || e?.message || "").toString().trim().replace(/\s+/g, " ");
+      console.error(`::warning::check ${spec.key} could not run — skipped. ${detail}`);
     }
   }
 
