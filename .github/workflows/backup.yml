@@ -1,0 +1,69 @@
+name: Supabase Backup
+
+on:
+  schedule:
+    - cron: '0 3 * * 0'   # Sundays 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      # PGDG client (v17) avoids "server version mismatch": ubuntu-latest's
+      # default postgresql-client can be older than Supabase's server, which
+      # makes pg_dump refuse to run.
+      - name: Install PostgreSQL 17 client
+        run: |
+          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+
+      - name: Dump, verify, compress, encrypt
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+
+          # Fail loudly if a secret is missing (clear message vs. a cryptic pg error)
+          if [ -z "${SUPABASE_DB_URL:-}" ]; then echo "::error::SUPABASE_DB_URL secret is not set"; exit 1; fi
+          if [ -z "${BACKUP_PASSPHRASE:-}" ]; then echo "::error::BACKUP_PASSPHRASE secret is not set"; exit 1; fi
+
+          DATE="$(date -u +%Y-%m-%d)"
+          echo "BACKUP_DATE=$DATE" >> "$GITHUB_ENV"
+
+          # 1. Dump to file (custom format, no ownership). Direct exit-code check.
+          pg_dump "$SUPABASE_DB_URL" --format=custom --no-owner -f dump.pgcustom
+
+          # 2. Assert a real dump (>10KB) BEFORE we spend effort / upload anything.
+          SIZE="$(stat -c%s dump.pgcustom)"
+          echo "Dump size: ${SIZE} bytes"
+          if [ "$SIZE" -lt 10240 ]; then
+            echo "::error::Dump is only ${SIZE} bytes (<10KB) — treating as failed/empty backup"
+            exit 1
+          fi
+
+          # 3. Compress -> dump.pgcustom.gz
+          gzip dump.pgcustom
+
+          # 4. Encrypt (AES-256-CBC + PBKDF2, salted). Passphrase via env (not argv).
+          openssl enc -aes-256-cbc -pbkdf2 -salt \
+            -in dump.pgcustom.gz \
+            -out "supabase-backup-${DATE}.pgcustom.gz.enc" \
+            -pass env:BACKUP_PASSPHRASE
+
+          # 5. Never let plaintext-derived data reach the artifact store.
+          rm -f dump.pgcustom.gz
+
+      - name: Upload encrypted artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-backup-${{ env.BACKUP_DATE }}
+          path: supabase-backup-${{ env.BACKUP_DATE }}.pgcustom.gz.enc
+          retention-days: 30
+          if-no-files-found: error   # fail loudly if the .enc somehow isn't there
+          compression-level: 0       # already gzipped+encrypted; don't re-compress
