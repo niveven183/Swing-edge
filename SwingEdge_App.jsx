@@ -2831,6 +2831,12 @@ export default function SwingEdge() {
                               style={{ width: `${Math.min(Math.abs(livePnlPct) * 10, 100)}%` }} />
                           </div>
                         )}
+                        <div className="mt-2 flex justify-end">
+                          <button onClick={() => { setClosingTrade(tr); setShowCloseForm(true); }}
+                            className="text-[10px] px-2 py-1 rounded bg-[#ef4444]/10 border border-[#ef4444]/20 text-[#ef4444] hover:opacity-80 transition">
+                            Close
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
