@@ -16,7 +16,7 @@ export default function TickerLogo({ ticker, size = 20, className = "" }) {
   return (
     <img
       src={`https://financialmodelingprep.com/image-stock/${cleanTicker}.png`}
-      alt={cleanTicker}
+      alt={`${cleanTicker} logo`}
       loading="lazy"
       className={`rounded-full bg-white/5 object-cover flex-shrink-0 ${className}`}
       style={{ width: size, height: size }}

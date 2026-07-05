@@ -123,6 +123,7 @@ function PasswordField({ show, onToggle, isRTL, ...rest }) {
         type="button"
         onClick={onToggle}
         tabIndex={-1}
+        aria-label={lang === "he" ? (show ? "הסתר סיסמה" : "הצג סיסמה") : (show ? "Hide password" : "Show password")}
         className={`absolute top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition ${isRTL ? "left-3" : "right-3"}`}
       >
         {show ? <EyeOff size={16} /> : <Eye size={16} />}

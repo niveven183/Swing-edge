@@ -54,7 +54,9 @@ function Toast({ toast, onClose }) {
     <div className={`pointer-events-auto flex items-start gap-2 rounded-xl ${s.bg} border ${s.border} ${s.text} px-4 py-3 shadow-2xl backdrop-blur-md animate-fade-in`}>
       <Icon size={16} className={`${s.iconColor} shrink-0 mt-0.5`} />
       <span className="flex-1 text-xs leading-relaxed">{message}</span>
-      <button onClick={onClose} className="text-slate-400 hover:text-white transition shrink-0">
+      <button onClick={onClose}
+        aria-label={typeof document !== "undefined" && document.documentElement.lang === "en" ? "Close" : "סגור"}
+        className="text-slate-400 hover:text-white transition shrink-0">
         <X size={14} />
       </button>
     </div>

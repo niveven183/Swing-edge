@@ -310,6 +310,7 @@ function Input({ icon: Icon, rightIcon: RightIcon, onRightClick, isRTL, ...rest 
           type="button"
           tabIndex={-1}
           onClick={onRightClick}
+          aria-label={isRTL ? "הצג/הסתר סיסמה" : "Show/hide password"}
           className={`absolute top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 ${isRTL ? "left-3" : "right-3"}`}
         >
           <RightIcon size={16} />
