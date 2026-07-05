@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef, useId, memo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, useId, memo, lazy, Suspense } from "react";
 import OnboardingScreen from "./src/components/OnboardingScreen.jsx";
 import AuthScreen from "./src/components/AuthScreen.jsx";
 import Logo from "./src/components/Logo.jsx";
@@ -9,7 +9,9 @@ import BetaWelcome from "./src/components/BetaWelcome.jsx";
 import OnboardingTour from "./src/components/OnboardingTour.jsx";
 import FeedbackTab from "./src/components/FeedbackTab.jsx";
 import IOSInstallBanner from "./src/components/IOSInstallBanner.jsx";
-import AdminPanel from "./src/components/AdminPanel.jsx";
+// Admin-only, self-contained, and off the normal tab flow → lazy-loaded so its
+// bundle (incl. recharts) is fetched only when an admin opens the Admin tab.
+const AdminPanel = lazy(() => import("./src/components/AdminPanel.jsx"));
 import EditTradeModal from "./src/components/EditTradeModal.jsx";
 import ResetAllModal from "./src/components/ResetAllModal.jsx";
 import ChangePasswordModal from "./src/components/ChangePasswordModal.jsx";
@@ -5387,7 +5389,9 @@ export default function SwingEdge() {
         {/* ══════════════ ADMIN (niveven183@gmail.com only) ══════════════ */}
         {tab === "admin" && (
           isAdmin ? (
-            <AdminPanel />
+            <Suspense fallback={<div className="flex items-center justify-center py-20 text-slate-400 text-sm">…</div>}>
+              <AdminPanel />
+            </Suspense>
           ) : (
             <div className="flex items-center justify-center py-20">
               <div className="max-w-md text-center bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-rose-500/30 rounded-2xl p-8 shadow-2xl">

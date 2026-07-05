@@ -27,6 +27,20 @@ export default defineConfig({
       release: { create: false, finalize: false },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        // Split the heaviest runtime vendors into their own chunks so the main
+        // app bundle stays small and each vendor caches independently.
+        // (html2canvas is not in the import graph, so it is intentionally omitted.)
+        manualChunks: {
+          recharts: ["recharts"],
+          sentry: ["@sentry/react"],
+          "date-fns": ["date-fns"],
+        },
+      },
+    },
+  },
   server: {
     proxy: {
       // Mirror the Vercel `api/symbol-search.js` function in local dev:
