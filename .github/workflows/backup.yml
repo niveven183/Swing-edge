@@ -12,15 +12,17 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     steps:
-      # PGDG client (v17) avoids "server version mismatch": ubuntu-latest's
-      # default postgresql-client can be older than Supabase's server, which
-      # makes pg_dump refuse to run.
+      # PGDG client (v17) avoids "server version mismatch": Supabase runs
+      # Postgres 17 and pg_dump must be >= the server. ubuntu-latest ships a
+      # v16 pg_dump at /usr/bin, so we install v17 AND prepend its bin dir to
+      # PATH (via $GITHUB_PATH) so the v17 binary wins in later steps.
       - name: Install PostgreSQL 17 client
         run: |
           sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
           curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
           sudo apt-get update
           sudo apt-get install -y postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
 
       - name: Dump, verify, compress, encrypt
         env:
@@ -37,6 +39,7 @@ jobs:
           echo "BACKUP_DATE=$DATE" >> "$GITHUB_ENV"
 
           # 1. Dump to file (custom format, no ownership). Direct exit-code check.
+          pg_dump --version   # must be >= Supabase server version
           pg_dump "$SUPABASE_DB_URL" --format=custom --no-owner -f dump.pgcustom
 
           # 2. Assert a real dump (>10KB) BEFORE we spend effort / upload anything.
