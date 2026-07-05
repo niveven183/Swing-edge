@@ -1,0 +1,60 @@
+name: Daily Digest
+
+# One Hebrew morning digest (07:00 Israel = 04:00 UTC) rolling up CI health, live
+# product health, open action items, and unresolved feedback — with a deeper
+# weekly section on Sundays. Read-only; reuses existing secrets. Replaces scattered
+# raw notifications with a single email.
+
+on:
+  schedule:
+    - cron: '0 4 * * *'   # 04:00 UTC = 07:00 Israel
+  workflow_dispatch:
+
+concurrency:
+  group: daily-digest
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+  actions: read          # required to read workflow-run conclusions (CI health)
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    env:
+      MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+      MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Compose digest
+        id: digest
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: node scripts/daily-digest.mjs
+
+      - name: Email digest
+        if: ${{ env.MAIL_USERNAME != '' && env.MAIL_PASSWORD != '' }}
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          from: SwingEdge Digest <${{ secrets.MAIL_USERNAME }}>
+          to: niveven183@gmail.com
+          subject: "☀️ SwingEdge — סיכום יומי (${{ steps.digest.outputs.date }})"
+          body: ${{ steps.digest.outputs.digest }}
+
+      - name: Note missing mail secrets
+        if: ${{ env.MAIL_USERNAME == '' || env.MAIL_PASSWORD == '' }}
+        run: echo "::warning::MAIL_USERNAME/MAIL_PASSWORD not set — email skipped, digest is in the job summary above."
