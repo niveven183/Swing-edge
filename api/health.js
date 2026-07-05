@@ -5,9 +5,14 @@
 // Each check gets a 5s timeout and never throws past itself — one bad
 // dependency reports as "failing", it never crashes the whole probe.
 //
+// TwelveData is credit-limited and prone to transient 429/timeout, so a single
+// blip must NOT page us — it is non-fatal (reported under `warnings`, still 200).
+// Supabase / Finnhub / CoinGecko stay hard-fail (503) since they're load-bearing.
+//
 //   GET /api/health
-//     → 200 { status: "ok", checks: { <service>: <ms>, ... } }      all pass
-//     → 503 { status: "degraded", failing: [...], checks: {...} }   any fail
+//     → 200 { status: "ok", checks: {...} }                         all pass
+//     → 200 { status: "ok", warnings: ["twelvedata"], checks }      only TwelveData down
+//     → 503 { status: "degraded", failing: [...], warnings, checks } a critical dep fails
 
 const FINNHUB_BASE = "https://finnhub.io/api/v1";
 const COINGECKO_BASE = "https://api.coingecko.com/api/v3";
@@ -73,6 +78,10 @@ const SERVICES = {
   coingecko: checkCoinGecko,
 };
 
+// Non-fatal deps: reported under `warnings`, never trigger a 503. TwelveData's
+// credit rate-limits (429/timeout) shouldn't page us on a transient blip.
+const NON_FATAL = new Set(["twelvedata"]);
+
 async function run(fn) {
   const start = Date.now();
   try {
@@ -101,10 +110,17 @@ export default async function handler(req, res) {
     if (!results[i].ok) failing.push(n);
   });
 
+  const criticalFailing = failing.filter((n) => !NON_FATAL.has(n));
+  const warnings = failing.filter((n) => NON_FATAL.has(n));
+
   res.setHeader("Cache-Control", "no-store");
-  if (failing.length === 0) {
-    res.status(200).json({ status: "ok", checks });
+  if (criticalFailing.length > 0) {
+    // A load-bearing dependency is down — page us.
+    res.status(503).json({ status: "degraded", failing: criticalFailing, warnings, checks });
+  } else if (warnings.length > 0) {
+    // Only TwelveData is down: visible in the body, but non-fatal (no 503).
+    res.status(200).json({ status: "ok", warnings, checks });
   } else {
-    res.status(503).json({ status: "degraded", failing, checks });
+    res.status(200).json({ status: "ok", checks });
   }
 }

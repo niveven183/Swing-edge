@@ -1,0 +1,221 @@
+name: Triage
+
+# On any monitored workflow failing, fetch its failed logs, ask Claude to
+# classify + recommend (Hebrew, <=4 lines), email Niv, and — ONLY for a
+# provably-safe lockfile regeneration — open a PR. Never touches main.
+
+on:
+  workflow_run:
+    workflows: ["Health Monitor", "Smoke Tests", "Build", "Supabase Backup"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Failed run id to triage"
+        required: true
+
+permissions:
+  contents: write        # branch + commit only, never main
+  pull-requests: write
+  issues: read
+  actions: read
+
+concurrency:
+  group: triage-${{ github.event.workflow_run.id || github.event.inputs.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  triage:
+    # Only act on real failures (or a manual dispatch).
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+      MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+    steps:
+      # ---- Resolve which run we're triaging (event or manual input) ----
+      - name: Resolve target run
+        id: target
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            RUN_ID="${{ github.event.inputs.run_id }}"
+          else
+            RUN_ID="${{ github.event.workflow_run.id }}"
+          fi
+          # Pull name + conclusion straight from the API so both trigger paths agree.
+          META="$(gh api "repos/${{ github.repository }}/actions/runs/${RUN_ID}" \
+                    --jq '{name: .name, conclusion: .conclusion, url: .html_url}')"
+          WF_NAME="$(echo "$META"    | jq -r '.name')"
+          CONCLUSION="$(echo "$META" | jq -r '.conclusion')"
+          RUN_URL="$(echo "$META"    | jq -r '.url')"
+          echo "run_id=$RUN_ID"        >> "$GITHUB_OUTPUT"
+          echo "wf_name=$WF_NAME"      >> "$GITHUB_OUTPUT"
+          echo "conclusion=$CONCLUSION">> "$GITHUB_OUTPUT"
+          echo "run_url=$RUN_URL"      >> "$GITHUB_OUTPUT"
+          echo "Triaging: $WF_NAME ($CONCLUSION) — $RUN_URL"
+
+      # ---- Step A: diagnose via Claude (Hebrew, <=4 lines) ----
+      - name: Diagnose
+        id: diagnose
+        run: |
+          set -uo pipefail
+          RUN_ID="${{ steps.target.outputs.run_id }}"
+          WF_NAME="${{ steps.target.outputs.wf_name }}"
+          CONCLUSION="${{ steps.target.outputs.conclusion }}"
+          RUN_URL="${{ steps.target.outputs.run_url }}"
+
+          # Grab failed-step logs, fall back to full log zip; keep only last 200 lines.
+          gh run view "$RUN_ID" --log-failed > /tmp/full.txt 2>/dev/null || true
+          if [ ! -s /tmp/full.txt ]; then
+            gh api "repos/${{ github.repository }}/actions/runs/${RUN_ID}/logs" \
+              > /tmp/logs.zip 2>/dev/null || true
+            if [ -s /tmp/logs.zip ]; then
+              unzip -p /tmp/logs.zip > /tmp/full.txt 2>/dev/null || true
+            fi
+          fi
+          tail -n 200 /tmp/full.txt > /tmp/log.txt || true
+          [ -s /tmp/log.txt ] || echo "(no logs retrieved)" > /tmp/log.txt
+
+          FALLBACK_HE="⚠️ טריאז' אוטומטי לא הצליח לנתח את הכשל. בדוק ידנית את הריצה: ${RUN_URL}"
+
+          # Build the request body with jq so log content can never break the JSON.
+          SYS='You are a CI triage assistant. Reply with STRICT JSON only, no prose, no markdown fences. Schema: {"class":"external-outage|our-bug|flaky|config","component":"<short>","summary_he":"<Hebrew, at most 4 short lines: diagnosis then ONE recommended action>"}. Never include secrets, tokens, or API keys in your output.'
+          USER="$(printf 'Workflow: %s\nConclusion: %s\nRun: %s\n\n--- last 200 log lines ---\n%s' \
+                    "$WF_NAME" "$CONCLUSION" "$RUN_URL" "$(cat /tmp/log.txt)")"
+          jq -n --arg sys "$SYS" --arg user "$USER" '{
+            model: "claude-sonnet-4-6",
+            max_tokens: 800,
+            system: $sys,
+            messages: [ { role: "user", content: $user } ]
+          }' > /tmp/req.json
+
+          HTTP=$(curl -sS -o /tmp/resp.json -w '%{http_code}' \
+            https://api.anthropic.com/v1/messages \
+            -H "x-api-key: ${ANTHROPIC_API_KEY}" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" \
+            --data @/tmp/req.json) || HTTP="000"
+
+          CLASS="unknown"; COMPONENT="unknown"; SUMMARY_HE="$FALLBACK_HE"
+          if [ "$HTTP" = "200" ]; then
+            TEXT="$(jq -r '.content[0].text // empty' /tmp/resp.json)"
+            # Model may wrap JSON; strip to the outermost braces before parsing.
+            CLEAN="$(printf '%s' "$TEXT" | sed -n 's/^[^{]*\({.*}\)[^}]*$/\1/p')"
+            [ -n "$CLEAN" ] || CLEAN="$TEXT"
+            if echo "$CLEAN" | jq -e . >/dev/null 2>&1; then
+              CLASS="$(echo "$CLEAN"      | jq -r '.class      // "unknown"')"
+              COMPONENT="$(echo "$CLEAN"  | jq -r '.component  // "unknown"')"
+              SUMMARY_HE="$(echo "$CLEAN" | jq -r '.summary_he // empty')"
+              [ -n "$SUMMARY_HE" ] || SUMMARY_HE="$FALLBACK_HE"
+            fi
+          else
+            echo "::warning::Claude API call failed (HTTP $HTTP) — degrading to raw run link"
+          fi
+
+          # Always surface the Hebrew diagnosis in the job summary (visible w/o email).
+          {
+            echo "### 🔍 Triage: $WF_NAME ($CONCLUSION)"
+            echo ""
+            echo "**class:** \`$CLASS\` — **component:** \`$COMPONENT\`"
+            echo ""
+            echo "$SUMMARY_HE"
+            echo ""
+            echo "[Failed run]($RUN_URL)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          {
+            echo "class=$CLASS"
+            echo "component=$COMPONENT"
+            echo "run_url=$RUN_URL"
+          } >> "$GITHUB_OUTPUT"
+          # Multiline Hebrew via heredoc-style delimiter.
+          {
+            echo "summary_he<<HE_EOF"
+            echo "$SUMMARY_HE"
+            echo "HE_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      # ---- Step B: email Niv the Hebrew diagnosis (degrades if secrets absent) ----
+      - name: Email diagnosis
+        if: ${{ env.MAIL_USERNAME != '' && env.MAIL_PASSWORD != '' }}
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          from: SwingEdge Triage <${{ secrets.MAIL_USERNAME }}>
+          to: niveven183@gmail.com
+          subject: "🔍 Triage: ${{ steps.target.outputs.wf_name }} ${{ steps.target.outputs.conclusion }}"
+          body: |
+            ${{ steps.diagnose.outputs.summary_he }}
+
+            ריצה שנכשלה: ${{ steps.diagnose.outputs.run_url }}
+
+      - name: Note missing mail secrets
+        if: ${{ env.MAIL_USERNAME == '' || env.MAIL_PASSWORD == '' }}
+        run: echo "::warning::MAIL_USERNAME/MAIL_PASSWORD not set — email skipped, diagnosis is in the job summary above."
+
+      # ---- Step C: safe-fix, lockfile-only. Skips unless CLASS==our-bug + install signature ----
+      - name: Detect lockfile-fix eligibility
+        id: eligible
+        run: |
+          set -uo pipefail
+          OK="no"
+          if [ "${{ steps.diagnose.outputs.class }}" = "our-bug" ]; then
+            if grep -qiE 'npm ci|npm error|EUSAGE|lock file|out of sync|npm ERR|Missing: ' /tmp/log.txt; then
+              OK="yes"
+            fi
+          fi
+          echo "ok=$OK" >> "$GITHUB_OUTPUT"
+          echo "lockfile-fix eligible: $OK"
+
+      - name: Checkout for fix
+        if: ${{ steps.eligible.outputs.ok == 'yes' }}
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        if: ${{ steps.eligible.outputs.ok == 'yes' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Regenerate lockfile & open PR (exact-diff guarded)
+        if: ${{ steps.eligible.outputs.ok == 'yes' }}
+        run: |
+          set -euo pipefail
+          RUN_ID="${{ steps.target.outputs.run_id }}"
+          rm -f package-lock.json
+          npm install --package-lock-only --ignore-scripts
+
+          CHANGED="$(git diff --name-only)"
+          echo "Changed files: [$CHANGED]"
+          # HARD GUARD: proceed only if the ONLY change is package-lock.json.
+          if [ "$CHANGED" != "package-lock.json" ]; then
+            echo "::warning::Lockfile regen touched '$CHANGED' (not exactly package-lock.json) — aborting safe-fix, no PR."
+            exit 0
+          fi
+
+          BRANCH="triage/fix-${RUN_ID}"
+          git config user.name  "swingedge-triage[bot]"
+          git config user.email "triage@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add package-lock.json
+          git commit -m "fix(triage): regenerate package-lock.json"
+          git push -u origin "$BRANCH"
+
+          BODY="$(printf 'אבחון אוטומטי (%s):\n\n%s\n\nריצה שנכשלה: %s\n\n_נוצר אוטומטית ע\"י Triage — לבדיקה לפני מיזוג. עובר דרך Build+Smoke._' \
+                    "${{ steps.diagnose.outputs.component }}" \
+                    "${{ steps.diagnose.outputs.summary_he }}" \
+                    "${{ steps.diagnose.outputs.run_url }}")"
+          gh pr create \
+            --base main --head "$BRANCH" \
+            --title "fix(triage): ${{ steps.diagnose.outputs.component }} lockfile regenerate" \
+            --body "$BODY" \
+            --label agent-fix
