@@ -60,9 +60,6 @@ const HE = {
   duplicate_suspects: "חשד לכפילויות (טיקר + כניסה + תאריך זהים)",
 };
 
-// YYYY-MM-DD guard so the free-text `date` column can't crash a ::date cast.
-const DATE_OK = "date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'";
-
 // ── main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -129,21 +126,17 @@ async function main() {
   }
 
   if (has("date", "closedAt", "createdAt")) {
-    // `date` is free text. Postgres does NOT guarantee left-to-right AND evaluation,
-    // so a regex guard can't protect a `date::date` cast from a bad value. Instead a
-    // CASE (guaranteed short-circuit) runs `to_date` only on YYYY-MM-DD shapes, and
-    // `OFFSET 0` fences the outer date comparisons from being pushed below the CASE.
+    // `date` is a native Postgres date column, so it compares directly (no cast/regex).
+    // Flags: closed before entry, a future entry date, or future close/create stamps.
     specs.push({
       key: "impossible_dates",
       severity: "high",
       body:
-        `FROM (SELECT id, "closedAt" AS ca, "createdAt" AS cta, ` +
-        `CASE WHEN ${DATE_OK} THEN to_date(date, 'YYYY-MM-DD') END AS d ` +
-        `FROM trades WHERE ${notDemo} OFFSET 0) s ` +
-        `WHERE (s.ca IS NOT NULL AND s.d IS NOT NULL AND s.ca::date < s.d) ` +
-        `OR (s.d IS NOT NULL AND s.d > current_date) ` +
-        `OR (s.ca IS NOT NULL AND s.ca > now()) ` +
-        `OR (s.cta IS NOT NULL AND s.cta > now())`,
+        `FROM trades WHERE ${notDemo} AND (` +
+        `("closedAt" IS NOT NULL AND "closedAt"::date < date) ` +
+        `OR (date > current_date) ` +
+        `OR ("closedAt" IS NOT NULL AND "closedAt" > now()) ` +
+        `OR ("createdAt" IS NOT NULL AND "createdAt" > now()))`,
     });
   }
 
