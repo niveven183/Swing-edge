@@ -7,18 +7,14 @@ import {
 import { he as heLocale } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { nTrades } from '../i18n.js';
+import { localDayKey } from '../utils.js';
 import DayTradesModal from './DayTradesModal.jsx';
 
 // Day a CLOSED trade belongs to = the day it was closed (its realized P&L lands then).
 // `closedAt` is a full ISO timestamp written on close; `date`/`exitDate` may be a plain
-// 'YYYY-MM-DD'. Demo/legacy trades carry only `date` (entry) → fall back to it. Returns a
-// LOCAL 'YYYY-MM-DD' so a late-evening close doesn't roll into the next UTC day.
+// 'YYYY-MM-DD'. Demo/legacy trades carry only `date` (entry) → fall back to it.
 function dayKeyOf(t) {
-  const raw = t.closedAt || t.exitDate || t.date || t.openDate || t.createdAt;
-  if (!raw) return null;
-  if (typeof raw === 'string' && raw.length === 10 && raw[4] === '-') return raw;
-  const d = new Date(raw);
-  return isNaN(d.getTime()) ? null : format(d, 'yyyy-MM-dd');
+  return localDayKey(t.closedAt || t.exitDate || t.date || t.openDate || t.createdAt);
 }
 
 // trades: array of trade objects (closed trades preferred — open trades show 0 P&L).

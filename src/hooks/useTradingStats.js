@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { isFollowedPlan, isOffPlan, qstars } from "../utils.js";
+import { isFollowedPlan, isOffPlan, qstars, holdDays } from "../utils.js";
 import { edgeScore, wilsonLowerBound } from "../intelligence/utils/statisticalModels.js";
 
 /**
@@ -111,11 +111,11 @@ export function useTradingStats(trades, capital, calcTradeMetrics) {
     const antiEdges = findEdges(metrics, "anti");
 
     // ─── Hold time ─────────────────────────────────────────────
-    const withDates = metrics.filter(m => m.date && m.exitDate);
-    const avgHoldHours = withDates.length
-      ? withDates.reduce((s, m) => s + (new Date(m.exitDate) - new Date(m.date)) / 3600000, 0) / withDates.length
+    const holdValues = metrics.map(m => holdDays(m)).filter(d => d != null);
+    const avgHoldDays = holdValues.length
+      ? holdValues.reduce((s, d) => s + d, 0) / holdValues.length
       : 0;
-    const avgHoldDays = avgHoldHours / 24;
+    const avgHoldHours = avgHoldDays * 24;
 
     return {
       // counts

@@ -19,7 +19,7 @@ import TickerLogo from "./src/components/TickerLogo.jsx";
 import { TVTickerTape } from "./src/components/TradingViewWidgets.jsx";
 import { useToast, useConfirm } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured, tradeForSupabase } from "./src/supabaseClient.js";
-import { calcTradeMetrics, fmt$, fmtR, formatPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL } from "./src/utils.js";
+import { calcTradeMetrics, fmt$, fmtR, formatPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays } from "./src/utils.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell,
@@ -1639,15 +1639,7 @@ export default function SwingEdge() {
   }, []);
 
   // ─── JOURNAL PRO: filtered view + stats ─────────────────────────────────────
-  const holdTimeDays = (t) => {
-    if (!t.date || !t.exitDate) return null;
-    try {
-      const d1 = new Date(t.date).getTime();
-      const d2 = new Date(t.exitDate).getTime();
-      if (!d1 || !d2) return null;
-      return Math.max(0, Math.round((d2 - d1) / 86400000));
-    } catch { return null; }
-  };
+  const holdTimeDays = (t) => holdDays(t);
 
   const filteredTrades = useMemo(() => {
     const f = journalFilters;
@@ -3403,7 +3395,7 @@ export default function SwingEdge() {
                           {(() => {
                             const d = holdTimeDays(t);
                             if (typeof d !== "number") return <span className="text-slate-700">–</span>;
-                            return `${d}d`;
+                            return d === 0 ? "<1d" : `${d}d`;
                           })()}
                         </td>
                         <td className="p-3"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 whitespace-nowrap">{t.setup}</span></td>
@@ -4392,9 +4384,9 @@ export default function SwingEdge() {
               // 6. Hold Time vs P&L
               const holdScatter = closedTrades.map(t => {
                 const { pnl } = calcTradeMetrics(t);
-                if (pnl == null || !t.date || !t.exitDate) return null;
-                const hold = Math.max(1, Math.round((new Date(t.exitDate) - new Date(t.date)) / 86400000));
-                return { hold, pnl: Math.round(pnl), ticker: t.ticker };
+                const hold = holdDays(t);
+                if (pnl == null || hold == null) return null;
+                return { hold: Math.max(1, hold), pnl: Math.round(pnl), ticker: t.ticker };
               }).filter(Boolean);
 
               const darkTooltip = { background: "#0d1424", border: "1px solid #162032", borderRadius: 10, fontSize: 11, color: "#e2e8f0" };

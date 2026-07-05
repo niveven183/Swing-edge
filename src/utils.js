@@ -1,5 +1,31 @@
+import { format } from "date-fns";
+
 export const DEFAULT_CAPITAL = 2500;
 export const RISK_PCT = 0.01;
+
+// Returns a LOCAL 'YYYY-MM-DD' key for a date-ish value (full ISO timestamp
+// or an already-a-day string). Avoids toISOString(), which would roll a
+// late-evening local timestamp into the next UTC day.
+export const localDayKey = (raw) => {
+  if (!raw) return null;
+  if (typeof raw === "string" && raw.length === 10 && raw[4] === "-") return raw;
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? null : format(d, "yyyy-MM-dd");
+};
+
+// Hold time in calendar days: the day a trade was closed (`closedAt`,
+// falling back to the legacy `exitDate`) minus the day it was entered
+// (`date`). `closedAt` is written on every close; `exitDate` is never
+// written by the normal close flow, only by manual edits.
+export const holdDays = (trade) => {
+  const startKey = localDayKey(trade?.date);
+  const endKey = localDayKey(trade?.closedAt || trade?.exitDate);
+  if (!startKey || !endKey) return null;
+  const d1 = new Date(startKey + "T00:00:00").getTime();
+  const d2 = new Date(endKey + "T00:00:00").getTime();
+  if (isNaN(d1) || isNaN(d2)) return null;
+  return Math.max(0, Math.round((d2 - d1) / 86400000));
+};
 
 export const calcTradeMetrics = (trade) => {
   if (!trade.exit) return { pnl: null, rMultiple: null };
