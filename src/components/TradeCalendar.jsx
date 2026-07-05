@@ -7,6 +7,7 @@ import {
 import { he as heLocale } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { nTrades } from '../i18n.js';
+import DayTradesModal from './DayTradesModal.jsx';
 
 // Day a CLOSED trade belongs to = the day it was closed (its realized P&L lands then).
 // `closedAt` is a full ISO timestamp written on close; `date`/`exitDate` may be a plain
@@ -159,7 +160,7 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he' }) {
             <button
               key={key}
               type="button"
-              onClick={() => setSelectedDate(isSelected ? null : day)}
+              onClick={() => { if (hasTrades) setSelectedDate(day); }}
               aria-label={`${format(day, lang === 'he' ? 'dd/MM/yyyy' : 'MMMM d, yyyy', { locale })}${hasTrades ? ` — ${nTrades(dayTrades.length, lang)}` : ''}`}
               aria-pressed={isSelected ? true : false}
               className={`
@@ -214,52 +215,15 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he' }) {
         })}
       </div>
 
-      {/* Selected day panel */}
-      {selectedDate && (
-        <div className="border-t border-slate-100 dark:border-white/[0.06] bg-slate-50/50 dark:bg-white/[0.04] p-4">
-          <h4 className="font-medium text-slate-700 dark:text-slate-200 mb-3 text-sm">
-            {format(selectedDate, lang === 'he' ? 'dd בMMMM yyyy' : 'MMMM dd, yyyy', { locale })}
-          </h4>
-
-          {selectedTrades.length === 0 ? (
-            <p className="text-sm text-slate-400 dark:text-slate-500">
-              {lang === 'he' ? 'אין עסקאות ביום זה' : 'No trades this day'}
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {selectedTrades.map((t, i) => {
-                const { pnl, rMultiple } = metricsOf(t);
-                return (
-                  <div key={t.id || i}
-                    className="flex items-center justify-between p-3 bg-white dark:bg-white/[0.06] rounded-xl border border-slate-100 dark:border-white/[0.06]">
-                    <div className="flex items-center gap-3">
-                      <span className="font-mono font-semibold text-slate-800 dark:text-slate-200 text-sm">
-                        {t.ticker}
-                      </span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium
-                        ${t.side === 'LONG'
-                          ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
-                          : 'bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400'}`}>
-                        {t.side || 'LONG'}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <div className={`font-mono font-semibold text-sm
-                        ${(pnl || 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                        {(pnl || 0) >= 0 ? '+' : ''}${(pnl || 0).toFixed(2)}
-                      </div>
-                      {rMultiple !== null && rMultiple !== undefined && (
-                        <div className="text-xs text-slate-400 dark:text-slate-500 font-mono">
-                          {rMultiple >= 0 ? '+' : ''}{rMultiple.toFixed(2)}R
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+      {/* Day drill-down modal */}
+      {selectedKey && selectedTrades.length > 0 && (
+        <DayTradesModal
+          dateKey={selectedKey}
+          trades={selectedTrades}
+          calcMetrics={calcMetrics}
+          lang={lang}
+          onClose={() => setSelectedDate(null)}
+        />
       )}
     </div>
   );

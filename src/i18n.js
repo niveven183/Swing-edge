@@ -308,6 +308,18 @@ const en = {
   followedPlan: "Followed Plan?",
   lessonLearned: "Lesson Learned",
 
+  // Trade calendar — day drill-down
+  cal_pnl: "P&L",
+  cal_entry: "Entry",
+  cal_exit: "Exit",
+  cal_setup: "Setup",
+  cal_emotion: "Emotion",
+  cal_planFollowed: "Plan followed",
+  cal_rMultiple: "R",
+  cal_noTrades: "No trades this day",
+  cal_prevTrade: "Previous trade",
+  cal_nextTrade: "Next trade",
+
   // Edit trade
   editTrade: "Edit Trade",
   saveChanges: "Save Changes",
@@ -748,6 +760,18 @@ const he = {
   followedPlan: "עקבת אחר התוכנית?",
   lessonLearned: "לקח שנלמד",
 
+  // Trade calendar — day drill-down
+  cal_pnl: "רווח/הפסד",
+  cal_entry: "כניסה",
+  cal_exit: "יציאה",
+  cal_setup: "סטאפ",
+  cal_emotion: "רגש",
+  cal_planFollowed: "עקב אחר התוכנית",
+  cal_rMultiple: "R",
+  cal_noTrades: "אין עסקאות ביום זה",
+  cal_prevTrade: "עסקה קודמת",
+  cal_nextTrade: "עסקה הבאה",
+
   // Edit trade
   editTrade: "עריכת עסקה",
   saveChanges: "שמור שינויים",
@@ -1166,6 +1190,18 @@ const es = {
   followedPlan: "¿Seguiste el Plan?",
   lessonLearned: "Lección Aprendida",
 
+  // Trade calendar — day drill-down
+  cal_pnl: "P&L",
+  cal_entry: "Entrada",
+  cal_exit: "Salida",
+  cal_setup: "Setup",
+  cal_emotion: "Emoción",
+  cal_planFollowed: "Siguió el plan",
+  cal_rMultiple: "R",
+  cal_noTrades: "Sin operaciones este día",
+  cal_prevTrade: "Operación anterior",
+  cal_nextTrade: "Operación siguiente",
+
   // Edit trade
   editTrade: "Editar Operación",
   saveChanges: "Guardar Cambios",
@@ -1527,6 +1563,18 @@ const pt = {
   followedPlan: "Seguiu o Plano?",
   lessonLearned: "Lição Aprendida",
 
+  // Trade calendar — day drill-down
+  cal_pnl: "P&L",
+  cal_entry: "Entrada",
+  cal_exit: "Saída",
+  cal_setup: "Setup",
+  cal_emotion: "Emoção",
+  cal_planFollowed: "Seguiu o plano",
+  cal_rMultiple: "R",
+  cal_noTrades: "Nenhuma negociação neste dia",
+  cal_prevTrade: "Negociação anterior",
+  cal_nextTrade: "Próxima negociação",
+
   // Edit trade
   editTrade: "Editar Operação",
   saveChanges: "Salvar Alterações",
@@ -1887,6 +1935,18 @@ const ar = {
   exitReason: "سبب الخروج",
   followedPlan: "هل اتبعت الخطة؟",
   lessonLearned: "الدرس المستفاد",
+
+  // Trade calendar — day drill-down
+  cal_pnl: "الربح/الخسارة",
+  cal_entry: "دخول",
+  cal_exit: "خروج",
+  cal_setup: "الإعداد",
+  cal_emotion: "المشاعر",
+  cal_planFollowed: "اتبع الخطة",
+  cal_rMultiple: "R",
+  cal_noTrades: "لا صفقات في هذا اليوم",
+  cal_prevTrade: "الصفقة السابقة",
+  cal_nextTrade: "الصفقة التالية",
 
   // Edit trade
   editTrade: "تعديل الصفقة",
