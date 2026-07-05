@@ -7,6 +7,7 @@
 // bearing REGIMES enums so every downstream consumer stays back-compatible.
 
 import { getClosed, groupBy } from "../utils/statisticalModels.js";
+import { getRegimeSizing } from "../calibration.js";
 
 export const REGIMES = {
   BULL_TREND:      "BULL_TREND",
@@ -239,6 +240,15 @@ const ADVICE = {
   },
 };
 
+// Advice payload for a regime, with the position-size multiplier calibrated
+// via calibration.json. Falls back to the literal ADVICE sizing, so an empty
+// file yields the exact same object as before. All other advice fields are
+// untouched (load-bearing strings and setup lists stay hardcoded).
+const adviceFor = (regime) => {
+  const base = ADVICE[regime] || ADVICE[REGIMES.UNKNOWN];
+  return { ...base, sizing: getRegimeSizing(regime, base.sizing) };
+};
+
 // ─── PUBLIC API ──────────────────────────────────────────────────────────────
 // Returns the regime plus the advice payload needed to render an indicator.
 // Second arg accepts { marketData, snapshot }; a bare snapshot object is still
@@ -253,7 +263,7 @@ export const detectMarketRegime = (trades = [], opts = {}) => {
     return {
       ...fromMarket,
       source: "market",
-      advice: ADVICE[fromMarket.regime] || ADVICE[REGIMES.UNKNOWN],
+      advice: adviceFor(fromMarket.regime),
       snapshot: snapshot || null,
       updatedAt: new Date().toISOString(),
     };
@@ -264,7 +274,7 @@ export const detectMarketRegime = (trades = [], opts = {}) => {
   return {
     regime,
     source: fromSnap !== REGIMES.UNKNOWN ? "snapshot" : "trades",
-    advice: ADVICE[regime] || ADVICE[REGIMES.UNKNOWN],
+    advice: adviceFor(regime),
     confidence: fromSnap !== REGIMES.UNKNOWN ? "medium" : (getClosed(trades).length ? "low" : "insufficient"),
     trendBias: null,
     volatility: null,

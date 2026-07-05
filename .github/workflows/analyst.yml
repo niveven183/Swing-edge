@@ -1,0 +1,125 @@
+name: Analyst
+
+# Weekly (Sunday 06:00 UTC, pre-digest) statistical feedback-loop analysis of the
+# trades data (read-only). Emails Niv a Hebrew report every week. ONLY when a
+# proposal clears the high-confidence bar (n>=15 AND Wilson CI excludes 50%) does
+# it write src/intelligence/calibration.json and open a PR labeled "engine-tuning".
+# It never edits engine logic and never merges — Niv reviews every PR.
+
+on:
+  schedule:
+    - cron: '0 6 * * 0'   # Sunday 06:00 UTC (before the 04:00-cron daily digest cycle)
+  workflow_dispatch:
+
+concurrency:
+  group: analyst
+  cancel-in-progress: false
+
+permissions:
+  contents: write        # push a proposal BRANCH only — never main, never merge
+  pull-requests: write   # open the calibration PR
+  issues: read           # read context; label application is best-effort (see below)
+
+jobs:
+  analyst:
+    runs-on: ubuntu-latest
+    env:
+      MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+      MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # The analyst imports canonical trade math from src/ (date-fns), so deps
+      # must be installed — unlike the self-contained guardian/digest scripts.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Analyst
+        id: analyst
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: node scripts/analyst.mjs
+
+      - name: Email weekly analysis
+        if: ${{ steps.analyst.outputs.email_he != '' && env.MAIL_USERNAME != '' && env.MAIL_PASSWORD != '' }}
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          from: SwingEdge Analyst <${{ secrets.MAIL_USERNAME }}>
+          to: niveven183@gmail.com
+          subject: "🧠 SwingEdge — ניתוח שבועי (${{ steps.analyst.outputs.date }})"
+          body: ${{ steps.analyst.outputs.email_he }}
+
+      - name: Note missing mail secrets
+        if: ${{ steps.analyst.outputs.email_he != '' && (env.MAIL_USERNAME == '' || env.MAIL_PASSWORD == '') }}
+        run: echo "::warning::MAIL_USERNAME/MAIL_PASSWORD not set — email skipped, the report is in the job summary above."
+
+      # ── Dormant PR path — only when a high-confidence proposal was written ──
+      - name: Push calibration branch
+        id: branch
+        if: ${{ steps.analyst.outputs.has_proposal == '1' }}
+        env:
+          RUN_DATE: ${{ steps.analyst.outputs.date }}
+        run: |
+          set -euo pipefail
+          BRANCH="analyst/calibration-${RUN_DATE}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add src/intelligence/calibration.json
+          git commit -m "🧠 Analyst: calibration proposal (${RUN_DATE})"
+          git push --force-with-lease -u origin "$BRANCH"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+
+      - name: Open calibration PR
+        if: ${{ steps.analyst.outputs.has_proposal == '1' }}
+        uses: actions/github-script@v7
+        env:
+          BRANCH: ${{ steps.branch.outputs.branch }}
+          PR_TITLE: ${{ steps.analyst.outputs.pr_title }}
+          PR_BODY: ${{ steps.analyst.outputs.pr_body }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const head = process.env.BRANCH;
+            const title = process.env.PR_TITLE;
+            const body = process.env.PR_BODY;
+
+            // Create or refresh the PR from the proposal branch.
+            const existing = await github.rest.pulls.list({
+              owner, repo, state: 'open', head: `${owner}:${head}`,
+            });
+            let num;
+            if (existing.data.length) {
+              num = existing.data[0].number;
+              await github.rest.pulls.update({ owner, repo, pull_number: num, title, body });
+            } else {
+              const pr = await github.rest.pulls.create({ owner, repo, title, body, head, base: 'main' });
+              num = pr.data.number;
+            }
+
+            // Label is best-effort: applying labels needs the Issues scope, which
+            // is intentionally read-only here. The PR is the load-bearing output;
+            // the label is a nicety. Never fail the run over it.
+            try {
+              const label = 'engine-tuning';
+              try { await github.rest.issues.getLabel({ owner, repo, name: label }); }
+              catch (e) {
+                if (e.status === 404) {
+                  await github.rest.issues.createLabel({ owner, repo, name: label, color: '8250df', description: 'Analyst calibration proposals' });
+                } else { throw e; }
+              }
+              await github.rest.issues.addLabels({ owner, repo, issue_number: num, labels: [label] });
+            } catch (e) {
+              core.warning(`Could not apply 'engine-tuning' label (needs issues:write) — PR #${num} opened without it. ${e.message}`);
+            }
+            core.notice(`Calibration PR #${num} ready for review: ${context.serverUrl}/${owner}/${repo}/pull/${num}`);

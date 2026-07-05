@@ -10,6 +10,7 @@ import { matchIdeaToEdge, matchIdeaToAntiEdge } from "./EdgeFinder.js";
 import { getPersonalizedRecommendations } from "./TradeDNA.js";
 import { isSetupCompatible } from "./MarketRegime.js";
 import { qstars } from "../../utils.js";
+import { getEmotionWeight } from "../calibration.js";
 
 // Utility — build a derived "idea" from the raw trade form fields.
 const ideaFromForm = (form) => {
@@ -214,14 +215,14 @@ const setupMarketComboCheck = (trades, idea) => {
 const emotionalCheck = (dna, idea) => {
   if (!idea.emotionAtEntry) return null;
   if (idea.emotionAtEntry === "FOMO") return {
-    icon: "🚨", kind: "skip", weight: -15,
+    icon: "🚨", kind: "skip", weight: getEmotionWeight("FOMO", -15),
     text: {
       en: "FOMO entry — historically your worst emotional state. Wait 15 minutes.",
       he: "כניסה מתוך FOMO — היסטורית המצב הרגשי הכי גרוע שלך. חכה 15 דקות.",
     },
   };
   if (idea.emotionAtEntry === "Confident") return {
-    icon: "🧠", kind: "go", weight: 6,
+    icon: "🧠", kind: "go", weight: getEmotionWeight("Confident", 6),
     text: {
       en: "Confident state — stay mechanical and respect your stop.",
       he: "מצב בטוח — שמור על משמעת וכבד את הסטופ.",
