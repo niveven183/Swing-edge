@@ -1,0 +1,107 @@
+name: Data Guardian
+
+# Every 3 days, validate the trades data in Supabase (read-only) and notify Niv
+# ONLY when integrity findings exist: a Hebrew email + a GitHub issue labeled
+# "data-quality". A clean run is silent — no email, no issue, green CI.
+
+on:
+  schedule:
+    - cron: '0 5 */3 * *'   # 05:00 UTC every 3rd day
+  workflow_dispatch:
+
+concurrency:
+  group: data-guardian
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  guardian:
+    runs-on: ubuntu-latest
+    env:
+      MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+      MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run Data Guardian
+        id: guard
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: node scripts/data-guardian.mjs
+
+      - name: Email findings
+        if: ${{ steps.guard.outputs.findings != '0' && env.MAIL_USERNAME != '' && env.MAIL_PASSWORD != '' }}
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          from: SwingEdge Data Guardian <${{ secrets.MAIL_USERNAME }}>
+          to: niveven183@gmail.com
+          subject: "🛡️ Data Guardian: ${{ steps.guard.outputs.findings }} findings (${{ steps.guard.outputs.date }})"
+          body: ${{ steps.guard.outputs.summary_he }}
+
+      - name: Note missing mail secrets
+        if: ${{ steps.guard.outputs.findings != '0' && (env.MAIL_USERNAME == '' || env.MAIL_PASSWORD == '') }}
+        run: echo "::warning::MAIL_USERNAME/MAIL_PASSWORD not set — email skipped, findings are in the job summary above."
+
+      - name: Create or update data-quality issue
+        if: ${{ steps.guard.outputs.findings != '0' }}
+        uses: actions/github-script@v7
+        env:
+          FINDINGS: ${{ steps.guard.outputs.findings }}
+          RUN_DATE: ${{ steps.guard.outputs.date }}
+          TABLE: ${{ steps.guard.outputs.issue_table }}
+        with:
+          script: |
+            const label = 'data-quality';
+            const { owner, repo } = context.repo;
+
+            // Ensure the label exists (create it if missing).
+            try {
+              await github.rest.issues.getLabel({ owner, repo, name: label });
+            } catch (e) {
+              if (e.status === 404) {
+                await github.rest.issues.createLabel({
+                  owner, repo, name: label, color: 'd93f0b',
+                  description: 'Automated trades data-quality findings',
+                });
+              } else { throw e; }
+            }
+
+            const n = process.env.FINDINGS;
+            const date = process.env.RUN_DATE;
+            const body = [
+              `🛡️ **Data Guardian** found **${n}** finding(s) on ${date}.`,
+              '',
+              process.env.TABLE,
+              '',
+              '_IDs only — full trade rows are never exported (privacy). Run: '
+                + `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}_`,
+            ].join('\n');
+            const title = `🛡️ Data Guardian — ${n} findings (${date})`;
+
+            // Reuse the newest open issue carrying the label; otherwise open one.
+            const existing = await github.rest.issues.listForRepo({
+              owner, repo, state: 'open', labels: label, per_page: 1,
+            });
+            if (existing.data.length > 0) {
+              const num = existing.data[0].number;
+              await github.rest.issues.update({ owner, repo, issue_number: num, title, body });
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: num,
+                body: `🔄 Refreshed ${date}: ${n} finding(s). See body table above.`,
+              });
+            } else {
+              await github.rest.issues.create({ owner, repo, title, body, labels: [label] });
+            }
