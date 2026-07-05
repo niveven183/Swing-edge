@@ -3311,7 +3311,7 @@ export default function SwingEdge() {
                   </tr>
                 </thead>
                 <tbody>
-                  {[...filteredTrades].reverse().map(t => {
+                  {[...filteredTrades].sort((a, b) => String(b.date || "").localeCompare(String(a.date || ""))).map(t => {
                     const { pnl, rMultiple } = calcTradeMetrics(t);
                     const isOpen = t.status === "OPEN";
                     const win = !isOpen && pnl > 0;
