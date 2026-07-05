@@ -72,13 +72,20 @@ const REGIME_OF = {
 };
 
 // ── psql helper (identical shape to data-guardian.mjs) ───────────────────────
+// The RO prefix runs in the same -c batch as the query, so psql prints a "SET"
+// command-status tag on its own line ahead of the result. Drop those tag lines
+// before parsing — otherwise JSON.parse chokes on "SET\n[{...}]".
+const STATUS_TAG = /^(SET|BEGIN|COMMIT|ROLLBACK)$/;
+const stripStatus = (out) =>
+  out.split("\n").filter((l) => !STATUS_TAG.test(l.trim()));
+
 function psqlScalar(sql) {
   const out = execFileSync("psql", [SUPABASE_DB_URL, "-tAc", `${RO} ${sql}`], {
     encoding: "utf8",
     timeout: 20000,
     stdio: ["ignore", "pipe", "pipe"],
   });
-  return out.trim();
+  return stripStatus(out).join("\n").trim();
 }
 
 function psqlRows(sql) {
@@ -87,7 +94,7 @@ function psqlRows(sql) {
     timeout: 20000,
     stdio: ["ignore", "pipe", "pipe"],
   });
-  return out.trim().split("\n").filter(Boolean).map((line) => line.split("|"));
+  return stripStatus(out.trim()).filter(Boolean).map((line) => line.split("|"));
 }
 
 // ── statistics ───────────────────────────────────────────────────────────────
