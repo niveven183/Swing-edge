@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useId, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import Logo from "./Logo.jsx";
+import { supabase, isSupabaseConfigured } from "../supabaseClient.js";
 import "./LandingPage.css";
 
 /* ============================================================
@@ -80,6 +81,19 @@ const STR = {
     privacy: "פרטיות", terms: "תנאי שימוש", soon: "בקרוב",
     heroDisclaimer: "SwingEdge אינו ייעוץ השקעות. מסחר כרוך בסיכון לאובדן כספך — כל החלטה באחריותך בלבד.",
     disclaimer: "SwingEdge הוא כלי לניהול וניתוח יומן מסחר בלבד. אין לראות בתוכן באפליקציה או בדף זה ייעוץ השקעות, המלצה לרכישה או מכירה של נייר ערך כלשהו, או תחליף לייעוץ פיננסי מקצועי. מסחר בשוק ההון כרוך בסיכון להפסד הון. ביצועי עבר אינם מעידים על ביצועים עתידיים. כל החלטת מסחר היא באחריות המשתמש בלבד.",
+    waitlistKicker: "רשימת המתנה",
+    waitlistTitle: "שריין את המקום שלך",
+    waitlistSub: "אנחנו פותחים גישה בהדרגה. השאר אימייל ותהיה מהראשונים שיקבלו הזמנה — בלי ספאם, רק העדכון החשוב.",
+    waitlistPlaceholder: "האימייל שלך",
+    waitlistCta: "שריין מקום",
+    waitlistSending: "רגע…",
+    waitlistSuccess: "אתה בפנים 🎯 נודיע לך ברגע שנפתח לך גישה.",
+    waitlistDup: "אתה כבר ברשימה 🎯 נודיע לך ברגע שנצא לדרך.",
+    waitlistInvalid: "רגע — האימייל לא נראה תקין. בדוק שוב?",
+    waitlistError: "משהו השתבש. נסה שוב עוד רגע.",
+    waitlistUnavailable: "ההרשמה תיפתח ממש בקרוב.",
+    waitlistPrivacyNote: "בהרשמה אתה מסכים שנשמור את האימייל לצורך עדכון על ההשקה. פרטים ב",
+    waitlistPrivacyLink: "מדיניות הפרטיות",
   },
   en: {
     dir: "ltr",
@@ -151,6 +165,19 @@ const STR = {
     privacy: "Privacy", terms: "Terms", soon: "Soon",
     heroDisclaimer: "SwingEdge is not investment advice. Trading involves risk of losing your money — every decision is your responsibility alone.",
     disclaimer: "SwingEdge is a tool for managing and analyzing a trading journal only. Nothing in the app or on this page constitutes investment advice, a recommendation to buy or sell any security, or a substitute for professional financial advice. Trading the capital markets involves risk of loss of capital. Past performance is not indicative of future results. Every trading decision is the sole responsibility of the user.",
+    waitlistKicker: "Waitlist",
+    waitlistTitle: "Reserve your spot",
+    waitlistSub: "We're opening access gradually. Drop your email to be among the first to get an invite — no spam, just the one that matters.",
+    waitlistPlaceholder: "Your email",
+    waitlistCta: "Reserve my spot",
+    waitlistSending: "One sec…",
+    waitlistSuccess: "You're in 🎯 We'll let you know the moment your access opens.",
+    waitlistDup: "You're already on the list 🎯 We'll be in touch the moment we launch.",
+    waitlistInvalid: "Hold on — that email doesn't look right. Mind checking?",
+    waitlistError: "Something went wrong. Try again in a moment.",
+    waitlistUnavailable: "Sign-ups open very soon.",
+    waitlistPrivacyNote: "By signing up you agree we'll store your email to notify you about launch. Details in the ",
+    waitlistPrivacyLink: "Privacy Policy",
   },
 };
 
@@ -450,6 +477,119 @@ function LogoMark({ size = 34, shadow = true }) {
   );
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function WaitlistForm({ L, lang }) {
+  const inputId = useId();
+  const msgId = useId();
+  // Capture UTM params once, on mount — before any client-side navigation.
+  const [utm] = useState(() => {
+    try {
+      const q = new URLSearchParams(window.location.search);
+      return { source: q.get("utm_source"), campaign: q.get("utm_campaign") };
+    } catch {
+      return { source: null, campaign: null };
+    }
+  });
+  const [email, setEmail] = useState("");
+  // status: idle | sending | success | duplicate | error
+  const [status, setStatus] = useState("idle");
+  const [message, setMessage] = useState("");
+
+  const done = status === "success" || status === "duplicate";
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (status === "sending" || done) return;
+
+    const clean = email.trim().toLowerCase();
+    if (!EMAIL_RE.test(clean)) {
+      setStatus("error");
+      setMessage(L.waitlistInvalid);
+      return;
+    }
+    if (!isSupabaseConfigured || !supabase) {
+      setStatus("error");
+      setMessage(L.waitlistUnavailable);
+      return;
+    }
+
+    setStatus("sending");
+    setMessage("");
+    const { error } = await supabase
+      .from("waitlist")
+      .insert({ email: clean, source: utm.source, campaign: utm.campaign });
+
+    if (!error) {
+      setStatus("success");
+      setMessage(L.waitlistSuccess);
+    } else if (error.code === "23505") {
+      // Duplicate email — friendly, not an error state.
+      setStatus("duplicate");
+      setMessage(L.waitlistDup);
+    } else {
+      console.error("[waitlist] insert failed:", error);
+      setStatus("error");
+      setMessage(L.waitlistError);
+    }
+  };
+
+  const okTone = status === "success" || status === "duplicate";
+  const field = {
+    flex: "1 1 240px", minWidth: 0, padding: "15px 18px", borderRadius: 999,
+    background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.18)",
+    color: "#fff", fontSize: 16, fontWeight: 600, fontFamily: "'Heebo',sans-serif",
+    outline: "none",
+  };
+
+  return (
+    <div style={{ maxWidth: 520, margin: "0 auto", width: "100%" }}>
+      <form
+        onSubmit={submit}
+        className="se-waitlist-form"
+        style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "center" }}
+      >
+        <label htmlFor={inputId} style={{ position: "absolute", width: 1, height: 1, padding: 0, margin: -1, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap", border: 0 }}>
+          {L.waitlistPlaceholder}
+        </label>
+        <input
+          id={inputId}
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          dir="ltr"
+          required
+          placeholder={L.waitlistPlaceholder}
+          value={email}
+          onChange={(e) => { setEmail(e.target.value); if (status === "error") { setStatus("idle"); setMessage(""); } }}
+          disabled={done}
+          aria-describedby={message ? msgId : undefined}
+          aria-invalid={status === "error"}
+          style={{ ...field, textAlign: lang === "he" ? "right" : "left" }}
+        />
+        <button
+          type="submit"
+          disabled={status === "sending" || done}
+          style={{
+            ...( { cursor: "pointer", border: "none", flex: "0 0 auto", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "15px 30px", borderRadius: 999, background: "#00C076", color: "#06281C", fontWeight: 800, fontSize: 16, fontFamily: "'Heebo',sans-serif", boxShadow: "0 10px 26px rgba(0,192,118,0.35)" } ),
+            opacity: status === "sending" || done ? 0.7 : 1,
+          }}
+        >
+          {status === "sending" ? L.waitlistSending : done ? "✓" : L.waitlistCta}
+        </button>
+      </form>
+      <div
+        id={msgId}
+        role="status"
+        aria-live="polite"
+        style={{ minHeight: 22, marginTop: 14, fontSize: 15, fontWeight: 700, color: okTone ? "#7CF3C0" : status === "error" ? "#FF9B9D" : "transparent" }}
+      >
+        {message}
+      </div>
+    </div>
+  );
+}
+
 export default function LandingPage() {
   const navigate = useNavigate();
   const goApp = () => navigate("/app");
@@ -461,6 +601,8 @@ export default function LandingPage() {
   const signalChips = SIGNAL_CHIPS[lang];
   const dnaBars = DNA_BARS[lang];
   const trust = TRUST[lang];
+  const goWaitlist = () =>
+    document.getElementById("waitlist")?.scrollIntoView({ behavior: "smooth", block: "center" });
 
   // Count-up animation for the showcase stats (cubic ease-out over 1200ms).
   const [p, setP] = useState(0);
@@ -540,7 +682,7 @@ export default function LandingPage() {
             <button onClick={() => setLang("he")} style={lang === "he" ? activeBtn : idleBtn} aria-pressed={lang === "he"}>עב</button>
             <button onClick={() => setLang("en")} style={lang === "en" ? activeBtn : idleBtn} aria-pressed={lang === "en"}>EN</button>
           </div>
-          <button onClick={goApp} style={{ ...pill, padding: "10px 20px", fontSize: 15, boxShadow: "0 6px 18px rgba(0,192,118,0.32)" }}>
+          <button onClick={goWaitlist} style={{ ...pill, padding: "10px 20px", fontSize: 15, boxShadow: "0 6px 18px rgba(0,192,118,0.32)" }}>
             {L.ctaStart}
           </button>
         </div>
@@ -563,7 +705,7 @@ export default function LandingPage() {
             </h1>
             <p style={{ fontSize: "clamp(16px,1.9vw,21px)", lineHeight: 1.6, color: "#A9B7AF", maxWidth: 600, margin: "0 auto 34px" }}>{L.heroSub}</p>
             <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 13, marginBottom: 22 }}>
-              <button onClick={goApp} style={{ ...pill, padding: "16px 34px", fontSize: 17, boxShadow: "0 10px 30px rgba(0,192,118,0.40)" }}>{L.ctaStart}</button>
+              <button onClick={goWaitlist} style={{ ...pill, padding: "16px 34px", fontSize: 17, boxShadow: "0 10px 30px rgba(0,192,118,0.40)" }}>{L.ctaStart}</button>
               <a href="#how" style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "16px 28px", borderRadius: 999, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.16)", color: "#fff", fontWeight: 700, fontSize: 17 }}>{L.ctaDemo}</a>
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, color: "#7E8E85", fontSize: 14, fontWeight: 600, fontStyle: "italic" }}>
@@ -802,13 +944,31 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ============ WAITLIST ============ */}
+      <section id="waitlist" aria-label={L.waitlistTitle} style={{ position: "relative", overflow: "hidden", background: "#070D0A", color: "#fff", padding: "clamp(64px,8vw,110px) clamp(16px,4vw,40px)", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(720px 420px at 50% -10%, rgba(0,192,118,0.22), transparent 62%)" }} />
+        <div data-reveal="" style={{ position: "relative", maxWidth: 640, margin: "0 auto", textAlign: "center" }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 13px", borderRadius: 999, background: "rgba(0,192,118,0.12)", border: "1px solid rgba(0,192,118,0.30)", fontSize: 13, fontWeight: 700, color: "#7CF3C0", marginBottom: 20 }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#00E08A", boxShadow: "0 0 10px #00E08A" }} />
+            {L.waitlistKicker}
+          </div>
+          <h2 style={{ fontSize: "clamp(30px,5vw,54px)", lineHeight: 1.06, letterSpacing: "-0.035em", fontWeight: 800, margin: "0 0 16px" }}>{L.waitlistTitle}</h2>
+          <p style={{ fontSize: "clamp(16px,1.9vw,20px)", lineHeight: 1.6, color: "#A9B7AF", maxWidth: 520, margin: "0 auto 30px" }}>{L.waitlistSub}</p>
+          <WaitlistForm L={L} lang={lang} />
+          <p style={{ marginTop: 20, fontSize: 12.5, lineHeight: 1.6, color: "#7E8E85" }}>
+            {L.waitlistPrivacyNote}
+            <a href="/privacy" style={{ color: "#7CF3C0", textDecoration: "underline" }}>{L.waitlistPrivacyLink}</a>.
+          </p>
+        </div>
+      </section>
+
       {/* ============ FINAL CTA ============ */}
       <section style={{ position: "relative", overflow: "hidden", background: "linear-gradient(120deg,#008555,#00C076 55%,#16D687)", color: "#06281C", padding: "clamp(70px,9vw,120px) clamp(16px,4vw,40px)", textAlign: "center" }}>
         <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,255,255,0.10) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.10) 1px,transparent 1px)", backgroundSize: "46px 46px", WebkitMaskImage: "radial-gradient(120% 100% at 50% 0%, #000 30%, transparent 75%)", maskImage: "radial-gradient(120% 100% at 50% 0%, #000 30%, transparent 75%)" }} />
         <div data-reveal="" style={{ position: "relative", maxWidth: 760, margin: "0 auto" }}>
           <h2 style={{ fontSize: "clamp(34px,5.4vw,64px)", lineHeight: 1.04, letterSpacing: "-0.035em", fontWeight: 800, margin: "0 0 18px" }}>{L.finalTitle}</h2>
           <p style={{ fontSize: "clamp(16px,2vw,20px)", lineHeight: 1.55, color: "rgba(6,40,28,0.78)", fontWeight: 600, margin: "0 0 34px" }}>{L.finalSub}</p>
-          <button onClick={goApp} style={{ cursor: "pointer", border: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "17px 42px", borderRadius: 999, background: "#06281C", color: "#16D687", fontWeight: 800, fontSize: 18, boxShadow: "0 16px 40px rgba(6,40,28,0.32)", fontFamily: "'Heebo',sans-serif" }}>{L.ctaStart}</button>
+          <button onClick={goWaitlist} style={{ cursor: "pointer", border: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "17px 42px", borderRadius: 999, background: "#06281C", color: "#16D687", fontWeight: 800, fontSize: 18, boxShadow: "0 16px 40px rgba(6,40,28,0.32)", fontFamily: "'Heebo',sans-serif" }}>{L.ctaStart}</button>
           <div style={{ marginTop: 18, fontSize: 14, fontWeight: 700, color: "rgba(6,40,28,0.7)" }}>{L.heroTrust}</div>
         </div>
       </section>

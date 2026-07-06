@@ -376,6 +376,7 @@ export default function AdminPanel() {
   const [authUser, setAuthUser] = useState(null);
   const [trades, setTrades] = useState([]);
   const [feedback, setFeedback] = useState([]);
+  const [waitlistCount, setWaitlistCount] = useState(null);
   const [loading, setLoading] = useState(true);
   const [supaUp, setSupaUp] = useState(null);
   const toast = useToast();
@@ -404,6 +405,13 @@ export default function AdminPanel() {
       setTrades(tr.data || []);
       setFeedback(fb.data || []);
       setSupaUp(true);
+
+      // Waitlist count (admin-only via RLS). Isolated so a miss here never
+      // breaks the core dashboard — head:true fetches count without rows.
+      const wl = await supabase
+        .from("waitlist")
+        .select("*", { count: "exact", head: true });
+      setWaitlistCount(wl.error ? null : wl.count ?? 0);
     } catch (e) {
       setSupaUp(false);
       toast.error("Load failed: " + (e?.message || "unknown"));
@@ -486,7 +494,7 @@ export default function AdminPanel() {
       </div>
 
       {/* Tab bodies */}
-      {tab === "overview" && <OverviewTab trades={trades} feedback={feedback} users={users} loading={loading} />}
+      {tab === "overview" && <OverviewTab trades={trades} feedback={feedback} users={users} waitlistCount={waitlistCount} loading={loading} />}
       {tab === "users"    && <UsersTab users={users} trades={trades} feedback={feedback} toast={toast} onMutate={loadAll} />}
       {tab === "trades"   && <TradesTab trades={trades} toast={toast} onMutate={loadAll} />}
       {tab === "feedback" && <FeedbackTab feedback={feedback} setFeedback={setFeedback} toast={toast} />}
@@ -500,7 +508,7 @@ export default function AdminPanel() {
 //  TAB 1 — Overview
 // ════════════════════════════════════════════════════════════════════════════
 
-function OverviewTab({ trades, feedback, users, loading }) {
+function OverviewTab({ trades, feedback, users, waitlistCount, loading }) {
   const totalUsers = users.length;
   const activeUsers = users.filter((u) => isWithinDays(u.last, 30)).length;
   const totalTrades = trades.length;
@@ -532,6 +540,7 @@ function OverviewTab({ trades, feedback, users, loading }) {
         <KpiCard label="Avg trades / user" value={avgTradesPerUser} accent="amber" icon={TrendingUp} loading={loading} />
         <KpiCard label="New users this week" value={newUsersThisWeek} accent="rose" icon={Calendar} loading={loading} />
         <KpiCard label="Trades this week" value={tradesThisWeek} accent="slate" icon={Zap} loading={loading} />
+        <KpiCard label="Waitlist" value={waitlistCount == null ? "—" : Number(waitlistCount).toLocaleString()} accent="emerald" icon={Mail} sub="landing signups" loading={loading} />
       </div>
 
       <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-2xl p-4">
