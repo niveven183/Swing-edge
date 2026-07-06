@@ -50,6 +50,27 @@ jobs:
             exit 1
           fi
 
+          # 2b. Manifest (baseline for the restore drill): per-table row counts +
+          #     the set of public indexes, captured now from the same live DB. Read-only.
+          #     Non-sensitive (table names + counts only) — safe to store in plaintext.
+          RO="SET default_transaction_read_only = on;"
+          TABLES_OBJ="$(
+            while IFS= read -r t; do
+              [ -z "$t" ] && continue
+              c="$(psql "$SUPABASE_DB_URL" -tAc "$RO SELECT count(*) FROM public.\"$t\";")"
+              jq -n --arg k "$t" --argjson v "$c" '{($k): $v}'
+            done < <(psql "$SUPABASE_DB_URL" -tAc "$RO SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY table_name;") \
+            | jq -s 'add // {}'
+          )"
+          IDX_ARR="$(psql "$SUPABASE_DB_URL" -tAc "$RO SELECT indexname FROM pg_indexes WHERE schemaname='public' ORDER BY indexname;" | jq -R . | jq -s 'map(select(length>0))')"
+          jq -n \
+            --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --argjson tables "$TABLES_OBJ" \
+            --argjson indexes "$IDX_ARR" \
+            '{generated_at:$ts, source:"supabase", tables:$tables, indexes:$indexes}' \
+            > manifest.json
+          echo "Manifest:"; cat manifest.json
+
           # 3. Compress -> dump.pgcustom.gz
           gzip dump.pgcustom
 
@@ -66,7 +87,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: supabase-backup-${{ env.BACKUP_DATE }}
-          path: supabase-backup-${{ env.BACKUP_DATE }}.pgcustom.gz.enc
+          path: |
+            supabase-backup-${{ env.BACKUP_DATE }}.pgcustom.gz.enc
+            manifest.json
           retention-days: 30
-          if-no-files-found: error   # fail loudly if the .enc somehow isn't there
+          if-no-files-found: error   # fail loudly if the .enc/manifest somehow aren't there
           compression-level: 0       # already gzipped+encrypted; don't re-compress

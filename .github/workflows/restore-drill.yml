@@ -1,0 +1,205 @@
+name: Restore Drill
+
+# Proves the encrypted backup produced by backup.yml can actually be restored — a backup
+# that has never been restored is hope, not a backup. Downloads the latest green backup
+# artifact, decrypts it, and restores it into an ISOLATED postgres:17 service container,
+# then asserts restored public-schema row counts + indexes match the manifest captured at
+# backup time. Production is never touched: SUPABASE_DB_URL is intentionally NOT in this
+# job, so the drill can only ever talk to the throwaway localhost container.
+#
+# Quarterly (catches a silently-dead backup schedule via the staleness guard) + manual.
+# Always emails the result; the job goes red on any mismatch.
+
+on:
+  schedule:
+    - cron: '0 4 1 */3 *'   # quarterly: 04:00 UTC on Jan 1 / Apr 1 / Jul 1 / Oct 1
+  workflow_dispatch:
+
+concurrency:
+  group: restore-drill
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read            # to locate + download the latest backup.yml artifact
+
+jobs:
+  drill:
+    runs-on: ubuntu-latest
+    env:
+      MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+      MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+      # Throwaway credentials for the ephemeral service container (not a secret).
+      PGPASSWORD: drillpass
+      LOCAL_ADMIN: postgresql://postgres:drillpass@localhost:5432/postgres
+      LOCAL_DRILL: postgresql://postgres:drillpass@localhost:5432/drill
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: drillpass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      # PGDG v17 client so pg_restore/psql match the postgres:17 server (see backup.yml).
+      - name: Install PostgreSQL 17 client
+        run: |
+          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+      - name: Locate + download latest green backup (with staleness guard)
+        id: fetch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          RUN_JSON="$(gh run list --workflow=backup.yml --status=success --branch=main --limit 1 --json databaseId,createdAt --repo "$REPO")"
+          RUN_ID="$(echo "$RUN_JSON" | jq -r '.[0].databaseId // empty')"
+          CREATED="$(echo "$RUN_JSON" | jq -r '.[0].createdAt // empty')"
+          if [ -z "$RUN_ID" ]; then echo "::error::No successful backup.yml run found"; exit 1; fi
+          echo "Latest green backup run: $RUN_ID (created $CREATED)"
+
+          # Staleness guard: a fresh drill green-lighting a stale backup is a false sense of
+          # safety. >8d means the weekly (Sun 03:00) backup schedule is silently broken.
+          AGE_DAYS=$(( ( $(date -u +%s) - $(date -u -d "$CREATED" +%s) ) / 86400 ))
+          echo "Backup age: ${AGE_DAYS} day(s)"
+          if [ "$AGE_DAYS" -gt 8 ]; then
+            echo "::error::backup artifact stale (>8d, age ${AGE_DAYS}d) — backup.yml may be broken"
+            exit 1
+          fi
+
+          gh run download "$RUN_ID" --repo "$REPO" --dir artifact
+          ENC="$(find artifact -name '*.pgcustom.gz.enc' | head -n1)"
+          MAN="$(find artifact -name 'manifest.json' | head -n1)"
+          if [ -z "$ENC" ]; then echo "::error::no .enc file in backup artifact"; exit 1; fi
+          if [ -z "$MAN" ]; then echo "::error::no manifest.json in backup artifact — re-run backup.yml (it now emits one)"; exit 1; fi
+          echo "Found dump: $ENC"
+          echo "Found manifest: $MAN"; cat "$MAN"
+          echo "enc=$ENC" >> "$GITHUB_OUTPUT"
+          echo "manifest=$MAN" >> "$GITHUB_OUTPUT"
+
+      - name: Decrypt + restore into isolated postgres:17
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+          ENC: ${{ steps.fetch.outputs.enc }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BACKUP_PASSPHRASE:-}" ]; then echo "::error::BACKUP_PASSPHRASE secret is not set"; exit 1; fi
+
+          # Decrypt -> gunzip -> dump.pgcustom. Passphrase only via env, never echoed.
+          openssl enc -d -aes-256-cbc -pbkdf2 -in "$ENC" -out dump.pgcustom.gz -pass env:BACKUP_PASSPHRASE
+          gunzip dump.pgcustom.gz
+
+          # Fresh, isolated target DB in the service container (never any real 'public').
+          psql "$LOCAL_ADMIN" -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS drill;" -c "CREATE DATABASE drill;"
+
+          # Full restore so public objects get the extensions/schemas they depend on. Supabase
+          # -specific extensions/roles/policies are absent here and produce NON-FATAL errors we
+          # deliberately ignore — the drill's verdict is the public-schema check below, not
+          # pg_restore's exit code. --no-owner/--no-privileges avoid Supabase-role noise.
+          pg_restore --no-owner --no-privileges --dbname "$LOCAL_DRILL" dump.pgcustom \
+            || echo "::warning::pg_restore reported non-fatal errors (Supabase-only extensions/roles/policies not present in the drill container) — verifying public schema below"
+
+      - name: Verify restored data against manifest
+        id: compare
+        if: success()
+        env:
+          MANIFEST: ${{ steps.fetch.outputs.manifest }}
+        run: |
+          STATUS=pass
+          PROBLEMS=""
+
+          # --- Two-way table-set diff: manifest keys vs restored public base tables ---------
+          MAN_TABLES="$(jq -r '.tables | keys[]' "$MANIFEST" | sort)"
+          DB_TABLES="$(psql "$LOCAL_DRILL" -tAc "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY table_name")"
+          MISSING="$(comm -23 <(printf '%s\n' "$MAN_TABLES") <(printf '%s\n' "$DB_TABLES") | tr -d ' ')"
+          EXTRA="$(comm -13 <(printf '%s\n' "$MAN_TABLES") <(printf '%s\n' "$DB_TABLES") | tr -d ' ')"
+          if [ -n "$MISSING" ]; then STATUS=fail; PROBLEMS="${PROBLEMS}\nטבלאות שב-manifest אך חסרות בשחזור: $(echo $MISSING)"; fi
+          if [ -n "$EXTRA" ]; then STATUS=fail; PROBLEMS="${PROBLEMS}\nטבלאות שבשחזור אך חסרות ב-manifest: $(echo $EXTRA)"; fi
+
+          # --- Per-table row counts: restored must equal manifest --------------------------
+          TOTAL=0; M=0
+          while IFS= read -r t; do
+            [ -z "$t" ] && continue
+            M=$((M+1))
+            exp="$(jq -r --arg k "$t" '.tables[$k]' "$MANIFEST")"
+            act="$(psql "$LOCAL_DRILL" -tAc "SELECT count(*) FROM public.\"$t\"" 2>/dev/null || echo MISSING)"
+            [ "$act" != "MISSING" ] && TOTAL=$((TOTAL+act))
+            echo "table $t: manifest=$exp restored=$act"
+            if [ "$exp" != "$act" ]; then STATUS=fail; PROBLEMS="${PROBLEMS}\n$t: manifest=$exp restored=$act"; fi
+          done <<< "$MAN_TABLES"
+
+          # --- Indexes: every manifest index must exist in the restored DB -----------------
+          while IFS= read -r idx; do
+            [ -z "$idx" ] && continue
+            found="$(psql "$LOCAL_DRILL" -tAc "SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='$idx' LIMIT 1")"
+            if [ "$found" != "1" ]; then STATUS=fail; PROBLEMS="${PROBLEMS}\nאינדקס חסר בשחזור: $idx"; fi
+          done <<< "$(jq -r '.indexes[]' "$MANIFEST")"
+
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+          echo "rows=$TOTAL" >> "$GITHUB_OUTPUT"
+          echo "tables=$M" >> "$GITHUB_OUTPUT"
+          echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+          if [ "$STATUS" = pass ]; then
+            SUMMARY="✅ שחזור אומת: ${TOTAL} שורות ב-${M} טבלאות שוחזרו מהגיבוי ותואמות ל-manifest, כולל כל האינדקסים."
+          else
+            SUMMARY="🚨 תרגיל השחזור נכשל — הגיבוי אינו משחזר נאמנה:${PROBLEMS}"
+          fi
+          { echo "summary<<EOF"; echo -e "$SUMMARY"; echo "EOF"; } >> "$GITHUB_OUTPUT"
+          echo "===================="; echo -e "$SUMMARY"
+
+      - name: Email success
+        if: ${{ steps.compare.outputs.status == 'pass' && env.MAIL_USERNAME != '' && env.MAIL_PASSWORD != '' }}
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          from: SwingEdge Restore Drill <${{ secrets.MAIL_USERNAME }}>
+          to: niveven183@gmail.com
+          subject: "✅ Restore Drill — שחזור אומת (${{ steps.compare.outputs.date }})"
+          body: ${{ steps.compare.outputs.summary }}
+
+      - name: Email failure (alarm)
+        if: ${{ always() && steps.compare.outputs.status != 'pass' && env.MAIL_USERNAME != '' && env.MAIL_PASSWORD != '' }}
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          from: SwingEdge Restore Drill <${{ secrets.MAIL_USERNAME }}>
+          to: niveven183@gmail.com
+          subject: "🚨 Restore Drill FAILED — הגיבוי לא אומת"
+          body: |
+            תרגיל שחזור הגיבוי נכשל. הגיבוי אולי אינו ניתן לשחזור — טפל מיד.
+            ${{ steps.compare.outputs.summary }}
+
+            לוג מלא: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Note missing mail secrets
+        if: ${{ env.MAIL_USERNAME == '' || env.MAIL_PASSWORD == '' }}
+        run: echo "::warning::MAIL_USERNAME/MAIL_PASSWORD not set — email skipped, result is in the job log/summary above."
+
+      - name: Enforce drill result (red on mismatch)
+        if: always()
+        run: |
+          if [ "${{ steps.compare.outputs.status }}" != "pass" ]; then
+            echo "::error::Restore drill did not pass — see verification log and the alarm email."
+            exit 1
+          fi
+          echo "Restore drill passed: ${{ steps.compare.outputs.rows }} rows across ${{ steps.compare.outputs.tables }} tables."
