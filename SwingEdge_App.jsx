@@ -712,7 +712,7 @@ ${equityPoints.length > 0 ? `
 <div class="section">
   <div class="section-title">Lessons Learned</div>
   <div class="lessons">
-    <ul style="padding-left:18px;line-height:1.6">
+    <ul style="padding-inline-start:18px;line-height:1.6">
       ${lessonRows}
     </ul>
   </div>
@@ -892,7 +892,7 @@ const StatCard = ({ label, value, sub, trend, icon: Icon, accent = "cyan", info 
 const UserMenuItem = ({ icon: Icon, label, color = "text-slate-300", onClick }) => (
   <button
     onClick={onClick}
-    className="w-full h-10 px-3 flex items-center gap-3 rounded-lg hover:bg-[#1a2235] active:bg-[#0d9488] transition-[background-color] duration-150 text-left group"
+    className="w-full h-10 px-3 flex items-center gap-3 rounded-lg hover:bg-[#1a2235] active:bg-[#0d9488] transition-[background-color] duration-150 text-start group"
   >
     <Icon size={16} className={`${color} group-active:text-white`} />
     <span className="text-sm text-slate-200 font-medium group-active:text-white">{label}</span>
@@ -2522,7 +2522,7 @@ export default function SwingEdge() {
           >
             <Logo size={28} showText={false} />
             <span className="font-bold text-sm tracking-wider text-white whitespace-nowrap">SWING<span className="text-emerald-400">EDGE</span></span>
-            <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-500 border border-cyan-500/20 tracking-widest uppercase hidden sm:inline">{t.pro}</span>
+            <span className="ms-1 text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-500 border border-cyan-500/20 tracking-widest uppercase hidden sm:inline">{t.pro}</span>
             <ChevronDown size={13} className={`text-slate-400 transition-transform ${showProfileDropdown ? "rotate-180" : ""}`} />
           </button>
           {showProfileDropdown && (
@@ -2584,7 +2584,7 @@ export default function SwingEdge() {
                   {isSupabaseConfigured && session && (
                     <button
                       onClick={handleLogout}
-                      className="w-full h-10 px-3 flex items-center gap-3 rounded-lg hover:bg-rose-500/10 transition-[background-color] duration-150 text-left text-rose-400">
+                      className="w-full h-10 px-3 flex items-center gap-3 rounded-lg hover:bg-rose-500/10 transition-[background-color] duration-150 text-start text-rose-400">
                       <LogOut size={16} />
                       <span className="text-sm font-semibold flex-1">{t.logout}</span>
                     </button>
@@ -2627,7 +2627,7 @@ export default function SwingEdge() {
               </span>
             )}
           </div>
-          <div className="text-right hidden sm:block">
+          <div className="text-end hidden sm:block">
             <div className="text-xs text-slate-500">{t.account}</div>
             <div className="text-sm font-bold font-mono text-cyan-400">${curEquity.toLocaleString("en-US", { minimumFractionDigits: 2 })}</div>
           </div>
@@ -2743,7 +2743,7 @@ export default function SwingEdge() {
                           <PatternTags parts={[{ dim: "setup", value: edge.setup }, { dim: "emotion", value: edge.emotion }]} />
                           <div className="text-slate-400 text-xs">{nTrades(edge.count, lang)}</div>
                         </div>
-                        <div className="text-right">
+                        <div className="text-end">
                           <div className="text-emerald-400 font-bold text-sm">{formatPct(edge.winRate)} WR</div>
                           <div className="text-slate-300 text-xs">${edge.totalPnL.toFixed(0)}</div>
                         </div>
@@ -2760,7 +2760,7 @@ export default function SwingEdge() {
                           <PatternTags parts={[{ dim: "setup", value: edge.setup }, { dim: "emotion", value: edge.emotion }]} />
                           <div className="text-slate-400 text-xs">{nTrades(edge.count, lang)}</div>
                         </div>
-                        <div className="text-right">
+                        <div className="text-end">
                           <div className="text-rose-400 font-bold text-sm">{formatPct(edge.winRate)} WR</div>
                           <div className="text-slate-300 text-xs">${edge.totalPnL.toFixed(0)}</div>
                         </div>
@@ -2880,7 +2880,7 @@ export default function SwingEdge() {
                   <thead>
                     <tr className="text-slate-600 border-b border-[var(--border-subtle)] dark:border-white/[0.06]">
                       {["Ticker","Date","Side","Entry","Exit","Shares","P&L","R Multiple","Setup"].map(h => (
-                        <th key={h} className="pb-2 text-left font-semibold tracking-wider pr-4">{h}</th>
+                        <th key={h} className="pb-2 text-start font-semibold tracking-wider pe-4">{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -2890,15 +2890,15 @@ export default function SwingEdge() {
                       const win = pnl > 0;
                       return (
                         <tr key={t.id} className="border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors">
-                          <td className="py-2 pr-4 font-bold text-white font-mono"><div className="flex items-center gap-1.5"><TickerLogo ticker={t.ticker} size={16} />{t.ticker}</div></td>
-                          <td className="py-2 pr-4 text-slate-500">{t.date}</td>
-                          <td className="py-2 pr-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side==="LONG"?"bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20":"bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20"}`}>{t.side}</span></td>
-                          <td className="py-2 pr-4 font-mono text-slate-300">${t.entry}</td>
-                          <td className="py-2 pr-4 font-mono text-slate-300">${t.exit}</td>
-                          <td className="py-2 pr-4 font-mono text-slate-400">{t.shares}</td>
-                          <td className={`py-2 pr-4 font-bold font-mono ${win ? "text-[#10b981]" : "text-[#ef4444]"}`}>{fmt$(Math.round(pnl))}</td>
-                          <td className={`py-2 pr-4 font-bold font-mono ${rMultiple >= 0 ? "text-cyan-400" : "text-[#ef4444]"}`}>{fmtR(rMultiple)}</td>
-                          <td className="py-2 pr-4"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">{t.setup}</span></td>
+                          <td className="py-2 pe-4 font-bold text-white font-mono"><div className="flex items-center gap-1.5"><TickerLogo ticker={t.ticker} size={16} />{t.ticker}</div></td>
+                          <td className="py-2 pe-4 text-slate-500">{t.date}</td>
+                          <td className="py-2 pe-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side==="LONG"?"bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20":"bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20"}`}>{t.side}</span></td>
+                          <td className="py-2 pe-4 font-mono text-slate-300">${t.entry}</td>
+                          <td className="py-2 pe-4 font-mono text-slate-300">${t.exit}</td>
+                          <td className="py-2 pe-4 font-mono text-slate-400">{t.shares}</td>
+                          <td className={`py-2 pe-4 font-bold font-mono ${win ? "text-[#10b981]" : "text-[#ef4444]"}`}>{fmt$(Math.round(pnl))}</td>
+                          <td className={`py-2 pe-4 font-bold font-mono ${rMultiple >= 0 ? "text-cyan-400" : "text-[#ef4444]"}`}>{fmtR(rMultiple)}</td>
+                          <td className="py-2 pe-4"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">{t.setup}</span></td>
                         </tr>
                       );
                     })}
@@ -2995,7 +2995,7 @@ export default function SwingEdge() {
                       <div className="mt-2 flex items-baseline gap-1">
                         <span className={`text-lg font-bold font-mono ${meterColor.text}`}>{usedPct.toFixed(0)}%</span>
                         <span className="text-[10px] text-slate-600">{t.ofLimit}</span>
-                        <span className="ml-auto text-[10px] text-slate-500 font-mono">
+                        <span className="ms-auto text-[10px] text-slate-500 font-mono">
                           {t.remaining}: ${Math.max(maxRiskDollar - totalRiskDollar, 0).toFixed(2)}
                         </span>
                       </div>
@@ -3011,7 +3011,7 @@ export default function SwingEdge() {
                           <thead>
                             <tr className="text-slate-600 border-b border-[var(--border-subtle)] dark:border-white/[0.06]">
                               {["Ticker", "Side", "Entry", "Stop", "Shares", "Risk $", "Risk %", "R/R", "Bar"].map(h => (
-                                <th key={h} className="pb-2 text-left font-semibold tracking-wider pr-4 whitespace-nowrap">{h}</th>
+                                <th key={h} className="pb-2 text-start font-semibold tracking-wider pe-4 whitespace-nowrap">{h}</th>
                               ))}
                             </tr>
                           </thead>
@@ -3030,21 +3030,21 @@ export default function SwingEdge() {
                               const barWidth = Math.min((t.riskPct / MAX_RISK_PCT) * 100, 100);
                               return (
                                 <tr key={t.id} className="border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors">
-                                  <td className="py-2 pr-4 font-bold text-white font-mono">{t.ticker}</td>
-                                  <td className="py-2 pr-4">
+                                  <td className="py-2 pe-4 font-bold text-white font-mono">{t.ticker}</td>
+                                  <td className="py-2 pe-4">
                                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side === "LONG" ? "bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20" : "bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20"}`}>
                                       {t.side}
                                     </span>
                                   </td>
-                                  <td className="py-2 pr-4 font-mono text-slate-300">${t.entry}</td>
-                                  <td className="py-2 pr-4 font-mono text-[#ef4444]">${t.stop}</td>
-                                  <td className="py-2 pr-4 font-mono text-slate-400">{t.shares}</td>
-                                  <td className={`py-2 pr-4 font-bold font-mono ${rowColor}`}>${t.riskDollar.toFixed(2)}</td>
-                                  <td className={`py-2 pr-4 font-bold font-mono ${rowColor}`}>{t.riskPct.toFixed(2)}%</td>
-                                  <td className="py-2 pr-4 font-mono text-slate-400">
+                                  <td className="py-2 pe-4 font-mono text-slate-300">${t.entry}</td>
+                                  <td className="py-2 pe-4 font-mono text-[#ef4444]">${t.stop}</td>
+                                  <td className="py-2 pe-4 font-mono text-slate-400">{t.shares}</td>
+                                  <td className={`py-2 pe-4 font-bold font-mono ${rowColor}`}>${t.riskDollar.toFixed(2)}</td>
+                                  <td className={`py-2 pe-4 font-bold font-mono ${rowColor}`}>{t.riskPct.toFixed(2)}%</td>
+                                  <td className="py-2 pe-4 font-mono text-slate-400">
                                     {t.rrRatio !== null ? `${t.rrRatio.toFixed(2)}:1` : "—"}
                                   </td>
-                                  <td className="py-2 pr-4 w-24">
+                                  <td className="py-2 pe-4 w-24">
                                     <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden w-20">
                                       <div className={`h-full rounded-full ${barColor}`} style={{ width: `${barWidth}%` }} />
                                     </div>
@@ -3307,7 +3307,7 @@ export default function SwingEdge() {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-slate-600 border-b border-[var(--border-subtle)] dark:border-white/[0.06] text-[10px] tracking-widest uppercase">
-                    <th className="p-3 text-left font-semibold w-8">
+                    <th className="p-3 text-start font-semibold w-8">
                       <input
                         type="checkbox"
                         aria-label={lang === "he" ? "בחר הכל" : "Select all"}
@@ -3329,7 +3329,7 @@ export default function SwingEdge() {
                       />
                     </th>
                     {["Ticker","Date","Side","Entry","Stop","Target","Shares",t.currentPrice,t.livePnl,"Exit","P&L","R","Hold","Setup","Mkt","Emotion","★","Exit Rsn","Plan","Lesson","Status","Action"].map(h => (
-                      <th key={h} className={`p-3 text-left font-semibold whitespace-nowrap ${h===t.currentPrice||h===t.livePnl ? "text-cyan-600" : ""}`}>{h}</th>
+                      <th key={h} className={`p-3 text-start font-semibold whitespace-nowrap ${h===t.currentPrice||h===t.livePnl ? "text-cyan-600" : ""}`}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -3357,7 +3357,7 @@ export default function SwingEdge() {
                             className="w-3.5 h-3.5 rounded border border-white/20 bg-white/5 cursor-pointer accent-cyan-500"
                           />
                         </td>
-                        <td className="p-3 font-bold text-white font-mono whitespace-nowrap"><div className="flex items-center gap-1.5"><TickerLogo ticker={t.ticker} size={16} />{t.ticker}{t.isDemo && <span className="text-xs bg-slate-700 text-slate-400 px-1 py-0.5 rounded ml-1 font-normal">DEMO</span>}</div></td>
+                        <td className="p-3 font-bold text-white font-mono whitespace-nowrap"><div className="flex items-center gap-1.5"><TickerLogo ticker={t.ticker} size={16} />{t.ticker}{t.isDemo && <span className="text-xs bg-slate-700 text-slate-400 px-1 py-0.5 rounded ms-1 font-normal">DEMO</span>}</div></td>
                         <td className="p-3 text-slate-500 whitespace-nowrap">{t.date}</td>
                         <td className="p-3"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side==="LONG"?"bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20":"bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20"}`}>{t.side}</span></td>
                         <td className="p-3 font-mono text-slate-300">${t.entry}</td>
@@ -3709,7 +3709,7 @@ export default function SwingEdge() {
                           ★
                         </button>
                       ))}
-                      <span className="text-[10px] text-slate-600 ml-1">{analyzerForm.entryQuality}/5</span>
+                      <span className="text-[10px] text-slate-600 ms-1">{analyzerForm.entryQuality}/5</span>
                     </div>
                   </div>
                 </div>
@@ -3760,7 +3760,7 @@ export default function SwingEdge() {
                           </div>
                         </div>
                         {analyzerResult.entry_score && (
-                          <div className="text-right">
+                          <div className="text-end">
                             <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">{t.entryScore}</div>
                             <div className="text-amber-400 font-mono font-bold text-xl">
                               {"★".repeat(analyzerResult.entry_score)}{"☆".repeat(5 - analyzerResult.entry_score)}
@@ -4278,7 +4278,7 @@ export default function SwingEdge() {
                           <PatternTags parts={[{ dim: "setup", value: edge.setup }, { dim: "emotion", value: edge.emotion }]} />
                           <div className="text-slate-400 text-xs">{nTrades(edge.count, lang)}</div>
                         </div>
-                        <div className="text-right">
+                        <div className="text-end">
                           <div className="text-emerald-400 font-bold text-sm">{formatPct(edge.winRate)} WR</div>
                           <div className="text-slate-300 text-xs">${edge.totalPnL.toFixed(0)}</div>
                         </div>
@@ -4295,7 +4295,7 @@ export default function SwingEdge() {
                           <PatternTags parts={[{ dim: "setup", value: edge.setup }, { dim: "emotion", value: edge.emotion }]} />
                           <div className="text-slate-400 text-xs">{nTrades(edge.count, lang)}</div>
                         </div>
-                        <div className="text-right">
+                        <div className="text-end">
                           <div className="text-rose-400 font-bold text-sm">{formatPct(edge.winRate)} WR</div>
                           <div className="text-slate-300 text-xs">${edge.totalPnL.toFixed(0)}</div>
                         </div>
@@ -4500,7 +4500,7 @@ export default function SwingEdge() {
                         </InfoTooltip>
                       </h3>
                       <p className="text-xs text-slate-600 mb-4">{lang === "he" ? `${streaks.length} רצפים · מקסימום ${maxStreak}` : `${streaks.length} streaks · max ${maxStreak}`}</p>
-                      <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                      <div className="space-y-1.5 max-h-48 overflow-y-auto pe-1">
                         {streaks.length === 0 ? (
                           <p className="text-xs text-slate-600 text-center py-8">{lang === "he" ? "אין מספיק נתונים" : "Not enough data"}</p>
                         ) : streaks.map((s, i) => (
@@ -4535,11 +4535,11 @@ export default function SwingEdge() {
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="text-[10px] text-slate-500 uppercase tracking-wider border-b border-[var(--border-subtle)] dark:border-white/[0.06]">
-                            <th className="text-left py-2 font-semibold">{lang === "he" ? "סטאפ" : "Setup"}</th>
+                            <th className="text-start py-2 font-semibold">{lang === "he" ? "סטאפ" : "Setup"}</th>
                             <th className="text-center py-2 font-semibold">{lang === "he" ? "עסקאות" : "Trades"}</th>
                             <th className="text-center py-2 font-semibold">WR%</th>
                             <th className="text-center py-2 font-semibold">Avg R</th>
-                            <th className="text-right py-2 font-semibold">{lang === "he" ? "רווח כולל" : "Total P&L"}</th>
+                            <th className="text-end py-2 font-semibold">{lang === "he" ? "רווח כולל" : "Total P&L"}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -4560,7 +4560,7 @@ export default function SwingEdge() {
                                 }`}>{formatPct(s.winRate)}</span>
                               </td>
                               <td className="py-2.5 text-center font-mono text-slate-300">{s.avgR}R</td>
-                              <td className={`py-2.5 text-right font-mono font-bold ${s.totalPnL >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                              <td className={`py-2.5 text-end font-mono font-bold ${s.totalPnL >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
                                 {fmt$(s.totalPnL)}
                               </td>
                             </tr>
@@ -4766,7 +4766,7 @@ export default function SwingEdge() {
                     return (
                       <div key={s.ticker}
                         className={`flex items-center justify-between p-2 bg-white/3 rounded-lg border transition group ${chartSymbol === s.chartSym ? "border-cyan-500/40 bg-cyan-500/5" : "border-[var(--border-subtle)] dark:border-white/[0.06] hover:border-cyan-500/20 hover:bg-cyan-500/3"}`}>
-                        <button type="button" className="flex items-center gap-1.5 flex-1 text-right" onClick={() => setChartSymbol(s.chartSym)} aria-label={t.selectStock}>
+                        <button type="button" className="flex items-center gap-1.5 flex-1 text-end" onClick={() => setChartSymbol(s.chartSym)} aria-label={t.selectStock}>
                           <TickerLogo ticker={s.ticker} size={18} />
                           <div>
                             <div className="font-bold text-[11px] text-white font-mono">{s.ticker}</div>
@@ -4780,7 +4780,7 @@ export default function SwingEdge() {
                             ) : null}
                           </div>
                         </button>
-                        <div className="text-right flex items-center gap-1.5">
+                        <div className="text-end flex items-center gap-1.5">
                           {price != null ? (
                             <div>
                               <div className="text-[11px] font-mono font-bold text-slate-200">${typeof price === 'number' ? price.toFixed(2) : price}</div>
@@ -5689,7 +5689,7 @@ export default function SwingEdge() {
                       ★
                     </button>
                   ))}
-                  <span className="text-[10px] text-slate-600 ml-1">{form.entryQuality}/5</span>
+                  <span className="text-[10px] text-slate-600 ms-1">{form.entryQuality}/5</span>
                 </div>
               </div>
                 </div>
