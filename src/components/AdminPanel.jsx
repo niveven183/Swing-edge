@@ -423,7 +423,7 @@ export default function AdminPanel() {
 
   const reviewedSet = useMemo(() => new Set(readJSON(REVIEWED_FEEDBACK_KEY, [])), [feedback]);
   const unreadFeedbackCount = feedback.reduce((n, f) => {
-    if (f.resolved) return n;
+    if (f.status === "resolved") return n;
     if (reviewedSet.has(f.id)) return n;
     return n + 1;
   }, 0);
@@ -857,7 +857,7 @@ function UserFeedbackView({ user, feedback }) {
           <div className="flex items-center gap-2 text-[11px] text-slate-500 mb-1">
             <span>{emoji[f.type] || "💬"}</span>
             <span>{formatDateTime(f.created_at)}</span>
-            {f.resolved && <Badge tone="emerald">Resolved</Badge>}
+            {f.status === "resolved" && <Badge tone="emerald">Resolved</Badge>}
           </div>
           <p className="text-xs text-slate-200 whitespace-pre-wrap leading-relaxed">{f.message}</p>
         </div>
@@ -1089,7 +1089,7 @@ function FeedbackTab({ feedback, setFeedback, toast }) {
   };
 
   const getStatus = (f) => {
-    if (f.resolved) return "resolved";
+    if (f.status === "resolved") return "resolved";
     if (reviewed.has(f.id)) return "reviewed";
     return "new";
   };
@@ -1109,9 +1109,10 @@ function FeedbackTab({ feedback, setFeedback, toast }) {
 
   const markResolved = async (id, resolved) => {
     try {
-      const { error } = await supabase.from("feedback").update({ resolved }).eq("id", id);
+      const nextStatus = resolved ? "resolved" : "new";
+      const { error } = await supabase.from("feedback").update({ status: nextStatus }).eq("id", id);
       if (error) throw error;
-      setFeedback((rs) => rs.map((r) => (r.id === id ? { ...r, resolved } : r)));
+      setFeedback((rs) => rs.map((r) => (r.id === id ? { ...r, status: nextStatus } : r)));
       toast.success(resolved ? "Resolved ✓" : "Reopened");
     } catch (e) {
       toast.error("Update failed: " + (e?.message || ""));
@@ -1195,9 +1196,9 @@ function FeedbackTab({ feedback, setFeedback, toast }) {
                     className={`text-[10px] px-2 py-1 rounded border ${reviewed.has(f.id) ? "bg-amber-500/20 border-amber-500/40 text-amber-200" : "bg-white/5 border-white/10 text-slate-400 hover:text-white"}`}
                   >Reviewed</button>
                   <button
-                    onClick={() => markResolved(f.id, !f.resolved)}
-                    className={`text-[10px] px-2 py-1 rounded border ${f.resolved ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-200" : "bg-white/5 border-white/10 text-slate-400 hover:text-white"}`}
-                  >{f.resolved ? "✓ Resolved" : "Resolve"}</button>
+                    onClick={() => markResolved(f.id, f.status !== "resolved")}
+                    className={`text-[10px] px-2 py-1 rounded border ${f.status === "resolved" ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-200" : "bg-white/5 border-white/10 text-slate-400 hover:text-white"}`}
+                  >{f.status === "resolved" ? "✓ Resolved" : "Resolve"}</button>
                   <button
                     onClick={() => remove(f.id)}
                     title="Delete"

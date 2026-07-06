@@ -171,11 +171,11 @@ function gatherFeedback() {
     return fb;
   }
   try {
-    const n = parseInt(psqlScalar("SELECT count(*) FROM feedback WHERE resolved = false"), 10);
+    const n = parseInt(psqlScalar("SELECT count(*) FROM feedback WHERE status IS DISTINCT FROM 'resolved'"), 10);
     fb.unresolved = Number.isFinite(n) ? n : null;
     if (IS_SUNDAY) {
       const rows = psqlRows(
-        "SELECT type, count(*) FROM feedback WHERE resolved = false GROUP BY type ORDER BY 2 DESC"
+        "SELECT type, count(*) FROM feedback WHERE status IS DISTINCT FROM 'resolved' GROUP BY type ORDER BY 2 DESC"
       );
       fb.themes = rows.map(([type, count]) => ({ type, count: parseInt(count, 10) }));
     }
