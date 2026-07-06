@@ -54,15 +54,19 @@ jobs:
           #     the set of public indexes, captured now from the same live DB. Read-only.
           #     Non-sensitive (table names + counts only) — safe to store in plaintext.
           RO="SET default_transaction_read_only = on;"
+          # -q (quiet) is required here: without it, psql echoes a literal "SET" status
+          # line before the query's own output whenever a SET is combined with a query in
+          # one -c string, which corrupts anything captured via command substitution.
+          PSQL=(psql -v ON_ERROR_STOP=1 -tAq "$SUPABASE_DB_URL")
           TABLES_OBJ="$(
             while IFS= read -r t; do
               [ -z "$t" ] && continue
-              c="$(psql "$SUPABASE_DB_URL" -tAc "$RO SELECT count(*) FROM public.\"$t\";")"
+              c="$("${PSQL[@]}" -c "$RO SELECT count(*) FROM public.\"$t\";")"
               jq -n --arg k "$t" --argjson v "$c" '{($k): $v}'
-            done < <(psql "$SUPABASE_DB_URL" -tAc "$RO SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY table_name;") \
+            done < <("${PSQL[@]}" -c "$RO SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY table_name;") \
             | jq -s 'add // {}'
           )"
-          IDX_ARR="$(psql "$SUPABASE_DB_URL" -tAc "$RO SELECT indexname FROM pg_indexes WHERE schemaname='public' ORDER BY indexname;" | jq -R . | jq -s 'map(select(length>0))')"
+          IDX_ARR="$("${PSQL[@]}" -c "$RO SELECT indexname FROM pg_indexes WHERE schemaname='public' ORDER BY indexname;" | jq -R . | jq -s 'map(select(length>0))')"
           jq -n \
             --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --argjson tables "$TABLES_OBJ" \
