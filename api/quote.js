@@ -21,6 +21,15 @@ const FINNHUB_BASE = "https://finnhub.io/api/v1";
 const COINGECKO_BASE = "https://api.coingecko.com/api/v3";
 const TWELVEDATA_BASE = "https://api.twelvedata.com";
 
+// Abort any upstream call that hangs past `ms` so one slow provider never
+// stalls the whole batch (Promise.allSettled/catch paths already treat this
+// like any other fetch failure — same null/fallback response).
+const fetchWithTimeout = (url, opts = {}, ms = 8000) => {
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(), ms);
+  return fetch(url, { ...opts, signal: c.signal }).finally(() => clearTimeout(t));
+};
+
 // ── Crypto registry ─────────────────────────────────────────────────────────
 // base ticker → { id: coingecko id, name: display }. Crypto reaches us in two
 // forms: with a "-USD" suffix (BTC-USD, the client's toYahooSymbol output) and
@@ -81,7 +90,7 @@ async function warmCrypto(ids) {
       `${COINGECKO_BASE}/simple/price?ids=${encodeURIComponent(need.join(","))}` +
       `&vs_currencies=usd&include_24hr_change=true` +
       `&include_market_cap=true&include_24hr_vol=true`;
-    const r = await fetch(url, { headers: { Accept: "application/json" } });
+    const r = await fetchWithTimeout(url, { headers: { Accept: "application/json" } });
     if (!r.ok) return; // 429 / 5xx → keep stale cache, symbols may resolve null
     const data = await r.json();
     for (const id of need) {
@@ -122,7 +131,7 @@ function cryptoResult(id, name) {
 async function finnhubResult(symbol, key) {
   if (!key) return null;
   const url = `${FINNHUB_BASE}/quote?symbol=${encodeURIComponent(symbol)}&token=${key}`;
-  const r = await fetch(url, { headers: { Accept: "application/json" } });
+  const r = await fetchWithTimeout(url, { headers: { Accept: "application/json" } });
   if (!r.ok) return null;
   const d = await r.json();
   if (!d || typeof d.c !== "number" || d.c === 0) return null;
@@ -222,7 +231,7 @@ async function fetchEquityHistory(symbols, key, outputsize) {
   const url =
     `${TWELVEDATA_BASE}/time_series?symbol=${encodeURIComponent(symbols.join(","))}` +
     `&interval=1day&outputsize=${outputsize}&apikey=${key}`;
-  const r = await fetch(url, { headers: { Accept: "application/json" } });
+  const r = await fetchWithTimeout(url, { headers: { Accept: "application/json" } });
   if (!r.ok) return {};
   const data = await r.json();
   if (!data || typeof data !== "object") return {};
@@ -248,7 +257,7 @@ async function fetchCryptoHistory(sym, days) {
   const url =
     `${COINGECKO_BASE}/coins/${meta.id}/market_chart` +
     `?vs_currency=usd&days=${days}${daily ? "&interval=daily" : ""}`;
-  const r = await fetch(url, { headers: { Accept: "application/json" } });
+  const r = await fetchWithTimeout(url, { headers: { Accept: "application/json" } });
   if (!r.ok) return null;
   const data = await r.json();
   let closes = (Array.isArray(data?.prices) ? data.prices : [])
@@ -337,7 +346,7 @@ export default async function handler(req, res) {
   const search = String(q.search || "").trim().slice(0, 64);
   if (search) {
     try {
-      const r = await fetch(
+      const r = await fetchWithTimeout(
         `${FINNHUB_BASE}/search?q=${encodeURIComponent(search)}&token=${KEY}`,
         { headers: { Accept: "application/json" } }
       );

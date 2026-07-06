@@ -9,6 +9,14 @@
 
 const TV_BASE = "https://symbol-search.tradingview.com/symbol_search/";
 
+// Abort if TradingView hangs past `ms` — the existing catch-all below already
+// degrades to the same tv_fetch_failed fallback for any error, timeout included.
+const fetchWithTimeout = (url, opts = {}, ms = 8000) => {
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(), ms);
+  return fetch(url, { ...opts, signal: c.signal }).finally(() => clearTimeout(t));
+};
+
 export default async function handler(req, res) {
   // CORS — allow the SPA (same origin in prod, but keep it permissive/robust).
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -30,7 +38,7 @@ export default async function handler(req, res) {
     `&hl=1&exchange=&lang=en&type=&domain=production`;
 
   try {
-    const tvRes = await fetch(url, {
+    const tvRes = await fetchWithTimeout(url, {
       headers: {
         // These two are what unlock the endpoint (otherwise 403).
         Referer: "https://www.tradingview.com/",

@@ -21,6 +21,15 @@
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 
+// Abort an upstream call that hangs past `ms`. Both call sites already wrap
+// their fetch in a catch-all that degrades to the same fallback response for
+// any error, so a timeout is handled identically to a network failure.
+const fetchWithTimeout = (url, opts = {}, ms = 8000) => {
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(), ms);
+  return fetch(url, { ...opts, signal: c.signal }).finally(() => clearTimeout(t));
+};
+
 // Single source for the model — A/B against Haiku is a one-line change here.
 const MODEL = "claude-sonnet-4-6";
 
@@ -248,7 +257,7 @@ async function verifyUser(req) {
   const token = m[1].trim();
   if (!token) return null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    const r = await fetchWithTimeout(`${SUPABASE_URL}/auth/v1/user`, {
       headers: { Authorization: `Bearer ${token}`, apikey: SUPABASE_ANON_KEY },
     });
     if (!r.ok) return null;
@@ -367,34 +376,38 @@ export default async function handler(req, res) {
   };
 
   try {
-    const r = await fetch(ANTHROPIC_URL, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": KEY,
-        "anthropic-version": ANTHROPIC_VERSION,
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 300,
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "image",
-                source: {
-                  type: "base64",
-                  media_type: img.mediaType,
-                  data: img.data,
+    const r = await fetchWithTimeout(
+      ANTHROPIC_URL,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": KEY,
+          "anthropic-version": ANTHROPIC_VERSION,
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          max_tokens: 300,
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "image",
+                  source: {
+                    type: "base64",
+                    media_type: img.mediaType,
+                    data: img.data,
+                  },
                 },
-              },
-              { type: "text", text: buildPrompt() },
-            ],
-          },
-        ],
-      }),
-    });
+                { type: "text", text: buildPrompt() },
+              ],
+            },
+          ],
+        }),
+      },
+      30000
+    );
 
     if (!r.ok) {
       // Upstream error (auth, rate limit, 5xx) — recoverable, not our 500.
