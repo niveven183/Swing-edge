@@ -1,0 +1,40 @@
+name: Failure Alert
+
+# Instant failure email for workflows whose own email step is content-gated
+# (findings/output non-empty) rather than failure-gated, so a hard crash today
+# produces silence. Excludes: Health Monitor/Smoke Tests/Build/Supabase Backup
+# (already covered by Triage's workflow_run watch list) and Restore Drill
+# (already self-alarms on its own failure condition) — avoids duplicate mail.
+on:
+  workflow_run:
+    workflows: ["Analyst", "Architecture Auditor", "Daily Digest", "Data Guardian", "Triage"]
+    types: [completed]
+
+jobs:
+  alert:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    env:
+      MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+      MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+    steps:
+      - name: Email failure alert
+        if: ${{ env.MAIL_USERNAME != '' && env.MAIL_PASSWORD != '' }}
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          from: SwingEdge Failure Alert <${{ secrets.MAIL_USERNAME }}>
+          to: niveven183@gmail.com
+          subject: "🚨 ${{ github.event.workflow_run.name }} נכשל"
+          body: |
+            הריצה של ${{ github.event.workflow_run.name }} נכשלה.
+
+            פרטים: ${{ github.event.workflow_run.html_url }}
+
+      - name: Note missing mail secrets
+        if: ${{ env.MAIL_USERNAME == '' || env.MAIL_PASSWORD == '' }}
+        run: echo "::warning::MAIL_USERNAME/MAIL_PASSWORD not set — email skipped."

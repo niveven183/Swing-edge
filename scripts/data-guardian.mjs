@@ -58,7 +58,26 @@ const HE = {
   pnl_sign_mismatch: "סיבת היציאה סותרת את כיוון הרווח/ההפסד",
   impossible_dates: "תאריכים בלתי אפשריים (סגירה לפני כניסה או תאריך עתידי)",
   duplicate_suspects: "חשד לכפילויות (טיקר + כניסה + תאריך זהים)",
+  schema_drift: "עמודה שהסקריפטים משתמשים בה חסרה מהסכמה בפועל (דריפט סכימה)",
 };
+
+// ── referenced schema (manual list — mirrors SQL columns our scripts query) ──
+// Covers daily-digest.mjs + data-guardian.mjs only (see docs/INCIDENTS.md #2).
+const REFERENCED_COLUMNS = [
+  { table: "trades", column: "id" },
+  { table: "trades", column: "status" },
+  { table: "trades", column: "closedAt" },
+  { table: "trades", column: "exit" },
+  { table: "trades", column: "side" },
+  { table: "trades", column: "stop" },
+  { table: "trades", column: "entry" },
+  { table: "trades", column: "exitReason" },
+  { table: "trades", column: "date" },
+  { table: "trades", column: "createdAt" },
+  { table: "trades", column: "ticker" },
+  { table: "feedback", column: "status" },
+  { table: "feedback", column: "type" },
+];
 
 // ── main ─────────────────────────────────────────────────────────────────────
 
@@ -70,13 +89,14 @@ async function main() {
 
   // Schema pre-flight: learn which columns actually exist, guard against drift.
   let cols;
+  let existingPairs = new Set();
   try {
-    cols = new Set(
-      psqlRows(
-        "SELECT column_name FROM information_schema.columns " +
-          "WHERE table_schema = 'public' AND table_name = 'trades'"
-      ).map((r) => r[0])
+    const schemaRows = psqlRows(
+      "SELECT table_name, column_name FROM information_schema.columns " +
+        "WHERE table_schema = 'public' AND table_name = ANY(ARRAY['trades','feedback'])"
     );
+    cols = new Set(schemaRows.filter((r) => r[0] === "trades").map((r) => r[1]));
+    existingPairs = new Set(schemaRows.map((r) => `${r[0]}.${r[1]}`));
   } catch (e) {
     console.error("::warning::Data Guardian could not read the trades schema — treating as clean.");
     return emitOutputs([], null);
@@ -169,6 +189,19 @@ async function main() {
       const detail = (e?.stderr || e?.message || "").toString().trim().replace(/\s+/g, " ");
       console.error(`::warning::check ${spec.key} could not run — skipped. ${detail}`);
     }
+  }
+
+  // Schema-drift: flag any manually-tracked {table, column} our scripts query
+  // that doesn't actually exist (sample_ids holds "table.column" strings here,
+  // not row ids — see docs/INCIDENTS.md #2).
+  const missingRefs = REFERENCED_COLUMNS.filter((r) => !existingPairs.has(`${r.table}.${r.column}`));
+  if (missingRefs.length) {
+    findings.push({
+      check: "schema_drift",
+      severity: "high",
+      count: missingRefs.length,
+      sample_ids: missingRefs.map((r) => `${r.table}.${r.column}`),
+    });
   }
 
   const summaryHe = findings.length ? (await composeWithClaude(findings)) || fallbackHe(findings) : "";

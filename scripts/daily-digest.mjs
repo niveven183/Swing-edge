@@ -214,7 +214,7 @@ async function gatherWeekly() {
 
 function countAttention(facts) {
   let n = 0;
-  for (const w of facts.ci) if (w.conclusion !== "success" && w.conclusion !== null) n++;
+  for (const w of facts.ci) if (w.conclusion === "failure") n++;
   if (facts.live.pipelineOk === false) n++;
   if (facts.live.health && facts.live.health.status === "degraded") n++;
   n += facts.open.issueCount + facts.open.prCount;
@@ -232,7 +232,7 @@ function fallbackDigest(facts) {
       : `🟡 ${facts.attentionCount} דברים דורשים תשומת לב`
   );
 
-  const badCi = facts.ci.filter((w) => w.conclusion !== "success" && w.conclusion !== null);
+  const badCi = facts.ci.filter((w) => w.conclusion === "failure");
   if (badCi.length) {
     lines.push("");
     lines.push("תהליכי CI עם בעיה:");
@@ -288,6 +288,7 @@ async function composeWithClaude(facts) {
     "אתה עורך דיווח בוקר יומי למפתח יחיד (Niv) של אפליקציית מסחר בשם SwingEdge.",
     "כתוב סיכום קצר בעברית בלבד, בטקסט רגיל (ללא Markdown fences, ללא JSON).",
     "שורה ראשונה = כותרת: אם attentionCount=0 כתוב בדיוק '🟢 הכל תקין', אחרת '🟡 N דברים דורשים תשומת לב' (N=attentionCount).",
+    "ב-ci, conclusion: null פירושו שהתהליך עדיין רץ או טרם רץ — זה לא כשל ואסור לרשום אותו כבעיה; רק conclusion: \"failure\" הוא בעיה אמיתית.",
     "אחרי הכותרת פרט אך ורק את הפריטים שבאמת דורשים תשומת לב — בלי מילוי, בלי לחזור על מה שתקין.",
     "אם הכל ירוק — סה\"כ 2-3 שורות ותו לא.",
     "כלול קישורים ישירים לכל PR/Issue שדורש פעולה.",
