@@ -1,0 +1,93 @@
+{
+  "_meta": { "version": "1.0.0", "updated": "2026-07-05", "sources": "Bulkowski Encyclopedia of Chart Patterns 3rd ed · Minervini SEPA · O'Neil CANSLIM · Qullamaggie · SMB Capital", "note": "סטטיסטיקות Bulkowski: שוק שורי. כשל BE = לא זז 5% אחרי פריצה." },
+  "vcp": {
+    "name": "VCP (Volatility Contraction Pattern)",
+    "definition": "בסיס בתוך מגמת Stage 2 עם 2–6 התכווצויות, כל אחת רדודה מקודמתה (25%→12%→6%), ווליום מתייבש לקראת ה-pivot.",
+    "entry_criteria": ["מחיר מעל 50/150/200 SMA וה-200 עולה (Trend Template)", "כל התכווצות רדודה מהקודמת", "ווליום יורד לאורך הבסיס ומתכווץ מתחת לממוצע בהתכווצות האחרונה", "פריצת pivot על ווליום מתרחב"],
+    "invalidation": ["התכווצות עמוקה מהקודמת = תבנית שבורה", "פריצה על ווליום נמוך = חשד לכשל", "שבירת שפל ההתכווצות האחרונה"],
+    "stop": "מתחת לשפל ההתכווצות האחרונה, מקסימום 7–8% מהכניסה",
+    "source": "Minervini — Trade Like a Stock Market Wizard",
+    "reliability": "גבוהה כשכל הקריטריונים מתקיימים; דורש שוק שורי (M של CANSLIM)"
+  },
+  "breakout_continuation": {
+    "name": "Breakout (המשך) — Qullamaggie",
+    "definition": "מניה שעלתה 30–100%+ ב-1–3 חודשים, קונסולידציה צמודה 2–8 שבועות עם שפלים עולים, רוכבת על 10/20 MA.",
+    "entry_criteria": ["מהלך קודם חזק (30%+)", "קונסולידציה עם שפלים עולים", "מחיר מחזיק מעל 10/20 MA", "פריצה על ווליום מוגבר", "פילטר שוק: 10 MA מעל 20 MA במדד"],
+    "invalidation": ["איבוד ה-20 MA בסגירה", "שפל יורד בתוך הקונסולידציה", "פריצה ללא ווליום"],
+    "stop": "שפל היום של הפריצה או ה-LOD",
+    "source": "qullamaggie.com — 3 Timeless Setups",
+    "reliability": "win rate ~25–30% אצל המקור — הרווח ממנצחות גדולות, לא מדיוק"
+  },
+  "episodic_pivot": {
+    "name": "Episodic Pivot (EP)",
+    "definition": "gap-up של 10%+ על ווליום עצום בעקבות קטליזטור (דוחות/חדשות) — שינוי נרטיב מהותי.",
+    "entry_criteria": ["gap 10%+ עם RVOL>3", "קטליזטור אמיתי (לא תנועה טכנית)", "רצוי מניה ששכבה זמן רב לפני"],
+    "invalidation": ["שבירת שפל הבוקר", "כשל בהחזקת VWAP אחרי הכניסה"],
+    "stop": "שפל הבוקר",
+    "source": "Qullamaggie / Unknown Market Wizards (Schwager)",
+    "reliability": "הסטאפ הנדיר ביותר ובעל ה-R/R הטוב ביותר בשיטה"
+  },
+  "cup_and_handle": {
+    "name": "Cup & Handle (כוס וידית)",
+    "definition": "תבנית המשך שורית: כוס בצורת U, ידית קונסולידציה קטנה, פריצה לשיאים.",
+    "entry_criteria": ["כוס U חודשים (לא V חד)", "ידית בחצי העליון של הכוס, נטייה מטה קלה", "ווליום מתייבש בידית, מתפרץ בפריצה (+40% מעל ממוצע 20 יום)"],
+    "invalidation": ["ידית עמוקה מ-50% מהכוס", "פריצה על ווליום חלש"],
+    "stop": "מתחת לשפל הידית",
+    "source": "O'Neil · Bulkowski (דירוג 3/39, כשל BE 5%, עלייה ממוצעת +54%, הגעה ליעד 63%)",
+    "reliability": "מהתבניות המדורגות ביותר אצל Bulkowski"
+  },
+  "bull_flag": {
+    "name": "Bull Flag (דגל שורי)",
+    "definition": "תורן (מהלך חד) ואז דגל — קונסולידציה צרה נגד המגמה — ופריצה בכיוון התורן.",
+    "entry_criteria": ["תורן על ווליום גבוה", "דגל 1–3 שבועות, ווליום יורד בתוכו", "פריצה על ווליום חוזר"],
+    "invalidation": ["דגל שמתארך מעבר ל-3–4 שבועות", "retrace עמוק מ-50% מהתורן"],
+    "stop": "מתחת לשפל הדגל",
+    "source": "Bulkowski — thepatternsite.com/flags.html",
+    "reliability": "תבנית המשך אמינה כשהתורן חד והדגל צמוד"
+  },
+  "double_bottom": {
+    "name": "Double Bottom (תחתית כפולה)",
+    "definition": "היפוך שורי בצורת W. אישור רק בסגירה מעל הפסגה שבין התחתיות.",
+    "entry_criteria": ["שתי תחתיות באותו אזור", "אישור בשבירת קו הצוואר", "תחתית שנייה על ווליום גבוה (capitulation) = חזק יותר"],
+    "invalidation": ["כניסה לפני אישור = הטעות הנפוצה", "שבירת התחתיות אחרי כניסה"],
+    "stop": "מתחת לתחתית השנייה",
+    "source": "Bulkowski (Eve&Eve: דירוג 5/39, כשל BE 12%, ‏+50% ממוצע)",
+    "reliability": "וריאציית Eve&Eve (מעוגלת) החזקה ביותר"
+  },
+  "head_and_shoulders": {
+    "name": "Head & Shoulders (ראש וכתפיים)",
+    "definition": "היפוך דובי: כתף-ראש-כתף וקו צוואר. אישור בסגירה מתחת לקו הצוואר.",
+    "entry_criteria": ["ווליום שיא בכתף שמאל ובראש, דועך בכתף ימין", "אישור שבירת קו צוואר", "יעד = גובה הראש מוקרן מהפריצה"],
+    "invalidation": ["כניסה לפני שבירת קו הצוואר", "תבנית א-סימטרית מתפקדת פחות"],
+    "stop": "מעל כתף ימין",
+    "source": "Bulkowski — thepatternsite.com/hst.html (pullback ~50–67%)",
+    "reliability": "מהיפוכי הדובי המוכרים; המתן לאישור"
+  },
+  "ascending_triangle": {
+    "name": "Ascending Triangle (משולש עולה)",
+    "definition": "התנגדות אופקית + שפלים עולים. הטיה שורית — קונים אגרסיביים מול מוכר סטטי.",
+    "entry_criteria": ["לפחות 2 נגיעות בהתנגדות ו-2 שפלים עולים", "פריצה על ווליום"],
+    "invalidation": ["פריצה מטה (קורה ~37%)", "throwback שנכשל לחזור מעל הרמה"],
+    "stop": "מתחת לשפל העולה האחרון",
+    "source": "Bulkowski (פורץ מעלה ~63%, ‏+43% ממוצע, כשל BE ~17%)",
+    "reliability": "בינונית-גבוהה עם אישור ווליום"
+  },
+  "orb": {
+    "name": "Opening Range Breakout (ORB)",
+    "definition": "פריצת טווח הפתיחה (5/15/30 דק'). סטופ מובנה בקצה הנגדי של הטווח.",
+    "entry_criteria": ["טווח פתיחה מוגדר", "פריצה על RVOL גבוה", "עובד הכי טוב אחרי יום NR7 (טווח צר מ-7 ימים)"],
+    "invalidation": ["חזרה לתוך הטווח וסגירה בצד הנגדי"],
+    "stop": "הקצה הנגדי של טווח הפתיחה",
+    "source": "SMB Capital — One Good Trade / The Playbook",
+    "reliability": "סטאפ דיי-טריידינג; ללא ווליום — דלג"
+  },
+  "parabolic_short": {
+    "name": "Parabolic Short",
+    "definition": "שורט על מניה שעלתה אנכית: 50–100%+ (large-cap) או 300–1000%+ (small-cap) ב-3–5 ימים.",
+    "entry_criteria": ["יום 3–5 של המהלך — לא יום 1–2", "סימן חולשה ראשון: שבירת Opening Range Low או כשל חזרה ל-VWAP"],
+    "invalidation": ["שורט ביום 1–2 = התאבדות", "המניה מחזיקה VWAP"],
+    "stop": "מעל שיא היום",
+    "source": "Qullamaggie",
+    "reliability": "R/R גבוה אך דורש תזמון מדויק ומשמעת"
+  }
+}
