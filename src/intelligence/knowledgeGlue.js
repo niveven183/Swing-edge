@@ -33,6 +33,9 @@ const SETUP_NAME_TO_KEY = {
   "ORB": "orb",
   "Opening Range Breakout": "orb",
   "Parabolic Short": "parabolic_short",
+  "Pullback": "pullback",
+  "Support Bounce": "support_bounce",
+  "Resistance Break": "resistance_break",
 };
 
 /**

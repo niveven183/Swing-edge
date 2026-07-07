@@ -119,5 +119,41 @@
     "stats": { "note": "R:R גבוה, תזמון קריטי: יום 3-5 בלבד", "source": "Qullamaggie" },
     "regime_affinity": { "best": ["Volatile"], "avoid": ["Trending Up"] },
     "coach_line": "Parabolic Short ביום 1-2 של המהלך = התאבדות (Qullamaggie). מחכים ליום 3-5 ולסימן חולשה ראשון."
+  },
+  "pullback": {
+    "name": "Pullback (חזרה לממוצע)",
+    "definition": "כניסה במגמת עלייה קיימת בעת חזרה מסודרת לתמיכה דינמית (10/20/50 MA) על ווליום יורד, והתחדשות המגמה.",
+    "entry_criteria": ["מגמת עלייה מוכחת (HH/HL, מחיר מעל 50 SMA עולה)","חזרה של 3-8% אל אזור ממוצע נע על ווליום מתכווץ","נר היפוך/התחדשות על הממוצע עם ווליום חוזר","המגמה הראשית לא נפגעה (אין שבירת שפל משמעותי)"],
+    "invalidation": ["סגירה מתחת ל-50 SMA על ווליום גבוה","ווליום עולה בירידה (מכירה מוסדית, לא פולבק)","שבירת השפל הקודם במבנה"],
+    "stop": "מתחת לשפל הפולבק / מתחת לממוצע שממנו נקנה",
+    "source": "Minervini — pullback buys ל-10/20 MA; O'Neil — קנייה בתמיכת 50 SMA",
+    "reliability": "מהכניסות האמינות במגמה בריאה — בתנאי שהמגמה אכן בריאה",
+    "stats": { "note": "Minervini: במגמת Stage 2 בריאה המחיר קופץ שוב ושוב מה-20/50 — כניסות ה-R:R הטובות ביותר אחרי פריצה" },
+    "regime_affinity": { "best": ["Trending Up"], "avoid": ["Trending Down","Sideways"] },
+    "coach_line": "Pullback עובד רק כשיש מגמה לחזור אליה. ב-Sideways אין pullback — יש סתם ירידה. Minervini: קונים חולשה רק בתוך חוזק."
+  },
+  "support_bounce": {
+    "name": "Support Bounce (קפיצה מתמיכה)",
+    "definition": "כניסת long ברמת תמיכה אופקית מוכחת (2+ נגיעות קודמות) עם אישור דחייה — נר היפוך וווליום.",
+    "entry_criteria": ["רמת תמיכה עם לפחות 2 נגיעות היסטוריות","הגעה לרמה על ווליום לא-פאני","נר דחייה (hammer/bullish engulfing) על הרמה","אישור: סגירה מעל שיא נר הדחייה"],
+    "invalidation": ["סגירה מתחת לרמה (לא רק wick)","נגיעה רביעית+ — הרמה נשחקת","הגעה לרמה בנפילה אנכית על ווליום עצום (סכין נופלת)"],
+    "stop": "מתחת לרמת התמיכה עם מרווח נשימה (לא צמוד לסנט)",
+    "source": "Murphy — Technical Analysis of the Financial Markets; Wyckoff — בדיקת תמיכה",
+    "reliability": "ככל שהרמה נבדקה יותר בעבר — חזקה יותר; אך כל בדיקה נוספת שוחקת",
+    "stats": { "note": "עיקרון role reversal: תמיכה שנשברה הופכת התנגדות — לכן הסטופ מתחת לרמה הוא מבני, לא שרירותי" },
+    "regime_affinity": { "best": ["Sideways","Trending Up"], "avoid": ["Trending Down"] },
+    "coach_line": "Support Bounce ב-Trending Down = לתפוס סכין נופלת. Wyckoff: תמיכה אמיתית מוכיחה את עצמה בנר דחייה — נכנסים על האישור, לא על התקווה."
+  },
+  "resistance_break": {
+    "name": "Resistance Break (פריצת התנגדות)",
+    "definition": "כניסת long בפריצה מאושרת של רמת התנגדות אופקית מוכחת, על ווליום מתפרץ.",
+    "entry_criteria": ["רמת התנגדות עם 2+ נגיעות","קונסולידציה מתחת לרמה לפני הפריצה (לא הגעה אנכית)","פריצה בסגירה מעל הרמה על ווליום 40%+ מהממוצע","רצוי: retest קצר של הרמה כתמיכה (role reversal)"],
+    "invalidation": ["פריצה על ווליום נמוך — חשד ל-false breakout","חזרה וסגירה מתחת לרמה אחרי הפריצה","הרמה נפרצה ישר אחרי מהלך אנכי (climax, לא בסיס)"],
+    "stop": "מתחת לרמה שנפרצה (שהפכה תמיכה)",
+    "source": "Murphy; Bulkowski — סטטיסטיקות פריצה; O'Neil — קנייה בפריצת בסיס",
+    "reliability": "תלוי-ווליום באופן קריטי: פריצה שקטה נכשלת פי כמה",
+    "stats": { "note": "Bulkowski: ווליום בפריצה לא מבטיח מהלך גדול יותר — אבל בלעדיו הכשלים משולשים" },
+    "regime_affinity": { "best": ["Trending Up","Sideways"], "avoid": ["Trending Down"] },
+    "coach_line": "Resistance Break בלי ווליום זה לא breakout — זו הזמנה ל-false break. Bulkowski: הכשלים משולשים בלי אישור ווליום."
   }
 }
