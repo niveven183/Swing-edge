@@ -83,6 +83,67 @@ export const getAllSetups = () => {
 };
 
 /**
+ * Coach line for a setup by key (e.g. "vcp"), or null.
+ * @param {string} setupKey
+ * @returns {string|null}
+ */
+export const getCoachLine = (setupKey) => {
+  try {
+    const s = pick(setups, setupKey);
+    return s && typeof s.coach_line === "string" ? s.coach_line : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Violation line for a rule by key (e.g. "rr_minimum"), or null.
+ * @param {string} ruleKey
+ * @returns {string|null}
+ */
+export const getViolationLine = (ruleKey) => {
+  try {
+    const r = pick(rules, ruleKey);
+    return r && typeof r.violation_line === "string" ? r.violation_line : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Regime affinity ({ best, avoid }) for a setup by key, or null.
+ * @param {string} setupKey
+ * @returns {object|null}
+ */
+export const getRegimeAffinity = (setupKey) => {
+  try {
+    const s = pick(setups, setupKey);
+    const a = s && s.regime_affinity;
+    return a && typeof a === "object" ? a : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Cross-references for a psychology entry ({ related_rules, related_setups }), or null.
+ * @param {string} psychologyKey
+ * @returns {object|null}
+ */
+export const getRelated = (psychologyKey) => {
+  try {
+    const p = pick(psychology, psychologyKey);
+    if (!p) return null;
+    const related_rules = Array.isArray(p.related_rules) ? p.related_rules : [];
+    const related_setups = Array.isArray(p.related_setups) ? p.related_setups : [];
+    if (!related_rules.length && !related_setups.length) return null;
+    return { related_rules, related_setups };
+  } catch {
+    return null;
+  }
+};
+
+/**
  * True when at least one knowledge source loaded with usable content.
  * @returns {boolean}
  */

@@ -7,7 +7,10 @@
     "invalidation": ["התכווצות עמוקה מהקודמת = תבנית שבורה", "פריצה על ווליום נמוך = חשד לכשל", "שבירת שפל ההתכווצות האחרונה"],
     "stop": "מתחת לשפל ההתכווצות האחרונה, מקסימום 7–8% מהכניסה",
     "source": "Minervini — Trade Like a Stock Market Wizard",
-    "reliability": "גבוהה כשכל הקריטריונים מתקיימים; דורש שוק שורי (M של CANSLIM)"
+    "reliability": "גבוהה כשכל הקריטריונים מתקיימים; דורש שוק שורי (M של CANSLIM)",
+    "stats": { "note": "אין נתון Bulkowski ישיר — תבנית Minervini; אמינות גבוהה רק כשכל הקריטריונים מתקיימים" },
+    "regime_affinity": { "best": ["Trending Up"], "avoid": ["Trending Down","Volatile"] },
+    "coach_line": "VCP תקף רק ב-Stage 2 (Trending Up). Minervini: כל התכווצות חייבת להיות רדודה מקודמתה והווליום מתייבש — אחרת זו לא התבנית."
   },
   "breakout_continuation": {
     "name": "Breakout (המשך) — Qullamaggie",
@@ -16,7 +19,10 @@
     "invalidation": ["איבוד ה-20 MA בסגירה", "שפל יורד בתוך הקונסולידציה", "פריצה ללא ווליום"],
     "stop": "שפל היום של הפריצה או ה-LOD",
     "source": "qullamaggie.com — 3 Timeless Setups",
-    "reliability": "win rate ~25–30% אצל המקור — הרווח ממנצחות גדולות, לא מדיוק"
+    "reliability": "win rate ~25–30% אצל המקור — הרווח ממנצחות גדולות, לא מדיוק",
+    "stats": { "note": "win rate ~25-30% אצל Qullamaggie — הרווח ממנצחות גדולות, לא מדיוק" },
+    "regime_affinity": { "best": ["Trending Up"], "avoid": ["Trending Down","Sideways"] },
+    "coach_line": "Breakout בלי מגמת שוק תומכת (10MA>20MA במדד) = נגד הסטטיסטיקה של Qullamaggie. פילטר השוק קודם לכל."
   },
   "episodic_pivot": {
     "name": "Episodic Pivot (EP)",
@@ -25,7 +31,10 @@
     "invalidation": ["שבירת שפל הבוקר", "כשל בהחזקת VWAP אחרי הכניסה"],
     "stop": "שפל הבוקר",
     "source": "Qullamaggie / Unknown Market Wizards (Schwager)",
-    "reliability": "הסטאפ הנדיר ביותר ובעל ה-R/R הטוב ביותר בשיטה"
+    "reliability": "הסטאפ הנדיר ביותר ובעל ה-R/R הטוב ביותר בשיטה",
+    "stats": { "note": "הסטאפ הנדיר ביותר ובעל ה-R:R הטוב בשיטת Qullamaggie" },
+    "regime_affinity": { "best": ["Trending Up","Sideways"], "avoid": ["Trending Down"] },
+    "coach_line": "EP אמיתי דורש gap 10%+ עם RVOL>3 וקטליזטור. בלי קטליזטור — זה סתם gap, לא Episodic Pivot."
   },
   "cup_and_handle": {
     "name": "Cup & Handle (כוס וידית)",
@@ -34,7 +43,10 @@
     "invalidation": ["ידית עמוקה מ-50% מהכוס", "פריצה על ווליום חלש"],
     "stop": "מתחת לשפל הידית",
     "source": "O'Neil · Bulkowski (דירוג 3/39, כשל BE 5%, עלייה ממוצעת +54%, הגעה ליעד 63%)",
-    "reliability": "מהתבניות המדורגות ביותר אצל Bulkowski"
+    "reliability": "מהתבניות המדורגות ביותר אצל Bulkowski",
+    "stats": { "be_fail": "5%", "avg_move": "+54%", "target_hit": "63%", "source": "Bulkowski, דירוג 3/39" },
+    "regime_affinity": { "best": ["Trending Up"], "avoid": ["Trending Down","Volatile"] },
+    "coach_line": "Cup & Handle מדורגת 3/39 אצל Bulkowski עם כשל של 5% בלבד — אבל רק עם ווליום מתפרץ בפריצה (+40% מהממוצע)."
   },
   "bull_flag": {
     "name": "Bull Flag (דגל שורי)",
@@ -43,7 +55,10 @@
     "invalidation": ["דגל שמתארך מעבר ל-3–4 שבועות", "retrace עמוק מ-50% מהתורן"],
     "stop": "מתחת לשפל הדגל",
     "source": "Bulkowski — thepatternsite.com/flags.html",
-    "reliability": "תבנית המשך אמינה כשהתורן חד והדגל צמוד"
+    "reliability": "תבנית המשך אמינה כשהתורן חד והדגל צמוד",
+    "stats": { "be_fail": "44%", "avg_move": "+9% (על ה-swing)", "target_hit": "46%", "source": "Bulkowski" },
+    "regime_affinity": { "best": ["Trending Up"], "avoid": ["Sideways","Trending Down"] },
+    "coach_line": "Bull Flag חי או מת על התורן: בלי מהלך חד לפני ובלי ווליום שמתייבש בדגל — אין תבנית."
   },
   "double_bottom": {
     "name": "Double Bottom (תחתית כפולה)",
@@ -52,7 +67,10 @@
     "invalidation": ["כניסה לפני אישור = הטעות הנפוצה", "שבירת התחתיות אחרי כניסה"],
     "stop": "מתחת לתחתית השנייה",
     "source": "Bulkowski (Eve&Eve: דירוג 5/39, כשל BE 12%, ‏+50% ממוצע)",
-    "reliability": "וריאציית Eve&Eve (מעוגלת) החזקה ביותר"
+    "reliability": "וריאציית Eve&Eve (מעוגלת) החזקה ביותר",
+    "stats": { "be_fail": "12% (Eve&Eve)", "avg_move": "+50%", "target_hit": "65%", "source": "Bulkowski, דירוג 5/39" },
+    "regime_affinity": { "best": ["Sideways","Trending Down"], "avoid": [] },
+    "coach_line": "Double Bottom נכשלת בידיים של מי שנכנס לפני אישור קו הצוואר — Bulkowski: ההמתנה לסגירה מעל הפסגה היא ההבדל."
   },
   "head_and_shoulders": {
     "name": "Head & Shoulders (ראש וכתפיים)",
@@ -61,7 +79,10 @@
     "invalidation": ["כניסה לפני שבירת קו הצוואר", "תבנית א-סימטרית מתפקדת פחות"],
     "stop": "מעל כתף ימין",
     "source": "Bulkowski — thepatternsite.com/hst.html (pullback ~50–67%)",
-    "reliability": "מהיפוכי הדובי המוכרים; המתן לאישור"
+    "reliability": "מהיפוכי הדובי המוכרים; המתן לאישור",
+    "stats": { "be_fail": "~20%", "avg_move": "-16% עד -29%", "pullback": "~50-67%", "source": "Bulkowski" },
+    "regime_affinity": { "best": ["Trending Up"], "avoid": [] },
+    "coach_line": "H&S בלי שבירת neckline מאושרת = עדיין אין תבנית. וזכור: pullback חוזר ב-2/3 מהמקרים — הכניסה השנייה לגיטימית."
   },
   "ascending_triangle": {
     "name": "Ascending Triangle (משולש עולה)",
@@ -70,7 +91,10 @@
     "invalidation": ["פריצה מטה (קורה ~37%)", "throwback שנכשל לחזור מעל הרמה"],
     "stop": "מתחת לשפל העולה האחרון",
     "source": "Bulkowski (פורץ מעלה ~63%, ‏+43% ממוצע, כשל BE ~17%)",
-    "reliability": "בינונית-גבוהה עם אישור ווליום"
+    "reliability": "בינונית-גבוהה עם אישור ווליום",
+    "stats": { "be_fail": "17%", "avg_move": "+43%", "target_hit": "~70%", "source": "Bulkowski, פורץ מעלה ~63%" },
+    "regime_affinity": { "best": ["Trending Up","Sideways"], "avoid": ["Trending Down"] },
+    "coach_line": "Ascending Triangle דורש לפחות 3 נגיעות בהתנגדות. שתיים = קו, לא תבנית."
   },
   "orb": {
     "name": "Opening Range Breakout (ORB)",
@@ -79,7 +103,10 @@
     "invalidation": ["חזרה לתוך הטווח וסגירה בצד הנגדי"],
     "stop": "הקצה הנגדי של טווח הפתיחה",
     "source": "SMB Capital — One Good Trade / The Playbook",
-    "reliability": "סטאפ דיי-טריידינג; ללא ווליום — דלג"
+    "reliability": "סטאפ דיי-טריידינג; ללא ווליום — דלג",
+    "stats": { "note": "עובד הכי טוב אחרי יום NR7; סטופ מובנה בקצה הנגדי של הטווח", "source": "SMB Capital" },
+    "regime_affinity": { "best": ["Trending Up","Volatile"], "avoid": [] },
+    "coach_line": "ORB בלי RVOL גבוה = דלג. SMB: אם אין ווליום בפתיחה, אין המשכיות."
   },
   "parabolic_short": {
     "name": "Parabolic Short",
@@ -88,6 +115,9 @@
     "invalidation": ["שורט ביום 1–2 = התאבדות", "המניה מחזיקה VWAP"],
     "stop": "מעל שיא היום",
     "source": "Qullamaggie",
-    "reliability": "R/R גבוה אך דורש תזמון מדויק ומשמעת"
+    "reliability": "R/R גבוה אך דורש תזמון מדויק ומשמעת",
+    "stats": { "note": "R:R גבוה, תזמון קריטי: יום 3-5 בלבד", "source": "Qullamaggie" },
+    "regime_affinity": { "best": ["Volatile"], "avoid": ["Trending Up"] },
+    "coach_line": "Parabolic Short ביום 1-2 של המהלך = התאבדות (Qullamaggie). מחכים ליום 3-5 ולסימן חולשה ראשון."
   }
 }
