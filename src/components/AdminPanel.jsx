@@ -1119,8 +1119,9 @@ function FeedbackTab({ feedback, setFeedback, toast }) {
   const markResolved = async (id, resolved) => {
     try {
       const nextStatus = resolved ? "resolved" : "new";
-      const { error } = await supabase.from("feedback").update({ status: nextStatus }).eq("id", id);
+      const { data, error } = await supabase.from("feedback").update({ status: nextStatus }).eq("id", id).select();
       if (error) throw error;
+      if (!data || data.length === 0) throw new Error("No rows updated (check permissions)");
       setFeedback((rs) => rs.map((r) => (r.id === id ? { ...r, status: nextStatus } : r)));
       toast.success(resolved ? "Resolved ✓" : "Reopened");
     } catch (e) {
