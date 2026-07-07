@@ -92,6 +92,18 @@ export default function MonthlyReportModal({ report, t, lang, isRTL, onClose, on
                 <ArrowRight size={12} /> {t.mr_oneAction}
               </div>
               <p className="text-xs font-semibold text-slate-900 dark:text-white leading-snug">{actionText}</p>
+              {action.knowledge && (
+                <div className="mt-1.5 space-y-0.5" dir={isRTL ? 'rtl' : 'ltr'}>
+                  {action.knowledge.coachLine && (
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
+                      {action.knowledge.coachLine}{action.knowledge.source ? ` — ${action.knowledge.source}` : ''}
+                    </p>
+                  )}
+                  {action.knowledge.statLine && (
+                    <p className="text-[11px] font-medium text-cyan-700 dark:text-cyan-300">{action.knowledge.statLine}</p>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

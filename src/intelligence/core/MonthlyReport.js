@@ -13,6 +13,7 @@
 
 import { isFollowedPlan, isOffPlan } from "../../utils.js";
 import { edgeScore } from "../utils/statisticalModels.js";
+import { getSetupActionKnowledge } from "../knowledgeGlue.js";
 
 const DOW = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTHS = [
@@ -257,7 +258,7 @@ export function generateMonthlyReport(trades, month, year, calcMetrics) {
   // ── ACTION ITEMS (3) ──
   const actionItems = [];
   if (patterns.worstSetup && patterns.worstSetup.winRate <= 45 && patterns.worstSetup !== patterns.bestSetup) {
-    actionItems.push({ priority: "high", tid: "mr_a_avoidSetup", params: { setup: patterns.worstSetup.name }, action: `Pause or refine ${patterns.worstSetup.name}`, reason: `Low win rate this month (${Math.round(patterns.worstSetup.winRate)}%)` });
+    actionItems.push({ priority: "high", tid: "mr_a_avoidSetup", params: { setup: patterns.worstSetup.name }, action: `Pause or refine ${patterns.worstSetup.name}`, reason: `Low win rate this month (${Math.round(patterns.worstSetup.winRate)}%)`, knowledge: getSetupActionKnowledge({ setup: patterns.worstSetup.name, userWinRate: patterns.worstSetup.winRate }) });
   }
   if (tiltLosses >= 2) {
     actionItems.push({ priority: "high", tid: "mr_a_tilt", params: {}, action: "Cut size after a loss", reason: `${tiltLosses} losses came from tilt/off-plan trades` });
@@ -266,7 +267,7 @@ export function generateMonthlyReport(trades, month, year, calcMetrics) {
     actionItems.push({ priority: "medium", tid: "mr_a_discipline", params: {}, action: "Follow your written plan on every entry", reason: `Plan adherence was ${Math.round(disciplineRatio * 100)}%` });
   }
   if (patterns.bestSetup) {
-    actionItems.push({ priority: "medium", tid: "mr_a_leanSetup", params: { setup: patterns.bestSetup.name }, action: `Lean into ${patterns.bestSetup.name}`, reason: `Your strongest setup (${Math.round(patterns.bestSetup.winRate)}%)` });
+    actionItems.push({ priority: "medium", tid: "mr_a_leanSetup", params: { setup: patterns.bestSetup.name }, action: `Lean into ${patterns.bestSetup.name}`, reason: `Your strongest setup (${Math.round(patterns.bestSetup.winRate)}%)`, knowledge: getSetupActionKnowledge({ setup: patterns.bestSetup.name, userWinRate: patterns.bestSetup.winRate }) });
   }
   if (patterns.worstEmotion && patterns.worstEmotion.winRate <= 45) {
     actionItems.push({ priority: "low", tid: "mr_a_manageEmotion", params: { emotion: patterns.worstEmotion.name }, action: `Add a check before entering while ${patterns.worstEmotion.name}`, reason: `Weakest mindset (${Math.round(patterns.worstEmotion.winRate)}%)` });

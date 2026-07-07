@@ -278,6 +278,18 @@ export default function MonthlyReportTab({ trades, calcMetrics, t, lang, isRTL }
                   <span className={`text-[9px] px-1.5 py-0.5 rounded border font-semibold uppercase ${PRIORITY_STYLE[a.priority] || PRIORITY_STYLE.low}`}>{t[`mr_priority_${a.priority}`] || a.priority}</span>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{a.reason}</p>
+                {a.knowledge && (
+                  <div className="mt-1.5 space-y-0.5" dir={isRTL ? 'rtl' : 'ltr'}>
+                    {a.knowledge.coachLine && (
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                        {a.knowledge.coachLine}{a.knowledge.source ? ` — ${a.knowledge.source}` : ''}
+                      </p>
+                    )}
+                    {a.knowledge.statLine && (
+                      <p className="text-[11px] font-medium text-cyan-700 dark:text-cyan-300">{a.knowledge.statLine}</p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))}

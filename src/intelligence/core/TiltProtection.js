@@ -11,6 +11,7 @@ import {
   trailingLossRun, isRevengeWindow, tradesToday, isOffHours,
   planDeviationsInLastDays, minutesSinceLastClose,
 } from "../utils/psychologyPatterns.js";
+import { getPsychology } from "../knowledge.js";
 
 const LOCAL_KEY = "swingEdgeTiltState";
 
@@ -53,25 +54,42 @@ export const acknowledgeWarning = (key) => {
   writeState(state);
 };
 
+// Enrich a tilt indicator's DISPLAYED TEXT with a Douglas correction line +
+// source. Additive only: when the psychology entry is missing/malformed we return
+// the indicator unchanged, so absent knowledge = today's exact strings. The
+// correction copy is Hebrew-only, so it appends to `he`; the source (a proper
+// noun) appends to both. Never touches key/severity.
+const enrichTilt = (indicator, psychEntry) => {
+  const correction =
+    psychEntry && typeof psychEntry.correction === "string" ? psychEntry.correction : null;
+  if (!correction) return indicator;
+  const src = typeof psychEntry.source === "string" && psychEntry.source ? ` — ${psychEntry.source}` : "";
+  return {
+    ...indicator,
+    en: `${indicator.en}${src}`,
+    he: `${indicator.he} ${correction}${src}`,
+  };
+};
+
 // ─── INDICATOR RULES ─────────────────────────────────────────────────────────
 const rules = (trades, nowTs = Date.now()) => {
   const indicators = [];
   const lossRun = trailingLossRun(trades);
-  if (lossRun >= 3) indicators.push({
+  if (lossRun >= 3) indicators.push(enrichTilt({
     key: "lossRun",
     severity: lossRun >= 5 ? 3 : 2,
     en: `${lossRun} losses in a row — step away and review before the next trade.`,
     he: `${lossRun} הפסדים ברצף — קח אוויר ונתח לפני העסקה הבאה.`,
-  });
+  }, getPsychology("tilt")));
 
   if (isRevengeWindow(trades, nowTs)) {
     const mins = Math.round(minutesSinceLastClose(trades, nowTs));
-    indicators.push({
+    indicators.push(enrichTilt({
       key: "revenge",
       severity: 2,
       en: `Only ${mins} min since your last loss — revenge-trade risk is high.`,
       he: `עברו רק ${mins} דקות מההפסד האחרון — סיכון גבוה ל-revenge trading.`,
-    });
+    }, getPsychology("revenge_trading")));
   }
 
   const today = tradesToday(trades);

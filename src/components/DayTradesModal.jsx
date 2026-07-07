@@ -5,8 +5,10 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { getTranslations, isRTLLang, nTrades } from '../i18n.js';
 import useModalA11y from '../hooks/useModalA11y.js';
 import TickerLogo from './TickerLogo.jsx';
+import InfoTooltip from './ui/InfoTooltip.jsx';
 import { EMOTION_OPTIONS } from '../data/tradeOptions.jsx';
 import { isFollowedPlan, isOffPlan } from '../utils.js';
+import { getSetupTooltip } from '../intelligence/knowledgeGlue.js';
 
 const EMOTION_EMOJI = Object.fromEntries(EMOTION_OPTIONS.map(o => [o.value, o.emoji]));
 
@@ -227,7 +229,7 @@ export default function DayTradesModal({ dateKey, trades = [], calcMetrics, lang
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-xs">
                   <Field label={t.cal_entry} value={tr.entry != null ? `$${tr.entry}` : '–'} mono />
                   <Field label={t.cal_exit} value={tr.exit != null ? `$${tr.exit}` : '–'} mono />
-                  <Field label={t.cal_setup} value={tr.setup || '–'} />
+                  <Field label={t.cal_setup} value={tr.setup || '–'} tip={<SetupTip setup={tr.setup} isRTL={isRTL} />} />
                   <Field
                     label={t.cal_emotion}
                     value={tr.emotionAtEntry
@@ -265,11 +267,33 @@ export default function DayTradesModal({ dateKey, trades = [], calcMetrics, lang
   );
 }
 
-function Field({ label, value, mono = false }) {
+// Info "?" beside a mapped setup tag — knowledge name/definition/coach line.
+// Returns null for unmapped / "Other" / empty setups, so the tag stays plain.
+function SetupTip({ setup, isRTL }) {
+  const st = getSetupTooltip(setup);
+  if (!st) return null;
+  const dir = isRTL ? 'rtl' : 'ltr';
+  return (
+    <InfoTooltip label={isRTL ? `מידע על ${st.name}` : `More info: ${st.name}`}>
+      <div dir={dir} style={{ direction: dir, textAlign: 'start' }}>
+        <div className="font-bold text-emerald-600 dark:text-emerald-400 mb-1.5 text-[13px]">{st.name}</div>
+        {st.definition && <div className="whitespace-pre-line mb-2">{st.definition}</div>}
+        {st.coachLine && (
+          <div className="whitespace-pre-line text-slate-600 dark:text-slate-300">{st.coachLine}</div>
+        )}
+      </div>
+    </InfoTooltip>
+  );
+}
+
+function Field({ label, value, mono = false, tip = null }) {
   return (
     <div className="min-w-0">
       <div className="text-[10px] uppercase tracking-wide text-slate-400 dark:text-slate-500">{label}</div>
-      <div className={`text-slate-700 dark:text-slate-200 truncate ${mono ? 'font-mono' : ''}`}>{value}</div>
+      <div className="flex items-center gap-1">
+        <div className={`text-slate-700 dark:text-slate-200 truncate ${mono ? 'font-mono' : ''}`}>{value}</div>
+        {tip}
+      </div>
     </div>
   );
 }

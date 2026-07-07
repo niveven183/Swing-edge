@@ -74,3 +74,48 @@ export const getSetupRegimeKnowledge = ({ setup, marketCondition } = {}) => {
   }
   return null;
 };
+
+/**
+ * Journal tooltip payload for a setup label. Additive — null when the setup is
+ * unmapped / "Other" / empty, so callers show the plain tag exactly as today.
+ * @param {string} setupName app setup label (e.g. "Breakout", "Pullback")
+ * @returns {{name:string, definition:string, coachLine:string, source:string}|null}
+ */
+export const getSetupTooltip = (setupName) => {
+  if (!setupName) return null;
+  const key = SETUP_NAME_TO_KEY[setupName];
+  if (!key) return null;
+  const s = getSetup(key);
+  if (!s) return null;
+  return {
+    name: s.name || setupName,
+    definition: s.definition || "",
+    coachLine: s.coach_line || "",
+    source: s.source || "",
+  };
+};
+
+/**
+ * Monthly-report action-item enrichment for a setup recommendation. Attaches a
+ * coach line + source and, when the setup carries a Bulkowski break-even stat, a
+ * one-line canon baseline pairing the user's own win rate against it.
+ * @param {{setup?:string, userWinRate?:number}} args
+ * @returns {{coachLine:string, source:string, statLine:(string|null)}|null}
+ */
+export const getSetupActionKnowledge = ({ setup, userWinRate } = {}) => {
+  if (!setup) return null;
+  const key = SETUP_NAME_TO_KEY[setup];
+  if (!key) return null;
+  const s = getSetup(key);
+  if (!s) return null;
+  const coachLine = s.coach_line || "";
+  const source = s.source || "";
+  if (!coachLine && !source) return null;
+  const stats = s.stats;
+  let statLine = null;
+  if (stats && typeof stats.be_fail === "string" && Number.isFinite(userWinRate)) {
+    const statSource = stats.source || "Bulkowski";
+    statLine = `אצלך ${Math.round(userWinRate)}% | קאנון: כשל BE ${stats.be_fail} (${statSource})`;
+  }
+  return { coachLine, source, statLine };
+};
