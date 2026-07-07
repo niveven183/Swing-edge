@@ -9,6 +9,7 @@ import TermTooltip from "../../components/ui/TermTooltip.jsx";
 import { TRADING_TOOLTIPS } from "../../data/tooltips.js";
 import { dayLabel } from "../utils/statisticalModels.js";
 import { nTrades } from "../../i18n.js";
+import { getRegimeKnowledge } from "../knowledgeGlue.js";
 import {
   Brain, Sparkles, Shield, Flame, TrendingUp, TrendingDown,
   AlertTriangle, Activity, Target, Compass, Zap, Timer,
@@ -262,6 +263,16 @@ export const DecisionCoachPanel = ({ coaching, lang = "he" }) => {
         ))}
       </div>
 
+      {coaching.knowledgeWarning && (
+        <div className="text-[11px] text-slate-500 dark:text-slate-500 border-t border-slate-200 dark:border-white/5 pt-2 flex items-start gap-1.5">
+          <span aria-hidden="true" className="leading-none">📖</span>
+          <span>
+            {coaching.knowledgeWarning}
+            {coaching.knowledgeSource ? <span className="opacity-70"> — {coaching.knowledgeSource}</span> : null}
+          </span>
+        </div>
+      )}
+
       {!lowData && coaching.historicalContext && (
         <div className="text-[11px] text-slate-500 dark:text-slate-500 border-t border-slate-200 dark:border-white/5 pt-2">
           {historyText(coaching.historicalContext, lang)}
@@ -439,6 +450,16 @@ export const RegimeIndicator = ({ regime, lang = "he" }) => {
       <div className="mt-1.5 text-[11px] text-slate-400 leading-relaxed">
         {pick(regime.advice, lang)}
       </div>
+      {(() => {
+        const k = getRegimeKnowledge(regime.regime);
+        if (!k || !k.coachLine) return null;
+        return (
+          <div className="mt-2 pt-2 border-t border-white/5 text-[10px] text-slate-500 leading-relaxed flex items-start gap-1.5">
+            <span aria-hidden="true" className="leading-none">📖</span>
+            <span>{k.coachLine} <span className="opacity-70">— Weinstein</span></span>
+          </div>
+        );
+      })()}
       {regime.regime === "HIGH_VOLATILITY" && (regime.trendBias === "bull" || regime.trendBias === "bear") && (
         <div className="mt-1 text-[10px] text-slate-500">
           {lang === "he" ? "מגמת רקע" : "Underlying"}: {pick(REGIME_BIAS_LABEL[regime.trendBias], lang)}

@@ -9,6 +9,7 @@ import { tradesToday, trailingLossRun, isRevengeWindow } from "../utils/psycholo
 import { matchIdeaToEdge, matchIdeaToAntiEdge } from "./EdgeFinder.js";
 import { getPersonalizedRecommendations } from "./TradeDNA.js";
 import { isSetupCompatible } from "./MarketRegime.js";
+import { getSetupRegimeKnowledge } from "../knowledgeGlue.js";
 import { qstars } from "../../utils.js";
 import { getEmotionWeight } from "../calibration.js";
 
@@ -433,6 +434,10 @@ export const coachTrade = ({ form, trades = [], dna = null, edges = null, regime
   // Merge for display only — score/verdict were already locked above.
   const insights = prioritizeInsights(dedupeInsights(checks));
 
+  // Additive knowledge layer — display only, never touches score/verdict. Spreads
+  // { knowledgeWarning, knowledgeSource } or { knowledgeBoost } when relevant, else {}.
+  const knowledge = getSetupRegimeKnowledge({ setup: idea.setup, marketCondition: idea.marketCondition });
+
   return {
     verdict,
     confidence: Math.round(confidence),
@@ -443,6 +448,7 @@ export const coachTrade = ({ form, trades = [], dna = null, edges = null, regime
     expectedR,
     idea,
     sampleSize: getClosed(trades).length,
+    ...(knowledge || {}),
   };
 };
 
