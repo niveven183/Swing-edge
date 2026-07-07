@@ -1179,10 +1179,6 @@ function FeedbackTab({ feedback, setFeedback, toast }) {
         </div>
       </header>
 
-      <GapNote>
-        "Reviewed" state is stored in localStorage (admin-local only). Real status column requires a schema migration.
-      </GapNote>
-
       <div className="space-y-2">
         {filtered.map((f) => {
           const status = getStatus(f);
