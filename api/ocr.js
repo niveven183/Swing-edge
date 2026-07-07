@@ -18,6 +18,8 @@
 // Low confidence or failed validation → null, never a guess. On any upstream or
 // parse failure the endpoint degrades to a safe null result rather than a 500.
 
+import { rateLimit } from "./_lib/rateLimit.js";
+
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 
@@ -268,34 +270,6 @@ async function verifyUser(req) {
   }
 }
 
-// Best-effort per-user rate limit. In-memory → scoped to one warm instance and
-// reset on cold start; Vercel may run several instances, so this is a speed bump,
-// not a hard cap. The JWT gate above is the real control. Generous ceiling so a
-// trader analyzing several charts back-to-back is never blocked.
-const RL_WINDOW_MS = 60 * 1000;
-const RL_MAX = 30;
-const rlHits = new Map(); // userId -> number[] (recent request timestamps)
-
-function rateLimitOk(userId) {
-  const now = Date.now();
-  // Bound memory on long-lived warm instances by sweeping stale entries.
-  if (rlHits.size > 1000) {
-    for (const [k, v] of rlHits) {
-      const fresh = v.filter((t) => now - t < RL_WINDOW_MS);
-      if (fresh.length) rlHits.set(k, fresh);
-      else rlHits.delete(k);
-    }
-  }
-  const arr = (rlHits.get(userId) || []).filter((t) => now - t < RL_WINDOW_MS);
-  if (arr.length >= RL_MAX) {
-    rlHits.set(userId, arr);
-    return false;
-  }
-  arr.push(now);
-  rlHits.set(userId, arr);
-  return true;
-}
-
 export default async function handler(req, res) {
   // CORS — restricted to the app's own origins (localhost + *.vercel.app).
   // Same-origin SPA calls are unaffected; this blocks cross-origin abuse of the
@@ -326,9 +300,15 @@ export default async function handler(req, res) {
     res.status(401).json({ error: "unauthorized" });
     return;
   }
-  // Defense-in-depth: per-user rate limit (best-effort, see note above).
-  if (!rateLimitOk(user.id)) {
-    res.status(429).json({ error: "rate_limited" });
+  // Defense-in-depth: per-user rate limit, two windows (both must pass).
+  // Best-effort/in-memory — see api/_lib/rateLimit.js header comment.
+  const perMin = rateLimit(`${user.id}:ocr:min`, { windowMs: 60 * 1000, max: 10 });
+  const perHour = rateLimit(`${user.id}:ocr:hour`, { windowMs: 60 * 60 * 1000, max: 60 });
+  if (!perMin.allowed || !perHour.allowed) {
+    const retryAfter = Math.max(perMin.retryAfter, perHour.retryAfter);
+    console.warn(`[rate_limited] ocr user=${user.id} retryAfter=${retryAfter}s`);
+    res.setHeader("Retry-After", String(retryAfter));
+    res.status(429).json({ error: "rate_limited", retryAfter });
     return;
   }
 

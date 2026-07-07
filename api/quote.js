@@ -17,6 +17,8 @@
 // never fails the batch, and an upstream outage yields per-symbol null, never
 // a global 500.
 
+import { rateLimit, clientIp } from "./_lib/rateLimit.js";
+
 const FINNHUB_BASE = "https://finnhub.io/api/v1";
 const COINGECKO_BASE = "https://api.coingecko.com/api/v3";
 const TWELVEDATA_BASE = "https://api.twelvedata.com";
@@ -335,6 +337,17 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") {
     res.status(204).end();
+    return;
+  }
+
+  const { allowed, retryAfter } = rateLimit(`${clientIp(req)}:quote`, {
+    windowMs: 60 * 1000,
+    max: 60,
+  });
+  if (!allowed) {
+    console.warn(`[rate_limited] quote ip=${clientIp(req)} retryAfter=${retryAfter}s`);
+    res.setHeader("Retry-After", String(retryAfter));
+    res.status(429).json({ error: "rate_limited", retryAfter });
     return;
   }
 

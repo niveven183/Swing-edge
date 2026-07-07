@@ -7,6 +7,8 @@
 // The client (priceService.searchSymbolsTV) falls back to Yahoo automatically
 // if this endpoint errors, so a TV outage is transparent to the user.
 
+import { rateLimit, clientIp } from "./_lib/rateLimit.js";
+
 const TV_BASE = "https://symbol-search.tradingview.com/symbol_search/";
 
 // Abort if TradingView hangs past `ms` — the existing catch-all below already
@@ -24,6 +26,17 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") {
     res.status(204).end();
+    return;
+  }
+
+  const { allowed, retryAfter } = rateLimit(`${clientIp(req)}:symbol-search`, {
+    windowMs: 60 * 1000,
+    max: 30,
+  });
+  if (!allowed) {
+    console.warn(`[rate_limited] symbol-search ip=${clientIp(req)} retryAfter=${retryAfter}s`);
+    res.setHeader("Retry-After", String(retryAfter));
+    res.status(429).json({ error: "rate_limited", retryAfter });
     return;
   }
 
