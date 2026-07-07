@@ -19,6 +19,7 @@ const STR = {
       { label: "מחירים", href: "#pricing" },
     ],
     ctaStart: "התחל חינם",
+    navLogin: "התחבר",
     ctaDemo: "ראה איך זה עובד",
     heroBadge: "ה-AI שמכיר את הטריידינג שלך · בזמן אמת",
     heroPre: "היומן ש", heroHi: "לומד אותך", heroPost: " ומלמד אותך",
@@ -103,6 +104,7 @@ const STR = {
       { label: "Pricing", href: "#pricing" },
     ],
     ctaStart: "Start free",
+    navLogin: "Log in",
     ctaDemo: "See how it works",
     heroBadge: "The AI that knows your trading · Real-time",
     heroPre: "The journal that ", heroHi: "learns you", heroPost: " — and teaches you",
@@ -682,6 +684,18 @@ export default function LandingPage() {
             <button onClick={() => setLang("he")} style={lang === "he" ? activeBtn : idleBtn} aria-pressed={lang === "he"}>עב</button>
             <button onClick={() => setLang("en")} style={lang === "en" ? activeBtn : idleBtn} aria-pressed={lang === "en"}>EN</button>
           </div>
+          <button
+            onClick={goApp}
+            style={{
+              border: "none", background: "transparent", cursor: "pointer",
+              color: "#3c4a42", fontWeight: 600, fontSize: 15, padding: "8px 10px",
+              textDecoration: "none",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+            onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+          >
+            {L.navLogin}
+          </button>
           <button onClick={goWaitlist} style={{ ...pill, padding: "10px 20px", fontSize: 15, boxShadow: "0 6px 18px rgba(0,192,118,0.32)" }}>
             {L.ctaStart}
           </button>
