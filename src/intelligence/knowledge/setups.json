@@ -1,5 +1,5 @@
 {
-  "_meta": { "version": "1.0.0", "updated": "2026-07-05", "sources": "Bulkowski Encyclopedia of Chart Patterns 3rd ed · Minervini SEPA · O'Neil CANSLIM · Qullamaggie · SMB Capital", "note": "סטטיסטיקות Bulkowski: שוק שורי. כשל BE = לא זז 5% אחרי פריצה." },
+  "_meta": { "version": "1.0.0", "updated": "2026-07-08", "sources": "Bulkowski Encyclopedia of Chart Patterns 3rd ed · Minervini SEPA · O'Neil CANSLIM · Qullamaggie · SMB Capital", "note": "סטטיסטיקות Bulkowski: שוק שורי. כשל BE = לא זז 5% אחרי פריצה." },
   "vcp": {
     "name": "VCP (Volatility Contraction Pattern)",
     "definition": "בסיס בתוך מגמת Stage 2 עם 2–6 התכווצויות, כל אחת רדודה מקודמתה (25%→12%→6%), ווליום מתייבש לקראת ה-pivot.",
@@ -155,5 +155,213 @@
     "stats": { "note": "Bulkowski: ווליום בפריצה לא מבטיח מהלך גדול יותר — אבל בלעדיו הכשלים משולשים" },
     "regime_affinity": { "best": ["Trending Up","Sideways"], "avoid": ["Trending Down"] },
     "coach_line": "Resistance Break בלי ווליום זה לא breakout — זו הזמנה ל-false break. Bulkowski: הכשלים משולשים בלי אישור ווליום."
+  },
+  "higher_low": {
+    "name": "Higher Low — כניסה בתיקון במגמת עלייה",
+    "definition": "במגמת עלייה מוגדרת (שיאים ושפלים עולים), המחיר נסוג לשפל שגבוה מהשפל הקודם ומתהפך כלפי מעלה. כניסה ברגע שהמגמה מתחדשת — קונים חולשה, לא שיא.",
+    "entry_criteria": [
+      "מבנה HH/HL ברור לפני הכניסה",
+      "השפל החדש גבוה מהשפל הקודם",
+      "נר היפוך שורי (hammer/engulfing) בשפל",
+      "ווליום יורד בירידה, עולה בהתאוששות",
+      "לא התיקון הראשון במגמה חדשה — עדיף השני/שלישי"
+    ],
+    "invalidation": [
+      "שבירת השפל הקודם (הופך ל-Lower Low)",
+      "נר אדום גדול על ווליום גבוה דרך התמיכה",
+      "המגמה משתטחת"
+    ],
+    "stop": "מתחת לשפל האחרון שנוצר",
+    "source": "Price-action classic (Al Brooks · forex.com price-action trends)",
+    "reliability": "תלוי-מגמה — עובד רק במגמת עלייה נקייה, כושל בשוק דשדוש",
+    "stats": {
+      "note": "אין סטטיסטיקה כמותית יחידה — תבנית price-action כללית, לא תבנית Bulkowski ממוספרת"
+    },
+    "regime_affinity": {
+      "best": ["Trending Up"],
+      "avoid": ["Sideways", "Trending Down"]
+    },
+    "coach_line": "Higher Low הוא מהלך המשך — דורש מבנה HH/HL קיים. בשוק דשדוש זו מלכודת. ודא מגמה קודם."
+  },
+  "trend_continuation": {
+    "name": "Trend Continuation — המשך מגמה",
+    "definition": "כניסה לכיוון המגמה השלטת לאחר הפסקה/תיקון קצר. הרעיון: לרכוב על מומנטום קיים במקום לנחש היפוך. עדיף כניסה בהתאם למגמת הגרף היומי.",
+    "entry_criteria": [
+      "מגמה ברורה בטווח הגבוה (מעל 50 EMA)",
+      "הפסקה/דגל קצר",
+      "חידוש בכיוון המגמה",
+      "פילטר מגמה: המחיר בצד הנכון של ה-50 EMA"
+    ],
+    "invalidation": [
+      "סגירה נגד המגמה מתחת למבנה",
+      "איבוד ה-50 EMA",
+      "דשדוש שמאבד כיוון"
+    ],
+    "stop": "מתחת לשפל התיקון (long) או מעל השיא (short)",
+    "source": "Trend-following classic (Bulkowski trendiness studies · forex.com)",
+    "reliability": "מגמה נמשכת לרוב יותר ממה שנראה — היציאה המוקדמת מהתיקון היא הטעות הנפוצה",
+    "stats": {
+      "note": "אין מספר יחיד — תלוי בחוזק המגמה ובטווח הזמן"
+    },
+    "regime_affinity": {
+      "best": ["Trending Up", "Trending Down"],
+      "avoid": ["Sideways"]
+    },
+    "coach_line": "המשך מגמה דורש מגמה. אם השוק מדשדש — אין מה להמשיך. הצד הנכון של ה-50 EMA הוא התנאי."
+  },
+  "failed_breakout": {
+    "name": "Failed Breakout — פריצה כושלת (fade)",
+    "definition": "פריצה מעל התנגדות/מתחת לתמיכה שנדחית מהר וחוזרת לתוך הטווח. אות חזק להיפוך כיוון — הפרו-טריידרים דוחפים חזרה את מי ש\"נפל בפח\" הפריצה. סטופ צמוד, R/R גבוה.",
+    "entry_criteria": [
+      "פריצה ברורה של רמה בולטת",
+      "דחייה מהירה + חזרה לתוך הטווח (סגירה, לא רק wick)",
+      "עדיף נגד מגמה בגרף היומי שמתהפכת",
+      "ווליום גבוה בדחייה"
+    ],
+    "invalidation": [
+      "המחיר מחזיק מעל/מתחת לרמת הפריצה (פריצה אמיתית)",
+      "אין חזרה לטווח"
+    ],
+    "stop": "מעבר לקצה ה-wick של הפריצה הכושלת",
+    "source": "Bulkowski \"busted patterns\" (thepatternsite.com) · priceaction.com false-break",
+    "reliability": "Bulkowski: ~60-80% מהפריצות כושלות בשווקים המודרניים; busted patterns נעים לרוב 2-3× חזק יותר מהאות המקורי",
+    "stats": {
+      "note": "60-80% שיעור כשל של פריצות (Bulkowski / Tradeciety) — הבסיס לאסטרטגיית ה-fade"
+    },
+    "regime_affinity": {
+      "best": ["Sideways", "Volatile"],
+      "avoid": ["Trending Up", "Trending Down"]
+    },
+    "coach_line": "פריצה כושלת = fade נגד ההמון. דורש סגירה חזרה לטווח, לא רק wick. הסטופ צמוד — זה כל היתרון."
+  },
+  "ema_bounce_50": {
+    "name": "50 EMA Bounce — תיקון ל-50 EMA",
+    "definition": "במגמת עלייה מתמשכת, המחיר נסוג ל-50 EMA (תמיכה דינמית לטווח בינוני), מחזיק, ומתהפך. עדיף על 20 EMA כשהמגמה רצה זמן רב ותיקונים עמוקים יותר.",
+    "entry_criteria": [
+      "20 EMA מעל 50 EMA (stack שורי)",
+      "המחיר נסוג ונוגע ב-50 EMA",
+      "האטת מכירה: נרות קטנים/wick תחתון",
+      "נר חידוש שורי",
+      "לא נר אדום גדול על ווליום שחוצה את ה-EMA"
+    ],
+    "invalidation": [
+      "סגירה מתחת ל-50 EMA + שבירת מבנה",
+      "50 EMA משתטח/יורד",
+      "ה-stack מתהפך (20 מתחת ל-50)"
+    ],
+    "stop": "מתחת לשפל התיקון או מתחת ל-50 EMA",
+    "source": "Swing-trading MA classic (Bulls on Wall Street \"Bone Zone\" · tradingsim)",
+    "reliability": "עובד רק כשה-50 EMA עולה — במגמה משתטחת ה-EMA נותן אותות שווא",
+    "stats": {
+      "note": "אין סטטיסטיקה כמותית יחידה — תלוי בחוזק המגמה ובשיפוע ה-EMA"
+    },
+    "regime_affinity": {
+      "best": ["Trending Up"],
+      "avoid": ["Sideways", "Trending Down"]
+    },
+    "coach_line": "50 EMA Bounce עובד רק ב-stack שורי (20>50) עם EMA עולה. נר אדום גדול שחוצה על ווליום = לא סטאפ, אלא שבירה."
+  },
+  "range_breakout": {
+    "name": "Range Breakout — פריצת טווח",
+    "definition": "המחיר נע זמן-מה בטווח אופקי צר (rectangle) בין תמיכה להתנגדות, ואז פורץ מעבר לגבול על ווליום מוגבר. פריצת הטווח מסמנת סוף האיזון ותחילת מהלך חדש.",
+    "entry_criteria": [
+      "טווח אופקי מוגדר היטב עם מגעים חוזרים",
+      "ווליום מתכווץ בתוך הטווח, מתפוצץ בפריצה (≥120% מהממוצע)",
+      "סגירה מעבר לגבול, לא רק wick",
+      "יעד: גובה הטווח מוקרן מנקודת הפריצה"
+    ],
+    "invalidation": [
+      "חזרה מהירה לתוך הטווח (fakeout)",
+      "פריצה על ווליום נמוך",
+      "דשדוש מחדש סביב הגבול"
+    ],
+    "stop": "בחזרה לתוך הטווח, מעבר לגבול הפריצה (או 1-1.5× ATR)",
+    "source": "Breakout classic (Capital.com · forextester range breakout)",
+    "reliability": "פריצות שווא נפוצות מאוד — הווליום הוא הפילטר העיקרי. סטופ בתוך הטווח נורה מרעש",
+    "stats": {
+      "note": "דרישת ווליום ≥120% מממוצע 20 נרות כפילטר פריצה תקפה"
+    },
+    "regime_affinity": {
+      "best": ["Sideways", "Volatile"],
+      "avoid": ["Trending Up", "Trending Down"]
+    },
+    "coach_line": "פריצת טווח ללא התפוצצות ווליום = לרוב fakeout. דרוש ≥120% ווליום וסגירה מעבר לגבול, לא wick."
+  },
+  "breakdown": {
+    "name": "Breakdown — שבירת תמיכה (short)",
+    "definition": "ההיפוך של Breakout: המחיר שובר מתחת לרמת תמיכה מרכזית על ווליום, ומסמן תחילת מהלך יורד. כניסת שורט לכיוון השבירה.",
+    "entry_criteria": [
+      "תמיכה מוגדרת עם מגעים חוזרים",
+      "סגירה מתחת לתמיכה על ווליום מוגבר",
+      "עדיף במגמת ירידה בגרף היומי (המחיר מתחת ל-50 EMA)",
+      "יעד: גובה הבסיס מוקרן כלפי מטה"
+    ],
+    "invalidation": [
+      "חזרה מהירה מעל התמיכה השבורה (fakeout)",
+      "שבירה על ווליום נמוך",
+      "reclaim של הרמה"
+    ],
+    "stop": "מעל התמיכה השבורה (שהפכה להתנגדות)",
+    "source": "Breakout mechanics inverted (Capital.com · metrotrade)",
+    "reliability": "כמו פריצות למעלה — רוב השבירות נכשלות בשוק מודרני; ווליום הוא הפילטר",
+    "stats": {
+      "note": "מראה סטטיסטי לפריצות — שיעור כשל גבוה ללא אישור ווליום"
+    },
+    "regime_affinity": {
+      "best": ["Trending Down", "Volatile"],
+      "avoid": ["Trending Up"]
+    },
+    "coach_line": "Breakdown הוא short — דורש מגמת ירידה תומכת. שבירה מתחת ל-50 EMA על ווליום. reclaim מהיר = צא."
+  },
+  "retest": {
+    "name": "Retest — פריצה + חזרה לרמה (break-and-retest)",
+    "definition": "לאחר פריצה, המחיר חוזר לרמה שנפרצה ובוחן אותה מחדש — התנגדות שבורה הופכת לתמיכה (ולהיפך). כניסה על הדחייה מהרמה. עדיף על רדיפת הפריצה עצמה: כניסה צמודה יותר, R/R טוב יותר.",
+    "entry_criteria": [
+      "פריצה ברורה על ווליום גבוה",
+      "חזרה לרמה על ווליום מתכווץ (לא קורס)",
+      "נר דחייה (hammer/engulfing/pin bar) שמחזיק את הרמה",
+      "הרמה מחזיקה בתפקידה החדש (התנגדות→תמיכה)"
+    ],
+    "invalidation": [
+      "סגירה חזרה לתוך הטווח הישן על ווליום כבד = פריצה כושלת",
+      "הרמה לא מחזיקה"
+    ],
+    "stop": "מעבר לקצה נר הדחייה + מעבר לרמה השבורה",
+    "source": "Change-of-polarity / break-and-retest (Capital.com · shareplanner)",
+    "reliability": "לא כל פריצה חוזרת ל-retest — תפספס חלק מהמהלכים, וזה בסדר. היתרון: מסנן פריצות שווא",
+    "stats": {
+      "note": "ווליום מתכווץ בחזרה = retest תקף; ווליום כבד בחזרה = פריצה כושלת"
+    },
+    "regime_affinity": {
+      "best": ["Trending Up", "Trending Down"],
+      "avoid": ["Sideways"]
+    },
+    "coach_line": "Retest תקף רק אם הווליום מתכווץ בחזרה. חזרה על ווליום כבד לתוך הטווח = פריצה כושלת, לא retest."
+  },
+  "post_earnings_strength": {
+    "name": "Post-Earnings Strength — דריפט אחרי דוחות (PEAD)",
+    "definition": "מניה שהכתה ציפיות ברבעון וממשיכה לדרוף בכיוון ההפתעה לאורך ימים-שבועות. כניסה אחרי אישור התגובה (gap-and-hold על ווליום), לא לפני הדוח — כדי להימנע מסיכון בינארי.",
+    "entry_criteria": [
+      "הפתעת רווח משמעותית (עדיף 10%+ beat)",
+      "gap-and-hold מעל טווח הפתיחה על ווליום גבוה",
+      "כניסה שעות/יום אחרי הדוח, לא לפניו",
+      "עדיף עם raised guidance + חוזק יחסי מקדים"
+    ],
+    "invalidation": [
+      "סגירת ה-gap",
+      "guidance מאוכזב למרות ה-beat",
+      "דעיכת ווליום/מומנטום"
+    ],
+    "stop": "5-8% מתחת לכניסה, או מתחת לתחתית ה-gap",
+    "source": "PEAD academic anomaly (Ball & Brown 1968 · Bernard & Thomas 1989)",
+    "reliability": "מחלוקת מחקרית: אנומליה מהמתועדות ביותר, אך נחלשה — יש מחקר (Martineau 2022) שטוען שנעלמה מחוץ למיקרו-קאפ. חזק יותר בקאפ קטן, beat גדול, כיסוי אנליסטים נמוך",
+    "stats": {
+      "note": "beat 10%+ ≈ 72% הסתברות למומנטום חיובי 5 ימים (Alpha Architect). האפקט נחלש מאז 2001-2006 במניות לא-מיקרו-קאפ (Martineau 2022)"
+    },
+    "regime_affinity": {
+      "best": ["Trending Up"],
+      "avoid": ["Trending Down"]
+    },
+    "coach_line": "PEAD חזק אחרי beat 10%+ עם raised guidance. הסטטיסטיקה נחלשה במגה-קאפ — עדיף קאפ קטן. כניסה אחרי אישור ה-hold, לא לפני הדוח."
   }
 }

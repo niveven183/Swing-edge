@@ -36,6 +36,19 @@ const SETUP_NAME_TO_KEY = {
   "Pullback": "pullback",
   "Support Bounce": "support_bounce",
   "Resistance Break": "resistance_break",
+  // New canonical setups (8):
+  "Higher Low": "higher_low",
+  "Trend Continuation": "trend_continuation",
+  "Failed Breakout": "failed_breakout",
+  "EMA Bounce 50": "ema_bounce_50",
+  "Range Breakout": "range_breakout",
+  "Breakdown": "breakdown",
+  "Retest": "retest",
+  "Post Earnings Strength": "post_earnings_strength",
+  // Aliases to existing knowledge:
+  "Cup and Handle": "cup_and_handle",
+  "Pullback to 20 EMA": "pullback",
+  "ORB Breakout": "orb",
 };
 
 /**
