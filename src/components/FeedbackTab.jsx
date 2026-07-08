@@ -12,7 +12,6 @@ import {
   ShieldCheck,
   Loader2,
 } from "lucide-react";
-import { supabase, isSupabaseConfigured } from "../supabaseClient.js";
 import { getTranslations, isRTLLang, LANGUAGES } from "../i18n.js";
 
 const EMAILJS_SERVICE_ID = "service_jxkivjs";
@@ -166,12 +165,18 @@ export default function FeedbackTab({ user, lang = "he", originTab = "dashboard"
     let detail = "";
 
     try {
-      if (isSupabaseConfigured && supabase) {
-        const { error: dbError } = await supabase
-          .from("feedback")
-          .insert([payload]);
-        if (!dbError) supabaseOk = true;
-        else detail = dbError.message || String(dbError);
+      const resp = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (resp.ok) {
+        supabaseOk = true;
+      } else if (resp.status === 429) {
+        detail = t.fb_rate_limited;
+      } else {
+        const body = await resp.json().catch(() => null);
+        detail = body?.error || resp.statusText;
       }
     } catch (err) {
       detail = err?.message || String(err);
