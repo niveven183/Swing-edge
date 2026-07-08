@@ -161,7 +161,7 @@ jobs:
 
       - name: Email success
         if: ${{ steps.compare.outputs.status == 'pass' && env.MAIL_USERNAME != '' && env.MAIL_PASSWORD != '' }}
-        uses: dawidd6/action-send-mail@v3
+        uses: dawidd6/action-send-mail@v18
         with:
           server_address: smtp.gmail.com
           server_port: 465
@@ -175,7 +175,7 @@ jobs:
 
       - name: Email failure (alarm)
         if: ${{ always() && steps.compare.outputs.status != 'pass' && env.MAIL_USERNAME != '' && env.MAIL_PASSWORD != '' }}
-        uses: dawidd6/action-send-mail@v3
+        uses: dawidd6/action-send-mail@v18
         with:
           server_address: smtp.gmail.com
           server_port: 465
