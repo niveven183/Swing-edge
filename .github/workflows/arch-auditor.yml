@@ -67,7 +67,7 @@ jobs:
 
       - name: Create or update architecture issue
         if: ${{ steps.audit.outputs.findings != '0' }}
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           FINDINGS: ${{ steps.audit.outputs.findings }}
           RUN_DATE: ${{ steps.audit.outputs.date }}

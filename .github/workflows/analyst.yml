@@ -82,7 +82,7 @@ jobs:
 
       - name: Open calibration PR
         if: ${{ steps.analyst.outputs.has_proposal == '1' }}
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           BRANCH: ${{ steps.branch.outputs.branch }}
           PR_TITLE: ${{ steps.analyst.outputs.pr_title }}
