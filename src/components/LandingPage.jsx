@@ -22,8 +22,8 @@ const STR = {
     navLogin: "התחבר",
     ctaDemo: "ראה איך זה עובד",
     heroBadge: "ה-AI שמכיר את הטריידינג שלך · בזמן אמת",
-    heroPre: "היומן ש", heroHi: "לומד אותך", heroPost: " ומלמד אותך",
-    heroSub: "היומן היחיד שקורא את ההיסטוריה שלך, תופס את הדפוסים שחוזרים אצלך שוב ושוב, ומראה לך בזמן אמת מה עובד לך ומה שורף לך את החשבון — עוד לפני שלחצת Enter.",
+    heroH1: "הפסקת לנחש.",
+    heroSub: "היומן שקורא את ההיסטוריה שלך ומראה בזמן אמת מה באמת עובד לך — עוד לפני Enter.",
     heroTrust: "בלי כרטיס אשראי · נרשמים ב-30 שניות · הכל בעברית",
     coachTitle: "Decision Coach", coachLive: "Live", coachTrade: "NVDA · Long", coachRR: "R/R 1:2.4",
     statWinLabel: "Win Rate", statScoreLabel: "ציון החודש",
@@ -107,8 +107,8 @@ const STR = {
     navLogin: "Log in",
     ctaDemo: "See how it works",
     heroBadge: "The AI that knows your trading · Real-time",
-    heroPre: "The journal that ", heroHi: "learns you", heroPost: " — and teaches you",
-    heroSub: "The only journal that reads your history, catches the patterns you repeat over and over, and shows you in real time what works for you and what's burning your account — before you ever hit Enter.",
+    heroH1: "You stopped guessing.",
+    heroSub: "The journal that reads your history and shows you, in real time, what actually works for you — before you hit Enter.",
     heroTrust: "No credit card · Sign up in 30 seconds · Hebrew & English",
     coachTitle: "Decision Coach", coachLive: "Live", coachTrade: "NVDA · Long", coachRR: "R/R 1:2.4",
     statWinLabel: "Win Rate", statScoreLabel: "This month",
@@ -649,7 +649,7 @@ export default function LandingPage() {
       style={{
         fontFamily: "'Heebo',system-ui,sans-serif",
         color: "#15201A",
-        background: "#F4F8F2",
+        background: "#FFFFFF",
         minHeight: "100vh",
         overflowX: "hidden",
         lineHeight: 1.5,
@@ -663,7 +663,7 @@ export default function LandingPage() {
         style={{
           position: "sticky", top: 0, zIndex: 50, display: "flex",
           alignItems: "center", justifyContent: "space-between", gap: 16,
-          padding: "14px clamp(16px,4vw,40px)", background: "rgba(244,248,242,0.78)",
+          padding: "14px clamp(16px,4vw,40px)", background: "rgba(255,255,255,0.80)",
           backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)",
           borderBottom: "1px solid rgba(21,32,26,0.06)",
         }}
@@ -703,31 +703,92 @@ export default function LandingPage() {
       </nav>
 
       {/* ============ HERO ============ */}
-      <header id="top" style={{ position: "relative", background: "#070D0A", color: "#fff", overflow: "hidden", padding: "clamp(48px,7vw,96px) clamp(16px,4vw,40px) clamp(60px,8vw,110px)" }}>
-        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(900px 520px at 78% -8%, rgba(0,192,118,0.30), transparent 60%),radial-gradient(700px 520px at 8% 110%, rgba(79,70,229,0.22), transparent 60%)" }} />
-        <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,255,255,0.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.045) 1px,transparent 1px)", backgroundSize: "54px 54px", WebkitMaskImage: "radial-gradient(120% 90% at 50% 0%, #000 40%, transparent 78%)", maskImage: "radial-gradient(120% 90% at 50% 0%, #000 40%, transparent 78%)" }} />
-        <div style={{ position: "relative", maxWidth: 900, margin: "0 auto", textAlign: "center" }}>
+      <header id="top" style={{ position: "relative", background: "#070B0A", color: "#fff", overflow: "hidden", padding: "clamp(48px,7vw,96px) clamp(16px,4vw,40px) clamp(72px,9vw,120px)" }}>
+        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(900px 520px at 50% -12%, rgba(255,255,255,0.05), transparent 62%)" }} />
+        <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,255,255,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.04) 1px,transparent 1px)", backgroundSize: "54px 54px", WebkitMaskImage: "radial-gradient(120% 90% at 50% 0%, #000 40%, transparent 78%)", maskImage: "radial-gradient(120% 90% at 50% 0%, #000 40%, transparent 78%)" }} />
+        <div style={{ position: "relative", maxWidth: 860, margin: "0 auto", textAlign: "center" }}>
           <div data-reveal="">
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 13px", borderRadius: 999, background: "rgba(0,192,118,0.12)", border: "1px solid rgba(0,192,118,0.30)", fontSize: 13, fontWeight: 700, color: "#7CF3C0", marginBottom: 24 }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 13px", borderRadius: 999, background: "rgba(0,192,118,0.10)", border: "1px solid rgba(0,192,118,0.24)", fontSize: 13, fontWeight: 700, color: "#7CF3C0", marginBottom: 30 }}>
               <span data-se-float="" style={{ width: 7, height: 7, borderRadius: "50%", background: "#00E08A", boxShadow: "0 0 10px #00E08A", animation: "seGlow 1.8s ease-in-out infinite" }} />
               {L.heroBadge}
             </div>
-            <h1 style={{ fontSize: "clamp(42px,7vw,84px)", lineHeight: 1.02, letterSpacing: "-0.035em", fontWeight: 800, margin: "0 0 24px" }}>
-              {L.heroPre}
-              <span style={{ background: "linear-gradient(100deg,#16D687,#00C076 45%,#5B8CFF)", WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent" }}>{L.heroHi}</span>
-              {L.heroPost}
-            </h1>
-            <p style={{ fontSize: "clamp(16px,1.9vw,21px)", lineHeight: 1.6, color: "#A9B7AF", maxWidth: 600, margin: "0 auto 34px" }}>{L.heroSub}</p>
-            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 13, marginBottom: 22 }}>
-              <button onClick={goWaitlist} style={{ ...pill, padding: "16px 34px", fontSize: 17, boxShadow: "0 10px 30px rgba(0,192,118,0.40)" }}>{L.ctaStart}</button>
-              <a href="#how" style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "16px 28px", borderRadius: 999, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.16)", color: "#fff", fontWeight: 700, fontSize: 17 }}>{L.ctaDemo}</a>
+            <h1 className="se-serif" style={{ fontSize: "clamp(42px,7vw,84px)", lineHeight: 1.02, letterSpacing: "-1px", margin: "0 0 22px" }}>{L.heroH1}</h1>
+            <p style={{ fontSize: "clamp(16px,1.7vw,19px)", lineHeight: 1.6, color: "#A9B7AF", maxWidth: 540, margin: "0 auto 34px" }}>{L.heroSub}</p>
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
+              <button onClick={goWaitlist} style={{ cursor: "pointer", border: "none", height: 44, padding: "0 32px", borderRadius: 36, background: "#00C076", color: "#06281C", fontWeight: 400, fontSize: 16, fontFamily: "'Heebo',sans-serif" }}>{L.ctaStart}</button>
             </div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, color: "#7E8E85", fontSize: 14, fontWeight: 600, fontStyle: "italic" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, color: "#7E8E85", fontSize: 14, fontWeight: 600 }}>
               <span style={{ color: "#00E08A" }}>✓</span>{L.heroTrust}
             </div>
-            <a href="/terms" style={{ display: "block", maxWidth: 560, margin: "18px auto 0", color: "#7E8E85", fontSize: 12.5, lineHeight: 1.6, textDecoration: "none" }}>
+            <a href="/terms" style={{ display: "block", maxWidth: 560, margin: "16px auto 0", color: "#7E8E85", fontSize: 12.5, lineHeight: 1.6, textDecoration: "none" }}>
               {L.heroDisclaimer}
             </a>
+          </div>
+
+          {/* Device mockup — CSS dashboard in an angled browser frame.
+              Placeholder for a real app screenshot (polish phase A3). */}
+          <div className="se-hero-device" data-reveal="" style={{ marginTop: "clamp(56px,7vw,100px)", perspective: 1600 }}>
+            <div className="se-hero-frame" style={{ maxWidth: 960, margin: "0 auto", borderRadius: 18, overflow: "hidden", border: "1px solid rgba(255,255,255,0.10)", background: "linear-gradient(180deg,#0E1714,#070D0A)", boxShadow: "0 50px 120px rgba(0,0,0,0.55)" }}>
+              {/* title bar */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+                <span style={{ width: 11, height: 11, borderRadius: "50%", background: "#FF5F57" }} />
+                <span style={{ width: 11, height: 11, borderRadius: "50%", background: "#FEBC2E" }} />
+                <span style={{ width: 11, height: 11, borderRadius: "50%", background: "#28C840" }} />
+                <span style={{ marginInlineStart: 14, fontSize: 12, color: "#8F9D94", fontFamily: "'JetBrains Mono',monospace" }}>app.swing-edge.com</span>
+              </div>
+              {/* body */}
+              <div style={{ display: "flex", textAlign: "start" }}>
+                <div className="se-hero-sidebar" style={{ flex: "none", width: 56, borderInlineEnd: "1px solid rgba(255,255,255,0.06)", padding: "16px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+                  <LogoMark size={24} shadow={false} />
+                  {[0, 1, 2, 3].map((i) => (
+                    <span key={i} style={{ width: 22, height: 22, borderRadius: 7, background: i === 0 ? "rgba(0,192,118,0.16)" : "rgba(255,255,255,0.05)" }} />
+                  ))}
+                </div>
+                <div style={{ flex: 1, minWidth: 0, padding: "clamp(16px,2.4vw,26px)" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+                    <span style={{ fontWeight: 800, fontSize: 16, color: "#fff" }}>{lang === "he" ? "לוח בקרה" : "Dashboard"}</span>
+                    <span style={{ fontSize: 12, color: "#8F9D94", fontFamily: "'JetBrains Mono',monospace" }}>{lang === "he" ? "החודש" : "This month"}</span>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 16 }}>
+                    {[
+                      { label: L.statWinLabel, value: "68%", accent: "#16D687" },
+                      { label: lang === "he" ? "עסקאות" : "Trades", value: "142", accent: "#fff" },
+                      { label: L.statScoreLabel, value: "8.2", accent: "#fff" },
+                    ].map((t) => (
+                      <div key={t.label} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "12px 14px" }}>
+                        <div style={{ fontSize: 11.5, color: "#8F9D94", fontWeight: 600, marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.label}</div>
+                        <div style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, fontSize: 22, color: t.accent, lineHeight: 1 }}>{t.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: 16, marginBottom: 14 }}>
+                    <svg viewBox="0 0 320 90" preserveAspectRatio="none" style={{ width: "100%", height: 76, display: "block" }} aria-hidden="true">
+                      <defs>
+                        <linearGradient id="seHeroArea" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="rgba(0,192,118,0.30)" />
+                          <stop offset="100%" stopColor="rgba(0,192,118,0)" />
+                        </linearGradient>
+                      </defs>
+                      <path d="M0,72 L40,62 L80,66 L120,46 L160,52 L200,34 L240,38 L280,18 L320,10 L320,90 L0,90 Z" fill="url(#seHeroArea)" />
+                      <polyline points="0,72 40,62 80,66 120,46 160,52 200,34 240,38 280,18 320,10" fill="none" stroke="#00C076" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+                    </svg>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    {[
+                      { s: "NVDA", side: lang === "he" ? "לונג" : "Long", pnl: "+2.4R", up: true },
+                      { s: "AAPL", side: lang === "he" ? "שורט" : "Short", pnl: "-1.0R", up: false },
+                      { s: "TSLA", side: lang === "he" ? "לונג" : "Long", pnl: "+1.8R", up: true },
+                    ].map((r, i) => (
+                      <div key={r.s} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 2px", borderTop: i === 0 ? "none" : "1px solid rgba(255,255,255,0.05)" }}>
+                        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, fontSize: 13.5, color: "#fff" }}>{r.s}</span>
+                        <span style={{ fontSize: 12.5, color: "#8F9D94", fontWeight: 600 }}>{r.side}</span>
+                        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, fontSize: 13.5, color: r.up ? "#16D687" : "#FF6B6E" }}>{r.pnl}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </header>
@@ -804,12 +865,12 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* Edge Finder */}
-            <div data-reveal="" style={{ gridColumn: "span 2", background: "#039E26", color: "#fff", borderRadius: 24, padding: 26, position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-              <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,255,255,0.10) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.10) 1px,transparent 1px)", backgroundSize: "30px 30px", opacity: 0.5 }} />
-              <span style={{ position: "relative", display: "inline-block", alignSelf: "flex-start", padding: "5px 12px", borderRadius: 999, background: "rgba(255,255,255,0.18)", fontSize: 12, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", marginBottom: "auto" }}>{L.featEdgeTag}</span>
-              <h3 style={{ position: "relative", fontSize: 20, fontWeight: 800, letterSpacing: "-0.01em", margin: "14px 0 6px" }}>{renderTerms(L.featEdgeTitle, lang, "onGreen")}</h3>
-              <p style={{ position: "relative", fontSize: 14, lineHeight: 1.5, color: "rgba(255,255,255,0.95)", margin: 0 }}>{renderTerms(L.featEdgeBody, lang, "onGreen")}</p>
+            {/* Edge Finder — "black on white", literally. */}
+            <div data-reveal="" style={{ gridColumn: "span 2", background: "#fff", color: "#15201A", border: "1px solid rgba(21,32,26,0.07)", borderRadius: 24, padding: 26, position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+              <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(21,32,26,0.05) 1px,transparent 1px),linear-gradient(90deg,rgba(21,32,26,0.05) 1px,transparent 1px)", backgroundSize: "30px 30px", opacity: 0.6 }} />
+              <span style={{ position: "relative", display: "inline-block", alignSelf: "flex-start", padding: "5px 12px", borderRadius: 999, background: "rgba(21,32,26,0.06)", color: "#3c4a42", fontSize: 12, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", marginBottom: "auto" }}>{L.featEdgeTag}</span>
+              <h3 style={{ position: "relative", fontSize: 20, fontWeight: 800, letterSpacing: "-0.01em", margin: "14px 0 6px" }}>{renderTerms(L.featEdgeTitle, lang, "light")}</h3>
+              <p style={{ position: "relative", fontSize: 14, lineHeight: 1.5, color: "#5b6b62", margin: 0 }}>{renderTerms(L.featEdgeBody, lang, "light")}</p>
             </div>
 
             {/* Monthly Report */}
@@ -908,10 +969,10 @@ export default function LandingPage() {
       {/* ============ QUOTE ============ */}
       <section style={{ padding: "clamp(64px,8vw,110px) clamp(16px,4vw,40px)" }}>
         <div data-reveal="" style={{ maxWidth: 900, margin: "0 auto", textAlign: "center" }}>
-          <div style={{ fontSize: 60, lineHeight: 0.6, color: "#00C076", fontWeight: 800, marginBottom: 10 }}>”</div>
+          <div style={{ fontSize: 60, lineHeight: 0.6, color: "#CBD5CE", fontWeight: 800, marginBottom: 10 }}>”</div>
           <blockquote style={{ fontSize: "clamp(22px,3.2vw,36px)", lineHeight: 1.32, letterSpacing: "-0.02em", fontWeight: 800, margin: "0 0 26px", color: "#15201A" }}>{renderTerms(L.quote, lang, "light")}</blockquote>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 12 }}>
-            <span style={{ width: 42, height: 42, borderRadius: "50%", background: "linear-gradient(135deg,#00C076,#4F46E5)" }} />
+            <span style={{ width: 42, height: 42, borderRadius: "50%", background: "#E4EAE6", border: "1px solid rgba(21,32,26,0.08)" }} />
             <span style={{ textAlign: "start" }}>
               <span style={{ display: "block", fontWeight: 800, fontSize: 15 }}>{L.quoteName}</span>
               <span style={{ display: "block", fontSize: 13, color: "#5b6b62" }}>{L.quoteRole}</span>
@@ -960,7 +1021,7 @@ export default function LandingPage() {
 
       {/* ============ WAITLIST ============ */}
       <section id="waitlist" aria-label={L.waitlistTitle} style={{ position: "relative", overflow: "hidden", background: "#070D0A", color: "#fff", padding: "clamp(64px,8vw,110px) clamp(16px,4vw,40px)", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(720px 420px at 50% -10%, rgba(0,192,118,0.22), transparent 62%)" }} />
+        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(720px 420px at 50% -10%, rgba(255,255,255,0.05), transparent 62%)" }} />
         <div data-reveal="" style={{ position: "relative", maxWidth: 640, margin: "0 auto", textAlign: "center" }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 13px", borderRadius: 999, background: "rgba(0,192,118,0.12)", border: "1px solid rgba(0,192,118,0.30)", fontSize: 13, fontWeight: 700, color: "#7CF3C0", marginBottom: 20 }}>
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#00E08A", boxShadow: "0 0 10px #00E08A" }} />

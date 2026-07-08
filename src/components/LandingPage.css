@@ -5,6 +5,15 @@
    override them). Keep this file color-free on purpose.
    ============================================================ */
 
+/* Serif display face — used ONLY for the 3-4 "flag moment" headings.
+   Weight 400 (never bold). Falls back to Heebo (already preloaded) so the
+   swap causes no meaningful layout shift. */
+.se-landing .se-serif {
+  font-family: 'Frank Ruhl Libre', 'Noto Serif Hebrew', 'Heebo', serif;
+  font-weight: 400;
+  font-synthesis-weight: none;
+}
+
 @keyframes seGlow {
   0%, 100% { opacity: 0.55; }
   50%      { opacity: 1; }
@@ -38,7 +47,14 @@
   .se-landing [data-se-float] { animation: none !important; }
 }
 
-/* Mobile (<= 880px): hide nav links, collapse the bento + how grids. */
+/* Hero device mockup — slight forward tilt on wide screens. */
+.se-landing .se-hero-frame {
+  transform: rotateX(7deg);
+  transform-origin: 50% 0%;
+}
+
+/* Mobile (<= 880px): hide nav links, collapse the bento + how grids,
+   flatten the hero device frame. */
 @media (max-width: 880px) {
   .se-landing .se-nav-links { display: none !important; }
   .se-landing .se-feat-grid { grid-template-columns: 1fr !important; }
@@ -48,4 +64,10 @@
   }
   .se-landing .se-how-grid { grid-template-columns: 1fr !important; }
   .se-landing .se-how-showcase { order: -1; left: 0 !important; }
+  .se-landing .se-hero-frame { transform: none; }
+}
+
+/* Narrow (<= 560px): drop the mock sidebar so the dashboard breathes. */
+@media (max-width: 560px) {
+  .se-landing .se-hero-sidebar { display: none !important; }
 }
