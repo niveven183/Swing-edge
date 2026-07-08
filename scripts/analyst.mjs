@@ -384,6 +384,101 @@ function layer4Growth(trades) {
   return { series, trend, expSlope: round3(expSlope), rolling };
 }
 
+// ── LAYER 5: CANON CROSS-CHECK (edges vs the trading books) ──────────────────
+// Additive: cross-checks each knowledge-mapped setup against canonical book rules
+// (Bulkowski / Minervini / Qullamaggie …). A profitable edge that violates canon is
+// flagged "שביר" (fragile — profitable now ≠ structural); a losing edge in an avoided
+// regime confirms canon; a winner in a preferred regime is "מבני" (structural).
+//
+// CI-SAFE BY DESIGN: the knowledge JSON is fs-read inside try/catch — NOT a static
+// import like src/intelligence/knowledge.js, whose top-level `import ... with {type:
+// "json"}` executes at module load and cannot be caught. A missing/corrupt file
+// degrades to an absent section, never a crashed run.
+const KNOWLEDGE_DIR = join(__dirname, "..", "src", "intelligence", "knowledge");
+const KNOWLEDGE_MIN_N = 5; // the "sample ≥5" bar for a canon verdict (independent of MIN_N).
+
+// Mirror of src/intelligence/knowledgeGlue.js SETUP_NAME_TO_KEY — kept inline so we
+// never import knowledge.js (see CI-SAFE note above). Unmapped setups → no verdict.
+// Trade `marketCondition` is already knowledge vocabulary (Trending Up/Down/Sideways/
+// Volatile), so no regime-enum translation is needed here.
+// ⚠️ DRIFT RISK: MUST stay in sync with src/intelligence/knowledgeGlue.js:22. We were
+// already burned by schema drift once — data-guardian idea: add an automated sync
+// check (assert this map deep-equals knowledgeGlue's) so a future edit to one side
+// can't silently diverge. TODO(sync-check): wire that assertion into data-guardian.mjs.
+const SETUP_NAME_TO_KEY = {
+  "Breakout": "breakout_continuation",
+  "Pullback": "pullback",
+  "Support Bounce": "support_bounce",
+  "Resistance Break": "resistance_break",
+  // knowledge display names (future- / externally-tagged setups):
+  "VCP": "vcp", "Bull Flag": "bull_flag", "Cup & Handle": "cup_and_handle",
+  "Double Bottom": "double_bottom", "Head & Shoulders": "head_and_shoulders",
+  "Ascending Triangle": "ascending_triangle", "Episodic Pivot": "episodic_pivot",
+  "ORB": "orb", "Opening Range Breakout": "orb", "Parabolic Short": "parabolic_short",
+};
+
+export function loadSetupsKnowledge() {
+  try {
+    return JSON.parse(readFileSync(join(KNOWLEDGE_DIR, "setups.json"), "utf8"));
+  } catch {
+    return null; // missing / corrupt → caller renders no canon section.
+  }
+}
+
+// Returns up to 3 strongest canon verdicts as { setup, market, n, winRate, verdict, line }.
+export function layerKnowledge(trades, setupsKB) {
+  if (!setupsKB || typeof setupsKB !== "object") return [];
+
+  // Group by (setup, marketCondition); mirrors knowledgeGlue.getSetupRegimeKnowledge.
+  const groups = new Map();
+  for (const t of trades) {
+    const { setup, marketCondition: market } = t;
+    if (!setup || !market) continue;
+    const key = SETUP_NAME_TO_KEY[setup];
+    if (!key) continue;
+    const s = setupsKB[key];
+    const affinity = s && s.regime_affinity;
+    if (!affinity || typeof affinity !== "object") continue;
+    const avoid = Array.isArray(affinity.avoid) ? affinity.avoid : [];
+    const best = Array.isArray(affinity.best) ? affinity.best : [];
+    if (!avoid.includes(market) && !best.includes(market)) continue;
+    const label = `${setup}||${market}`;
+    if (!groups.has(label)) groups.set(label, { setup, market, s, avoid, best, list: [] });
+    groups.get(label).list.push(t);
+  }
+
+  const findings = [];
+  for (const g of groups.values()) {
+    const n = g.list.length;
+    if (n < KNOWLEDGE_MIN_N) continue;
+    const wins = g.list.filter((t) => t.pnl > 0).length;
+    const winRate = Math.round((wins / n) * 100);
+    const coach = g.s.coach_line || "";
+    const source = g.s.source || "";
+    const inAvoid = g.avoid.includes(g.market);
+    const inBest = g.best.includes(g.market);
+
+    let verdict, line;
+    if (inAvoid && winRate > 50) {
+      verdict = "fragile";
+      line = `⚠️ שביר — ${g.setup} ב-${g.market}: ${winRate}% (n=${n}) רווחי אך נגד הקאנון. ${coach}${source ? ` [${source}]` : ""}`;
+    } else if (inAvoid && winRate <= 50) {
+      verdict = "canon_agrees";
+      line = `✓ הקאנון מסכים — ${g.setup} ב-${g.market}: ${winRate}% (n=${n}). ${coach}`;
+    } else if (inBest && winRate > 50) {
+      verdict = "structural";
+      line = `✓ מבני — ${g.setup} ב-${g.market}: ${winRate}% (n=${n}) תואם${source ? ` ${source}` : " את הקאנון"}.`;
+    } else {
+      continue; // best + underperforming: not one of the three specified verdicts.
+    }
+    findings.push({ setup: g.setup, market: g.market, n, winRate, verdict, line });
+  }
+
+  // Strongest signal first: distance from 50% weighted by sample size.
+  findings.sort((a, b) => Math.abs(b.winRate - 50) * b.n - Math.abs(a.winRate - 50) * a.n);
+  return findings.slice(0, 3);
+}
+
 // ── Claude composer (Hebrew narration of deterministic stats) ────────────────
 async function composeWithClaude(facts) {
   if (!ANTHROPIC_API_KEY) return null;
@@ -395,6 +490,7 @@ async function composeWithClaude(facts) {
     "לכל טענה ציין את גודל המדגם n ואת רווח הסמך (CI). אם אין ממצאים מובהקים — אמור זאת בכנות.",
     "מבנה: (1) שורת פסק-דין ראשית. (2) פערי כיול מובילים. (3) תגליות מובילות.",
     "(4) הצעות מדורגות לכיול המנוע. (5) מגמת צמיחה. היה תמציתי ומקצועי, ללא סיסמאות.",
+    "אם השדה knowledge אינו ריק — הוסף סעיף קצר בכותרת 'מול הספרים 📖' עם עד 3 שורות מהשדה knowledge בלבד (מילה במילה, אין להמציא). אם knowledge ריק — אל תכלול את הסעיף כלל.",
     "אל תכלול סודות, טוקנים או מפתחות.",
   ].join(" ");
   try {
@@ -456,6 +552,11 @@ function fallbackHe(facts) {
   for (const p of facts.proposals) {
     L.push(`• ${p.param}: ${p.current} → ${p.proposed} (n=${p.evidence.n}, CI ${p.evidence.ci[0]}-${p.evidence.ci[1]}%, ` +
       `תוחלת ${p.evidence.expR}R)${p.highConfidence ? " ⭐ ביטחון גבוה" : ""}.`);
+  }
+  if (facts.knowledge && facts.knowledge.length) {
+    L.push("");
+    L.push("מול הספרים 📖:");
+    for (const k of facts.knowledge.slice(0, 3)) L.push(`• ${k.line}`);
   }
   return L.join("\n");
 }
@@ -524,6 +625,7 @@ async function main() {
     discovery: { cellsTested: 0, significant: 0, top: [] },
     proposals: [],
     growth: { series: [], trend: "flat", expSlope: 0, rolling: null },
+    knowledge: [],
   };
 
   if (trades.length >= MIN_N) {
@@ -531,6 +633,7 @@ async function main() {
     facts.discovery = layer2Discovery(trades);
     facts.proposals = layer3Proposals(facts.calibration, facts.discovery);
     facts.growth = layer4Growth(trades);
+    facts.knowledge = layerKnowledge(trades, loadSetupsKnowledge());
   }
 
   // Narrate (Claude) with deterministic Hebrew fallback.
@@ -561,8 +664,12 @@ async function main() {
   console.log(JSON.stringify(facts, null, 2));
 }
 
-main().catch((e) => {
-  // Never fail the workflow over the analyst itself.
-  console.error("::warning::Analyst failed unexpectedly.", e?.message || e);
-  emit({ date: DATE, email_he: "", has_proposal: 0 });
-});
+// Run only when invoked directly (node scripts/analyst.mjs). When imported — e.g.
+// by a verification harness — the exports are used without triggering the DB run.
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  main().catch((e) => {
+    // Never fail the workflow over the analyst itself.
+    console.error("::warning::Analyst failed unexpectedly.", e?.message || e);
+    emit({ date: DATE, email_he: "", has_proposal: 0 });
+  });
+}
