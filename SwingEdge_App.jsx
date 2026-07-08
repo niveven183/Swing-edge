@@ -58,12 +58,30 @@ import SmartSelect from "./src/components/ui/SmartSelect.jsx";
 import useModalA11y from "./src/hooks/useModalA11y.js";
 import { getTradeSelectProps, CATEGORY_TOOLTIP, EMOTION_VALUES } from "./src/data/tradeOptions.jsx";
 import { TRADING_TOOLTIPS, resolveSetupKey } from "./src/data/tooltips.js";
+import { getSetupTooltip } from "./src/intelligence/knowledgeGlue.js";
 import { TradeCalendar } from "./src/components/TradeCalendar.jsx";
 import { AdaptiveLessons } from "./src/intelligence/core/AdaptiveLessons.js";
 import GrowthPredictor from "./src/components/GrowthPredictor.jsx";
 import MonthlyReportTab from "./src/components/MonthlyReportTab.jsx";
 import MonthlyReportModal from "./src/components/MonthlyReportModal.jsx";
 import { generateMonthlyReport, findBestMonth } from "./src/intelligence/core/MonthlyReport.js";
+// "?" beside a mapped setup tag — canonical name/definition/coach line. Returns
+// null for unmapped / "Other" / empty setups, so the tag stays plain (as before).
+function SetupTagTip({ setup, isRTL }) {
+  const st = getSetupTooltip(setup);
+  if (!st) return null;
+  const dir = isRTL ? 'rtl' : 'ltr';
+  return (
+    <InfoTooltip label={isRTL ? `מידע על ${st.name}` : `More info: ${st.name}`}>
+      <div dir={dir} style={{ direction: dir, textAlign: 'start' }}>
+        <div className="font-bold text-emerald-600 dark:text-emerald-400 mb-1.5 text-[13px]">{st.name}</div>
+        {st.definition && <div className="whitespace-pre-line mb-2">{st.definition}</div>}
+        {st.coachLine && <div className="whitespace-pre-line text-slate-600 dark:text-slate-300">{st.coachLine}</div>}
+      </div>
+    </InfoTooltip>
+  );
+}
+
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const RISK_PCT = 0.01;
 
@@ -2898,7 +2916,7 @@ export default function SwingEdge() {
                           <td className="py-2 pe-4 font-mono text-slate-400">{t.shares}</td>
                           <td className={`py-2 pe-4 font-bold font-mono ${win ? "text-[#10b981]" : "text-[#ef4444]"}`}>{fmt$(Math.round(pnl))}</td>
                           <td className={`py-2 pe-4 font-bold font-mono ${rMultiple >= 0 ? "text-cyan-400" : "text-[#ef4444]"}`}>{fmtR(rMultiple)}</td>
-                          <td className="py-2 pe-4"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">{t.setup}</span></td>
+                          <td className="py-2 pe-4"><span className="inline-flex items-center gap-1"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">{t.setup}</span><SetupTagTip setup={t.setup} isRTL={isRTL} /></span></td>
                         </tr>
                       );
                     })}
@@ -3400,7 +3418,7 @@ export default function SwingEdge() {
                             return d === 0 ? "<1d" : `${d}d`;
                           })()}
                         </td>
-                        <td className="p-3"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 whitespace-nowrap">{t.setup}</span></td>
+                        <td className="p-3"><span className="inline-flex items-center gap-1"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 whitespace-nowrap">{t.setup}</span><SetupTagTip setup={t.setup} isRTL={isRTL} /></span></td>
                         <td className="p-3 text-slate-500 text-[10px] whitespace-nowrap">{t.marketCondition || "–"}</td>
                         <td className="p-3 text-slate-500 text-[10px] whitespace-nowrap">{t.emotionAtEntry || "–"}</td>
                         <td className="p-3 text-amber-400 text-xs font-mono">{qstars(t.entryQuality) ? `${"★".repeat(qstars(t.entryQuality))}` : "–"}</td>
@@ -5590,6 +5608,18 @@ export default function SwingEdge() {
                 </div>
               )}
 
+              {/* Setup + Market — surfaced above the coach so manual entry drives the canonical line live */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="log-setup" className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">Setup Type<InfoTooltip label="Setup Type">{lang === 'he' ? CATEGORY_TOOLTIP.setup.he : CATEGORY_TOOLTIP.setup.en}</InfoTooltip></label>
+                  <SmartSelect id="log-setup" ariaLabel="Setup Type" value={form.setup} onChange={v=>setForm(f=>({...f,setup:v}))} dir={isRTL?'rtl':'ltr'} {...getTradeSelectProps('setup', lang)} />
+                </div>
+                <div>
+                  <label htmlFor="log-market-condition" className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">Market Condition<InfoTooltip label="Market Condition">{lang === 'he' ? CATEGORY_TOOLTIP.market.he : CATEGORY_TOOLTIP.market.en}</InfoTooltip></label>
+                  <SmartSelect id="log-market-condition" ariaLabel="Market Condition" value={form.marketCondition} onChange={v=>setForm(f=>({...f,marketCondition:v}))} dir={isRTL?'rtl':'ltr'} {...getTradeSelectProps('market', lang)} />
+                </div>
+              </div>
+
               {/* Live Decision Coach — analyses the trade as you type (only on valid input) */}
               {tradeValidity.valid && <DecisionCoachPanel coaching={aiCoach} lang={lang} />}
 
@@ -5654,24 +5684,12 @@ export default function SwingEdge() {
 
               {showTradeContext && (
                 <div className="space-y-4 animate-fade-in">
-              {/* Setup Type + Notes */}
+              {/* Notes + Emotion (Setup + Market are surfaced above, next to the coach) */}
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="log-setup" className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">Setup Type<InfoTooltip label="Setup Type">{lang === 'he' ? CATEGORY_TOOLTIP.setup.he : CATEGORY_TOOLTIP.setup.en}</InfoTooltip></label>
-                  <SmartSelect id="log-setup" ariaLabel="Setup Type" value={form.setup} onChange={v=>setForm(f=>({...f,setup:v}))} dir={isRTL?'rtl':'ltr'} {...getTradeSelectProps('setup', lang)} />
-                </div>
                 <div>
                   <label htmlFor="log-notes" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Notes</label>
                   <input id="log-notes" value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}
                     placeholder="Trade thesis..." className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none transition" />
-                </div>
-              </div>
-
-              {/* Market Condition + Emotion */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="log-market-condition" className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">Market Condition<InfoTooltip label="Market Condition">{lang === 'he' ? CATEGORY_TOOLTIP.market.he : CATEGORY_TOOLTIP.market.en}</InfoTooltip></label>
-                  <SmartSelect id="log-market-condition" ariaLabel="Market Condition" value={form.marketCondition} onChange={v=>setForm(f=>({...f,marketCondition:v}))} dir={isRTL?'rtl':'ltr'} {...getTradeSelectProps('market', lang)} />
                 </div>
                 <div>
                   <label htmlFor="log-emotion" className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">Emotion at Entry<InfoTooltip label="Emotion at Entry">{lang === 'he' ? CATEGORY_TOOLTIP.emotion.he : CATEGORY_TOOLTIP.emotion.en}</InfoTooltip></label>
