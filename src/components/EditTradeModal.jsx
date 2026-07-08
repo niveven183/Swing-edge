@@ -267,7 +267,7 @@ export default function EditTradeModal({ trade, lang, onClose, onSave }) {
                   ★
                 </button>
               ))}
-              <span className="text-[10px] text-slate-600 ml-1">{form.entryQuality}/5</span>
+              <span className={`text-[10px] text-slate-600 ${isHe ? "mr-1" : "ml-1"}`}>{form.entryQuality}/5</span>
             </div>
           </div>
 

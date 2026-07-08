@@ -25,6 +25,7 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he' }) {
   const [selectedDate, setSelectedDate] = useState(null);
 
   const locale = lang === 'he' ? heLocale : undefined;
+  const isRTL = lang === 'he' || lang === 'ar';
   const metricsOf = (t) => {
     try {
       const m = typeof calcMetrics === 'function' ? calcMetrics(t) : null;
@@ -161,7 +162,7 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he' }) {
               aria-pressed={isSelected ? true : false}
               className={`
                 relative min-h-[56px] p-1.5 border-b border-r border-slate-100 dark:border-white/[0.06]
-                transition-all text-left
+                transition-all ${isRTL ? 'text-right' : 'text-left'}
                 ${!inMonth ? 'opacity-30' : ''}
                 ${isSelected
                   ? 'bg-emerald-50 dark:bg-emerald-500/20 ring-2 ring-inset ring-emerald-400 dark:ring-emerald-500'

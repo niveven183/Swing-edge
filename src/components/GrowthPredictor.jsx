@@ -196,6 +196,7 @@ function generateQuestions(closedTrades, stats, lang) {
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function GrowthPredictor({ trades = [], stats = {}, capital = 0, lang = "en" }) {
   const S = { ...STR.en, ...(STR[lang] || {}) };
+  const isRTL = lang === "he" || lang === "ar";
 
   const closedTrades = useMemo(
     () => (trades || []).filter((t) => t.status === "CLOSED"),
@@ -439,7 +440,7 @@ export default function GrowthPredictor({ trades = [], stats = {}, capital = 0, 
                 key={`${currentQ}-${i}-${opt.text}`}
                 onClick={() => handleAnswer(i)}
                 disabled={feedback === "correct"}
-                className={`relative px-4 py-3 rounded-xl border text-sm font-medium transition-all text-left
+                className={`relative px-4 py-3 rounded-xl border text-sm font-medium transition-all ${isRTL ? "text-right" : "text-left"}
                   ${
                     showCorrect
                       ? "bg-emerald-500/20 border-emerald-400 text-emerald-300 ring-2 ring-emerald-400/40"
@@ -463,7 +464,7 @@ export default function GrowthPredictor({ trades = [], stats = {}, capital = 0, 
         {feedback === "wrong" && (
           <div className="mt-4 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
             <span className="font-bold">{S.wrong}</span>
-            <span className="opacity-80 ml-2">— {q.explanation}</span>
+            <span className={`opacity-80 ${isRTL ? "mr-2" : "ml-2"}`}>— {q.explanation}</span>
           </div>
         )}
         {feedback === "correct" && (

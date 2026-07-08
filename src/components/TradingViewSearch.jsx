@@ -96,7 +96,8 @@ function Highlighted({ text, query }) {
   );
 }
 
-export default function TradingViewSearch({ value, onPick, livePrices = {}, setLivePrices, placeholder = "Search symbol..." }) {
+export default function TradingViewSearch({ value, onPick, livePrices = {}, setLivePrices, placeholder = "Search symbol...", lang = "he" }) {
+  const isRTL = lang === "he" || lang === "ar";
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -237,9 +238,9 @@ export default function TradingViewSearch({ value, onPick, livePrices = {}, setL
         {!query && value && (
           <span className="text-[10px] font-mono text-cyan-300 font-bold whitespace-nowrap">
             {value}
-            {typeof currentPrice === "number" && <span className="text-slate-400 ml-1">${currentPrice.toFixed(2)}</span>}
+            {typeof currentPrice === "number" && <span className={`text-slate-400 ${isRTL ? "mr-1" : "ml-1"}`}>${currentPrice.toFixed(2)}</span>}
             {typeof currentChangePct === "number" && (
-              <span className={`ml-1 ${currentChangePct >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+              <span className={`${isRTL ? "mr-1" : "ml-1"} ${currentChangePct >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
                 {currentChangePct >= 0 ? "+" : ""}{currentChangePct.toFixed(2)}%
               </span>
             )}
@@ -286,7 +287,7 @@ export default function TradingViewSearch({ value, onPick, livePrices = {}, setL
                 key={`${r.symbol}-${r.exchange}-${i}`}
                 onMouseEnter={() => setActiveIdx(i)}
                 onClick={() => pick(r)}
-                className={`w-full flex items-center gap-3 px-3 py-2 text-xs border-b border-[var(--border-subtle)] dark:border-white/[0.04] last:border-0 transition text-left ${active ? "bg-cyan-500/10" : "hover:bg-cyan-500/5"}`}
+                className={`w-full flex items-center gap-3 px-3 py-2 text-xs border-b border-[var(--border-subtle)] dark:border-white/[0.04] last:border-0 transition ${isRTL ? "text-right" : "text-left"} ${active ? "bg-cyan-500/10" : "hover:bg-cyan-500/5"}`}
               >
                 <TickerLogo ticker={r.symbol} size={20} />
                 <div className="flex flex-col flex-1 min-w-0">

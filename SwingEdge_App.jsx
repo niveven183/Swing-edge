@@ -4742,6 +4742,7 @@ export default function SwingEdge() {
                     livePrices={livePrices}
                     setLivePrices={setLivePrices}
                     placeholder={t.addTicker}
+                    lang={lang}
                   />
                 </div>
 
