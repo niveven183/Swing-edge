@@ -127,6 +127,8 @@
   --v3-line:         rgba(255,255,255,.08);
   --v3-loss:         #F43F5E;
   --v3-info:         #06b6d4;   /* equity/live-data channel — distinct from accent */
+  --v3-purple:       #A78BFA;   /* setup-identity channel — distinct from accent/info */
+  --v3-purple-glow:  rgba(167,139,250,.12);
   /* radius */
   --v3-radius-card:  20px;
   --v3-radius-pill:  999px;

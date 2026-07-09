@@ -3,6 +3,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Serif flag-moment face (app-wide) ──
+   Frank Ruhl Libre 400, preloaded in index.html. Landing keeps its own
+   scoped `.se-landing .se-serif` rule (higher specificity). Used in-app for
+   exactly one hero figure per screen. Never bold. */
+.se-serif {
+  font-family: 'Frank Ruhl Libre', 'Noto Serif Hebrew', 'Heebo', serif;
+  font-weight: 400;
+  font-synthesis-weight: none;
+}
+
 /* ── Animations ── */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(-4px); }

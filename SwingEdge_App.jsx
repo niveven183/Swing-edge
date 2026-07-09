@@ -4062,7 +4062,51 @@ export default function SwingEdge() {
 
         {/* ══════════════ ANALYTICS ══════════════ */}
         {tab === "analytics" && (
-          <div className="space-y-5 animate-fade-in">
+          <div className="space-y-8 animate-fade-in">
+            {/* ═══════════ HERO — the story of your account ═══════════ */}
+            <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-2xl p-6 md:p-8">
+              <div className="flex items-start justify-between gap-4 mb-6">
+                <div>
+                  <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500">
+                    {lang === "he" ? "הסיפור של החשבון שלך" : "The story of your account"}
+                  </span>
+                  <div className={`se-serif mt-2 text-5xl md:text-6xl leading-none tracking-tight ${totalPnL>=0?"text-[var(--v3-accent)]":"text-[var(--v3-loss)]"}`}>
+                    {fmt$(Math.round(totalPnL * 100) / 100)}
+                  </div>
+                  <div className="mt-2.5 flex items-center gap-2 text-xs text-slate-500">
+                    <span className={`font-mono font-semibold ${totalPnL>=0?"text-[var(--v3-accent)]":"text-[var(--v3-loss)]"}`}>
+                      {totalPnL>=0?"▲":"▼"} {stats.returnPct.toFixed(2)}%
+                    </span>
+                    <span className="text-slate-600">·</span>
+                    <span>{lang === "he" ? `הון התחלתי $${capital.toLocaleString()}` : `starting capital $${capital.toLocaleString()}`}</span>
+                  </div>
+                </div>
+                <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 flex items-center gap-1 shrink-0">
+                  Equity Curve<TermTooltip term="equityCurve" lang={lang} />
+                </span>
+              </div>
+              <ResponsiveContainer width="100%" height={340}>
+                <AreaChart data={equityCurve} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="eqFull" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--v3-info)" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="var(--v3-info)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} />
+                  <YAxis domain={["auto","auto"]} tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v=>`$${(v/1000).toFixed(1)}k`} />
+                  <ReferenceLine y={capital} stroke="var(--v3-text-lo)" strokeDasharray="5 5" label={{ value: lang === "he" ? "הון התחלתי" : "Starting Capital", position: "insideTopRight", fontSize: 9, fill: "var(--v3-text-lo)" }} />
+                  <Tooltip
+                    contentStyle={{ background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 10, fontSize: 11 }}
+                    formatter={(v, n, p) => [`$${v.toLocaleString()} (${p.payload.ticker})`, "Equity"]}
+                  />
+                  <Area type="monotone" dataKey="equity" stroke="var(--v3-info)" strokeWidth={2.5} fill="url(#eqFull)" dot={{ fill: "var(--v3-info)", r: 4, strokeWidth: 0 }} activeDot={{ r: 6, fill: "var(--v3-info)" }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Supporting KPI strip */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <StatCard label="Total Trades"  value={realTrades.length} sub="All time"      icon={Layers}    accent="cyan"   />
               <StatCard label={<span className="flex items-center gap-1">Win Rate<TermTooltip term="winRate" lang={lang} /></span>} value={formatPct(winRate)} sub={`${stats.wins} wins`} icon={CheckCircle} accent="green" />
@@ -4070,50 +4114,20 @@ export default function SwingEdge() {
               <StatCard label="Total Return"   value={`${stats.returnPct.toFixed(2)}%`} sub={`$${Math.round(Math.abs(totalPnL)).toLocaleString()} P&L`} icon={TrendingUp} accent={totalPnL>=0?"green":"red"} />
             </div>
 
-            {/* Full Equity Curve */}
-            <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-sm font-bold text-white flex items-center gap-1.5">Equity Curve<TermTooltip term="equityCurve" lang={lang} /></h3>
-                  <p className="text-xs text-slate-600">Account balance over time · starting capital ${capital.toLocaleString()}</p>
-                </div>
-                <span className={`text-sm font-bold font-mono ${totalPnL>=0?"text-[#10b981]":"text-[#ef4444]"}`}>{fmt$(Math.round(totalPnL * 100) / 100)}</span>
-              </div>
-              <ResponsiveContainer width="100%" height={280}>
-                <AreaChart data={equityCurve} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="eqFull" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.35} />
-                      <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.05} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} />
-                  <YAxis domain={["auto","auto"]} tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v=>`$${(v/1000).toFixed(1)}k`} />
-                  <ReferenceLine y={capital} stroke="#475569" strokeDasharray="5 5" label={{ value: "Starting Capital", position: "insideTopRight", fontSize: 9, fill: "#475569" }} />
-                  <Tooltip
-                    contentStyle={{ background: "#0d1424", border: "1px solid #162032", borderRadius: 10, fontSize: 11 }}
-                    formatter={(v, n, p) => [`$${v.toLocaleString()} (${p.payload.ticker})`, "Equity"]}
-                  />
-                  <Area type="monotone" dataKey="equity" stroke="#06b6d4" strokeWidth={2.5} fill="url(#eqFull)" dot={{ fill: "#06b6d4", r: 4, strokeWidth: 0 }} activeDot={{ r: 6, fill: "#06b6d4" }} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-
             {/* Per-trade P&L bars */}
-            <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
-              <h3 className="text-sm font-bold text-white mb-4">{t.pnlByTrade}</h3>
+            <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-6">
+              <h3 className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mb-4">{t.pnlByTrade}</h3>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={closedTrades.map(t => ({ name: t.ticker, pnl: Math.round(calcTradeMetrics(t).pnl || 0) }))}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v=>`$${v}`} />
-                  <Tooltip contentStyle={{ background: "#0d1424", border: "1px solid #162032", borderRadius: 10, fontSize: 11 }} formatter={v=>[fmt$(v),"P&L"]} />
-                  <ReferenceLine y={0} stroke="#334155" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v=>`$${v}`} />
+                  <Tooltip contentStyle={{ background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 10, fontSize: 11 }} formatter={v=>[fmt$(v),"P&L"]} />
+                  <ReferenceLine y={0} stroke="var(--v3-text-lo)" />
                   <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
                     {closedTrades.map((t, i) => {
                       const { pnl } = calcTradeMetrics(t);
-                      return <Cell key={i} fill={pnl > 0 ? "#10b981" : "#f43f5e"} />;
+                      return <Cell key={i} fill={pnl > 0 ? "var(--v3-accent)" : "var(--v3-loss)"} />;
                     })}
                   </Bar>
                 </BarChart>
@@ -4121,18 +4135,18 @@ export default function SwingEdge() {
             </div>
 
             {/* Setup breakdown — dynamic grouping from actual trade data */}
-            <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
-              <h3 className="text-sm font-bold text-white mb-4">{t.perfBySetup}<TermTooltip term="performanceBySetup" lang={lang} /></h3>
+            <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-6">
+              <h3 className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mb-4 flex items-center gap-1.5">{t.perfBySetup}<TermTooltip term="performanceBySetup" lang={lang} /></h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[...stats.bySetup]
                   .sort((a, b) => b.count - a.count)
                   .map((s) => (
                     <div key={s.name} className="bg-white/3 rounded-xl p-3 border border-[var(--border-subtle)] dark:border-white/[0.06]">
-                      <div className="text-xs font-semibold text-violet-400 mb-2 truncate" title={s.name}>{s.name}</div>
+                      <div className="text-xs font-semibold text-[var(--v3-purple)] mb-2 truncate" title={s.name}>{s.name}</div>
                       <div className="font-bold text-white text-lg font-mono">{formatPct(s.winRate)}</div>
                       <div className="text-[10px] text-slate-500">{nTrades(s.count, lang)} · {s.totalR.toFixed(1)}R {t.rTotal}</div>
                       <div className="mt-2 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-violet-500 to-cyan-500 rounded-full transition-all" style={{ width: `${s.winRate}%` }} />
+                        <div className="h-full bg-gradient-to-r from-[var(--v3-purple)] to-[var(--v3-info)] rounded-full transition-all" style={{ width: `${s.winRate}%` }} />
                       </div>
                     </div>
                   ))}
@@ -4149,25 +4163,25 @@ export default function SwingEdge() {
                 count: dayLookup[day]?.count || 0,
               }));
               return (
-                <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
-                  <h3 className="text-sm font-bold text-white mb-1">{t.pnlByDay}<TermTooltip term="dayOfWeek" lang={lang} /></h3>
+                <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-6">
+                  <h3 className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mb-1 flex items-center gap-1.5">{t.pnlByDay}<TermTooltip term="dayOfWeek" lang={lang} /></h3>
                   <p className="text-xs text-slate-600 mb-4">{t.pnlByDaySubtitle}</p>
                   <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
-                      <XAxis dataKey="day" tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v => dayLabel(v, lang)} />
-                      <YAxis tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
+                      <XAxis dataKey="day" tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => dayLabel(v, lang)} />
+                      <YAxis tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
                       <Tooltip
-                        contentStyle={{ background: "#0d1424", border: "1px solid #162032", borderRadius: 10, fontSize: 11 }}
+                        contentStyle={{ background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 10, fontSize: 11 }}
                         formatter={(v, n, p) => [`${fmt$(v)} · ${nTrades(p.payload.count, lang)}`, "P&L"]}
                         labelFormatter={l => lang === "he"
                           ? dayLabel(l, "he")
                           : (["Sun","Mon","Tue","Wed","Thu","Fri"].includes(l) ? ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday"][["Sun","Mon","Tue","Wed","Thu","Fri"].indexOf(l)] : l)}
                       />
-                      <ReferenceLine y={0} stroke="#334155" />
+                      <ReferenceLine y={0} stroke="var(--v3-text-lo)" />
                       <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
                         {data.map((d, i) => (
-                          <Cell key={i} fill={d.pnl >= 0 ? "#10b981" : "#f43f5e"} />
+                          <Cell key={i} fill={d.pnl >= 0 ? "var(--v3-accent)" : "var(--v3-loss)"} />
                         ))}
                       </Bar>
                     </BarChart>
@@ -4184,23 +4198,23 @@ export default function SwingEdge() {
                 .sort((a, b) => b.count - a.count);
               const short = name => name.length > 11 ? name.slice(0, 10) + "…" : name;
               return (
-                <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
-                  <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">{t.winRateBySetup}<InfoTooltip label="Win Rate by Setup">{lang === 'he' ? 'אחוז הזכייה לכל סטאפ. עמודות סגולות = מעל 50% WR. עמודות אפורות = מתחת ל-50%. גובה העמודה = מספר עסקאות.' : 'Win rate per setup. Purple bars = above 50% WR. Gray bars = below 50%. Bar height = trade count.'}</InfoTooltip></h3>
+                <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-6">
+                  <h3 className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mb-1 flex items-center gap-1.5">{t.winRateBySetup}<InfoTooltip label="Win Rate by Setup">{lang === 'he' ? 'אחוז הזכייה לכל סטאפ. עמודות סגולות = מעל 50% WR. עמודות אפורות = מתחת ל-50%. גובה העמודה = מספר עסקאות.' : 'Win rate per setup. Purple bars = above 50% WR. Gray bars = below 50%. Bar height = trade count.'}</InfoTooltip></h3>
                   <p className="text-xs text-slate-600 mb-4">{t.winRateBySetupSubtitle}</p>
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={data} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
-                      <XAxis dataKey="setup" tick={{ fontSize: 9, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={short} />
-                      <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
+                      <XAxis dataKey="setup" tick={{ fontSize: 9, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={short} />
+                      <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`} />
                       <Tooltip
-                        contentStyle={{ background: "#0d1424", border: "1px solid #162032", borderRadius: 10, fontSize: 11 }}
+                        contentStyle={{ background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 10, fontSize: 11 }}
                         formatter={(v, n, p) => [`${v}% · ${nTrades(p.payload.count, lang)}`, "Win Rate"]}
                         labelFormatter={l => l}
                       />
-                      <ReferenceLine y={50} stroke="#475569" strokeDasharray="4 4" label={{ value: "50%", position: "insideTopRight", fontSize: 9, fill: "#475569" }} />
-                      <Bar dataKey="winRate" radius={[4, 4, 0, 0]} label={{ position: "top", fontSize: 9, fill: "#94a3b8", formatter: (v, entry) => entry?.payload?.count ? `${entry.payload.count}t` : "" }}>
+                      <ReferenceLine y={50} stroke="var(--v3-text-lo)" strokeDasharray="4 4" label={{ value: "50%", position: "insideTopRight", fontSize: 9, fill: "var(--v3-text-lo)" }} />
+                      <Bar dataKey="winRate" radius={[4, 4, 0, 0]} label={{ position: "top", fontSize: 9, fill: "var(--v3-text-mid)", formatter: (v, entry) => entry?.payload?.count ? `${entry.payload.count}t` : "" }}>
                         {data.map((d, i) => (
-                          <Cell key={i} fill={d.winRate >= 50 ? "#8b5cf6" : "#64748b"} />
+                          <Cell key={i} fill={d.winRate >= 50 ? "var(--v3-purple)" : "var(--v3-text-lo)"} />
                         ))}
                       </Bar>
                     </BarChart>
@@ -4237,7 +4251,7 @@ export default function SwingEdge() {
               return (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {/* Best Day */}
-                  <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-emerald-500/20 rounded-xl p-4">
+                  <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-emerald-500/20 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-3">
                       <span className="text-xs font-semibold tracking-widest uppercase text-emerald-400 flex items-center gap-1">{t.bestDay}<InfoTooltip label="Best Day">{lang === 'he' ? 'יום השבוע שבו הרווחת הכי הרבה מבחינת P&L כולל ומספר עסקאות.' : 'The weekday where you made the most total P&L and traded most successfully.'}</InfoTooltip></span>
                     </div>
@@ -4252,9 +4266,9 @@ export default function SwingEdge() {
                   </div>
 
                   {/* Best Setup */}
-                  <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-violet-500/20 rounded-xl p-4">
+                  <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--v3-purple)]/25 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs font-semibold tracking-widest uppercase text-violet-400 flex items-center gap-1">{t.bestSetup}<InfoTooltip label="Best Setup">{lang === 'he' ? 'הסטאפ הרווחי ביותר שלך לפי P&L כולל ואחוז הצלחה. זה ה-Edge שלך — תסחור אותו יותר.' : 'Your most profitable setup by total P&L and win rate. This is your edge — trade it more.'}</InfoTooltip></span>
+                      <span className="text-xs font-semibold tracking-widest uppercase text-[var(--v3-purple)] flex items-center gap-1">{t.bestSetup}<InfoTooltip label="Best Setup">{lang === 'he' ? 'הסטאפ הרווחי ביותר שלך לפי P&L כולל ואחוז הצלחה. זה ה-Edge שלך — תסחור אותו יותר.' : 'Your most profitable setup by total P&L and win rate. This is your edge — trade it more.'}</InfoTooltip></span>
                     </div>
                     {bestSetup ? (
                       <>
@@ -4267,7 +4281,7 @@ export default function SwingEdge() {
                   </div>
 
                   {/* Best Emotion */}
-                  <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-amber-500/20 rounded-xl p-4">
+                  <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-amber-500/20 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-3">
                       <span className="text-xs font-semibold tracking-widest uppercase text-amber-400 flex items-center gap-1">{t.bestEmotion}<InfoTooltip label="Best Emotion">{lang === 'he' ? 'המצב הרגשי שבו אתה מניב הכי טוב. כשאתה מרגיש ככה — הביצועים שלך חדים יותר.' : 'The emotional state where you perform best. When you feel this way, your trading is sharper.'}</InfoTooltip></span>
                     </div>
@@ -4409,14 +4423,14 @@ export default function SwingEdge() {
                 return { hold: Math.max(1, hold), pnl: Math.round(pnl), ticker: t.ticker };
               }).filter(Boolean);
 
-              const darkTooltip = { background: "#0d1424", border: "1px solid #162032", borderRadius: 10, fontSize: 11, color: "#e2e8f0" };
+              const darkTooltip = { background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 10, fontSize: 11, color: "var(--v3-text-mid)" };
 
               return (
                 <>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {/* R Distribution */}
-                    <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
-                      <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">
+                    <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-6">
+                      <h3 className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mb-1 flex items-center gap-1.5">
                         {lang === "he" ? "התפלגות R Multiple" : "R Multiple Distribution"}
                         <InfoTooltip label="R Distribution">
                           {lang === "he"
@@ -4424,16 +4438,16 @@ export default function SwingEdge() {
                             : "Trades per R range. Most in 0-1R = exiting too early."}
                         </InfoTooltip>
                       </h3>
-                      <p className="text-xs text-slate-600 mb-4">{lang === "he" ? "פיזור התוצאות שלך" : "Distribution of your outcomes"}</p>
+                      <p className="text-xs text-slate-600 mb-4">{lang === "he" ? "איפה העסקאות נוחתות — המנצחות מימין" : "Where your trades land — winners cluster right"}</p>
                       <ResponsiveContainer width="100%" height={200}>
                         <BarChart data={rBuckets} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
-                          <XAxis dataKey="range" tick={{ fontSize: 9, fill: "#475569" }} tickLine={false} axisLine={false} />
-                          <YAxis tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} />
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
+                          <XAxis dataKey="range" tick={{ fontSize: 9, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} />
+                          <YAxis tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} />
                           <Tooltip contentStyle={darkTooltip} />
                           <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                             {rBuckets.map((entry, i) => (
-                              <Cell key={i} fill={entry.max <= 0 ? "#f43f5e" : "#10b981"} />
+                              <Cell key={i} fill={entry.max <= 0 ? "var(--v3-loss)" : "var(--v3-accent)"} />
                             ))}
                           </Bar>
                         </BarChart>
@@ -4441,8 +4455,8 @@ export default function SwingEdge() {
                     </div>
 
                     {/* P&L by Month */}
-                    <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
-                      <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">
+                    <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-6">
+                      <h3 className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mb-1 flex items-center gap-1.5">
                         {lang === "he" ? "P&L לפי חודש" : "P&L by Month"}
                         <InfoTooltip label="P&L by Month">
                           {lang === "he"
@@ -4450,17 +4464,17 @@ export default function SwingEdge() {
                             : "Monthly P&L. Spot your strong and weak months."}
                         </InfoTooltip>
                       </h3>
-                      <p className="text-xs text-slate-600 mb-4">{lang === "he" ? "מגמת ביצועים חודשית" : "Monthly performance trend"}</p>
+                      <p className="text-xs text-slate-600 mb-4">{lang === "he" ? "לוח התוצאות חודש-אחר-חודש" : "Your month-by-month scoreboard"}</p>
                       <ResponsiveContainer width="100%" height={200}>
                         <BarChart data={pnlByMonth} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
-                          <XAxis dataKey="month" tick={{ fontSize: 9, fill: "#475569" }} tickLine={false} axisLine={false} />
-                          <YAxis tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
+                          <XAxis dataKey="month" tick={{ fontSize: 9, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} />
+                          <YAxis tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
                           <Tooltip contentStyle={darkTooltip} formatter={(v, n, p) => [`${fmt$(v)} · ${p.payload.count} trade${p.payload.count !== 1 ? "s" : ""}`, "P&L"]} />
-                          <ReferenceLine y={0} stroke="#334155" />
+                          <ReferenceLine y={0} stroke="var(--v3-text-lo)" />
                           <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
                             {pnlByMonth.map((d, i) => (
-                              <Cell key={i} fill={d.pnl >= 0 ? "#10b981" : "#f43f5e"} />
+                              <Cell key={i} fill={d.pnl >= 0 ? "var(--v3-accent)" : "var(--v3-loss)"} />
                             ))}
                           </Bar>
                         </BarChart>
@@ -4468,8 +4482,8 @@ export default function SwingEdge() {
                     </div>
 
                     {/* Emotion Performance */}
-                    <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
-                      <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">
+                    <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-6">
+                      <h3 className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mb-1 flex items-center gap-1.5">
                         {lang === "he" ? "ביצועים לפי רגש" : "Performance by Emotion"}
                         <InfoTooltip label="Emotion Performance">
                           {lang === "he"
@@ -4480,14 +4494,14 @@ export default function SwingEdge() {
                       <p className="text-xs text-slate-600 mb-4">{lang === "he" ? "הרגש שמרוויח לך כסף" : "Which emotion pays off"}</p>
                       <ResponsiveContainer width="100%" height={200}>
                         <BarChart data={emotionStatsArr} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
-                          <XAxis dataKey="emotion" tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} />
-                          <YAxis tick={{ fontSize: 10, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
+                          <XAxis dataKey="emotion" tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} />
+                          <YAxis tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
                           <Tooltip contentStyle={darkTooltip} formatter={(v, n, p) => [`${fmt$(v)} · ${formatPct(p.payload.winRate)} WR`, "P&L"]} />
-                          <ReferenceLine y={0} stroke="#334155" />
+                          <ReferenceLine y={0} stroke="var(--v3-text-lo)" />
                           <Bar dataKey="totalPnL" radius={[4, 4, 0, 0]}>
                             {emotionStatsArr.map((e, i) => (
-                              <Cell key={i} fill={e.totalPnL >= 0 ? "#10b981" : "#f43f5e"} />
+                              <Cell key={i} fill={e.totalPnL >= 0 ? "var(--v3-accent)" : "var(--v3-loss)"} />
                             ))}
                           </Bar>
                         </BarChart>
@@ -4508,8 +4522,8 @@ export default function SwingEdge() {
                     </div>
 
                     {/* Streak History */}
-                    <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
-                      <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">
+                    <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-6">
+                      <h3 className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mb-1 flex items-center gap-1.5">
                         {lang === "he" ? "היסטוריית רצפים" : "Streak History"}
                         <InfoTooltip label="Streak History">
                           {lang === "he"
@@ -4520,7 +4534,7 @@ export default function SwingEdge() {
                       <p className="text-xs text-slate-600 mb-4">{lang === "he" ? `${streaks.length} רצפים · מקסימום ${maxStreak}` : `${streaks.length} streaks · max ${maxStreak}`}</p>
                       <div className="space-y-1.5 max-h-48 overflow-y-auto pe-1">
                         {streaks.length === 0 ? (
-                          <p className="text-xs text-slate-600 text-center py-8">{lang === "he" ? "אין מספיק נתונים" : "Not enough data"}</p>
+                          <p className="text-xs text-slate-600 text-center py-8">{lang === "he" ? "עוד אין מספיק עסקאות — סגור כמה כדי לראות רצפים." : "Not enough trades yet — close a few to see your streaks."}</p>
                         ) : streaks.map((s, i) => (
                           <div key={i} className="flex items-center gap-2">
                             <span className="text-[10px] font-mono text-slate-500 w-14 shrink-0">
@@ -4528,7 +4542,7 @@ export default function SwingEdge() {
                             </span>
                             <div className="flex-1 bg-white/5 rounded-full h-3 overflow-hidden">
                               <div
-                                className={`h-full rounded-full ${s.type === "win" ? "bg-emerald-500" : "bg-rose-500"}`}
+                                className={`h-full rounded-full ${s.type === "win" ? "bg-[var(--v3-accent)]" : "bg-[var(--v3-loss)]"}`}
                                 style={{ width: `${Math.max(8, (s.length / maxStreak) * 100)}%` }}
                               />
                             </div>
@@ -4539,8 +4553,8 @@ export default function SwingEdge() {
                   </div>
 
                   {/* Setup Matrix */}
-                  <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
-                    <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">
+                  <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-6">
+                    <h3 className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mb-1 flex items-center gap-1.5">
                       {lang === "he" ? "מטריצת סטאפים" : "Setup Matrix"}
                       <InfoTooltip label="Setup Matrix">
                         {lang === "he"
@@ -4578,7 +4592,7 @@ export default function SwingEdge() {
                                 }`}>{formatPct(s.winRate)}</span>
                               </td>
                               <td className="py-2.5 text-center font-mono text-slate-300">{s.avgR}R</td>
-                              <td className={`py-2.5 text-end font-mono font-bold ${s.totalPnL >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                              <td className={`py-2.5 text-end font-mono font-bold ${s.totalPnL >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>
                                 {fmt$(s.totalPnL)}
                               </td>
                             </tr>
@@ -4590,8 +4604,8 @@ export default function SwingEdge() {
 
                   {/* Hold Time vs P&L Scatter */}
                   {holdScatter.length > 0 && (
-                    <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
-                      <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">
+                    <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-6">
+                      <h3 className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mb-1 flex items-center gap-1.5">
                         {lang === "he" ? "זמן החזקה vs P&L" : "Hold Time vs P&L"}
                         <InfoTooltip label="Hold Time vs PnL">
                           {lang === "he"
@@ -4602,43 +4616,43 @@ export default function SwingEdge() {
                       <p className="text-xs text-slate-600 mb-4">{nTrades(holdScatter.length, lang)}</p>
                       <ResponsiveContainer width="100%" height={280}>
                         <ScatterChart margin={{ top: 10, right: 16, left: 0, bottom: 10 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
                           <XAxis
                             type="number"
                             dataKey="hold"
                             name="Days"
-                            tick={{ fontSize: 10, fill: "#475569" }}
+                            tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }}
                             tickLine={false}
                             axisLine={false}
-                            label={{ value: lang === "he" ? "ימי החזקה" : "Days held", position: "insideBottom", offset: -2, fontSize: 10, fill: "#475569" }}
+                            label={{ value: lang === "he" ? "ימי החזקה" : "Days held", position: "insideBottom", offset: -2, fontSize: 10, fill: "var(--v3-text-lo)" }}
                           />
                           <YAxis
                             type="number"
                             dataKey="pnl"
                             name="P&L"
-                            tick={{ fontSize: 10, fill: "#475569" }}
+                            tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }}
                             tickLine={false}
                             axisLine={false}
                             tickFormatter={v => `$${v}`}
                           />
-                          <ReferenceLine y={0} stroke="#334155" />
+                          <ReferenceLine y={0} stroke="var(--v3-text-lo)" />
                           <Tooltip
                             cursor={{ strokeDasharray: "3 3" }}
                             content={({ payload }) => {
                               if (!payload?.length) return null;
                               const d = payload[0].payload;
                               return (
-                                <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[#162032] rounded-lg px-3 py-2 text-xs shadow-xl">
-                                  <p className="font-mono font-bold text-white">{d.ticker}</p>
+                                <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-[var(--v3-line)] rounded-lg px-3 py-2 text-xs shadow-xl">
+                                  <p className="font-mono font-bold text-[var(--text-primary)] dark:text-white">{d.ticker}</p>
                                   <p className="text-slate-400">{lang === "he" ? "ימים" : "Days"}: {d.hold}</p>
-                                  <p className={d.pnl >= 0 ? "text-emerald-400" : "text-rose-400"}>{fmt$(d.pnl)}</p>
+                                  <p className={d.pnl >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}>{fmt$(d.pnl)}</p>
                                 </div>
                               );
                             }}
                           />
                           <Scatter data={holdScatter}>
                             {holdScatter.map((entry, i) => (
-                              <Cell key={i} fill={entry.pnl >= 0 ? "#10b981" : "#f43f5e"} fillOpacity={0.75} />
+                              <Cell key={i} fill={entry.pnl >= 0 ? "var(--v3-accent)" : "var(--v3-loss)"} fillOpacity={0.75} />
                             ))}
                           </Scatter>
                         </ScatterChart>
