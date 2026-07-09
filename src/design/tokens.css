@@ -113,6 +113,25 @@
   --z-modal:       300;
   --z-toast:       400;
   --z-tooltip:     500;
+
+  /* ═══ Design System v3 (Robinhood-serif × Linear) — parallel layer ═══ */
+  /* מהגרים מסך-מסך. הישן נשאר עד שכל המסכים מומרים. */
+  --v3-bg-void:      #070B0A;
+  --v3-bg-panel:     #0A100D;
+  --v3-bg-light:     #F4F8F2;
+  --v3-accent:       #00C076;
+  --v3-accent-glow:  rgba(0,192,118,.12);
+  --v3-text-hi:      #FFFFFF;
+  --v3-text-mid:     #C7D0CC;
+  --v3-text-lo:      #7A8783;
+  --v3-line:         rgba(255,255,255,.08);
+  --v3-loss:         #F43F5E;
+  /* radius */
+  --v3-radius-card:  20px;
+  --v3-radius-pill:  999px;
+  --v3-radius-chip:  10px;
+  /* motion */
+  --v3-transition:   150ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
