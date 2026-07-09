@@ -992,7 +992,7 @@ const moFmtPrice = (p) =>
 // One index "pulse" card: name, latest close, weekly % with arrow, and a sparkline.
 const MarketPulseCard = memo(({ item, t }) => {
   const up = item.weekChangePct >= 0;
-  const color = up ? "#10b981" : "#ef4444";
+  const color = up ? "var(--v3-accent)" : "var(--v3-loss)";
   const data = (item.closes || []).map((c, i) => ({ i, c }));
   const gid = `mo-spark-${item.sym}`;
   return (
@@ -1027,7 +1027,7 @@ const MarketPulseCard = memo(({ item, t }) => {
 // the strongest mover (maxAbs). Bar width anchors to the reading edge, so it's RTL-safe.
 const SectorThemeCard = memo(({ item, t, maxAbs }) => {
   const up = item.weekChangePct >= 0;
-  const color = up ? "#10b981" : "#ef4444";
+  const color = up ? "var(--v3-accent)" : "var(--v3-loss)";
   const pct = maxAbs > 0 ? Math.min(100, (Math.abs(item.weekChangePct) / maxAbs) * 100) : 0;
   const name = t[item.key] || item.sym;
   return (
@@ -2540,7 +2540,7 @@ export default function SwingEdge() {
           >
             <Logo size={28} showText={false} />
             <span className="font-bold text-sm tracking-wider text-white whitespace-nowrap">SWING<span className="text-emerald-400">EDGE</span></span>
-            <span className="ms-1 text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-500 border border-cyan-500/20 tracking-widest uppercase hidden sm:inline">{t.pro}</span>
+            <span className="ms-1 text-[10px] px-1.5 py-0.5 rounded text-slate-500 border border-slate-700 tracking-widest uppercase hidden sm:inline">{t.pro}</span>
             <ChevronDown size={13} className={`text-slate-400 transition-transform ${showProfileDropdown ? "rotate-180" : ""}`} />
           </button>
           {showProfileDropdown && (
@@ -2661,7 +2661,7 @@ export default function SwingEdge() {
           <button key={id} data-tour-tab={id} onClick={() => setTab(id)}
             className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-3 text-xs font-semibold tracking-wide transition-all whitespace-nowrap border-b-2 shrink-0
               ${tab === id
-                ? "text-white border-cyan-400"
+                ? "text-white border-emerald-400"
                 : "text-slate-500 border-transparent hover:text-slate-300 hover:border-slate-600"}`}>
             <Icon size={13} />
             {t[key]}
@@ -4669,9 +4669,22 @@ export default function SwingEdge() {
         {tab === "intel" && (
           <div className="space-y-4 animate-fade-in">
 
+            {/* Screen header — frames the monitor. Sharp & readable (Heebo bold), no serif. */}
+            <header className="mb-1">
+              <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500">
+                {lang === "he" ? "מודיעין שוק" : "Market Intel"}
+              </span>
+              <h2 className="mt-1.5 text-xl md:text-2xl font-bold tracking-tight text-white">
+                {lang === "he" ? "מה השוק עושה עכשיו" : "What the market is doing now"}
+              </h2>
+              <p className="mt-1 text-xs text-slate-500">
+                {lang === "he" ? "קרא את המפה לפני שאתה נכנס לפוזיציה." : "Read the tape before you size your next trade."}
+              </p>
+            </header>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* TradingView Chart */}
-              <div className="md:col-span-2 bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl overflow-hidden relative" style={{ height: 520 }}>
+              <div className="md:col-span-2 bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl overflow-hidden relative" style={{ height: 520 }}>
                 <div ref={tvRef} style={{ height: "100%" }} />
 
                 {/* ── Floating AI Trade Buttons (screenshot → OCR) ── */}
@@ -4707,7 +4720,7 @@ export default function SwingEdge() {
                       disabled={chartAiLoading}
                       aria-label={t.chartCapturePositionAria}
                       aria-busy={chartAiLoading && chartAiTarget === "position"}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-xl backdrop-blur-md bg-gradient-to-r from-cyan-500/20 to-violet-500/20 border border-cyan-500/40 text-cyan-300 hover:from-cyan-500/30 hover:to-violet-500/30 hover:border-cyan-400/60 hover:text-white disabled:opacity-50"
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-xl backdrop-blur-md bg-[var(--v3-info-glow)] border border-[var(--v3-info)] text-[var(--v3-info)] hover:bg-[var(--v3-info)] hover:border-[var(--v3-info)] hover:text-white disabled:opacity-50"
                     >
                       {chartAiLoading && chartAiTarget === "position" ? (
                         <><RefreshCw size={13} className="animate-spin" /> {t.calculating}</>
@@ -4723,7 +4736,7 @@ export default function SwingEdge() {
                       disabled={chartAiLoading}
                       aria-label={t.chartCaptureJournalAria}
                       aria-busy={chartAiLoading && chartAiTarget === "journal"}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-xl backdrop-blur-md bg-gradient-to-r from-violet-500/20 to-rose-500/20 border border-violet-500/40 text-violet-300 hover:from-violet-500/30 hover:to-rose-500/30 hover:border-violet-400/60 hover:text-white disabled:opacity-50"
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-xl backdrop-blur-md bg-[var(--v3-purple-glow)] border border-[var(--v3-purple)] text-[var(--v3-purple)] hover:bg-[var(--v3-purple)] hover:border-[var(--v3-purple)] hover:text-white disabled:opacity-50"
                     >
                       {chartAiLoading && chartAiTarget === "journal" ? (
                         <><RefreshCw size={13} className="animate-spin" /> {t.processing}</>
@@ -4738,12 +4751,12 @@ export default function SwingEdge() {
               </div>
 
               {/* Watchlist */}
-              <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4 flex flex-col" style={{ height: 440 }}>
+              <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4 flex flex-col" style={{ height: 440 }}>
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">{t.watchlist}</span>
                   <div className="flex items-center gap-2">
-                    {pricesLoading && <RefreshCw size={10} className="animate-spin text-cyan-400" />}
-                    <Radio size={12} className="text-cyan-400" />
+                    {pricesLoading && <RefreshCw size={10} className="animate-spin text-[var(--v3-info)]" />}
+                    <Radio size={12} className="text-[var(--v3-info)]" />
                   </div>
                 </div>
                 {/* Professional symbol search — full-market autocomplete via
@@ -4798,7 +4811,7 @@ export default function SwingEdge() {
                       'bg-slate-500/20 text-slate-400';
                     return (
                       <div key={s.ticker}
-                        className={`flex items-center justify-between p-2 bg-white/3 rounded-lg border transition group ${chartSymbol === s.chartSym ? "border-cyan-500/40 bg-cyan-500/5" : "border-[var(--border-subtle)] dark:border-white/[0.06] hover:border-cyan-500/20 hover:bg-cyan-500/3"}`}>
+                        className={`flex items-center justify-between p-2 bg-white/3 rounded-lg border transition group ${chartSymbol === s.chartSym ? "border-[var(--v3-info)] bg-[var(--v3-info-glow)]" : "border-[var(--border-subtle)] dark:border-white/[0.06] hover:border-[var(--v3-info)] hover:bg-[var(--v3-info-glow)]"}`}>
                         <button type="button" className="flex items-center gap-1.5 flex-1 text-end" onClick={() => setChartSymbol(s.chartSym)} aria-label={t.selectStock}>
                           <TickerLogo ticker={s.ticker} size={18} />
                           <div>
@@ -4817,7 +4830,7 @@ export default function SwingEdge() {
                           {price != null ? (
                             <div>
                               <div className="text-[11px] font-mono font-bold text-slate-200">${typeof price === 'number' ? price.toFixed(2) : price}</div>
-                              <div className={`text-[9px] font-mono font-semibold flex items-center justify-end gap-0.5 ${changePct>=0?"text-[#10b981]":"text-[#ef4444]"}`}>
+                              <div className={`text-[9px] font-mono font-semibold flex items-center justify-end gap-0.5 ${changePct>=0?"text-[var(--v3-accent)]":"text-[var(--v3-loss)]"}`}>
                                 {changePct>=0?<ArrowUpRight size={8}/>:<ArrowDownRight size={8}/>}
                                 {changePct>=0?"+":""}{typeof changePct === 'number' ? changePct.toFixed(2) : changePct}%
                               </div>
@@ -4844,7 +4857,7 @@ export default function SwingEdge() {
             </div>
 
             {/* ── MARKET OVERVIEW ── weekly change across indices, sectors & themes */}
-            <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
+            <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
               <div className="flex items-center gap-2 mb-4">
                 <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">{t.mo_title}</span>
                 <span className={`w-1.5 h-1.5 rounded-full ${pulse ? "bg-emerald-400" : "bg-emerald-700"} transition-colors`} />
