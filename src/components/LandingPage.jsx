@@ -58,6 +58,10 @@ const STR = {
       { n: "02", title: "המערכת לומדת אותך", body: "כל עסקה מלמדת את ה-AI מי אתה — הדפוסים, החוזקות, והמקומות שאתה נופל בהם שוב ושוב." },
       { n: "03", title: "מקבל את המראה", body: "בזמן אמת, על כל עסקה: מה עבד לך היסטורית, ומה שרף. אתה מחליט — עם דאטה, לא עם תחושת בטן." },
     ],
+    flagLine: "הצטרף לדור החדש של הסוחרים.",
+    knowledgeKicker: "מנוע הידע",
+    knowledgeTitle: "המאמן שקרא את הספרים",
+    knowledgeBody: "כל אזהרה, כל דפוס, כל המלצה — נשענים על המתודולוגיות שבנו את הטריידינג המודרני.",
     quote: "תוך חודש הבנתי שאני מפסיד תמיד באותה שעה ובאותו setup. SwingEdge הראה לי את זה במראה. הפסקתי — ה-Win Rate קפץ.",
     quoteName: "סוחר סווינג", quoteRole: "Beta · 3 חודשים",
     pricingKicker: "מחירים",
@@ -143,6 +147,10 @@ const STR = {
       { n: "02", title: "The system learns you", body: "Every trade teaches the AI who you are — the patterns, the strengths, and the places you fall into again and again." },
       { n: "03", title: "Get the mirror", body: "In real time, on every trade: what worked for you historically, and what burned. You decide — with data, not a gut feeling." },
     ],
+    flagLine: "Join the new generation of traders.",
+    knowledgeKicker: "The knowledge engine",
+    knowledgeTitle: "The coach that read the books",
+    knowledgeBody: "Every warning, every pattern, every nudge — grounded in the methodologies that built modern trading.",
     quote: "Within a month I realized I always lose at the same hour, on the same setup. SwingEdge held up the mirror. I stopped — my Win Rate jumped.",
     quoteName: "Swing trader", quoteRole: "Beta · 3 months",
     pricingKicker: "Pricing",
@@ -236,6 +244,10 @@ const TRUST = {
     { show: "1", label: "AI agent that knows you" },
   ],
 };
+
+// Methodologies the coach's knowledge engine is grounded in. Proper nouns —
+// identical in both languages.
+const SOURCES = ["Minervini", "O'Neil", "Bulkowski", "Douglas", "Wyckoff", "Qullamaggie"];
 
 /* ============================================================
    Trading-term glossary + inline highlighter.
@@ -810,7 +822,7 @@ export default function LandingPage() {
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
           <div data-reveal="" style={{ textAlign: "center", maxWidth: 760, margin: "0 auto 48px" }}>
             <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#039E26", marginBottom: 14 }}>{L.problemKicker}</div>
-            <h2 style={{ fontSize: "clamp(30px,4.6vw,52px)", lineHeight: 1.08, letterSpacing: "-0.03em", fontWeight: 800, margin: 0 }}>{L.problemTitlePre}<span style={{ color: "#E5484D" }}>{L.problemTitleHi}</span></h2>
+            <h2 className="se-serif" style={{ fontSize: "clamp(30px,4.6vw,52px)", lineHeight: 1.08, letterSpacing: "-0.03em", fontWeight: 400, margin: 0 }}>{L.problemTitlePre}<span style={{ color: "#E5484D" }}>{L.problemTitleHi}</span></h2>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 20 }}>
             {L.problemCards.map((c) => (
@@ -898,6 +910,11 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ============ FLAG LINE ============ */}
+      <section style={{ background: "#070B0A", color: "#fff", padding: "clamp(48px,6vw,84px) clamp(16px,4vw,40px)", textAlign: "center" }}>
+        <p data-reveal="" className="se-serif" style={{ maxWidth: 820, margin: "0 auto", fontSize: "clamp(24px,3.4vw,42px)", lineHeight: 1.25, letterSpacing: "-0.02em" }}>{L.flagLine}</p>
+      </section>
+
       {/* ============ HOW IT WORKS ============ */}
       <section id="how" style={{ background: "#fff", borderTop: "1px solid rgba(21,32,26,0.06)", borderBottom: "1px solid rgba(21,32,26,0.06)", padding: "clamp(64px,8vw,110px) clamp(16px,4vw,40px)" }}>
         <div style={{ maxWidth: 1180, margin: "0 auto" }}>
@@ -966,11 +983,25 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ============ KNOWLEDGE ENGINE ============ */}
+      <section style={{ padding: "clamp(56px,7vw,96px) clamp(16px,4vw,40px)" }}>
+        <div data-reveal="" style={{ maxWidth: 820, margin: "0 auto", textAlign: "center" }}>
+          <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#039E26", marginBottom: 14 }}>{L.knowledgeKicker}</div>
+          <h2 style={{ fontSize: "clamp(26px,4vw,44px)", lineHeight: 1.1, letterSpacing: "-0.03em", fontWeight: 800, margin: "0 0 14px" }}>{L.knowledgeTitle}</h2>
+          <p style={{ fontSize: "clamp(15px,1.7vw,17px)", lineHeight: 1.6, color: "#5b6b62", maxWidth: 620, margin: "0 auto" }}>{L.knowledgeBody}</p>
+          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 10, marginTop: 26 }}>
+            {SOURCES.map((s) => (
+              <span key={s} style={{ display: "inline-block", padding: "8px 15px", borderRadius: 999, background: "rgba(21,32,26,0.05)", border: "1px solid rgba(21,32,26,0.10)", color: "#3c4a42", fontSize: 13.5, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace" }}>{s}</span>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ============ QUOTE ============ */}
       <section style={{ padding: "clamp(64px,8vw,110px) clamp(16px,4vw,40px)" }}>
         <div data-reveal="" style={{ maxWidth: 900, margin: "0 auto", textAlign: "center" }}>
           <div style={{ fontSize: 60, lineHeight: 0.6, color: "#CBD5CE", fontWeight: 800, marginBottom: 10 }}>”</div>
-          <blockquote style={{ fontSize: "clamp(22px,3.2vw,36px)", lineHeight: 1.32, letterSpacing: "-0.02em", fontWeight: 800, margin: "0 0 26px", color: "#15201A" }}>{renderTerms(L.quote, lang, "light")}</blockquote>
+          <blockquote className="se-serif" style={{ fontSize: "clamp(22px,3.2vw,36px)", lineHeight: 1.32, letterSpacing: "-0.02em", fontWeight: 400, fontStyle: "italic", margin: "0 0 26px", color: "#15201A" }}>{renderTerms(L.quote, lang, "light")}</blockquote>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 12 }}>
             <span style={{ width: 42, height: 42, borderRadius: "50%", background: "#E4EAE6", border: "1px solid rgba(21,32,26,0.08)" }} />
             <span style={{ textAlign: "start" }}>
