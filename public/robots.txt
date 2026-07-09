@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 Disallow: /app
-Sitemap: https://swing-edge.vercel.app/sitemap.xml
+Sitemap: https://swing-edge.com/sitemap.xml
