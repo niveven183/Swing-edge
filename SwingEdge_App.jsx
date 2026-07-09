@@ -3887,7 +3887,7 @@ export default function SwingEdge() {
               </div>
 
               {/* Inputs */}
-              <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5 space-y-4">
+              <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-semibold tracking-widest uppercase text-slate-500">{t.riskParams}</span>
                   <button onClick={handlePosCalcReset}
@@ -3962,7 +3962,7 @@ export default function SwingEdge() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1 flex items-center gap-1">
-                      <ArrowUpRight size={10} className="text-[#10b981]" /> {t.entryPrice}
+                      <ArrowUpRight size={10} className="text-[var(--v3-accent)]" /> {t.entryPrice}
                     </label>
                     <input
                       value={posCalc.entry}
@@ -3971,12 +3971,12 @@ export default function SwingEdge() {
                       type="number"
                       min="0"
                       step="0.01"
-                      className="w-full bg-white/5 border border-[#10b981]/20 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-[#10b981]/50 focus:outline-none focus:ring-1 focus:ring-[#10b981]/20 transition font-mono"
+                      className="w-full bg-white/5 border border-[var(--v3-accent)]/20 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-[var(--v3-accent)]/50 focus:outline-none focus:ring-1 focus:ring-[var(--v3-accent)]/20 transition font-mono"
                     />
                   </div>
                   <div>
                     <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1 flex items-center gap-1">
-                      <ArrowDownRight size={10} className="text-[#ef4444]" /> {t.stopLossPrice}
+                      <ArrowDownRight size={10} className="text-[var(--v3-loss)]" /> {t.stopLossPrice}
                     </label>
                     <input
                       value={posCalc.stop}
@@ -3985,7 +3985,7 @@ export default function SwingEdge() {
                       type="number"
                       min="0"
                       step="0.01"
-                      className="w-full bg-white/5 border border-[#ef4444]/20 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-[#ef4444]/50 focus:outline-none focus:ring-1 focus:ring-[#ef4444]/20 transition font-mono"
+                      className="w-full bg-white/5 border border-[var(--v3-loss)]/20 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-[var(--v3-loss)]/50 focus:outline-none focus:ring-1 focus:ring-[var(--v3-loss)]/20 transition font-mono"
                     />
                   </div>
                 </div>
@@ -3996,7 +3996,7 @@ export default function SwingEdge() {
                 <div className="space-y-3">
                   <span className="text-[10px] font-semibold tracking-widest uppercase text-slate-500">{t.calcResults}</span>
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-cyan-500/25 rounded-xl p-4 flex flex-col gap-1">
+                    <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-cyan-500/25 rounded-xl p-4 flex flex-col gap-1">
                       <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase tracking-widest">
                         <Hash size={10} className="text-cyan-400" /> {t.sharesToBuy}
                       </div>
@@ -4004,23 +4004,23 @@ export default function SwingEdge() {
                       <div className="text-xs text-slate-600">{t.sharesToBuyDesc}</div>
                     </div>
 
-                    <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[#ef4444]/25 rounded-xl p-4 flex flex-col gap-1">
+                    <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--v3-loss)]/25 rounded-xl p-4 flex flex-col gap-1">
                       <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase tracking-widest">
-                        <AlertTriangle size={10} className="text-[#ef4444]" /> {t.riskInDollars}
+                        <AlertTriangle size={10} className="text-[var(--v3-loss)]" /> {t.riskInDollars}
                       </div>
-                      <div className="text-2xl font-bold font-mono text-[#ef4444]">${riskDollars.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                      <div className="text-2xl font-bold font-mono text-[var(--v3-loss)]">${riskDollars.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                       <div className="text-xs text-slate-600">{riskN}% {t.ofCapital}</div>
                     </div>
 
-                    <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[#10b981]/25 rounded-xl p-4 flex flex-col gap-1">
+                    <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--v3-accent)]/25 rounded-xl p-4 flex flex-col gap-1">
                       <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase tracking-widest">
-                        <DollarSign size={10} className="text-[#10b981]" /> {t.positionSize}
+                        <DollarSign size={10} className="text-[var(--v3-accent)]" /> {t.positionSize}
                       </div>
-                      <div className="text-2xl font-bold font-mono text-[#10b981]">${posValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                      <div className="text-2xl font-bold font-mono text-[var(--v3-accent)]">${posValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                       <div className="text-xs text-slate-600">{shares} × ${entN.toFixed(2)}</div>
                     </div>
 
-                    <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-violet-500/25 rounded-xl p-4 flex flex-col gap-1">
+                    <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-violet-500/25 rounded-xl p-4 flex flex-col gap-1">
                       <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase tracking-widest">
                         <Percent size={10} className="text-violet-400" /> {t.portfolioPct}
                       </div>
@@ -4049,7 +4049,7 @@ export default function SwingEdge() {
                   </button>
                 </div>
               ) : (
-                <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-8 text-center">
+                <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-8 text-center">
                   <Calculator size={32} className="text-slate-700 mx-auto mb-3" />
                   <p className="text-sm text-slate-600">
                     {entN > 0 && stopN > 0 && entN === stopN ? t.stopEqualsEntry : t.enterDataToCalc}
