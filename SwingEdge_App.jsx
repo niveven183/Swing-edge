@@ -2792,7 +2792,7 @@ export default function SwingEdge() {
             {/* Mini Equity + Open Positions */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Equity mini */}
-              <div className="md:col-span-2 bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
+              <div className="md:col-span-2 bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Equity Curve</span>
                   <span className="text-xs text-cyan-400 font-mono">{equityCurve.length} data pts</span>
@@ -2801,22 +2801,22 @@ export default function SwingEdge() {
                   <AreaChart data={equityCurve}>
                     <defs>
                       <linearGradient id="eqGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.3} />
-                        <stop offset="100%" stopColor="#06b6d4" stopOpacity={0} />
+                        <stop offset="0%" stopColor="var(--v3-info)" stopOpacity={0.3} />
+                        <stop offset="100%" stopColor="var(--v3-info)" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" />
-                    <XAxis dataKey="date" tick={{ fontSize: 9, fill: "#475569" }} tickLine={false} axisLine={false} />
-                    <YAxis domain={["auto", "auto"]} tick={{ fontSize: 9, fill: "#475569" }} tickLine={false} axisLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
-                    <ReferenceLine y={capital} stroke="#475569" strokeDasharray="4 4" />
-                    <Tooltip contentStyle={{ background: "#0d1424", border: "1px solid #162032", borderRadius: 8, fontSize: 11 }} formatter={(v) => [`$${v.toLocaleString()}`, "Equity"]} />
-                    <Area type="monotone" dataKey="equity" stroke="#06b6d4" strokeWidth={2} fill="url(#eqGrad)" dot={{ fill: "#06b6d4", r: 3 }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
+                    <XAxis dataKey="date" tick={{ fontSize: 9, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} />
+                    <YAxis domain={["auto", "auto"]} tick={{ fontSize: 9, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
+                    <ReferenceLine y={capital} stroke="var(--v3-text-lo)" strokeDasharray="4 4" />
+                    <Tooltip contentStyle={{ background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 8, fontSize: 11 }} formatter={(v) => [`$${v.toLocaleString()}`, "Equity"]} />
+                    <Area type="monotone" dataKey="equity" stroke="var(--v3-info)" strokeWidth={2} fill="url(#eqGrad)" dot={{ fill: "var(--v3-info)", r: 3 }} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
 
               {/* Open trades */}
-              <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
+              <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">{t.openPositions}</span>
                   <span className="text-xs bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded-full border border-cyan-500/20">{openTrades.length}</span>
@@ -2839,7 +2839,7 @@ export default function SwingEdge() {
                             <span className="font-bold text-sm text-white font-mono">{tr.ticker}</span>
                           </div>
                           <div className="flex items-center gap-1.5">
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${tr.side === "LONG" ? "bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20" : "bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20"}`}>{tr.side}</span>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${tr.side === "LONG" ? "bg-[var(--v3-accent)]/10 text-[var(--v3-accent)] border border-[var(--v3-accent)]/20" : "bg-[var(--v3-loss)]/10 text-[var(--v3-loss)] border border-[var(--v3-loss)]/20"}`}>{tr.side}</span>
                             <button onClick={() => { setShowAlertInput(showAlertInput === tr.id ? null : tr.id); setAlertInputValue(priceAlerts[tr.ticker] ? String(priceAlerts[tr.ticker]) : ""); }}
                               className={`text-[10px] p-0.5 rounded ${priceAlerts[tr.ticker] ? "text-amber-400" : "text-slate-600 hover:text-amber-400"} transition`}
                               title={t.priceAlert}>
@@ -2863,18 +2863,18 @@ export default function SwingEdge() {
                         <div className="mt-1 grid grid-cols-2 gap-x-3 text-[10px] text-slate-500 font-mono">
                           <span>Entry <span className="text-slate-300">${tr.entry}</span></span>
                           <span>Now <span className={currentPrice ? "text-cyan-300 font-bold" : "text-slate-600"}>{currentPrice ? `$${currentPrice.toFixed(2)}` : "..."}</span></span>
-                          <span>Stop <span className="text-[#ef4444]">${tr.stop}</span></span>
-                          <span>P&L <span className={livePnl !== null ? (livePnl >= 0 ? "text-[#10b981] font-bold" : "text-[#ef4444] font-bold") : "text-slate-600"}>{livePnl !== null ? fmt$(Math.round(livePnl)) : "..."}</span></span>
+                          <span>Stop <span className="text-[var(--v3-loss)]">${tr.stop}</span></span>
+                          <span>P&L <span className={livePnl !== null ? (livePnl >= 0 ? "text-[var(--v3-accent)] font-bold" : "text-[var(--v3-loss)] font-bold") : "text-slate-600"}>{livePnl !== null ? fmt$(Math.round(livePnl)) : "..."}</span></span>
                         </div>
                         {livePnlPct !== null && (
                           <div className="mt-1.5 h-1 bg-white/5 rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full transition-all ${livePnl >= 0 ? "bg-gradient-to-r from-[#10b981] to-cyan-500" : "bg-gradient-to-r from-[#ef4444] to-rose-500"}`}
+                            <div className={`h-full rounded-full transition-all ${livePnl >= 0 ? "bg-gradient-to-r from-[var(--v3-accent)] to-cyan-500" : "bg-gradient-to-r from-[var(--v3-loss)] to-rose-500"}`}
                               style={{ width: `${Math.min(Math.abs(livePnlPct) * 10, 100)}%` }} />
                           </div>
                         )}
                         <div className="mt-2 flex justify-end">
                           <button onClick={() => { setClosingTrade(tr); setShowCloseForm(true); }}
-                            className="text-[10px] px-2 py-1 rounded bg-[#ef4444]/10 border border-[#ef4444]/20 text-[#ef4444] hover:opacity-80 transition">
+                            className="text-[10px] px-2 py-1 rounded bg-[var(--v3-loss)]/10 border border-[var(--v3-loss)]/20 text-[var(--v3-loss)] hover:opacity-80 transition">
                             Close
                           </button>
                         </div>
@@ -2889,7 +2889,7 @@ export default function SwingEdge() {
             </div>
 
             {/* Recent Closed */}
-            <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
+            <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Recent Closed Trades</span>
               </div>
@@ -2910,12 +2910,12 @@ export default function SwingEdge() {
                         <tr key={t.id} className="border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors">
                           <td className="py-2 pe-4 font-bold text-white font-mono"><div className="flex items-center gap-1.5"><TickerLogo ticker={t.ticker} size={16} />{t.ticker}</div></td>
                           <td className="py-2 pe-4 text-slate-500">{t.date}</td>
-                          <td className="py-2 pe-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side==="LONG"?"bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20":"bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20"}`}>{t.side}</span></td>
+                          <td className="py-2 pe-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side==="LONG"?"bg-[var(--v3-accent)]/10 text-[var(--v3-accent)] border border-[var(--v3-accent)]/20":"bg-[var(--v3-loss)]/10 text-[var(--v3-loss)] border border-[var(--v3-loss)]/20"}`}>{t.side}</span></td>
                           <td className="py-2 pe-4 font-mono text-slate-300">${t.entry}</td>
                           <td className="py-2 pe-4 font-mono text-slate-300">${t.exit}</td>
                           <td className="py-2 pe-4 font-mono text-slate-400">{t.shares}</td>
-                          <td className={`py-2 pe-4 font-bold font-mono ${win ? "text-[#10b981]" : "text-[#ef4444]"}`}>{fmt$(Math.round(pnl))}</td>
-                          <td className={`py-2 pe-4 font-bold font-mono ${rMultiple >= 0 ? "text-cyan-400" : "text-[#ef4444]"}`}>{fmtR(rMultiple)}</td>
+                          <td className={`py-2 pe-4 font-bold font-mono ${win ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>{fmt$(Math.round(pnl))}</td>
+                          <td className={`py-2 pe-4 font-bold font-mono ${rMultiple >= 0 ? "text-cyan-400" : "text-[var(--v3-loss)]"}`}>{fmtR(rMultiple)}</td>
                           <td className="py-2 pe-4"><span className="inline-flex items-center gap-1"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">{t.setup}</span><SetupTagTip setup={t.setup} isRTL={isRTL} /></span></td>
                         </tr>
                       );
@@ -2944,18 +2944,18 @@ export default function SwingEdge() {
               const isWarning = totalRiskPct > MAX_RISK_PCT * 0.7;
 
               const meterColor = isOverLimit
-                ? { bar: "bg-[#ef4444]", text: "text-[#ef4444]", border: "border-[#ef4444]/30", bg: "bg-[#ef4444]/8" }
+                ? { bar: "bg-[var(--v3-loss)]", text: "text-[var(--v3-loss)]", border: "border-[var(--v3-loss)]/30", bg: "bg-[var(--v3-loss)]/8" }
                 : isWarning
                 ? { bar: "bg-amber-400", text: "text-amber-400", border: "border-amber-400/30", bg: "bg-amber-400/8" }
-                : { bar: "bg-[#10b981]", text: "text-[#10b981]", border: "border-[#10b981]/30", bg: "bg-[#10b981]/8" };
+                : { bar: "bg-[var(--v3-accent)]", text: "text-[var(--v3-accent)]", border: "border-[var(--v3-accent)]/30", bg: "bg-[var(--v3-accent)]/8" };
 
               return (
                 <div className="space-y-4">
                   {/* Alert banner */}
                   {isOverLimit && (
-                    <div className="flex items-center gap-3 bg-[#ef4444]/10 border border-[#ef4444]/30 rounded-xl px-4 py-3">
-                      <AlertTriangle size={15} className="text-[#ef4444] shrink-0" />
-                      <span className="text-xs text-[#ef4444] font-semibold">
+                    <div className="flex items-center gap-3 bg-[var(--v3-loss)]/10 border border-[var(--v3-loss)]/30 rounded-xl px-4 py-3">
+                      <AlertTriangle size={15} className="text-[var(--v3-loss)] shrink-0" />
+                      <span className="text-xs text-[var(--v3-loss)] font-semibold">
                         {t.warningRiskOver}
                       </span>
                     </div>
@@ -2973,7 +2973,7 @@ export default function SwingEdge() {
                   {/* KPI cards + meter */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {/* Total open risk */}
-                    <div className={`bg-[var(--bg-elevated)] dark:bg-[#0d1424] border rounded-xl p-4 ${meterColor.border}`}>
+                    <div className={`bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border rounded-xl p-4 ${meterColor.border}`}>
                       <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 block mb-1">{t.totalOpenRisk}</span>
                       <span className={`text-2xl font-bold font-mono ${meterColor.text}`}>{totalRiskPct.toFixed(2)}%</span>
                       <span className="text-xs text-slate-500 block mt-0.5 font-mono">${totalRiskDollar.toFixed(2)}</span>
@@ -2981,7 +2981,7 @@ export default function SwingEdge() {
                     </div>
 
                     {/* Max allowed risk */}
-                    <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
+                    <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
                       <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mb-1 flex items-center gap-1">{t.maxAllowedRisk}<TermTooltip term="riskLimits" lang={lang} /></span>
                       <span className="text-2xl font-bold font-mono text-violet-400">{MAX_RISK_PCT.toFixed(1)}%</span>
                       <span className="text-xs text-slate-500 block mt-0.5 font-mono">${maxRiskDollar.toFixed(2)}</span>
@@ -2989,7 +2989,7 @@ export default function SwingEdge() {
                     </div>
 
                     {/* Visual risk meter */}
-                    <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
+                    <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
                       <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 block mb-3">{t.riskMeter}</span>
                       <div className="relative">
                         {/* Meter bar background */}
@@ -3003,7 +3003,7 @@ export default function SwingEdge() {
                         <div className="flex justify-between mt-1.5 text-[9px] text-slate-600 font-mono">
                           <span>0%</span>
                           <span className="text-amber-600/80">70%</span>
-                          <span className="text-[#ef4444]/80">100% ({MAX_RISK_PCT}%)</span>
+                          <span className="text-[var(--v3-loss)]/80">100% ({MAX_RISK_PCT}%)</span>
                         </div>
                         {/* Zone lines */}
                         <div className="absolute top-0 left-0 w-full h-4 pointer-events-none">
@@ -3022,7 +3022,7 @@ export default function SwingEdge() {
 
                   {/* Per-trade risk table */}
                   {openRisks.length > 0 && (
-                    <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
+                    <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
                       <span className="text-xs font-semibold tracking-widest uppercase text-slate-500 block mb-3">{t.riskPerTrade}</span>
                       <div className="overflow-x-auto">
                         <table className="w-full text-xs">
@@ -3036,26 +3036,26 @@ export default function SwingEdge() {
                           <tbody>
                             {openRisks.map(t => {
                               const rowColor = t.riskPct > MAX_RISK_PCT
-                                ? "text-[#ef4444]"
+                                ? "text-[var(--v3-loss)]"
                                 : t.riskPct > MAX_RISK_PCT * 0.5
                                 ? "text-amber-400"
-                                : "text-[#10b981]";
+                                : "text-[var(--v3-accent)]";
                               const barColor = t.riskPct > MAX_RISK_PCT
-                                ? "bg-[#ef4444]"
+                                ? "bg-[var(--v3-loss)]"
                                 : t.riskPct > MAX_RISK_PCT * 0.5
                                 ? "bg-amber-400"
-                                : "bg-[#10b981]";
+                                : "bg-[var(--v3-accent)]";
                               const barWidth = Math.min((t.riskPct / MAX_RISK_PCT) * 100, 100);
                               return (
                                 <tr key={t.id} className="border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors">
                                   <td className="py-2 pe-4 font-bold text-white font-mono">{t.ticker}</td>
                                   <td className="py-2 pe-4">
-                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side === "LONG" ? "bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20" : "bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20"}`}>
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side === "LONG" ? "bg-[var(--v3-accent)]/10 text-[var(--v3-accent)] border border-[var(--v3-accent)]/20" : "bg-[var(--v3-loss)]/10 text-[var(--v3-loss)] border border-[var(--v3-loss)]/20"}`}>
                                       {t.side}
                                     </span>
                                   </td>
                                   <td className="py-2 pe-4 font-mono text-slate-300">${t.entry}</td>
-                                  <td className="py-2 pe-4 font-mono text-[#ef4444]">${t.stop}</td>
+                                  <td className="py-2 pe-4 font-mono text-[var(--v3-loss)]">${t.stop}</td>
                                   <td className="py-2 pe-4 font-mono text-slate-400">{t.shares}</td>
                                   <td className={`py-2 pe-4 font-bold font-mono ${rowColor}`}>${t.riskDollar.toFixed(2)}</td>
                                   <td className={`py-2 pe-4 font-bold font-mono ${rowColor}`}>{t.riskPct.toFixed(2)}%</td>
