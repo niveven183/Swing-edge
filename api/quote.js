@@ -134,7 +134,10 @@ async function finnhubResult(symbol, key) {
   if (!key) return null;
   const url = `${FINNHUB_BASE}/quote?symbol=${encodeURIComponent(symbol)}&token=${key}`;
   const r = await fetchWithTimeout(url, { headers: { Accept: "application/json" } });
-  if (!r.ok) return null;
+  if (!r.ok) {
+    console.error(`Finnhub quote failed: HTTP ${r.status}`);
+    return null;
+  }
   const d = await r.json();
   if (!d || typeof d.c !== "number" || d.c === 0) return null;
   const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
