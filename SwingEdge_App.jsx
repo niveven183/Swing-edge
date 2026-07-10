@@ -5466,16 +5466,16 @@ export default function SwingEdge() {
       {/* ── TRADE ENTRY MODAL ── */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div ref={logModalRef} role="dialog" aria-modal="true" aria-labelledby={logTitleId} tabIndex={-1} className="w-full max-w-2xl bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col focus:outline-none">
+          <div ref={logModalRef} role="dialog" aria-modal="true" aria-labelledby={logTitleId} tabIndex={-1} className="w-full max-w-2xl bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-[var(--v3-line)] rounded-[var(--v3-radius-card)] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col focus:outline-none">
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-gradient-to-r from-cyan-500/5 to-violet-500/5">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-subtle)] dark:border-[var(--v3-line)] bg-gradient-to-r from-[var(--v3-accent-glow)] to-[var(--v3-purple-glow)]">
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-cyan-400 to-violet-500 flex items-center justify-center">
+                <div className="w-6 h-6 rounded-[var(--v3-radius-chip)] bg-gradient-to-br from-[var(--v3-accent)] to-[var(--v3-purple)] flex items-center justify-center">
                   <Plus size={12} className="text-white" />
                 </div>
                 <span id={logTitleId} className="text-sm font-bold text-white">Log New Trade</span>
               </div>
-              <button onClick={()=>setShowForm(false)} aria-label={lang === "he" ? "סגור" : "Close"} className="text-slate-600 hover:text-slate-300 transition">
+              <button onClick={()=>setShowForm(false)} aria-label={lang === "he" ? "סגור" : "Close"} className="text-[var(--v3-text-lo)] hover:text-[var(--v3-text-mid)] transition">
                 <X size={16} />
               </button>
             </div>
@@ -5484,16 +5484,16 @@ export default function SwingEdge() {
               {/* Row 1 */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="log-ticker" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Ticker *</label>
+                  <label htmlFor="log-ticker" className="text-[10px] text-[var(--v3-text-lo)] tracking-widest uppercase block mb-1">Ticker *</label>
                   <input id="log-ticker" value={form.ticker} onChange={e=>setForm(f=>({...f,ticker:e.target.value.toUpperCase()}))}
-                    placeholder="e.g. AAPL" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono font-bold tracking-wider" />
+                    placeholder="e.g. AAPL" className="w-full bg-white/5 border border-[var(--border-subtle)] dark:border-[var(--v3-line)] rounded-[var(--v3-radius-chip)] px-3 py-2 text-sm text-white placeholder-[var(--v3-text-lo)] focus:border-[var(--v3-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--v3-accent-glow)] transition font-mono font-bold tracking-wider" />
                 </div>
                 <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Direction</label>
+                  <label className="text-[10px] text-[var(--v3-text-lo)] tracking-widest uppercase block mb-1">Direction</label>
                   <div className="flex gap-2">
                     {["LONG","SHORT"].map(s=>(
                       <button key={s} onClick={()=>setForm(f=>({...f,side:s}))}
-                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition border ${form.side===s?(s==="LONG"?"bg-[#10b981]/20 text-[#10b981] border-[#10b981]/30":"bg-[#ef4444]/20 text-[#ef4444] border-[#ef4444]/30"):"bg-white/3 text-slate-500 border-white/10 hover:border-white/20"}`}>
+                        className={`flex-1 py-2 rounded-[var(--v3-radius-chip)] text-xs font-bold transition border ${form.side===s?(s==="LONG"?"bg-[var(--v3-accent)]/20 text-[var(--v3-accent)] border-[var(--v3-accent)]/30":"bg-[var(--v3-loss)]/20 text-[var(--v3-loss)] border-[var(--v3-loss)]/30"):"bg-white/3 text-[var(--v3-text-lo)] border-[var(--v3-line)] hover:border-white/20"}`}>
                         {s==="LONG"?<span className="flex items-center justify-center gap-1"><TrendingUp size={11}/>{s}</span>:<span className="flex items-center justify-center gap-1"><TrendingDown size={11}/>{s}</span>}
                       </button>
                     ))}
@@ -5507,7 +5507,7 @@ export default function SwingEdge() {
                 const q = formQuote;
                 const marketOpen = (formQuote?.marketState || marketState) === MARKET_STATE.OPEN;
                 return (
-                  <div className="bg-white/3 border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-3">
+                  <div className="bg-white/3 border border-[var(--border-subtle)] dark:border-[var(--v3-line)] rounded-[var(--v3-radius-chip)] p-3">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <span
@@ -5520,7 +5520,7 @@ export default function SwingEdge() {
                           <span className="text-sm font-mono font-bold text-white">${q.price.toFixed(2)}</span>
                         )}
                         {q?.changePct != null && (
-                          <span className={`text-[11px] font-mono ${q.changePct >= 0 ? "text-[#10b981]" : "text-[#ef4444]"}`}>
+                          <span className={`text-[11px] font-mono ${q.changePct >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>
                             {q.changePct >= 0 ? "+" : ""}{q.changePct.toFixed(2)}%
                           </span>
                         )}
@@ -5530,27 +5530,27 @@ export default function SwingEdge() {
                         disabled={formQuoteLoading}
                         title="Refresh price"
                         aria-label={lang === "he" ? "רענן מחיר" : "Refresh price"}
-                        className="text-slate-400 hover:text-cyan-400 transition p-1 rounded hover:bg-white/5 disabled:opacity-50"
+                        className="text-[var(--v3-text-mid)] hover:text-[var(--v3-info)] transition p-1 rounded hover:bg-white/5 disabled:opacity-50"
                       >
                         <RefreshCw size={12} className={formQuoteLoading ? "animate-spin" : ""} />
                       </button>
                     </div>
-                    <div className="grid grid-cols-5 gap-1 text-[9px] text-slate-500">
+                    <div className="grid grid-cols-5 gap-1 text-[9px] text-[var(--v3-text-lo)]">
                       <div className="text-center">
                         <div className="uppercase tracking-wider">Open</div>
-                        <div className="font-mono text-slate-300">{q?.regularMarketOpen != null ? q.regularMarketOpen.toFixed(2) : "—"}</div>
+                        <div className="font-mono text-[var(--v3-text-mid)]">{q?.regularMarketOpen != null ? q.regularMarketOpen.toFixed(2) : "—"}</div>
                       </div>
                       <div className="text-center">
                         <div className="uppercase tracking-wider">High</div>
-                        <div className="font-mono text-[#10b981]">{q?.regularMarketDayHigh != null ? q.regularMarketDayHigh.toFixed(2) : "—"}</div>
+                        <div className="font-mono text-[var(--v3-accent)]">{q?.regularMarketDayHigh != null ? q.regularMarketDayHigh.toFixed(2) : "—"}</div>
                       </div>
                       <div className="text-center">
                         <div className="uppercase tracking-wider">Low</div>
-                        <div className="font-mono text-[#ef4444]">{q?.regularMarketDayLow != null ? q.regularMarketDayLow.toFixed(2) : "—"}</div>
+                        <div className="font-mono text-[var(--v3-loss)]">{q?.regularMarketDayLow != null ? q.regularMarketDayLow.toFixed(2) : "—"}</div>
                       </div>
                       <div className="text-center">
                         <div className="uppercase tracking-wider">Pre</div>
-                        <div className="font-mono text-amber-400">{q?.preMarketPrice != null ? q.preMarketPrice.toFixed(2) : "—"}</div>
+                        <div className="font-mono text-[var(--v3-warn)]">{q?.preMarketPrice != null ? q.preMarketPrice.toFixed(2) : "—"}</div>
                       </div>
                       <div className="text-center">
                         <div className="uppercase tracking-wider">After</div>
@@ -5563,11 +5563,11 @@ export default function SwingEdge() {
 
               {/* Prices */}
               <div className="grid grid-cols-3 gap-3">
-                {[["Entry *","entry","text-white"],["Stop Loss *","stop","text-[#ef4444]"],["Target","target","text-[#10b981]"]].map(([label,key,cls])=>(
+                {[["Entry *","entry","text-white"],["Stop Loss *","stop","text-[var(--v3-loss)]"],["Target","target","text-[var(--v3-accent)]"]].map(([label,key,cls])=>(
                   <div key={key}>
-                    <label htmlFor={`log-${key}`} className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{label}</label>
+                    <label htmlFor={`log-${key}`} className="text-[10px] text-[var(--v3-text-lo)] tracking-widest uppercase block mb-1">{label}</label>
                     <input id={`log-${key}`} value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))}
-                      placeholder="0.00" className={`w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono ${cls}`} />
+                      placeholder="0.00" className={`w-full bg-white/5 border border-[var(--border-subtle)] dark:border-[var(--v3-line)] rounded-[var(--v3-radius-chip)] px-3 py-2 text-sm placeholder-[var(--v3-text-lo)] focus:border-[var(--v3-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--v3-accent-glow)] transition font-mono ${cls}`} />
                   </div>
                 ))}
               </div>
@@ -5577,17 +5577,17 @@ export default function SwingEdge() {
                 <div className="space-y-2">
                   <div className="space-y-1">
                     <div className="flex items-center gap-1.5">
-                      <Shield size={12} className="text-cyan-400/70" />
-                      <span className="text-[10px] font-semibold tracking-widest uppercase text-slate-500">{t.riskMgmtSuggestion}</span>
+                      <Shield size={12} className="text-[var(--v3-info)]/70" />
+                      <span className="text-[10px] font-semibold tracking-widest uppercase text-[var(--v3-text-lo)]">{t.riskMgmtSuggestion}</span>
                     </div>
-                    <span className="block text-[9px] text-slate-600">{t.riskMgmtSuggestionHint}</span>
+                    <span className="block text-[9px] text-[var(--v3-text-lo)]">{t.riskMgmtSuggestionHint}</span>
                   </div>
-                  <div className="grid grid-cols-4 gap-2 bg-white/3 rounded-xl p-3 border border-[var(--border-subtle)] dark:border-white/[0.06]">
+                  <div className="grid grid-cols-4 gap-2 bg-white/3 rounded-[var(--v3-radius-chip)] p-3 border border-[var(--border-subtle)] dark:border-[var(--v3-line)]">
                   <div className="text-center group">
-                    <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">Shares</div>
+                    <div className="text-[10px] text-[var(--v3-text-lo)] uppercase tracking-wider mb-0.5">Shares</div>
                     {tradeValidity.valid ? (
                       <div className="flex items-center justify-center gap-1">
-                        <Pencil size={10} aria-hidden className="shrink-0 text-slate-600 group-hover:text-slate-400 transition-colors pointer-events-none" />
+                        <Pencil size={10} aria-hidden className="shrink-0 text-[var(--v3-text-lo)] group-hover:text-[var(--v3-text-mid)] transition-colors pointer-events-none" />
                         <input
                           type="text" inputMode="numeric" aria-label={t.sharesEditable}
                           value={sharesOverrideStr !== "" ? sharesOverrideStr : String(suggestedShares)}
@@ -5597,29 +5597,29 @@ export default function SwingEdge() {
                             setForm(f => ({ ...f, shares: v }));
                           }}
                           style={{ width: `${Math.max((sharesOverrideStr !== "" ? sharesOverrideStr : String(suggestedShares)).length, 1) + 1}ch` }}
-                          className={`min-w-0 text-center text-sm font-bold font-mono !bg-transparent rounded px-0.5 focus:outline-none ${posSizeTooSmall?"!text-amber-400":"!text-cyan-400"}`}
+                          className={`min-w-0 text-center text-sm font-bold font-mono !bg-transparent rounded px-0.5 focus:outline-none ${posSizeTooSmall?"!text-[var(--v3-warn)]":"!text-[var(--v3-info)]"}`}
                         />
                       </div>
                     ) : (
-                      <div className="text-sm font-bold font-mono text-slate-500">—</div>
+                      <div className="text-sm font-bold font-mono text-[var(--v3-text-lo)]">—</div>
                     )}
                   </div>
                   <div className="text-center">
-                    <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">Pos. Value</div>
-                    <div className={`text-sm font-bold font-mono truncate ${tradeValidity.valid?"text-white":"text-slate-500"}`}>{tradeValidity.valid?`$${effPosValue.toLocaleString()}`:"—"}</div>
+                    <div className="text-[10px] text-[var(--v3-text-lo)] uppercase tracking-wider mb-0.5">Pos. Value</div>
+                    <div className={`text-sm font-bold font-mono truncate ${tradeValidity.valid?"text-white":"text-[var(--v3-text-lo)]"}`}>{tradeValidity.valid?`$${effPosValue.toLocaleString()}`:"—"}</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">Max Risk</div>
-                    <div className={`text-sm font-bold font-mono truncate ${tradeValidity.valid?"text-[#ef4444]":"text-slate-500"}`}>{tradeValidity.valid?`$${Math.round(effPotLoss).toLocaleString()}`:"—"}</div>
+                    <div className="text-[10px] text-[var(--v3-text-lo)] uppercase tracking-wider mb-0.5">Max Risk</div>
+                    <div className={`text-sm font-bold font-mono truncate ${tradeValidity.valid?"text-[var(--v3-loss)]":"text-[var(--v3-text-lo)]"}`}>{tradeValidity.valid?`$${Math.round(effPotLoss).toLocaleString()}`:"—"}</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5 flex items-center justify-center gap-1">R/R Ratio<TermTooltip term="rr" lang={lang} /></div>
-                    <div className={`text-sm font-bold font-mono ${tradeValidity.valid?(targetN>0?(rrRatio>=2?"text-[#10b981]":rrRatio>=1?"text-amber-400":"text-[#ef4444]"):"text-slate-500"):"text-slate-500"}`}>{tradeValidity.valid?(targetN>0?`${rrRatio.toFixed(2)}:1`:"–"):"—"}</div>
+                    <div className="text-[10px] text-[var(--v3-text-lo)] uppercase tracking-wider mb-0.5 flex items-center justify-center gap-1">R/R Ratio<TermTooltip term="rr" lang={lang} /></div>
+                    <div className={`text-sm font-bold font-mono ${tradeValidity.valid?(targetN>0?(rrRatio>=2?"text-[var(--v3-accent)]":rrRatio>=1?"text-[var(--v3-warn)]":"text-[var(--v3-loss)]"):"text-[var(--v3-text-lo)]"):"text-[var(--v3-text-lo)]"}`}>{tradeValidity.valid?(targetN>0?`${rrRatio.toFixed(2)}:1`:"–"):"—"}</div>
                   </div>
                   </div>
                   {hasSharesOverride && (
                     <button type="button" onClick={() => setForm(f => ({ ...f, shares: "" }))}
-                      className="flex items-center gap-1 mx-auto text-[10px] text-slate-500 hover:text-cyan-400 transition-colors">
+                      className="flex items-center gap-1 mx-auto text-[10px] text-[var(--v3-text-lo)] hover:text-[var(--v3-info)] transition-colors">
                       <RotateCcw size={10} /> {t.resetToSuggested}
                     </button>
                   )}
@@ -5628,7 +5628,7 @@ export default function SwingEdge() {
 
               {/* Invalid-input banner — single red signal when the geometry is wrong for the chosen side */}
               {entryN > 0 && stopN > 0 && !tradeValidity.valid && (
-                <div className="flex items-center gap-2 p-2.5 rounded-lg border text-xs bg-[#ef4444]/5 border-[#ef4444]/20 text-[#ef4444]">
+                <div className="flex items-center gap-2 p-2.5 rounded-[var(--v3-radius-chip)] border text-xs bg-[var(--v3-loss)]/5 border-[var(--v3-loss)]/20 text-[var(--v3-loss)]">
                   <AlertTriangle size={13} />
                   <span>{(lang === "he" ? "קלט לא תקין — " : "Invalid input — ") + (tradeValidity.reason?.[lang] || tradeValidity.reason?.en)}</span>
                 </div>
@@ -5636,7 +5636,7 @@ export default function SwingEdge() {
 
               {/* Position-too-small hint — explains why Shares/Value/Risk are 0 (R/R stays valid) */}
               {tradeValidity.valid && posSizeTooSmall && (
-                <div className="flex items-center gap-2 p-2.5 rounded-lg border text-xs bg-amber-500/5 border-amber-500/20 text-amber-400">
+                <div className="flex items-center gap-2 p-2.5 rounded-[var(--v3-radius-chip)] border text-xs bg-[var(--v3-warn)]/5 border-[var(--v3-warn)]/20 text-[var(--v3-warn)]">
                   <AlertTriangle size={13} />
                   <span>{lang === "he"
                     ? "בסיכון 1% הפוזיציה קטנה ממניה אחת — הכרטיסים מציגים מינימום של מניה אחת. הגדל הון או הדק את הסטופ. ה-R/R תקף."
@@ -5647,35 +5647,47 @@ export default function SwingEdge() {
               {/* Setup + Market — surfaced above the coach so manual entry drives the canonical line live */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="log-setup" className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">Setup Type<InfoTooltip label="Setup Type">{lang === 'he' ? CATEGORY_TOOLTIP.setup.he : CATEGORY_TOOLTIP.setup.en}</InfoTooltip></label>
+                  <label htmlFor="log-setup" className="text-[10px] text-[var(--v3-text-lo)] tracking-widest uppercase mb-1 flex items-center gap-1">Setup Type<InfoTooltip label="Setup Type">{lang === 'he' ? CATEGORY_TOOLTIP.setup.he : CATEGORY_TOOLTIP.setup.en}</InfoTooltip></label>
                   <SmartSelect id="log-setup" ariaLabel="Setup Type" value={form.setup} onChange={v=>setForm(f=>({...f,setup:v}))} dir={isRTL?'rtl':'ltr'} {...getTradeSelectProps('setup', lang)} />
                 </div>
                 <div>
-                  <label htmlFor="log-market-condition" className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">Market Condition<InfoTooltip label="Market Condition">{lang === 'he' ? CATEGORY_TOOLTIP.market.he : CATEGORY_TOOLTIP.market.en}</InfoTooltip></label>
+                  <label htmlFor="log-market-condition" className="text-[10px] text-[var(--v3-text-lo)] tracking-widest uppercase mb-1 flex items-center gap-1">Market Condition<InfoTooltip label="Market Condition">{lang === 'he' ? CATEGORY_TOOLTIP.market.he : CATEGORY_TOOLTIP.market.en}</InfoTooltip></label>
                   <SmartSelect id="log-market-condition" ariaLabel="Market Condition" value={form.marketCondition} onChange={v=>setForm(f=>({...f,marketCondition:v}))} dir={isRTL?'rtl':'ltr'} {...getTradeSelectProps('market', lang)} />
                 </div>
               </div>
 
               {/* Live Decision Coach — analyses the trade as you type (only on valid input) */}
-              {tradeValidity.valid && <DecisionCoachPanel coaching={aiCoach} lang={lang} />}
+              {/* Hero halo — wrapper glow tinted by the live verdict; reads aiCoach.verdict only, never mutates it */}
+              {tradeValidity.valid && (() => {
+                const heroTone =
+                  aiCoach?.verdict === "GO"      ? { border: "border-[var(--v3-accent)]/40", glow: "var(--shadow-lg), 0 0 40px var(--v3-accent-glow)" } :
+                  aiCoach?.verdict === "CAUTION" ? { border: "border-[var(--v3-warn)]/40",   glow: "var(--shadow-lg), 0 0 40px var(--v3-warn-glow)" }   :
+                  aiCoach?.verdict === "SKIP"    ? { border: "border-[var(--v3-loss)]/40",   glow: "var(--shadow-lg), 0 0 40px var(--v3-loss-glow)" }   :
+                                                   { border: "border-[var(--v3-accent)]/20", glow: "var(--shadow-lg)" };
+                return (
+                  <div className={`rounded-[var(--v3-radius-card)] border ${heroTone.border} p-1.5 bg-[var(--v3-accent-glow)]/30 transition-shadow`} style={{ boxShadow: heroTone.glow }}>
+                    {tradeValidity.valid && <DecisionCoachPanel coaching={aiCoach} lang={lang} />}
+                  </div>
+                );
+              })()}
 
               {/* TradingView screenshot → OCR auto-fill (top-level, mirrors the Analyzer) */}
               <div>
-                <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{t.imageFromTradingView}</label>
-                <label className="flex items-center gap-2 cursor-pointer w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-400 hover:border-cyan-500/30 hover:text-cyan-400 transition">
+                <label className="text-[10px] text-[var(--v3-text-lo)] tracking-widest uppercase block mb-1">{t.imageFromTradingView}</label>
+                <label className="flex items-center gap-2 cursor-pointer w-full bg-white/5 border border-[var(--border-subtle)] dark:border-[var(--v3-line)] rounded-[var(--v3-radius-chip)] px-3 py-2 text-xs text-[var(--v3-text-mid)] hover:border-[var(--v3-accent)]/40 hover:text-[var(--v3-accent)] transition">
                   <Eye size={12} />
                   <span>{form.tradeImage ? form.tradeImage.name : t.uploadChart}</span>
                   <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
                 </label>
-                <p className="text-[10px] text-slate-500 mt-1 leading-snug">{t.ocrTooltip}</p>
-                <p className="text-[9px] text-slate-600 mt-1 leading-snug">{lang === "he"
+                <p className="text-[10px] text-[var(--v3-text-lo)] mt-1 leading-snug">{t.ocrTooltip}</p>
+                <p className="text-[9px] text-[var(--v3-text-lo)] mt-1 leading-snug">{lang === "he"
                   ? "נשמר מקומית להפעלה זו בלבד — עדיין לא נשמר בענן."
                   : "Saved locally for this session — not stored in the cloud yet."}</p>
               </div>
 
               {/* Image preview */}
               {form.tradeImagePreview && (
-                <div className="relative rounded-lg overflow-hidden border border-white/10">
+                <div className="relative rounded-[var(--v3-radius-chip)] overflow-hidden border border-[var(--border-subtle)] dark:border-[var(--v3-line)]">
                   <img src={form.tradeImagePreview} alt="Trade chart" className="w-full h-32 object-cover" />
                   <button onClick={() => { setForm(f=>({...f,tradeImage:null,tradeImagePreview:null})); setOcrStatus(null); }}
                     aria-label={lang === "he" ? "הסר תמונה" : "Remove image"}
@@ -5692,10 +5704,10 @@ export default function SwingEdge() {
                 const high = ok && confidence >= 70;
                 const mid  = ok && confidence >= 40 && confidence < 70;
                 const tone =
-                  status === "processing" ? "bg-cyan-500/5 border-cyan-500/20 text-cyan-300" :
-                  high ? "bg-emerald-500/5 border-emerald-500/20 text-[#10b981]" :
-                  mid  ? "bg-amber-500/5 border-amber-500/20 text-amber-400" :
-                         "bg-[#ef4444]/5 border-[#ef4444]/20 text-[#ef4444]";
+                  status === "processing" ? "bg-[var(--v3-info)]/5 border-[var(--v3-info)]/20 text-[var(--v3-info)]" :
+                  high ? "bg-[var(--v3-accent)]/5 border-[var(--v3-accent)]/20 text-[var(--v3-accent)]" :
+                  mid  ? "bg-[var(--v3-warn)]/5 border-[var(--v3-warn)]/20 text-[var(--v3-warn)]" :
+                         "bg-[var(--v3-loss)]/5 border-[var(--v3-loss)]/20 text-[var(--v3-loss)]";
                 let icon, text;
                 if (status === "processing") { icon = <RefreshCw size={12} className="animate-spin" />; text = lang === "he" ? "קורא גרף…" : "Reading chart…"; }
                 else if (status === "config_error") { icon = <AlertTriangle size={12} />; text = lang === "he" ? "מפתח API חסר — פנה לאדמין" : "API key missing — contact admin"; }
@@ -5704,7 +5716,7 @@ export default function SwingEdge() {
                 else if (mid)  { icon = <CheckCircle size={12} />; text = `OCR ~ ${confidence}%`; }
                 else { icon = <AlertTriangle size={12} />; text = lang === "he" ? "לא זוהה — ודא ידנית" : "Not detected — verify manually"; }
                 return (
-                  <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-[11px] ${tone}`}>
+                  <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--v3-radius-chip)] border text-[11px] ${tone}`}>
                     {icon}<span>{text}</span>
                   </div>
                 );
@@ -5713,7 +5725,7 @@ export default function SwingEdge() {
               {/* ── Trade context (journaling metadata) — collapsed by default ── */}
               <button type="button" onClick={()=>setShowTradeContext(v=>!v)}
                 aria-expanded={showTradeContext}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-white/3 border border-[var(--border-subtle)] dark:border-white/[0.06] text-slate-400 hover:text-white hover:border-white/20 transition">
+                className="w-full flex items-center justify-between px-3 py-2 rounded-[var(--v3-radius-chip)] bg-white/3 border border-[var(--border-subtle)] dark:border-[var(--v3-line)] text-[var(--v3-text-mid)] hover:text-white hover:border-white/20 transition">
                 <span className="text-[10px] tracking-widest uppercase font-semibold">{lang === "he" ? "הקשר העסקה" : "Trade Context"}</span>
                 <ChevronDown size={14} className={`transition-transform ${showTradeContext ? "rotate-180" : ""}`} />
               </button>
@@ -5723,27 +5735,27 @@ export default function SwingEdge() {
               {/* Notes + Emotion (Setup + Market are surfaced above, next to the coach) */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="log-notes" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Notes</label>
+                  <label htmlFor="log-notes" className="text-[10px] text-[var(--v3-text-lo)] tracking-widest uppercase block mb-1">Notes</label>
                   <input id="log-notes" value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}
-                    placeholder="Trade thesis..." className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none transition" />
+                    placeholder="Trade thesis..." className="w-full bg-white/5 border border-[var(--border-subtle)] dark:border-[var(--v3-line)] rounded-[var(--v3-radius-chip)] px-3 py-2 text-sm text-white placeholder-[var(--v3-text-lo)] focus:border-[var(--v3-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--v3-accent-glow)] transition" />
                 </div>
                 <div>
-                  <label htmlFor="log-emotion" className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">Emotion at Entry<InfoTooltip label="Emotion at Entry">{lang === 'he' ? CATEGORY_TOOLTIP.emotion.he : CATEGORY_TOOLTIP.emotion.en}</InfoTooltip></label>
+                  <label htmlFor="log-emotion" className="text-[10px] text-[var(--v3-text-lo)] tracking-widest uppercase mb-1 flex items-center gap-1">Emotion at Entry<InfoTooltip label="Emotion at Entry">{lang === 'he' ? CATEGORY_TOOLTIP.emotion.he : CATEGORY_TOOLTIP.emotion.en}</InfoTooltip></label>
                   <SmartSelect id="log-emotion" ariaLabel="Emotion at Entry" value={form.emotionAtEntry} onChange={v=>setForm(f=>({...f,emotionAtEntry:v}))} dir={isRTL?'rtl':'ltr'} {...getTradeSelectProps('emotion', lang)} />
                 </div>
               </div>
 
               {/* Entry Quality (stars) */}
               <div>
-                <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Entry Quality</label>
+                <label className="text-[10px] text-[var(--v3-text-lo)] tracking-widest uppercase block mb-1">Entry Quality</label>
                 <div className="flex items-center gap-1 mt-1">
                   {[1,2,3,4,5].map(star => (
                     <button key={star} type="button" onClick={() => setForm(f=>({...f,entryQuality:star}))}
-                      className={`text-xl transition-transform hover:scale-110 ${form.entryQuality >= star ? "text-amber-400" : "text-slate-700"}`}>
+                      className={`text-xl transition-transform hover:scale-110 ${form.entryQuality >= star ? "text-[var(--v3-warn)]" : "text-slate-700"}`}>
                       ★
                     </button>
                   ))}
-                  <span className="text-[10px] text-slate-600 ms-1">{form.entryQuality}/5</span>
+                  <span className="text-[10px] text-[var(--v3-text-lo)] ms-1">{form.entryQuality}/5</span>
                 </div>
               </div>
                 </div>
@@ -5753,7 +5765,7 @@ export default function SwingEdge() {
               <div className="flex gap-2 pt-1">
                 <button onClick={handleSubmit}
                   disabled={!form.ticker || !entryN || !stopN}
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-white text-sm font-bold hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:opacity-40">
+                  className="flex-1 py-2.5 rounded-[var(--v3-radius-chip)] bg-gradient-to-r from-[var(--v3-accent)] to-[var(--v3-purple)] text-white text-sm font-bold hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:opacity-40">
                   Log Trade →
                 </button>
                 <button onClick={() => {
@@ -5762,10 +5774,10 @@ export default function SwingEdge() {
                     setFormQuote(null);
                     setFormQuoteLoading(false);
                   }}
-                  className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm hover:text-white hover:border-white/20 transition">
+                  className="px-4 py-2.5 rounded-[var(--v3-radius-chip)] bg-white/5 border border-[var(--border-subtle)] dark:border-[var(--v3-line)] text-[var(--v3-text-mid)] text-sm hover:text-white hover:border-white/20 transition">
                   {lang === "he" ? "איפוס" : "Reset"}
                 </button>
-                <button onClick={()=>setShowForm(false)} className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm hover:text-white hover:border-white/20 transition">
+                <button onClick={()=>setShowForm(false)} className="px-4 py-2.5 rounded-[var(--v3-radius-chip)] bg-white/5 border border-[var(--border-subtle)] dark:border-[var(--v3-line)] text-[var(--v3-text-mid)] text-sm hover:text-white hover:border-white/20 transition">
                   Cancel
                 </button>
               </div>
