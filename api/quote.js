@@ -128,20 +128,29 @@ function cryptoResult(id, name) {
 }
 
 // ── Finnhub ─────────────────────────────────────────────────────────────────
+// Per-symbol quote cache — mirrors _cgCache. Short TTL: stock prices move,
+// but 15s absorbs burst 429s without stale UI.
+const _fhCache = new Map(); // SYMBOL → { result, ts }
+const FH_TTL = 15_000;
+
 // Build a Yahoo-chart-shaped result for one stock/ETF from Finnhub /quote.
 // Finnhub returns c=0 for unknown symbols → treat as null (no usable price).
 async function finnhubResult(symbol, key) {
   if (!key) return null;
+  const now = Date.now();
+  const cached = _fhCache.get(symbol);
+  if (cached && now - cached.ts < FH_TTL) return cached.result; // fresh → no fetch
+
   const url = `${FINNHUB_BASE}/quote?symbol=${encodeURIComponent(symbol)}&token=${key}`;
   const r = await fetchWithTimeout(url, { headers: { Accept: "application/json" } });
   if (!r.ok) {
     console.error(`Finnhub quote failed: HTTP ${r.status}`);
-    return null;
+    return cached ? cached.result : null; // stale fallback — 15s-old price beats null
   }
   const d = await r.json();
   if (!d || typeof d.c !== "number" || d.c === 0) return null;
   const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
-  return {
+  const result = {
     meta: {
       regularMarketPrice: d.c,
       chartPreviousClose: num(d.pc),
@@ -152,6 +161,8 @@ async function finnhubResult(symbol, key) {
     },
     indicators: { quote: [{ close: [d.c] }] },
   };
+  _fhCache.set(symbol, { result, ts: now });
+  return result;
 }
 
 // Map Finnhub security type → the client's quoteType vocabulary.
