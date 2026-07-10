@@ -3496,25 +3496,25 @@ export default function SwingEdge() {
         {tab === "tools" && toolsTab === 'analyzer' && (
           <div className="space-y-5 animate-fade-in max-w-3xl mx-auto">
             <div>
-              <h2 className="text-sm font-bold text-white flex items-center gap-2"><FlaskConical size={15} className="text-violet-400" /> Trade Analyzer</h2>
-              <p className="text-xs text-slate-600 mt-0.5">Enter trade data to get an instant rule-based analysis (no API key required).</p>
+              <h2 className="text-lg font-bold text-white flex items-center gap-2.5 tracking-tight"><FlaskConical size={17} className="text-[var(--v3-purple)]" /> Trade Analyzer</h2>
+              <p className="text-xs text-slate-500 mt-1">Enter trade data to get an instant rule-based analysis (no API key required).</p>
             </div>
 
             {/* Input Fields */}
-            <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5 space-y-4">
-              <span className="text-[10px] font-semibold tracking-widest uppercase text-slate-500">{t.tradeDetails}</span>
+            <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-[var(--v3-line)] rounded-[var(--v3-radius-card)] p-5 space-y-5 shadow-[var(--shadow-card)]">
+              <span className="text-[10px] font-semibold tracking-widest uppercase text-[var(--v3-purple)]">{t.tradeDetails}</span>
 
               {/* Row 1: Ticker + Shares */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Ticker *</label>
+                  <label className="text-[10px] text-slate-500 tracking-widest uppercase block mb-1.5">Ticker *</label>
                   <input value={analyzerForm.ticker} onChange={e => setAnalyzerForm(f => ({ ...f, ticker: e.target.value.toUpperCase() }))}
-                    placeholder="e.g. AAPL" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono font-bold tracking-wider" />
+                    placeholder="e.g. AAPL" className="w-full bg-white/5 border border-[var(--v3-line)] rounded-[var(--v3-radius-chip)] px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-[var(--v3-info)]/50 focus:outline-none focus:ring-1 focus:ring-[var(--v3-info)]/20 transition font-mono font-bold tracking-wider" />
                 </div>
                 <div>
-                  <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{t.sharesToBuy}</label>
+                  <label className="text-[10px] text-slate-500 tracking-widest uppercase block mb-1.5">{t.sharesToBuy}</label>
                   <input value={analyzerForm.shares} onChange={e => setAnalyzerForm(f => ({ ...f, shares: e.target.value }))}
-                    placeholder="10" type="number" min="0" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono" />
+                    placeholder="10" type="number" min="0" className="w-full bg-white/5 border border-[var(--v3-line)] rounded-[var(--v3-radius-chip)] px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-[var(--v3-info)]/50 focus:outline-none focus:ring-1 focus:ring-[var(--v3-info)]/20 transition font-mono" />
                 </div>
               </div>
 
@@ -3580,33 +3580,33 @@ export default function SwingEdge() {
 
               {/* Row 2: Entry / Stop / Target */}
               <div className="grid grid-cols-3 gap-3">
-                {[[t.entry, "entry", "text-white", null], [t.stopLoss, "stop", "text-[#ef4444]", "stopLoss"], [t.target, "target", "text-[#10b981]", "takeProfit"]].map(([label, key, cls, term]) => (
+                {[[t.entry, "entry", "text-white", null], [t.stopLoss, "stop", "text-[var(--v3-loss)]", "stopLoss"], [t.target, "target", "text-[var(--v3-accent)]", "takeProfit"]].map(([label, key, cls, term]) => (
                   <div key={key}>
-                    <label className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">{label}{term && <TermTooltip term={term} lang={lang} />}</label>
+                    <label className="text-[10px] text-slate-500 tracking-widest uppercase mb-1.5 flex items-center gap-1">{label}{term && <TermTooltip term={term} lang={lang} />}</label>
                     <input value={analyzerForm[key]} onChange={e => setAnalyzerForm(f => ({ ...f, [key]: e.target.value }))}
-                      placeholder="0.00" className={`w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono ${cls}`} />
+                      placeholder="0.00" className={`w-full bg-white/5 border border-[var(--v3-line)] rounded-[var(--v3-radius-chip)] px-3 py-2.5 text-sm placeholder-slate-600 focus:border-[var(--v3-info)]/50 focus:outline-none focus:ring-1 focus:ring-[var(--v3-info)]/20 transition font-mono ${cls}`} />
                   </div>
                 ))}
               </div>
 
               {/* Auto Calculations */}
               {azEntry > 0 && azStop > 0 && (
-                <div className="grid grid-cols-3 gap-3 bg-white/3 rounded-xl p-3 border border-[var(--border-subtle)] dark:border-white/[0.06]">
+                <div className="grid grid-cols-3 gap-3 bg-white/[0.03] rounded-[var(--v3-radius-chip)] p-3.5 border border-[var(--border-subtle)] dark:border-[var(--v3-line)]">
                   <div className="text-center">
-                    <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5 flex items-center justify-center gap-1">R/R Ratio<TermTooltip term="rr" lang={lang} /></div>
-                    <div className={`text-base font-bold font-mono ${azRRRatio >= 2 ? "text-[#10b981]" : azRRRatio >= 1 ? "text-amber-400" : "text-[#ef4444]"}`}>
+                    <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1 flex items-center justify-center gap-1">R/R Ratio<TermTooltip term="rr" lang={lang} /></div>
+                    <div className={`text-lg font-bold font-mono ${azRRRatio >= 2 ? "text-[var(--v3-accent)]" : azRRRatio >= 1 ? "text-[var(--v3-warn)]" : "text-[var(--v3-loss)]"}`}>
                       {azTarget > 0 ? `${azRRRatio.toFixed(2)}:1` : "–"}
                     </div>
                   </div>
                   <div className="text-center">
-                    <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">{t.riskInDollars}</div>
-                    <div className="text-base font-bold font-mono text-[#ef4444]">
+                    <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">{t.riskInDollars}</div>
+                    <div className="text-lg font-bold font-mono text-[var(--v3-loss)]">
                       {azShares > 0 ? `$${azDollarRisk.toFixed(2)}` : "–"}
                     </div>
                   </div>
                   <div className="text-center">
-                    <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-0.5">{t.riskOfPortfolio}</div>
-                    <div className={`text-base font-bold font-mono ${azPortfolioRisk > 2 ? "text-[#ef4444]" : azPortfolioRisk > 1 ? "text-amber-400" : "text-[#10b981]"}`}>
+                    <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">{t.riskOfPortfolio}</div>
+                    <div className={`text-lg font-bold font-mono ${azPortfolioRisk > 2 ? "text-[var(--v3-loss)]" : azPortfolioRisk > 1 ? "text-[var(--v3-warn)]" : "text-[var(--v3-accent)]"}`}>
                       {azShares > 0 ? `${azPortfolioRisk.toFixed(2)}%` : "–"}
                     </div>
                   </div>
@@ -3615,7 +3615,7 @@ export default function SwingEdge() {
 
               {/* R/R quality badge */}
               {azEntry > 0 && azStop > 0 && azTarget > 0 && (
-                <div className={`flex items-center gap-2 p-2.5 rounded-lg border text-xs ${azRRRatio >= 2 ? "bg-emerald-500/5 border-emerald-500/20 text-[#10b981]" : azRRRatio >= 1 ? "bg-amber-500/5 border-amber-500/20 text-amber-400" : "bg-[#ef4444]/5 border-[#ef4444]/20 text-[#ef4444]"}`}>
+                <div className={`flex items-center gap-2 p-2.5 rounded-[var(--v3-radius-chip)] border text-xs ${azRRRatio >= 2 ? "bg-[var(--v3-accent)]/5 border-[var(--v3-accent)]/20 text-[var(--v3-accent)]" : azRRRatio >= 1 ? "bg-[var(--v3-warn)]/5 border-[var(--v3-warn)]/20 text-[var(--v3-warn)]" : "bg-[var(--v3-loss)]/5 border-[var(--v3-loss)]/20 text-[var(--v3-loss)]"}`}>
                   {azRRRatio >= 2 ? <CheckCircle size={13} /> : <AlertTriangle size={13} />}
                   <span>{azRRRatio >= 2 ? t.rrExcellent : azRRRatio >= 1 ? t.rrFair : t.rrLow}</span>
                 </div>
@@ -3629,18 +3629,18 @@ export default function SwingEdge() {
                   {["LONG", "SHORT"].map((s) => (
                     <button key={s} type="button" onClick={() => setAnalyzerOcrSide(s)}
                       aria-pressed={analyzerOcrSide === s}
-                      className={`flex-1 px-3 py-1.5 rounded-lg text-[11px] font-semibold tracking-wide uppercase border transition ${
+                      className={`flex-1 px-3 py-1.5 rounded-[var(--v3-radius-chip)] text-[11px] font-semibold tracking-wide uppercase border transition ${
                         analyzerOcrSide === s
                           ? (s === "LONG"
-                              ? "bg-emerald-500/10 border-emerald-500/40 text-[#10b981]"
-                              : "bg-[#ef4444]/10 border-[#ef4444]/40 text-[#ef4444]")
-                          : "bg-white/5 border-white/10 text-slate-500 hover:text-slate-300"
+                              ? "bg-[var(--v3-accent)]/10 border-[var(--v3-accent)]/40 text-[var(--v3-accent)]"
+                              : "bg-[var(--v3-loss)]/10 border-[var(--v3-loss)]/40 text-[var(--v3-loss)]")
+                          : "bg-white/5 border-[var(--v3-line)] text-slate-500 hover:text-slate-300"
                       }`}>
                       {s === "LONG" ? (lang === "he" ? "לונג" : "Long") : (lang === "he" ? "שורט" : "Short")}
                     </button>
                   ))}
                 </div>
-                <label className="flex items-center gap-2 cursor-pointer w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-400 hover:border-cyan-500/30 hover:text-cyan-400 transition">
+                <label className="flex items-center gap-2 cursor-pointer w-full bg-white/5 border border-[var(--v3-line)] rounded-[var(--v3-radius-chip)] px-3 py-2.5 text-xs text-slate-400 hover:border-[var(--v3-info)]/30 hover:text-[var(--v3-info)] transition">
                   <Eye size={12} />
                   <span>{analyzerImage ? analyzerImage.name : t.uploadChart}</span>
                   <input type="file" accept="image/*" onChange={handleAnalyzerImageUpload} className="hidden" />
@@ -3654,10 +3654,10 @@ export default function SwingEdge() {
                 const mid = ok && confidence >= 40 && confidence < 70;
                 const low = ok && confidence < 40;
                 const tone =
-                  status === "processing" ? "bg-cyan-500/5 border-cyan-500/20 text-cyan-300" :
-                  high ? "bg-emerald-500/5 border-emerald-500/20 text-[#10b981]" :
-                  mid  ? "bg-amber-500/5 border-amber-500/20 text-amber-400" :
-                         "bg-[#ef4444]/5 border-[#ef4444]/20 text-[#ef4444]";
+                  status === "processing" ? "bg-[var(--v3-info)]/5 border-[var(--v3-info)]/20 text-[var(--v3-info)]" :
+                  high ? "bg-[var(--v3-accent)]/5 border-[var(--v3-accent)]/20 text-[var(--v3-accent)]" :
+                  mid  ? "bg-[var(--v3-warn)]/5 border-[var(--v3-warn)]/20 text-[var(--v3-warn)]" :
+                         "bg-[var(--v3-loss)]/5 border-[var(--v3-loss)]/20 text-[var(--v3-loss)]";
                 let icon, text;
                 if (status === "processing") { icon = <RefreshCw size={12} className="animate-spin" />; text = lang === "he" ? "קורא גרף…" : "Reading chart…"; }
                 else if (status === "config_error") { icon = <AlertTriangle size={12} />; text = lang === "he" ? "מפתח API חסר — פנה לאדמין" : "API key missing — contact admin"; }
@@ -3685,7 +3685,7 @@ export default function SwingEdge() {
               {/* ── Trade context (journaling metadata) — collapsed by default. Reuses Log New Trade fields so the smart checks (emotion/setup/market) light up here too. ── */}
               <button type="button" onClick={()=>setShowAnalyzerContext(v=>!v)}
                 aria-expanded={showAnalyzerContext}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-white/3 border border-[var(--border-subtle)] dark:border-white/[0.06] text-slate-400 hover:text-white hover:border-white/20 transition">
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-[var(--v3-radius-chip)] bg-white/[0.03] border border-[var(--border-subtle)] dark:border-[var(--v3-line)] text-slate-400 hover:text-white hover:border-white/20 transition">
                 <span className="text-[10px] tracking-widest uppercase font-semibold">{lang === "he" ? "הקשר העסקה" : "Trade Context"}</span>
                 <ChevronDown size={14} className={`transition-transform ${showAnalyzerContext ? "rotate-180" : ""}`} />
               </button>
@@ -3695,31 +3695,31 @@ export default function SwingEdge() {
                   {/* Setup Type + Notes */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label htmlFor="az-setup" className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">Setup Type<InfoTooltip label="Setup Type">{lang === 'he' ? CATEGORY_TOOLTIP.setup.he : CATEGORY_TOOLTIP.setup.en}</InfoTooltip></label>
+                      <label htmlFor="az-setup" className="text-[10px] text-slate-500 tracking-widest uppercase mb-1.5 flex items-center gap-1">Setup Type<InfoTooltip label="Setup Type">{lang === 'he' ? CATEGORY_TOOLTIP.setup.he : CATEGORY_TOOLTIP.setup.en}</InfoTooltip></label>
                       <SmartSelect id="az-setup" ariaLabel="Setup Type" value={analyzerForm.setup} onChange={v=>setAnalyzerForm(f=>({...f,setup:v}))} dir={isRTL?'rtl':'ltr'} {...getTradeSelectProps('setup', lang)} />
                     </div>
                     <div>
-                      <label htmlFor="az-notes" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Notes</label>
+                      <label htmlFor="az-notes" className="text-[10px] text-slate-500 tracking-widest uppercase block mb-1.5">Notes</label>
                       <input id="az-notes" value={analyzerForm.notes} onChange={e=>setAnalyzerForm(f=>({...f,notes:e.target.value}))}
-                        placeholder="Trade thesis..." className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none transition" />
+                        placeholder="Trade thesis..." className="w-full bg-white/5 border border-[var(--v3-line)] rounded-[var(--v3-radius-chip)] px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-[var(--v3-info)]/50 focus:outline-none transition" />
                     </div>
                   </div>
 
                   {/* Market Condition + Emotion */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label htmlFor="az-market-condition" className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">Market Condition<InfoTooltip label="Market Condition">{lang === 'he' ? CATEGORY_TOOLTIP.market.he : CATEGORY_TOOLTIP.market.en}</InfoTooltip></label>
+                      <label htmlFor="az-market-condition" className="text-[10px] text-slate-500 tracking-widest uppercase mb-1.5 flex items-center gap-1">Market Condition<InfoTooltip label="Market Condition">{lang === 'he' ? CATEGORY_TOOLTIP.market.he : CATEGORY_TOOLTIP.market.en}</InfoTooltip></label>
                       <SmartSelect id="az-market-condition" ariaLabel="Market Condition" value={analyzerForm.marketCondition} onChange={v=>setAnalyzerForm(f=>({...f,marketCondition:v}))} dir={isRTL?'rtl':'ltr'} {...getTradeSelectProps('market', lang)} />
                     </div>
                     <div>
-                      <label htmlFor="az-emotion" className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">Emotion at Entry<InfoTooltip label="Emotion at Entry">{lang === 'he' ? CATEGORY_TOOLTIP.emotion.he : CATEGORY_TOOLTIP.emotion.en}</InfoTooltip></label>
+                      <label htmlFor="az-emotion" className="text-[10px] text-slate-500 tracking-widest uppercase mb-1.5 flex items-center gap-1">Emotion at Entry<InfoTooltip label="Emotion at Entry">{lang === 'he' ? CATEGORY_TOOLTIP.emotion.he : CATEGORY_TOOLTIP.emotion.en}</InfoTooltip></label>
                       <SmartSelect id="az-emotion" ariaLabel="Emotion at Entry" value={analyzerForm.emotionAtEntry} onChange={v=>setAnalyzerForm(f=>({...f,emotionAtEntry:v}))} dir={isRTL?'rtl':'ltr'} {...getTradeSelectProps('emotion', lang)} />
                     </div>
                   </div>
 
                   {/* Entry Quality (stars) */}
                   <div>
-                    <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Entry Quality</label>
+                    <label className="text-[10px] text-slate-500 tracking-widest uppercase block mb-1.5">Entry Quality</label>
                     <div className="flex items-center gap-1 mt-1">
                       {[1,2,3,4,5].map(star => (
                         <button key={star} type="button" onClick={() => setAnalyzerForm(f=>({...f,entryQuality:star}))}
@@ -3736,42 +3736,49 @@ export default function SwingEdge() {
               {/* Analyze button + Reset */}
               <div className="flex gap-2">
                 <button onClick={analyzeTradeStandalone} disabled={analyzerLoading}
-                  className="flex-1 py-3 rounded-xl bg-gradient-to-r from-violet-500/25 to-cyan-500/25 border border-violet-500/35 text-violet-200 text-sm font-bold hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-50">
+                  className="flex-1 py-3 rounded-[var(--v3-radius-chip)] bg-gradient-to-r from-[var(--v3-purple)]/25 to-[var(--v3-info)]/25 border border-[var(--v3-purple)]/35 text-violet-200 text-sm font-bold hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-50 shadow-[0_4px_16px_var(--v3-purple-glow)]">
                   {analyzerLoading ? <><RefreshCw size={14} className="animate-spin" /> {t.analyzing}</> : <><Cpu size={14} /> {t.analyzeTrade}</>}
                 </button>
                 <button onClick={handleAnalyzerReset} disabled={analyzerLoading}
                   aria-label={lang === "he" ? "איפוס" : "Reset"}
-                  className="py-3 px-5 rounded-xl border border-white/10 text-slate-400 text-sm font-semibold hover:text-white hover:border-white/20 hover:bg-white/5 transition disabled:opacity-50">
+                  className="py-3 px-5 rounded-[var(--v3-radius-chip)] border border-[var(--v3-line)] text-slate-400 text-sm font-semibold hover:text-white hover:border-white/20 hover:bg-white/5 transition disabled:opacity-50">
                   {lang === "he" ? "איפוס" : "Reset"}
                 </button>
               </div>
             </div>
 
             {/* Analysis Result */}
-            {analyzerResult && (
-              <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-violet-500/25 rounded-xl p-5 space-y-4">
-                <div className="flex items-center gap-2 text-violet-400 font-semibold text-xs uppercase tracking-wider">
+            {analyzerResult && (() => {
+              const rec = analyzerResult.recommendation;
+              const heroTone =
+                rec === "GO"   ? { border: "border-[var(--v3-accent)]/40", glow: "var(--shadow-lg), 0 0 44px var(--v3-accent-glow)", icon: "text-[var(--v3-accent)]" } :
+                rec === "WAIT" ? { border: "border-[var(--v3-warn)]/40",   glow: "var(--shadow-lg), 0 0 44px var(--v3-warn-glow)",   icon: "text-[var(--v3-warn)]" } :
+                rec === "SKIP" ? { border: "border-[var(--v3-loss)]/40",   glow: "var(--shadow-lg), 0 0 44px var(--v3-loss-glow)",   icon: "text-[var(--v3-loss)]" } :
+                                 { border: "border-[var(--v3-purple)]/25", glow: "var(--shadow-lg)", icon: "text-[var(--v3-purple)]" };
+              return (
+              <div className={`bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border ${heroTone.border} rounded-[var(--v3-radius-card)] p-5 space-y-4`} style={{ boxShadow: heroTone.glow }}>
+                <div className={`flex items-center gap-2 ${heroTone.icon} font-semibold text-xs uppercase tracking-wider`}>
                   <Cpu size={13} /> {t.analysisResult}
                 </div>
 
                 {analyzerResult.error ? (
-                  <div className="text-xs text-[#ef4444] bg-[#ef4444]/5 border border-[#ef4444]/20 rounded-lg p-3">{analyzerResult.error}</div>
+                  <div className="text-xs text-[var(--v3-loss)] bg-[var(--v3-loss)]/5 border border-[var(--v3-loss)]/20 rounded-[var(--v3-radius-chip)] p-3">{analyzerResult.error}</div>
                 ) : analyzerResult.raw ? (
                   <div className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed">{analyzerResult.raw}</div>
                 ) : (
                   <div className="space-y-3">
                     {/* Recommendation banner */}
                     {analyzerResult.recommendation && (
-                      <div className={`flex items-center justify-between p-4 rounded-xl border ${
-                        analyzerResult.recommendation === "GO"   ? "bg-emerald-500/8 border-emerald-500/30" :
-                        analyzerResult.recommendation === "WAIT" ? "bg-amber-500/8 border-amber-500/30" :
-                                                                    "bg-[#ef4444]/8 border-[#ef4444]/30"}`}>
+                      <div className={`flex items-center justify-between p-5 rounded-[var(--v3-radius-card)] border ${
+                        analyzerResult.recommendation === "GO"   ? "bg-[var(--v3-accent)]/8 border-[var(--v3-accent)]/30" :
+                        analyzerResult.recommendation === "WAIT" ? "bg-[var(--v3-warn)]/8 border-[var(--v3-warn)]/30" :
+                                                                    "bg-[var(--v3-loss)]/8 border-[var(--v3-loss)]/30"}`}>
                         <div>
                           <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">{t.recommendation}</div>
-                          <div className={`text-2xl font-bold font-mono ${
-                            analyzerResult.recommendation === "GO"   ? "text-[#10b981]" :
-                            analyzerResult.recommendation === "WAIT" ? "text-amber-400" :
-                                                                        "text-[#ef4444]"}`}>
+                          <div className={`text-3xl font-bold font-mono tracking-tight ${
+                            analyzerResult.recommendation === "GO"   ? "text-[var(--v3-accent)]" :
+                            analyzerResult.recommendation === "WAIT" ? "text-[var(--v3-warn)]" :
+                                                                        "text-[var(--v3-loss)]"}`}>
                             {analyzerResult.recommendation === "GO"   ? "GO ✅" :
                              analyzerResult.recommendation === "WAIT" ? "WAIT ⚠️" :
                                                                          "SKIP ❌"}
@@ -3792,17 +3799,17 @@ export default function SwingEdge() {
                     {/* Detail cards */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {analyzerResult.stop_logic && (
-                        <div className="bg-white/3 rounded-xl p-3 border border-[var(--border-subtle)] dark:border-white/[0.06]">
+                        <div className="bg-white/[0.03] rounded-[var(--v3-radius-chip)] p-3.5 border border-[var(--border-subtle)] dark:border-[var(--v3-line)]">
                           <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-1.5 flex items-center gap-1">
-                            <Target size={10} /> {t.stopLossLabel}
+                            <Target size={10} className="text-[var(--v3-loss)]" /> {t.stopLossLabel}
                           </div>
                           <p className="text-xs text-slate-300 leading-relaxed">{analyzerResult.stop_logic}</p>
                         </div>
                       )}
                       {analyzerResult.rr_assessment && (
-                        <div className="bg-white/3 rounded-xl p-3 border border-[var(--border-subtle)] dark:border-white/[0.06]">
+                        <div className="bg-white/[0.03] rounded-[var(--v3-radius-chip)] p-3.5 border border-[var(--border-subtle)] dark:border-[var(--v3-line)]">
                           <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-1.5 flex items-center gap-1">
-                            <Activity size={10} /> R/R
+                            <Activity size={10} className="text-[var(--v3-info)]" /> R/R
                           </div>
                           <p className="text-xs text-slate-300 leading-relaxed">{analyzerResult.rr_assessment}</p>
                         </div>
@@ -3824,8 +3831,8 @@ export default function SwingEdge() {
                       exp = exp.replace(/\s{2,}/g, " ").replace(/^[\s.,—–-]+/, "").trim();
                       if (exp.length < 6) return null;
                       return (
-                        <div className="bg-violet-500/5 border border-violet-500/15 rounded-xl p-3">
-                          <div className="text-[10px] text-violet-400 uppercase tracking-widest mb-1.5">{t.explanation}</div>
+                        <div className="bg-[var(--v3-purple)]/5 border border-[var(--v3-purple)]/15 rounded-[var(--v3-radius-chip)] p-3">
+                          <div className="text-[10px] text-[var(--v3-purple)] uppercase tracking-widest mb-1.5">{t.explanation}</div>
                           <p className="text-xs text-slate-300 leading-relaxed">{exp}</p>
                         </div>
                       );
@@ -3833,7 +3840,8 @@ export default function SwingEdge() {
                   </div>
                 )}
               </div>
-            )}
+              );
+            })()}
           </div>
         )}
 

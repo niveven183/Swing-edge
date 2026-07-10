@@ -126,6 +126,7 @@
   --v3-text-lo:      #7A8783;
   --v3-line:         rgba(255,255,255,.08);
   --v3-loss:         #F43F5E;
+  --v3-loss-glow:    rgba(244,63,94,.14);
   --v3-info:         #06b6d4;   /* equity/live-data channel — distinct from accent */
   --v3-info-glow:    rgba(6,182,212,.12);
   --v3-purple:       #A78BFA;   /* setup-identity channel — distinct from accent/info */
