@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Mail, Lock, Eye, EyeOff, User } from "lucide-react";
 import { supabase, isSupabaseConfigured } from "../supabaseClient.js";
 import Logo from "./Logo.jsx";
@@ -35,7 +35,12 @@ const STR = {
   agreeMid:      { en: " and ",                         he: " ול" },
   agreePrivacy:  { en: "Privacy Policy",                he: "מדיניות הפרטיות" },
   errConsent:    { en: "You must agree to the Terms of Use and Privacy Policy.", he: "יש לאשר את תנאי השימוש ומדיניות הפרטיות." },
+  errCaptcha:    { en: "Please complete the security check.", he: "יש להשלים את בדיקת האבטחה." },
+  errCaptchaFail:{ en: "Security check failed — please try again.", he: "בדיקת האבטחה נכשלה — נסה שוב." },
 };
+
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+const isTurnstileConfigured = Boolean(TURNSTILE_SITE_KEY);
 
 export default function AuthScreen() {
   const lang = (typeof document !== "undefined" && document.documentElement.lang === "en") ? "en" : "he";
@@ -53,6 +58,10 @@ export default function AuthScreen() {
   const [error, setError]     = useState("");
   const [success, setSuccess] = useState("");
   const [agree, setAgree]     = useState(false);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaKey, setCaptchaKey]     = useState(0);
+
+  const resetCaptcha = () => { setCaptchaToken(""); setCaptchaKey((k) => k + 1); };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -85,9 +94,24 @@ export default function AuthScreen() {
     if (password.length < 8)  { setError(t("errShort")); return; }
     if (password !== confirm) { setError(t("errMatch")); return; }
     if (!agree) { setError(t("errConsent")); return; }
+    if (isTurnstileConfigured && !captchaToken) { setError(t("errCaptcha")); return; }
     if (!isSupabaseConfigured || !supabase) { setError(t("errSupabase")); return; }
     setLoading(true);
     try {
+      if (isTurnstileConfigured) {
+        try {
+          const vr = await fetch("/api/verify-turnstile", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: captchaToken }),
+          });
+          // Only a definitive 400 (invalid/expired token) blocks signup.
+          // 5xx / 429 / network error → fail open so an outage never locks users out.
+          if (vr.status === 400) { setError(t("errCaptchaFail")); return; }
+        } catch {
+          /* our verify route unreachable → fail open, allow signup */
+        }
+      }
       const nick = nickname.trim();
       const { error: err } = await supabase.auth.signUp({
         email: email.trim(),
@@ -99,6 +123,7 @@ export default function AuthScreen() {
     } catch (err) {
       setError(err.message?.includes("already registered") ? t("errExists") : (err.message || ""));
     } finally {
+      if (isTurnstileConfigured) resetCaptcha();
       setLoading(false);
     }
   };
@@ -163,10 +188,10 @@ export default function AuthScreen() {
             <>
               {/* Tabs */}
               <div className="flex bg-slate-100 rounded-[12px] p-1 mb-6">
-                <TabBtn active={tab === "signin"} onClick={() => { setTab("signin"); resetMsg(); }}>
+                <TabBtn active={tab === "signin"} onClick={() => { setTab("signin"); resetMsg(); resetCaptcha(); }}>
                   {t("signIn")}
                 </TabBtn>
-                <TabBtn active={tab === "signup"} onClick={() => { setTab("signup"); resetMsg(); setAgree(false); }}>
+                <TabBtn active={tab === "signup"} onClick={() => { setTab("signup"); resetMsg(); setAgree(false); resetCaptcha(); }}>
                   {t("signUp")}
                 </TabBtn>
               </div>
@@ -221,6 +246,15 @@ export default function AuthScreen() {
                     value={confirm} onChange={(e) => setConfirm(e.target.value)} isRTL={isRTL}
                     autoComplete="new-password"
                     aria-label={t("confirmPass")} />
+
+                  {isTurnstileConfigured && (
+                    <Turnstile
+                      key={captchaKey}
+                      siteKey={TURNSTILE_SITE_KEY}
+                      onToken={setCaptchaToken}
+                      onExpire={() => setCaptchaToken("")}
+                    />
+                  )}
 
                   <label className="flex items-start gap-2 text-xs leading-snug cursor-pointer" style={{ color: "#5b6b62" }}>
                     <input
@@ -369,6 +403,50 @@ function Divider({ label }) {
       <div className="flex-1 h-px bg-slate-200" />
     </div>
   );
+}
+
+function Turnstile({ siteKey, onToken, onExpire }) {
+  const ref = useRef(null);
+  const SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+
+  useEffect(() => {
+    let cancelled = false;
+    let widgetId;
+
+    const render = () => {
+      if (cancelled || !ref.current || !window.turnstile) return;
+      widgetId = window.turnstile.render(ref.current, {
+        sitekey: siteKey,
+        theme: "light",
+        callback: (token) => onToken(token),
+        "expired-callback": () => onExpire?.(),
+        "error-callback": () => onExpire?.(),
+      });
+    };
+
+    if (window.turnstile) {
+      render();
+    } else {
+      let script = document.querySelector(`script[src="${SRC}"]`);
+      if (!script) {
+        script = document.createElement("script");
+        script.src = SRC;
+        script.async = true;
+        script.defer = true;
+        document.head.appendChild(script);
+      }
+      script.addEventListener("load", render);
+    }
+
+    return () => {
+      cancelled = true;
+      try {
+        if (widgetId && window.turnstile) window.turnstile.remove(widgetId);
+      } catch { /* widget already gone */ }
+    };
+  }, [siteKey]);
+
+  return <div ref={ref} className="flex justify-center min-h-[65px] items-center" />;
 }
 
 function FeedbackArea({ error, success }) {
