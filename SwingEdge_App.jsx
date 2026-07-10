@@ -4929,8 +4929,8 @@ export default function SwingEdge() {
             return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
           }).length;
           const tiltLevel = tiltCount === 0 ? "safe" : tiltCount <= 2 ? "safe" : tiltCount === 3 ? "warning" : "danger";
-          const tiltColor = tiltLevel === "safe" ? "#10b981" : tiltLevel === "warning" ? "#f59e0b" : "#ef4444";
-          const tiltBg = tiltLevel === "safe" ? "border-emerald-500/25 bg-emerald-500/5" : tiltLevel === "warning" ? "border-amber-500/25 bg-amber-500/5" : "border-red-500/25 bg-red-500/5";
+          const tiltColor = tiltLevel === "safe" ? "#00C076" : tiltLevel === "warning" ? "#F59E0B" : "#F43F5E";
+          const tiltBg = tiltLevel === "safe" ? "border-[#00C076]/25 bg-[var(--v3-accent-glow)]" : tiltLevel === "warning" ? "border-[#F59E0B]/25 bg-[var(--v3-warn-glow)]" : "border-[#F43F5E]/25 bg-[#F43F5E]/5";
           const tiltPct = Math.min(tiltCount / 6 * 100, 100);
 
           // ── Playbook: calculate success rate per setup from journal ──
@@ -4981,17 +4981,17 @@ export default function SwingEdge() {
           return (
             <div className="space-y-6 animate-fade-in max-w-3xl mx-auto">
               <div>
-                <h2 className="text-sm font-bold text-white flex items-center gap-2"><Settings size={15} className="text-cyan-400" /> {t.settings}</h2>
-                <p className="text-xs text-slate-600 mt-0.5">{t.playbookAndDiscipline}</p>
+                <h2 className="text-sm font-bold text-white flex items-center gap-2"><Settings size={15} className="text-[var(--v3-text-mid)]" /> {t.settings}</h2>
+                <p className="text-xs text-[var(--v3-text-lo)] mt-0.5">{t.playbookAndDiscipline}</p>
               </div>
 
               {/* ── APPEARANCE (Theme) ── */}
-              <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-emerald-500/20 rounded-xl p-5">
+              <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-4">
                   <span aria-hidden="true" className="text-base">🎨</span>
                   <h3 className="text-sm font-bold text-white">{t.appearance}</h3>
                 </div>
-                <p className="text-xs text-slate-500 mb-3">{t.appearanceDesc}</p>
+                <p className="text-xs text-[var(--v3-text-lo)] mb-3">{t.appearanceDesc}</p>
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     { value: "auto",  icon: Monitor, label: t.themeAuto,  desc: t.themeSystem },
@@ -5007,42 +5007,42 @@ export default function SwingEdge() {
                         onClick={() => setThemeMode(opt.value)}
                         aria-label={opt.label}
                         aria-pressed={isActive}
-                        className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl border-2 transition-all ${
+                        className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl border transition-all ${
                           isActive
-                            ? "border-emerald-500 bg-emerald-500/10"
-                            : "border-white/10 hover:border-white/20"
+                            ? "border-[var(--v3-accent)] bg-[var(--v3-accent-glow)]"
+                            : "border-[var(--border-subtle)] dark:border-white/[0.08] hover:border-white/20"
                         }`}
                       >
-                        <Icon size={18} className={isActive ? "text-emerald-700 dark:text-emerald-400" : "text-slate-400"} />
-                        <span className={`text-xs font-semibold ${isActive ? "text-emerald-700 dark:text-emerald-300" : "text-slate-300"}`}>
+                        <Icon size={18} className={isActive ? "text-emerald-700 dark:text-[var(--v3-accent)]" : "text-[var(--v3-text-lo)]"} />
+                        <span className={`text-xs font-semibold ${isActive ? "text-emerald-700 dark:text-[var(--v3-accent)]" : "text-[var(--v3-text-mid)]"}`}>
                           {opt.label}
                         </span>
                         {opt.desc && (
-                          <span className="text-[10px] text-slate-500">{opt.desc}</span>
+                          <span className="text-[10px] text-[var(--v3-text-lo)]">{opt.desc}</span>
                         )}
                       </button>
                     );
                   })}
                 </div>
                 {themeMode === "auto" && (
-                  <p className="text-xs text-slate-500 mt-3">
+                  <p className="text-xs text-[var(--v3-text-lo)] mt-3">
                     {t.themeCurrentlyLabel} {themeResolved === "dark" ? t.themeDark : t.themeLight} ({t.themeSystemPreference})
                   </p>
                 )}
               </div>
 
               {/* ── LANGUAGE SELECTOR ── */}
-              <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-violet-500/20 rounded-xl p-5">
+              <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-4">
-                  <Globe size={16} className="text-violet-400" />
+                  <Globe size={16} className="text-[var(--v3-text-mid)]" />
                   <h3 className="text-sm font-bold text-white">{t.language}</h3>
                 </div>
-                <p className="text-xs text-slate-500 mb-3">{t.languageDesc}</p>
+                <p className="text-xs text-[var(--v3-text-lo)] mb-3">{t.languageDesc}</p>
                 <select
                   value={lang}
                   onChange={e => setLang(e.target.value)}
                   dir="ltr"
-                  className="w-full bg-white/5 border border-violet-500/30 rounded-lg px-3 py-2.5 text-sm text-white focus:border-violet-500/60 focus:outline-none transition font-semibold"
+                  className="w-full bg-white/5 border border-[var(--border-subtle)] dark:border-white/[0.10] rounded-lg px-3 py-2.5 text-sm text-white focus:border-[var(--v3-accent)] focus:outline-none transition font-semibold"
                 >
                   {LANGUAGES.map(l => (
                     <option key={l.code} value={l.code}>
@@ -5057,21 +5057,21 @@ export default function SwingEdge() {
                 const provider = authUser?.app_metadata?.provider || "email";
                 const isGoogle = provider === "google";
                 return (
-                  <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-emerald-500/20 rounded-xl p-5">
+                  <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
                     <div className="flex items-center gap-2 mb-4">
-                      <KeyRound size={16} className="text-emerald-400" />
+                      <KeyRound size={16} className="text-[var(--v3-text-mid)]" />
                       <h3 className="text-sm font-bold text-white">{t.security}</h3>
                     </div>
                     {isGoogle ? (
-                      <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-xl">
-                        <p className="text-xs text-slate-300 leading-relaxed">
+                      <div className="p-3 bg-[var(--v3-info-glow)] border border-[#06b6d4]/30 rounded-xl">
+                        <p className="text-xs text-[var(--v3-text-mid)] leading-relaxed">
                           {t.googleSignedInInfo}
                         </p>
                         <a
                           href="https://myaccount.google.com/security"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 mt-2 text-xs font-semibold text-emerald-400 hover:underline"
+                          className="inline-flex items-center gap-1 mt-2 text-xs font-semibold text-[var(--v3-info)] hover:underline"
                         >
                           {t.manageOnGoogle}
                           <ExternalLink size={11} />
@@ -5079,19 +5079,19 @@ export default function SwingEdge() {
                       </div>
                     ) : (
                       <>
-                        <p className="text-xs text-slate-500 mb-3">
+                        <p className="text-xs text-[var(--v3-text-lo)] mb-3">
                           {t.changePassword}
                         </p>
                         <button
                           type="button"
                           onClick={() => setShowChangePassword(true)}
-                          className="w-full px-4 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-bold hover:bg-emerald-500/20 transition flex items-center justify-between"
+                          className="w-full px-4 py-2.5 rounded-lg bg-[var(--v3-accent-glow)] border border-[#00C076]/30 text-[var(--v3-accent)] text-xs font-bold hover:bg-[#00C076]/20 transition flex items-center justify-between"
                         >
                           <span className="flex items-center gap-2">
                             <Lock size={12} />
                             {t.changePassword}
                           </span>
-                          <span className="text-slate-400">{isRTL ? "←" : "→"}</span>
+                          <span className="text-[var(--v3-text-lo)]">{isRTL ? "←" : "→"}</span>
                         </button>
                       </>
                     )}
@@ -5100,19 +5100,19 @@ export default function SwingEdge() {
               })()}
 
               {/* ── PORTFOLIO CAPITAL ── */}
-              <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-cyan-500/20 rounded-xl p-5">
+              <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-4">
-                  <DollarSign size={16} className="text-cyan-400" />
+                  <DollarSign size={16} className="text-[var(--v3-text-mid)]" />
                   <h3 className="text-sm font-bold text-white">{t.portfolioCapitalTitle}</h3>
                 </div>
-                <p className="text-xs text-slate-500 mb-3">{t.updateCapitalDesc}</p>
+                <p className="text-xs text-[var(--v3-text-lo)] mb-3">{t.updateCapitalDesc}</p>
                 <div className="flex gap-2">
                   <input
                     type="number"
                     value={capitalInput}
                     onChange={e => setCapitalInput(e.target.value)}
                     placeholder={`${capital.toLocaleString()}`}
-                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono"
+                    className="flex-1 bg-white/5 border border-[var(--border-subtle)] dark:border-white/[0.10] rounded-lg px-3 py-2 text-sm text-white placeholder-[var(--v3-text-lo)] focus:border-[var(--v3-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--v3-accent-glow)] transition font-mono"
                   />
                   <button
                     onClick={() => {
@@ -5123,36 +5123,36 @@ export default function SwingEdge() {
                         try { localStorage.setItem("swingEdgeCapital", String(val)); } catch {}
                       }
                     }}
-                    className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500/20 to-violet-500/20 border border-cyan-500/30 text-cyan-400 text-xs font-bold hover:opacity-90 transition whitespace-nowrap">
+                    className="px-4 py-2 rounded-lg bg-[var(--v3-accent-glow)] border border-[#00C076]/30 text-[var(--v3-accent)] text-xs font-bold hover:bg-[#00C076]/20 transition whitespace-nowrap">
                     {t.updateCapital}
                   </button>
                 </div>
-                <p className="text-[10px] text-slate-600 mt-2">
-                  {t.currentCapital}: <span className="text-cyan-400 font-mono font-bold">${capital.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                <p className="text-[10px] text-[var(--v3-text-lo)] mt-2">
+                  {t.currentCapital}: <span className="text-[var(--v3-accent)] font-mono font-bold">${capital.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
                 </p>
               </div>
 
               {/* ── DEMO TRADES ── */}
-              <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-amber-500/20 rounded-xl p-5">
+              <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-3">
-                  <FlaskConical size={16} className="text-amber-400" />
+                  <FlaskConical size={16} className="text-[var(--v3-info)]" />
                   <h3 className="text-sm font-bold text-white">Demo Trades</h3>
                 </div>
-                <p className="text-xs text-slate-500 mb-3">
+                <p className="text-xs text-[var(--v3-text-lo)] mb-3">
                   {t.loadDemoLong}
                 </p>
                 <button
                   onClick={handleLoadDemoTrades}
-                  className="w-full py-2.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
+                  className="w-full py-2.5 rounded-lg bg-[var(--v3-info-glow)] border border-[#06b6d4]/30 text-[var(--v3-info)] text-xs font-bold hover:bg-[#06b6d4]/20 transition flex items-center justify-center gap-2">
                   <Download size={12} /> 📊 {t.loadDemoBtn}
                 </button>
-                <p className="text-[10px] text-slate-700 mt-2">
+                <p className="text-[10px] text-[var(--v3-text-lo)] mt-2">
                   {t.loadDemoNote}
                 </p>
               </div>
 
               {/* ── TILTMETER ── */}
-              <div className={`bg-[var(--bg-elevated)] dark:bg-[#0d1424] border rounded-xl p-5 ${tiltBg}`}>
+              <div className={`bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border rounded-xl p-5 ${tiltBg}`}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <Thermometer size={16} style={{ color: tiltColor }} />
@@ -5167,17 +5167,17 @@ export default function SwingEdge() {
                 {/* Visual gauge */}
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs text-slate-500">{t.followedPlanNo}</span>
+                    <span className="text-xs text-[var(--v3-text-lo)]">{t.followedPlanNo}</span>
                     <span className="text-2xl font-bold font-mono" style={{ color: tiltColor }}>{tiltCount}</span>
                   </div>
                   <div className="h-3 bg-white/5 rounded-full overflow-hidden">
                     <div className="h-full rounded-full transition-all duration-700"
-                      style={{ width: `${tiltPct}%`, background: `linear-gradient(to right, #10b981, ${tiltColor})` }} />
+                      style={{ width: `${tiltPct}%`, background: `linear-gradient(to right, #00C076, ${tiltColor})` }} />
                   </div>
-                  <div className="flex justify-between mt-1 text-[10px] text-slate-700 font-mono">
+                  <div className="flex justify-between mt-1 text-[10px] text-[var(--v3-text-lo)] font-mono">
                     <span>0</span>
-                    <span className="text-amber-600">⚠ 3</span>
-                    <span className="text-red-600">🔴 6+</span>
+                    <span style={{ color: "var(--v3-warn)" }}>⚠ 3</span>
+                    <span style={{ color: "var(--v3-loss)" }}>🔴 6+</span>
                   </div>
                 </div>
 
@@ -5185,7 +5185,7 @@ export default function SwingEdge() {
                 <div className="flex gap-1.5 mb-4">
                   {[1,2,3,4,5,6].map(i => {
                     const filled = i <= tiltCount;
-                    const segColor = i <= 2 ? "#10b981" : i <= 3 ? "#f59e0b" : "#ef4444";
+                    const segColor = i <= 2 ? "#00C076" : i <= 3 ? "#F59E0B" : "#F43F5E";
                     return (
                       <div key={i} className="flex-1 h-4 rounded"
                         style={{ background: filled ? segColor : segColor + "20", border: `1px solid ${segColor}40` }} />
@@ -5195,56 +5195,56 @@ export default function SwingEdge() {
 
                 {/* Warning banner */}
                 {tiltCount > 3 && (
-                  <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-lg p-3">
-                    <AlertTriangle size={14} className="text-red-400 flex-shrink-0" />
-                    <span className="text-xs text-red-300">
+                  <div className="flex items-center gap-2 bg-[#F43F5E]/10 border border-[#F43F5E]/30 rounded-lg p-3">
+                    <AlertTriangle size={14} className="text-[var(--v3-loss)] flex-shrink-0" />
+                    <span className="text-xs text-[var(--v3-loss)]">
                       {t.tiltWarn3}
                     </span>
                   </div>
                 )}
                 {tiltCount === 3 && (
-                  <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
-                    <AlertTriangle size={14} className="text-amber-400 flex-shrink-0" />
-                    <span className="text-xs text-amber-300">
+                  <div className="flex items-center gap-2 bg-[var(--v3-warn-glow)] border border-[#F59E0B]/30 rounded-lg p-3">
+                    <AlertTriangle size={14} className="text-[var(--v3-warn)] flex-shrink-0" />
+                    <span className="text-xs text-[var(--v3-warn)]">
                       {t.tiltAlert3}
                     </span>
                   </div>
                 )}
                 {tiltCount === 0 && (
-                  <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3">
-                    <CheckCircle size={14} className="text-emerald-400 flex-shrink-0" />
-                    <span className="text-xs text-emerald-300">{t.tiltClean}</span>
+                  <div className="flex items-center gap-2 bg-[var(--v3-accent-glow)] border border-[#00C076]/30 rounded-lg p-3">
+                    <CheckCircle size={14} className="text-[var(--v3-accent)] flex-shrink-0" />
+                    <span className="text-xs text-[var(--v3-accent)]">{t.tiltClean}</span>
                   </div>
                 )}
 
-                <p className="text-[10px] text-slate-700 mt-3">{t.tiltNote}</p>
+                <p className="text-[10px] text-[var(--v3-text-lo)] mt-3">{t.tiltNote}</p>
               </div>
 
               {/* ── PERSONAL PLAYBOOK ── */}
-              <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
+              <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <BookMarked size={16} className="text-violet-400" />
+                    <BookMarked size={16} className="text-[var(--v3-purple)]" />
                     <h3 className="text-sm font-bold text-white">Personal Playbook</h3>
                   </div>
                   <button onClick={() => { setPlaybookForm({ name: "", description: "", imagePreview: null }); setEditingSetupId(null); setShowPlaybookForm(v => !v); }}
-                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/30 text-violet-400 hover:opacity-90 transition">
+                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[var(--v3-purple-glow)] border border-[#A78BFA]/30 text-[var(--v3-purple)] hover:bg-[#A78BFA]/20 transition">
                     <Plus size={11} /> {t.addSetup}
                   </button>
                 </div>
 
                 {/* Add/Edit Form */}
                 {showPlaybookForm && (
-                  <div className="mb-5 bg-white/3 border border-white/10 rounded-xl p-4 space-y-3">
+                  <div className="mb-5 bg-white/3 border border-[var(--border-subtle)] dark:border-white/[0.10] rounded-xl p-4 space-y-3">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{t.setupName}</label>
+                        <label className="text-[10px] text-[var(--v3-text-lo)] tracking-widest uppercase block mb-1">{t.setupName}</label>
                         <input value={playbookForm.name} onChange={e => setPlaybookForm(f => ({ ...f, name: e.target.value }))}
-                          placeholder="Breakout, Pullback…" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-violet-500/50 focus:outline-none transition" />
+                          placeholder="Breakout, Pullback…" className="w-full bg-white/5 border border-[var(--border-subtle)] dark:border-white/[0.10] rounded-lg px-3 py-2 text-sm text-white placeholder-[var(--v3-text-lo)] focus:border-[var(--v3-purple)] focus:outline-none transition" />
                       </div>
                       <div>
-                        <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{t.imageOptional}</label>
-                        <label className="flex items-center gap-2 cursor-pointer w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-400 hover:border-violet-500/30 transition">
+                        <label className="text-[10px] text-[var(--v3-text-lo)] tracking-widest uppercase block mb-1">{t.imageOptional}</label>
+                        <label className="flex items-center gap-2 cursor-pointer w-full bg-white/5 border border-[var(--border-subtle)] dark:border-white/[0.10] rounded-lg px-3 py-2 text-xs text-[var(--v3-text-mid)] hover:border-[#A78BFA]/40 transition">
                           <Eye size={12} />
                           <span>{playbookForm.imagePreview ? `${t.imageLoaded} ✓` : t.uploadImage}</span>
                           <input type="file" accept="image/*" onChange={handlePlaybookImageUpload} className="hidden" />
@@ -5252,28 +5252,28 @@ export default function SwingEdge() {
                       </div>
                     </div>
                     <div>
-                      <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{t.description}</label>
+                      <label className="text-[10px] text-[var(--v3-text-lo)] tracking-widest uppercase block mb-1">{t.description}</label>
                       <textarea value={playbookForm.description} onChange={e => setPlaybookForm(f => ({ ...f, description: e.target.value }))}
                         placeholder={t.setupDescPlaceholder} rows={2}
-                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-violet-500/50 focus:outline-none transition resize-none" />
+                        className="w-full bg-white/5 border border-[var(--border-subtle)] dark:border-white/[0.10] rounded-lg px-3 py-2 text-sm text-white placeholder-[var(--v3-text-lo)] focus:border-[var(--v3-purple)] focus:outline-none transition resize-none" />
                     </div>
                     {playbookForm.imagePreview && (
-                      <div className="relative rounded-lg overflow-hidden border border-white/10 h-24">
+                      <div className="relative rounded-lg overflow-hidden border border-[var(--border-subtle)] dark:border-white/[0.10] h-24">
                         <img src={playbookForm.imagePreview} alt="Setup" className="w-full h-full object-cover" />
                         <button onClick={() => setPlaybookForm(f => ({ ...f, imagePreview: null }))}
                           aria-label={lang === "he" ? "הסר תמונה" : "Remove image"}
-                          className="absolute top-1 right-1 rtl:right-auto rtl:left-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-slate-300 hover:text-white">
+                          className="absolute top-1 right-1 rtl:right-auto rtl:left-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-[var(--v3-text-mid)] hover:text-white">
                           <X size={10} />
                         </button>
                       </div>
                     )}
                     <div className="flex gap-2">
                       <button onClick={handlePlaybookSubmit}
-                        className="flex-1 py-2 rounded-lg bg-gradient-to-r from-violet-500 to-cyan-500 text-white text-xs font-bold hover:opacity-90 transition">
+                        className="flex-1 py-2 rounded-lg bg-[var(--v3-accent)] text-[#070B0A] text-xs font-bold hover:opacity-90 transition">
                         {editingSetupId !== null ? t.updateSetup : t.saveSetup}
                       </button>
                       <button onClick={() => { setShowPlaybookForm(false); setEditingSetupId(null); }}
-                        className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-slate-400 text-xs hover:border-white/20 transition">
+                        className="px-4 py-2 rounded-lg bg-white/5 border border-[var(--border-subtle)] dark:border-white/[0.10] text-[var(--v3-text-mid)] text-xs hover:border-white/20 transition">
                         {t.cancel}
                       </button>
                     </div>
@@ -5282,7 +5282,7 @@ export default function SwingEdge() {
 
                 {/* Playbook list */}
                 {playbookSetups.length === 0 ? (
-                  <div className="text-center py-8 text-slate-600 text-xs">
+                  <div className="text-center py-8 text-[var(--v3-text-lo)] text-xs">
                     <BookMarked size={28} className="mx-auto mb-2 opacity-20" />
                     <p>{t.noSetupsYet}</p>
                   </div>
@@ -5290,9 +5290,9 @@ export default function SwingEdge() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {playbookSetups.map(setup => {
                       const stats = calcSetupSuccess(setup.name);
-                      const successColor = stats === null ? "#475569" : stats.rate >= 60 ? "#10b981" : stats.rate >= 40 ? "#f59e0b" : "#ef4444";
+                      const successColor = stats === null ? "#7A8783" : stats.rate >= 60 ? "#00C076" : stats.rate >= 40 ? "#F59E0B" : "#F43F5E";
                       return (
-                        <div key={setup.id} className="bg-white/3 border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl overflow-hidden hover:border-violet-500/20 transition">
+                        <div key={setup.id} className="bg-white/3 border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl overflow-hidden hover:border-[#A78BFA]/25 transition">
                           {setup.imagePreview && (
                             <div className="h-28 overflow-hidden">
                               <img src={setup.imagePreview} alt={setup.name} className="w-full h-full object-cover" />
@@ -5303,17 +5303,17 @@ export default function SwingEdge() {
                               <span className="text-sm font-bold text-white">{setup.name}</span>
                               <div className="flex gap-1">
                                 <button onClick={() => startEdit(setup)}
-                                  className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-slate-500 hover:text-cyan-400 hover:border-cyan-500/20 transition">
+                                  className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-[var(--border-subtle)] dark:border-white/[0.10] text-[var(--v3-text-lo)] hover:text-[var(--v3-info)] hover:border-[#06b6d4]/25 transition">
                                   ✎
                                 </button>
                                 <button onClick={() => deleteSetup(setup.id)}
-                                  className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-slate-500 hover:text-red-400 hover:border-red-500/20 transition">
+                                  className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-[var(--border-subtle)] dark:border-white/[0.10] text-[var(--v3-text-lo)] hover:text-[var(--v3-loss)] hover:border-[#F43F5E]/25 transition">
                                   <Trash2 size={10} />
                                 </button>
                               </div>
                             </div>
                             {setup.description && (
-                              <p className="text-[11px] text-slate-500 mb-2 leading-relaxed">{setup.description}</p>
+                              <p className="text-[11px] text-[var(--v3-text-lo)] mb-2 leading-relaxed">{setup.description}</p>
                             )}
                             {/* Auto success rate from journal */}
                             <div className="flex items-center gap-2">
@@ -5325,7 +5325,7 @@ export default function SwingEdge() {
                                 {stats ? `${stats.rate}% (${nTrades(stats.count, lang)})` : t.noJournalData}
                               </span>
                             </div>
-                            <p className="text-[9px] text-slate-700 mt-1">{t.successRateFromJournal}</p>
+                            <p className="text-[9px] text-[var(--v3-text-lo)] mt-1">{t.successRateFromJournal}</p>
                           </div>
                         </div>
                       );
@@ -5335,31 +5335,31 @@ export default function SwingEdge() {
               </div>
 
               {/* ── DATA EXPORT ── */}
-              <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
+              <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-4">
-                  <Download size={16} className="text-emerald-400" />
+                  <Download size={16} className="text-[var(--v3-text-mid)]" />
                   <h3 className="text-sm font-bold text-white">{t.dataExport}</h3>
                 </div>
-                <p className="text-xs text-slate-500 mb-5">{t.exportDesc}</p>
+                <p className="text-xs text-[var(--v3-text-lo)] mb-5">{t.exportDesc}</p>
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {/* CSV Export */}
                   <div className="bg-white/[0.03] border border-[var(--border-subtle)] dark:border-white/[0.08] rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center flex-shrink-0">
-                        <Download size={14} className="text-emerald-400" />
+                      <div className="w-8 h-8 rounded-lg bg-[var(--v3-accent-glow)] border border-[#00C076]/20 flex items-center justify-center flex-shrink-0">
+                        <Download size={14} className="text-[var(--v3-accent)]" />
                       </div>
                       <div>
                         <div className="text-xs font-bold text-white">{t.journalCsv}</div>
-                        <div className="text-[10px] text-slate-600">{nTrades(trades.length, lang)}</div>
+                        <div className="text-[10px] text-[var(--v3-text-lo)]">{nTrades(trades.length, lang)}</div>
                       </div>
                     </div>
-                    <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
+                    <p className="text-[11px] text-[var(--v3-text-lo)] mb-3 leading-relaxed">
                       {t.csvIncludes}
                     </p>
                     <button
                       onClick={() => exportTradesCSV(trades)}
-                      className="w-full py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 transition flex items-center justify-center gap-1.5">
+                      className="w-full py-2 rounded-lg bg-[var(--v3-accent-glow)] border border-[#00C076]/25 text-[var(--v3-accent)] text-xs font-bold hover:bg-[#00C076]/20 transition flex items-center justify-center gap-1.5">
                       <Download size={12} /> {t.downloadCsv}
                     </button>
                   </div>
@@ -5367,46 +5367,46 @@ export default function SwingEdge() {
                   {/* PDF Report */}
                   <div className="bg-white/[0.03] border border-[var(--border-subtle)] dark:border-white/[0.08] rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center flex-shrink-0">
-                        <FileText size={14} className="text-cyan-400" />
+                      <div className="w-8 h-8 rounded-lg bg-[var(--v3-info-glow)] border border-[#06b6d4]/20 flex items-center justify-center flex-shrink-0">
+                        <FileText size={14} className="text-[var(--v3-info)]" />
                       </div>
                       <div>
                         <div className="text-xs font-bold text-white">{t.monthlyPdf}</div>
-                        <div className="text-[10px] text-slate-600">{new Date().toLocaleString("en-US",{month:"long",year:"numeric"})}</div>
+                        <div className="text-[10px] text-[var(--v3-text-lo)]">{new Date().toLocaleString("en-US",{month:"long",year:"numeric"})}</div>
                       </div>
                     </div>
-                    <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
+                    <p className="text-[11px] text-[var(--v3-text-lo)] mb-3 leading-relaxed">
                       {t.pdfIncludes}
                     </p>
                     <button
                       onClick={() => exportMonthlyPDF(realTrades, capital, stats, monthStats, curEquity)}
-                      className="w-full py-2 rounded-lg bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 text-xs font-bold hover:bg-cyan-500/20 transition flex items-center justify-center gap-1.5">
+                      className="w-full py-2 rounded-lg bg-[var(--v3-info-glow)] border border-[#06b6d4]/25 text-[var(--v3-info)] text-xs font-bold hover:bg-[#06b6d4]/20 transition flex items-center justify-center gap-1.5">
                       <FileText size={12} /> {t.createPdf}
                     </button>
                   </div>
                 </div>
 
-                <p className="text-[10px] text-slate-700 mt-3">
+                <p className="text-[10px] text-[var(--v3-text-lo)] mt-3">
                   {t.pdfNote}
                 </p>
               </div>
 
               {/* ── DANGER ZONE ── */}
-              <div className="mt-8 p-4 border-2 border-rose-500/30 bg-rose-500/5 rounded-2xl">
+              <div className="mt-8 p-4 border border-[#F43F5E]/30 bg-[#F43F5E]/5 rounded-2xl">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-lg">⚠️</span>
-                  <h3 className="font-bold text-rose-400 text-sm">
+                  <h3 className="font-bold text-[var(--v3-loss)] text-sm">
                     {lang === "he" ? "אזור מסוכן" : "Danger Zone"}
                   </h3>
                 </div>
-                <p className="text-sm text-rose-300/80 mb-3">
+                <p className="text-sm text-[#F43F5E]/80 mb-3">
                   {lang === "he"
                     ? "מחיקת כל העסקאות לא ניתנת לביטול. נדרשת סיסמת חשבון לאימות."
                     : "Resetting all trades cannot be undone. Account password is required to confirm."}
                 </p>
                 <button
                   onClick={() => setShowResetAll(true)}
-                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-medium transition"
+                  className="px-4 py-2 bg-[var(--v3-loss)] hover:opacity-90 text-white rounded-lg text-sm font-medium transition"
                 >
                   {lang === "he" ? "אפס יומן" : "Reset Journal"}
                 </button>
