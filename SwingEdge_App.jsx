@@ -3089,17 +3089,17 @@ export default function SwingEdge() {
             {smartLessons.length > 0 && (
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold tracking-widest uppercase text-violet-400">{t.smartLessons}</span>
+                  <span className="text-xs font-semibold tracking-widest uppercase text-[var(--v3-purple)]">{t.smartLessons}</span>
                   <div className="flex-1 h-px bg-white/[0.05]" />
                   <span className="text-[10px] text-slate-600">{t.lessonsSubtitle}</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {smartLessons.map((lesson, i) => (
-                    <div key={lesson.title || `${lesson.type}_${i}`} className={`bg-[var(--bg-elevated)] dark:bg-[#0d1424] border rounded-xl p-4 ${
-                      lesson.type === "strength" ? "border-[#10b981]/25" :
+                    <div key={lesson.title || `${lesson.type}_${i}`} className={`bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border rounded-xl p-4 ${
+                      lesson.type === "strength" ? "border-[#00C076]/25" :
                       lesson.type === "warning" ? "border-amber-500/25" :
-                      lesson.type === "insight" ? "border-cyan-500/25" :
-                      "border-violet-500/25"
+                      lesson.type === "insight" ? "border-[#06b6d4]/25" :
+                      "border-[#A78BFA]/25"
                     }`}>
                       <div className="flex items-start gap-2 mb-2">
                         <span className="text-lg">💡</span>
@@ -3109,10 +3109,10 @@ export default function SwingEdge() {
                         </div>
                       </div>
                       <div className={`text-[10px] p-2 rounded-lg mt-2 ${
-                        lesson.type === "strength" ? "bg-[#10b981]/5 text-[#10b981]" :
+                        lesson.type === "strength" ? "bg-[#00C076]/5 text-[var(--v3-accent)]" :
                         lesson.type === "warning" ? "bg-amber-500/5 text-amber-400" :
-                        lesson.type === "insight" ? "bg-cyan-500/5 text-cyan-400" :
-                        "bg-violet-500/5 text-violet-400"
+                        lesson.type === "insight" ? "bg-[#06b6d4]/5 text-[var(--v3-info)]" :
+                        "bg-[#A78BFA]/5 text-[var(--v3-purple)]"
                       }`}>
                         <span className="font-semibold">→</span> {lesson.action}
                       </div>
@@ -3122,7 +3122,7 @@ export default function SwingEdge() {
               </div>
             )}
             {smartLessons.length === 0 && closedTrades.length < 2 && (
-              <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-violet-500/15 rounded-xl p-4 text-center">
+              <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[#A78BFA]/15 rounded-xl p-4 text-center">
                 <span className="text-xs text-slate-600">{t.noLessonsYet}</span>
               </div>
             )}
@@ -3134,11 +3134,11 @@ export default function SwingEdge() {
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <button onClick={() => setShowJournalFilters(v => !v)}
-                  className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg border transition ${showJournalFilters ? "bg-cyan-500/15 border-cyan-500/30 text-cyan-300" : "bg-white/5 border-white/10 text-slate-400 hover:border-cyan-500/30 hover:text-cyan-300"}`}>
+                  className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg border transition ${showJournalFilters ? "bg-[#06b6d4]/15 border-[#06b6d4]/30 text-[var(--v3-info)]" : "bg-white/5 border-white/10 text-slate-400 hover:border-[#06b6d4]/30 hover:text-[var(--v3-info)]"}`}>
                   <Filter size={11} /> {lang === "he" ? "מסננים" : "Filters"}
                 </button>
                 <button onClick={() => { exportTradesCSV(filteredTrades); toast.success(lang === "he" ? "יוצא כ-CSV" : "CSV exported"); }}
-                  className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:border-emerald-500/30 hover:text-emerald-300 transition">
+                  className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:border-[#00C076]/30 hover:text-[var(--v3-accent)] transition">
                   <Download size={11} /> CSV
                 </button>
                 {openTrades.length > 0 && pricesLastUpdated && (
@@ -3148,7 +3148,7 @@ export default function SwingEdge() {
                 )}
                 {openTrades.length > 0 && (
                   <button onClick={fetchLivePrices} disabled={pricesLoading}
-                    className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-cyan-400 transition disabled:opacity-40 border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg px-2 py-1">
+                    className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-[var(--v3-info)] transition disabled:opacity-40 border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg px-2 py-1">
                     <RefreshCw size={10} className={pricesLoading ? "animate-spin" : ""} />
                     {pricesLoading ? (lang === "he" ? "טוען…" : "Loading…") : (lang === "he" ? "רענן מחירים" : "Refresh")}
                   </button>
@@ -3159,49 +3159,49 @@ export default function SwingEdge() {
             {/* ── PRO STATS BAR ── */}
             {closedTrades.length > 0 && (
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
-                <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
+                <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600">{lang === "he" ? "סה״כ סגורות" : "Closed"}</div>
                   <div className="text-sm font-bold text-white font-mono mt-0.5">{journalStats.total}</div>
                 </div>
-                <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
+                <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{lang === "he" ? "אחוז הצלחה" : "Win Rate"}<TermTooltip term="winRate" lang={lang} /></div>
-                  <div className="text-sm font-bold font-mono mt-0.5 text-emerald-300">{formatPct(journalStats.winRate)}</div>
+                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-accent)]">{formatPct(journalStats.winRate)}</div>
                 </div>
-                <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
+                <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{lang === "he" ? "רווח ממוצע" : "Avg Win"}<TermTooltip term="avgWin" lang={lang} /></div>
-                  <div className="text-sm font-bold font-mono mt-0.5 text-emerald-400">{fmt$(Math.round(journalStats.avgWin))}</div>
+                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-accent)]">{fmt$(Math.round(journalStats.avgWin))}</div>
                 </div>
-                <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
+                <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{lang === "he" ? "הפסד ממוצע" : "Avg Loss"}<TermTooltip term="avgLoss" lang={lang} /></div>
-                  <div className="text-sm font-bold font-mono mt-0.5 text-rose-400">{fmt$(-Math.round(journalStats.avgLoss))}</div>
+                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-loss)]">{fmt$(-Math.round(journalStats.avgLoss))}</div>
                 </div>
-                <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
+                <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">Profit Factor<TermTooltip term="profitFactor" lang={lang} /></div>
-                  <div className="text-sm font-bold font-mono mt-0.5 text-cyan-300">{isFinite(journalStats.profitFactor) ? journalStats.profitFactor.toFixed(2) : "∞"}</div>
+                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-info)]">{isFinite(journalStats.profitFactor) ? journalStats.profitFactor.toFixed(2) : "∞"}</div>
                 </div>
-                <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
+                <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">Max DD<TermTooltip term="maxDD" lang={lang} /></div>
-                  <div className="text-sm font-bold font-mono mt-0.5 text-rose-300">{fmt$(-Math.round(journalStats.maxDD))}</div>
+                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-loss)]">{fmt$(-Math.round(journalStats.maxDD))}</div>
                 </div>
-                <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
+                <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{lang === "he" ? "זמן החזקה" : "Avg Hold"}<TermTooltip term="avgHold" lang={lang} /></div>
-                  <div className="text-sm font-bold font-mono mt-0.5 text-violet-300">{journalStats.avgHold.toFixed(1)}d</div>
+                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-purple)]">{journalStats.avgHold.toFixed(1)}d</div>
                 </div>
               </div>
             )}
 
             {/* ── FILTERS PANEL ── */}
             {showJournalFilters && (
-              <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-cyan-500/20 rounded-xl p-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+              <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[#06b6d4]/20 rounded-xl p-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
                 <div>
                   <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">Ticker</label>
                   <input value={journalFilters.ticker} onChange={e => setJournalFilters(f => ({ ...f, ticker: e.target.value }))}
-                    placeholder="e.g. AAPL" className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-mono text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none" />
+                    placeholder="e.g. AAPL" className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-mono text-white placeholder-slate-600 focus:border-[#06b6d4]/50 focus:outline-none" />
                 </div>
                 <div>
                   <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">Setup</label>
                   <select value={journalFilters.setup} onChange={e => setJournalFilters(f => ({ ...f, setup: e.target.value }))}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:border-cyan-500/50 focus:outline-none">
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:border-[#06b6d4]/50 focus:outline-none">
                     <option value="all">All</option>
                     {uniqueSetups.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
@@ -3209,7 +3209,7 @@ export default function SwingEdge() {
                 <div>
                   <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">Result</label>
                   <select value={journalFilters.result} onChange={e => setJournalFilters(f => ({ ...f, result: e.target.value }))}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:border-cyan-500/50 focus:outline-none">
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:border-[#06b6d4]/50 focus:outline-none">
                     <option value="all">All</option>
                     <option value="win">Win</option>
                     <option value="loss">Loss</option>
@@ -3219,22 +3219,22 @@ export default function SwingEdge() {
                 <div>
                   <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">From</label>
                   <input type="date" value={journalFilters.from} onChange={e => setJournalFilters(f => ({ ...f, from: e.target.value }))}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:border-cyan-500/50 focus:outline-none" />
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:border-[#06b6d4]/50 focus:outline-none" />
                 </div>
                 <div>
                   <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">To</label>
                   <input type="date" value={journalFilters.to} onChange={e => setJournalFilters(f => ({ ...f, to: e.target.value }))}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:border-cyan-500/50 focus:outline-none" />
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:border-[#06b6d4]/50 focus:outline-none" />
                 </div>
                 <div>
                   <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">R Min</label>
                   <input type="number" step="0.1" value={journalFilters.rMin} onChange={e => setJournalFilters(f => ({ ...f, rMin: e.target.value }))}
-                    placeholder="-2" className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-mono text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none" />
+                    placeholder="-2" className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-mono text-white placeholder-slate-600 focus:border-[#06b6d4]/50 focus:outline-none" />
                 </div>
                 <div>
                   <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">R Max</label>
                   <input type="number" step="0.1" value={journalFilters.rMax} onChange={e => setJournalFilters(f => ({ ...f, rMax: e.target.value }))}
-                    placeholder="5" className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-mono text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none" />
+                    placeholder="5" className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-mono text-white placeholder-slate-600 focus:border-[#06b6d4]/50 focus:outline-none" />
                 </div>
                 <div className="col-span-2 md:col-span-4 lg:col-span-7 flex justify-end">
                   <button onClick={() => setJournalFilters({ ticker: "", setup: "all", result: "all", from: "", to: "", rMin: "", rMax: "" })}
@@ -3245,14 +3245,14 @@ export default function SwingEdge() {
               </div>
             )}
             {/* ── VIEW TOGGLE: Table / Calendar ── */}
-            <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
+            <div className="flex gap-1 p-1 bg-[var(--surface-sunken)] dark:bg-white/[0.04] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl w-fit">
               <button
                 type="button"
                 onClick={() => setJournalView('table')}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all
                   ${journalView === 'table'
-                    ? 'bg-white shadow-sm text-emerald-600'
-                    : 'text-slate-500 hover:text-slate-700'}`}
+                    ? 'bg-white dark:bg-[var(--v3-accent-glow)] shadow-sm dark:shadow-none text-emerald-600 dark:text-[var(--v3-accent)]'
+                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
               >
                 {lang === 'he' ? '📋 טבלה' : '📋 Table'}
               </button>
@@ -3261,8 +3261,8 @@ export default function SwingEdge() {
                 onClick={() => setJournalView('calendar')}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all
                   ${journalView === 'calendar'
-                    ? 'bg-white shadow-sm text-emerald-600'
-                    : 'text-slate-500 hover:text-slate-700'}`}
+                    ? 'bg-white dark:bg-[var(--v3-accent-glow)] shadow-sm dark:shadow-none text-emerald-600 dark:text-[var(--v3-accent)]'
+                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
               >
                 {lang === 'he' ? '📅 לוח שנה' : '📅 Calendar'}
               </button>
@@ -3275,13 +3275,13 @@ export default function SwingEdge() {
                 lang={lang}
               />
             ) : trades.length === 0 ? (
-              <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-2xl p-12 text-center">
-                <BookOpen size={36} className="mx-auto text-slate-600 mb-3" />
-                <h3 className="text-sm font-bold text-white mb-2">{lang === "he" ? "אין עדיין עסקאות" : "No trades yet"}</h3>
-                <p className="text-xs text-slate-500 mb-4">{lang === "he" ? "התחל את היומן שלך — הוסף עסקה ראשונה או טען 30 עסקאות לדוגמה" : "Start journaling — add a trade or load 30 demo trades"}</p>
+              <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-2xl p-12 text-center">
+                <BookOpen size={36} className="mx-auto text-slate-600 mb-4" />
+                <h3 className="se-serif text-2xl md:text-3xl text-white mb-2 tracking-tight">{lang === "he" ? "כאן מתחיל התיעוד שלך" : "Your record starts here"}</h3>
+                <p className="text-xs text-slate-500 mb-5 max-w-sm mx-auto leading-relaxed">{lang === "he" ? "כל עסקה היא נתון. הוסף את הראשונה — או טען 30 לדוגמה." : "Every trade is a data point. Add your first — or load 30 demo trades."}</p>
                 <div className="flex flex-wrap items-center justify-center gap-2">
                   <button onClick={() => { setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null }); setOcrStatus(null); setShowForm(true); }}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500 text-black font-bold text-xs hover:bg-cyan-400 transition">
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--v3-accent)] text-black font-bold text-xs hover:opacity-90 transition">
                     <Plus size={13} /> {lang === "he" ? "עסקה ראשונה" : "Add First Trade"}
                   </button>
                   <button onClick={handleLoadDemoTrades}
@@ -3291,16 +3291,16 @@ export default function SwingEdge() {
                 </div>
               </div>
             ) : filteredTrades.length === 0 ? (
-              <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-2xl p-8 text-center">
+              <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-2xl p-8 text-center">
                 <Filter size={28} className="mx-auto text-slate-600 mb-3" />
-                <h3 className="text-sm font-bold text-white mb-1">{lang === "he" ? "אין תוצאות למסננים" : "No matching trades"}</h3>
-                <p className="text-xs text-slate-500">{lang === "he" ? "נסה לשנות או לנקות את המסננים" : "Try adjusting the filters"}</p>
+                <h3 className="text-sm font-bold text-white mb-1">{lang === "he" ? "אין עסקה שתואמת" : "Nothing matches"}</h3>
+                <p className="text-xs text-slate-500">{lang === "he" ? "רופף את המסננים כדי לראות יותר" : "Loosen the filters to see more"}</p>
               </div>
             ) : (
             <>
             {selectedTrades.size > 0 && (
-              <div className="sticky top-0 z-10 bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 mb-3 flex items-center justify-between backdrop-blur shadow-sm">
-                <span className="text-sm font-medium text-emerald-300">
+              <div className="sticky top-0 z-10 bg-[#00C076]/10 border border-[#00C076]/30 rounded-xl p-3 mb-3 flex items-center justify-between backdrop-blur shadow-sm">
+                <span className="text-sm font-medium text-[var(--v3-accent)]">
                   {lang === "he"
                     ? `${selectedTrades.size} עסקאות נבחרו`
                     : `${selectedTrades.size} trades selected`}
@@ -3314,14 +3314,14 @@ export default function SwingEdge() {
                   </button>
                   <button
                     onClick={handleBulkDelete}
-                    className="px-3 py-1.5 text-sm bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-medium transition"
+                    className="px-3 py-1.5 text-sm bg-[var(--v3-loss)] hover:opacity-90 text-white rounded-lg font-medium transition"
                   >
                     🗑️ {lang === "he" ? "מחק נבחרים" : "Delete Selected"}
                   </button>
                 </div>
               </div>
             )}
-            <div className="overflow-x-auto bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl">
+            <div className="overflow-x-auto bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-slate-600 border-b border-[var(--border-subtle)] dark:border-white/[0.06] text-[10px] tracking-widest uppercase">
@@ -3343,11 +3343,11 @@ export default function SwingEdge() {
                             setSelectedTrades(new Set());
                           }
                         }}
-                        className="w-3.5 h-3.5 rounded border border-white/20 bg-white/5 cursor-pointer accent-cyan-500"
+                        className="w-3.5 h-3.5 rounded border border-white/20 bg-white/5 cursor-pointer accent-[var(--v3-info)]"
                       />
                     </th>
                     {["Ticker","Date","Side","Entry","Stop","Target","Shares",t.currentPrice,t.livePnl,"Exit","P&L","R","Hold","Setup","Mkt","Emotion","★","Exit Rsn","Plan","Lesson","Status","Action"].map(h => (
-                      <th key={h} className={`p-3 text-start font-semibold whitespace-nowrap ${h===t.currentPrice||h===t.livePnl ? "text-cyan-600" : ""}`}>{h}</th>
+                      <th key={h} className={`p-3 text-start font-semibold whitespace-nowrap ${h===t.currentPrice||h===t.livePnl ? "text-[var(--v3-info)]" : ""}`}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -3358,8 +3358,8 @@ export default function SwingEdge() {
                     const win = !isOpen && pnl > 0;
                     const isSelected = selectedTrades.has(t.id);
                     return (
-                      <tr key={t.id} className={`border-b border-white/[0.04] transition-colors ${isSelected ? "bg-cyan-500/[0.06]" : ""} ${!isOpen && win ? "hover:bg-[#10b981]/[0.04]" : !isOpen ? "hover:bg-[#ef4444]/[0.04]" : "hover:bg-white/[0.03]"}`}>
-                        <td className="p-3 w-8">
+                      <tr key={t.id} className={`border-b border-white/[0.04] transition-colors ${isSelected ? "bg-[#06b6d4]/[0.06]" : ""} ${!isOpen && win ? "hover:bg-[#00C076]/[0.04]" : !isOpen ? "hover:bg-[#F43F5E]/[0.04]" : "hover:bg-white/[0.03]"}`}>
+                        <td className={`p-3 w-8 border-s-[3px] ${isOpen ? "border-[#06b6d4]/40" : win ? "border-[var(--v3-accent)]" : "border-[var(--v3-loss)]"}`}>
                           <input
                             type="checkbox"
                             aria-label={lang === "he" ? "בחר עסקה" : "Select trade"}
@@ -3372,15 +3372,15 @@ export default function SwingEdge() {
                                 return next;
                               });
                             }}
-                            className="w-3.5 h-3.5 rounded border border-white/20 bg-white/5 cursor-pointer accent-cyan-500"
+                            className="w-3.5 h-3.5 rounded border border-white/20 bg-white/5 cursor-pointer accent-[var(--v3-info)]"
                           />
                         </td>
                         <td className="p-3 font-bold text-white font-mono whitespace-nowrap"><div className="flex items-center gap-1.5"><TickerLogo ticker={t.ticker} size={16} />{t.ticker}{t.isDemo && <span className="text-xs bg-slate-700 text-slate-400 px-1 py-0.5 rounded ms-1 font-normal">DEMO</span>}</div></td>
                         <td className="p-3 text-slate-500 whitespace-nowrap">{t.date}</td>
-                        <td className="p-3"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side==="LONG"?"bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20":"bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20"}`}>{t.side}</span></td>
+                        <td className="p-3"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side==="LONG"?"bg-[#00C076]/10 text-[var(--v3-accent)] border border-[#00C076]/20":"bg-[#F43F5E]/10 text-[var(--v3-loss)] border border-[#F43F5E]/20"}`}>{t.side}</span></td>
                         <td className="p-3 font-mono text-slate-300">${t.entry}</td>
-                        <td className="p-3 font-mono text-[#ef4444]">${t.stop}</td>
-                        <td className="p-3 font-mono text-[#10b981]">${t.target}</td>
+                        <td className="p-3 font-mono text-[var(--v3-loss)]">${t.stop}</td>
+                        <td className="p-3 font-mono text-[var(--v3-accent)]">${t.target}</td>
                         <td className="p-3 font-mono text-slate-400">{t.shares}</td>
                         {/* Current Price */}
                         <td className="p-3 font-mono text-xs whitespace-nowrap">
@@ -3401,24 +3401,24 @@ export default function SwingEdge() {
                             const lp = t.side === "LONG"
                               ? (cp - t.entry) * t.shares
                               : (t.entry - cp) * t.shares;
-                            return <span className={lp >= 0 ? "text-[#10b981]" : "text-[#ef4444]"}>{fmt$(Math.round(lp))}</span>;
+                            return <span className={lp >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}>{fmt$(Math.round(lp))}</span>;
                           })()}
                         </td>
                         <td className="p-3 font-mono text-slate-300">{t.exit ? `$${t.exit}` : "–"}</td>
-                        <td className={`p-3 font-bold font-mono ${isOpen ? "text-slate-500" : win ? "text-[#10b981]" : "text-[#ef4444]"}`}>
+                        <td className={`p-3 font-bold font-mono text-sm ${isOpen ? "text-slate-500" : win ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>
                           {isOpen ? "–" : fmt$(Math.round(pnl))}
                         </td>
-                        <td className={`p-3 font-bold font-mono text-xs ${isOpen ? "text-slate-500" : rMultiple >= 0 ? "text-cyan-400" : "text-[#ef4444]"}`}>
+                        <td className={`p-3 font-bold font-mono text-xs ${isOpen ? "text-slate-500" : rMultiple >= 0 ? "text-[var(--v3-info)]" : "text-[var(--v3-loss)]"}`}>
                           {isOpen ? "–" : fmtR(rMultiple)}
                         </td>
-                        <td className="p-3 text-[10px] font-mono text-violet-300 whitespace-nowrap">
+                        <td className="p-3 text-[10px] font-mono text-[var(--v3-purple)] whitespace-nowrap">
                           {(() => {
                             const d = holdTimeDays(t);
                             if (typeof d !== "number") return <span className="text-slate-700">–</span>;
                             return d === 0 ? "<1d" : `${d}d`;
                           })()}
                         </td>
-                        <td className="p-3"><span className="inline-flex items-center gap-1"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 whitespace-nowrap">{t.setup}</span><SetupTagTip setup={t.setup} isRTL={isRTL} /></span></td>
+                        <td className="p-3"><span className="inline-flex items-center gap-1"><span className="text-[10px] px-2 py-0.5 rounded bg-[#A78BFA]/10 text-[var(--v3-purple)] border border-[#A78BFA]/20 whitespace-nowrap">{t.setup}</span><SetupTagTip setup={t.setup} isRTL={isRTL} /></span></td>
                         <td className="p-3 text-slate-500 text-[10px] whitespace-nowrap">{t.marketCondition || "–"}</td>
                         <td className="p-3 text-slate-500 text-[10px] whitespace-nowrap">{t.emotionAtEntry || "–"}</td>
                         <td className="p-3 text-amber-400 text-xs font-mono">{qstars(t.entryQuality) ? `${"★".repeat(qstars(t.entryQuality))}` : "–"}</td>
@@ -3428,29 +3428,29 @@ export default function SwingEdge() {
                             : <span className="text-slate-700">–</span>}
                         </td>
                         <td className="p-3 text-center">
-                          {t.followedPlan === true        && <span className="text-[#10b981] text-sm font-bold">✓</span>}
-                          {t.followedPlan === false       && <span className="text-[#ef4444] text-sm font-bold">✗</span>}
+                          {t.followedPlan === true        && <span className="text-[var(--v3-accent)] text-sm font-bold">✓</span>}
+                          {t.followedPlan === false       && <span className="text-[var(--v3-loss)] text-sm font-bold">✗</span>}
                           {t.followedPlan === "Partially" && <span className="text-amber-400 text-sm font-bold">◐</span>}
                           {t.followedPlan == null         && <span className="text-slate-700 text-[10px]">–</span>}
                         </td>
                         <td className="p-3 text-slate-500 text-[10px] max-w-[160px] truncate" title={t.lessonLearned || t.notes}>
                           {t.lessonLearned
-                            ? <span className="text-violet-400/80">💡 {t.lessonLearned}</span>
+                            ? <span className="text-[#A78BFA]/80">💡 {t.lessonLearned}</span>
                             : t.notes
                               ? <span className="text-slate-600">{t.notes}</span>
                               : <span className="text-slate-700">–</span>}
                         </td>
-                        <td className="p-3"><span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${isOpen ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20" : "bg-slate-500/10 text-slate-500 border border-slate-700"}`}>{t.status}</span></td>
+                        <td className="p-3"><span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${isOpen ? "bg-[#06b6d4]/10 text-[var(--v3-info)] border border-[#06b6d4]/20" : "bg-slate-500/10 text-slate-500 border border-slate-700"}`}>{t.status}</span></td>
                         <td className="p-3">
                           <div className="flex items-center gap-1 whitespace-nowrap">
                             {isOpen && (
                               <button onClick={()=>{setClosingTrade(t);setShowCloseForm(true);}}
-                                className="text-[10px] px-2 py-1 rounded bg-[#ef4444]/10 border border-[#ef4444]/20 text-[#ef4444] hover:opacity-80 transition">
+                                className="text-[10px] px-2 py-1 rounded bg-[#F43F5E]/10 border border-[#F43F5E]/20 text-[var(--v3-loss)] hover:opacity-80 transition">
                                 Close
                               </button>
                             )}
                             <button onClick={() => handleEditOpen(t)}
-                              className="text-[10px] px-1.5 py-1 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 hover:opacity-80 transition"
+                              className="text-[10px] px-1.5 py-1 rounded bg-[#06b6d4]/10 border border-[#06b6d4]/20 text-[var(--v3-info)] hover:opacity-80 transition"
                               title={lang === "he" ? "עריכה" : "Edit"}>✏️</button>
                             <button onClick={() => handleDeleteTrade(t.id)}
                               className="text-[10px] px-1.5 py-1 rounded bg-slate-500/10 border border-slate-500/20 text-slate-400 hover:text-red-400 hover:border-red-500/30 transition"
