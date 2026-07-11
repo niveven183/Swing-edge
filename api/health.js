@@ -9,7 +9,8 @@
 // blip must NOT page us — it is non-fatal (reported under `warnings`, still 200).
 // Finnhub is also non-fatal for the same reason (transient 401/429/timeout
 // shouldn't page us either — see console.error in checkFinnhub for root cause).
-// Supabase / CoinGecko stay hard-fail (503) since they're load-bearing.
+// CoinGecko is also non-fatal now — its rate-limits/timeouts shouldn't page us.
+// Supabase stays the sole hard-fail (503) dependency since it's load-bearing.
 //
 //   GET /api/health
 //     → 200 { status: "ok", checks: {...} }                         all pass
@@ -85,8 +86,9 @@ const SERVICES = {
 
 // Non-fatal deps: reported under `warnings`, never trigger a 503. TwelveData's
 // credit rate-limits (429/timeout) shouldn't page us on a transient blip;
-// Finnhub gets the same treatment (see checkFinnhub's console.error for cause).
-const NON_FATAL = new Set(["twelvedata", "finnhub"]);
+// Finnhub gets the same treatment (see checkFinnhub's console.error for cause);
+// CoinGecko's public API is similarly prone to transient rate-limits/timeouts.
+const NON_FATAL = new Set(["twelvedata", "finnhub", "coingecko"]);
 
 async function run(fn) {
   const start = Date.now();

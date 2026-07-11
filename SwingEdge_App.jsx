@@ -3537,7 +3537,7 @@ export default function SwingEdge() {
                           <span className="text-sm font-mono font-bold text-white">${q.price.toFixed(2)}</span>
                         )}
                         {q?.changePct != null && (
-                          <span className={`text-[11px] font-mono ${q.changePct >= 0 ? "text-[#10b981]" : "text-[#ef4444]"}`}>
+                          <span className={`text-[11px] font-mono ${q.changePct >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>
                             {q.changePct >= 0 ? "+" : ""}{q.changePct.toFixed(2)}%
                           </span>
                         )}
@@ -3559,11 +3559,11 @@ export default function SwingEdge() {
                       </div>
                       <div className="text-center">
                         <div className="uppercase tracking-wider">High</div>
-                        <div className="font-mono text-[#10b981]">{q?.regularMarketDayHigh != null ? q.regularMarketDayHigh.toFixed(2) : "—"}</div>
+                        <div className="font-mono text-[var(--v3-accent)]">{q?.regularMarketDayHigh != null ? q.regularMarketDayHigh.toFixed(2) : "—"}</div>
                       </div>
                       <div className="text-center">
                         <div className="uppercase tracking-wider">Low</div>
-                        <div className="font-mono text-[#ef4444]">{q?.regularMarketDayLow != null ? q.regularMarketDayLow.toFixed(2) : "—"}</div>
+                        <div className="font-mono text-[var(--v3-loss)]">{q?.regularMarketDayLow != null ? q.regularMarketDayLow.toFixed(2) : "—"}</div>
                       </div>
                       <div className="text-center">
                         <div className="uppercase tracking-wider">Pre</div>
