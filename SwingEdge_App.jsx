@@ -42,7 +42,7 @@ import {
 import { getTranslations, LANGUAGES, isRTLLang, nTrades } from "./src/i18n.js";
 import {
   fetchPrices, fmtVolume, fmtMarketCap, searchTickers,
-  fetchQuote, getMarketState, getMarketStateBadge, getRefreshInterval, MARKET_STATE,
+  fetchQuote, fetchEarnings, getMarketState, getMarketStateBadge, getRefreshInterval, MARKET_STATE,
   fetchMarketOverview, getOverviewRefreshInterval,
 } from "./src/priceService.js";
 import { POPULAR_TICKERS as STATIC_TICKERS, getTickerMeta, searchTickers as searchStaticTickers } from "./src/data/tickers.js";
@@ -1719,9 +1719,26 @@ export default function SwingEdge() {
     const id = setTimeout(() => setCoachForm(form), 300);
     return () => clearTimeout(id);
   }, [form]);
+
+  // Earnings awareness (timing channel). Keyed on the ticker alone so entry/stop
+  // keystrokes don't refetch. Fail-open: any failure → null → Coach runs normally.
+  const [coachEarnings, setCoachEarnings] = useState(null);
+  useEffect(() => {
+    const ticker = form.ticker.trim();
+    if (!ticker) { setCoachEarnings(null); return; }
+    let cancelled = false;
+    const id = setTimeout(async () => {
+      const e = await fetchEarnings(ticker);
+      if (!cancelled) setCoachEarnings(e);
+    }, 300);
+    return () => { cancelled = true; clearTimeout(id); };
+  }, [form.ticker]);
+
   const aiCoach = useMemo(
-    () => SwingEdgeAI.analyzeNewTrade(coachForm, realTrades, { marketData: regimeOverview }),
-    [coachForm, realTrades, regimeOverview]
+    () => SwingEdgeAI.analyzeNewTrade(coachForm, realTrades, {
+      marketData: { ...(regimeOverview || {}), earnings: coachEarnings },
+    }),
+    [coachForm, realTrades, regimeOverview, coachEarnings]
   );
 
   // ─── CENTRAL EQUITY ENGINE ──────────────────────────────────────────────────
@@ -5522,6 +5539,13 @@ export default function SwingEdge() {
                         {q?.changePct != null && (
                           <span className={`text-[11px] font-mono ${q.changePct >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>
                             {q.changePct >= 0 ? "+" : ""}{q.changePct.toFixed(2)}%
+                          </span>
+                        )}
+                        {coachEarnings?.daysUntil != null && coachEarnings.daysUntil >= 0 && coachEarnings.daysUntil <= 5 && (
+                          <span className="text-[10px] font-bold tracking-wider px-2 py-0.5 rounded-full border bg-[var(--v3-warn)]/10 border-[var(--v3-warn)]/30 text-[var(--v3-warn)]">
+                            {lang === "he"
+                              ? `📅 Earnings בעוד ${coachEarnings.daysUntil} ימים`
+                              : `📅 Earnings in ${coachEarnings.daysUntil}d`}
                           </span>
                         )}
                       </div>

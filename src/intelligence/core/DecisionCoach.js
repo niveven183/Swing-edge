@@ -300,6 +300,44 @@ const sequentialCheck = (trades) => {
   return null;
 };
 
+// ─── TIMING CHANNEL — EARNINGS AWARENESS ─────────────────────────────────────
+// Entering a swing right before earnings is a binary bet (gap ±20%), not a
+// setup. earnings: { symbol, nextEarningsDate, daysUntil } | null. Silent when
+// absent (crypto / no report in window) — fail-open. daysUntil <= 2 also clamps
+// the verdict to CAUTION (applied in coachTrade, outside the score engine).
+const earningsDayPhrase = (n, lang) => {
+  if (lang === "he") {
+    if (n <= 0) return "היום";
+    if (n === 1) return "מחר";
+    if (n === 2) return "בעוד יומיים";
+    return `בעוד ${n} ימים`;
+  }
+  if (n <= 0) return "today";
+  if (n === 1) return "tomorrow";
+  return `in ${n} days`;
+};
+
+const earningsCheck = (earnings) => {
+  if (!earnings || earnings.daysUntil == null) return null;
+  const n = earnings.daysUntil;
+  if (n > 5 || n < 0) return null;
+  const sym = earnings.symbol || "This ticker";
+  if (n <= 2) return {
+    icon: "📅", kind: "warn", channel: "timing", weight: -20,
+    text: {
+      en: `⚠️ ${sym} reports ${earningsDayPhrase(n, "en")} — entering now is a binary bet, not a setup.`,
+      he: `⚠️ ${sym} מדווחת ${earningsDayPhrase(n, "he")} — כניסה עכשיו = הימור בינארי, לא setup.`,
+    },
+  };
+  return {
+    icon: "📅", kind: "warn", channel: "timing", weight: -6,
+    text: {
+      en: `${sym} reports ${earningsDayPhrase(n, "en")} — consider waiting until after earnings.`,
+      he: `${sym} מדווחת ${earningsDayPhrase(n, "he")} — שקול לחכות עד אחרי הדוחות.`,
+    },
+  };
+};
+
 const regimeCheck = (regimeReport, idea) => {
   if (!regimeReport || !idea.setup) return null;
   const compat = isSetupCompatible(regimeReport, idea.setup);
@@ -347,7 +385,7 @@ const prioritizeInsights = (list) =>
 
 // ─── PUBLIC API ──────────────────────────────────────────────────────────────
 // coachTrade: { form, trades, dna, edges, regime, lang }
-export const coachTrade = ({ form, trades = [], dna = null, edges = null, regime = null } = {}) => {
+export const coachTrade = ({ form, trades = [], dna = null, edges = null, regime = null, earnings = null } = {}) => {
   if (!form || !form.entry || !form.stop) {
     return {
       verdict: "PENDING",
@@ -373,12 +411,20 @@ export const coachTrade = ({ form, trades = [], dna = null, edges = null, regime
     entryQualityCheck(idea),
     sequentialCheck(trades),
     regimeCheck(regime, idea),
+    earningsCheck(earnings),
   ].filter(Boolean);
 
   // Score aggregation, clipped to a 0..100 confidence band.
   const rawScore = checks.reduce((s, c) => s + c.weight, 0);
   const confidence = Math.max(0, Math.min(100, 50 + rawScore * 2));
-  const verdict = verdictFrom(rawScore);
+
+  // Verdict engine is untouched — this clamp wraps *around* it: entering within
+  // 48h of earnings caps the verdict at CAUTION regardless of how strong the
+  // setup scores. Binary event risk is a commercial call, not a score nudge.
+  let verdict = verdictFrom(rawScore);
+  if (earnings && earnings.daysUntil != null && earnings.daysUntil <= 2 && verdict === "GO") {
+    verdict = "CAUTION";
+  }
 
   // Edge match + anti-edge match
   const edgeMatch     = edges ? matchIdeaToEdge(edges, idea)     : null;

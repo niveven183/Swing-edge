@@ -56,6 +56,9 @@ export const SwingEdgeAI = {
     dna:    SwingEdgeAI.getDNA(trades),
     edges:  SwingEdgeAI.getEdges(trades),
     regime: SwingEdgeAI.getRegime(trades, opts),
+    // Timing channel — earnings rides inside marketData but never reaches the
+    // regime classifier (it ignores unknown keys); pulled out here for the Coach.
+    earnings: opts?.marketData?.earnings ?? null,
   }),
 
   // Standalone Analyzer — runs the SAME coach engine as analyzeNewTrade, then

@@ -271,6 +271,23 @@ export const fetchQuote = async (ticker) => {
   return q || null;
 };
 
+// Next-earnings-date lookup for the Decision Coach's timing channel, via the
+// isolated /api/earnings proxy. Crypto (-USD) is skipped client-side to save a
+// call; the proxy is the real guarantee (empty calendar → null). Fail-open:
+// any failure resolves to null so the Coach runs without a timing insight.
+export const fetchEarnings = async (ticker) => {
+  const t = String(ticker || "").toUpperCase().trim();
+  if (!t || /-USD$/.test(t)) return null;
+  try {
+    const res = await fetch(`/api/earnings?symbol=${encodeURIComponent(t)}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const d = await res.json();
+    return d && typeof d === "object" && d.symbol ? d : null;
+  } catch {
+    return null;
+  }
+};
+
 export const fmtVolume = (vol) => {
   if (!vol) return "—";
   if (vol >= 1e9) return `${(vol / 1e9).toFixed(1)}B`;
