@@ -56,7 +56,7 @@ import {
   Download, FileText, Bell, Flame, Globe, LogOut, MessageCircle,
   Shield, Filter, Save, BarChart3, ChevronDown, HelpCircle, Lock,
   CreditCard, Smartphone, Wrench, Sun, Moon, Monitor, KeyRound, ExternalLink, RotateCcw, Pencil,
-  Users, GraduationCap, UserPlus
+  Users, GraduationCap, UserPlus, NotebookPen, CalendarCheck
 } from "lucide-react";
 import { getTranslations, LANGUAGES, isRTLLang, nTrades } from "./src/i18n.js";
 import {
@@ -84,6 +84,8 @@ import { AdaptiveLessons } from "./src/intelligence/core/AdaptiveLessons.js";
 import GrowthPredictor from "./src/components/GrowthPredictor.jsx";
 import MonthlyReportTab from "./src/components/MonthlyReportTab.jsx";
 import MonthlyReportModal from "./src/components/MonthlyReportModal.jsx";
+import NotebookTab from "./src/components/NotebookTab.jsx";
+import WeeklyReviewTab from "./src/components/WeeklyReviewTab.jsx";
 import { generateMonthlyReport, findBestMonth } from "./src/intelligence/core/MonthlyReport.js";
 // "?" beside a mapped setup tag — canonical name/definition/coach line. Returns
 // null for unmapped / "Other" / empty setups, so the tag stays plain (as before).
@@ -981,6 +983,8 @@ const RibbonTicker = ({ item }) => {
 const NAV_KEYS = [
   { id: "dashboard", key: "dashboard",      icon: LayoutDashboard },
   { id: "journal",   key: "journal",        icon: BookOpen },
+  { id: "notebook",  key: "notebookTab",     icon: NotebookPen },
+  { id: "weeklyReview", key: "weeklyReviewTab", icon: CalendarCheck },
   { id: "tools",     key: "tools",           icon: Wrench },
   { id: "analytics", key: "analytics",      icon: BarChart2 },
   { id: "intel",     key: "marketIntel",    icon: Rss },
@@ -5977,6 +5981,24 @@ export default function SwingEdge() {
           <MonthlyReportTab
             trades={realTrades}
             calcMetrics={calcTradeMetrics}
+            t={t}
+            lang={lang}
+            isRTL={isRTL}
+          />
+        )}
+
+        {/* ══════════════ NOTEBOOK (B3 — free-form trader notes) ══════════════ */}
+        {tab === "notebook" && (
+          <NotebookTab authUser={authUser} t={t} lang={lang} isRTL={isRTL} />
+        )}
+
+        {/* ══════════════ WEEKLY REVIEW (B3 — rolling 7-day engine summary) ══════════════ */}
+        {tab === "weeklyReview" && (
+          <WeeklyReviewTab
+            trades={realTrades}
+            capital={capital}
+            calcMetrics={calcTradeMetrics}
+            authUser={authUser}
             t={t}
             lang={lang}
             isRTL={isRTL}
