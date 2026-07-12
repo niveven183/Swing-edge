@@ -48,6 +48,7 @@ import {
 } from "./src/priceService.js";
 import { POPULAR_TICKERS as STATIC_TICKERS, getTickerMeta, searchTickers as searchStaticTickers } from "./src/data/tickers.js";
 import { SwingEdgeAI } from "./src/intelligence/SwingEdgeAI.js";
+import { calculateTradeDNA } from "./src/intelligence/core/TradeDNA.js";
 import { dayLabel } from "./src/intelligence/utils/statisticalModels.js";
 import {
   DNACard, EdgeCard, DecisionCoachPanel, TiltShield, GrowthChart, RegimeIndicator, PatternTags,
@@ -1313,6 +1314,13 @@ export default function SwingEdge() {
   const [myMentors, setMyMentors] = useState([]);   // mentorships where I am the mentee
   const [myMentees, setMyMentees] = useState([]);   // mentorships where I am the mentor
 
+  // Mentor Dashboard (B4.3) — read-only view into an active mentee's data.
+  // Kept strictly separate from the mentor's OWN trades/stats/DNA. No writes ever.
+  const [mentoringMenteeId, setMentoringMenteeId] = useState(null); // selected mentee user_id
+  const [menteeTrades, setMenteeTrades] = useState([]);             // selected mentee's trades
+  const [menteeTeasers, setMenteeTeasers] = useState({});           // { [mentee_id]: {count, winRate} }
+  const [menteeLoading, setMenteeLoading] = useState(false);
+
   // Edit trade state (modal owns its form; we just track the open trade)
   const [editingTrade, setEditingTrade] = useState(null);
   const showEditForm = editingTrade != null;
@@ -1623,6 +1631,13 @@ export default function SwingEdge() {
   // ─── MASTER STATS HUB — single source of truth ──────────────────────────────
   const stats = useTradingStats(realTrades, capital, stableCalcTradeMetrics);
   const { totalPnL, winRate, avgR } = stats;
+
+  // Mentor Dashboard (B4.3) — derived analytics for the SELECTED mentee. Kept
+  // separate from the mentor's own `stats`/`aiDNA` so the two never mix. Both
+  // hooks run unconditionally with an empty default until a mentee is chosen.
+  const menteeRealTrades = useMemo(() => menteeTrades.filter(t => !t.isDemo), [menteeTrades]);
+  const menteeStats = useTradingStats(menteeRealTrades, capital, stableCalcTradeMetrics);
+  const menteeDNA = useMemo(() => calculateTradeDNA(menteeRealTrades), [menteeRealTrades]);
 
   // Current-month subset fed through the same hub — powers the monthly PDF export.
   const currentMonthRealTrades = useMemo(() => {
@@ -2227,6 +2242,68 @@ export default function SwingEdge() {
     await loadMentorships();
   }, [authUser?.id, confirmDialog, toast, lang, loadMentorships]);
 
+  // ── Mentor Dashboard (B4.3) — read-only ───────────────────────────────
+  // Teaser stats (trade count + win rate) for every active mentee in one shot.
+  // RLS's SELECT-only "mentors read active mentee trades" returns rows only for
+  // active mentees, so this can never leak a revoked/foreign user's data.
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+    const ids = myMentees.map((m) => m.mentee_id);
+    if (ids.length === 0) { setMenteeTeasers({}); return; }
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("trades")
+        .select("user_id,status,side,entry,exit,shares,stop,is_demo")
+        .in("user_id", ids);
+      if (cancelled || error || !data) return;
+      const byUser = {};
+      for (const row of data) {
+        if (row.is_demo) continue; // teaser mirrors real trades only
+        const u = row.user_id;
+        (byUser[u] ||= { count: 0, closed: 0, wins: 0 });
+        byUser[u].count += 1;
+        if (row.status === "CLOSED") {
+          byUser[u].closed += 1;
+          if ((calcTradeMetrics(row).pnl || 0) > 0) byUser[u].wins += 1;
+        }
+      }
+      const teasers = {};
+      for (const [u, s] of Object.entries(byUser)) {
+        teasers[u] = { count: s.count, winRate: s.closed ? (s.wins / s.closed) * 100 : 0 };
+      }
+      if (!cancelled) setMenteeTeasers(teasers);
+    })();
+    return () => { cancelled = true; };
+  }, [myMentees]);
+
+  // Load one mentee's full trade set on selection. Normalized through the same
+  // cleanTrades/purge pipeline as the mentor's own trades so DNA/stats match.
+  const selectMentee = useCallback(async (menteeId) => {
+    if (!isSupabaseConfigured || !supabase || !menteeId) return;
+    setMentoringMenteeId(menteeId);
+    setMenteeLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("trades")
+        .select("*")
+        .eq("user_id", menteeId)
+        .order("date", { ascending: false });
+      if (error) { toast.error(error.message); setMenteeTrades([]); return; }
+      setMenteeTrades(purgeInvalidTrades(cleanTrades(data || [])));
+    } finally {
+      setMenteeLoading(false);
+    }
+  }, [toast]);
+
+  // If a mentee is revoked while selected, drop the stale view.
+  useEffect(() => {
+    if (mentoringMenteeId && !myMentees.some((m) => m.mentee_id === mentoringMenteeId)) {
+      setMentoringMenteeId(null);
+      setMenteeTrades([]);
+    }
+  }, [myMentees, mentoringMenteeId]);
+
   // Unified symbol pick from the professional search: add to watchlist (if new)
   // AND load it on the chart — one action, one search box.
   const handleSymbolPick = useCallback((tvSym, r) => {
@@ -2754,7 +2831,11 @@ export default function SwingEdge() {
 
       {/* ── NAV ── */}
       <nav data-tour="main-nav" className="flex flex-wrap sm:flex-nowrap items-center justify-center sm:justify-start gap-0 px-2 sm:px-5 border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-[var(--bg-elevated)] sm:overflow-x-auto">
-        {NAV_KEYS.map(({ id, key, icon: Icon }) => (
+        {[
+          ...NAV_KEYS,
+          // Mentoring tab (B4.3) — only for users who are an active mentor.
+          ...(myMentees.length > 0 ? [{ id: "mentoring", key: "mentoringTab", icon: Users }] : []),
+        ].map(({ id, key, icon: Icon }) => (
           <button key={id} data-tour-tab={id} onClick={() => setTab(id)}
             className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-3 text-xs font-semibold tracking-wide transition-all whitespace-nowrap border-b-2 shrink-0
               ${tab === id
@@ -2768,6 +2849,120 @@ export default function SwingEdge() {
 
       {/* ── CONTENT ── */}
       <main className="flex-1 overflow-auto p-4 md:p-5 space-y-5">
+
+        {/* ══════════════ MENTORING (B4.3 — read-only mentee view) ══════════════ */}
+        {tab === "mentoring" && (
+          <div className="space-y-5">
+            <div className="flex items-center gap-2">
+              <Users size={18} className="text-[var(--v3-accent)]" />
+              <h2 className="text-lg font-bold text-white">{t.mentoringTab}</h2>
+            </div>
+            <p className="text-xs text-[var(--v3-text-lo)] -mt-3">{t.mentoringPickMentee}</p>
+
+            {/* Mentee list — teaser (count + win rate) per active mentee */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {myMentees.map((m) => {
+                const teaser = menteeTeasers[m.mentee_id];
+                const active = mentoringMenteeId === m.mentee_id;
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => selectMentee(m.mentee_id)}
+                    className={`text-start rounded-[var(--v3-radius-card)] p-4 border transition-all bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)]
+                      ${active
+                        ? "border-[var(--v3-accent)] ring-1 ring-[var(--v3-accent)]/40"
+                        : "border-[var(--border-subtle)] dark:border-white/[0.06] hover:border-[var(--v3-accent)]/40"}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-sm font-bold text-[var(--v3-accent)] tracking-wider">
+                        {m.mentee_id.slice(0, 8)}
+                      </span>
+                      {active && <Eye size={14} className="text-[var(--v3-accent)]" />}
+                    </div>
+                    <div className="mt-2 text-xs text-[var(--v3-text-mid)]">
+                      {teaser
+                        ? `${teaser.count} ${t.tradesUnit} · ${formatPct(teaser.winRate)} ${t.winRateShort}`
+                        : t.menteeNoTrades}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Selected mentee panel — read-only */}
+            {mentoringMenteeId && (
+              <div className="space-y-4">
+                {/* Context banner — clearly separates mentee data from the mentor's own */}
+                <div className="flex flex-wrap items-center gap-2 rounded-[var(--v3-radius-card)] px-4 py-3 bg-[var(--v3-accent-glow)] border border-[var(--v3-accent)]/30">
+                  <Eye size={15} className="text-[var(--v3-accent)]" />
+                  <span className="text-sm font-semibold text-white">
+                    {t.viewingAsMentor} <span className="font-mono text-[var(--v3-accent)]">{mentoringMenteeId.slice(0, 8)}</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-[var(--v3-radius-pill)] bg-[var(--v3-accent)]/15 text-[var(--v3-accent)]">
+                    <Lock size={10} /> {t.readOnlyNotice}
+                  </span>
+                </div>
+
+                {menteeLoading ? (
+                  <div className="text-center text-sm text-[var(--v3-text-lo)] py-10">…</div>
+                ) : menteeRealTrades.length === 0 ? (
+                  <div className="text-center text-sm text-[var(--v3-text-lo)] py-10">{t.menteeNoTrades}</div>
+                ) : (
+                  <>
+                    {/* Trading DNA — the mentee's, not the mentor's */}
+                    <DNACard dna={menteeDNA} lang={lang} />
+
+                    {/* Core stat cards from the mentee's own stats */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <StatCard label={t.winRate}      value={formatPct(menteeStats.winRate)} sub={`${menteeStats.wins}W / ${menteeStats.losses}L`} icon={Target}     accent="purple" />
+                      <StatCard label={t.avgRMultiple} value={fmtR(menteeStats.avgR)}         sub={t.perClosedTrade}                                icon={Activity}   accent="amber" />
+                      <StatCard label={t.netPnlClosed} value={fmt$(Math.round(menteeStats.totalPnL * 100) / 100)} sub={`${menteeStats.total} ${t.closedTrades}`} icon={TrendingUp} accent={menteeStats.totalPnL >= 0 ? "green" : "red"} />
+                      <StatCard label={t.streakCounter} value={menteeStats.currentStreak}      sub={`${t.bestStreak}: ${menteeStats.bestStreak}`}    icon={Zap}        accent={menteeStats.currentStreak >= 3 ? "green" : "amber"} />
+                    </div>
+
+                    {/* Read-only trade table — NO edit/close/delete/bulk affordances */}
+                    <div className="rounded-[var(--v3-radius-card)] border border-[var(--border-subtle)] dark:border-white/[0.06] overflow-x-auto bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)]">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-[11px] uppercase tracking-widest text-[var(--v3-text-lo)] border-b border-[var(--border-subtle)] dark:border-white/[0.06]">
+                            <th className="text-start font-semibold px-3 py-2">{t.ticker || "Ticker"}</th>
+                            <th className="text-start font-semibold px-3 py-2">{t.side || "Side"}</th>
+                            <th className="text-start font-semibold px-3 py-2">{t.date || "Date"}</th>
+                            <th className="text-end font-semibold px-3 py-2">{t.entry || "Entry"}</th>
+                            <th className="text-end font-semibold px-3 py-2">{t.exit || "Exit"}</th>
+                            <th className="text-end font-semibold px-3 py-2">P&amp;L</th>
+                            <th className="text-end font-semibold px-3 py-2">R</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {menteeRealTrades.map((tr) => {
+                            const mm = calcTradeMetrics(tr);
+                            const closed = tr.status === "CLOSED";
+                            return (
+                              <tr key={tr.id} className="border-b border-[var(--border-subtle)] dark:border-white/[0.04] last:border-0">
+                                <td className="px-3 py-2 font-mono font-bold text-white">{tr.ticker}</td>
+                                <td className="px-3 py-2 text-[var(--v3-text-mid)]">{tr.side}</td>
+                                <td className="px-3 py-2 text-[var(--v3-text-lo)] font-mono">{tr.date}</td>
+                                <td className="px-3 py-2 text-end font-mono text-[var(--v3-text-mid)]">{tr.entry != null ? `$${tr.entry}` : "—"}</td>
+                                <td className="px-3 py-2 text-end font-mono text-[var(--v3-text-mid)]">{closed && tr.exit != null ? `$${tr.exit}` : "—"}</td>
+                                <td className={`px-3 py-2 text-end font-mono font-semibold ${!closed ? "text-[var(--v3-text-lo)]" : (mm.pnl || 0) >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>
+                                  {closed ? fmt$(Math.round((mm.pnl || 0) * 100) / 100) : "—"}
+                                </td>
+                                <td className={`px-3 py-2 text-end font-mono ${!closed ? "text-[var(--v3-text-lo)]" : (mm.rMultiple || 0) >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>
+                                  {closed ? fmtR(mm.rMultiple) : "—"}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ══════════════ DASHBOARD ══════════════ */}
         {tab === "dashboard" && (

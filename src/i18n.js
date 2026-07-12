@@ -298,6 +298,14 @@ const en = {
   mentoringMenteeLabel: "Mentee",
   mentoringRevoke: "Revoke",
   mentoringActive: "Active",
+  // Mentor dashboard (B4.3)
+  mentoringTab: "Mentoring",
+  mentoringPickMentee: "Select a mentee to view their Trading DNA and trades (read-only).",
+  viewingAsMentor: "Viewing as mentor:",
+  readOnlyNotice: "Read-only",
+  menteeNoTrades: "No trades yet",
+  tradesUnit: "trades",
+  winRateShort: "win",
 
   // Trade form
   logNewTrade: "Log New Trade",
@@ -781,6 +789,14 @@ const he = {
   mentoringMenteeLabel: "חניך",
   mentoringRevoke: "בטל",
   mentoringActive: "פעיל",
+  // Mentor dashboard (B4.3)
+  mentoringTab: "מנטורינג",
+  mentoringPickMentee: "בחר חניך כדי לצפות ב-Trading DNA ובעסקאות שלו (צפייה בלבד).",
+  viewingAsMentor: "צופה כמנטור ב-",
+  readOnlyNotice: "צפייה בלבד",
+  menteeNoTrades: "אין עדיין עסקאות",
+  tradesUnit: "עסקאות",
+  winRateShort: "הצלחה",
 
   // Trade form
   logNewTrade: "רשום עסקה חדשה",

@@ -156,7 +156,11 @@ const computeScores = (trades) => {
 let _dnaCache = { key: null, result: null };
 
 export const calculateTradeDNA = (allTrades = []) => {
-  const _cacheKey = `${allTrades.length}_${allTrades[allTrades.length - 1]?.date || ''}`;
+  // Key must distinguish DIFFERENT trade sets, not just add/edit within one set:
+  // the mentor dashboard computes DNA for a mentee's trades through this same
+  // function, so a count+last-date-only key could collide two distinct people.
+  const _last = allTrades[allTrades.length - 1];
+  const _cacheKey = `${allTrades.length}_${allTrades[0]?.date || ''}_${_last?.date || ''}_${_last?.id || ''}`;
   if (_dnaCache.key === _cacheKey && _dnaCache.result !== null) return _dnaCache.result;
 
   const closed = getClosed(allTrades);
