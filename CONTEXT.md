@@ -10,7 +10,8 @@ SwingEdge הוא יומן מסחר מקצועי לסוחרי סווינג.
 - **Supabase project:** zicstkfkwhzvmdkzpidm
 
 ## Current Build
-- **JS bundle:** `index-BcsUYqwS.js` · **CSS bundle:** `index-BAnW1fG5.css`
+- **JS bundle:** `index-BiZNq5OR.js` · **CSS bundle:** `index-DC62v2Bu.css`
+- ⚠️ These hashes drift on every build and the Vercel-deployed hash will always differ from a local build (Vercel rebuilds independently) — see "Verify live deploys" below.
 
 ## Architecture
 - `SwingEdge_App.jsx` — root component, ~5200 lines (single-file by design, post-launch split planned).
@@ -29,6 +30,20 @@ Both the **Log New Trade** form and the standalone **Trade Analyzer** run on one
 - **Trade Analyzer** entry point: `SwingEdgeAI.analyzeStandalone(input, trades, lang)` — `SwingEdgeAI.js:55` → `coachTrade` → `coachingToAnalyzerView(coaching, { entry, stop, target, shares, capital, lang })` adapter (`DecisionCoach.js:414`) flattens the rich output onto the flat shape the Analyzer view expects (`$risk` preserved in `explanation`).
 - **Approach A (Adapter):** the Analyzer was unified *onto* `coachTrade` via the adapter — `coachTrade` itself was not modified, so Log New Trade behavior is byte-identical to before the unification.
 - **Input validation (single source):** `validateTradeInputs(entry, stop, target, side)` — `src/utils.js:34`. Bilingual, LONG+SHORT, uses the **explicit `side`**. Invalid input → position cards render `"—"`, a red banner shows, and `handleSubmit` blocks the save (no garbage metrics persisted).
+
+## Design System v3 (complete — all 9 screens)
+- **Tokens:** `src/design/tokens.css:117-142`, `--v3-` namespace, 5 semantic channels + `-glow` rgba variants each: `--v3-accent #00C076` (profit), `--v3-loss #F43F5E`, `--v3-info #06b6d4` (equity/live data), `--v3-purple #A78BFA` (setup identity), `--v3-warn #F59E0B` (caution tier).
+- **Rollout:** all 9 screens converted — Dashboard, Calc, Analytics, Navbar+Intel, Journal, Settings, Analyzer, Log New Trade (commits `7d4fc7e`, `20f415e`, `b623563` and the v3 series that followed).
+- **Migration model (intentional, in-file comment at `tokens.css:118`):** screens migrate one at a time; the old token layer stays until every screen is converted — both systems coexist by design, not oversight.
+- **`DecisionCoachPanel`** (`src/intelligence/ui/IntelligenceUI.jsx`) — verdict-driven styling keyed off `coaching.verdict`: `GO`=emerald, `CAUTION`=amber, `SKIP`=rose (glow-halo variant on the Log New Trade hero).
+- ⚠️ **Tailwind gotcha:** `bg-[var(--v3-x)]/opacity` does not compile — use a hex-with-opacity value or the token's `-glow` variant instead.
+- **Serif font budget:** 3–4 in-app uses only (Analytics hero, Journal empty state, Weekly Review) — don't expand without reason.
+
+## Track B Features
+- **B2 — Earnings Awareness** (`1d37162`): `api/earnings.js` — Finnhub `/calendar/earnings`, 6h cache (`EARN_TTL`), fail-open (stale cache or `null` on error), crypto symbols → `null`. Feeds a `timing` channel into Decision Coach; verdict clamps `GO→CAUTION` when `daysUntil≤2`.
+- **B4 — Mentorship (full)** (`6949c8a`→`92ca3dd`): `supabase/migrations/20260711120000_mentorship_schema.sql` + `20260712090000_mentor_invite_rpcs.sql`. 3 tables — `mentorships`, `mentor_invites`, `mentor_notes` — plus `is_active_mentor()` (SECURITY DEFINER). RPCs `create_mentor_invite()` (8-char Crockford base32 code) and `redeem_mentor_invite(code)` (atomic compare-and-set claim). Mentor dashboard is read-only; notes are mentor-writes / mentee-reads. Model: full transparency, invite active immediately on redemption.
+- **B3 — Notebook + Weekly Review** (`88cc6c8`): `supabase/migrations/20260712100000_journal_notes.sql`. `journal_notes` (free-form, 1–10k chars) + `weekly_reviews` (`last_reviewed_at`, rolling 7-day window). Summarizes the existing analysis engine's output — no new analysis logic added.
+- **B1 — Multi-Account: NOT built.** Diagnosed/audited only. Deferred decisions (recorded here so they aren't re-litigated): per-account capital, real+paper account types only, `ON DELETE RESTRICT`, mentor sees all of a mentee's accounts.
 
 ## Tabs Structure (NAV_KEYS)
 `dashboard | journal | tools | analytics | intel | feedback`
@@ -73,7 +88,7 @@ Always compare with `=== true` / `=== false`; never rely on raw string equality 
 ## Key Components
 
 ### Main
-- `SwingEdge_App.jsx` — root
+- `SwingEdge_App.jsx` — root. `AdminPanel` is lazy-loaded via a `lazyWithRetry` wrapper (top of file): detects stale-chunk `ChunkLoadError`, reloads once via a `sessionStorage` flag, then gives up (commit `60d6fe0`).
 - `src/hooks/useTradingStats.js` — stats aggregation
 - `src/supabaseClient.js` — Supabase client + sync
 - `src/utils.js` — canonical math helpers: `calcTradeMetrics`, `fmt$`, `fmtR`, `CAPITAL`, `RISK_PCT`, `priceBasedRR(entry,stop,target)`, `inferSide(entry,stop,target)`
@@ -113,8 +128,11 @@ Always compare with `=== true` / `=== false`; never rely on raw string equality 
 
 ### Services
 - `src/priceService.js` — client-side price layer: `searchSymbolsTV()` (TradingView via serverless proxy) + quote fetch + 5min cache + CORS proxy fallbacks. ⚠️ Yahoo Finance helpers (`toYahooSymbol`, `fromYahooSymbol`, etc.) remain in file but are unused for live quotes — kept for search fallback only.
-- `api/quote.js` — Vercel serverless function. **Stocks/ETFs → Finnhub** (`/api/v1/quote`, requires `FINNHUB_API_KEY` env var). **Crypto → CoinGecko** (`/simple/price`, keyless). Yahoo Finance was the original source but is blocked on Vercel IPs (429 / TLS handshake failure) and is no longer used for quote data.
+- `api/quote.js` — Vercel serverless function. **Stocks/ETFs → Finnhub** (`/api/v1/quote`, requires `FINNHUB_API_KEY` env var). **Crypto → CoinGecko** (`/simple/price`, keyless). Yahoo Finance was the original source but is blocked on Vercel IPs (429 / TLS handshake failure) and is no longer used for quote data. Finnhub responses cached 15s in-memory (`_fhCache`) with stale-on-error fallback to absorb 429 rate limits.
 - `api/symbol-search.js` — Vercel serverless function; proxies TradingView symbol search (spoofs `Referer` header). Dev proxy in `vite.config.js`.
+- `api/earnings.js` — see Track B2 above.
+- `api/health.js` — dependency health check. `NON_FATAL = new Set(["twelvedata","finnhub","coingecko"])`; Supabase is the sole hard-fail dependency — 503 only if Supabase (or a future non-listed check) fails, non-fatal services degrade to a `warnings` array with 200.
+- `api/verify-turnstile.js` — Cloudflare Turnstile bot protection on signup only (not signin), fail-open on 5xx. Requires Vercel env vars `VITE_TURNSTILE_SITE_KEY` (frontend, `AuthScreen.jsx`) + `TURNSTILE_SECRET_KEY` (server).
 
 ### Vision (legacy, still in repo)
 - `src/vision/ChartVisionEngine.js` — TradingView screenshot parser
@@ -292,6 +310,13 @@ After the engine unification (Stage 2) and the Analyzer rich-context wiring (Sta
 
 Agents write **prompts** for Claude Code, not code directly.
 Constants: `VALID_SETUPS` (30) · `VALID_EMOTIONS` (15) · `VALID_MARKETS` (14) + aliases.
+
+## Cowork Autonomous Agents
+Run **outside this repo** (no code here references them) — ops/maintenance agents, distinct from the trading-idea Hive agents above:
+- **#7 Dispatcher** [🔧] — hourly. Reads email alerts, diagnoses, drafts a Claude Code prompt as a Gmail draft. Never executes directly.
+- **#8 Cost** [💰] — daily.
+- **#9 Growth** [📈] — daily.
+- **#10 Vitals** [📊] — weekly.
 
 ## Known Issues / Workarounds
 - Supabase Phone Auth = disabled (Twilio cost)
