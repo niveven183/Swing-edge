@@ -281,6 +281,24 @@ const en = {
   manageOnGoogle: "Manage on Google",
   changePassword: "Change Password",
 
+  // Mentoring (B4.2)
+  mentoringTitle: "Mentoring",
+  mentoringDesc: "Invite a mentor to review your trades, or connect to a mentee using their code.",
+  mentoringInviteHeading: "Invite a mentor",
+  mentoringInviteBtn: "Generate invite code",
+  mentoringInviteHint: "Share this code with your mentor. It expires in 7 days and can be used once.",
+  mentoringCopy: "Copy",
+  mentoringCopied: "Copied",
+  mentoringRedeemHeading: "Have an invite code?",
+  mentoringRedeemPlaceholder: "Enter code",
+  mentoringConnect: "Connect",
+  mentoringMyMentors: "My mentors",
+  mentoringMyMentees: "My mentees",
+  mentoringMentorLabel: "Mentor",
+  mentoringMenteeLabel: "Mentee",
+  mentoringRevoke: "Revoke",
+  mentoringActive: "Active",
+
   // Trade form
   logNewTrade: "Log New Trade",
   direction: "Direction",
@@ -745,6 +763,24 @@ const he = {
   googleSignedInInfo: "אתה מחובר דרך Google. לשינוי סיסמה — נהל אותה מחשבון Google שלך.",
   manageOnGoogle: "נהל בחשבון Google",
   changePassword: "שנה סיסמה",
+
+  // Mentoring (B4.2)
+  mentoringTitle: "מנטורינג",
+  mentoringDesc: "הזמן מנטור שיצפה בעסקאות שלך, או התחבר כמנטור באמצעות קוד הזמנה.",
+  mentoringInviteHeading: "הזמן מנטור",
+  mentoringInviteBtn: "צור קוד הזמנה",
+  mentoringInviteHint: "שתף את הקוד עם המנטור שלך. תוקפו 7 ימים וניתן להשתמש בו פעם אחת.",
+  mentoringCopy: "העתק",
+  mentoringCopied: "הועתק",
+  mentoringRedeemHeading: "יש לך קוד הזמנה?",
+  mentoringRedeemPlaceholder: "הזן קוד",
+  mentoringConnect: "התחבר",
+  mentoringMyMentors: "המנטורים שלי",
+  mentoringMyMentees: "החניכים שלי",
+  mentoringMentorLabel: "מנטור",
+  mentoringMenteeLabel: "חניך",
+  mentoringRevoke: "בטל",
+  mentoringActive: "פעיל",
 
   // Trade form
   logNewTrade: "רשום עסקה חדשה",

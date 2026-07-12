@@ -37,7 +37,8 @@ import {
   Settings, BookMarked, Thermometer, Trash2, User,
   Download, FileText, Bell, Flame, Globe, LogOut, MessageCircle,
   Shield, Filter, Save, BarChart3, ChevronDown, HelpCircle, Lock,
-  CreditCard, Smartphone, Wrench, Sun, Moon, Monitor, KeyRound, ExternalLink, RotateCcw, Pencil
+  CreditCard, Smartphone, Wrench, Sun, Moon, Monitor, KeyRound, ExternalLink, RotateCcw, Pencil,
+  Users, GraduationCap, UserPlus
 } from "lucide-react";
 import { getTranslations, LANGUAGES, isRTLLang, nTrades } from "./src/i18n.js";
 import {
@@ -1304,6 +1305,14 @@ export default function SwingEdge() {
   // Change password modal
   const [showChangePassword, setShowChangePassword] = useState(false);
 
+  // Mentoring (B4.2) — invite/redeem flow + active relationships
+  const [mentorInviteCode, setMentorInviteCode] = useState("");
+  const [mentorCodeCopied, setMentorCodeCopied] = useState(false);
+  const [redeemCodeInput, setRedeemCodeInput] = useState("");
+  const [mentorBusy, setMentorBusy] = useState(false);
+  const [myMentors, setMyMentors] = useState([]);   // mentorships where I am the mentee
+  const [myMentees, setMyMentees] = useState([]);   // mentorships where I am the mentor
+
   // Edit trade state (modal owns its form; we just track the open trade)
   const [editingTrade, setEditingTrade] = useState(null);
   const showEditForm = editingTrade != null;
@@ -2146,6 +2155,77 @@ export default function SwingEdge() {
     toast.success(lang === "he" ? `נטענו ${demoWithUserId.length} עסקאות דמו` : `Loaded ${demoWithUserId.length} demo trades`);
     setTab("journal");
   };
+
+  // ── Mentoring (B4.2) ──────────────────────────────────────────────────
+  // Load active relationships in both directions. RLS lets each party read
+  // only their own mentorship rows, so these two queries are self-scoped.
+  const loadMentorships = useCallback(async () => {
+    if (!isSupabaseConfigured || !supabase || !authUser?.id) return;
+    const [asMentee, asMentor] = await Promise.all([
+      supabase.from("mentorships").select("id,mentor_id,created_at").eq("mentee_id", authUser.id).eq("status", "active"),
+      supabase.from("mentorships").select("id,mentee_id,created_at").eq("mentor_id", authUser.id).eq("status", "active"),
+    ]);
+    if (!asMentee.error) setMyMentors(asMentee.data || []);
+    if (!asMentor.error) setMyMentees(asMentor.data || []);
+  }, [authUser?.id]);
+
+  useEffect(() => { loadMentorships(); }, [loadMentorships]);
+
+  const handleCreateInvite = useCallback(async () => {
+    if (!isSupabaseConfigured || !supabase) return;
+    setMentorBusy(true);
+    try {
+      const { data, error } = await supabase.rpc("create_mentor_invite");
+      if (error) { toast.error(error.message); return; }
+      setMentorInviteCode(data);
+      setMentorCodeCopied(false);
+    } finally { setMentorBusy(false); }
+  }, [toast]);
+
+  const handleCopyInvite = useCallback(async () => {
+    if (!mentorInviteCode) return;
+    try {
+      await navigator.clipboard.writeText(mentorInviteCode);
+      setMentorCodeCopied(true);
+      setTimeout(() => setMentorCodeCopied(false), 2000);
+    } catch { /* clipboard blocked — code stays visible for manual copy */ }
+  }, [mentorInviteCode]);
+
+  const handleRedeemInvite = useCallback(async () => {
+    if (!isSupabaseConfigured || !supabase) return;
+    const code = redeemCodeInput.trim().toUpperCase();
+    if (!code) return;
+    setMentorBusy(true);
+    try {
+      const { error } = await supabase.rpc("redeem_mentor_invite", { _code: code });
+      if (error) { toast.error(error.message); return; }
+      toast.success(lang === "he" ? "התחברת כמנטור" : "Connected as mentor");
+      setRedeemCodeInput("");
+      await loadMentorships();
+    } finally { setMentorBusy(false); }
+  }, [redeemCodeInput, toast, lang, loadMentorships]);
+
+  // Mentee-side revoke only (existing RLS permits mentee UPDATE). Sets the row
+  // to 'revoked' → is_active_mentor flips to false, cutting the mentor's access.
+  const handleRevokeMentor = useCallback(async (id) => {
+    if (!isSupabaseConfigured || !supabase || !authUser?.id) return;
+    const ok = await confirmDialog({
+      title: lang === "he" ? "ביטול מנטור" : "Revoke Mentor",
+      message: lang === "he"
+        ? "לבטל את גישת המנטור לעסקאות שלך? ניתן להזמין מחדש בעתיד."
+        : "Revoke this mentor's access to your trades? You can re-invite later.",
+      confirmText: lang === "he" ? "בטל גישה" : "Revoke",
+      cancelText: lang === "he" ? "ביטול" : "Cancel",
+      danger: true,
+    });
+    if (!ok) return;
+    const { error } = await supabase.from("mentorships")
+      .update({ status: "revoked", revoked_at: new Date().toISOString() })
+      .eq("id", id).eq("mentee_id", authUser.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(lang === "he" ? "הגישה בוטלה" : "Access revoked");
+    await loadMentorships();
+  }, [authUser?.id, confirmDialog, toast, lang, loadMentorships]);
 
   // Unified symbol pick from the professional search: add to watchlist (if new)
   // AND load it on the chart — one action, one search box.
@@ -5123,6 +5203,109 @@ export default function SwingEdge() {
                   </div>
                 );
               })()}
+
+              {/* ── MENTORING (B4.2) ── */}
+              <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <Users size={16} className="text-[var(--v3-text-mid)]" />
+                  <h3 className="text-sm font-bold text-white">{t.mentoringTitle}</h3>
+                </div>
+                <p className="text-xs text-[var(--v3-text-lo)] mb-4">{t.mentoringDesc}</p>
+
+                {/* Mentee side — mint an invite code */}
+                <div className="mb-5">
+                  <p className="text-[11px] font-semibold text-[var(--v3-text-mid)] mb-2 flex items-center gap-1.5">
+                    <UserPlus size={12} /> {t.mentoringInviteHeading}
+                  </p>
+                  {mentorInviteCode ? (
+                    <div className="flex gap-2">
+                      <code className="flex-1 bg-white/5 border border-[var(--border-subtle)] dark:border-white/[0.10] rounded-lg px-3 py-2 text-sm text-[var(--v3-accent)] font-mono font-bold tracking-widest text-center select-all">
+                        {mentorInviteCode}
+                      </code>
+                      <button
+                        type="button"
+                        onClick={handleCopyInvite}
+                        className="px-3 py-2 rounded-lg bg-[var(--v3-accent-glow)] border border-[#00C076]/30 text-[var(--v3-accent)] text-xs font-bold hover:bg-[#00C076]/20 transition flex items-center gap-1.5 whitespace-nowrap">
+                        {mentorCodeCopied ? <CheckCircle size={13} /> : <Copy size={13} />}
+                        {mentorCodeCopied ? t.mentoringCopied : t.mentoringCopy}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleCreateInvite}
+                      disabled={mentorBusy}
+                      className="w-full px-4 py-2.5 rounded-lg bg-[var(--v3-accent-glow)] border border-[#00C076]/30 text-[var(--v3-accent)] text-xs font-bold hover:bg-[#00C076]/20 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                      <UserPlus size={13} /> {t.mentoringInviteBtn}
+                    </button>
+                  )}
+                  <p className="text-[10px] text-[var(--v3-text-lo)] mt-2">{t.mentoringInviteHint}</p>
+                </div>
+
+                {/* Mentor side — redeem a code */}
+                <div className="mb-5">
+                  <p className="text-[11px] font-semibold text-[var(--v3-text-mid)] mb-2 flex items-center gap-1.5">
+                    <GraduationCap size={13} /> {t.mentoringRedeemHeading}
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={redeemCodeInput}
+                      onChange={e => setRedeemCodeInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") handleRedeemInvite(); }}
+                      placeholder={t.mentoringRedeemPlaceholder}
+                      maxLength={8}
+                      className="flex-1 bg-white/5 border border-[var(--border-subtle)] dark:border-white/[0.10] rounded-lg px-3 py-2 text-sm text-white placeholder-[var(--v3-text-lo)] focus:border-[var(--v3-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--v3-accent-glow)] transition font-mono uppercase tracking-widest"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRedeemInvite}
+                      disabled={mentorBusy || !redeemCodeInput.trim()}
+                      className="px-4 py-2 rounded-lg bg-[var(--v3-accent-glow)] border border-[#00C076]/30 text-[var(--v3-accent)] text-xs font-bold hover:bg-[#00C076]/20 transition disabled:opacity-50 whitespace-nowrap">
+                      {t.mentoringConnect}
+                    </button>
+                  </div>
+                </div>
+
+                {/* My mentors — mentee can revoke */}
+                {myMentors.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-[11px] font-semibold text-[var(--v3-text-mid)] mb-2">{t.mentoringMyMentors}</p>
+                    <div className="space-y-1.5">
+                      {myMentors.map(m => (
+                        <div key={m.id} className="flex items-center justify-between bg-white/5 border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg px-3 py-2">
+                          <span className="text-xs font-mono text-[var(--v3-text-mid)]">
+                            {t.mentoringMentorLabel} ····{m.mentor_id.slice(-4)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleRevokeMentor(m.id)}
+                            className="text-[11px] font-bold text-[var(--v3-loss)] hover:underline flex items-center gap-1">
+                            <Trash2 size={11} /> {t.mentoringRevoke}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* My mentees — read-only (mentee controls the relationship) */}
+                {myMentees.length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-semibold text-[var(--v3-text-mid)] mb-2">{t.mentoringMyMentees}</p>
+                    <div className="space-y-1.5">
+                      {myMentees.map(m => (
+                        <div key={m.id} className="flex items-center justify-between bg-white/5 border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg px-3 py-2">
+                          <span className="text-xs font-mono text-[var(--v3-text-mid)]">
+                            {t.mentoringMenteeLabel} ····{m.mentee_id.slice(-4)}
+                          </span>
+                          <span className="text-[10px] text-[var(--v3-accent)] font-semibold">{t.mentoringActive}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* ── PORTFOLIO CAPITAL ── */}
               <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
