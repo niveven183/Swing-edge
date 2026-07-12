@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef, useId, memo, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, useId, memo, lazy, Suspense, Fragment } from "react";
 import OnboardingScreen from "./src/components/OnboardingScreen.jsx";
 import AuthScreen from "./src/components/AuthScreen.jsx";
 import Logo from "./src/components/Logo.jsx";
@@ -1321,6 +1321,15 @@ export default function SwingEdge() {
   const [menteeTeasers, setMenteeTeasers] = useState({});           // { [mentee_id]: {count, winRate} }
   const [menteeLoading, setMenteeLoading] = useState(false);
 
+  // Mentor Notes (B4.4) — mentor writes notes on a mentee's trade (mentor_notes).
+  // mentor side: notes I wrote on the selected mentee's trades, keyed by trade_id.
+  // mentee side: notes written ABOUT me (read-only), shown in my Journal, by trade_id.
+  const [menteeNotesByTrade, setMenteeNotesByTrade] = useState({}); // mentor view
+  const [myTradeNotes, setMyTradeNotes] = useState({});            // mentee view (Journal)
+  const [noteEditorTradeId, setNoteEditorTradeId] = useState(null);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [noteBusy, setNoteBusy] = useState(false);
+
   // Edit trade state (modal owns its form; we just track the open trade)
   const [editingTrade, setEditingTrade] = useState(null);
   const showEditForm = editingTrade != null;
@@ -2301,8 +2310,71 @@ export default function SwingEdge() {
     if (mentoringMenteeId && !myMentees.some((m) => m.mentee_id === mentoringMenteeId)) {
       setMentoringMenteeId(null);
       setMenteeTrades([]);
+      setMenteeNotesByTrade({});
+      setNoteEditorTradeId(null);
     }
   }, [myMentees, mentoringMenteeId]);
+
+  // ── Mentor Notes (B4.4) ───────────────────────────────────────────────
+  // Group a flat notes array into { [trade_id]: [notes...] }.
+  const groupNotesByTrade = (rows) => {
+    const by = {};
+    for (const r of rows || []) (by[r.trade_id] ||= []).push(r);
+    return by;
+  };
+
+  // Mentor: load the notes I wrote on a mentee's trades. RLS "mentor reads own
+  // notes" scopes this to auth.uid(), so it returns only my own notes.
+  const loadMenteeNotes = useCallback(async (menteeId) => {
+    if (!isSupabaseConfigured || !supabase || !menteeId) return;
+    const { data, error } = await supabase
+      .from("mentor_notes")
+      .select("id,trade_id,note,created_at")
+      .eq("mentee_id", menteeId)
+      .order("created_at", { ascending: true });
+    if (!error) setMenteeNotesByTrade(groupNotesByTrade(data));
+  }, []);
+
+  // Load mentee notes whenever the selected mentee changes.
+  useEffect(() => {
+    if (mentoringMenteeId) loadMenteeNotes(mentoringMenteeId);
+    else setMenteeNotesByTrade({});
+  }, [mentoringMenteeId, loadMenteeNotes]);
+
+  // Mentee: load notes written ABOUT me for my Journal (read-only). RLS
+  // "mentee reads notes on them" scopes this to auth.uid().
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase || !authUser?.id) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("mentor_notes")
+        .select("id,trade_id,note,created_at")
+        .eq("mentee_id", authUser.id)
+        .order("created_at", { ascending: true });
+      if (!cancelled && !error) setMyTradeNotes(groupNotesByTrade(data));
+    })();
+    return () => { cancelled = true; };
+  }, [authUser?.id]);
+
+  // Mentor writes a note on a mentee's trade. Insert only — RLS "mentor writes
+  // note" requires mentor_id = auth.uid() AND is_active_mentor(mentee_id).
+  const handleAddNote = useCallback(async (tradeId) => {
+    if (!isSupabaseConfigured || !supabase || !authUser?.id || !mentoringMenteeId) return;
+    const text = noteDraft.trim();
+    if (!text) return;
+    setNoteBusy(true);
+    try {
+      const { error } = await supabase.from("mentor_notes").insert({
+        trade_id: tradeId, mentor_id: authUser.id, mentee_id: mentoringMenteeId, note: text,
+      });
+      if (error) { toast.error(error.message); return; }
+      setNoteDraft("");
+      setNoteEditorTradeId(null);
+      await loadMenteeNotes(mentoringMenteeId);
+      toast.success(lang === "he" ? "ההערה נשמרה" : "Note saved");
+    } finally { setNoteBusy(false); }
+  }, [authUser?.id, mentoringMenteeId, noteDraft, toast, lang, loadMenteeNotes]);
 
   // Unified symbol pick from the professional search: add to watchlist (if new)
   // AND load it on the chart — one action, one search box.
@@ -2932,14 +3004,18 @@ export default function SwingEdge() {
                             <th className="text-end font-semibold px-3 py-2">{t.exit || "Exit"}</th>
                             <th className="text-end font-semibold px-3 py-2">P&amp;L</th>
                             <th className="text-end font-semibold px-3 py-2">R</th>
+                            <th className="text-center font-semibold px-3 py-2">{t.notesLabel}</th>
                           </tr>
                         </thead>
                         <tbody>
                           {menteeRealTrades.map((tr) => {
                             const mm = calcTradeMetrics(tr);
                             const closed = tr.status === "CLOSED";
+                            const notes = menteeNotesByTrade[tr.id] || [];
+                            const editing = noteEditorTradeId === tr.id;
                             return (
-                              <tr key={tr.id} className="border-b border-[var(--border-subtle)] dark:border-white/[0.04] last:border-0">
+                              <Fragment key={tr.id}>
+                              <tr className="border-b border-[var(--border-subtle)] dark:border-white/[0.04]">
                                 <td className="px-3 py-2 font-mono font-bold text-white">{tr.ticker}</td>
                                 <td className="px-3 py-2 text-[var(--v3-text-mid)]">{tr.side}</td>
                                 <td className="px-3 py-2 text-[var(--v3-text-lo)] font-mono">{tr.date}</td>
@@ -2951,7 +3027,54 @@ export default function SwingEdge() {
                                 <td className={`px-3 py-2 text-end font-mono ${!closed ? "text-[var(--v3-text-lo)]" : (mm.rMultiple || 0) >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>
                                   {closed ? fmtR(mm.rMultiple) : "—"}
                                 </td>
+                                <td className="px-3 py-2 text-center">
+                                  <button
+                                    onClick={() => { setNoteEditorTradeId(editing ? null : tr.id); setNoteDraft(""); }}
+                                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-[var(--v3-radius-chip)] text-xs font-semibold transition-colors
+                                      ${editing ? "bg-[var(--v3-accent)]/20 text-[var(--v3-accent)]" : "text-[var(--v3-text-lo)] hover:text-[var(--v3-accent)] hover:bg-white/5"}`}
+                                    title={t.addNote}
+                                  >
+                                    <MessageCircle size={13} />
+                                    {notes.length > 0 && <span className="font-mono">{notes.length}</span>}
+                                  </button>
+                                </td>
                               </tr>
+                              {editing && (
+                                <tr className="bg-white/[0.02]">
+                                  <td colSpan={8} className="px-3 py-3">
+                                    <div className="space-y-2">
+                                      {notes.length > 0 && (
+                                        <ul className="space-y-1.5">
+                                          {notes.map((n) => (
+                                            <li key={n.id} className="text-xs text-[var(--v3-text-mid)] bg-[var(--v3-accent-glow)] border border-[var(--v3-accent)]/20 rounded-[var(--v3-radius-chip)] px-3 py-2">
+                                              <span className="whitespace-pre-wrap break-words">{n.note}</span>
+                                              <span className="block mt-1 text-[10px] text-[var(--v3-text-lo)] font-mono">{new Date(n.created_at).toLocaleString()}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      )}
+                                      <div className="flex items-start gap-2">
+                                        <textarea
+                                          value={noteDraft}
+                                          onChange={(e) => setNoteDraft(e.target.value.slice(0, 5000))}
+                                          rows={2}
+                                          maxLength={5000}
+                                          placeholder={t.notePlaceholder}
+                                          className="flex-1 text-sm bg-white/5 border border-[var(--border-subtle)] dark:border-white/[0.10] rounded-lg px-3 py-2 text-white placeholder:text-[var(--v3-text-lo)] focus:border-[var(--v3-accent)] focus:outline-none resize-y"
+                                        />
+                                        <button
+                                          onClick={() => handleAddNote(tr.id)}
+                                          disabled={noteBusy || !noteDraft.trim()}
+                                          className="shrink-0 px-3 py-2 rounded-lg text-sm font-semibold bg-[var(--v3-accent-glow)] border border-[#00C076]/30 text-[var(--v3-accent)] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--v3-accent)]/20 transition-colors"
+                                        >
+                                          {t.saveNote}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                              </Fragment>
                             );
                           })}
                         </tbody>
@@ -3725,12 +3848,24 @@ export default function SwingEdge() {
                           {t.followedPlan === "Partially" && <span className="text-amber-400 text-sm font-bold">◐</span>}
                           {t.followedPlan == null         && <span className="text-slate-700 text-[10px]">–</span>}
                         </td>
-                        <td className="p-3 text-slate-500 text-[10px] max-w-[160px] truncate" title={t.lessonLearned || t.notes}>
-                          {t.lessonLearned
-                            ? <span className="text-[#A78BFA]/80">💡 {t.lessonLearned}</span>
-                            : t.notes
-                              ? <span className="text-slate-600">{t.notes}</span>
-                              : <span className="text-slate-700">–</span>}
+                        <td className="p-3 text-slate-500 text-[10px] max-w-[200px] align-top">
+                          <div className="truncate" title={t.lessonLearned || t.notes}>
+                            {t.lessonLearned
+                              ? <span className="text-[#A78BFA]/80">💡 {t.lessonLearned}</span>
+                              : t.notes
+                                ? <span className="text-slate-600">{t.notes}</span>
+                                : <span className="text-slate-700">–</span>}
+                          </div>
+                          {(myTradeNotes[t.id] || []).length > 0 && (
+                            <div className="mt-1.5 space-y-1" title={t.mentorNoteLabel}>
+                              {(myTradeNotes[t.id] || []).map((n) => (
+                                <div key={n.id} className="flex items-start gap-1 text-[10px] leading-snug text-[var(--v3-accent)] bg-[var(--v3-accent-glow)] border border-[var(--v3-accent)]/20 rounded px-1.5 py-1 whitespace-normal break-words">
+                                  <MessageCircle size={10} className="mt-0.5 shrink-0" />
+                                  <span className="break-words">{n.note}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </td>
                         <td className="p-3"><span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${isOpen ? "bg-[#06b6d4]/10 text-[var(--v3-info)] border border-[#06b6d4]/20" : "bg-slate-500/10 text-slate-500 border border-slate-700"}`}>{t.status}</span></td>
                         <td className="p-3">

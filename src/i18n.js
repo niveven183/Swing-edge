@@ -306,6 +306,12 @@ const en = {
   menteeNoTrades: "No trades yet",
   tradesUnit: "trades",
   winRateShort: "win",
+  // Mentor notes (B4.4)
+  notesLabel: "Notes",
+  addNote: "Add a note",
+  notePlaceholder: "Write feedback for this trade…",
+  saveNote: "Save note",
+  mentorNoteLabel: "Mentor note",
 
   // Trade form
   logNewTrade: "Log New Trade",
@@ -797,6 +803,12 @@ const he = {
   menteeNoTrades: "אין עדיין עסקאות",
   tradesUnit: "עסקאות",
   winRateShort: "הצלחה",
+  // Mentor notes (B4.4)
+  notesLabel: "הערות",
+  addNote: "הוסף הערה",
+  notePlaceholder: "כתוב משוב לעסקה הזו…",
+  saveNote: "שמור הערה",
+  mentorNoteLabel: "הערת מנטור",
 
   // Trade form
   logNewTrade: "רשום עסקה חדשה",
