@@ -11,7 +11,25 @@ import FeedbackTab from "./src/components/FeedbackTab.jsx";
 import IOSInstallBanner from "./src/components/IOSInstallBanner.jsx";
 // Admin-only, self-contained, and off the normal tab flow → lazy-loaded so its
 // bundle (incl. recharts) is fetched only when an admin opens the Admin tab.
-const AdminPanel = lazy(() => import("./src/components/AdminPanel.jsx"));
+function lazyWithRetry(importFn) {
+  return lazy(() =>
+    importFn().catch((err) => {
+      const isChunkError =
+        /Failed to fetch dynamically imported module/i.test(err?.message || "") ||
+        err?.name === "ChunkLoadError";
+      if (!isChunkError) throw err;
+
+      const flagKey = "chunk-reloaded-adminpanel";
+      if (sessionStorage.getItem(flagKey)) {
+        throw err;
+      }
+      sessionStorage.setItem(flagKey, "1");
+      window.location.reload();
+      return new Promise(() => {});
+    })
+  );
+}
+const AdminPanel = lazyWithRetry(() => import("./src/components/AdminPanel.jsx"));
 import EditTradeModal from "./src/components/EditTradeModal.jsx";
 import ResetAllModal from "./src/components/ResetAllModal.jsx";
 import ChangePasswordModal from "./src/components/ChangePasswordModal.jsx";
