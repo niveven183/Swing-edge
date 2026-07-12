@@ -4,6 +4,7 @@ import AuthScreen from "./src/components/AuthScreen.jsx";
 import Logo from "./src/components/Logo.jsx";
 import HelpModal from "./src/components/HelpModal.jsx";
 import PrivacyModal from "./src/components/PrivacyModal.jsx";
+import ChartGuideModal from "./src/components/ChartGuideModal.jsx";
 import BillingModal from "./src/components/BillingModal.jsx";
 import BetaWelcome from "./src/components/BetaWelcome.jsx";
 import OnboardingTour from "./src/components/OnboardingTour.jsx";
@@ -1173,6 +1174,7 @@ export default function SwingEdge() {
   // Modals + PWA install
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [showChartGuide, setShowChartGuide] = useState(false);
   const [showBillingModal, setShowBillingModal] = useState(false);
   const [pwaPromptEvent, setPwaPromptEvent] = useState(null);
   useEffect(() => {
@@ -4072,7 +4074,14 @@ export default function SwingEdge() {
 
               {/* Image Upload */}
               <div>
-                <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{t.imageFromTradingView}</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] text-slate-600 tracking-widest uppercase">{t.imageFromTradingView}</label>
+                  <button type="button" onClick={() => setShowChartGuide(true)}
+                    aria-label={isRTL ? "איך לצלם עסקה מהצ'ארט (מדריך) — How to screenshot a trade chart (guide)" : "How to screenshot a trade chart (guide) — איך לצלם עסקה מהצ'ארט"}
+                    className="text-[10px] text-[var(--v3-info)]/70 hover:text-[var(--v3-info)] border border-[var(--v3-info)]/30 hover:border-[var(--v3-info)]/60 rounded-full w-4 h-4 flex items-center justify-center transition shrink-0">
+                    ?
+                  </button>
+                </div>
                 {/* Direction tells Vision which line is the stop vs the target before reading the chart. */}
                 <div className="flex gap-1.5 mb-2">
                   {["LONG", "SHORT"].map((s) => (
@@ -6250,7 +6259,14 @@ export default function SwingEdge() {
 
               {/* TradingView screenshot → OCR auto-fill (top-level, mirrors the Analyzer) */}
               <div>
-                <label className="text-[10px] text-[var(--v3-text-lo)] tracking-widest uppercase block mb-1">{t.imageFromTradingView}</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] text-[var(--v3-text-lo)] tracking-widest uppercase">{t.imageFromTradingView}</label>
+                  <button type="button" onClick={() => setShowChartGuide(true)}
+                    aria-label={isRTL ? "איך לצלם עסקה מהצ'ארט (מדריך) — How to screenshot a trade chart (guide)" : "How to screenshot a trade chart (guide) — איך לצלם עסקה מהצ'ארט"}
+                    className="text-[10px] text-[var(--v3-info)]/70 hover:text-[var(--v3-info)] border border-[var(--v3-info)]/30 hover:border-[var(--v3-info)]/60 rounded-full w-4 h-4 flex items-center justify-center transition shrink-0">
+                    ?
+                  </button>
+                </div>
                 <label className="flex items-center gap-2 cursor-pointer w-full bg-white/5 border border-[var(--border-subtle)] dark:border-[var(--v3-line)] rounded-[var(--v3-radius-chip)] px-3 py-2 text-xs text-[var(--v3-text-mid)] hover:border-[var(--v3-accent)]/40 hover:text-[var(--v3-accent)] transition">
                   <Eye size={12} />
                   <span>{form.tradeImage ? form.tradeImage.name : t.uploadChart}</span>
@@ -6491,6 +6507,7 @@ export default function SwingEdge() {
 
       {/* ── PRIVACY MODAL ── */}
       {showPrivacyModal && <PrivacyModal onClose={() => setShowPrivacyModal(false)} t={t} />}
+      {showChartGuide && <ChartGuideModal onClose={() => setShowChartGuide(false)} lang={lang} />}
 
       {/* ── BILLING MODAL ── */}
       {showBillingModal && <BillingModal onClose={() => setShowBillingModal(false)} t={t} />}

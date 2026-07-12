@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SwingEdge · איך לצלם עסקה מ-TradingView</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Heebo:wght@400;500;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0e14; --panel:#111823; --panel-2:#0d141d; --line:#1e2a38;
+    --text:#e7eef6; --muted:#8496a9; --dim:#5b6b7c;
+    --accent:#00C076; --accent-glow:rgba(0,192,118,.16);
+    --loss:#F43F5E; --loss-glow:rgba(244,63,94,.14);
+    --info:#06b6d4; --warn:#F59E0B; --purple:#A78BFA;
+    --serif:'Frank Ruhl Libre',serif; --sans:'Heebo',sans-serif; --mono:'JetBrains Mono',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+  body{min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:clamp(16px,4vw,40px)}
+  .guide{width:100%;max-width:860px}
+
+  /* header */
+  .brand{display:flex;align-items:center;gap:9px;margin-bottom:22px}
+  .brand svg{width:26px;height:26px;flex:none}
+  .brand .wm{font-family:var(--sans);font-weight:800;font-size:17px;letter-spacing:-.3px}
+  .brand .wm b{color:var(--accent);font-weight:800}
+  h1{font-family:var(--serif);font-weight:700;font-size:clamp(26px,5vw,40px);line-height:1.1;letter-spacing:-.5px}
+  .sub{color:var(--muted);font-size:clamp(14px,2.4vw,16px);margin-top:10px;max-width:52ch;line-height:1.55}
+
+  /* toggle */
+  .toggle{display:inline-flex;background:var(--panel-2);border:1px solid var(--line);border-radius:14px;padding:4px;margin:24px 0 18px;gap:4px}
+  .toggle button{font-family:var(--sans);font-weight:700;font-size:14px;color:var(--muted);background:transparent;border:0;border-radius:10px;padding:10px 18px;cursor:pointer;transition:.18s;display:flex;align-items:center;gap:7px}
+  .toggle button .ic{font-size:15px}
+  .toggle button[data-mode="long"].active{color:#04160f;background:var(--accent);box-shadow:0 4px 16px var(--accent-glow)}
+  .toggle button[data-mode="short"].active{color:#1a060c;background:var(--loss);box-shadow:0 4px 16px var(--loss-glow)}
+
+  /* stage */
+  .stage{background:linear-gradient(180deg,var(--panel) 0%,var(--panel-2) 100%);border:1px solid var(--line);border-radius:22px;overflow:hidden}
+  .scene{position:relative;background:
+      radial-gradient(120% 90% at 80% 0%,rgba(6,182,212,.05),transparent 55%),
+      var(--panel-2);
+    border-bottom:1px solid var(--line);padding:clamp(14px,3vw,26px)}
+  .scene svg{width:100%;height:auto;display:block;max-height:340px}
+  .grid-bg{stroke:#141d28;stroke-width:1}
+
+  .caption{padding:clamp(20px,3.4vw,30px)}
+  .kicker{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .stepno{font-family:var(--mono);font-weight:700;font-size:12px;color:var(--dim);letter-spacing:1px}
+  .chip{font-family:var(--sans);font-weight:700;font-size:11px;padding:4px 9px;border-radius:999px;letter-spacing:.3px}
+  .chip.long{color:var(--accent);background:var(--accent-glow)}
+  .chip.short{color:var(--loss);background:var(--loss-glow)}
+  h2{font-family:var(--sans);font-weight:800;font-size:clamp(19px,3vw,24px);line-height:1.25;letter-spacing:-.3px}
+  .desc{color:var(--muted);font-size:15px;line-height:1.65;margin-top:11px;max-width:56ch}
+  .tip{display:flex;gap:10px;align-items:flex-start;margin-top:18px;padding:13px 15px;background:rgba(6,182,212,.06);border:1px solid rgba(6,182,212,.18);border-radius:12px}
+  .tip .t-ic{color:var(--info);font-size:15px;line-height:1.5;flex:none}
+  .tip .t-tx{font-size:13.5px;line-height:1.55;color:#bcd3e2}
+  .tip b{color:#e7eef6;font-weight:700}
+  .mono{font-family:var(--mono);font-weight:700;font-size:.92em}
+
+  /* controls */
+  .controls{display:flex;align-items:center;gap:14px;padding:16px clamp(18px,3vw,26px);border-top:1px solid var(--line)}
+  .nav{width:40px;height:40px;flex:none;border-radius:11px;border:1px solid var(--line);background:var(--panel-2);color:var(--text);font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
+  .nav:hover{border-color:var(--accent);color:var(--accent)}
+  .nav.play{margin-inline-start:auto}
+  .track{flex:1;height:4px;background:var(--line);border-radius:99px;overflow:hidden}
+  .bar{height:100%;width:0;background:linear-gradient(90deg,var(--info),var(--accent));border-radius:99px}
+  .bar.run{animation:fill linear forwards}
+  @keyframes fill{from{width:0}to{width:100%}}
+
+  .dots{display:flex;gap:8px;justify-content:center;padding:0 0 20px}
+  .dot{width:8px;height:8px;border-radius:99px;background:var(--line);cursor:pointer;transition:.2s;border:0}
+  .dot.on{width:26px;background:var(--accent)}
+  body.short-mode .dot.on{background:var(--loss)}
+
+  footer{margin-top:26px;padding:20px 22px;background:var(--panel-2);border:1px solid var(--line);border-radius:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .flow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-weight:700;font-size:14px}
+  .flow .st{padding:7px 13px;border-radius:10px;background:var(--panel);border:1px solid var(--line)}
+  .flow .st.hl{color:var(--accent);border-color:rgba(0,192,118,.35)}
+  body.short-mode .flow .st.hl{color:var(--loss);border-color:rgba(244,63,94,.35)}
+  .flow .arr{color:var(--dim)}
+  .fnote{color:var(--muted);font-size:13px;line-height:1.5}
+
+  /* scene entrance */
+  .fade{animation:fade .42s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  @media (max-width:560px){
+    .toggle{width:100%}.toggle button{flex:1;justify-content:center;padding:11px 8px}
+    footer{flex-direction:column;align-items:flex-start}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .fade,.bar.run{animation:none}
+  }
+</style>
+</head>
+<body>
+<div class="guide">
+
+  <div class="brand">
+    <svg viewBox="0 0 32 32" fill="none">
+      <rect x="1" y="1" width="30" height="30" rx="8" stroke="#1e2a38" stroke-width="1.5"/>
+      <path d="M7 21 L13 15 L17 18 L25 9" stroke="#00C076" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="25" cy="9" r="2.4" fill="#00C076"/>
+    </svg>
+    <span class="wm">Swing<b>Edge</b></span>
+  </div>
+
+  <h1>איך לצלם עסקה מ-TradingView</h1>
+  <p class="sub">מדריך מהיר לצילום מסך שהמערכת יודעת לקרוא. משתמשים בכלי הפוזיציה של TradingView — SwingEdge זולל ממנו את הטיקר, הכניסה, הסטופ והיעד וממלא אוטומטית.</p>
+
+  <div class="toggle" id="toggle">
+    <button data-mode="long" class="active">
+      <svg class="ic" width="26" height="22" viewBox="0 0 40 34" fill="none" aria-hidden="true">
+        <line x1="6" y1="6" x2="34" y2="6" stroke="currentColor" stroke-width="1.7"/><circle cx="6" cy="6" r="2.5" stroke="currentColor" stroke-width="1.7"/>
+        <rect x="13" y="12" width="15" height="12" rx="2" stroke="currentColor" stroke-width="1.7"/><text x="20.5" y="21" font-family="monospace" font-size="9.5" font-weight="700" fill="currentColor" text-anchor="middle">L</text>
+        <line x1="6" y1="28" x2="34" y2="28" stroke="currentColor" stroke-width="1.7"/><circle cx="6" cy="28" r="2.5" stroke="currentColor" stroke-width="1.7"/>
+      </svg> עסקת LONG</button>
+    <button data-mode="short">
+      <svg class="ic" width="26" height="22" viewBox="0 0 40 34" fill="none" aria-hidden="true">
+        <line x1="6" y1="6" x2="34" y2="6" stroke="currentColor" stroke-width="1.7"/><circle cx="6" cy="6" r="2.5" stroke="currentColor" stroke-width="1.7"/>
+        <rect x="13" y="12" width="15" height="12" rx="2" stroke="currentColor" stroke-width="1.7"/><text x="20.5" y="21" font-family="monospace" font-size="9.5" font-weight="700" fill="currentColor" text-anchor="middle">S</text>
+        <line x1="6" y1="28" x2="34" y2="28" stroke="currentColor" stroke-width="1.7"/><circle cx="6" cy="28" r="2.5" stroke="currentColor" stroke-width="1.7"/>
+      </svg> עסקת SHORT</button>
+  </div>
+
+  <div class="stage">
+    <div class="scene"><div id="scene"></div></div>
+    <div class="caption">
+      <div class="kicker">
+        <span class="stepno" id="stepno">01 / 06</span>
+        <span class="chip long" id="chip">LONG · קנייה</span>
+      </div>
+      <h2 id="title"></h2>
+      <p class="desc" id="desc"></p>
+      <div class="tip"><span class="t-ic">◆</span><span class="t-tx" id="tip"></span></div>
+    </div>
+    <div class="controls">
+      <button class="nav" id="prev" aria-label="הקודם">‹</button>
+      <div class="track"><div class="bar" id="bar"></div></div>
+      <button class="nav play" id="play" aria-label="השהה">❚❚</button>
+      <button class="nav" id="next" aria-label="הבא">›</button>
+    </div>
+  </div>
+
+  <div class="dots" id="dots"></div>
+
+  <footer>
+    <div class="flow">
+      <span class="st">פתח SwingEdge</span><span class="arr">←</span>
+      <span class="st hl" id="fmode">בחר LONG</span><span class="arr">←</span>
+      <span class="st">Upload chart</span><span class="arr">←</span>
+      <span class="st">בדוק שהתמלא ✓</span>
+    </div>
+    <div class="fnote">התמונה נשמרת מקומית לסשן — נקראת ע"י ה-OCR, לא מאוחסנת בענן.</div>
+  </footer>
+
+</div>
+
+<script>
+const A='#00C076', L='#F43F5E', I='#06b6d4', T='#e7eef6', M='#8496a9', DIM='#5b6b7c';
+
+/* ---------- reusable candlestick chart ---------- */
+function candles(){
+  // x,openTop,closeBottom-ish via simple up/down; returns <g>
+  const data=[
+    [60,150,120,1],[92,158,130,0],[124,140,108,1],[156,150,118,1],[188,168,138,0],
+    [220,150,120,1],[252,132,100,1],[284,146,112,0],[316,124,96,1],[348,110,84,1]
+  ];
+  let g='';
+  data.forEach(([x,lo,hi,up])=>{
+    const c=up?A:L; const w=14;
+    g+=`<line x1="${x}" y1="${hi-14}" x2="${x}" y2="${lo+14}" stroke="${c}" stroke-width="1.4" opacity=".7"/>`;
+    g+=`<rect x="${x-w/2}" y="${hi}" width="${w}" height="${lo-hi}" rx="2" fill="${c}" opacity=".92"/>`;
+  });
+  return g;
+}
+function gridFrame(){
+  let g='<rect x="1" y="1" width="638" height="318" rx="12" fill="none" stroke="#141d28"/>';
+  for(let y=40;y<320;y+=56) g+=`<line x1="1" y1="${y}" x2="639" y2="${y}" class="grid-bg" opacity=".5"/>`;
+  return g;
+}
+function tickerBadge(sym){
+  return `<g>
+    <rect x="16" y="14" width="150" height="30" rx="7" fill="#0d141d" stroke="#1e2a38"/>
+    <circle cx="34" cy="29" r="7" fill="${A}" opacity=".18"/><text x="34" y="33" font-family="'JetBrains Mono'" font-size="10" font-weight="700" fill="${A}" text-anchor="middle">$</text>
+    <text x="50" y="33" font-family="'JetBrains Mono'" font-size="14" font-weight="700" fill="${T}">${sym}</text>
+    <text x="112" y="33" font-family="'JetBrains Mono'" font-size="11" font-weight="700" fill="${M}">· 1D</text>
+  </g>`;
+}
+
+/* ---------- the SIGNATURE: position tool ---------- */
+function positionTool(mode){
+  const entryY=118, top=44, bot=192;
+  const x0=250, x1=560;
+  const long = mode==='long';
+  // zones
+  const targetZone = long ? {y:top,h:entryY-top} : {y:entryY,h:bot-entryY};
+  const stopZone   = long ? {y:entryY,h:bot-entryY} : {y:top,h:entryY-top};
+  const targetPrice = long?'781.25':'715.44', targetPct = long?'+3.47%':'−5.22%';
+  const stopPrice   = long?'745.53':'760.78', stopPct   = long?'−1.26%':'+0.79%';
+  const rr = long?'2.76':'6.63';
+  const targetEdgeY = long?top:bot;
+  const stopEdgeY   = long?bot:top;
+
+  const handle=(x,y)=>`<circle cx="${x}" cy="${y}" r="4.5" fill="#0a0e14" stroke="${I}" stroke-width="2"/>`;
+  const priceTag=(x,y,txt,col,anchor='start')=>`
+    <rect x="${anchor==='start'?x:x-96}" y="${y-11}" width="96" height="22" rx="5" fill="${col}"/>
+    <text x="${anchor==='start'?x+48:x-48}" y="${y+4}" font-family="'JetBrains Mono'" font-size="11" font-weight="700" fill="#0a0e14" text-anchor="middle">${txt}</text>`;
+
+  return `<g class="ptool">
+    <!-- target zone -->
+    <rect x="${x0}" y="${targetZone.y}" width="${x1-x0}" height="${targetZone.h}" fill="${A}" opacity=".14"/>
+    <line x1="${x0}" y1="${targetEdgeY}" x2="${x1}" y2="${targetEdgeY}" stroke="${A}" stroke-width="1.6"/>
+    <!-- stop zone -->
+    <rect x="${x0}" y="${stopZone.y}" width="${x1-x0}" height="${stopZone.h}" fill="${L}" opacity=".13"/>
+    <line x1="${x0}" y1="${stopEdgeY}" x2="${x1}" y2="${stopEdgeY}" stroke="${L}" stroke-width="1.6"/>
+    <!-- entry line -->
+    <line x1="${x0-20}" y1="${entryY}" x2="${x1+8}" y2="${entryY}" stroke="${T}" stroke-width="1.4" stroke-dasharray="5 4" opacity=".85"/>
+
+    <!-- labels on the right price axis -->
+    ${priceTag(x1+2,targetEdgeY,targetPrice,A)}
+    ${priceTag(x1+2,stopEdgeY,stopPrice,L)}
+    ${priceTag(x1+2,entryY,long?'755.00':'754.84','#334',)}
+    <rect x="${x1+2}" y="${entryY-11}" width="96" height="22" rx="5" fill="#243040"/>
+    <text x="${x1+50}" y="${entryY+4}" font-family="'JetBrains Mono'" font-size="11" font-weight="700" fill="${T}" text-anchor="middle">${long?'755.00':'754.84'}</text>
+
+    <!-- floating info labels (TradingView-style) -->
+    <g>
+      <rect x="${x0+70}" y="${targetEdgeY-13}" width="150" height="24" rx="6" fill="#0d141d" stroke="${A}"/>
+      <text x="${x0+78}" y="${targetEdgeY+3}" font-family="'Heebo'" font-size="11" font-weight="700" fill="${A}">יעד</text>
+      <text x="${x0+145}" y="${targetEdgeY+3}" font-family="'JetBrains Mono'" font-size="11" font-weight="700" fill="${A}">${targetPct}</text>
+    </g>
+    <g>
+      <rect x="${x0+70}" y="${stopEdgeY-13}" width="150" height="24" rx="6" fill="#0d141d" stroke="${L}"/>
+      <text x="${x0+78}" y="${stopEdgeY+3}" font-family="'Heebo'" font-size="11" font-weight="700" fill="${L}">סטופ</text>
+      <text x="${x0+140}" y="${stopEdgeY+3}" font-family="'JetBrains Mono'" font-size="11" font-weight="700" fill="${L}">${stopPct}</text>
+    </g>
+
+    <!-- R/R center badge -->
+    <g>
+      <rect x="${(x0+x1)/2-58}" y="${entryY-16}" width="116" height="32" rx="8" fill="#0d141d" stroke="${I}"/>
+      <text x="${(x0+x1)/2-30}" y="${entryY+4}" font-family="'Heebo'" font-size="11" font-weight="700" fill="${M}">R/R</text>
+      <text x="${(x0+x1)/2+22}" y="${entryY+5}" font-family="'JetBrains Mono'" font-size="15" font-weight="700" fill="${I}">${rr}</text>
+    </g>
+
+    <!-- handles -->
+    ${handle(x0,targetEdgeY)}${handle(x1,targetEdgeY)}
+    ${handle(x0,stopEdgeY)}${handle(x1,stopEdgeY)}
+    ${handle(x0,entryY)}
+  </g>`;
+}
+
+/* ---------- real TradingView position-tool icons ---------- */
+// Long: two dots on the LEFT, an "L" box, horizontal guide lines. Short: same with "S".
+function posIcon(x,y,letter,col,scale){
+  const s=scale||1, dot=r=>2.1*s;
+  const g=(cx,cy)=>`<circle cx="${cx}" cy="${cy}" r="${2.1*s}" fill="none" stroke="${col}" stroke-width="${1.4*s}"/>`;
+  return `<g>
+    <!-- top guide -->
+    <line x1="${x}" y1="${y}" x2="${x+34*s}" y2="${y}" stroke="${col}" stroke-width="${1.3*s}"/>
+    ${g(x,y)}
+    <!-- letter box (middle) -->
+    <rect x="${x+9*s}" y="${y+7*s}" width="${16*s}" height="${13*s}" rx="${2*s}" fill="none" stroke="${col}" stroke-width="${1.3*s}"/>
+    <text x="${x+17*s}" y="${y+17*s}" font-family="'JetBrains Mono'" font-size="${10*s}" font-weight="700" fill="${col}" text-anchor="middle">${letter}</text>
+    <!-- bottom guide -->
+    <line x1="${x}" y1="${y+27*s}" x2="${x+34*s}" y2="${y+27*s}" stroke="${col}" stroke-width="${1.3*s}"/>
+    ${g(x,y+27*s)}
+  </g>`;
+}
+
+/* ---------- toolbar + forecasting menu (accurate) ---------- */
+function toolbarScene(mode){
+  const long=mode==='long';
+
+  // --- left toolbar (real order: crosshair, trendline, hlines, fib/pitchfork, POSITION(S/L), brush, text, emoji | ruler, zoom, magnet...) ---
+  const barX=20, barW=52, iconX=barX+barW/2;
+  const tools=[ 'cross','trend','hlines','fib','pos','brush','text','emoji' ];
+  let bar=`<rect x="${barX}" y="30" width="${barW}" height="290" rx="13" fill="#0d141d" stroke="#1e2a38"/>`;
+  tools.forEach((tk,i)=>{
+    const cy=54+i*34; const active=(tk==='pos');
+    if(active){
+      bar+=`<rect x="${barX+6}" y="${cy-15}" width="${barW-12}" height="30" rx="8" fill="${A}18" stroke="${A}" stroke-width="1.4"/>`;
+      // position tool icon (mini) in accent
+      bar+=posIcon(iconX-11,cy-8,long?'L':'S',A,.62);
+    } else {
+      bar+=miniToolIcon(tk,iconX,cy);
+    }
+  });
+  // pointer callout to the position tool
+  bar+=`<path d="M${barX+barW+6} ${54+4*34} q22 4 40 -14" stroke="${A}" stroke-width="1.5" fill="none" stroke-dasharray="4 3"/>
+        <circle cx="${barX+barW+46}" cy="${54+4*34-10}" r="3" fill="${A}"/>`;
+
+  // --- forecasting menu popup ---
+  const mx=190, mw=430;
+  const rows=[
+    {ic:'L',t:'Long position',on:long,col:A,star:true},
+    {ic:'S',t:'Short position',on:!long,col:L,star:true},
+    {ic:'pf',t:'Position forecast',on:false},
+    {ic:'bp',t:'Bars pattern',on:false},
+  ];
+  let menu=`<rect x="${mx-14}" y="34" width="${mw}" height="252" rx="14" fill="#0b1118" stroke="#232f3d"/>
+    <text x="${mx+4}" y="66" font-family="'Heebo'" font-size="12" font-weight="700" fill="${DIM}" letter-spacing="1.5">FORECASTING</text>`;
+  rows.forEach((r,i)=>{
+    const y=84+i*46; const on=r.on;
+    menu+=`<g>
+      ${on?`<rect x="${mx-6}" y="${y}" width="${mw-16}" height="40" rx="9" fill="#0d141d" stroke="${r.col}" stroke-width="1.5"/>`:''}
+      ${r.ic==='L'||r.ic==='S'
+        ? `<g transform="translate(${mx+6},${y+9})">${posIcon(0,0,r.ic,on?r.col:M,.66)}</g>`
+        : `<rect x="${mx+8}" y="${y+9}" width="22" height="22" rx="4" fill="none" stroke="${M}" stroke-width="1.3"/>`}
+      <text x="${mx+46}" y="${y+26}" font-family="'Heebo'" font-size="15" font-weight="${on?700:500}" fill="${on?T:'#c3d2e0'}">${r.t}</text>
+      ${on?`<text x="${mx+mw-44}" y="${y+27}" font-size="15" fill="${r.col}" text-anchor="end">✓</text>`
+          : (r.star?`<text x="${mx+mw-44}" y="${y+27}" font-size="15" fill="#f5c542" text-anchor="end">★</text>`:'')}
+    </g>`;
+  });
+
+  return `<svg viewBox="0 0 640 320">
+    ${gridFrame()}
+    ${bar}
+    ${menu}
+    <text x="620" y="${long?100:146}" font-family="'Heebo'" font-size="12.5" font-weight="700" fill="${long?A:L}" text-anchor="end">${long? 'קנית → בחר Long' : 'שורט → בחר Short'}</text>
+  </svg>`;
+}
+// simplified glyphs for the other toolbar buttons
+function miniToolIcon(tk,cx,cy){
+  const col='#8496a9', sw=1.4;
+  switch(tk){
+    case 'cross': return `<path d="M${cx} ${cy-8} V${cy+8} M${cx-8} ${cy} H${cx+8}" stroke="${col}" stroke-width="${sw}" stroke-linecap="round"/>`;
+    case 'trend': return `<line x1="${cx-8}" y1="${cy+7}" x2="${cx+8}" y2="${cy-7}" stroke="${col}" stroke-width="${sw}"/><circle cx="${cx-8}" cy="${cy+7}" r="2" fill="none" stroke="${col}" stroke-width="${sw}"/><circle cx="${cx+8}" cy="${cy-7}" r="2" fill="none" stroke="${col}" stroke-width="${sw}"/>`;
+    case 'hlines': return `<path d="M${cx-9} ${cy-5} H${cx+9} M${cx-9} ${cy} H${cx+9} M${cx-9} ${cy+5} H${cx+9}" stroke="${col}" stroke-width="${sw}"/><circle cx="${cx-9}" cy="${cy}" r="1.8" fill="${col}"/>`;
+    case 'fib': return `<path d="M${cx-8} ${cy+6} L${cx-2} ${cy-6} L${cx+3} ${cy+2} L${cx+8} ${cy-5}" fill="none" stroke="${col}" stroke-width="${sw}"/>`;
+    case 'brush': return `<path d="M${cx-7} ${cy+7} q4 -12 14 -14" fill="none" stroke="${col}" stroke-width="${sw}"/>`;
+    case 'text': return `<path d="M${cx-6} ${cy-7} H${cx+6} M${cx} ${cy-7} V${cy+7}" stroke="${col}" stroke-width="${sw}" stroke-linecap="round"/>`;
+    case 'emoji': return `<circle cx="${cx}" cy="${cy}" r="8" fill="none" stroke="${col}" stroke-width="${sw}"/><circle cx="${cx-3}" cy="${cy-2}" r="1" fill="${col}"/><circle cx="${cx+3}" cy="${cy-2}" r="1" fill="${col}"/><path d="M${cx-3} ${cy+3} q3 3 6 0" fill="none" stroke="${col}" stroke-width="${sw}"/>`;
+    default: return `<circle cx="${cx}" cy="${cy}" r="7" fill="none" stroke="${col}" stroke-width="${sw}"/>`;
+  }
+}
+
+/* ---------- upload UI scene ---------- */
+function uploadScene(mode){
+  const long=mode==='long', col=long?A:L;
+  const fields=[
+    ['טיקר', long?'SPY':'SPY'],
+    ['כניסה', long?'755.00':'754.84'],
+    ['סטופ', long?'745.53':'760.78'],
+    ['יעד', long?'781.25':'715.44'],
+  ];
+  let f='';
+  fields.forEach((fd,i)=>{
+    const y=150+i*38;
+    f+=`<g>
+      <rect x="60" y="${y}" width="240" height="30" rx="7" fill="#0d141d" stroke="#1e2a38"/>
+      <text x="290" y="${y+20}" font-family="'Heebo'" font-size="12" fill="${M}" text-anchor="end">${fd[0]}</text>
+      <text x="72" y="${y+20}" font-family="'JetBrains Mono'" font-size="13" font-weight="700" fill="${col}">${fd[1]}</text>
+      <text x="270" y="${y+20}" font-size="12" fill="${A}" text-anchor="end">✓</text>
+    </g>`;
+  });
+  return `<svg viewBox="0 0 640 320">
+    ${gridFrame()}
+    <!-- LONG/SHORT segmented -->
+    <rect x="60" y="40" width="240" height="40" rx="11" fill="#0d141d" stroke="#1e2a38"/>
+    <rect x="${long?64:182}" y="44" width="114" height="32" rx="8" fill="${col}"/>
+    <text x="121" y="64" font-family="'Heebo'" font-size="13" font-weight="700" fill="${long?'#04160f':M}" text-anchor="middle">LONG</text>
+    <text x="239" y="64" font-family="'Heebo'" font-size="13" font-weight="700" fill="${long?M:'#1a060c'}" text-anchor="middle">SHORT</text>
+
+    <!-- dropzone -->
+    <rect x="60" y="96" width="240" height="42" rx="10" fill="${col}0d" stroke="${col}" stroke-width="1.5" stroke-dasharray="6 5"/>
+    <text x="180" y="122" font-family="'Heebo'" font-size="13" font-weight="700" fill="${col}" text-anchor="middle">⭱  Upload chart…</text>
+
+    ${f}
+
+    <!-- arrow to auto-filled -->
+    <text x="330" y="175" font-size="22" fill="${DIM}">→</text>
+    <g>
+      <rect x="360" y="120" width="220" height="130" rx="12" fill="#0d141d" stroke="${col}" stroke-width="1.5"/>
+      <text x="470" y="146" font-family="'Frank Ruhl Libre'" font-size="15" font-weight="700" fill="${T}" text-anchor="middle">מולא אוטומטית ✨</text>
+      <text x="470" y="170" font-family="'Heebo'" font-size="11" fill="${M}" text-anchor="middle">ה-OCR קרא את המבנה</text>
+      <text x="470" y="192" font-family="'Heebo'" font-size="11" fill="${M}" text-anchor="middle">מכלי הפוזיציה</text>
+      <rect x="400" y="210" width="140" height="26" rx="7" fill="${col}"/>
+      <text x="470" y="227" font-family="'Heebo'" font-size="12" font-weight="700" fill="${long?'#04160f':'#1a060c'}" text-anchor="middle">Decision Coach ⚡</text>
+    </g>
+  </svg>`;
+}
+
+/* ---------- scene builders per step ---------- */
+function scene(mode,i){
+  const long=mode==='long';
+  switch(i){
+    case 0: return `<svg viewBox="0 0 640 320">${gridFrame()}${candles()}${tickerBadge('SPY')}
+        <line x1="1" y1="112" x2="639" y2="112" stroke="${A}" stroke-width="1" stroke-dasharray="3 4" opacity=".4"/>
+        <rect x="574" y="101" width="60" height="22" rx="5" fill="${A}"/><text x="604" y="116" font-family="'JetBrains Mono'" font-size="11" font-weight="700" fill="#04160f" text-anchor="middle">754.95</text>
+      </svg>`;
+    case 1: return toolbarScene(mode);
+    case 2: return `<svg viewBox="0 0 640 320">${gridFrame()}${candles()}${tickerBadge('SPY')}
+        <line x1="1" y1="118" x2="639" y2="118" stroke="${T}" stroke-width="1.4" stroke-dasharray="5 4" opacity=".9"/>
+        <circle cx="400" cy="118" r="7" fill="none" stroke="${I}" stroke-width="2"/>
+        <line x1="400" y1="60" x2="400" y2="176" stroke="${I}" stroke-width="1" stroke-dasharray="3 3" opacity=".6"/>
+        <rect x="330" y="126" width="150" height="26" rx="7" fill="#0d141d" stroke="${T}"/>
+        <text x="345" y="143" font-family="'Heebo'" font-size="12" font-weight="700" fill="${T}">כניסה</text>
+        <text x="470" y="143" font-family="'JetBrains Mono'" font-size="12" font-weight="700" fill="${T}" text-anchor="end">755.00</text>
+      </svg>`;
+    case 3: return `<svg viewBox="0 0 640 320">${gridFrame()}${candles()}${tickerBadge('SPY')}${positionTool(mode)}</svg>`;
+    case 4: return `<svg viewBox="0 0 640 320">${gridFrame()}${candles()}${tickerBadge('SPY')}${positionTool(mode)}
+        <!-- capture frame -->
+        ${captureCorners(232,32,350,214)}
+        <g><rect x="500" y="18" width="120" height="28" rx="8" fill="#0d141d" stroke="${I}"/>
+        <text x="514" y="36" font-size="13" fill="${I}">📷</text>
+        <text x="536" y="36" font-family="'Heebo'" font-size="12" font-weight="700" fill="${T}">צילום מסך</text></g>
+      </svg>`;
+    case 5: return uploadScene(mode);
+  }
+}
+function captureCorners(x,y,w,h){
+  const c=I, s=18, sw=2.4;
+  const L=(cx,cy,dx,dy)=>`<path d="M${cx} ${cy+dy*s} L${cx} ${cy} L${cx+dx*s} ${cy}" stroke="${c}" stroke-width="${sw}" fill="none" stroke-linecap="round"/>`;
+  return `${L(x,y,1,1)}${L(x+w,y,-1,1)}${L(x,y+h,1,-1)}${L(x+w,y+h,-1,-1)}
+    <rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${c}" stroke-width="1" stroke-dasharray="4 5" opacity=".4"/>`;
+}
+
+/* ---------- step copy ---------- */
+function inlineIcon(letter,col){return `<svg width="28" height="24" viewBox="0 0 40 34" fill="none" style="vertical-align:middle;margin:0 5px;transform:translateY(-1px)">`
+  +`<line x1="6" y1="6" x2="34" y2="6" stroke="${col}" stroke-width="1.7"/><circle cx="6" cy="6" r="2.5" stroke="${col}" stroke-width="1.7"/>`
+  +`<rect x="13" y="12" width="15" height="12" rx="2" stroke="${col}" stroke-width="1.7"/><text x="20.5" y="21" font-family="'JetBrains Mono',monospace" font-size="9.5" font-weight="700" fill="${col}" text-anchor="middle">${letter}</text>`
+  +`<line x1="6" y1="28" x2="34" y2="28" stroke="${col}" stroke-width="1.7"/><circle cx="6" cy="28" r="2.5" stroke="${col}" stroke-width="1.7"/></svg>`;}
+const ICON_L=inlineIcon('L',A), ICON_S=inlineIcon('S',L);
+
+const COPY={
+  long:[
+    {t:'פתח את הגרף של המניה שסחרת',d:'טען ב-TradingView את הטיקר של העסקה — מניה, ETF או קריפטו. ודא שסמל הטיקר מופיע בבירור בפינה העליונה של הגרף.',tip:'ה-OCR קורא את שם הטיקר ישירות מכותרת הגרף. <b>שיהיה גלוי — לא חתוך.</b>'},
+    {t:'בחר את הכלי Long Position',d:`בסרגל הכלים השמאלי לחץ על כלי החיזוי (האייקון הרביעי מלמעלה — עם ה-${ICON_S}). בתפריט שנפתח, תחת <span class="mono">FORECASTING</span>, בחר <span class="mono">Long position</span> ${ICON_L}`,tip:'קנית = <b>Long</b>. הכלי מצייר אוטומטית אזור יעד <b>למעלה</b> וסטופ <b>למטה</b>. אפשר ללחוץ על ה-★ שלידו כדי לקבע אותו למועדפים.'},
+    {t:'סמן את נקודת הכניסה',d:'לחץ על הגרף במחיר שבו נכנסת לעסקה. הקו האמצעי המקווקו הוא מחיר הכניסה שלך — נקודת העוגן של הכלי.',tip:'אפשר לגרור ולכוונן אחר כך — <b>לא חייב לפגוע מדויק</b> בקליק הראשון.'},
+    {t:'גרור את הסטופ והיעד',d:'גרור את הקו האדום למחיר הסטופ שלך, ואת הקו הירוק למחיר היעד. TradingView מחשב לבד את האחוזים ואת יחס הסיכון/סיכוי (R/R).',tip:'ה-<b>R/R</b> שמופיע בכלי — SwingEdge קורא אותו ומשתמש בו בניתוח איכות העסקה.'},
+    {t:'צלם את המסך',d:'צלם כשהכלי גלוי בבירור — שלושת המחירים (כניסה · סטופ · יעד) והתיבות. במאק: <span class="mono">Cmd+Shift+4</span> ובחר את האזור. או אייקון המצלמה של TradingView.',tip:'תמונה נקייה = קריאה מדויקת. <b>אין צורך לחתוך בול</b> — SwingEdge קורא את המבנה הגיאומטרי, לא את הצבעים.'},
+    {t:'העלה ל-SwingEdge',d:'פתח את SwingEdge → בחר <span class="mono">LONG</span> → העלה את התמונה. הטיקר, הכניסה, הסטופ והיעד יתמלאו אוטומטית ותקבל ניתוח מיידי.',tip:'תמיד <b>ודא שהשדות התמלאו נכון</b> לפני שמירה — אפשר לתקן ידנית כל שדה.'},
+  ],
+  short:[
+    {t:'פתח את הגרף של המניה שסחרת',d:'טען ב-TradingView את הטיקר של העסקה — מניה, ETF או קריפטו. ודא שסמל הטיקר מופיע בבירור בפינה העליונה של הגרף.',tip:'ה-OCR קורא את שם הטיקר ישירות מכותרת הגרף. <b>שיהיה גלוי — לא חתוך.</b>'},
+    {t:'בחר את הכלי Short Position',d:`בסרגל הכלים השמאלי לחץ על כלי החיזוי (האייקון הרביעי מלמעלה — עם ה-${ICON_S}). בתפריט שנפתח, תחת <span class="mono">FORECASTING</span>, בחר <span class="mono">Short position</span> ${ICON_S}`,tip:'מכרת בשורט = <b>Short</b>. הכלי הופך את הגיאומטריה: סטופ <b>למעלה</b>, יעד <b>למטה</b>. אפשר ללחוץ על ה-★ שלידו כדי לקבע אותו למועדפים.'},
+    {t:'סמן את נקודת הכניסה',d:'לחץ על הגרף במחיר שבו נכנסת לשורט. הקו האמצעי המקווקו הוא מחיר הכניסה שלך — נקודת העוגן של הכלי.',tip:'אפשר לגרור ולכוונן אחר כך — <b>לא חייב לפגוע מדויק</b> בקליק הראשון.'},
+    {t:'גרור את הסטופ והיעד',d:'גרור את הקו האדום (למעלה) למחיר הסטופ, ואת הקו הירוק (למטה) למחיר היעד. בשורט אתה מרוויח כשהמחיר <b>יורד</b> — לכן היעד מתחת לכניסה.',tip:'ה-<b>R/R</b> שמופיע בכלי — SwingEdge קורא אותו ומשתמש בו בניתוח איכות העסקה.'},
+    {t:'צלם את המסך',d:'צלם כשהכלי גלוי בבירור — שלושת המחירים (כניסה · סטופ · יעד) והתיבות. במאק: <span class="mono">Cmd+Shift+4</span> ובחר את האזור. או אייקון המצלמה של TradingView.',tip:'תמונה נקייה = קריאה מדויקת. <b>אין צורך לחתוך בול</b> — SwingEdge קורא את המבנה הגיאומטרי, לא את הצבעים.'},
+    {t:'העלה ל-SwingEdge',d:'פתח את SwingEdge → בחר <span class="mono">SHORT</span> → העלה את התמונה. הטיקר, הכניסה, הסטופ והיעד יתמלאו אוטומטית ותקבל ניתוח מיידי.',tip:'תמיד <b>ודא שהשדות התמלאו נכון</b> לפני שמירה — אפשר לתקן ידנית כל שדה.'},
+  ]
+};
+
+/* ---------- controller ---------- */
+let mode='long', idx=0, playing=true, timer=null;
+const DUR=5400, N=6;
+const $=s=>document.querySelector(s);
+const sceneEl=$('#scene'), barEl=$('#bar');
+
+function dotsInit(){
+  const w=$('#dots'); w.innerHTML='';
+  for(let i=0;i<N;i++){const b=document.createElement('button');b.className='dot';b.setAttribute('aria-label','שלב '+(i+1));b.onclick=()=>{go(i,true)};w.appendChild(b)}
+}
+function render(){
+  const c=COPY[mode][idx];
+  sceneEl.innerHTML=scene(mode,idx);
+  sceneEl.classList.remove('fade'); void sceneEl.offsetWidth; sceneEl.classList.add('fade');
+  $('#stepno').textContent=String(idx+1).padStart(2,'0')+' / '+String(N).padStart(2,'0');
+  $('#title').textContent=c.t; $('#desc').innerHTML=c.d; $('#tip').innerHTML=c.tip;
+  const chip=$('#chip');
+  chip.className='chip '+mode; chip.textContent=mode==='long'?'LONG · קנייה':'SHORT · מכירה';
+  $('#fmode').textContent=mode==='long'?'בחר LONG':'בחר SHORT';
+  document.querySelectorAll('.dot').forEach((d,i)=>d.classList.toggle('on',i===idx));
+}
+function restartBar(){
+  barEl.classList.remove('run'); barEl.style.animationDuration=DUR+'ms'; void barEl.offsetWidth;
+  if(playing){barEl.classList.add('run'); barEl.style.animationPlayState='running'}
+  else{barEl.style.width=getComputedStyle(barEl).width}
+}
+function schedule(){clearTimeout(timer); if(playing) timer=setTimeout(()=>go(idx+1),DUR)}
+function go(i,user){idx=(i+N)%N; render(); restartBar(); schedule(); if(user&&!playing){/*stay paused*/}}
+function setPlay(p){
+  playing=p; $('#play').innerHTML=p?'❚❚':'▶'; $('#play').setAttribute('aria-label',p?'השהה':'נגן');
+  if(p){restartBar();schedule()} else {clearTimeout(timer); barEl.style.animationPlayState='paused'}
+}
+function setMode(m){
+  mode=m; document.body.classList.toggle('short-mode',m==='short');
+  document.querySelectorAll('#toggle button').forEach(b=>b.classList.toggle('active',b.dataset.mode===m));
+  render(); restartBar(); schedule();
+}
+
+$('#prev').onclick=()=>go(idx-1,true);
+$('#next').onclick=()=>go(idx+1,true);
+$('#play').onclick=()=>setPlay(!playing);
+document.querySelectorAll('#toggle button').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowLeft')go(idx+1,true); if(e.key==='ArrowRight')go(idx-1,true);
+  if(e.key===' '){e.preventDefault();setPlay(!playing)}
+});
+
+dotsInit(); render(); restartBar(); schedule();
+</script>
+</body>
+</html>
