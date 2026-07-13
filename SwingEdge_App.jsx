@@ -2951,7 +2951,7 @@ export default function SwingEdge() {
       </nav>
 
       {/* ── CONTENT ── */}
-      <main className="flex-1 overflow-auto p-4 md:p-5 space-y-5">
+      <main className="flex-1 overflow-auto p-4 md:p-5 space-y-5 pb-24 md:pb-5">
 
         {/* ══════════════ MENTORING (B4.3 — read-only mentee view) ══════════════ */}
         {tab === "mentoring" && (
