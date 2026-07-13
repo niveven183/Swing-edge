@@ -3252,7 +3252,7 @@ export default function SwingEdge() {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
-                    <XAxis dataKey="date" tick={{ fontSize: 9, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} />
+                    <XAxis dataKey="date" tick={{ fontSize: 9, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => typeof v === "string" && v.length === 10 && v[4] === "-" ? v.slice(5) : v} minTickGap={40} />
                     <YAxis domain={["auto", "auto"]} tick={{ fontSize: 9, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
                     <ReferenceLine y={capital} stroke="var(--v3-text-lo)" strokeDasharray="4 4" />
                     <Tooltip contentStyle={{ background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 8, fontSize: 11 }} formatter={(v) => [`$${v.toLocaleString()}`, "Equity"]} />
@@ -4598,7 +4598,7 @@ export default function SwingEdge() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} />
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => typeof v === "string" && v.length === 10 && v[4] === "-" ? v.slice(5) : v} minTickGap={40} />
                   <YAxis domain={["auto","auto"]} tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v=>`$${(v/1000).toFixed(1)}k`} />
                   <ReferenceLine y={capital} stroke="var(--v3-text-lo)" strokeDasharray="5 5" label={{ value: lang === "he" ? "הון התחלתי" : "Starting Capital", position: "insideTopRight", fontSize: 9, fill: "var(--v3-text-lo)" }} />
                   <Tooltip
@@ -4708,7 +4708,7 @@ export default function SwingEdge() {
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={data} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
-                      <XAxis dataKey="setup" tick={{ fontSize: 9, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={short} />
+                      <XAxis dataKey="setup" tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={short} angle={-45} textAnchor="end" interval={0} height={70} />
                       <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`} />
                       <Tooltip
                         contentStyle={{ background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 10, fontSize: 11 }}
@@ -5188,11 +5188,13 @@ export default function SwingEdge() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* TradingView Chart */}
-              <div className="md:col-span-2 bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl overflow-hidden relative" style={{ height: 520 }}>
-                <div ref={tvRef} style={{ height: "100%" }} />
+              <div className="md:col-span-2 relative">
+                <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl overflow-hidden" style={{ height: 520 }}>
+                  <div ref={tvRef} style={{ height: "100%" }} />
+                </div>
 
-                {/* ── Floating AI Trade Buttons (screenshot → OCR) ── */}
-                <div className="absolute bottom-4 right-4 rtl:right-auto rtl:left-4 z-10 flex flex-col gap-2">
+                {/* ── AI Trade Buttons (screenshot → OCR) — below chart on mobile, overlay on desktop ── */}
+                <div className="mt-2 z-10 flex flex-row flex-wrap justify-end gap-2 md:mt-0 md:absolute md:bottom-4 md:right-4 rtl:md:right-auto rtl:md:left-4 md:flex-col md:flex-nowrap md:justify-start">
                   {/* Capture/OCR status — announced to assistive tech */}
                   {chartOcrStatus && (() => {
                     const { status, confidence } = chartOcrStatus;
