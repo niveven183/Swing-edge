@@ -34,6 +34,10 @@ function MobileTradeCardImpl({
   const hasActions = Boolean(onClose || onDelete);
   const hasCheckbox = typeof isSelected === "boolean";
 
+  const shortDate = typeof trade.date === "string" && trade.date.length === 10 && trade.date[4] === "-"
+    ? trade.date.slice(5)
+    : trade.date;
+
   const handleCardClick = (e) => {
     if (e.target.closest("[data-card-noclick]")) return;
     onClick?.(trade);
@@ -42,7 +46,7 @@ function MobileTradeCardImpl({
   return (
     <article
       onClick={onClick ? handleCardClick : undefined}
-      className={`relative bg-[var(--v3-bg-panel)] border border-[var(--v3-line)] rounded-xl py-3 px-4 flex flex-col gap-2 border-s-[3px] ${borderStartClass} ${onClick ? "cursor-pointer active:opacity-80 transition-opacity" : ""} ${isSelected ? "bg-[#06b6d4]/[0.06]" : ""}`}
+      className={`relative bg-[var(--v3-bg-panel)] border border-[var(--v3-line)] rounded-lg py-2 px-3 flex flex-col gap-1.5 border-s-[3px] ${borderStartClass} ${onClick ? "cursor-pointer active:opacity-80 transition-opacity" : ""} ${isSelected ? "bg-[#06b6d4]/[0.06]" : ""}`}
     >
       <div className="flex items-center gap-2">
         {hasCheckbox && (
@@ -56,7 +60,7 @@ function MobileTradeCardImpl({
             className="w-3.5 h-3.5 rounded border border-white/20 bg-white/5 accent-[var(--v3-info)]"
           />
         )}
-        <TickerLogo ticker={trade.ticker} size={18} />
+        <TickerLogo ticker={trade.ticker} size={16} />
         <span className="font-bold font-mono text-[var(--v3-text-hi)]">{trade.ticker}</span>
         {trade.isDemo && (
           <span className="text-[10px] bg-slate-700 text-slate-400 px-1 py-0.5 rounded font-normal">DEMO</span>
@@ -64,13 +68,6 @@ function MobileTradeCardImpl({
         <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${sideClasses}`}>
           {trade.side}
         </span>
-        <span className="ms-auto text-[11px] font-mono text-[var(--v3-text-lo)]">{trade.date}</span>
-      </div>
-
-      <div className="flex items-center gap-2 font-mono text-xs">
-        <span className="text-slate-300">${trade.entry}</span>
-        <span className="text-[var(--v3-text-lo)]">→</span>
-        <span className="text-slate-300">{trade.exit ? `$${trade.exit}` : "–"}</span>
         <span className={`ms-auto font-bold text-sm ${pnlColorClass}`}>
           {isOpen ? "OPEN" : fmt$(Math.round(pnl))}
         </span>
@@ -79,46 +76,52 @@ function MobileTradeCardImpl({
         )}
       </div>
 
-      {(trade.setup || (mentorNotes && mentorNotes.length > 0)) && (
+      <div className="flex items-center gap-2 font-mono text-[11px]">
+        <span className="text-[var(--v3-text-lo)]">{shortDate}</span>
+        <span className="text-slate-300">${trade.entry}</span>
+        <span className="text-[var(--v3-text-lo)]">→</span>
+        <span className="text-slate-300">{trade.exit ? `$${trade.exit}` : "–"}</span>
+        {trade.setup && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#A78BFA]/10 text-[var(--v3-purple)] border border-[#A78BFA]/20 whitespace-nowrap max-w-[100px] truncate">
+            {trade.setup}
+          </span>
+        )}
+        {hasActions && (
+          <div
+            data-card-noclick
+            className="ms-auto flex items-center gap-1"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {isOpen && onClose && (
+              <button
+                onClick={() => onClose(trade)}
+                className="text-[10px] px-2 py-0.5 rounded bg-[#F43F5E]/10 border border-[#F43F5E]/20 text-[#F43F5E] hover:opacity-80 transition"
+              >
+                Close
+              </button>
+            )}
+            {onDelete && (
+              <button
+                onClick={() => onDelete(trade.id)}
+                className="text-[10px] px-1 py-0.5 rounded bg-slate-500/10 border border-slate-500/20 text-slate-400 hover:text-red-400 hover:border-red-500/30 transition"
+                title={isRTL ? "מחיקה" : "Delete"}
+                aria-label={isRTL ? "מחיקה" : "Delete"}
+              >
+                🗑️
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {mentorNotes && mentorNotes.length > 0 && (
         <div className="flex flex-col gap-1">
-          {trade.setup && (
-            <span className="self-start text-[10px] px-2 py-0.5 rounded bg-[#A78BFA]/10 text-[var(--v3-purple)] border border-[#A78BFA]/20 whitespace-nowrap">
-              {trade.setup}
-            </span>
-          )}
-          {(mentorNotes || []).map((n) => (
+          {mentorNotes.map((n) => (
             <div key={n.id} className="flex items-start gap-1 text-[10px] leading-snug text-[var(--v3-accent)] bg-[var(--v3-accent-glow)] border border-[var(--v3-accent)]/20 rounded px-1.5 py-1 whitespace-normal break-words">
               <MessageCircle size={10} className="mt-0.5 shrink-0" />
               <span className="break-words">{n.note}</span>
             </div>
           ))}
-        </div>
-      )}
-
-      {hasActions && (
-        <div
-          data-card-noclick
-          className="flex items-center gap-1.5 pt-2 border-t border-[var(--v3-line)]/60"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {isOpen && onClose && (
-            <button
-              onClick={() => onClose(trade)}
-              className="text-[10px] px-2 py-1 rounded bg-[#F43F5E]/10 border border-[#F43F5E]/20 text-[#F43F5E] hover:opacity-80 transition"
-            >
-              Close
-            </button>
-          )}
-          {onDelete && (
-            <button
-              onClick={() => onDelete(trade.id)}
-              className="ms-auto text-[10px] px-1.5 py-1 rounded bg-slate-500/10 border border-slate-500/20 text-slate-400 hover:text-red-400 hover:border-red-500/30 transition"
-              title={isRTL ? "מחיקה" : "Delete"}
-              aria-label={isRTL ? "מחיקה" : "Delete"}
-            >
-              🗑️
-            </button>
-          )}
         </div>
       )}
     </article>
