@@ -37,6 +37,7 @@ import ChangePasswordModal from "./src/components/ChangePasswordModal.jsx";
 import { useTheme } from "./src/contexts/ThemeContext.jsx";
 import TradingViewSearch from "./src/components/TradingViewSearch.jsx";
 import TickerLogo from "./src/components/TickerLogo.jsx";
+import MobileTradeCard from "./src/components/MobileTradeCard.jsx";
 import { TVTickerTape } from "./src/components/TradingViewWidgets.jsx";
 import { useToast, useConfirm } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured, tradeForSupabase } from "./src/supabaseClient.js";
@@ -1738,6 +1739,12 @@ export default function SwingEdge() {
     });
   }, [trades, journalFilters]);
 
+  // Single source of order for both desktop table and mobile cards.
+  const sortedFilteredTrades = useMemo(
+    () => [...filteredTrades].sort((a, b) => String(b.date || "").localeCompare(String(a.date || ""))),
+    [filteredTrades]
+  );
+
   // journalStats — same hub, scoped to the user's journal filters.
   // Stats exclude demo trades; the table itself still renders them with a badge.
   const filteredRealTrades = useMemo(
@@ -3328,11 +3335,14 @@ export default function SwingEdge() {
             </div>
 
             {/* Recent Closed */}
+            {(() => {
+              const recentClosed = closedTrades.slice(-5).reverse();
+              return (
             <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Recent Closed Trades</span>
               </div>
-              <div className="overflow-x-auto">
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="text-slate-600 border-b border-[var(--border-subtle)] dark:border-white/[0.06]">
@@ -3342,7 +3352,7 @@ export default function SwingEdge() {
                     </tr>
                   </thead>
                   <tbody>
-                    {closedTrades.slice(-5).reverse().map(t => {
+                    {recentClosed.map(t => {
                       const { pnl, rMultiple } = calcTradeMetrics(t);
                       const win = pnl > 0;
                       return (
@@ -3362,7 +3372,14 @@ export default function SwingEdge() {
                   </tbody>
                 </table>
               </div>
+              <div className="md:hidden flex flex-col gap-2">
+                {recentClosed.map(t => (
+                  <MobileTradeCard key={t.id} trade={t} isRTL={isRTL} />
+                ))}
+              </div>
             </div>
+              );
+            })()}
 
             {/* ══ RISK DASHBOARD ══ */}
             {(() => {
@@ -3760,7 +3777,7 @@ export default function SwingEdge() {
                 </div>
               </div>
             )}
-            <div className="overflow-x-auto bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl">
+            <div className="hidden md:block overflow-x-auto bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-slate-600 border-b border-[var(--border-subtle)] dark:border-white/[0.06] text-[10px] tracking-widest uppercase">
@@ -3791,7 +3808,7 @@ export default function SwingEdge() {
                   </tr>
                 </thead>
                 <tbody>
-                  {[...filteredTrades].sort((a, b) => String(b.date || "").localeCompare(String(a.date || ""))).map(t => {
+                  {sortedFilteredTrades.map(t => {
                     const { pnl, rMultiple } = calcTradeMetrics(t);
                     const isOpen = t.status === "OPEN";
                     const win = !isOpen && pnl > 0;
@@ -3913,6 +3930,27 @@ export default function SwingEdge() {
                   })}
                 </tbody>
               </table>
+            </div>
+            <div className="md:hidden flex flex-col gap-2">
+              {sortedFilteredTrades.map(t => (
+                <MobileTradeCard
+                  key={t.id}
+                  trade={t}
+                  onClick={handleEditOpen}
+                  onClose={(tr) => { setClosingTrade(tr); setShowCloseForm(true); }}
+                  onDelete={handleDeleteTrade}
+                  isSelected={selectedTrades.has(t.id)}
+                  onToggleSelect={(id, next) => {
+                    setSelectedTrades(prev => {
+                      const s = new Set(prev);
+                      if (next) s.add(id); else s.delete(id);
+                      return s;
+                    });
+                  }}
+                  mentorNotes={myTradeNotes[t.id]}
+                  isRTL={isRTL}
+                />
+              ))}
             </div>
             </>
             )}
