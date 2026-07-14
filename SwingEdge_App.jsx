@@ -2187,15 +2187,24 @@ export default function SwingEdge() {
 
     // 1. Keep only real trades, discard old demo trades
     const realTrades = trades.filter(t => !t.isDemo);
-    const demoWithUserId = DEMO_TRADES.map(t => ({
-      ...t,
-      user_id: userId,
-      id: crypto.randomUUID(),        // fresh UUID every load — no stale IDs
-      createdAt: new Date(t.date + "T14:30:00").toISOString(),
-      closedAt:  new Date(t.date + "T20:00:00").toISOString(),
-      tradeImage: null,
-      _prediction: null,
-    }));
+    const demoWithUserId = DEMO_TRADES.map((t, i) => {
+      // Deterministic 1–15 calendar-day swing hold, derived from index so the
+      // scatter spreads across the X-axis identically on every reload.
+      const holdD = (i % 15) + 1;
+      const close = new Date(t.date + "T20:00:00");
+      close.setDate(close.getDate() + holdD);   // local-time add → holdDays == holdD
+      const now = new Date();
+      if (close.getTime() > now.getTime()) close.setTime(now.getTime()); // never future
+      return {
+        ...t,
+        user_id: userId,
+        id: crypto.randomUUID(),        // fresh UUID every load — no stale IDs
+        createdAt: new Date(t.date + "T14:30:00").toISOString(),
+        closedAt:  close.toISOString(),
+        tradeImage: null,
+        _prediction: null,
+      };
+    });
 
     // 2. Update state → useEffect auto-saves to localStorage
     setTrades([...realTrades, ...demoWithUserId]);
@@ -4929,7 +4938,7 @@ export default function SwingEdge() {
                 const { pnl } = calcTradeMetrics(t);
                 const hold = holdDays(t);
                 if (pnl == null || hold == null) return null;
-                return { hold: Math.max(1, hold), pnl: Math.round(pnl), ticker: t.ticker };
+                return { hold, pnl: Math.round(pnl), ticker: t.ticker };
               }).filter(Boolean);
 
               const darkTooltip = { background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 10, fontSize: 11, color: "var(--v3-text-mid)" };
@@ -5130,6 +5139,8 @@ export default function SwingEdge() {
                             type="number"
                             dataKey="hold"
                             name="Days"
+                            domain={[0, 'dataMax']}
+                            allowDecimals={false}
                             tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }}
                             tickLine={false}
                             axisLine={false}
