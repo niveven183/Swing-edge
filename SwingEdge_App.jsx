@@ -1092,6 +1092,11 @@ export default function SwingEdge() {
 
   const handleOnboardingComplete = (profile) => {
     setUserProfile(profile);
+    const cap = Number(profile?.defaults?.capital);
+    if (cap > 0) {
+      setCapital(cap);
+      try { localStorage.setItem("swingEdgeCapital", String(cap)); } catch {}
+    }
     setShowOnboarding(false);
   };
 
@@ -2777,7 +2782,7 @@ export default function SwingEdge() {
       {/* ── BETA WELCOME (first login only) ── */}
       {showBetaWelcome && (
         <BetaWelcome
-          userName={authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || userProfile?.name}
+          userName={authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || userProfile?.profileName}
           onStart={dismissBetaWelcome}
         />
       )}
@@ -2841,7 +2846,7 @@ export default function SwingEdge() {
               >
                 {/* HEADER */}
                 <div className="px-4 py-3 border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-gradient-to-r from-cyan-500/5 to-violet-500/5">
-                  <p className="text-sm font-bold text-white truncate">{userProfile?.name || authUser?.user_metadata?.full_name || "Trader"}</p>
+                  <p className="text-sm font-bold text-white truncate">{userProfile?.profileName || authUser?.user_metadata?.full_name || "Trader"}</p>
                   {authUser?.email && (
                     <p className="text-[11px] text-slate-400 mt-0.5 font-mono truncate">{authUser.email}</p>
                   )}

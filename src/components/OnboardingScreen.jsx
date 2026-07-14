@@ -28,14 +28,9 @@ const QUESTIONS = [
   {
     id: "portfolioSize",
     icon: DollarSign,
+    type: "amount",
     title: "מה גודל התיק שלך?",
-    subtitle: "נגדיר אחוזי סיכון מתאימים",
-    options: [
-      { value: "small", label: "עד $5K", sub: "תיק מתחיל", emoji: "💼" },
-      { value: "medium", label: "$5K - $25K", sub: "תיק בינוני", emoji: "📊" },
-      { value: "large", label: "$25K - $100K", sub: "תיק מתקדם", emoji: "💰" },
-      { value: "xlarge", label: "מעל $100K", sub: "תיק מקצועי", emoji: "🏦" },
-    ],
+    subtitle: "נגדיר אחוזי סיכון ועמלה לפי סכום ההון",
   },
   {
     id: "goal",
@@ -65,17 +60,25 @@ const QUESTIONS = [
 const generateProfile = (answers) => {
   const { experience, strategy, portfolioSize, goal, frequency } = answers;
 
+  // portfolioSize is now the capital amount in $ (number). Derive the risk/commission bucket.
+  const capitalAmount = Number(portfolioSize) || 0;
+  let bucket = "medium";
+  if (capitalAmount < 5000) bucket = "small";
+  else if (capitalAmount < 25000) bucket = "medium";
+  else if (capitalAmount <= 100000) bucket = "large";
+  else bucket = "xlarge";
+
   // Risk percentage based on portfolio size and experience
   let riskPct = 1;
-  if (portfolioSize === "small") riskPct = experience === "beginner" ? 0.5 : 1;
-  else if (portfolioSize === "medium") riskPct = experience === "advanced" ? 1.5 : 1;
-  else if (portfolioSize === "large") riskPct = experience === "advanced" ? 2 : 1.5;
+  if (bucket === "small") riskPct = experience === "beginner" ? 0.5 : 1;
+  else if (bucket === "medium") riskPct = experience === "advanced" ? 1.5 : 1;
+  else if (bucket === "large") riskPct = experience === "advanced" ? 2 : 1.5;
   else riskPct = experience === "advanced" ? 2.5 : 2;
 
   // Commission based on portfolio size
   let commission = 0;
-  if (portfolioSize === "small") commission = 0.65;
-  else if (portfolioSize === "medium") commission = 0;
+  if (bucket === "small") commission = 0.65;
+  else if (bucket === "medium") commission = 0;
   else commission = 0;
 
   // Profile summary
@@ -167,7 +170,7 @@ const generateProfile = (answers) => {
     commission,
     summary: `${strategyMap[strategy]} עם ניסיון ${expMap[experience]}, מתמקד ב${goalMap[goal]}`,
     recommendations: recs,
-    defaults: { riskPct, commission, capital: portfolioSize },
+    defaults: { riskPct, commission, capital: capitalAmount },
   };
 };
 
@@ -194,6 +197,8 @@ export default function OnboardingScreen({ onComplete }) {
 
   const currentQuestion = step >= 1 && step <= 5 ? QUESTIONS[step - 1] : null;
   const progress = step === 0 ? 0 : Math.round((step / 5) * 100);
+  const isAmountStep = currentQuestion?.type === "amount";
+  const canProceed = isAmountStep ? Number(selected) > 0 : !!selected;
 
   const handleOptionSelect = (value) => {
     setSelected(value);
@@ -205,10 +210,11 @@ export default function OnboardingScreen({ onComplete }) {
       setSelected(null);
       return;
     }
-    if (!selected) return;
+    if (!canProceed) return;
 
     const q = QUESTIONS[step - 1];
-    const newAnswers = { ...answers, [q.id]: selected };
+    const value = q.type === "amount" ? Number(selected) : selected;
+    const newAnswers = { ...answers, [q.id]: value };
     setAnswers(newAnswers);
     setSelected(null);
 
@@ -323,31 +329,50 @@ export default function OnboardingScreen({ onComplete }) {
               </div>
               <p className="text-xs text-slate-500 mb-5 mr-13">{currentQuestion.subtitle}</p>
 
-              {/* Options */}
-              <div className="space-y-2.5">
-                {currentQuestion.options.map(opt => (
-                  <button
-                    key={opt.value}
-                    onClick={() => handleOptionSelect(opt.value)}
-                    className={`w-full flex items-center gap-3 p-3.5 rounded-xl border text-right transition-all duration-200 group ${
-                      selected === opt.value
-                        ? "border-cyan-500/50 bg-cyan-500/10 shadow-lg shadow-cyan-500/10"
-                        : "border-white/[0.07] bg-white/[0.02] hover:border-white/15 hover:bg-white/[0.04]"
-                    }`}
-                  >
-                    <span className="text-xl flex-shrink-0">{opt.emoji}</span>
-                    <div className="flex-1 text-left">
-                      <div className={`text-sm font-semibold transition-colors ${selected === opt.value ? "text-cyan-300" : "text-slate-200 group-hover:text-white"}`}>
-                        {opt.label}
+              {/* Options / amount input */}
+              {isAmountStep ? (
+                <div>
+                  <div className="relative">
+                    <DollarSign size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min="1"
+                      value={selected ?? ""}
+                      onChange={e => setSelected(e.target.value)}
+                      placeholder="10000"
+                      autoFocus
+                      className="w-full bg-white/[0.03] border border-white/[0.10] rounded-xl pr-10 pl-4 py-3.5 text-lg font-mono text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition text-right"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-600 mt-2">הזן את סכום ההון בדולרים ($). נגזור ממנו את אחוזי הסיכון והעמלה.</p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {currentQuestion.options.map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => handleOptionSelect(opt.value)}
+                      className={`w-full flex items-center gap-3 p-3.5 rounded-xl border text-right transition-all duration-200 group ${
+                        selected === opt.value
+                          ? "border-cyan-500/50 bg-cyan-500/10 shadow-lg shadow-cyan-500/10"
+                          : "border-white/[0.07] bg-white/[0.02] hover:border-white/15 hover:bg-white/[0.04]"
+                      }`}
+                    >
+                      <span className="text-xl flex-shrink-0">{opt.emoji}</span>
+                      <div className="flex-1 text-left">
+                        <div className={`text-sm font-semibold transition-colors ${selected === opt.value ? "text-cyan-300" : "text-slate-200 group-hover:text-white"}`}>
+                          {opt.label}
+                        </div>
+                        <div className="text-xs text-slate-600">{opt.sub}</div>
                       </div>
-                      <div className="text-xs text-slate-600">{opt.sub}</div>
-                    </div>
-                    {selected === opt.value && (
-                      <CheckCircle size={16} className="text-cyan-400 flex-shrink-0" />
-                    )}
-                  </button>
-                ))}
-              </div>
+                      {selected === opt.value && (
+                        <CheckCircle size={16} className="text-cyan-400 flex-shrink-0" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* Navigation */}
               <div className="flex gap-2 mt-5">
@@ -361,9 +386,9 @@ export default function OnboardingScreen({ onComplete }) {
                 )}
                 <button
                   onClick={handleNext}
-                  disabled={!selected}
+                  disabled={!canProceed}
                   className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                    selected
+                    canProceed
                       ? "bg-gradient-to-r from-cyan-500 to-violet-600 text-white hover:opacity-90 active:scale-98 shadow-lg shadow-cyan-500/20"
                       : "bg-white/5 text-slate-600 cursor-not-allowed"
                   }`}
