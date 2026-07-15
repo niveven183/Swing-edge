@@ -89,33 +89,34 @@ function MobileTradeCardImpl({
             {labelFor("setup", trade.setup, lang)}
           </span>
         )}
-        {hasActions && (
-          <div
-            data-card-noclick
-            className="ms-auto flex items-center gap-1"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {isOpen && onClose && (
-              <button
-                onClick={() => onClose(trade)}
-                className="text-[10px] px-2 py-0.5 rounded bg-[#F43F5E]/10 border border-[#F43F5E]/20 text-[#F43F5E] hover:opacity-80 transition"
-              >
-                {t.close}
-              </button>
-            )}
-            {onDelete && (
-              <button
-                onClick={() => onDelete(trade.id)}
-                className="text-[10px] px-1 py-0.5 rounded bg-slate-500/10 border border-slate-500/20 text-slate-400 hover:text-red-400 hover:border-red-500/30 transition"
-                title={isRTL ? "מחיקה" : "Delete"}
-                aria-label={isRTL ? "מחיקה" : "Delete"}
-              >
-                🗑️
-              </button>
-            )}
-          </div>
-        )}
       </div>
+
+      {hasActions && (
+        <div
+          data-card-noclick
+          className="flex items-center justify-end gap-1"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {isOpen && onClose && (
+            <button
+              onClick={() => onClose(trade)}
+              className="text-[10px] px-2 py-0.5 rounded bg-[#F43F5E]/10 border border-[#F43F5E]/20 text-[#F43F5E] hover:opacity-80 transition"
+            >
+              {t.close}
+            </button>
+          )}
+          {onDelete && (
+            <button
+              onClick={() => onDelete(trade.id)}
+              className="text-[10px] px-1 py-0.5 rounded bg-slate-500/10 border border-slate-500/20 text-slate-400 hover:text-red-400 hover:border-red-500/30 transition"
+              title={isRTL ? "מחיקה" : "Delete"}
+              aria-label={isRTL ? "מחיקה" : "Delete"}
+            >
+              🗑️
+            </button>
+          )}
+        </div>
+      )}
 
       {mentorNotes && mentorNotes.length > 0 && (
         <div className="flex flex-col gap-1">

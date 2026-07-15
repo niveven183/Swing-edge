@@ -35,3 +35,30 @@ Every production incident gets one short entry: what broke, root cause, fix, pre
   loudly with a toast instead of a fake success. Commit `22ceccc`.
 - **Prevention:** Any table with client-side writes needs explicit INSERT/UPDATE/DELETE policies
   reviewed together — a missing policy fails silently, not loudly, under RLS.
+
+## #4 — 2026-07-15 — Two mobile layout bugs found in production verification (390px)
+- **Symptom:** On swing-edge.vercel.app at 390×844 (iPhone emulation): (A) the Analytics "Setup
+  Matrix" table overflowed its `overflow-x-auto` wrapper; in RTL, `scrollLeft` starts at 0 and
+  shows the table's *end*, so the Avg R column was clipped with no visible affordance that
+  scrolling would reveal it. (B) `MobileTradeCard`'s setup badge could overlap the price-range
+  text and the delete button on the Journal tab.
+- **Root cause (A):** `SwingEdge_App.jsx`'s Setup Matrix table used default `table-layout: auto`
+  with an unconstrained setup-name column — any wide combination of setup name + monospace P&L
+  value could push the table wider than its wrapper, and RTL's default scroll position hides the
+  overflow instead of revealing it. **(B):** `MobileTradeCard.jsx`'s meta row combined
+  `flex-wrap` with a `margin-inline-start: auto` ("ms-auto") actions div — a fragile combination
+  where auto-margin placement on a wrapped line is inconsistent, especially under RTL, and can
+  render elements on top of each other instead of cleanly stacking.
+- **Fix:** (A) `table-fixed sm:table-auto` with explicit `w-[Npx] sm:w-auto` widths (measured
+  against real + synthetic worst-case content) on the 4 numeric/badge columns; only the setup-name
+  column truncates (with a `title` tooltip), numbers/badges never do. Verified at both 390px and
+  343px (the actual production width) with zero table overflow and zero clipped numeric cells.
+  (B) Split the actions (Close/Delete) out of the wrapping meta row into their own dedicated row
+  (`flex items-center justify-end gap-1`, no `ms-auto`), eliminating the flex-wrap + auto-margin
+  interaction entirely. Verified zero pairwise element overlap and that the delete button is
+  hit-testable at its own coordinates.
+- **Prevention:** Avoid `margin-inline-start/end: auto` inside any `flex-wrap` container —
+  auto-margin placement is a single-line trick and behaves unreliably once wrapping occurs,
+  especially in RTL. For `table-layout: auto` tables inside `overflow-x-auto` wrappers on mobile,
+  either constrain/truncate the variable-width column explicitly or switch to `table-fixed` with
+  measured column widths — don't rely on the browser to shrink content-driven columns to fit.

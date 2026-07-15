@@ -5115,35 +5115,40 @@ export default function SwingEdge() {
                     </h3>
                     <p className="text-xs text-slate-600 mb-4">{lang === "he" ? "מסודר לפי רווח כולל" : "Sorted by total P&L"}</p>
                     <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
+                      <table className="w-full text-sm table-fixed sm:table-auto">
                         <thead>
                           <tr className="text-[10px] text-slate-500 uppercase tracking-wider border-b border-[var(--border-subtle)] dark:border-white/[0.06]">
-                            <th className="text-start py-2 font-semibold">{lang === "he" ? "סטאפ" : "Setup"}</th>
-                            <th className="text-center py-2 font-semibold">{lang === "he" ? "עסקאות" : "Trades"}</th>
-                            <th className="text-center py-2 font-semibold">{t.wrPct}</th>
-                            <th className="text-center py-2 font-semibold">{t.avgRShort}</th>
-                            <th className="text-end py-2 font-semibold">{lang === "he" ? "רווח כולל" : "Total P&L"}</th>
+                            <th className="text-start py-2 px-1 sm:px-0 font-semibold">{lang === "he" ? "סטאפ" : "Setup"}</th>
+                            <th className="text-center py-2 px-1 sm:px-0 font-semibold w-[46px] sm:w-auto">{lang === "he" ? "עסקאות" : "Trades"}</th>
+                            <th className="text-center py-2 px-1 sm:px-0 font-semibold w-[49px] sm:w-auto">{t.wrPct}</th>
+                            <th className="text-center py-2 px-1 sm:px-0 font-semibold w-[44px] sm:w-auto">{t.avgRShort}</th>
+                            <th className="text-end py-2 px-1 sm:px-0 font-semibold w-[78px] sm:w-auto">{lang === "he" ? "רווח כולל" : "Total P&L"}</th>
                           </tr>
                         </thead>
                         <tbody>
                           {setupMatrix.map(s => (
                             <tr key={s.setup} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
-                              <td className="py-2.5 font-semibold text-white">
-                                <span className="inline-flex items-center gap-1">
-                                  {labelFor("setup", s.setup, lang)}
+                              <td className="py-2.5 px-1 sm:px-0 font-semibold text-white">
+                                <span className="flex items-center gap-1 min-w-0">
+                                  <span
+                                    className="truncate text-[10px] sm:text-sm sm:overflow-visible sm:whitespace-normal"
+                                    title={labelFor("setup", s.setup, lang)}
+                                  >
+                                    {labelFor("setup", s.setup, lang)}
+                                  </span>
                                   {resolveSetupKey(s.setup) && <TermTooltip term={resolveSetupKey(s.setup)} lang={lang} />}
                                 </span>
                               </td>
-                              <td className="py-2.5 text-center text-slate-400 font-mono">{s.count}</td>
-                              <td className="py-2.5 text-center">
+                              <td className="py-2.5 px-1 sm:px-0 text-center text-slate-400 font-mono text-[10px] sm:text-sm">{s.count}</td>
+                              <td className="py-2.5 px-1 sm:px-0 text-center">
                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                   s.winRate >= 60 ? "bg-emerald-500/15 text-emerald-400"
                                   : s.winRate >= 40 ? "bg-amber-500/15 text-amber-400"
                                   : "bg-rose-500/15 text-rose-400"
                                 }`}>{formatPct(s.winRate)}</span>
                               </td>
-                              <td className="py-2.5 text-center font-mono text-slate-300">{s.avgR}R</td>
-                              <td className={`py-2.5 text-end font-mono font-bold ${s.totalPnL >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>
+                              <td className="py-2.5 px-1 sm:px-0 text-center font-mono text-[10px] sm:text-sm text-slate-300">{s.avgR}R</td>
+                              <td className={`py-2.5 px-1 sm:px-0 text-end font-mono font-bold text-[10px] sm:text-sm ${s.totalPnL >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>
                                 {fmt$(s.totalPnL)}
                               </td>
                             </tr>
