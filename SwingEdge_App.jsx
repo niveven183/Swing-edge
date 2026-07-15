@@ -60,7 +60,7 @@ import {
   CreditCard, Smartphone, Wrench, Sun, Moon, Monitor, KeyRound, ExternalLink, RotateCcw, Pencil,
   Users, GraduationCap, UserPlus, NotebookPen, CalendarCheck
 } from "lucide-react";
-import { getTranslations, LANGUAGES, isRTLLang, nTrades } from "./src/i18n.js";
+import { getTranslations, LANGUAGES, isRTLLang, nTrades, labelFor } from "./src/i18n.js";
 import {
   fetchPrices, fmtVolume, fmtMarketCap, searchTickers,
   fetchQuote, fetchEarnings, getMarketState, getMarketStateBadge, getRefreshInterval, MARKET_STATE,
@@ -818,7 +818,7 @@ const generateSmartLessons = (closedTrades, calcFn, lang = 'he') => {
   if (bestSetup && bestSetup[1].wins + bestSetup[1].losses >= 2) {
     const n = bestSetup[1].wins + bestSetup[1].losses;
     const wr = Math.round(bestSetup[1].wins / n * 100);
-    const setup = snakeToTitle(bestSetup[0]);
+    const setup = labelFor("setup", snakeToTitle(bestSetup[0]), lang);
     lessons.push(he ? {
       type: "strength",
       title: `${setup} הוא הסטאפ החזק ביותר שלך`,
@@ -2771,7 +2771,7 @@ export default function SwingEdge() {
           <div className="animate-pulse">
             <Logo size={40} showText={false} />
           </div>
-          <span className="text-xs tracking-widest uppercase text-slate-500">Loading SwingEdge…</span>
+          <span className="text-xs tracking-widest uppercase text-slate-500">{t.loadingSwingEdge}</span>
         </div>
       </div>
     );
@@ -3218,7 +3218,7 @@ export default function SwingEdge() {
                     {stats.topEdges.map((edge, i) => (
                       <div key={edge.name || i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                         <div>
-                          <PatternTags parts={[{ dim: "setup", value: edge.setup }, { dim: "emotion", value: edge.emotion }]} />
+                          <PatternTags parts={[{ dim: "setup", value: edge.setup }, { dim: "emotion", value: edge.emotion }]} lang={lang} />
                           <div className="text-slate-400 text-xs">{nTrades(edge.count, lang)}</div>
                         </div>
                         <div className="text-end">
@@ -3235,7 +3235,7 @@ export default function SwingEdge() {
                     {stats.antiEdges.map((edge, i) => (
                       <div key={edge.name || i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                         <div>
-                          <PatternTags parts={[{ dim: "setup", value: edge.setup }, { dim: "emotion", value: edge.emotion }]} />
+                          <PatternTags parts={[{ dim: "setup", value: edge.setup }, { dim: "emotion", value: edge.emotion }]} lang={lang} />
                           <div className="text-slate-400 text-xs">{nTrades(edge.count, lang)}</div>
                         </div>
                         <div className="text-end">
@@ -3254,8 +3254,8 @@ export default function SwingEdge() {
               {/* Equity mini */}
               <div className="md:col-span-2 bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Equity Curve</span>
-                  <span className="text-xs text-cyan-400 font-mono">{equityCurve.length} data pts</span>
+                  <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">{t.equityCurve}</span>
+                  <span className="text-xs text-cyan-400 font-mono">{equityCurve.length} {t.dataPts}</span>
                 </div>
                 <ResponsiveContainer width="100%" height={160}>
                   <AreaChart data={equityCurve}>
@@ -3342,7 +3342,7 @@ export default function SwingEdge() {
                     );
                   })}
                   {openTrades.length === 0 && (
-                    <div className="text-center py-4 text-slate-700 text-xs">No open positions</div>
+                    <div className="text-center py-4 text-slate-700 text-xs">{t.noOpenPositions}</div>
                   )}
                 </div>
               </div>
@@ -3354,13 +3354,13 @@ export default function SwingEdge() {
               return (
             <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Recent Closed Trades</span>
+                <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">{t.recentClosed}</span>
               </div>
               <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="text-slate-600 border-b border-[var(--border-subtle)] dark:border-white/[0.06]">
-                      {["Ticker","Date","Side","Entry","Exit","Shares","P&L","R Multiple","Setup"].map(h => (
+                      {[t.colTicker,t.colDate,t.colSide,t.colEntry,t.colExit,t.colShares,"P&L",t.colRMultiple,t.colSetup].map(h => (
                         <th key={h} className="pb-2 text-start font-semibold tracking-wider pe-4">{h}</th>
                       ))}
                     </tr>
@@ -3379,7 +3379,7 @@ export default function SwingEdge() {
                           <td className="py-2 pe-4 font-mono text-slate-400">{t.shares}</td>
                           <td className={`py-2 pe-4 font-bold font-mono ${win ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>{fmt$(Math.round(pnl))}</td>
                           <td className={`py-2 pe-4 font-bold font-mono ${rMultiple >= 0 ? "text-cyan-400" : "text-[var(--v3-loss)]"}`}>{fmtR(rMultiple)}</td>
-                          <td className="py-2 pe-4"><span className="inline-flex items-center gap-1"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">{t.setup}</span><SetupTagTip setup={t.setup} isRTL={isRTL} /></span></td>
+                          <td className="py-2 pe-4"><span className="inline-flex items-center gap-1"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">{labelFor("setup", t.setup, lang)}</span><SetupTagTip setup={t.setup} isRTL={isRTL} /></span></td>
                         </tr>
                       );
                     })}
@@ -3388,7 +3388,7 @@ export default function SwingEdge() {
               </div>
               <div className="md:hidden flex flex-col gap-2">
                 {recentClosed.map(t => (
-                  <MobileTradeCard key={t.id} trade={t} isRTL={isRTL} />
+                  <MobileTradeCard key={t.id} trade={t} isRTL={isRTL} lang={lang} />
                 ))}
               </div>
             </div>
@@ -3433,10 +3433,10 @@ export default function SwingEdge() {
 
                   {/* Section header */}
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">Risk Dashboard</span>
+                    <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">{t.riskDashboard}</span>
                     <div className="flex-1 h-px bg-white/[0.05]" />
                     <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold font-mono ${meterColor.text} ${meterColor.border} ${meterColor.bg}`}>
-                      {isOverLimit ? "OVER LIMIT" : isWarning ? "CAUTION" : "SAFE"}
+                      {isOverLimit ? t.riskOverLimit : isWarning ? t.riskCaution : t.riskSafe}
                     </span>
                   </div>
 
@@ -3646,11 +3646,11 @@ export default function SwingEdge() {
                   <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-loss)]">{fmt$(-Math.round(journalStats.avgLoss))}</div>
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
-                  <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">Profit Factor<TermTooltip term="profitFactor" lang={lang} /></div>
+                  <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{t.profitFactor}<TermTooltip term="profitFactor" lang={lang} /></div>
                   <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-info)]">{isFinite(journalStats.profitFactor) ? journalStats.profitFactor.toFixed(2) : "∞"}</div>
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
-                  <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">Max DD<TermTooltip term="maxDD" lang={lang} /></div>
+                  <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{t.maxDD}<TermTooltip term="maxDD" lang={lang} /></div>
                   <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-loss)]">{fmt$(-Math.round(journalStats.maxDD))}</div>
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
@@ -3664,45 +3664,45 @@ export default function SwingEdge() {
             {showJournalFilters && (
               <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[#06b6d4]/20 rounded-xl p-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
                 <div>
-                  <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">Ticker</label>
+                  <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">{t.ticker}</label>
                   <input value={journalFilters.ticker} onChange={e => setJournalFilters(f => ({ ...f, ticker: e.target.value }))}
-                    placeholder="e.g. AAPL" className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-mono text-white placeholder-slate-600 focus:border-[#06b6d4]/50 focus:outline-none" />
+                    placeholder={t.tickerPlaceholder} className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-mono text-white placeholder-slate-600 focus:border-[#06b6d4]/50 focus:outline-none" />
                 </div>
                 <div>
-                  <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">Setup</label>
+                  <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">{t.filterSetup}</label>
                   <select value={journalFilters.setup} onChange={e => setJournalFilters(f => ({ ...f, setup: e.target.value }))}
                     className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:border-[#06b6d4]/50 focus:outline-none">
-                    <option value="all">All</option>
-                    {uniqueSetups.map(s => <option key={s} value={s}>{s}</option>)}
+                    <option value="all">{t.filterAll}</option>
+                    {uniqueSetups.map(s => <option key={s} value={s}>{labelFor("setup", s, lang)}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">Result</label>
+                  <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">{t.filterResult}</label>
                   <select value={journalFilters.result} onChange={e => setJournalFilters(f => ({ ...f, result: e.target.value }))}
                     className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:border-[#06b6d4]/50 focus:outline-none">
-                    <option value="all">All</option>
-                    <option value="win">Win</option>
-                    <option value="loss">Loss</option>
-                    <option value="be">Break Even</option>
+                    <option value="all">{t.filterAll}</option>
+                    <option value="win">{t.resultWin}</option>
+                    <option value="loss">{t.resultLoss}</option>
+                    <option value="be">{t.resultBE}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">From</label>
+                  <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">{t.filterFrom}</label>
                   <input type="date" value={journalFilters.from} onChange={e => setJournalFilters(f => ({ ...f, from: e.target.value }))}
                     className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:border-[#06b6d4]/50 focus:outline-none" />
                 </div>
                 <div>
-                  <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">To</label>
+                  <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">{t.filterTo}</label>
                   <input type="date" value={journalFilters.to} onChange={e => setJournalFilters(f => ({ ...f, to: e.target.value }))}
                     className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:border-[#06b6d4]/50 focus:outline-none" />
                 </div>
                 <div>
-                  <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">R Min</label>
+                  <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">{t.filterRMin}</label>
                   <input type="number" step="0.1" value={journalFilters.rMin} onChange={e => setJournalFilters(f => ({ ...f, rMin: e.target.value }))}
                     placeholder="-2" className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-mono text-white placeholder-slate-600 focus:border-[#06b6d4]/50 focus:outline-none" />
                 </div>
                 <div>
-                  <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">R Max</label>
+                  <label className="text-[9px] uppercase tracking-widest text-slate-600 block mb-1">{t.filterRMax}</label>
                   <input type="number" step="0.1" value={journalFilters.rMax} onChange={e => setJournalFilters(f => ({ ...f, rMax: e.target.value }))}
                     placeholder="5" className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-mono text-white placeholder-slate-600 focus:border-[#06b6d4]/50 focus:outline-none" />
                 </div>
@@ -3763,7 +3763,7 @@ export default function SwingEdge() {
             ) : filteredTrades.length === 0 ? (
               <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-2xl p-8 text-center">
                 <Filter size={28} className="mx-auto text-slate-600 mb-3" />
-                <h3 className="text-sm font-bold text-white mb-1">{lang === "he" ? "אין עסקה שתואמת" : "Nothing matches"}</h3>
+                <h3 className="text-sm font-bold text-white mb-1">{t.nothingMatches}</h3>
                 <p className="text-xs text-slate-500">{lang === "he" ? "רופף את המסננים כדי לראות יותר" : "Loosen the filters to see more"}</p>
               </div>
             ) : (
@@ -3816,7 +3816,7 @@ export default function SwingEdge() {
                         className="w-3.5 h-3.5 rounded border border-white/20 bg-white/5 cursor-pointer accent-[var(--v3-info)]"
                       />
                     </th>
-                    {["Ticker","Date","Side","Entry","Stop","Target","Shares",t.currentPrice,t.livePnl,"Exit","P&L","R","Hold","Setup","Mkt","Emotion","★","Exit Rsn","Plan","Lesson","Status","Action"].map(h => (
+                    {[t.colTicker,t.colDate,t.colSide,t.colEntry,t.colStop,t.colTarget,t.colShares,t.currentPrice,t.livePnl,t.colExit,"P&L","R",t.colHold,t.colSetup,t.colMkt,t.colEmotion,"★",t.colExitReason,t.colPlan,t.colLesson,t.colStatus,t.colAction].map(h => (
                       <th key={h} className={`p-3 text-start font-semibold whitespace-nowrap ${h===t.currentPrice||h===t.livePnl ? "text-[var(--v3-info)]" : ""}`}>{h}</th>
                     ))}
                   </tr>
@@ -3888,13 +3888,13 @@ export default function SwingEdge() {
                             return d === 0 ? "<1d" : `${d}d`;
                           })()}
                         </td>
-                        <td className="p-3"><span className="inline-flex items-center gap-1"><span className="text-[10px] px-2 py-0.5 rounded bg-[#A78BFA]/10 text-[var(--v3-purple)] border border-[#A78BFA]/20 whitespace-nowrap">{t.setup}</span><SetupTagTip setup={t.setup} isRTL={isRTL} /></span></td>
-                        <td className="p-3 text-slate-500 text-[10px] whitespace-nowrap">{t.marketCondition || "–"}</td>
-                        <td className="p-3 text-slate-500 text-[10px] whitespace-nowrap">{t.emotionAtEntry || "–"}</td>
+                        <td className="p-3"><span className="inline-flex items-center gap-1"><span className="text-[10px] px-2 py-0.5 rounded bg-[#A78BFA]/10 text-[var(--v3-purple)] border border-[#A78BFA]/20 whitespace-nowrap">{labelFor("setup", t.setup, lang)}</span><SetupTagTip setup={t.setup} isRTL={isRTL} /></span></td>
+                        <td className="p-3 text-slate-500 text-[10px] whitespace-nowrap">{t.marketCondition ? labelFor("market", t.marketCondition, lang) : "–"}</td>
+                        <td className="p-3 text-slate-500 text-[10px] whitespace-nowrap">{t.emotionAtEntry ? labelFor("emotion", t.emotionAtEntry, lang) : "–"}</td>
                         <td className="p-3 text-amber-400 text-xs font-mono">{qstars(t.entryQuality) ? `${"★".repeat(qstars(t.entryQuality))}` : "–"}</td>
                         <td className="p-3 text-[10px] text-slate-500 whitespace-nowrap">
                           {t.exitReason
-                            ? <span className="px-2 py-0.5 rounded bg-slate-700/40 text-slate-400 border border-[var(--border-subtle)] dark:border-white/[0.06]">{t.exitReason}</span>
+                            ? <span className="px-2 py-0.5 rounded bg-slate-700/40 text-slate-400 border border-[var(--border-subtle)] dark:border-white/[0.06]">{labelFor("exitReason", t.exitReason, lang)}</span>
                             : <span className="text-slate-700">–</span>}
                         </td>
                         <td className="p-3 text-center">
@@ -3922,7 +3922,7 @@ export default function SwingEdge() {
                             </div>
                           )}
                         </td>
-                        <td className="p-3"><span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${isOpen ? "bg-[#06b6d4]/10 text-[var(--v3-info)] border border-[#06b6d4]/20" : "bg-slate-500/10 text-slate-500 border border-slate-700"}`}>{t.status}</span></td>
+                        <td className="p-3"><span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${isOpen ? "bg-[#06b6d4]/10 text-[var(--v3-info)] border border-[#06b6d4]/20" : "bg-slate-500/10 text-slate-500 border border-slate-700"}`}>{labelFor("status", t.status, lang)}</span></td>
                         <td className="p-3">
                           <div className="flex items-center gap-1 whitespace-nowrap">
                             {isOpen && (
@@ -3950,6 +3950,7 @@ export default function SwingEdge() {
                 <MobileTradeCard
                   key={t.id}
                   trade={t}
+                  lang={lang}
                   onClick={handleEditOpen}
                   onClose={(tr) => { setClosingTrade(tr); setShowCloseForm(true); }}
                   onDelete={handleDeleteTrade}
@@ -3999,8 +4000,8 @@ export default function SwingEdge() {
         {tab === "tools" && toolsTab === 'analyzer' && (
           <div className="space-y-5 animate-fade-in max-w-3xl mx-auto">
             <div>
-              <h2 className="text-lg font-bold text-white flex items-center gap-2.5 tracking-tight"><FlaskConical size={17} className="text-[var(--v3-purple)]" /> Trade Analyzer</h2>
-              <p className="text-xs text-slate-500 mt-1">Enter trade data to get an instant rule-based analysis (no API key required).</p>
+              <h2 className="text-lg font-bold text-white flex items-center gap-2.5 tracking-tight"><FlaskConical size={17} className="text-[var(--v3-purple)]" /> {t.tradeAnalyzer}</h2>
+              <p className="text-xs text-slate-500 mt-1">{t.analyzerSubtitle}</p>
             </div>
 
             {/* Input Fields */}
@@ -4010,9 +4011,9 @@ export default function SwingEdge() {
               {/* Row 1: Ticker + Shares */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] text-slate-500 tracking-widest uppercase block mb-1.5">Ticker *</label>
+                  <label className="text-[10px] text-slate-500 tracking-widest uppercase block mb-1.5">{t.ticker} *</label>
                   <input value={analyzerForm.ticker} onChange={e => setAnalyzerForm(f => ({ ...f, ticker: e.target.value.toUpperCase() }))}
-                    placeholder="e.g. AAPL" className="w-full bg-white/5 border border-[var(--v3-line)] rounded-[var(--v3-radius-chip)] px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-[var(--v3-info)]/50 focus:outline-none focus:ring-1 focus:ring-[var(--v3-info)]/20 transition font-mono font-bold tracking-wider" />
+                    placeholder={t.tickerPlaceholder} className="w-full bg-white/5 border border-[var(--v3-line)] rounded-[var(--v3-radius-chip)] px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-[var(--v3-info)]/50 focus:outline-none focus:ring-1 focus:ring-[var(--v3-info)]/20 transition font-mono font-bold tracking-wider" />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-500 tracking-widest uppercase block mb-1.5">{t.sharesToBuy}</label>
@@ -4218,18 +4219,18 @@ export default function SwingEdge() {
                   {/* Market Condition + Emotion */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label htmlFor="az-market-condition" className="text-[10px] text-slate-500 tracking-widest uppercase mb-1.5 flex items-center gap-1">Market Condition<InfoTooltip label="Market Condition">{lang === 'he' ? CATEGORY_TOOLTIP.market.he : CATEGORY_TOOLTIP.market.en}</InfoTooltip></label>
+                      <label htmlFor="az-market-condition" className="text-[10px] text-slate-500 tracking-widest uppercase mb-1.5 flex items-center gap-1">{t.marketCondition}<InfoTooltip label="Market Condition">{lang === 'he' ? CATEGORY_TOOLTIP.market.he : CATEGORY_TOOLTIP.market.en}</InfoTooltip></label>
                       <SmartSelect id="az-market-condition" ariaLabel="Market Condition" value={analyzerForm.marketCondition} onChange={v=>setAnalyzerForm(f=>({...f,marketCondition:v}))} dir={isRTL?'rtl':'ltr'} {...getTradeSelectProps('market', lang)} />
                     </div>
                     <div>
-                      <label htmlFor="az-emotion" className="text-[10px] text-slate-500 tracking-widest uppercase mb-1.5 flex items-center gap-1">Emotion at Entry<InfoTooltip label="Emotion at Entry">{lang === 'he' ? CATEGORY_TOOLTIP.emotion.he : CATEGORY_TOOLTIP.emotion.en}</InfoTooltip></label>
+                      <label htmlFor="az-emotion" className="text-[10px] text-slate-500 tracking-widest uppercase mb-1.5 flex items-center gap-1">{t.emotionAtEntry}<InfoTooltip label="Emotion at Entry">{lang === 'he' ? CATEGORY_TOOLTIP.emotion.he : CATEGORY_TOOLTIP.emotion.en}</InfoTooltip></label>
                       <SmartSelect id="az-emotion" ariaLabel="Emotion at Entry" value={analyzerForm.emotionAtEntry} onChange={v=>setAnalyzerForm(f=>({...f,emotionAtEntry:v}))} dir={isRTL?'rtl':'ltr'} {...getTradeSelectProps('emotion', lang)} />
                     </div>
                   </div>
 
                   {/* Entry Quality (stars) */}
                   <div>
-                    <label className="text-[10px] text-slate-500 tracking-widest uppercase block mb-1.5">Entry Quality</label>
+                    <label className="text-[10px] text-slate-500 tracking-widest uppercase block mb-1.5">{t.entryQuality}</label>
                     <div className="flex items-center gap-1 mt-1">
                       {[1,2,3,4,5].map(star => (
                         <button key={star} type="button" onClick={() => setAnalyzerForm(f=>({...f,entryQuality:star}))}
@@ -4430,7 +4431,7 @@ export default function SwingEdge() {
                           setPosCalc(f => ({ ...f, ticker: tk, entry: String(lp) }));
                         }
                       }}
-                      placeholder="e.g. AAPL"
+                      placeholder={t.tickerPlaceholder}
                       className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none transition font-mono font-bold tracking-wider"
                     />
                     {tickerPrice && (
@@ -4600,7 +4601,7 @@ export default function SwingEdge() {
                   </div>
                 </div>
                 <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 flex items-center gap-1 shrink-0">
-                  Equity Curve<TermTooltip term="equityCurve" lang={lang} />
+                  {t.equityCurve}<TermTooltip term="equityCurve" lang={lang} />
                 </span>
               </div>
               <ResponsiveContainer width="100%" height={340}>
@@ -4626,10 +4627,10 @@ export default function SwingEdge() {
 
             {/* Supporting KPI strip */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <StatCard label="Total Trades"  value={realTrades.length} sub="All time"      icon={Layers}    accent="cyan"   />
-              <StatCard label={<span className="flex items-center gap-1">Win Rate<TermTooltip term="winRate" lang={lang} /></span>} value={formatPct(winRate)} sub={`${stats.wins} wins`} icon={CheckCircle} accent="green" />
-              <StatCard label={<span className="flex items-center gap-1">Avg R Multiple<TermTooltip term="avgR" lang={lang} /></span>} value={fmtR(avgR)} sub="Closed trades" icon={Activity}  accent="purple" />
-              <StatCard label="Total Return"   value={`${stats.returnPct.toFixed(2)}%`} sub={`$${Math.round(Math.abs(totalPnL)).toLocaleString()} P&L`} icon={TrendingUp} accent={totalPnL>=0?"green":"red"} />
+              <StatCard label={t.totalTrades}  value={realTrades.length} sub={t.allTime}      icon={Layers}    accent="cyan"   />
+              <StatCard label={<span className="flex items-center gap-1">{t.winRate}<TermTooltip term="winRate" lang={lang} /></span>} value={formatPct(winRate)} sub={`${stats.wins} ${t.wins}`} icon={CheckCircle} accent="green" />
+              <StatCard label={<span className="flex items-center gap-1">{t.avgRMultiple}<TermTooltip term="avgR" lang={lang} /></span>} value={fmtR(avgR)} sub={t.closedTrades} icon={Activity}  accent="purple" />
+              <StatCard label={t.totalReturn}   value={`${stats.returnPct.toFixed(2)}%`} sub={`$${Math.round(Math.abs(totalPnL)).toLocaleString()} P&L`} icon={TrendingUp} accent={totalPnL>=0?"green":"red"} />
             </div>
 
             {/* Per-trade P&L bars */}
@@ -4660,7 +4661,7 @@ export default function SwingEdge() {
                   .sort((a, b) => b.count - a.count)
                   .map((s) => (
                     <div key={s.name} className="bg-white/3 rounded-xl p-3 border border-[var(--border-subtle)] dark:border-white/[0.06]">
-                      <div className="text-xs font-semibold text-[var(--v3-purple)] mb-2 truncate" title={s.name}>{s.name}</div>
+                      <div className="text-xs font-semibold text-[var(--v3-purple)] mb-2 truncate" title={labelFor("setup", s.name, lang)}>{labelFor("setup", s.name, lang)}</div>
                       <div className="font-bold text-white text-lg font-mono">{formatPct(s.winRate)}</div>
                       <div className="text-[10px] text-slate-500">{nTrades(s.count, lang)} · {s.totalR.toFixed(1)}R {t.rTotal}</div>
                       <div className="mt-2 h-1.5 bg-white/5 rounded-full overflow-hidden">
@@ -4790,7 +4791,7 @@ export default function SwingEdge() {
                     </div>
                     {bestSetup ? (
                       <>
-                        <div className="text-2xl font-bold text-white font-mono">{bestSetup.setup}</div>
+                        <div className="text-2xl font-bold text-white font-mono">{labelFor("setup", bestSetup.setup, lang)}</div>
                         <div className="text-xs text-slate-500 mt-1">{formatPct(bestSetup.winRate)} {t.winRate} · {nTrades(bestSetup.count, lang)}</div>
                       </>
                     ) : (
@@ -4805,7 +4806,7 @@ export default function SwingEdge() {
                     </div>
                     {bestEmotion ? (
                       <>
-                        <div className="text-2xl font-bold text-white font-mono">{bestEmotion.emotion}</div>
+                        <div className="text-2xl font-bold text-white font-mono">{labelFor("emotion", bestEmotion.emotion, lang)}</div>
                         <div className="text-xs text-slate-500 mt-1">{formatPct(bestEmotion.winRate)} {t.winRate} · {nTrades(bestEmotion.count, lang)}</div>
                       </>
                     ) : (
@@ -4825,7 +4826,7 @@ export default function SwingEdge() {
                     {stats.topEdges.map((edge, i) => (
                       <div key={edge.name || i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                         <div>
-                          <PatternTags parts={[{ dim: "setup", value: edge.setup }, { dim: "emotion", value: edge.emotion }]} />
+                          <PatternTags parts={[{ dim: "setup", value: edge.setup }, { dim: "emotion", value: edge.emotion }]} lang={lang} />
                           <div className="text-slate-400 text-xs">{nTrades(edge.count, lang)}</div>
                         </div>
                         <div className="text-end">
@@ -4842,7 +4843,7 @@ export default function SwingEdge() {
                     {stats.antiEdges.map((edge, i) => (
                       <div key={edge.name || i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                         <div>
-                          <PatternTags parts={[{ dim: "setup", value: edge.setup }, { dim: "emotion", value: edge.emotion }]} />
+                          <PatternTags parts={[{ dim: "setup", value: edge.setup }, { dim: "emotion", value: edge.emotion }]} lang={lang} />
                           <div className="text-slate-400 text-xs">{nTrades(edge.count, lang)}</div>
                         </div>
                         <div className="text-end">
@@ -5013,7 +5014,7 @@ export default function SwingEdge() {
                       <ResponsiveContainer width="100%" height={200}>
                         <BarChart data={emotionStatsArr} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
-                          <XAxis dataKey="emotion" tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} />
+                          <XAxis dataKey="emotion" tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => labelFor("emotion", v, lang)} />
                           <YAxis tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
                           <Tooltip contentStyle={darkTooltip} formatter={(v, n, p) => [`${fmt$(v)} · ${formatPct(p.payload.winRate)} WR`, "P&L"]} />
                           <ReferenceLine y={0} stroke="var(--v3-text-lo)" />
@@ -5031,7 +5032,7 @@ export default function SwingEdge() {
                           return (
                             <span key={e.emotion} className="inline-flex items-center gap-1 text-[11px] text-slate-400">
                               <span className={`w-2 h-2 rounded-full ${e.totalPnL >= 0 ? "bg-emerald-500" : "bg-rose-500"}`} />
-                              {e.emotion}
+                              {labelFor("emotion", e.emotion, lang)}
                               {TRADING_TOOLTIPS[emoKey] && <TermTooltip term={emoKey} lang={lang} />}
                             </span>
                           );
@@ -5087,8 +5088,8 @@ export default function SwingEdge() {
                           <tr className="text-[10px] text-slate-500 uppercase tracking-wider border-b border-[var(--border-subtle)] dark:border-white/[0.06]">
                             <th className="text-start py-2 font-semibold">{lang === "he" ? "סטאפ" : "Setup"}</th>
                             <th className="text-center py-2 font-semibold">{lang === "he" ? "עסקאות" : "Trades"}</th>
-                            <th className="text-center py-2 font-semibold">WR%</th>
-                            <th className="text-center py-2 font-semibold">Avg R</th>
+                            <th className="text-center py-2 font-semibold">{t.wrPct}</th>
+                            <th className="text-center py-2 font-semibold">{t.avgRShort}</th>
                             <th className="text-end py-2 font-semibold">{lang === "he" ? "רווח כולל" : "Total P&L"}</th>
                           </tr>
                         </thead>
@@ -5097,7 +5098,7 @@ export default function SwingEdge() {
                             <tr key={s.setup} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
                               <td className="py-2.5 font-semibold text-white">
                                 <span className="inline-flex items-center gap-1">
-                                  {s.setup}
+                                  {labelFor("setup", s.setup, lang)}
                                   {resolveSetupKey(s.setup) && <TermTooltip term={resolveSetupKey(s.setup)} lang={lang} />}
                                 </span>
                               </td>
@@ -5298,7 +5299,7 @@ export default function SwingEdge() {
                 {/* Sort controls */}
                 <div className="flex items-center gap-1 mb-2">
                   <span className="text-[9px] text-slate-600">{t.sortBy}:</span>
-                  {[["ticker","A-Z"],["changePct","%"],["price","$"],["sector","Sector"]].map(([key, label]) => (
+                  {[["ticker","A-Z"],["changePct","%"],["price","$"],["sector",t.sectorSort]].map(([key, label]) => (
                     <button key={key} onClick={() => setWatchlistSortBy(key)}
                       className={`text-[9px] px-1.5 py-0.5 rounded ${watchlistSortBy === key ? "bg-cyan-500/20 text-cyan-400" : "text-slate-600 hover:text-slate-400"} transition`}>
                       {label}
@@ -5341,7 +5342,7 @@ export default function SwingEdge() {
                             {meta ? (
                               <div className="flex items-center gap-1 mt-0.5">
                                 <span className="text-[8px] text-slate-500 truncate max-w-[72px]">{meta.name}</span>
-                                <span className={`text-[7px] px-1 rounded-full font-medium ${sectorColor}`}>{meta.sector}</span>
+                                <span className={`text-[7px] px-1 rounded-full font-medium ${sectorColor}`}>{labelFor("sector", meta.sector, lang)}</span>
                               </div>
                             ) : lp?.volume ? (
                               <div className="text-[8px] text-slate-700 font-mono">Vol: {fmtVolume(lp.volume)}</div>
@@ -5761,7 +5762,7 @@ export default function SwingEdge() {
               <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-3">
                   <FlaskConical size={16} className="text-[var(--v3-info)]" />
-                  <h3 className="text-sm font-bold text-white">Demo Trades</h3>
+                  <h3 className="text-sm font-bold text-white">{t.demoTrades}</h3>
                 </div>
                 <p className="text-xs text-[var(--v3-text-lo)] mb-3">
                   {t.loadDemoLong}
@@ -5785,7 +5786,7 @@ export default function SwingEdge() {
                   </div>
                   <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-semibold border"
                     style={{ color: tiltColor, borderColor: tiltColor + "40", background: tiltColor + "15" }}>
-                    {tiltLevel === "safe" ? "UNDER CONTROL" : tiltLevel === "warning" ? "⚠ WATCH OUT" : "🔴 TILTING"}
+                    {tiltLevel === "safe" ? t.tiltCalm : tiltLevel === "warning" ? t.tiltWatch : t.tiltTilting}
                   </span>
                 </div>
 
@@ -5850,7 +5851,7 @@ export default function SwingEdge() {
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <BookMarked size={16} className="text-[var(--v3-purple)]" />
-                    <h3 className="text-sm font-bold text-white">Personal Playbook</h3>
+                    <h3 className="text-sm font-bold text-white">{t.personalPlaybook}</h3>
                   </div>
                   <button onClick={() => { setPlaybookForm({ name: "", description: "", imagePreview: null }); setEditingSetupId(null); setShowPlaybookForm(v => !v); }}
                     className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[var(--v3-purple-glow)] border border-[#A78BFA]/30 text-[var(--v3-purple)] hover:bg-[#A78BFA]/20 transition">
@@ -6121,7 +6122,7 @@ export default function SwingEdge() {
                 <div>
                   <label htmlFor="log-ticker" className="text-[10px] text-[var(--v3-text-lo)] tracking-widest uppercase block mb-1">Ticker *</label>
                   <input id="log-ticker" value={form.ticker} onChange={e=>setForm(f=>({...f,ticker:e.target.value.toUpperCase()}))}
-                    placeholder="e.g. AAPL" className="w-full bg-white/5 border border-[var(--border-subtle)] dark:border-[var(--v3-line)] rounded-[var(--v3-radius-chip)] px-3 py-2 text-sm text-white placeholder-[var(--v3-text-lo)] focus:border-[var(--v3-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--v3-accent-glow)] transition font-mono font-bold tracking-wider" />
+                    placeholder={t.tickerPlaceholder} className="w-full bg-white/5 border border-[var(--border-subtle)] dark:border-[var(--v3-line)] rounded-[var(--v3-radius-chip)] px-3 py-2 text-sm text-white placeholder-[var(--v3-text-lo)] focus:border-[var(--v3-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--v3-accent-glow)] transition font-mono font-bold tracking-wider" />
                 </div>
                 <div>
                   <label className="text-[10px] text-[var(--v3-text-lo)] tracking-widest uppercase block mb-1">Direction</label>
@@ -6463,15 +6464,15 @@ export default function SwingEdge() {
               {/* Exit Price + Exit Reason */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="close-exit" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Exit Price *</label>
+                  <label htmlFor="close-exit" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{t.exitPrice}</label>
                   <input id="close-exit" value={closeForm.exit} onChange={e=>setCloseForm(f=>({...f,exit:e.target.value}))}
                     placeholder="0.00" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-rose-500/50 focus:outline-none focus:ring-1 focus:ring-rose-500/20 transition font-mono" />
                 </div>
                 <div>
-                  <label htmlFor="close-exit-reason" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Exit Reason</label>
+                  <label htmlFor="close-exit-reason" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{t.exitReason}</label>
                   <select id="close-exit-reason" value={closeForm.exitReason} onChange={e=>setCloseForm(f=>({...f,exitReason:e.target.value}))}
                     className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-rose-500/50 focus:outline-none focus:ring-1 focus:ring-rose-500/20 transition">
-                    {["Hit Target","Hit Stop","Manual Exit","Trailing Stop","Other"].map(s=><option key={s}>{s}</option>)}
+                    {["Hit Target","Hit Stop","Manual Exit","Trailing Stop","Other"].map(s=><option key={s} value={s}>{labelFor("exitReason", s, lang)}</option>)}
                   </select>
                 </div>
               </div>
@@ -6479,25 +6480,25 @@ export default function SwingEdge() {
               {/* MFE + MAE */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="close-mfe" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Max Favorable Excursion</label>
+                  <label htmlFor="close-mfe" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{t.mfe}</label>
                   <input id="close-mfe" value={closeForm.maxFavorable} onChange={e=>setCloseForm(f=>({...f,maxFavorable:e.target.value}))}
-                    placeholder="Highest price reached" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-[#10b981] placeholder-slate-600 focus:border-emerald-500/50 focus:outline-none transition font-mono" />
+                    placeholder={t.mfePlaceholder} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-[#10b981] placeholder-slate-600 focus:border-emerald-500/50 focus:outline-none transition font-mono" />
                 </div>
                 <div>
-                  <label htmlFor="close-mae" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Max Adverse Excursion</label>
+                  <label htmlFor="close-mae" className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{t.mae}</label>
                   <input id="close-mae" value={closeForm.maxAdverse} onChange={e=>setCloseForm(f=>({...f,maxAdverse:e.target.value}))}
-                    placeholder="Lowest price reached" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-[#ef4444] placeholder-slate-600 focus:border-rose-500/50 focus:outline-none transition font-mono" />
+                    placeholder={t.maePlaceholder} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-[#ef4444] placeholder-slate-600 focus:border-rose-500/50 focus:outline-none transition font-mono" />
                 </div>
               </div>
 
               {/* Followed Plan */}
               <div>
-                <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">Followed Plan?</label>
+                <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{t.followedPlan}</label>
                 <div className="flex gap-2">
                   {[
-                    { val: true, label: "✓ Yes", on: "bg-[#10b981]/20 text-[#10b981] border-[#10b981]/30" },
-                    { val: "Partially", label: "◐ Partially", on: "bg-amber-500/20 text-amber-300 border-amber-500/30" },
-                    { val: false, label: "✗ No", on: "bg-[#ef4444]/20 text-[#ef4444] border-[#ef4444]/30" },
+                    { val: true, label: t.planYes, on: "bg-[#10b981]/20 text-[#10b981] border-[#10b981]/30" },
+                    { val: "Partially", label: t.planPartially, on: "bg-amber-500/20 text-amber-300 border-amber-500/30" },
+                    { val: false, label: t.planNo, on: "bg-[#ef4444]/20 text-[#ef4444] border-[#ef4444]/30" },
                   ].map(({ val, label, on }) => (
                     <button key={String(val)} onClick={()=>setCloseForm(f=>({...f,followedPlan:val}))}
                       className={`flex-1 py-2 rounded-lg text-xs font-bold transition border ${closeForm.followedPlan===val ? on : "bg-white/3 text-slate-500 border-white/10 hover:border-white/20"}`}>

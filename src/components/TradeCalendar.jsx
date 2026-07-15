@@ -6,7 +6,7 @@ import {
 } from 'date-fns';
 import { he as heLocale } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { nTrades } from '../i18n.js';
+import { nTrades, getTranslations } from '../i18n.js';
 import { localDayKey } from '../utils.js';
 import DayTradesModal from './DayTradesModal.jsx';
 
@@ -24,6 +24,7 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he' }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
 
+  const t = getTranslations(lang);
   const locale = lang === 'he' ? heLocale : undefined;
   const isRTL = lang === 'he' || lang === 'ar';
   const metricsOf = (t) => {
@@ -126,7 +127,7 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he' }) {
                 {monthSummary.pnl >= 0 ? '+' : ''}${monthSummary.pnl.toFixed(0)}
               </span>
               <span className="px-3 py-1 bg-slate-100 dark:bg-white/[0.08] text-slate-600 dark:text-slate-300 rounded-full text-xs">
-                {monthSummary.winRate}% WR
+                {monthSummary.winRate}{t.wrSuffix}
               </span>
             </>
           )}

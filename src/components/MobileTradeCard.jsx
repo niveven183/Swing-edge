@@ -2,6 +2,7 @@ import { memo } from "react";
 import { MessageCircle } from "lucide-react";
 import TickerLogo from "./TickerLogo";
 import { calcTradeMetrics, fmt$, fmtR } from "../utils";
+import { getTranslations, labelFor } from "../i18n.js";
 
 function MobileTradeCardImpl({
   trade,
@@ -12,7 +13,9 @@ function MobileTradeCardImpl({
   onToggleSelect,
   mentorNotes,
   isRTL,
+  lang = "en",
 }) {
+  const t = getTranslations(lang);
   const { pnl, rMultiple } = calcTradeMetrics(trade);
   const isOpen = trade.status === "OPEN";
   const win = !isOpen && pnl > 0;
@@ -69,7 +72,7 @@ function MobileTradeCardImpl({
           {trade.side}
         </span>
         <span className={`ms-auto font-bold text-sm ${pnlColorClass}`}>
-          {isOpen ? "OPEN" : fmt$(Math.round(pnl))}
+          {isOpen ? labelFor("status", "OPEN", lang) : fmt$(Math.round(pnl))}
         </span>
         {!isOpen && rMultiple != null && (
           <span className={`text-[11px] ${rColorClass}`}>{fmtR(rMultiple)}</span>
@@ -83,7 +86,7 @@ function MobileTradeCardImpl({
         <span className="text-slate-300">{trade.exit ? `$${trade.exit}` : "–"}</span>
         {trade.setup && (
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#A78BFA]/10 text-[var(--v3-purple)] border border-[#A78BFA]/20 whitespace-nowrap max-w-[100px] truncate">
-            {trade.setup}
+            {labelFor("setup", trade.setup, lang)}
           </span>
         )}
         {hasActions && (
@@ -97,7 +100,7 @@ function MobileTradeCardImpl({
                 onClick={() => onClose(trade)}
                 className="text-[10px] px-2 py-0.5 rounded bg-[#F43F5E]/10 border border-[#F43F5E]/20 text-[#F43F5E] hover:opacity-80 transition"
               >
-                Close
+                {t.close}
               </button>
             )}
             {onDelete && (

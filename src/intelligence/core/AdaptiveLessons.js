@@ -7,6 +7,7 @@
 // call via the `calcMetrics(trade)` function passed in from the host app.
 
 import { rankSetupEdges, MIN_SAMPLE_EDGE } from '../utils/statisticalModels.js';
+import { labelFor } from '../../i18n.js';
 
 const pnlOf = (t, calc) => {
   try { return calc(t)?.pnl ?? 0; } catch { return 0; }
@@ -120,7 +121,7 @@ const PATTERNS = [
       return { setup: top.setup, wr: top.winRate, count: top.n };
     },
     render: ({ setup, wr, count }, lang) => lang === 'he' ? {
-      title: `${snakeToTitle(setup)} — ה-Edge החזק שלך`,
+      title: `${labelFor("setup", snakeToTitle(setup), lang)} — ה-Edge החזק שלך`,
       detail: `${wr}% הצלחה על פני ${count} עסקאות — הסטאפ החזק ביותר שלך.`,
       action: 'סחור אותו אגרסיבי יותר — תן לו יותר משקל.',
     } : {

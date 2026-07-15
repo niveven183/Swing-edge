@@ -7,6 +7,7 @@ import {
   MIN_SAMPLE_EDGE,
 } from "../utils/statisticalModels.js";
 import { qstars } from "../../utils.js";
+import { labelFor } from "../../i18n.js";
 
 // The dimensions we explore. Keep the combination space small enough that a
 // single user's history can produce meaningful samples.
@@ -38,13 +39,16 @@ const groupKey = (trade, dims) =>
 // Soft comma joiner — used only for prose (Top-Edge / Anti-Edge sentences and the
 // Decision Coach). The card UI renders typed chips from the raw key instead, so a
 // mechanical " + " never reaches the screen (it also breaks under RTL bidi).
-// `lang` translates day-dimension VALUES for display only (e.g. "Sun" → "א׳").
-// All other dimensions and the underlying key are left untouched.
+// `lang` translates VALUES for display only: day dims via dayLabel, enum dims
+// (setup/emotion/marketCondition) via labelFor. Unknown dims (rr, entryQuality)
+// fail open to the raw value. The underlying key is never mutated.
 const prettyPattern = (key, lang = "en") => key.split(" + ").map(s => {
   const i = s.indexOf(":");
   if (i === -1) return s;
   const dim = s.slice(0, i), value = s.slice(i + 1);
-  return dim === "day" ? dayLabel(value, lang) : value;
+  if (dim === "day") return dayLabel(value, lang);
+  const cat = dim === "marketCondition" ? "market" : dim;
+  return labelFor(cat, value, lang);
 }).join(", ");
 
 const scorePattern = (list) => {

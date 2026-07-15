@@ -6,6 +6,11 @@
 
 import { getRegimeStage, getSetup } from "./knowledge.js";
 
+// Resolve a possibly-bilingual field ({en,he}) to a plain string. Plain strings
+// pass through unchanged, so pre-bilingual knowledge entries still work.
+const pickLang = (v, lang) =>
+  v && typeof v === "object" ? (v[lang] || v.en || "") : (v || "");
+
 // MarketRegime REGIMES enum → knowledge affinity/mapping vocabulary.
 const REGIME_ENUM_TO_MAPPING = {
   BULL_TREND:      "Trending Up",
@@ -54,14 +59,19 @@ const SETUP_NAME_TO_KEY = {
 /**
  * Weinstein/Wyckoff stage knowledge for a live regime enum.
  * @param {string} regimeEnum e.g. "BULL_TREND"
+ * @param {string} lang UI language ("he" | "en"); bilingual fields resolve to it.
  * @returns {{stageName:string, coachLine:string, action:string}|null}
  */
-export const getRegimeKnowledge = (regimeEnum) => {
+export const getRegimeKnowledge = (regimeEnum, lang = "he") => {
   const mapping = REGIME_ENUM_TO_MAPPING[regimeEnum];
   if (!mapping) return null;
   const stage = getRegimeStage(mapping);
   if (!stage) return null;
-  return { stageName: stage.name, coachLine: stage.coach_line, action: stage.action };
+  return {
+    stageName: pickLang(stage.name, lang),
+    coachLine: pickLang(stage.coach_line, lang),
+    action: stage.action,
+  };
 };
 
 /**

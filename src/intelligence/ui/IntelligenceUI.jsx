@@ -8,7 +8,7 @@ import InfoTooltip from "../../components/ui/InfoTooltip.jsx";
 import TermTooltip from "../../components/ui/TermTooltip.jsx";
 import { TRADING_TOOLTIPS } from "../../data/tooltips.js";
 import { dayLabel } from "../utils/statisticalModels.js";
-import { nTrades } from "../../i18n.js";
+import { nTrades, labelFor } from "../../i18n.js";
 import { getRegimeKnowledge } from "../knowledgeGlue.js";
 import {
   Brain, Sparkles, Shield, Flame, TrendingUp, TrendingDown,
@@ -119,9 +119,10 @@ export const PatternTags = ({ parts = [], className = "", lang = "en" }) => {
             key={`${p.dim}:${p.value}:${i}`}
             className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border font-semibold whitespace-nowrap ${TAG_TONES[p.dim] || TAG_TONES.day}`}
           >
-            {/* Day-dimension values are display-translated (e.g. "Sun" → "א׳");
-                every other dimension renders its raw English value unchanged. */}
-            {p.dim === "day" ? dayLabel(p.value, lang) : p.value}
+            {/* Day-dimension values map to weekday labels (e.g. "Sun" → "א׳");
+                enum dims (setup/emotion/market) map via labelFor; unknown dims
+                (rr bands, etc.) fail open to the raw value. */}
+            {p.dim === "day" ? dayLabel(p.value, lang) : labelFor(p.dim, p.value, lang)}
             {showRRHelp && <TermTooltip term="rrBucket3plus" lang={lang} />}
           </span>
         );
@@ -451,7 +452,7 @@ export const RegimeIndicator = ({ regime, lang = "he" }) => {
         {pick(regime.advice, lang)}
       </div>
       {(() => {
-        const k = getRegimeKnowledge(regime.regime);
+        const k = getRegimeKnowledge(regime.regime, lang);
         if (!k || !k.coachLine) return null;
         return (
           <div className="mt-2 pt-2 border-t border-white/5 text-[10px] text-slate-500 leading-relaxed flex items-start gap-1.5">

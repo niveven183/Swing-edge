@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Search, X, RefreshCw, AlertCircle } from "lucide-react";
 import { searchSymbolsTV, fetchPrices } from "../priceService.js";
 import TickerLogo from "./TickerLogo.jsx";
+import { getTranslations } from "../i18n.js";
 
 // ─── POPULAR TICKERS (shown immediately on focus) ─────────────────────────
 const POPULAR = [
@@ -96,8 +97,9 @@ function Highlighted({ text, query }) {
   );
 }
 
-export default function TradingViewSearch({ value, onPick, livePrices = {}, setLivePrices, placeholder = "Search symbol...", lang = "he" }) {
+export default function TradingViewSearch({ value, onPick, livePrices = {}, setLivePrices, placeholder, lang = "he" }) {
   const isRTL = lang === "he" || lang === "ar";
+  const t = getTranslations(lang);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -225,7 +227,7 @@ export default function TradingViewSearch({ value, onPick, livePrices = {}, setL
             else { setResults(POPULAR); setSearched(false); prefetchPrices(POPULAR); }
           }}
           onKeyDown={onKeyDown}
-          placeholder={placeholder}
+          placeholder={placeholder || t.tvSearchPlaceholder}
           className="flex-1 bg-transparent text-xs font-mono text-white placeholder-slate-500 focus:outline-none min-w-0"
         />
         {query && (
@@ -252,20 +254,20 @@ export default function TradingViewSearch({ value, onPick, livePrices = {}, setL
         <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/10 rounded-lg shadow-2xl z-30 max-h-80 overflow-y-auto animate-slide-down">
           {!query && results.length > 0 && (
             <div className="px-3 py-1.5 text-[9px] text-slate-500 uppercase tracking-widest border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-white/3">
-              Popular
+              {t.tvPopular}
             </div>
           )}
 
           {error && (
             <div className="flex items-center gap-2 px-3 py-3 text-[11px] text-rose-400">
               <AlertCircle size={13} className="shrink-0" />
-              <span>Search unavailable — try again</span>
+              <span>{t.tvSearchUnavailable}</span>
             </div>
           )}
 
           {showEmpty && (
             <div className="px-3 py-3 text-[11px] text-slate-500 text-center">
-              No results for “{query}”
+              {t.tvNoResults} “{query}”
             </div>
           )}
 

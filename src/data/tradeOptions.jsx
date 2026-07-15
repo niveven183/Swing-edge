@@ -6,6 +6,7 @@
 // Consumed by SmartSelect via getTradeSelectProps() in Log, Analyze and Edit.
 // ─────────────────────────────────────────────────────────────────────────────
 import TradeGraph from "../components/ui/setupGraphs.jsx";
+import { labelFor } from "../i18n.js";
 
 // tone → semantic color, sourced from design tokens.
 export const TONE_COLOR = {
@@ -97,8 +98,11 @@ export function getTradeSelectProps(kind, lang = "en") {
     const graph = isEmotion
       ? <span aria-hidden="true" style={{ fontSize: 52, lineHeight: 1 }}>{o.emoji}</span>
       : <TradeGraph value={v} size={132} color={TONE_COLOR[o.tone]} />;
-    return { graph, title: v, explainer: pick(o.explain) };
+    return { graph, title: labelFor(kind, v, lang), explainer: pick(o.explain) };
   };
 
-  return { options, renderThumb, renderPreview };
+  // Display-only localized label for a stored option value (fail-open to value).
+  const getOptionLabel = (v) => labelFor(kind, v, lang);
+
+  return { options, renderThumb, renderPreview, getOptionLabel };
 }

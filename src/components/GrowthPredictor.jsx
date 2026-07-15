@@ -56,6 +56,7 @@ const STR = {
     fromNow: "מהיום",
     balance: "יתרה",
     reset: "אפס תחזית",
+    closedShort: "עסקאות סגורות",
   },
   en: {
     title: "Your Growth Forecast",
@@ -90,6 +91,7 @@ const STR = {
     fromNow: "Now",
     balance: "Balance",
     reset: "Reset forecast",
+    closedShort: "closed trades",
   },
   es: {
     monthlyDeposit: "Depósito Mensual — Amplifica el Crecimiento (Opcional)",
@@ -331,7 +333,7 @@ export default function GrowthPredictor({ trades = [], stats = {}, capital = 0, 
             <h3 className="font-bold text-white text-lg mb-1">{S.title}</h3>
             <p className="text-slate-400 text-sm">{S.needMore}</p>
             <p className="text-slate-500 text-xs mt-2">
-              {closedTrades.length} / 5 closed trades
+              {closedTrades.length} / 5 {S.closedShort}
             </p>
           </div>
         </div>

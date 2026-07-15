@@ -38,11 +38,13 @@ export default function SmartSelect({
   options = [],
   renderThumb,
   renderPreview,
+  getOptionLabel,
   dir = "ltr",
   id,
   ariaLabel,
   className = "",
 }) {
+  const displayLabel = (v) => (getOptionLabel ? getOptionLabel(v) : v);
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [panelPos, setPanelPos] = useState({ top: 0, left: 0, width: 0, placement: "bottom" });
@@ -241,7 +243,7 @@ export default function SmartSelect({
       >
         <span className="flex items-center gap-2 min-w-0 flex-1" style={{ justifyContent: isRTL ? "flex-end" : "flex-start" }}>
           {renderThumb?.(value)}
-          <span className="truncate">{value}</span>
+          <span className="truncate">{displayLabel(value)}</span>
         </span>
         <ChevronDown
           size={16}
@@ -299,7 +301,7 @@ export default function SmartSelect({
                 }}
               >
                 <span className="flex items-center flex-shrink-0" aria-hidden="true">{renderThumb?.(o.value)}</span>
-                <span className="flex-1 truncate text-sm" style={{ textAlign: isRTL ? "right" : "left" }}>{o.value}</span>
+                <span className="flex-1 truncate text-sm" style={{ textAlign: isRTL ? "right" : "left" }}>{displayLabel(o.value)}</span>
                 {selected && <Check size={15} style={{ color: UI.accent, flexShrink: 0 }} aria-hidden="true" />}
               </div>
             );
