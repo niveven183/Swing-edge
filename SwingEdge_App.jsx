@@ -916,10 +916,10 @@ const StatCard = ({ label, value, sub, trend, icon: Icon, accent = "cyan", info 
         <Icon size={26} />
       </div>
       <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 flex items-center gap-1">
-        {label}
+        <span className="pe-7 md:pe-0">{label}</span>
         {info && <InfoTooltip label={typeof label === "string" ? label : "info"}>{info}</InfoTooltip>}
       </span>
-      <span className={`text-2xl font-bold font-mono ${iconColor}`}>{value}</span>
+      <span className={`text-lg md:text-2xl font-bold font-mono ${iconColor}`}>{value}</span>
       {sub && <span className="text-xs text-slate-600">{sub}</span>}
       {trend !== undefined && (
         <span className={`text-xs font-semibold ${trend >= 0 ? "text-[#10b981]" : "text-[#ef4444]"}`}>
@@ -1241,6 +1241,38 @@ export default function SwingEdge() {
   const [chartStyle, setChartStyle] = useState("1");
   const tvRef = useRef(null);
   const [showForm, setShowForm] = useState(false);
+  const [fabVisible, setFabVisible] = useState(true);
+  const mainScrollRef = useRef(null);
+  useEffect(() => {
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReducedMotion) return;
+    let lastWinY = window.scrollY;
+    let lastMainY = mainScrollRef.current ? mainScrollRef.current.scrollTop : 0;
+    let ticking = false;
+    const evaluate = () => {
+      const winY = window.scrollY;
+      const mainY = mainScrollRef.current ? mainScrollRef.current.scrollTop : 0;
+      const winDelta = winY - lastWinY;
+      const mainDelta = mainY - lastMainY;
+      if (winDelta > 10 || mainDelta > 10) setFabVisible(false);
+      else if (winDelta < -10 || mainDelta < -10) setFabVisible(true);
+      lastWinY = winY;
+      lastMainY = mainY;
+      ticking = false;
+    };
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(evaluate);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    const mainEl = mainScrollRef.current;
+    mainEl?.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      mainEl?.removeEventListener("scroll", onScroll);
+    };
+  }, []);
   const [form, setForm] = useState({ ticker: "", side: "LONG", entry: "", stop: "", target: "", shares: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
   const [showTradeContext, setShowTradeContext] = useState(false);
   const [ocrStatus, setOcrStatus] = useState(null);
@@ -2965,7 +2997,7 @@ export default function SwingEdge() {
       </nav>
 
       {/* ── CONTENT ── */}
-      <main className="flex-1 overflow-auto p-4 md:p-5 space-y-5 pb-24 md:pb-5">
+      <main ref={mainScrollRef} className="flex-1 overflow-auto p-4 md:p-5 space-y-5 pb-24 md:pb-5">
 
         {/* ══════════════ MENTORING (B4.3 — read-only mentee view) ══════════════ */}
         {tab === "mentoring" && (
@@ -6579,7 +6611,7 @@ export default function SwingEdge() {
       {/* ── FLOATING NEW TRADE BUTTON ── */}
       <button
         onClick={() => { setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null }); setOcrStatus(null); setShowForm(true); }}
-        className="fixed bottom-6 right-6 rtl:right-auto rtl:left-6 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-violet-500 text-white shadow-2xl shadow-cyan-500/25 flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
+        className={`fixed bottom-6 right-6 rtl:right-auto rtl:left-6 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-violet-500 text-white shadow-2xl shadow-cyan-500/25 flex items-center justify-center hover:scale-110 active:scale-95 transition-transform motion-reduce:transition-none ${fabVisible ? "translate-y-0 opacity-100" : "translate-y-24 opacity-0 pointer-events-none"}`}
         aria-label={t.newTrade}
         title={t.newTrade}
       >
@@ -6597,7 +6629,7 @@ export default function SwingEdge() {
       </div>
 
       {/* ── FOOTER STATUS BAR ── */}
-      <footer className="flex items-center justify-between px-5 py-2 border-t border-[var(--border-subtle)] dark:border-white/[0.06] bg-[var(--bg-primary)] dark:bg-[#0a0f1e] text-[10px] text-slate-700 font-mono">
+      <footer className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-5 py-2 border-t border-[var(--border-subtle)] dark:border-white/[0.06] bg-[var(--bg-primary)] dark:bg-[#0a0f1e] text-[10px] text-slate-700 font-mono">
         <div className="flex items-center gap-4">
           {(() => {
             const fBadge = getMarketStateBadge(marketState);
@@ -6615,7 +6647,7 @@ export default function SwingEdge() {
         <div className="flex items-center gap-4">
           <span>{t.trades}: {trades.length}</span>
           <span>{t.open}: {openTrades.length}</span>
-          <span>SwingEdge Pro v2.1</span>
+          <span className="hidden md:inline">SwingEdge Pro v2.1</span>
         </div>
       </footer>
     </div>

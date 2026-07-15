@@ -79,13 +79,13 @@ function MobileTradeCardImpl({
         )}
       </div>
 
-      <div className="flex items-center gap-2 font-mono text-[11px]">
+      <div className="flex flex-wrap items-center gap-2 font-mono text-[11px]">
         <span className="text-[var(--v3-text-lo)]">{shortDate}</span>
         <span className="text-slate-300">${trade.entry}</span>
         <span className="text-[var(--v3-text-lo)]">→</span>
         <span className="text-slate-300">{trade.exit ? `$${trade.exit}` : "–"}</span>
         {trade.setup && (
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#A78BFA]/10 text-[var(--v3-purple)] border border-[#A78BFA]/20 whitespace-nowrap max-w-[100px] truncate">
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#A78BFA]/10 text-[var(--v3-purple)] border border-[#A78BFA]/20 whitespace-nowrap shrink-0">
             {labelFor("setup", trade.setup, lang)}
           </span>
         )}
