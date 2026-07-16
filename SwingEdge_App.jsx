@@ -107,8 +107,6 @@ function SetupTagTip({ setup, isRTL }) {
 }
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
-const RISK_PCT = 0.01;
-
 const MOCK_TRADES = [];
 
 // ─── TRADE DATA SANITIZER ────────────────────────────────────────────────────
@@ -1097,6 +1095,11 @@ export default function SwingEdge() {
       setCapital(cap);
       try { localStorage.setItem("swingEdgeCapital", String(cap)); } catch {}
     }
+    const rp = Number(profile?.defaults?.riskPct);
+    if (rp >= 0.1 && rp <= 10) {
+      setRiskPct(rp);
+      try { localStorage.setItem("swingEdgeRiskPct", String(rp)); } catch {}
+    }
     setShowOnboarding(false);
   };
 
@@ -1174,6 +1177,21 @@ export default function SwingEdge() {
     try { return parseFloat(localStorage.getItem("swingEdgeCapital")) || DEFAULT_CAPITAL; } catch { return DEFAULT_CAPITAL; }
   });
   const [capitalInput, setCapitalInput] = useState("");
+
+  // Personal risk-per-trade %, seeded once from the onboarding profile, editable in Settings.
+  // Stored as a percent (1 = 1%), not a fraction. Settings is the source of truth after seeding.
+  const [riskPct, setRiskPct] = useState(() => {
+    try {
+      const s = parseFloat(localStorage.getItem("swingEdgeRiskPct"));
+      if (s >= 0.1 && s <= 10) return s;
+    } catch {}
+    const p = Number(userProfile?.defaults?.riskPct);
+    return (p >= 0.1 && p <= 10) ? p : 1;
+  });
+  const [riskInput, setRiskInput] = useState("");
+  // Portfolio-wide risk cap, derived from per-trade risk. Floor of 3 preserves the
+  // pre-wave default (1% per trade → 3% cap) for users with no profile.
+  const maxRiskPct = useMemo(() => Math.min(5, Math.max(3, riskPct * 2)), [riskPct]);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const profileRef = useRef(null);
 
@@ -1949,19 +1967,19 @@ export default function SwingEdge() {
   const targetN = parseFloat(form.target) || 0;
   const riskPerShare   = Math.abs(entryN - stopN);
   const rewardPerShare = Math.abs(targetN - entryN);
-  const posSize        = riskPerShare > 0 ? Math.floor((capital * RISK_PCT) / riskPerShare) : 0;
+  const posSize        = riskPerShare > 0 ? Math.floor((capital * (riskPct / 100)) / riskPerShare) : 0;
   const posValue       = posSize * entryN;
   const potLoss        = posSize * riskPerShare;
   // R/R is a price-only ratio — independent of position size — so the card always
   // agrees with the Decision Coach even when posSize floors to 0 on a small account.
   const rrRatio        = priceBasedRR(entryN, stopN, targetN);
-  // True when the 1%-risk position rounds below a single share (high price / wide stop / small capital).
+  // True when the risk-%-sized position rounds below a single share (high price / wide stop / small capital).
   const posSizeTooSmall = riskPerShare > 0 && posSize === 0;
   // Geometry validity against the explicitly chosen side — drives the invalid-input
   // state (cards show "—", a red banner explains why, and save is blocked).
   const tradeValidity = validateTradeInputs(entryN, stopN, targetN, form.side);
   // Editable shares: `form.shares` is a manual override (raw positive-int string, "" = untouched).
-  // suggestedShares mirrors the 1%-risk value the card shows today (1 when posSizeTooSmall).
+  // suggestedShares mirrors the risk-%-sized value the card shows (1 when posSizeTooSmall).
   // effShares drives Pos.Value / Max Risk so an override recomputes them live; R/R stays price-only.
   // Sticky by design — changing entry/stop recomputes the suggestion but leaves the override in place.
   const suggestedShares   = posSizeTooSmall ? 1 : posSize;
@@ -3429,7 +3447,7 @@ export default function SwingEdge() {
 
             {/* ══ RISK DASHBOARD ══ */}
             {(() => {
-              const MAX_RISK_PCT = 3; // % of capital — adjustable
+              const MAX_RISK_PCT = maxRiskPct; // % of capital — derived from per-trade risk state
               const maxRiskDollar = capital * (MAX_RISK_PCT / 100);
 
               const openRisks = openTrades.map(t => {
@@ -5795,6 +5813,47 @@ export default function SwingEdge() {
                 </p>
               </div>
 
+              {/* ── RISK PER TRADE ── */}
+              <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <Percent size={16} className="text-[var(--v3-text-mid)]" />
+                  <h3 className="text-sm font-bold text-white">{t.riskPerTradeTitle}</h3>
+                </div>
+                <p className="text-xs text-[var(--v3-text-lo)] mb-3">{t.riskPerTradeDesc}</p>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.25"
+                    min="0.1"
+                    max="10"
+                    value={riskInput}
+                    onChange={e => setRiskInput(e.target.value)}
+                    placeholder={`${riskPct}`}
+                    className="flex-1 bg-white/5 border border-[var(--border-subtle)] dark:border-white/[0.10] rounded-lg px-3 py-2 text-sm text-white placeholder-[var(--v3-text-lo)] focus:border-[var(--v3-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--v3-accent-glow)] transition font-mono"
+                  />
+                  <button
+                    onClick={() => {
+                      const val = parseFloat(riskInput);
+                      if (val >= 0.1 && val <= 10) {
+                        setRiskPct(val);
+                        setRiskInput("");
+                        try { localStorage.setItem("swingEdgeRiskPct", String(val)); } catch {}
+                      }
+                    }}
+                    className="px-4 py-2 rounded-lg bg-[var(--v3-accent-glow)] border border-[#00C076]/30 text-[var(--v3-accent)] text-xs font-bold hover:bg-[#00C076]/20 transition whitespace-nowrap">
+                    {t.updateRisk}
+                  </button>
+                </div>
+                <p className="text-[10px] text-[var(--v3-text-lo)] mt-2">
+                  {t.currentRisk}: <span className="text-[var(--v3-accent)] font-mono font-bold">{riskPct}%</span>
+                </p>
+                <p className="text-[10px] text-[var(--v3-text-lo)] mt-1 flex items-center gap-1">
+                  {t.portfolioCapDerived}: <span className="text-violet-400 font-mono font-bold">{maxRiskPct}%</span>
+                  <TermTooltip term="riskLimits" lang={lang} />
+                </p>
+              </div>
+
               {/* ── DEMO TRADES ── */}
               <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-3">
@@ -6319,8 +6378,8 @@ export default function SwingEdge() {
                 <div className="flex items-center gap-2 p-2.5 rounded-[var(--v3-radius-chip)] border text-xs bg-[var(--v3-warn)]/5 border-[var(--v3-warn)]/20 text-[var(--v3-warn)]">
                   <AlertTriangle size={13} />
                   <span>{lang === "he"
-                    ? "בסיכון 1% הפוזיציה קטנה ממניה אחת — הכרטיסים מציגים מינימום של מניה אחת. הגדל הון או הדק את הסטופ. ה-R/R תקף."
-                    : "At 1% risk the position is under one share — cards show the 1-share minimum. Raise capital or tighten the stop. R/R is valid."}</span>
+                    ? `בסיכון ${riskPct}% הפוזיציה קטנה ממניה אחת — הכרטיסים מציגים מינימום של מניה אחת. הגדל הון או הדק את הסטופ. ה-R/R תקף.`
+                    : `At ${riskPct}% risk the position is under one share — cards show the 1-share minimum. Raise capital or tighten the stop. R/R is valid.`}</span>
                 </div>
               )}
 
