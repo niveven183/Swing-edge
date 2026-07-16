@@ -108,6 +108,12 @@ html, body {
 .text-slate-500, .text-gray-500 {
   color: var(--text-muted);
 }
+/* M-01: slate-600/700 as text render raw hex in dark (AA fail 1.7–2.5:1).
+   Dark-scoped so light mode keeps the strong raw hex. bg/border classes untouched. */
+.dark .text-slate-600, .dark .text-gray-600,
+.dark .text-slate-700, .dark .text-gray-700 {
+  color: var(--text-muted);
+}
 
 /* ━━━ Profit / Loss ━━━ */
 .text-green-400, .text-green-500, .text-green-600,

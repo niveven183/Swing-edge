@@ -2853,7 +2853,7 @@ export default function SwingEdge() {
       )}
 
       {/* ── HEADER ── */}
-      <header dir="ltr" className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-[var(--bg-elevated)] sticky top-0 z-50">
+      <header dir="ltr" className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-[var(--bg-elevated)] sticky top-0 z-50" style={{ paddingTop: "calc(0.75rem + env(safe-area-inset-top))" }}>
         {/* Logo + User Menu (left side, combined) */}
         <div className="relative" ref={profileRef}>
           <button
@@ -4009,19 +4009,19 @@ export default function SwingEdge() {
           <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit mx-auto">
             <button
               onClick={() => setToolsTab('analyzer')}
-              className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${toolsTab === 'analyzer' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${toolsTab === 'analyzer' ? 'bg-white shadow-sm text-emerald-600' : 'text-[#475569] hover:text-[#334155]'}`}
             >
               🧪 {lang === 'he' ? 'ניתוח עסקה' : 'Trade Analyzer'}
             </button>
             <button
               onClick={() => setToolsTab('calc')}
-              className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${toolsTab === 'calc' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${toolsTab === 'calc' ? 'bg-white shadow-sm text-emerald-600' : 'text-[#475569] hover:text-[#334155]'}`}
             >
               🧮 {lang === 'he' ? 'מחשבון פוזיציה' : 'Position Calculator'}
             </button>
             <button
               onClick={() => setToolsTab('report')}
-              className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${toolsTab === 'report' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${toolsTab === 'report' ? 'bg-white shadow-sm text-emerald-600' : 'text-[#475569] hover:text-[#334155]'}`}
             >
               📈 {t.dnaReport}
             </button>
@@ -4755,12 +4755,12 @@ export default function SwingEdge() {
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={data} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
-                      <XAxis dataKey="setup" tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={short} angle={-45} textAnchor="end" interval={0} height={70} />
+                      <XAxis dataKey="setup" tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => short(labelFor("setup", v, lang))} angle={-45} textAnchor="end" interval={0} height={70} />
                       <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`} />
                       <Tooltip
                         contentStyle={{ background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 10, fontSize: 11 }}
                         formatter={(v, n, p) => [`${v}% · ${nTrades(p.payload.count, lang)}`, "Win Rate"]}
-                        labelFormatter={l => l}
+                        labelFormatter={l => labelFor("setup", l, lang)}
                       />
                       <ReferenceLine y={50} stroke="var(--v3-text-lo)" strokeDasharray="4 4" label={{ value: "50%", position: "insideTopRight", fontSize: 9, fill: "var(--v3-text-lo)" }} />
                       <Bar dataKey="winRate" radius={[4, 4, 0, 0]} label={{ position: "top", fontSize: 9, fill: "var(--v3-text-mid)", formatter: (v, entry) => entry?.payload?.count ? `${entry.payload.count}t` : "" }}>
@@ -6617,6 +6617,7 @@ export default function SwingEdge() {
       <button
         onClick={() => { setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null }); setOcrStatus(null); setShowForm(true); }}
         className={`fixed bottom-6 right-6 rtl:right-auto rtl:left-6 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-violet-500 text-white shadow-2xl shadow-cyan-500/25 flex items-center justify-center hover:scale-110 active:scale-95 transition-transform motion-reduce:transition-none ${fabVisible ? "translate-y-0 opacity-100" : "translate-y-24 opacity-0 pointer-events-none"}`}
+        style={{ bottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
         aria-label={t.newTrade}
         title={t.newTrade}
       >
@@ -6634,7 +6635,7 @@ export default function SwingEdge() {
       </div>
 
       {/* ── FOOTER STATUS BAR ── */}
-      <footer className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-5 py-2 border-t border-[var(--border-subtle)] dark:border-white/[0.06] bg-[var(--bg-primary)] dark:bg-[#0a0f1e] text-[10px] text-slate-700 font-mono">
+      <footer className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-5 py-2 border-t border-[var(--border-subtle)] dark:border-white/[0.06] bg-[var(--bg-primary)] dark:bg-[#0a0f1e] text-[10px] text-slate-700 font-mono" style={{ paddingBottom: "calc(0.5rem + env(safe-area-inset-bottom))" }}>
         <div className="flex items-center gap-4">
           {(() => {
             const fBadge = getMarketStateBadge(marketState);
