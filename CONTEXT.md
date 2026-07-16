@@ -189,6 +189,9 @@ Always compare with `=== true` / `=== false`; never rely on raw string equality 
 ### Working procedures (handoff-critical)
 - **One task per prompt.** Split large tasks into sub-stages (Stage 3 → 3a / 3b / 3c / 3d). Keeps each diff reviewable and each deploy verifiable.
 - **Verify live deploys via Claude chat + the Vercel connector — not `curl`.** `curl` hits the "Vercel Security Checkpoint" anti-bot wall (`x-vercel-mitigated: challenge`) and fails. The local build hash will **always** differ from the deployed one (Vercel rebuilds independently); what matters is that the bundle *rolled*, not that the hashes match.
+- **Verify commit hashes via `github.com/[repo]/commits/main.atom`** — the Atom feed of `main` returns the latest commit SHAs without hitting the GitHub API rate-limit (bypasses the 60 req/hr unauthenticated cap). Use it to confirm a push landed on `origin/main`.
+- **Mobile verification = emulation on the *production* URL inside a 390px iframe.** Chrome's own window has a floor of ~500px, so a raw resize can't reach true phone widths — an embedded 390px iframe (iPhone-class) against the deployed site is the reliable way to reproduce mobile layout. Landscape/RTL clipping and safe-area behavior only show up here, not in a resized desktop window.
+- **Read-only tests run against a real account.** Verification of live data (stats, calendar, journal counts) is done by observing a real logged-in account read-only — no writes, no test-trade pollution.
 - **Prompt structure:** header (model / plan-mode / session / connectors) → "read, don't change" guardrail → diagnosis → Plan → execute → mandatory git block.
 - **`src/index.css` override layer** (~L86–100): a restyle layer that remaps Tailwind text-color utilities (`.text-white`, `.text-slate-*`, etc.) to CSS variables. Dark screens fight this layer — prefer inline colors over Tailwind text utilities there.
 
@@ -352,3 +355,30 @@ Run **outside this repo** (no code here references them) — ops/maintenance age
 - No hardcoded Supabase keys, no `dangerouslySetInnerHTML`.
 - All Supabase mutations + localStorage writes already wrapped in try/catch with cancellation tokens.
 - All division operations guarded against zero.
+
+---
+
+## Distribution-Readiness Waves 1–4.1 (2026-07)
+
+A pre-distribution sprint: wire the onboarding→coach pipeline, fix data-viz honesty, complete bilingual coverage, and make the app usable on a real phone. Each wave is one reviewable commit.
+
+- **Wave 1 — onboarding wired** (`c74c512`): onboarding now feeds the app for real. `profileName` is captured and used; capital is entered **manually in `$`** (no more hardcoded default) and drives **bucket derivation** downstream. Closes the "onboarding is decorative" gap from the pipeline audit (`ee359fd`, `docs/ONBOARDING-COACH-AUDIT-2026-07-13.md`).
+- **Wave 2 — R-01 hold-time scatter** (`e9bad7d`): the Hold-vs-P&L scatter had a hard floor that flattened the axis. Fix removes the floor, uses an **auto domain**, and spreads the demo holds so the distribution is legible instead of collapsed onto one value.
+- **Wave 3 — i18n sweep (he+en full)** (`9efa423`): localized remaining hardcoded UI strings + enum **display labels** via a central `labelFor(kind, value, lang)` helper in **`src/i18n.js`** (single source for enum→label). `regimes.json` made **bilingual** (regime knowledge in he+en). **L-01 reclassified** as a user-facing-text issue.
+- **Wave 4 — mobile layout** (`4e70fd7`): **FAB hide-on-scroll** wired to both `window` and the `main` scroll container (closes M-02/R-05 from the earlier QA); **footer wraps** instead of overflowing (M-01); **StatCard** value/label made responsive with proper padding (M-03/M-05); setup **badge unclipped**.
+- **Wave 4.1 — mobile hotfix** (`834870d`): Setup Matrix table switched to **`table-fixed sm:table-auto`** with explicit column widths (**46/49/44/78px**) so it fits the viewport without RTL clipping; mobile trade card reflowed to **3 rows** so the meta row no longer overlaps. Root cause + prevention logged in `docs/INCIDENTS.md` (`table-layout: auto` let a variable-width column blow past the viewport in RTL).
+
+### Mobile UX Audit (2026-07-15) — verdict: ready to distribute
+`docs/MOBILE-UX-AUDIT-2026-07-15.md` (`bd6c388`). Full mobile pass, HE/EN, emulated at 390px against production.
+- **Score: 0 🔴 blockers · 3 🟠 fix-soon · 7 🟡 polish.** No finding blocks distribution — verdict is "good enough for a first friends round."
+- **The 3 🟠 (fix before *wider* distribution):**
+  - **M-01** — dark-theme muted text fails WCAG AA (`#334155` on `#0d1424` = 1.84:1); raise `--text-muted`/`--text-tertiary` to ≥`#8A97A8` (~4.6:1).
+  - **M-02** — language leak: Analytics "Win Rate by Setup" shows English setup names under Hebrew (axis `tickFormatter`/tooltip `labelFormatter` bypass `labelFor`); wrap both in `labelFor("setup", …, lang)` (`SwingEdge_App.jsx:4758`/`4763`).
+  - **M-03** — no `env(safe-area-inset-*)` despite `viewport-fit=cover`; FAB/footer sit under the home indicator. Add safe-area padding to FAB/footer + sticky headers.
+- The 7 🟡 (M-04…M-10): sub-11px fonts, small "?" touch targets, TradingView ∅ placeholders, degenerate equity Y-axis, contradictory Journal counters, theme-default mismatch (landing dark / `/app` auto→light).
+
+## Next up (post-4.1)
+- **Wave 4.2** — clear the 3 🟠 from the mobile audit (M-01 contrast, M-02 setup-label leak, M-03 safe-area insets).
+- **Wave 5** — `RISK_PCT`: make risk-per-trade a real, user-controlled input (currently a constant in `src/utils.js`) so position sizing reflects the account's actual risk appetite.
+- **Wave 6** — Coach upgrade + a knowledge audit of coach output **against the canon** (the Stage 4 gaps: bilingual coach strings, de-dup, conflict resolution, reading `notes`/`lessonLearned`).
+- **Wave 7** — charts + the **dead-zone** cleanup (the 🟡 data-viz findings: axis fonts, degenerate domains, empty-states).
