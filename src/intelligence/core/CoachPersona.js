@@ -29,11 +29,13 @@ const CATEGORY = {
 const BEGINNER_RANK = { protection: 0, psych: 1 };
 const beginnerRank = (id) => BEGINNER_RANK[CATEGORY[id]] ?? 2;
 
-// Strategy nudge for equal-weight insights (display order only; lower = earlier).
+// Strategy → which knowledge categories surface earliest among equal-weight insights
+// (display order only; lower = earlier). swing emphasises market-stage / hold-through /
+// structural-stop; day emphasises timing / discipline / entry-quality.
 // Never applied to 'intermediate' (identity) or to 'searching'/'combined' (no key).
-const STRATEGY_BOOST = {
-  swing: { regime: -1, stop_distance: -1, earnings: -1 },
-  day:   { earnings: -2, sequential: -1, entry_quality: -1 },
+const STRATEGY_KNOWLEDGE_EMPHASIS = {
+  swing: { regime: -2, earnings: -1, stop_distance: -1 },
+  day:   { entry_quality: -2, sequential: -1, emotion: -1 },
 };
 
 // Advanced hides purely-educational INFO lines only. Never touches actionable
@@ -43,9 +45,18 @@ const ADVANCED_DROP_INFO = new Set(["stop_distance", "setup_combo", "dna"]);
 
 // Beginner "why" — sourced from the knowledge base via knowledgeGlue (Hebrew-only,
 // never invented). Only unambiguous id→rule mappings; other ids get no why line.
+// A ref may be strategy-conditional ({swing,day,default}); whyRefFor picks the strategy
+// key when present, else default — so swing vs day can cite a different sourced rule.
 const WHY_REF = {
-  stop_distance: "rule:cut_losses_fast",
   direction:     "rule:cut_losses_fast",
+  stop_distance: { swing: "rule:stop_is_structural", day: "rule:cut_losses_fast",
+                   default: "rule:cut_losses_fast" },
+};
+const whyRefFor = (id, strategy) => {
+  const ref = WHY_REF[id];
+  if (!ref) return null;
+  if (typeof ref === "string") return ref;
+  return ref[strategy] || ref.default || null;
 };
 
 const toneFor = (goal) =>
@@ -54,7 +65,7 @@ const toneFor = (goal) =>
 // Decorate → stable sort by (key, originalIndex) → strip. Deterministic total order
 // independent of the engine's own sort stability.
 const reorder = (insights, experience, strategy) => {
-  const boost = STRATEGY_BOOST[strategy] || null;
+  const boost = STRATEGY_KNOWLEDGE_EMPHASIS[strategy] || null;
   const keyOf = (ins) => {
     const base = experience === "beginner" ? beginnerRank(ins.id) * 10 : 0;
     const off = boost ? (boost[ins.id] || 0) : 0;
@@ -88,7 +99,7 @@ export const adaptCoaching = (coaching, profile = null, lang = null) => {
   }
   if (experience === "beginner") {
     insights = insights.map((ins) => {
-      const ref = WHY_REF[ins.id];
+      const ref = whyRefFor(ins.id, strategy);
       if (!ref) return ins;
       const why = getWhyLine(ref);
       return why ? { ...ins, whyLine: why } : ins;

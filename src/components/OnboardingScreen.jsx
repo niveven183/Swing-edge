@@ -57,11 +57,28 @@ const QUESTIONS = [
   },
 ];
 
+// Strategy-tuned 3rd recommendation (intermediate/advanced only). null for
+// searching/combined/unknown → keep the tier's original 3rd rec.
+const strategyRec = (strategy) => {
+  if (strategy === "swing") return {
+    icon: TrendingUp, color: "green",
+    title: "משמעת החזקה",
+    text: "בסווינג הרווח נבנה בהחזקה דרך רעש. הגדר יעד ו-stop מראש, עשה סקירה שבועית של הפוזיציות ואל תסגור מוקדם.",
+  };
+  if (strategy === "day") return {
+    icon: Zap, color: "violet",
+    title: "משמעת תזמון",
+    text: "במסחר יומי העיתוי הוא הכל. התמקד בשעה הראשונה כשהווליום בשיא, והימנע מכניסות בשעות המתות.",
+  };
+  return null;
+};
+
 const generateProfile = (answers) => {
   const { experience, strategy, portfolioSize, goal, frequency } = answers;
 
   // portfolioSize is now the capital amount in $ (number). Derive the risk/commission bucket.
   const capitalAmount = Number(portfolioSize) || 0;
+  const fmtCapital = capitalAmount > 0 ? `$${capitalAmount.toLocaleString()}` : null;
   let bucket = "medium";
   if (capitalAmount < 5000) bucket = "small";
   else if (capitalAmount < 25000) bucket = "medium";
@@ -109,13 +126,13 @@ const generateProfile = (answers) => {
     recs.push({
       icon: Shield,
       title: "שמור על סיכון נמוך",
-      text: `התחל עם ${riskPct}% מהתיק לעסקה. הגנה על הקפיטל חשובה יותר מהרווח הראשון.`,
+      text: `התחל עם ${riskPct}% מהתיק לעסקה. הגנה על הקפיטל חשובה יותר מהרווח הראשון. המאמן שלך יציג קודם את אזהרות ההגנה בכל עסקה.`,
       color: "cyan",
     });
     recs.push({
       icon: BookOpen,
       title: "תעד כל עסקה",
-      text: "השתמש ביומן המסחר לתיעוד כל כניסה. הסוחרים שמנהלים יומן מתפתחים מהר יותר.",
+      text: "השתמש ביומן לתיעוד כל כניסה. הסוחרים שמנהלים יומן מתפתחים מהר יותר.",
       color: "violet",
     });
     recs.push({
@@ -134,26 +151,28 @@ const generateProfile = (answers) => {
     recs.push({
       icon: BarChart2,
       title: "נתח את הביצועים",
-      text: "השתמש בלשונית Analytics לניתוח דפוסי הרווח וההפסד שלך. זהה את הסטאפים הטובים ביותר.",
+      text: "השתמש בלשונית ניתוח ביצועים לניתוח דפוסי הרווח וההפסד שלך. זהה את הסטאפים הטובים ביותר.",
       color: "green",
     });
     recs.push({
       icon: Zap,
       title: "שפר את הכניסות",
-      text: "השתמש ב-Trade Analyzer לניתוח כל עסקה לפני הכניסה. זה יעלה את דיוק הביצועים.",
+      text: "השתמש במנתח עסקאות לניתוח כל עסקה לפני הכניסה. זה יעלה את דיוק הביצועים.",
       color: "violet",
     });
   } else {
     recs.push({
       icon: Target,
       title: "אופטימיזציה מתקדמת",
-      text: `עם תיק של ${goalMap[goal]}, שקול להגדיל את גודל הפוזיציה לסטאפים עם ביטחון גבוה.`,
+      text: fmtCapital
+        ? `עם תיק של ${fmtCapital}, שקול להתאים את גודל הפוזיציה לסטאפים עם ביטחון גבוה.`
+        : `שקול להתאים את גודל הפוזיציה לסטאפים עם ביטחון גבוה.`,
       color: "amber",
     });
     recs.push({
       icon: BarChart2,
       title: "מעקב Expectancy",
-      text: "מדוד את ה-Expectancy של כל סטאפ. סוחר מנוסה מכיר את ה-edge שלו במספרים מדויקים.",
+      text: "מדוד את ה-Expectancy של כל סטאפ בניתוח ביצועים. סוחר מנוסה מכיר את ה-edge שלו במספרים מדויקים.",
       color: "cyan",
     });
     recs.push({
@@ -162,6 +181,13 @@ const generateProfile = (answers) => {
       text: "עקוב אחר הקורלציות בין הפוזיציות הפתוחות. הגבל חשיפה לסקטור אחד.",
       color: "green",
     });
+  }
+
+  // Strategy-tuned 3rd rec for intermediate/advanced only. Beginner always keeps the
+  // three fundamentals (risk / journal / 2:1 R:R); strategy reaches them via the Coach.
+  if (experience !== "beginner") {
+    const sr = strategyRec(strategy);
+    if (sr) recs[2] = sr;
   }
 
   return {
