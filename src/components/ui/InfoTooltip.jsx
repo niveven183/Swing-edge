@@ -102,6 +102,7 @@ export default function InfoTooltip({ children, label = 'More info', side = 'aut
           select-none flex-shrink-0
           cursor-pointer
           relative z-10
+          before:absolute before:content-[''] before:-inset-3
         "
         style={{
           lineHeight: 1,

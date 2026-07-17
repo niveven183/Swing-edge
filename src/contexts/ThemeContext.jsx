@@ -25,9 +25,18 @@ function readInitialMode() {
   return 'auto';
 }
 
+function resolveMode(mode) {
+  if (mode === 'light' || mode === 'dark') return mode;
+  try {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  } catch {
+    return 'light';
+  }
+}
+
 export function ThemeProvider({ children }) {
   const [mode, setMode] = useState(readInitialMode);
-  const [resolved, setResolved] = useState('light');
+  const [resolved, setResolved] = useState(() => resolveMode(readInitialMode()));
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');

@@ -64,7 +64,7 @@ import { getTranslations, LANGUAGES, isRTLLang, nTrades, labelFor } from "./src/
 import {
   fetchPrices, fmtVolume, fmtMarketCap, searchTickers,
   fetchQuote, fetchEarnings, getMarketState, getMarketStateBadge, getRefreshInterval, MARKET_STATE,
-  fetchMarketOverview, getOverviewRefreshInterval,
+  fetchMarketOverview, getOverviewRefreshInterval, MARKET_OVERVIEW,
 } from "./src/priceService.js";
 import { POPULAR_TICKERS as STATIC_TICKERS, getTickerMeta, searchTickers as searchStaticTickers } from "./src/data/tickers.js";
 import { SwingEdgeAI } from "./src/intelligence/SwingEdgeAI.js";
@@ -531,6 +531,33 @@ const generateEquityCurve = (cap, trades = []) => {
     ? new Date(new Date(firstRaw).getTime() - 86_400_000).toISOString().slice(0, 10)
     : new Date().toISOString().slice(0, 10);
   return [{ date: anchorDate, equity: cap, ticker: "START", pnl: 0 }, ...data];
+};
+
+// Axis-only money formatter: full dollars under $10k (keeps near-flat equity curves
+// legible so ticks don't all collapse to one "$Xk" string), k-notation above.
+const fmtAxisMoney = (v) => {
+  const n = Number(v) || 0;
+  if (Math.abs(n) >= 10000) {
+    const k = n / 1000;
+    return `$${Number.isInteger(k) ? k : k.toFixed(1)}k`;
+  }
+  return `$${Math.round(n).toLocaleString("en-US")}`;
+};
+
+// Display-only Y domain for the equity curve. Pads the real min/max; when the curve is
+// effectively flat, fabricates a small readable band so recharts emits distinct ticks
+// instead of six identical labels. Does not alter any equity/P&L value.
+const equityYDomain = (curve) => {
+  const vals = (curve || []).map(p => p && p.equity).filter(v => Number.isFinite(v));
+  if (!vals.length) return ["auto", "auto"];
+  const lo = Math.min(...vals), hi = Math.max(...vals);
+  const span = hi - lo;
+  if (span < 1) {
+    const pad = Math.max(50, Math.abs(hi) * 0.02);
+    return [Math.floor(lo - pad), Math.ceil(hi + pad)];
+  }
+  const pad = span * 0.08;
+  return [Math.floor(lo - pad), Math.ceil(hi + pad)];
 };
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -1046,6 +1073,17 @@ const MarketPulseCard = memo(({ item, t }) => {
     </div>
   );
 });
+
+// Placeholder for an index whose data hasn't converged yet (upstream per-symbol
+// null / cold-start partial). Keeps the Market Pulse grid full so the row never
+// shows a gap; fills with a real card once the value arrives.
+const MarketPulseCardSkeleton = memo(({ item, t }) => (
+  <div className="rounded-xl border border-[var(--border-subtle)] dark:border-white/[0.06] bg-white/[0.02] p-3">
+    <div className="text-[11px] font-bold text-white truncate">{t[item.key] || item.sym}</div>
+    <div className="text-sm font-mono font-bold text-slate-500 mt-0.5">—</div>
+    <div className="text-[11px] font-mono font-semibold text-slate-600 mt-0.5">—</div>
+  </div>
+));
 
 // One sector/theme card: name, weekly % with arrow, and a proportional bar scaled to
 // the strongest mover (maxAbs). Bar width anchors to the reading edge, so it's RTL-safe.
@@ -1719,6 +1757,10 @@ export default function SwingEdge() {
   const equityCurve = useMemo(() => generateEquityCurve(capital, realTrades), [realTrades, capital]);
   const closedTrades = realTrades.filter(t => t.status === "CLOSED");
   const openTrades   = realTrades.filter(t => t.status === "OPEN");
+  // Journal header counter: counts over the SAME base the journal list renders
+  // (all trades incl. demo), so total/open/closed stay internally consistent.
+  const openCountAll   = useMemo(() => trades.filter(t => t.status === "OPEN").length, [trades]);
+  const closedCountAll = useMemo(() => trades.filter(t => t.status === "CLOSED").length, [trades]);
 
   // Stable reference for the pure calcTradeMetrics function — prevents
   // useTradingStats from re-running its useMemo on every render.
@@ -3023,7 +3065,7 @@ export default function SwingEdge() {
       </nav>
 
       {/* ── CONTENT ── */}
-      <main ref={mainScrollRef} className="flex-1 overflow-auto p-4 md:p-5 space-y-5 pb-24 md:pb-5">
+      <main ref={mainScrollRef} className="flex-1 p-4 md:p-5 space-y-5 pb-24 md:pb-5">
 
         {/* ══════════════ MENTORING (B4.3 — read-only mentee view) ══════════════ */}
         {tab === "mentoring" && (
@@ -3324,8 +3366,8 @@ export default function SwingEdge() {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
-                    <XAxis dataKey="date" tick={{ fontSize: 9, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => typeof v === "string" && v.length === 10 && v[4] === "-" ? v.slice(5) : v} minTickGap={40} />
-                    <YAxis domain={["auto", "auto"]} tick={{ fontSize: 9, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
+                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => typeof v === "string" && v.length === 10 && v[4] === "-" ? v.slice(5) : v} minTickGap={40} />
+                    <YAxis domain={equityYDomain(equityCurve)} tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={fmtAxisMoney} width={52} />
                     <ReferenceLine y={capital} stroke="var(--v3-text-lo)" strokeDasharray="4 4" />
                     <Tooltip contentStyle={{ background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 8, fontSize: 11 }} formatter={(v) => [`$${v.toLocaleString()}`, "Equity"]} />
                     <Area type="monotone" dataKey="equity" stroke="var(--v3-info)" strokeWidth={2} fill="url(#eqGrad)" dot={{ fill: "var(--v3-info)", r: 3 }} />
@@ -3658,7 +3700,7 @@ export default function SwingEdge() {
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
                 <h2 className="text-sm font-bold text-white">{t.tradeJournal}</h2>
-                <p className="text-xs text-slate-600 mt-0.5">{trades.length} {t.totalEntries} · {openTrades.length} {t.open} · {closedTrades.length} {t.closed}</p>
+                <p className="text-xs text-slate-600 mt-0.5">{trades.length} {t.totalEntries} · {openCountAll} {t.open} · {closedCountAll} {t.closed}</p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <button onClick={() => setShowJournalFilters(v => !v)}
@@ -3779,7 +3821,7 @@ export default function SwingEdge() {
                 onClick={() => setJournalView('table')}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all
                   ${journalView === 'table'
-                    ? 'bg-white dark:bg-[var(--v3-accent-glow)] shadow-sm dark:shadow-none text-emerald-600 dark:text-[var(--v3-accent)]'
+                    ? 'bg-white dark:bg-[var(--v3-accent-glow)] shadow-sm dark:shadow-none text-emerald-700 dark:text-[var(--v3-accent)]'
                     : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
               >
                 {lang === 'he' ? '📋 טבלה' : '📋 Table'}
@@ -3789,7 +3831,7 @@ export default function SwingEdge() {
                 onClick={() => setJournalView('calendar')}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all
                   ${journalView === 'calendar'
-                    ? 'bg-white dark:bg-[var(--v3-accent-glow)] shadow-sm dark:shadow-none text-emerald-600 dark:text-[var(--v3-accent)]'
+                    ? 'bg-white dark:bg-[var(--v3-accent-glow)] shadow-sm dark:shadow-none text-emerald-700 dark:text-[var(--v3-accent)]'
                     : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
               >
                 {lang === 'he' ? '📅 לוח שנה' : '📅 Calendar'}
@@ -4035,19 +4077,19 @@ export default function SwingEdge() {
           <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit mx-auto">
             <button
               onClick={() => setToolsTab('analyzer')}
-              className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${toolsTab === 'analyzer' ? 'bg-white shadow-sm text-emerald-600' : 'text-[#475569] hover:text-[#334155]'}`}
+              className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${toolsTab === 'analyzer' ? 'bg-white shadow-sm text-emerald-700' : 'text-[#475569] hover:text-[#334155]'}`}
             >
               🧪 {lang === 'he' ? 'ניתוח עסקה' : 'Trade Analyzer'}
             </button>
             <button
               onClick={() => setToolsTab('calc')}
-              className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${toolsTab === 'calc' ? 'bg-white shadow-sm text-emerald-600' : 'text-[#475569] hover:text-[#334155]'}`}
+              className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${toolsTab === 'calc' ? 'bg-white shadow-sm text-emerald-700' : 'text-[#475569] hover:text-[#334155]'}`}
             >
               🧮 {lang === 'he' ? 'מחשבון פוזיציה' : 'Position Calculator'}
             </button>
             <button
               onClick={() => setToolsTab('report')}
-              className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${toolsTab === 'report' ? 'bg-white shadow-sm text-emerald-600' : 'text-[#475569] hover:text-[#334155]'}`}
+              className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${toolsTab === 'report' ? 'bg-white shadow-sm text-emerald-700' : 'text-[#475569] hover:text-[#334155]'}`}
             >
               📈 {t.dnaReport}
             </button>
@@ -4671,8 +4713,8 @@ export default function SwingEdge() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => typeof v === "string" && v.length === 10 && v[4] === "-" ? v.slice(5) : v} minTickGap={40} />
-                  <YAxis domain={["auto","auto"]} tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v=>`$${(v/1000).toFixed(1)}k`} />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => typeof v === "string" && v.length === 10 && v[4] === "-" ? v.slice(5) : v} minTickGap={40} />
+                  <YAxis domain={equityYDomain(equityCurve)} tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={fmtAxisMoney} width={52} />
                   <ReferenceLine y={capital} stroke="var(--v3-text-lo)" strokeDasharray="5 5" label={{ value: lang === "he" ? "הון התחלתי" : "Starting Capital", position: "insideTopRight", fontSize: 9, fill: "var(--v3-text-lo)" }} />
                   <Tooltip
                     contentStyle={{ background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 10, fontSize: 11 }}
@@ -4697,8 +4739,8 @@ export default function SwingEdge() {
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={closedTrades.map(t => ({ name: t.ticker, pnl: Math.round(calcTradeMetrics(t).pnl || 0) }))}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v=>`$${v}`} />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v=>`$${v}`} />
                   <Tooltip contentStyle={{ background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 10, fontSize: 11 }} formatter={v=>[fmt$(v),"P&L"]} />
                   <ReferenceLine y={0} stroke="var(--v3-text-lo)" />
                   <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
@@ -4746,8 +4788,8 @@ export default function SwingEdge() {
                   <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
-                      <XAxis dataKey="day" tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => dayLabel(v, lang)} />
-                      <YAxis tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
+                      <XAxis dataKey="day" tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => dayLabel(v, lang)} />
+                      <YAxis tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
                       <Tooltip
                         contentStyle={{ background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 10, fontSize: 11 }}
                         formatter={(v, n, p) => [`${fmt$(v)} · ${nTrades(p.payload.count, lang)}`, "P&L"]}
@@ -4781,8 +4823,8 @@ export default function SwingEdge() {
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={data} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
-                      <XAxis dataKey="setup" tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => short(labelFor("setup", v, lang))} angle={-45} textAnchor="end" interval={0} height={70} />
-                      <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`} />
+                      <XAxis dataKey="setup" tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => short(labelFor("setup", v, lang))} angle={-45} textAnchor="end" interval={0} height={70} />
+                      <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`} />
                       <Tooltip
                         contentStyle={{ background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 10, fontSize: 11 }}
                         formatter={(v, n, p) => [`${v}% · ${nTrades(p.payload.count, lang)}`, "Win Rate"]}
@@ -5019,8 +5061,8 @@ export default function SwingEdge() {
                       <ResponsiveContainer width="100%" height={200}>
                         <BarChart data={rBuckets} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
-                          <XAxis dataKey="range" tick={{ fontSize: 9, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} />
-                          <YAxis tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} />
+                          <XAxis dataKey="range" tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} />
+                          <YAxis tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} />
                           <Tooltip contentStyle={darkTooltip} />
                           <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                             {rBuckets.map((entry, i) => (
@@ -5045,8 +5087,8 @@ export default function SwingEdge() {
                       <ResponsiveContainer width="100%" height={200}>
                         <BarChart data={pnlByMonth} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
-                          <XAxis dataKey="month" tick={{ fontSize: 9, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} />
-                          <YAxis tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
+                          <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} />
+                          <YAxis tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
                           <Tooltip contentStyle={darkTooltip} formatter={(v, n, p) => [`${fmt$(v)} · ${p.payload.count} trade${p.payload.count !== 1 ? "s" : ""}`, "P&L"]} />
                           <ReferenceLine y={0} stroke="var(--v3-text-lo)" />
                           <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
@@ -5072,8 +5114,8 @@ export default function SwingEdge() {
                       <ResponsiveContainer width="100%" height={200}>
                         <BarChart data={emotionStatsArr} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
-                          <XAxis dataKey="emotion" tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => labelFor("emotion", v, lang)} />
-                          <YAxis tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
+                          <XAxis dataKey="emotion" tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => labelFor("emotion", v, lang)} />
+                          <YAxis tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
                           <Tooltip contentStyle={darkTooltip} formatter={(v, n, p) => [`${fmt$(v)} · ${formatPct(p.payload.winRate)} WR`, "P&L"]} />
                           <ReferenceLine y={0} stroke="var(--v3-text-lo)" />
                           <Bar dataKey="totalPnL" radius={[4, 4, 0, 0]}>
@@ -5205,7 +5247,7 @@ export default function SwingEdge() {
                             name="Days"
                             domain={[0, 'dataMax']}
                             allowDecimals={false}
-                            tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }}
+                            tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }}
                             tickLine={false}
                             axisLine={false}
                             label={{ value: lang === "he" ? "ימי החזקה" : "Days held", position: "insideBottom", offset: -2, fontSize: 10, fill: "var(--v3-text-lo)" }}
@@ -5214,7 +5256,7 @@ export default function SwingEdge() {
                             type="number"
                             dataKey="pnl"
                             name="P&L"
-                            tick={{ fontSize: 10, fill: "var(--v3-text-lo)" }}
+                            tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }}
                             tickLine={false}
                             axisLine={false}
                             tickFormatter={v => `$${v}`}
@@ -5404,7 +5446,7 @@ export default function SwingEdge() {
                             <div className="font-bold text-[11px] text-white font-mono">{s.ticker}</div>
                             {meta ? (
                               <div className="flex items-center gap-1 mt-0.5">
-                                <span className="text-[8px] text-slate-500 truncate max-w-[72px]">{meta.name}</span>
+                                <span dir="ltr" className="text-[11px] text-slate-500 truncate max-w-[72px] text-start">{meta.name}</span>
                                 <span className={`text-[7px] px-1 rounded-full font-medium ${sectorColor}`}>{labelFor("sector", meta.sector, lang)}</span>
                               </div>
                             ) : lp?.volume ? (
@@ -5467,17 +5509,20 @@ export default function SwingEdge() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {/* Row 1 — Market Pulse (indices) */}
-                  {marketOverview.indices.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-600 mb-2">{t.mo_pulse}</p>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-                        {marketOverview.indices.map(item => (
-                          <MarketPulseCard key={item.sym} item={item} t={t} />
-                        ))}
-                      </div>
+                  {/* Row 1 — Market Pulse (indices). Render every configured index;
+                       ones that haven't resolved yet get a placeholder so a partial
+                       upstream response shows the full row instead of a broken gap. */}
+                  <div>
+                    <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-600 mb-2">{t.mo_pulse}</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                      {MARKET_OVERVIEW.indices.map(cfg => {
+                        const loaded = marketOverview.indices.find(x => x.sym === cfg.sym.toUpperCase());
+                        return loaded
+                          ? <MarketPulseCard key={cfg.sym} item={loaded} t={t} />
+                          : <MarketPulseCardSkeleton key={cfg.sym} item={cfg} t={t} />;
+                      })}
                     </div>
-                  )}
+                  </div>
 
                   {/* Row 2 — Sectors & Themes, sorted best → worst */}
                   {marketOverview.sectorsThemes.length > 0 && (() => {
@@ -6720,7 +6765,7 @@ export default function SwingEdge() {
         <div className="flex items-center gap-4">
           <span>{t.trades}: {trades.length}</span>
           <span>{t.open}: {openTrades.length}</span>
-          <span className="hidden md:inline">SwingEdge Pro v2.1</span>
+          <span className="hidden md:inline">SwingEdge Pro v{typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev"}</span>
         </div>
       </footer>
     </div>
