@@ -383,6 +383,11 @@ const prioritizeInsights = (list) =>
     (Math.abs(b.weight || 0) - Math.abs(a.weight || 0))
   );
 
+// Stable display id for each insight source — additive tag only, never touches
+// weight/kind/text (verdict & confidence are computed from weight alone). Used by
+// the CoachPersona presentation layer to reorder/filter/annotate; null passes through.
+const withId = (id, ins) => (ins ? { ...ins, id } : ins);
+
 // ─── PUBLIC API ──────────────────────────────────────────────────────────────
 // coachTrade: { form, trades, dna, edges, regime, lang }
 export const coachTrade = ({ form, trades = [], dna = null, edges = null, regime = null, earnings = null } = {}) => {
@@ -402,16 +407,16 @@ export const coachTrade = ({ form, trades = [], dna = null, edges = null, regime
   const dist = stopDistribution(trades, idea);
 
   const checks = [
-    directionCheck(idea),
-    rrCheck(idea),
-    stopDistanceCheck(idea, dist),
-    patternMatchCheck(dna, idea),
-    setupMarketComboCheck(trades, idea),
-    emotionalCheck(dna, idea),
-    entryQualityCheck(idea),
-    sequentialCheck(trades),
-    regimeCheck(regime, idea),
-    earningsCheck(earnings),
+    withId("direction",     directionCheck(idea)),
+    withId("rr",            rrCheck(idea)),
+    withId("stop_distance", stopDistanceCheck(idea, dist)),
+    withId("pattern",       patternMatchCheck(dna, idea)),
+    withId("setup_combo",   setupMarketComboCheck(trades, idea)),
+    withId("emotion",       emotionalCheck(dna, idea)),
+    withId("entry_quality", entryQualityCheck(idea)),
+    withId("sequential",    sequentialCheck(trades)),
+    withId("regime",        regimeCheck(regime, idea)),
+    withId("earnings",      earningsCheck(earnings)),
   ].filter(Boolean);
 
   // Score aggregation, clipped to a 0..100 confidence band.
@@ -431,7 +436,7 @@ export const coachTrade = ({ form, trades = [], dna = null, edges = null, regime
   const antiEdgeMatch = edges ? matchIdeaToAntiEdge(edges, idea) : null;
   if (edgeMatch && edgeMatch.matched) {
     checks.push({
-      icon: "🎯", kind: "go", weight: 10,
+      id: "edge", icon: "🎯", kind: "go", weight: 10,
       text: {
         en: `Matches your top edge: ${edgeMatch.edge.pattern} (${edgeMatch.edge.winRate}% win).`,
         he: `תואם ל-Edge המוביל שלך: ${edgeMatch.edge.patternHe || edgeMatch.edge.pattern} (${edgeMatch.edge.winRate}% הצלחה).`,
@@ -440,7 +445,7 @@ export const coachTrade = ({ form, trades = [], dna = null, edges = null, regime
   }
   if (antiEdgeMatch && antiEdgeMatch.matched) {
     checks.push({
-      icon: "☠️", kind: "skip", weight: -15,
+      id: "anti_edge", icon: "☠️", kind: "skip", weight: -15,
       text: {
         en: `Matches a losing pattern: ${antiEdgeMatch.antiEdge.pattern} (${antiEdgeMatch.antiEdge.winRate}% win).`,
         he: `תואם לדפוס מפסיד: ${antiEdgeMatch.antiEdge.patternHe || antiEdgeMatch.antiEdge.pattern} (${antiEdgeMatch.antiEdge.winRate}% הצלחה).`,
@@ -453,6 +458,7 @@ export const coachTrade = ({ form, trades = [], dna = null, edges = null, regime
   for (const r of dnaRecs) {
     const isEmotion = r.key === "emotion";
     checks.push({
+      id: "dna",
       icon: r.kind === "weakness" ? "⚠️" : r.kind === "strength" ? "⭐" : "💡",
       kind: r.kind === "weakness" ? "warn" : "info",
       weight: 0,
@@ -469,7 +475,7 @@ export const coachTrade = ({ form, trades = [], dna = null, edges = null, regime
   const expectedR = history ? Number(history.avgReturn) : null;
   if (expectedR != null && history && history.similarTrades >= 3) {
     checks.push({
-      icon: "📈", kind: "info", weight: 0,
+      id: "expected_r", icon: "📈", kind: "info", weight: 0,
       text: {
         en: `Expected return based on ${history.similarTrades} similar trades: ${expectedR >= 0 ? "+" : ""}${expectedR.toFixed(2)}R.`,
         he: `תשואה צפויה לפי ${history.similarTrades} עסקאות דומות: ${expectedR >= 0 ? "+" : ""}${expectedR.toFixed(2)}R.`,

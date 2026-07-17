@@ -4,7 +4,7 @@
 // returns enrichment payloads or null. NEVER throws, NEVER alters a score: callers
 // spread the result only when it's non-null, so absent knowledge = today's behavior.
 
-import { getRegimeStage, getSetup } from "./knowledge.js";
+import { getRegimeStage, getSetup, getRule, getPsychology } from "./knowledge.js";
 
 // Resolve a possibly-bilingual field ({en,he}) to a plain string. Plain strings
 // pass through unchanged, so pre-bilingual knowledge entries still work.
@@ -141,4 +141,30 @@ export const getSetupActionKnowledge = ({ setup, userWinRate } = {}) => {
     statLine = `אצלך ${Math.round(userWinRate)}% | קאנון: כשל BE ${stats.be_fail} (${statSource})`;
   }
   return { coachLine, source, statLine };
+};
+
+/**
+ * "Why" line for a coaching insight, sourced verbatim from the canonical knowledge
+ * base (never invented). The knowledge JSON is Hebrew-only, so the returned line is
+ * Hebrew-only by design: { he } with NO `en` key — the UI shows it only in Hebrew
+ * and stays silent in other languages (no Hebrew leaking into an EN view).
+ * @param {string} ref "rule:<key>" | "psych:<key>" | "setup:<key>"
+ * @returns {{he:string}|null} null when the ref is unmapped or carries no text.
+ */
+export const getWhyLine = (ref) => {
+  if (!ref || typeof ref !== "string") return null;
+  const [domain, key] = ref.split(":");
+  if (!domain || !key) return null;
+  let he = "";
+  if (domain === "rule") {
+    const r = getRule(key);
+    he = (r && (r.rationale || r.violation_line)) || "";
+  } else if (domain === "psych") {
+    const p = getPsychology(key);
+    he = (p && (p.correction || p.definition)) || "";
+  } else if (domain === "setup") {
+    const s = getSetup(key);
+    he = (s && (s.definition || s.coach_line)) || "";
+  }
+  return he ? { he } : null;
 };

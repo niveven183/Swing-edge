@@ -8,6 +8,7 @@ import { findEdges }         from "./core/EdgeFinder.js";
 import { detectMarketRegime }from "./core/MarketRegime.js";
 import { checkTilt, engageCooldown, clearCooldown, acknowledgeWarning } from "./core/TiltProtection.js";
 import { coachTrade, coachingToAnalyzerView } from "./core/DecisionCoach.js";
+import { adaptCoaching } from "./core/CoachPersona.js";
 import {
   reinforceFromTrade, rebuildFromHistory, calibrationReport,
   capabilities, getWeights, resetLearning,
@@ -50,16 +51,21 @@ export const SwingEdgeAI = {
 
   // Real-time coaching on a candidate trade. Not memoised — the form state
   // changes on every keystroke.
-  analyzeNewTrade: (form, trades = [], opts = null) => coachTrade({
-    form,
-    trades,
-    dna:    SwingEdgeAI.getDNA(trades),
-    edges:  SwingEdgeAI.getEdges(trades),
-    regime: SwingEdgeAI.getRegime(trades, opts),
-    // Timing channel — earnings rides inside marketData but never reaches the
-    // regime classifier (it ignores unknown keys); pulled out here for the Coach.
-    earnings: opts?.marketData?.earnings ?? null,
-  }),
+  analyzeNewTrade: (form, trades = [], opts = null) => {
+    const coaching = coachTrade({
+      form,
+      trades,
+      dna:    SwingEdgeAI.getDNA(trades),
+      edges:  SwingEdgeAI.getEdges(trades),
+      regime: SwingEdgeAI.getRegime(trades, opts),
+      // Timing channel — earnings rides inside marketData but never reaches the
+      // regime classifier (it ignores unknown keys); pulled out here for the Coach.
+      earnings: opts?.marketData?.earnings ?? null,
+    });
+    // Profile-aware presentation only — verdict/confidence/numbers untouched.
+    // No profile → adaptCoaching returns the same object unchanged.
+    return adaptCoaching(coaching, opts?.profile ?? null);
+  },
 
   // Standalone Analyzer — runs the SAME coach engine as analyzeNewTrade, then
   // adapts the rich output to the Analyzer panel's flat shape. Passing `trades`
@@ -81,7 +87,8 @@ export const SwingEdgeAI = {
       edges:  SwingEdgeAI.getEdges(trades),
       regime: SwingEdgeAI.getRegime(trades, opts),
     });
-    return coachingToAnalyzerView(coaching, {
+    const adapted = adaptCoaching(coaching, opts?.profile ?? null);
+    return coachingToAnalyzerView(adapted, {
       entry:   input.entry,
       stop:    input.stop,
       target:  input.target,

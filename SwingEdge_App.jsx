@@ -1084,12 +1084,19 @@ export default function SwingEdge() {
   const [userProfile, setUserProfile] = useState(() => {
     try {
       const saved = localStorage.getItem("swingEdgeOnboarding");
-      return saved ? JSON.parse(saved).profile : null;
+      if (!saved) return null;
+      const parsed = JSON.parse(saved);
+      // Merge the onboarding answers (experience/strategy/goal/frequency) into the
+      // profile so the coach can read them — additive, existing consumers untouched.
+      return parsed?.profile ? { ...parsed.profile, ...(parsed.answers || {}) } : null;
     } catch { return null; }
   });
 
   const handleOnboardingComplete = (profile) => {
-    setUserProfile(profile);
+    // Re-read the just-written answers so userProfile carries them from first load.
+    let answers = {};
+    try { answers = JSON.parse(localStorage.getItem("swingEdgeOnboarding") || "{}").answers || {}; } catch {}
+    setUserProfile({ ...profile, ...answers });
     const cap = Number(profile?.defaults?.capital);
     if (cap > 0) {
       setCapital(cap);
@@ -1856,8 +1863,9 @@ export default function SwingEdge() {
   const aiCoach = useMemo(
     () => SwingEdgeAI.analyzeNewTrade(coachForm, realTrades, {
       marketData: { ...(regimeOverview || {}), earnings: coachEarnings },
+      profile: userProfile,
     }),
-    [coachForm, realTrades, regimeOverview, coachEarnings]
+    [coachForm, realTrades, regimeOverview, coachEarnings, userProfile]
   );
 
   // ─── CENTRAL EQUITY ENGINE ──────────────────────────────────────────────────

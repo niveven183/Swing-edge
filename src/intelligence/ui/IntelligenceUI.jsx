@@ -259,9 +259,19 @@ export const DecisionCoachPanel = ({ coaching, lang = "he" }) => {
       )}
 
       <div className="space-y-1.5">
-        {coaching.insights.slice(0, 6).map((ins, i) => (
-          <LiveInsight key={i} insight={ins} lang={lang} />
-        ))}
+        {coaching.insights.slice(0, 6).map((ins, i) => {
+          // whyLine is sourced from the knowledge base and Hebrew-only by design;
+          // pick() yields "" in non-Hebrew views, so the line simply stays hidden.
+          const why = ins.whyLine ? pick(ins.whyLine, lang) : "";
+          return (
+            <div key={i} className="space-y-1">
+              <LiveInsight insight={ins} lang={lang} />
+              {why && (
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 ms-9 leading-relaxed">{why}</div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {coaching.knowledgeWarning && (
