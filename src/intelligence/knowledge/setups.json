@@ -30,7 +30,7 @@
     "entry_criteria": ["gap 10%+ עם RVOL>3", "קטליזטור אמיתי (לא תנועה טכנית)", "רצוי מניה ששכבה זמן רב לפני"],
     "invalidation": ["שבירת שפל הבוקר", "כשל בהחזקת VWAP אחרי הכניסה"],
     "stop": "שפל הבוקר",
-    "source": "Qullamaggie / Unknown Market Wizards (Schwager)",
+    "source": "Pradeep Bonde (Stockbee) / Qullamaggie — 'Episodic Pivot' מקורו ב-Stockbee; ראה גם Unknown Market Wizards (Schwager)",
     "reliability": "הסטאפ הנדיר ביותר ובעל ה-R/R הטוב ביותר בשיטה",
     "stats": { "note": "הסטאפ הנדיר ביותר ובעל ה-R:R הטוב בשיטת Qullamaggie" },
     "regime_affinity": { "best": ["Trending Up","Sideways"], "avoid": ["Trending Down"] },
@@ -66,9 +66,9 @@
     "entry_criteria": ["שתי תחתיות באותו אזור", "אישור בשבירת קו הצוואר", "תחתית שנייה על ווליום גבוה (capitulation) = חזק יותר"],
     "invalidation": ["כניסה לפני אישור = הטעות הנפוצה", "שבירת התחתיות אחרי כניסה"],
     "stop": "מתחת לתחתית השנייה",
-    "source": "Bulkowski (Eve&Eve: דירוג 5/39, כשל BE 12%, ‏+50% ממוצע)",
+    "source": "Bulkowski (Eve&Eve: דירוג 5/39, כשל BE 4%, ‏+50% ממוצע)",
     "reliability": "וריאציית Eve&Eve (מעוגלת) החזקה ביותר",
-    "stats": { "be_fail": "12% (Eve&Eve)", "avg_move": "+50%", "target_hit": "65%", "source": "Bulkowski, דירוג 5/39" },
+    "stats": { "be_fail": "4% (Eve&Eve, thepatternsite)", "avg_move": "+50%", "target_hit": "65%", "source": "Bulkowski, דירוג 5/39" },
     "regime_affinity": { "best": ["Sideways","Trending Down"], "avoid": [] },
     "coach_line": "Double Bottom נכשלת בידיים של מי שנכנס לפני אישור קו הצוואר — Bulkowski: ההמתנה לסגירה מעל הפסגה היא ההבדל."
   },
@@ -80,14 +80,15 @@
     "stop": "מעל כתף ימין",
     "source": "Bulkowski — thepatternsite.com/hst.html (pullback ~50–67%)",
     "reliability": "מהיפוכי הדובי המוכרים; המתן לאישור",
-    "stats": { "be_fail": "~20%", "avg_move": "-16% עד -29%", "pullback": "~50-67%", "source": "Bulkowski" },
+    "stats": { "be_fail": "~20%", "avg_move": "-16% (ממוצע Bulkowski)", "pullback": "~50-67%", "source": "Bulkowski" },
     "regime_affinity": { "best": ["Trending Up"], "avoid": [] },
-    "coach_line": "H&S בלי שבירת neckline מאושרת = עדיין אין תבנית. וזכור: pullback חוזר ב-2/3 מהמקרים — הכניסה השנייה לגיטימית."
+    "note": "התבנית נוצרת בשיא Trending Up — affinity מציין את ההקשר, לא המלצת לונג",
+    "coach_line": "H&S בלי שבירת neckline מאושרת = עדיין אין תבנית. וזכור: פולבק חוזר ב-2/3 מהמקרים — הכניסה השנייה לגיטימית."
   },
   "ascending_triangle": {
     "name": "Ascending Triangle (משולש עולה)",
     "definition": "התנגדות אופקית + שפלים עולים. הטיה שורית — קונים אגרסיביים מול מוכר סטטי.",
-    "entry_criteria": ["לפחות 2 נגיעות בהתנגדות ו-2 שפלים עולים", "פריצה על ווליום"],
+    "entry_criteria": ["לפחות 3 נגיעות בהתנגדות ו-2 שפלים עולים", "פריצה על ווליום"],
     "invalidation": ["פריצה מטה (קורה ~37%)", "throwback שנכשל לחזור מעל הרמה"],
     "stop": "מתחת לשפל העולה האחרון",
     "source": "Bulkowski (פורץ מעלה ~63%, ‏+43% ממוצע, כשל BE ~17%)",
@@ -130,7 +131,7 @@
     "reliability": "מהכניסות האמינות במגמה בריאה — בתנאי שהמגמה אכן בריאה",
     "stats": { "note": "Minervini: במגמת Stage 2 בריאה המחיר קופץ שוב ושוב מה-20/50 — כניסות ה-R:R הטובות ביותר אחרי פריצה" },
     "regime_affinity": { "best": ["Trending Up"], "avoid": ["Trending Down","Sideways"] },
-    "coach_line": "Pullback עובד רק כשיש מגמה לחזור אליה. ב-Sideways אין pullback — יש סתם ירידה. Minervini: קונים חולשה רק בתוך חוזק."
+    "coach_line": "פולבק עובד רק כשיש מגמה לחזור אליה. ב-Sideways אין פולבק — יש סתם ירידה. Minervini: קונים חולשה רק בתוך חוזק."
   },
   "support_bounce": {
     "name": "Support Bounce (קפיצה מתמיכה)",
@@ -224,9 +225,9 @@
     ],
     "stop": "מעבר לקצה ה-wick של הפריצה הכושלת",
     "source": "Bulkowski \"busted patterns\" (thepatternsite.com) · priceaction.com false-break",
-    "reliability": "Bulkowski: ~60-80% מהפריצות כושלות בשווקים המודרניים; busted patterns נעים לרוב 2-3× חזק יותר מהאות המקורי",
+    "reliability": "פריצות שווא נפוצות בשוק צידי; Bulkowski 'busted patterns' נעים חזק בכיוון ההפוך. (אין נתון 60-80% מבוסס Bulkowski)",
     "stats": {
-      "note": "60-80% שיעור כשל של פריצות (Bulkowski / Tradeciety) — הבסיס לאסטרטגיית ה-fade"
+      "note": "false-break תוך-יומי שכיח בשוק צידי (תצפית price-action, לא סטטיסטיקת Bulkowski) — הבסיס לאסטרטגיית ה-fade; שונה מכשל תבנית מדורגת, ששיעורי ה-BE שלה אצל Bulkowski הם 5-20%"
     },
     "regime_affinity": {
       "best": ["Sideways", "Volatile"],
@@ -336,7 +337,7 @@
       "best": ["Trending Up", "Trending Down"],
       "avoid": ["Sideways"]
     },
-    "coach_line": "Retest תקף רק אם הווליום מתכווץ בחזרה. חזרה על ווליום כבד לתוך הטווח = פריצה כושלת, לא retest."
+    "coach_line": "ריטסט תקף רק אם הווליום מתכווץ בחזרה. חזרה על ווליום כבד לתוך הטווח = פריצה כושלת, לא ריטסט."
   },
   "post_earnings_strength": {
     "name": "Post-Earnings Strength — דריפט אחרי דוחות (PEAD)",
