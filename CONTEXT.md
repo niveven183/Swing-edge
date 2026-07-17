@@ -194,6 +194,7 @@ Always compare with `=== true` / `=== false`; never rely on raw string equality 
 - **Read-only tests run against a real account.** Verification of live data (stats, calendar, journal counts) is done by observing a real logged-in account read-only — no writes, no test-trade pollution.
 - **Prompt structure:** header (model / plan-mode / session / connectors) → "read, don't change" guardrail → diagnosis → Plan → execute → mandatory git block.
 - **`src/index.css` override layer** (~L86–100): a restyle layer that remaps Tailwind text-color utilities (`.text-white`, `.text-slate-*`, etc.) to CSS variables. Dark screens fight this layer — prefer inline colors over Tailwind text utilities there.
+- **`npm run test:coach` is mandatory before any change to an intelligence engine** (`scripts/coach-invariance-test.mjs`, 110 assertions) — asserts `coaching.verdict` is byte-identical across the fixture set. Run it before *and* after touching anything under `src/intelligence/` (including `CoachPersona`, `DecisionCoach.js`, knowledge-base data files) to catch accidental verdict drift.
 
 ## Coding Rules (Hive agents + Claude Code)
 1. ❌ NEVER access `trade.pnl` directly — ✅ `const { pnl } = calcTradeMetrics(trade)` (import from `./src/utils.js`)
@@ -377,8 +378,25 @@ A pre-distribution sprint: wire the onboarding→coach pipeline, fix data-viz ho
   - **M-03** — no `env(safe-area-inset-*)` despite `viewport-fit=cover`; FAB/footer sit under the home indicator. Add safe-area padding to FAB/footer + sticky headers.
 - The 7 🟡 (M-04…M-10): sub-11px fonts, small "?" touch targets, TradingView ∅ placeholders, degenerate equity Y-axis, contradictory Journal counters, theme-default mismatch (landing dark / `/app` auto→light).
 
-## Next up (post-4.1)
-- **Wave 4.2** — clear the 3 🟠 from the mobile audit (M-01 contrast, M-02 setup-label leak, M-03 safe-area insets).
-- **Wave 5** — `RISK_PCT`: make risk-per-trade a real, user-controlled input (currently a constant in `src/utils.js`) so position sizing reflects the account's actual risk appetite.
-- **Wave 6** — Coach upgrade + a knowledge audit of coach output **against the canon** (the Stage 4 gaps: bilingual coach strings, de-dup, conflict resolution, reading `notes`/`lessonLearned`).
-- **Wave 7** — charts + the **dead-zone** cleanup (the 🟡 data-viz findings: axis fonts, degenerate domains, empty-states).
+## Waves 6–7 — Coach knowledge audit + charts polish (2026-07, CLOSED)
+
+- **Wave 6.1 — knowledge audit** (`698dc1c`): 43 knowledge-base entries audited against the trading canon (setups/rules/psychology/regimes). Findings documented in the audit doc; no code changes in this commit (docs only).
+- **Wave 6.1b — apply corrections** (`6f9678d`): 7 items from the audit applied — **values only, keys untouched** (no schema/API break; downstream consumers unaffected).
+- **Wave 6.2 — profile-aware coach** (`be8fe4f`): new **`CoachPersona`** adaptation layer sits on top of `coachTrade` — adapts tone/emphasis to the user's profile without touching the underlying verdict logic. Verified with a dedicated **coach-invariance test** (110 assertions): the `verdict` field is byte-identical before/after the persona layer for every fixture. This is the regression guard for the whole coach engine going forward.
+- **Wave 6.3 — strategy-aware emphasis + profile recommendations** (`3f6b081`): knowledge emphasis now varies by the trader's stated strategy; profile-ready screen recommendations overhauled to use this.
+- **Wave 7 — charts + polish** (`9f3f5ac`): closes QA-AUDIT (R-02..R-04, P-01..P-05) + MOBILE-UX-AUDIT (M-04..M-10) + production scroll dead-zone **D1**. Display/layout only:
+  - **D1** — removed an inert nested `overflow-auto` on `<main>`; the document is now the sole scroller (this was the root cause of the production scroll dead-zone).
+  - Dynamic equity Y-domain + `fmtAxisMoney` → distinct tick labels (R-02/M-08); chart axis ticks 9–10px → **11px** (M-05).
+  - Footer version now sourced from **`__APP_VERSION__`** (single source = `package.json`) (P-02).
+  - Active-tab text contrast emerald-600 → 700, ≥4.5:1 (P-04).
+  - Watchlist name 8px → 11px + `dir=ltr` ellipsis (M-04/P-05).
+  - `InfoTooltip` **`?`** hit area enlarged to 44×44 (visual glyph still 20px) (M-06).
+  - Journal counters aligned to one base array — total/open/closed no longer drift (M-09).
+  - `ThemeContext` initial resolved mode now matches `index.html` pre-paint — no boot flash (M-10).
+  - `MarketPulseCardSkeleton` placeholders added for unresolved indices — no row-gap while loading (R-04).
+
+## Next up (post-Wave 7)
+- **Tour מקיף** — a comprehensive first-run product tour (beyond the current onboarding capital-entry step).
+- **ייבוא אקסל + מחיקת דמו** — Excel/CSV trade import, plus a clear path to delete the demo dataset once real trades are imported.
+- **Gate 2** — next distribution gate (criteria TBD as the above land).
+- **₪/Stripe** — pricing in ₪ + Stripe billing integration (blocked on Privacy/ToS + identity/bank per the existing Sprint 2 backlog above).
