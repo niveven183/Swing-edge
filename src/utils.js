@@ -100,6 +100,10 @@ export const fmtR = (r) => r >= 0 ? `+${r.toFixed(2)}R` : `${r.toFixed(2)}R`;
 // percentage rounding, so the same value renders identically everywhere.
 export const formatPct = (v) => `${Math.round(Number(v) || 0)}%`;
 
+// Return-on-capital display — single source of truth so the Dashboard KPI and
+// the Analytics figure round the same value to the same digit (#7).
+export const formatReturnPct = (v) => `${(Number(v) || 0).toFixed(2)}%`;
+
 // ─── followedPlan NORMALIZATION ───────────────────────────────────────────────
 // `followedPlan` is true | false | "Partially" | null in the UI, but the DB
 // column is text, so after a Supabase round-trip booleans come back as the

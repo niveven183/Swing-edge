@@ -145,18 +145,22 @@ const stopDistanceCheck = (idea, dist) => {
     };
     return null;
   }
+  // Without a setup filter the distribution spans ALL trades, so "similar" would
+  // overstate comparability — say "your trades" instead. (#13)
+  const enTrades = idea.setup ? "your similar trades" : "your trades";
+  const heTrades = idea.setup ? "מהעסקאות הדומות שלך" : "מהעסקאות שלך";
   if (idea.stopPct <= dist.p25) return {
     icon: "⚠️", kind: "warn", weight: -3,
     text: {
-      en: `Stop is tighter than 75% of your similar trades (${idea.stopPct.toFixed(2)}% vs ${dist.p50.toFixed(2)}% median).`,
-      he: `הסטופ קרוב יותר מ-75% מהעסקאות הדומות שלך (${idea.stopPct.toFixed(2)}% מול ${dist.p50.toFixed(2)}% חציון).`,
+      en: `Stop is tighter than 75% of ${enTrades} (${idea.stopPct.toFixed(2)}% vs ${dist.p50.toFixed(2)}% median).`,
+      he: `הסטופ קרוב יותר מ-75% ${heTrades} (${idea.stopPct.toFixed(2)}% מול ${dist.p50.toFixed(2)}% חציון).`,
     },
   };
   if (idea.stopPct >= dist.p90) return {
     icon: "⚠️", kind: "warn", weight: -8,
     text: {
-      en: `Stop is wider than 90% of your similar trades — reduce size.`,
-      he: `הסטופ רחב יותר מ-90% מהעסקאות הדומות שלך — הקטן גודל.`,
+      en: `Stop is wider than 90% of ${enTrades} — reduce size.`,
+      he: `הסטופ רחב יותר מ-90% ${heTrades} — הקטן גודל.`,
     },
   };
   return {
@@ -172,15 +176,18 @@ const patternMatchCheck = (dna, idea) => {
   if (!idea.setup || !dna || !dna.sampleSize) return null;
   const strong = (dna.strengths?.setups || []).find(s => s.key === idea.setup);
   const weak   = (dna.weaknesses?.setups || []).find(s => s.key === idea.setup);
+  // dedup `setup:<name>` — the DNA setup rec (getPersonalizedRecommendations)
+  // fires on the same underlying signal; the merge collapses the two into a
+  // single card. This scored line (weight ≠ 0) wins over the weight-0 DNA rec.
   if (strong) return {
-    icon: "⭐", kind: "go", weight: 15,
+    icon: "⭐", kind: "go", weight: 15, dedup: `setup:${idea.setup}`,
     text: {
       en: `${idea.setup} is a winning pattern for you — ${Math.round(strong.winRate * 100)}% win over ${strong.n} trades.`,
       he: `${idea.setup} זה סטאפ מנצח אצלך — ${Math.round(strong.winRate * 100)}% הצלחה ב-${strong.n} עסקאות.`,
     },
   };
   if (weak) return {
-    icon: "⚠️", kind: "warn", weight: -12,
+    icon: "⚠️", kind: "warn", weight: -12, dedup: `setup:${idea.setup}`,
     text: {
       en: `${idea.setup} historically loses for you — ${Math.round(weak.winRate * 100)}% win, ${weak.n} trades.`,
       he: `${idea.setup} היסטורית מפסיד אצלך — ${Math.round(weak.winRate * 100)}% הצלחה ב-${weak.n} עסקאות.`,
@@ -457,6 +464,7 @@ export const coachTrade = ({ form, trades = [], dna = null, edges = null, regime
   const dnaRecs = getPersonalizedRecommendations(dna, idea) || [];
   for (const r of dnaRecs) {
     const isEmotion = r.key === "emotion";
+    const isSetup   = r.key === "setup";
     checks.push({
       id: "dna",
       icon: r.kind === "weakness" ? "⚠️" : r.kind === "strength" ? "⭐" : "💡",
@@ -467,6 +475,9 @@ export const coachTrade = ({ form, trades = [], dna = null, edges = null, regime
       // keeps a single line. This DNA rec carries the actionable "pause" wording,
       // so it wins the de-dup.
       ...(isEmotion ? { dedup: `emotion:${idea.emotionAtEntry}`, _prefer: true } : {}),
+      // Same setup also surfaces via patternMatchCheck. Tag it so the merge keeps
+      // one card; no `_prefer` here, so the scored pattern line wins.
+      ...(isSetup ? { dedup: `setup:${idea.setup}` } : {}),
     });
   }
 

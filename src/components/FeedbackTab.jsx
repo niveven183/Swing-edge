@@ -40,6 +40,9 @@ const TAB_LABEL_KEYS = {
   analytics: "analytics",
   intel: "marketIntel",
   feedback: "feedback",
+  notebook: "notebookTab",
+  weeklyReview: "weeklyReviewTab",
+  settings: "settings",
 };
 
 function parseUA() {

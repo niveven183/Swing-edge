@@ -152,15 +152,29 @@ const computeScores = (trades) => {
 
 // ─── PUBLIC API ──────────────────────────────────────────────────────────────
 // Single-entry cache: avoids recomputing for the same trade set.
-// Key = count + last-trade date (O(1) to compute, covers add/edit events).
 let _dnaCache = { key: null, result: null };
 
 export const calculateTradeDNA = (allTrades = []) => {
-  // Key must distinguish DIFFERENT trade sets, not just add/edit within one set:
-  // the mentor dashboard computes DNA for a mentee's trades through this same
-  // function, so a count+last-date-only key could collide two distinct people.
+  // The key must satisfy TWO properties at once, because this single-entry slot
+  // is shared across callers:
+  //   (a) Mutation-sensitivity — closing or editing a trade (status / exit /
+  //       entry / stop / shares) changes the DNA, but leaves length + first/last
+  //       date + last id untouched. A length+date-only key returned a STALE memo
+  //       after a close (Dashboard 31 vs DNA 30). So we fold in closedCount plus
+  //       a cheap per-trade hash of the DNA-relevant fields.
+  //   (b) People-distinction — the mentor dashboard computes a mentee's DNA
+  //       through this same function (App: menteeDNA), so the key must never let
+  //       one person's trades collide with another's in the shared slot. The
+  //       first/last date + last id terms are kept, and the id-inclusive hash
+  //       makes a cross-person collision effectively impossible.
   const _last = allTrades[allTrades.length - 1];
-  const _cacheKey = `${allTrades.length}_${allTrades[0]?.date || ''}_${_last?.date || ''}_${_last?.id || ''}`;
+  let _sig = 0, _closed = 0;
+  for (const t of allTrades) {
+    if (t.status === "CLOSED" || t.exit != null || t.exitPrice != null) _closed++;
+    const s = `${t.id}|${t.status}|${t.exitPrice ?? t.exit ?? ''}|${t.entry}|${t.stop}|${t.shares}`;
+    for (let i = 0; i < s.length; i++) _sig = (_sig * 31 + s.charCodeAt(i)) | 0;
+  }
+  const _cacheKey = `${allTrades.length}_${_closed}_${allTrades[0]?.date || ''}_${_last?.date || ''}_${_last?.id || ''}_${_sig}`;
   if (_dnaCache.key === _cacheKey && _dnaCache.result !== null) return _dnaCache.result;
 
   const closed = getClosed(allTrades);

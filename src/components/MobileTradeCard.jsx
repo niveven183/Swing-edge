@@ -72,7 +72,7 @@ function MobileTradeCardImpl({
           {trade.side}
         </span>
         <span className={`ms-auto font-bold text-sm ${pnlColorClass}`}>
-          {isOpen ? labelFor("status", "OPEN", lang) : fmt$(Math.round(pnl))}
+          {isOpen ? labelFor("status", "OPEN", lang) : fmt$(pnl)}
         </span>
         {!isOpen && rMultiple != null && (
           <span className={`text-[11px] ${rColorClass}`}>{fmtR(rMultiple)}</span>

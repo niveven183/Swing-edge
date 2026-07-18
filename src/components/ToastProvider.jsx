@@ -106,8 +106,8 @@ export function ConfirmProvider({ children }) {
     <ConfirmCtx.Provider value={confirm}>
       {children}
       {state && (
-        <button type="button" className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => close(false)}>
-          <button type="button" onClick={(e) => e.stopPropagation()}
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => close(false)}>
+          <div role="dialog" aria-modal="true" aria-label={state.title} onClick={(e) => e.stopPropagation()}
             className="w-full max-w-sm bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-[var(--border-subtle)] dark:border-white/[0.06] flex items-center gap-2">
               <AlertTriangle size={16} className={state.danger ? "text-rose-400" : "text-amber-400"} />
@@ -126,8 +126,8 @@ export function ConfirmProvider({ children }) {
                 {state.confirmText}
               </button>
             </div>
-          </button>
-        </button>
+          </div>
+        </div>
       )}
     </ConfirmCtx.Provider>
   );

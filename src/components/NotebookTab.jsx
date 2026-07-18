@@ -104,13 +104,18 @@ export default function NotebookTab({ authUser, t, lang, isRTL }) {
           <span className="text-[11px] font-mono text-[var(--v3-text-lo)]">{draft.length}/10000</span>
           <button
             onClick={handleSave}
-            disabled={!draft.trim() || saving}
+            disabled={!draft.trim() || saving || !canDB}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-[var(--v3-radius-chip)] text-sm font-semibold bg-[var(--v3-accent-glow)] border border-[#00C076]/30 text-[var(--v3-accent)] hover:bg-[var(--v3-accent)]/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <Plus size={15} />
             {saving ? (t.nb_saving || "…") : t.nb_save}
           </button>
         </div>
+        {!canDB && (
+          <div className="mt-2 text-[11px] text-[var(--v3-text-lo)]">
+            {lang === "he" ? "התחבר כדי לשמור רשומות." : "Sign in to save notes."}
+          </div>
+        )}
       </div>
 
       {err && (

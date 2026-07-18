@@ -41,7 +41,7 @@ import MobileTradeCard from "./src/components/MobileTradeCard.jsx";
 import { TVTickerTape } from "./src/components/TradingViewWidgets.jsx";
 import { useToast, useConfirm } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured, tradeForSupabase } from "./src/supabaseClient.js";
-import { calcTradeMetrics, fmt$, fmtR, formatPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays } from "./src/utils.js";
+import { calcTradeMetrics, fmt$, fmtR, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays } from "./src/utils.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell,
@@ -834,10 +834,14 @@ const generateSmartLessons = (closedTrades, calcFn, lang = 'he') => {
     else setupMap[t.setup].losses++;
     setupMap[t.setup].totalPnl += pnl;
   });
+  // Tiebreak: win rate, then sample size — matches Analytics so both surfaces
+  // name the SAME "strongest setup" when two setups share a win rate. (#3)
   const bestSetup = Object.entries(setupMap).sort((a, b) => {
     const wrA = a[1].wins / (a[1].wins + a[1].losses);
     const wrB = b[1].wins / (b[1].wins + b[1].losses);
-    return wrB - wrA;
+    const nA = a[1].wins + a[1].losses;
+    const nB = b[1].wins + b[1].losses;
+    return (wrB - wrA) || (nB - nA);
   })[0];
 
   if (bestSetup && bestSetup[1].wins + bestSetup[1].losses >= 2) {
@@ -845,11 +849,13 @@ const generateSmartLessons = (closedTrades, calcFn, lang = 'he') => {
     const wr = Math.round(bestSetup[1].wins / n * 100);
     const setup = labelFor("setup", snakeToTitle(bestSetup[0]), lang);
     lessons.push(he ? {
+      channel: "best_setup",
       type: "strength",
       title: `${setup} הוא הסטאפ החזק ביותר שלך`,
       detail: `${wr}% הצלחה על פני ${n} עסקאות. התמקד יותר בתבנית הזו.`,
       action: `חפש עוד סטאפים של ${setup} והגדל את גודל הפוזיציה כשהביטחון גבוה.`,
     } : {
+      channel: "best_setup",
       type: "strength",
       title: `${setup} is your best setup`,
       detail: `${wr}% win rate across ${n} trades. Focus more on this pattern.`,
@@ -874,11 +880,13 @@ const generateSmartLessons = (closedTrades, calcFn, lang = 'he') => {
   if (fomoTrades.length >= 2 && fomoLosers.length > 0) {
     const fomoLossRate = Math.round(fomoLosers.length / fomoTrades.length * 100);
     lessons.push(he ? {
+      channel: "fomo",
       type: "warning",
       title: "עסקאות FOMO פוגעות בך",
       detail: `${fomoLossRate}% מכניסות ה-FOMO שלך הסתיימו בהפסד.`,
       action: "כשאתה מרגיש FOMO, חכה 15 דקות. אם הסטאפ עדיין נראה טוב, היכנס בגודל קטן יותר.",
     } : {
+      channel: "fomo",
       type: "warning",
       title: "FOMO trades are hurting you",
       detail: `${fomoLossRate}% of your FOMO entries resulted in losses.`,
@@ -926,7 +934,7 @@ const generateSmartLessons = (closedTrades, calcFn, lang = 'he') => {
 };
 
 // ─── STAT CARD ────────────────────────────────────────────────────────────────
-const StatCard = ({ label, value, sub, trend, icon: Icon, accent = "cyan", info }) => {
+const StatCard = ({ label, value, sub, trend, trendText, icon: Icon, accent = "cyan", info }) => {
   const accents = {
     cyan:   { border: "border-cyan-500/25", iconColor: "text-cyan-400", bg: "bg-cyan-500/8" },
     green:  { border: "border-[#10b981]/25", iconColor: "text-[#10b981]", bg: "bg-[#10b981]/8" },
@@ -948,7 +956,7 @@ const StatCard = ({ label, value, sub, trend, icon: Icon, accent = "cyan", info 
       {sub && <span className="text-xs text-slate-600">{sub}</span>}
       {trend !== undefined && (
         <span className={`text-xs font-semibold ${trend >= 0 ? "text-[#10b981]" : "text-[#ef4444]"}`}>
-          {trend >= 0 ? "▲" : "▼"} {Math.abs(trend).toFixed(1)}%
+          {trend >= 0 ? "▲" : "▼"} {trendText != null ? trendText : `${Math.abs(trend).toFixed(1)}%`}
         </span>
       )}
     </div>
@@ -1972,12 +1980,20 @@ export default function SwingEdge() {
   const smartLessons = useMemo(() => {
     const base = generateSmartLessons(closedTrades, calcTradeMetrics, lang) || [];
     const adaptive = AdaptiveLessons.generate(closedTrades, calcTradeMetrics, lang) || [];
-    const seen = new Set(base.map(l => l.id).filter(Boolean));
+    // Adaptive lessons that describe the SAME signal as a base lesson map onto a
+    // shared semantic channel, so the strip never shows two "strongest setup" or
+    // two FOMO cards. (#3)
+    const ADAPTIVE_CHANNEL = { best_setup_underused: "best_setup", fomo_late_entry: "fomo" };
+    const seenId = new Set(base.map(l => l.id).filter(Boolean));
+    const seenCh = new Set(base.map(l => l.channel).filter(Boolean));
     const merged = [...base];
     for (const l of adaptive) {
-      if (l.id && seen.has(l.id)) continue;
+      const ch = ADAPTIVE_CHANNEL[l.id];
+      if (l.id && seenId.has(l.id)) continue;
+      if (ch && seenCh.has(ch)) continue;
       merged.push(l);
-      if (l.id) seen.add(l.id);
+      if (l.id) seenId.add(l.id);
+      if (ch) seenCh.add(ch);
     }
     return merged;
   }, [closedTrades, lang]);
@@ -2039,6 +2055,11 @@ export default function SwingEdge() {
   const effShares   = sharesOverrideStr !== "" && sharesOverrideN > 0 ? sharesOverrideN : suggestedShares;
   const effPosValue = effShares * entryN;
   const effPotLoss  = effShares * riskPerShare;
+  // Actual portfolio risk of the sized position. When the 1-share floor (or a
+  // manual override) pushes this above the configured %, the "based on X% risk"
+  // claim is false — surface an honest over-risk warning without blocking. (#9)
+  const effRiskPct  = capital > 0 ? (effPotLoss / capital) * 100 : 0;
+  const isOverRisk  = tradeValidity.valid && effShares > 0 && effRiskPct > riskPct + 0.05;
 
   // Analyzer computed values
   const azEntry  = parseFloat(analyzerForm.entry)  || 0;
@@ -3257,7 +3278,7 @@ export default function SwingEdge() {
                 info={lang === "he"
                   ? `הון = בסיס ההון שהגדרת ($${capital.toLocaleString()}) בתוספת P&L מצטבר מעסקאות סגורות ופתוחות. הסיכון לכל עסקה מחושב תמיד מבסיס ההון הקבוע — לא מההון הנוכחי.`
                   : `Equity = your capital base ($${capital.toLocaleString()}) plus cumulative P&L from closed & open trades. Per-trade risk is always sized from your fixed capital base — not current equity.`} />
-              <StatCard label={t.netPnlClosed} value={fmt$(Math.round(totalPnL * 100) / 100)} sub={`${closedTrades.length} ${t.closedTrades}`} trend={totalPnL/capital*100} icon={TrendingUp} accent={totalPnL >= 0 ? "green" : "red"} />
+              <StatCard label={t.netPnlClosed} value={fmt$(Math.round(totalPnL * 100) / 100)} sub={`${closedTrades.length} ${t.closedTrades}`} trend={stats.returnPct} trendText={formatReturnPct(stats.returnPct)} icon={TrendingUp} accent={totalPnL >= 0 ? "green" : "red"} />
               <StatCard label={<span className="flex items-center gap-1">{t.winRate}<TermTooltip term="winRate" lang={lang} /></span>} value={formatPct(winRate)} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length}W / ${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)<0).length}L`} icon={Target} accent="purple" />
               <StatCard label={<span className="flex items-center gap-1">{t.avgRMultiple}<TermTooltip term="avgR" lang={lang} /></span>} value={fmtR(avgR)} sub={t.perClosedTrade} icon={Activity} accent="amber" />
               <StatCard label={t.dailyPnl} value={fmt$(Math.round(dailyPnL))} sub={t.todayTrades} icon={DollarSign} accent={dailyPnL >= 0 ? "green" : "red"} />
@@ -3976,7 +3997,7 @@ export default function SwingEdge() {
                         </td>
                         <td className="p-3 font-mono text-slate-300">{t.exit ? `$${t.exit}` : "–"}</td>
                         <td className={`p-3 font-bold font-mono text-sm ${isOpen ? "text-slate-500" : win ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>
-                          {isOpen ? "–" : fmt$(Math.round(pnl))}
+                          {isOpen ? "–" : fmt$(pnl)}
                         </td>
                         <td className={`p-3 font-bold font-mono text-xs ${isOpen ? "text-slate-500" : rMultiple >= 0 ? "text-[var(--v3-info)]" : "text-[var(--v3-loss)]"}`}>
                           {isOpen ? "–" : fmtR(rMultiple)}
@@ -4694,7 +4715,7 @@ export default function SwingEdge() {
                   </div>
                   <div className="mt-2.5 flex items-center gap-2 text-xs text-slate-500">
                     <span className={`font-mono font-semibold ${totalPnL>=0?"text-[var(--v3-accent)]":"text-[var(--v3-loss)]"}`}>
-                      {totalPnL>=0?"▲":"▼"} {stats.returnPct.toFixed(2)}%
+                      {totalPnL>=0?"▲":"▼"} {formatReturnPct(stats.returnPct)}
                     </span>
                     <span className="text-slate-600">·</span>
                     <span>{lang === "he" ? `הון התחלתי $${capital.toLocaleString()}` : `starting capital $${capital.toLocaleString()}`}</span>
@@ -4730,7 +4751,7 @@ export default function SwingEdge() {
               <StatCard label={t.totalTrades}  value={realTrades.length} sub={t.allTime}      icon={Layers}    accent="cyan"   />
               <StatCard label={<span className="flex items-center gap-1">{t.winRate}<TermTooltip term="winRate" lang={lang} /></span>} value={formatPct(winRate)} sub={`${stats.wins} ${t.wins}`} icon={CheckCircle} accent="green" />
               <StatCard label={<span className="flex items-center gap-1">{t.avgRMultiple}<TermTooltip term="avgR" lang={lang} /></span>} value={fmtR(avgR)} sub={t.closedTrades} icon={Activity}  accent="purple" />
-              <StatCard label={t.totalReturn}   value={`${stats.returnPct.toFixed(2)}%`} sub={`$${Math.round(Math.abs(totalPnL)).toLocaleString()} P&L`} icon={TrendingUp} accent={totalPnL>=0?"green":"red"} />
+              <StatCard label={t.totalReturn}   value={formatReturnPct(stats.returnPct)} sub={`$${Math.round(Math.abs(totalPnL)).toLocaleString()} P&L`} icon={TrendingUp} accent={totalPnL>=0?"green":"red"} />
             </div>
 
             {/* Per-trade P&L bars */}
@@ -4849,10 +4870,12 @@ export default function SwingEdge() {
                 .sort((a, b) => b.totalPnL - a.totalPnL)
                 .map(d => [d.name, { pnl: d.totalPnL, count: d.count }])[0];
 
-              // Best Setup — from the hub's setup breakdown (single source)
+              // Best Setup — from the hub's setup breakdown (single source).
+              // Win rate, then sample size — same deterministic tiebreak the
+              // Journal insight strip uses, so both name the same setup. (#3)
               const bestSetup = [...stats.bySetup]
                 .filter(s => s.count > 0)
-                .sort((a, b) => b.winRate - a.winRate)
+                .sort((a, b) => (b.winRate - a.winRate) || (b.count - a.count))
                 .map(s => ({ setup: s.name, winRate: s.winRate, count: s.count }))[0];
 
               // Best Emotion — local whitelist aggregation over the hub's enriched
@@ -6426,13 +6449,24 @@ export default function SwingEdge() {
                 </div>
               )}
 
-              {/* Position-too-small hint — explains why Shares/Value/Risk are 0 (R/R stays valid) */}
-              {tradeValidity.valid && posSizeTooSmall && (
+              {/* Position-too-small hint — explains why Shares/Value/Risk are 0 (R/R stays valid).
+                  Suppressed when the over-risk warning below already covers this trade. */}
+              {tradeValidity.valid && posSizeTooSmall && !isOverRisk && (
                 <div className="flex items-center gap-2 p-2.5 rounded-[var(--v3-radius-chip)] border text-xs bg-[var(--v3-warn)]/5 border-[var(--v3-warn)]/20 text-[var(--v3-warn)]">
                   <AlertTriangle size={13} />
                   <span>{lang === "he"
                     ? `בסיכון ${riskPct}% הפוזיציה קטנה ממניה אחת — הכרטיסים מציגים מינימום של מניה אחת. הגדל הון או הדק את הסטופ. ה-R/R תקף.`
                     : `At ${riskPct}% risk the position is under one share — cards show the 1-share minimum. Raise capital or tighten the stop. R/R is valid.`}</span>
+                </div>
+              )}
+
+              {/* Over-risk warning — the sized position risks more than the configured % (#9) */}
+              {isOverRisk && (
+                <div className="flex items-center gap-2 p-2.5 rounded-[var(--v3-radius-chip)] border text-xs bg-[var(--v3-loss)]/5 border-[var(--v3-loss)]/20 text-[var(--v3-loss)]">
+                  <AlertTriangle size={13} />
+                  <span>{lang === "he"
+                    ? `הפוזיציה חורגת מסיכון ${riskPct}% — סיכון בפועל ${effRiskPct.toFixed(1)}%. ההון קטן מדי למכשיר הזה, או הקטן גודל.`
+                    : `Position exceeds your ${riskPct}% risk — actual risk ${effRiskPct.toFixed(1)}%. Capital is too small for this instrument, or reduce size.`}</span>
                 </div>
               )}
 
