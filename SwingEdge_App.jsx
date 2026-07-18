@@ -934,7 +934,7 @@ const generateSmartLessons = (closedTrades, calcFn, lang = 'he') => {
 };
 
 // ─── STAT CARD ────────────────────────────────────────────────────────────────
-const StatCard = ({ label, value, sub, trend, trendText, icon: Icon, accent = "cyan", info }) => {
+const StatCard = ({ label, value, sub, trend, trendText, icon: Icon, accent = "cyan", info, anchor }) => {
   const accents = {
     cyan:   { border: "border-cyan-500/25", iconColor: "text-cyan-400", bg: "bg-cyan-500/8" },
     green:  { border: "border-[#10b981]/25", iconColor: "text-[#10b981]", bg: "bg-[#10b981]/8" },
@@ -944,7 +944,7 @@ const StatCard = ({ label, value, sub, trend, trendText, icon: Icon, accent = "c
   };
   const { border, iconColor, bg } = accents[accent] || accents.cyan;
   return (
-    <div className={`${bg} border ${border} rounded-xl p-4 flex flex-col gap-1 relative overflow-hidden bg-[var(--bg-elevated)] dark:bg-[#0d1424]`}>
+    <div data-tour={anchor} className={`${bg} border ${border} rounded-xl p-4 flex flex-col gap-1 relative overflow-hidden bg-[var(--bg-elevated)] dark:bg-[#0d1424]`}>
       <div className={`absolute top-3 right-3 rtl:right-auto rtl:left-3 opacity-15 ${iconColor}`}>
         <Icon size={26} />
       </div>
@@ -1026,17 +1026,33 @@ const NAV_KEYS = [
   { id: "feedback",  key: "feedback",       icon: MessageCircle },
 ];
 
-// ─── ONBOARDING TOUR STEPS (wave 3a) ───────────────────────────────────────────
-// All anchors live on the dashboard / always-visible nav, so the tour runs without
-// driving the UI into modals. Tilt Shield has no anchor (it only renders during an
-// active tilt) — an anchorless centered bubble explains the concept instead.
-const buildTourSteps = (t) => [
-  { anchor: '[data-tour="main-nav"]',    title: t.tourNavTitle,   body: t.tourNavBody },
-  { anchor: '[data-tour="trading-dna"]', title: t.tourDnaTitle,   body: t.tourDnaBody },
-  { anchor: null,                        title: t.tourTiltTitle,  body: t.tourTiltBody },
-  { anchor: '[data-tour-tab="journal"]', title: t.tourCoachTitle, body: t.tourCoachBody },
-  { anchor: '[data-tour-tab="journal"]', title: t.tourOcrTitle,   body: t.tourOcrBody },
-];
+// ─── ONBOARDING TOUR STEPS (wave 3a; wave 9: tab-navigating) ────────────────────
+// Each step may declare `tab` — the tour switches to it (setTab), waits for render,
+// then spotlights `anchor`. Anchorless / never-rendered anchors fall back to a
+// centered bubble (Tilt Shield, Decision Coach and the welcome/finish steps use
+// this by design). English is the fallback for locales that don't carry a key yet
+// (es/pt/ar), so no step ever renders blank.
+const enT = getTranslations("en");
+const buildTourSteps = (t) => {
+  const tk = (k) => t[k] ?? enT[k];
+  return [
+    { tab: "dashboard",    anchor: null,                          title: tk("tourWelcomeTitle"),   body: tk("tourWelcomeBody") },
+    { tab: "dashboard",    anchor: '[data-tour="main-nav"]',      title: tk("tourNavTitle"),       body: tk("tourNavBody") },
+    { tab: "dashboard",    anchor: '[data-tour="equity"]',        title: tk("tourEquityTitle"),    body: tk("tourEquityBody") },
+    { tab: "dashboard",    anchor: '[data-tour="trading-dna"]',   title: tk("tourDnaTitle"),       body: tk("tourDnaBody") },
+    { tab: "dashboard",    anchor: null,                          title: tk("tourTiltTitle"),      body: tk("tourTiltBody") },
+    { tab: "journal",      anchor: '[data-tour="add-trade"]',     title: tk("tourManualTitle"),    body: tk("tourManualBody") },
+    { tab: "journal",      anchor: '[data-tour="add-trade"]',     title: tk("tourImageTitle"),     body: tk("tourImageBody") },
+    { tab: "journal",      anchor: null,                          title: tk("tourCoachLiveTitle"), body: tk("tourCoachLiveBody") },
+    { tab: "analytics",    anchor: '[data-tour="setup-matrix"]',  title: tk("tourMatrixTitle"),    body: tk("tourMatrixBody") },
+    { tab: "tools",        anchor: '[data-tour="position-calc"]', title: tk("tourCalcTitle"),      body: tk("tourCalcBody") },
+    { tab: "intel",        anchor: '[data-tour="chart-ocr"]',     title: tk("tourIntelTitle"),     body: tk("tourIntelBody") },
+    { tab: "notebook",     anchor: '[data-tour="notebook"]',      title: tk("tourNotebookTitle"),  body: tk("tourNotebookBody") },
+    { tab: "weeklyReview", anchor: '[data-tour="weekly-review"]', title: tk("tourWeeklyTitle"),    body: tk("tourWeeklyBody") },
+    { tab: "feedback",     anchor: '[data-tour="feedback"]',      title: tk("tourFeedbackTitle"),  body: tk("tourFeedbackBody") },
+    { tab: "journal",      anchor: null,                          title: tk("tourFinishTitle"),    body: tk("tourFinishBody") },
+  ];
+};
 
 // Module-scope + memo (not defined inside the render IIFE): stable component identity
 // means the ~5-min overview refresh reconciles cards in place instead of remounting
@@ -1208,9 +1224,12 @@ export default function SwingEdge() {
   // Default false so plain reloads and existing users never auto-trigger; only
   // dismissBetaWelcome (brand-new flow) or a manual Help launch sets it true.
   const [showTour, setShowTour] = useState(false);
-  const completeTour = useCallback(() => {
+  // done === true → finished the last step (already on Journal); false → skipped
+  // early (X / Esc / "skip tour"), so return the user to the dashboard.
+  const completeTour = useCallback((done) => {
     try { localStorage.setItem("swingEdgeTourDone", "1"); } catch {}
     setShowTour(false);
+    if (!done) setTab("dashboard");
   }, []);
   const startTour = useCallback(() => {
     setTab("dashboard");
@@ -2919,7 +2938,7 @@ export default function SwingEdge() {
 
       {/* ── GUIDED TOUR (once, after BetaWelcome — wave 3a) ── */}
       {showTour && (
-        <OnboardingTour steps={buildTourSteps(t)} onClose={completeTour} t={t} isRTL={isRTL} />
+        <OnboardingTour steps={buildTourSteps(t)} onNavigate={setTab} onClose={completeTour} t={t} isRTL={isRTL} />
       )}
 
       {/* ── iOS INSTALL BANNER ── */}
@@ -3274,7 +3293,7 @@ export default function SwingEdge() {
             )}
             {/* KPI Row */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              <StatCard label={t.accountEquity}  value={`$${curEquity.toLocaleString("en-US", {minimumFractionDigits:0})}`} sub={`${t.startedAt} $${capital.toLocaleString()}`} trend={totalPnL/capital*100} icon={DollarSign} accent="cyan"
+              <StatCard anchor="equity" label={t.accountEquity}  value={`$${curEquity.toLocaleString("en-US", {minimumFractionDigits:0})}`} sub={`${t.startedAt} $${capital.toLocaleString()}`} trend={totalPnL/capital*100} icon={DollarSign} accent="cyan"
                 info={lang === "he"
                   ? `הון = בסיס ההון שהגדרת ($${capital.toLocaleString()}) בתוספת P&L מצטבר מעסקאות סגורות ופתוחות. הסיכון לכל עסקה מחושב תמיד מבסיס ההון הקבוע — לא מההון הנוכחי.`
                   : `Equity = your capital base ($${capital.toLocaleString()}) plus cumulative P&L from closed & open trades. Per-trade risk is always sized from your fixed capital base — not current equity.`} />
@@ -3871,7 +3890,7 @@ export default function SwingEdge() {
                 <h3 className="se-serif text-2xl md:text-3xl text-white mb-2 tracking-tight">{lang === "he" ? "כאן מתחיל התיעוד שלך" : "Your record starts here"}</h3>
                 <p className="text-xs text-slate-500 mb-5 max-w-sm mx-auto leading-relaxed">{lang === "he" ? "כל עסקה היא נתון. הוסף את הראשונה — או טען 30 לדוגמה." : "Every trade is a data point. Add your first — or load 30 demo trades."}</p>
                 <div className="flex flex-wrap items-center justify-center gap-2">
-                  <button onClick={() => { setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null }); setOcrStatus(null); setShowForm(true); }}
+                  <button data-tour="add-trade" onClick={() => { setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null }); setOcrStatus(null); setShowForm(true); }}
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--v3-accent)] text-black font-bold text-xs hover:opacity-90 transition">
                     <Plus size={13} /> {lang === "he" ? "עסקה ראשונה" : "Add First Trade"}
                   </button>
@@ -4103,6 +4122,7 @@ export default function SwingEdge() {
               🧪 {lang === 'he' ? 'ניתוח עסקה' : 'Trade Analyzer'}
             </button>
             <button
+              data-tour="position-calc"
               onClick={() => setToolsTab('calc')}
               className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${toolsTab === 'calc' ? 'bg-white shadow-sm text-emerald-700' : 'text-[#475569] hover:text-[#334155]'}`}
             >
@@ -4838,7 +4858,7 @@ export default function SwingEdge() {
                 .sort((a, b) => b.count - a.count);
               const short = name => name.length > 11 ? name.slice(0, 10) + "…" : name;
               return (
-                <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-6">
+                <div data-tour="setup-matrix" className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-6">
                   <h3 className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mb-1 flex items-center gap-1.5">{t.winRateBySetup}<InfoTooltip label="Win Rate by Setup">{lang === 'he' ? 'אחוז הזכייה לכל סטאפ. עמודות סגולות = מעל 50% WR. עמודות אפורות = מתחת ל-50%. גובה העמודה = מספר עסקאות.' : 'Win rate per setup. Purple bars = above 50% WR. Gray bars = below 50%. Bar height = trade count.'}</InfoTooltip></h3>
                   <p className="text-xs text-slate-600 mb-4">{t.winRateBySetupSubtitle}</p>
                   <ResponsiveContainer width="100%" height={220}>
@@ -5339,7 +5359,7 @@ export default function SwingEdge() {
                 </div>
 
                 {/* ── AI Trade Buttons (screenshot → OCR) — below chart on mobile, overlay on desktop ── */}
-                <div className="mt-2 z-10 flex flex-row flex-wrap justify-end gap-2 md:mt-0 md:absolute md:bottom-4 md:right-4 rtl:md:right-auto rtl:md:left-4 md:flex-col md:flex-nowrap md:justify-start">
+                <div data-tour="chart-ocr" className="mt-2 z-10 flex flex-row flex-wrap justify-end gap-2 md:mt-0 md:absolute md:bottom-4 md:right-4 rtl:md:right-auto rtl:md:left-4 md:flex-col md:flex-nowrap md:justify-start">
                   {/* Capture/OCR status — announced to assistive tech */}
                   {chartOcrStatus && (() => {
                     const { status, confidence } = chartOcrStatus;
@@ -6189,6 +6209,21 @@ export default function SwingEdge() {
                 </p>
               </div>
 
+              {/* ── GUIDED TOUR (wave 9) — replay the tab-navigating walkthrough ── */}
+              <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <GraduationCap size={16} className="text-[var(--v3-text-mid)]" />
+                  <h3 className="text-sm font-bold text-white">{t.restartTour}</h3>
+                </div>
+                <p className="text-xs text-[var(--v3-text-lo)] mb-3">{t.restartTourDesc}</p>
+                <button
+                  onClick={() => { try { localStorage.removeItem("swingEdgeTourDone"); } catch {} startTour(); }}
+                  className="w-full px-4 py-2.5 rounded-lg bg-[var(--v3-accent-glow)] border border-[#00C076]/30 text-[var(--v3-accent)] text-xs font-bold hover:bg-[#00C076]/20 transition"
+                >
+                  {t.restartTourBtn}
+                </button>
+              </div>
+
               {/* ── DANGER ZONE ── */}
               <div className="mt-8 p-4 border border-[#F43F5E]/30 bg-[#F43F5E]/5 rounded-2xl">
                 <div className="flex items-center gap-2 mb-2">
@@ -6761,6 +6796,7 @@ export default function SwingEdge() {
 
       {/* ── FLOATING NEW TRADE BUTTON ── */}
       <button
+        data-tour="add-trade"
         onClick={() => { setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null }); setOcrStatus(null); setShowForm(true); }}
         className={`fixed bottom-6 right-6 rtl:right-auto rtl:left-6 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-violet-500 text-white shadow-2xl shadow-cyan-500/25 flex items-center justify-center hover:scale-110 active:scale-95 transition-transform motion-reduce:transition-none ${fabVisible ? "translate-y-0 opacity-100" : "translate-y-24 opacity-0 pointer-events-none"}`}
         style={{ bottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}

@@ -273,6 +273,7 @@ export default function FeedbackTab({ user, lang = "he", originTab = "dashboard"
 
       {/* Form */}
       <form
+        data-tour="feedback"
         onSubmit={handleSubmit}
         className="space-y-5 rounded-2xl border border-[var(--border-subtle)] dark:border-white/[0.08] bg-[var(--bg-elevated)] dark:bg-[#0d1424]/60 p-5 sm:p-6"
       >

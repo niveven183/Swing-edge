@@ -91,7 +91,7 @@ export default function NotebookTab({ authUser, t, lang, isRTL }) {
       </div>
 
       {/* Composer */}
-      <div className={`${PANEL} p-4`}>
+      <div data-tour="notebook" className={`${PANEL} p-4`}>
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}

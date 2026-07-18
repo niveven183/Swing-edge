@@ -111,7 +111,7 @@ export default function WeeklyReviewTab({ trades, capital, calcMetrics, authUser
   return (
     <div className="max-w-3xl mx-auto space-y-5" dir={isRTL ? "rtl" : "ltr"}>
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+      <div data-tour="weekly-review" className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
           <CalendarCheck size={18} className="text-[var(--v3-accent)]" />
           <div>
