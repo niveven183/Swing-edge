@@ -98,3 +98,49 @@ via Vercel logs.
 Revisit (A) only if flapping continues after the monitor-side fix — at that
 point the extra data point (does raising monitor thresholds alone fix it?)
 will tell us whether the code even needs to change.
+
+## Fix applied — Gate 2.3a (`b98135e`, 2026-07-19)
+
+Context forced the server-side path even though the code was never *observed*
+to trigger a 503: UptimeRobot's free tier locks delay/confirmation and keyword
+monitoring behind payment and treats only `2xx,3xx` as Up — so a single 503
+blip is an immediate incident with no monitor-side dampening available. Option
+(A) was therefore shipped as the hardening, not just as fallback defense.
+
+Both changes are contained to [api/health.js](../api/health.js):
+
+1. **Supabase retry** — `checkSupabaseWithRetry` wraps the sole hard-fail
+   dependency: if the first attempt fails or throws, it waits ~300ms
+   (`SUPABASE_RETRY_DELAY_MS`) and tries once more. A single transient network
+   blip no longer escalates to a 503. The other three deps are untouched.
+2. **Short-lived success cache** — a module-level `healthCache` (20s TTL,
+   `CACHE_TTL_MS`) stores the last *healthy* full pass. On a warm instance,
+   repeat probes inside the window are served from cache without re-hitting any
+   dependency — cutting load/cost and smoothing double cold-starts.
+
+**What is deliberately preserved (monitor stays honest, not blinded):**
+- Only **200** results are ever cached. A 503 is always computed live and never
+  served from cache — if Supabase is genuinely down (both retry attempts fail),
+  the endpoint still returns 503, exactly as before.
+- **NON_FATAL** classification is unchanged: `twelvedata`/`finnhub`/`coingecko`
+  remain warnings-only (200), `supabase` remains the sole critical (503). No
+  change to what counts as critical.
+- `Cache-Control: no-store` is still sent to the caller; the cache is purely
+  server-internal.
+
+Verified before push: all-healthy cold→warm both 200 (warm served from cache,
+no extra Supabase call); simulated Supabase-down → 503 on both cold and warm
+(never cached, retry fires each time); transient blip (attempt 1 fails, retry
+succeeds) → 200; `vite build` clean.
+
+## Next suspect if flapping persists
+
+If DOWN/UP cycles continue after this deploy has had a full night to bake, the
+code is effectively exonerated — the retry+cache absorbs any single transient
+Supabase blip and the double-cold-start path, and a real 503 now requires two
+failed Supabase attempts within the same request. At that point the leading
+suspect shifts to **the UptimeRobot side: edge-level blocking or network
+flakiness between the monitor's probe location and swing-edge.com**
+(bot/challenge/deployment-protection intercepting the automated probe, or
+DNS/TLS flakiness on that path) — not `api/health.js`. Investigate the monitor
+and edge layer next, not the endpoint.
