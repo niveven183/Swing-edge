@@ -43,6 +43,22 @@ async function checkSupabase() {
   return r.ok;
 }
 
+const SUPABASE_RETRY_DELAY_MS = 300;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Supabase is the sole hard-fail (503) dependency, so a single transient blip
+// must not escalate straight to a page. Retry once after a short backoff; if the
+// second attempt also fails (returns false or throws), it fails for real → 503.
+async function checkSupabaseWithRetry() {
+  try {
+    if (await checkSupabase()) return true;
+  } catch {
+    // fall through to the retry below
+  }
+  await sleep(SUPABASE_RETRY_DELAY_MS);
+  return checkSupabase();
+}
+
 async function checkFinnhub() {
   const key = process.env.FINNHUB_API_KEY || "";
   if (!key) return false;
@@ -78,7 +94,7 @@ async function checkCoinGecko() {
 }
 
 const SERVICES = {
-  supabase: checkSupabase,
+  supabase: checkSupabaseWithRetry,
   finnhub: checkFinnhub,
   twelvedata: checkTwelveData,
   coingecko: checkCoinGecko,
@@ -100,11 +116,26 @@ async function run(fn) {
   }
 }
 
+// Short-lived in-memory cache of the last *healthy* (200) full pass. On a warm
+// instance, repeat probes inside the window are served from here instead of
+// re-hitting every dependency — cuts load/cost and smooths double cold-starts.
+// Only 200 results are ever cached, so a real Supabase outage is never masked:
+// a 503 is always computed live. Cache-Control stays no-store to the caller.
+const CACHE_TTL_MS = 20000;
+let healthCache = null; // { at: number, body: object }
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   if (req.method === "OPTIONS") {
     res.status(204).end();
+    return;
+  }
+
+  res.setHeader("Cache-Control", "no-store");
+
+  if (healthCache && Date.now() - healthCache.at < CACHE_TTL_MS) {
+    res.status(200).json(healthCache.body);
     return;
   }
 
@@ -121,14 +152,15 @@ export default async function handler(req, res) {
   const criticalFailing = failing.filter((n) => !NON_FATAL.has(n));
   const warnings = failing.filter((n) => NON_FATAL.has(n));
 
-  res.setHeader("Cache-Control", "no-store");
   if (criticalFailing.length > 0) {
-    // A load-bearing dependency is down — page us.
+    // A load-bearing dependency is down — page us. Never cached.
     res.status(503).json({ status: "degraded", failing: criticalFailing, warnings, checks });
-  } else if (warnings.length > 0) {
-    // Only TwelveData is down: visible in the body, but non-fatal (no 503).
-    res.status(200).json({ status: "ok", warnings, checks });
-  } else {
-    res.status(200).json({ status: "ok", checks });
+    return;
   }
+
+  // Healthy pass (with or without non-fatal warnings): cache it, then return.
+  const body =
+    warnings.length > 0 ? { status: "ok", warnings, checks } : { status: "ok", checks };
+  healthCache = { at: Date.now(), body };
+  res.status(200).json(body);
 }
