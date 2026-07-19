@@ -195,6 +195,8 @@ Always compare with `=== true` / `=== false`; never rely on raw string equality 
 - **Prompt structure:** header (model / plan-mode / session / connectors) → "read, don't change" guardrail → diagnosis → Plan → execute → mandatory git block.
 - **`src/index.css` override layer** (~L86–100): a restyle layer that remaps Tailwind text-color utilities (`.text-white`, `.text-slate-*`, etc.) to CSS variables. Dark screens fight this layer — prefer inline colors over Tailwind text utilities there.
 - **`npm run test:coach` is mandatory before any change to an intelligence engine** (`scripts/coach-invariance-test.mjs`, 110 assertions) — asserts `coaching.verdict` is byte-identical across the fixture set. Run it before *and* after touching anything under `src/intelligence/` (including `CoachPersona`, `DecisionCoach.js`, knowledge-base data files) to catch accidental verdict drift.
+- **`npm run test:import` (6 fixtures) is mandatory alongside `test:coach`** — run it before any change under `src/import/` or to the trade schema. Guards the CSV/XLSX parse → column-detect → normalize → build pipeline against silent regressions (synthetic-zero leakage, date misparsing, column-mapping drift).
+- **Waves 8+10 lesson — "done" requires an explicit push to `main`.** A task is only complete when the push output shows the branch landing on `main` (`..HEAD -> main` in the report). Working on a `claude/*` branch **without pushing to `main`** was caught **twice** by an independent tarball verification — the local commit existed but the deploy never rolled. Always confirm the `-> main` line before reporting "סיימתי".
 
 ## Coding Rules (Hive agents + Claude Code)
 1. ❌ NEVER access `trade.pnl` directly — ✅ `const { pnl } = calcTradeMetrics(trade)` (import from `./src/utils.js`)
@@ -395,8 +397,35 @@ A pre-distribution sprint: wire the onboarding→coach pipeline, fix data-viz ho
   - `ThemeContext` initial resolved mode now matches `index.html` pre-paint — no boot flash (M-10).
   - `MarketPulseCardSkeleton` placeholders added for unresolved indices — no row-gap while loading (R-04).
 
-## Next up (post-Wave 7)
-- **Tour מקיף** — a comprehensive first-run product tour (beyond the current onboarding capital-entry step).
-- **ייבוא אקסל + מחיקת דמו** — Excel/CSV trade import, plus a clear path to delete the demo dataset once real trades are imported.
-- **Gate 2** — next distribution gate (criteria TBD as the above land).
-- **₪/Stripe** — pricing in ₪ + Stripe billing integration (blocked on Privacy/ToS + identity/bank per the existing Sprint 2 backlog above).
+## Waves 8–10 — Deep audit → audit fixes → tour → universal import (2026-07, CLOSED)
+
+- **Deep audit** (`950774a`, `docs/DEEP-AUDIT-2026-07-17.md`): full functional + UX audit across **all tabs**, flows, and data consistency. Verdict **1🔴 / 3🟠 / 4🟡**, backed by a **ground-truth script** (independent recomputation of the displayed metrics).
+- **Wave 8 — audit fixes** (`819d169`): applied the audit findings —
+  - **DNA cache invalidation** — cache key now sensitive to `status`/`exit` (so closing/editing a trade busts the cache) **+ mentee separation** (a mentor viewing a mentee no longer reads the mentor's own cached DNA).
+  - **Coach insight dedup** — collapses duplicate/mirrored insights before display.
+  - **Guest notebook state** — notebook state handled correctly for guest (non-persisted) sessions.
+  - **Dialog semantics** + **formatting consistency** across screens.
+- **Wave 9 — guided tour** (`6989c42`): 15-step **tab-navigating** product tour — `onNavigate` + **retry** + **centered fallback** when an anchor is missing; **19 `data-tour` anchors**; **`en` fallback** for untranslated steps; **restart from Settings**. Satisfies source-of-truth requirement **#4 ✅**.
+- **Import spec** (`d0d42e1`, `docs/IMPORT-SPEC-2026-07-18.md` — **the source-of-truth for the import format**), gated pre-implementation, then **Wave 10 — universal import** (`0c8f2f3`):
+  - **CSV/XLSX** import under **`src/import/`** — `parseFile` / `detectColumns` / `normalizeRow` / `buildImport` / `synonyms`.
+  - **Smart bilingual column mapping** (he+en synonyms) **+ content sniffing** to disambiguate ambiguous headers.
+  - **Excel serial dates** handled, **DD/MM** as the default interpretation.
+  - **Per-row validation** — `stop = null` is allowed; **zero synthetic values** (guarded in `calcTradeMetrics`, so a missing field never becomes a fake `0`).
+  - **Rejected-rows report** + **undo** via session-state.
+  - **Permanent demo removal** — the demo *source* is deleted for good; **`isDemo` stays in the schema** (only the source was removed, not the flag). Satisfies requirement **#5 ✅**. **Verified in production** (bundle `D88-aYgu`).
+  - **Dependencies:** `papaparse` from npm; **`xlsx` from the SheetJS CDN `0.20.3`** — **intentional**: it carries CVE fixes absent from npm's `0.18.5`; integrity is pinned in the lockfile and the rationale is documented in `IMPORT-SPEC`. ⚠️ **Not a suspicious dependency** — future reviews should not flag it.
+
+### Super-status — all 5 of Niv's source-of-truth requirements shipped ✅
+1. **Manual capital in `$`** — Wave 1 (`c74c512`).
+2. **Coach adapts to profile** — Wave 6.2 (`be8fe4f`).
+3. **Real recommendations** — Wave 6.3 (`3f6b081`).
+4. **Comprehensive tour** — Wave 9 (`6989c42`).
+5. **Import + demo removal** — Wave 10 (`0c8f2f3`).
+
+The product is feature-complete; the launch is live.
+
+## Next up (הבא בתור)
+1. **Gate 2** — full **RLS audit** + **penetration** testing + **rate-limit** on `symbol-search` + **accessibility findings** from the Architecture Auditor report (alt / aria / RTL).
+2. **₪ + Stripe + pricing** — currency work is the central task (₪ pricing) + Stripe billing + **entitlement for founding users** (blocked on Privacy/ToS + identity/bank per the Sprint 2 backlog above).
+3. **B1 — Multi-Account** — build the deferred multi-account model (per-account capital, real+paper types, `ON DELETE RESTRICT`, mentor sees all accounts).
+4. **Track A** — next after the above land.
