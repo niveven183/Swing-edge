@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Shield, LayoutDashboard, Users as UsersIcon, BookOpen, MessageCircle,
   Settings as SettingsIcon, ScrollText, RefreshCw, CheckCircle2, Trash2,
-  Search, Ban, Download, ExternalLink, Activity, Eye, Lock, X,
+  Search, Ban, Download, Activity, Lock, X,
   AlertTriangle, TrendingUp, Mail, Database, Zap, Calendar,
 } from "lucide-react";
 import {
@@ -38,13 +38,6 @@ const TAB_DEFS = [
 //  Helpers — pure functions (kept inline; not exported)
 // ════════════════════════════════════════════════════════════════════════════
 
-function calcTradePnL(t) {
-  if (!t || t.exit == null || t.entry == null || t.shares == null) return null;
-  const e = Number(t.entry), x = Number(t.exit), s = Number(t.shares);
-  if (Number.isNaN(e) || Number.isNaN(x) || Number.isNaN(s)) return null;
-  return t.side === "LONG" ? (x - e) * s : (e - x) * s;
-}
-
 function readJSON(key, fallback) {
   try {
     const raw = localStorage.getItem(key);
@@ -75,80 +68,11 @@ function shortEmail(email) {
   return email.slice(0, 21) + "…";
 }
 
-function startOfWeek(d) {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  x.setDate(x.getDate() - x.getDay());
-  return x;
-}
-
-function bucketByWeek(timestamps, weeks = 7) {
-  const thisWeek = startOfWeek(new Date());
-  const buckets = [];
-  for (let i = weeks - 1; i >= 0; i--) {
-    const start = new Date(thisWeek);
-    start.setDate(start.getDate() - i * 7);
-    const end = new Date(start);
-    end.setDate(end.getDate() + 7);
-    buckets.push({
-      week: `${start.getMonth() + 1}/${start.getDate()}`,
-      start, end, count: 0,
-    });
-  }
-  timestamps.forEach((ts) => {
-    if (!ts) return;
-    const d = new Date(ts);
-    if (Number.isNaN(+d)) return;
-    for (const b of buckets) {
-      if (d >= b.start && d < b.end) { b.count++; break; }
-    }
-  });
-  return buckets.map((b) => ({ week: b.week, count: b.count }));
-}
-
-function aggregateUsers(feedback, trades) {
-  const idToEmail = new Map();
-  feedback.forEach((f) => {
-    if (f.user_id && f.user_email) idToEmail.set(f.user_id, f.user_email);
-  });
-
-  const map = new Map();
-  function touch(userId, email, ts) {
-    const key = email || userId;
-    if (!key) return null;
-    let u = map.get(key);
-    if (!u) {
-      u = {
-        key,
-        user_id: userId || null,
-        email: email || null,
-        trades: 0,
-        feedback: 0,
-        first: null,
-        last: null,
-      };
-      map.set(key, u);
-    }
-    if (userId && !u.user_id) u.user_id = userId;
-    if (email && !u.email) u.email = email;
-    if (ts) {
-      if (!u.first || ts < u.first) u.first = ts;
-      if (!u.last || ts > u.last) u.last = ts;
-    }
-    return u;
-  }
-
-  feedback.forEach((f) => {
-    const u = touch(f.user_id, f.user_email, f.created_at);
-    if (u) u.feedback++;
-  });
-  trades.forEach((t) => {
-    const email = idToEmail.get(t.user_id);
-    const u = touch(t.user_id, email, t.createdAt);
-    if (u) u.trades++;
-  });
-
-  return Array.from(map.values());
+function formatWeekLabel(ts) {
+  if (!ts) return "—";
+  const d = new Date(ts);
+  if (Number.isNaN(+d)) return "—";
+  return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
 function downloadCSV(rows, filename, columns) {
@@ -374,9 +298,12 @@ function PasswordGate({ open, onClose, onConfirm, title, message, busy }) {
 export default function AdminPanel() {
   const [tab, setTab] = useState("overview");
   const [authUser, setAuthUser] = useState(null);
-  const [trades, setTrades] = useState([]);
+  const [overview, setOverview] = useState(null);
+  const [usersList, setUsersList] = useState([]);
+  const [tradesAgg, setTradesAgg] = useState(null);
+  const [tradesList, setTradesList] = useState([]);
+  const [newUsersSeries, setNewUsersSeries] = useState([]);
   const [feedback, setFeedback] = useState([]);
-  const [waitlistCount, setWaitlistCount] = useState(null);
   const [loading, setLoading] = useState(true);
   const [supaUp, setSupaUp] = useState(null);
   const toast = useToast();
@@ -391,27 +318,29 @@ export default function AdminPanel() {
     return () => sub?.unsubscribe?.();
   }, []);
 
-  // Initial data load (trades + feedback) — shared across tabs
+  // Initial data load — every read goes through a SECURITY DEFINER admin RPC.
+  // The browser holds only the anon key; identity is verified in the DB, so a
+  // forged client-side isAdmin gets 42501 from every call below.
   const loadAll = useCallback(async () => {
     if (!isSupabaseConfigured || !supabase) { setSupaUp(false); setLoading(false); return; }
     setLoading(true);
     try {
-      const [tr, fb] = await Promise.all([
-        supabase.from("trades").select("*").order("createdAt", { ascending: false }),
-        supabase.from("feedback").select("*").order("created_at", { ascending: false }),
+      const [ov, ul, ta, tl, nus, fb] = await Promise.all([
+        supabase.rpc("admin_overview"),
+        supabase.rpc("admin_users_list"),
+        supabase.rpc("admin_trades_agg"),
+        supabase.rpc("admin_trades_list", { _limit: 5000, _offset: 0, _status: null, _demo: null }),
+        supabase.rpc("admin_new_users_series"),
+        supabase.rpc("admin_feedback_list"),
       ]);
-      if (tr.error) throw tr.error;
-      if (fb.error) throw fb.error;
-      setTrades(tr.data || []);
+      for (const r of [ov, ul, ta, tl, nus, fb]) if (r.error) throw r.error;
+      setOverview(ov.data || null);
+      setUsersList(ul.data || []);
+      setTradesAgg(ta.data || null);
+      setTradesList(tl.data || []);
+      setNewUsersSeries(nus.data || []);
       setFeedback(fb.data || []);
       setSupaUp(true);
-
-      // Waitlist count (admin-only via RLS). Isolated so a miss here never
-      // breaks the core dashboard — head:true fetches count without rows.
-      const wl = await supabase
-        .from("waitlist")
-        .select("*", { count: "exact", head: true });
-      setWaitlistCount(wl.error ? null : wl.count ?? 0);
     } catch (e) {
       setSupaUp(false);
       toast.error("Load failed: " + (e?.message || "unknown"));
@@ -421,13 +350,11 @@ export default function AdminPanel() {
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
-  // Internal admin guard (parent already checks, but defend in depth)
+  // Internal admin guard (parent already checks, but defend in depth). This only
+  // gates UI visibility — the real enforcement is the is_admin() check in every RPC.
   const email = (authUser?.email || "").toLowerCase();
   const isAdmin = email === ADMIN_EMAIL || authUser?.app_metadata?.role === "admin";
   if (authUser && !isAdmin) return null;
-
-  // Derived users list (cached via useMemo)
-  const users = useMemo(() => aggregateUsers(feedback, trades), [feedback, trades]);
 
   const reviewedSet = useMemo(() => new Set(readJSON(REVIEWED_FEEDBACK_KEY, [])), [feedback]);
   const unreadFeedbackCount = feedback.reduce((n, f) => {
@@ -450,7 +377,7 @@ export default function AdminPanel() {
               <Badge tone="rose">Restricted</Badge>
             </h1>
             <p className="text-[11px] text-slate-500 mt-0.5">
-              {authUser?.email || "—"} · {trades.length} {pluralize(trades.length, "trade", "trades")} · {users.length} {pluralize(users.length, "user", "users")} · {feedback.length} feedback
+              {authUser?.email || "—"} · {(overview?.total_trades ?? tradesList.length)} {pluralize(overview?.total_trades ?? tradesList.length, "trade", "trades")} · {usersList.length} {pluralize(usersList.length, "user", "users")} · {feedback.length} feedback
             </p>
           </div>
         </div>
@@ -494,12 +421,12 @@ export default function AdminPanel() {
       </div>
 
       {/* Tab bodies */}
-      {tab === "overview" && <OverviewTab trades={trades} feedback={feedback} users={users} waitlistCount={waitlistCount} loading={loading} />}
-      {tab === "users"    && <UsersTab users={users} trades={trades} feedback={feedback} toast={toast} onMutate={loadAll} />}
-      {tab === "trades"   && <TradesTab trades={trades} toast={toast} onMutate={loadAll} />}
+      {tab === "overview" && <OverviewTab overview={overview} series={newUsersSeries} users={usersList} loading={loading} />}
+      {tab === "users"    && <UsersTab users={usersList} feedback={feedback} toast={toast} onMutate={loadAll} />}
+      {tab === "trades"   && <TradesTab tradesList={tradesList} agg={tradesAgg} toast={toast} onMutate={loadAll} />}
       {tab === "feedback" && <FeedbackTab feedback={feedback} setFeedback={setFeedback} toast={toast} />}
-      {tab === "system"   && <SystemTab trades={trades} feedback={feedback} supaUp={supaUp} toast={toast} onMutate={loadAll} />}
-      {tab === "logs"     && <LogsTab trades={trades} feedback={feedback} />}
+      {tab === "system"   && <SystemTab agg={tradesAgg} totalTrades={overview?.total_trades ?? tradesList.length} feedbackCount={feedback.length} supaUp={supaUp} toast={toast} onMutate={loadAll} />}
+      {tab === "logs"     && <LogsTab tradesList={tradesList} feedback={feedback} />}
     </div>
   );
 }
@@ -508,21 +435,22 @@ export default function AdminPanel() {
 //  TAB 1 — Overview
 // ════════════════════════════════════════════════════════════════════════════
 
-function OverviewTab({ trades, feedback, users, waitlistCount, loading }) {
-  const totalUsers = users.length;
-  const activeUsers = users.filter((u) => isWithinDays(u.last, 30)).length;
-  const totalTrades = trades.length;
-  const avgTradesPerUser = totalUsers > 0 ? (totalTrades / totalUsers).toFixed(1) : "0";
-  const newUsersThisWeek = users.filter((u) => isWithinDays(u.first, 7)).length;
-  const tradesThisWeek = trades.filter((t) => isWithinDays(t.createdAt, 7)).length;
+function OverviewTab({ overview, series, users, loading }) {
+  const totalUsers = overview?.total_users ?? 0;
+  const activeUsers = overview?.active_30d ?? 0;
+  const totalTrades = overview?.total_trades ?? 0;
+  const avgTradesPerUser = overview?.avg_trades_user != null ? Number(overview.avg_trades_user).toFixed(1) : "0";
+  const newUsersThisWeek = overview?.new_users_week ?? 0;
+  const tradesThisWeek = overview?.trades_week ?? 0;
+  const waitlistCount = overview?.waitlist_count ?? null;
 
   const chartData = useMemo(
-    () => bucketByWeek(users.map((u) => u.first), 7),
-    [users]
+    () => (series || []).map((s) => ({ week: formatWeekLabel(s.week_start), count: s.count })),
+    [series]
   );
 
   const topUsers = useMemo(
-    () => [...users].sort((a, b) => b.trades - a.trades).slice(0, 5),
+    () => [...users].sort((a, b) => (b.trade_count || 0) - (a.trade_count || 0)).slice(0, 5),
     [users]
   );
 
@@ -530,7 +458,7 @@ function OverviewTab({ trades, feedback, users, waitlistCount, loading }) {
     <div className="space-y-5">
       <header>
         <h2 className="text-sm font-bold text-white">Overview</h2>
-        <p className="text-[11px] text-slate-500">Live KPIs and platform health, computed from <code className="text-slate-400">trades</code> + <code className="text-slate-400">feedback</code> aggregation.</p>
+        <p className="text-[11px] text-slate-500">Live KPIs and platform health, computed server-side via <code className="text-slate-400">admin_overview()</code> (aggregates only).</p>
       </header>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -569,7 +497,7 @@ function OverviewTab({ trades, feedback, users, waitlistCount, loading }) {
           )}
         </div>
         <p className="text-[10px] text-slate-600 mt-2">
-          Proxy: "new user" = first activity (trade or feedback) within that week. Requires service_role for real <code>auth.users.created_at</code>.
+          Real new-user counts from <code>auth.users.created_at</code>, bucketed by week (server-side).
         </p>
       </div>
 
@@ -581,16 +509,16 @@ function OverviewTab({ trades, feedback, users, waitlistCount, loading }) {
               <th className="p-2 text-left font-semibold">Email</th>
               <th className="p-2 text-right font-semibold">Trades</th>
               <th className="p-2 text-left font-semibold">Last active</th>
-              <th className="p-2 text-left font-semibold">Joined (proxy)</th>
+              <th className="p-2 text-left font-semibold">Joined</th>
             </tr>
           </thead>
           <tbody>
             {topUsers.map((u) => (
-              <tr key={u.key} className="border-b border-white/[0.04]">
+              <tr key={u.user_id} className="border-b border-white/[0.04]">
                 <td className="p-2 font-mono text-slate-200">{u.email || u.user_id?.slice(0, 8) || "—"}</td>
-                <td className="p-2 font-mono text-right text-cyan-400 tabular-nums">{u.trades}</td>
-                <td className="p-2 font-mono text-[11px] text-slate-500">{formatDateTime(u.last)}</td>
-                <td className="p-2 font-mono text-[11px] text-slate-500">{formatDate(u.first)}</td>
+                <td className="p-2 font-mono text-right text-cyan-400 tabular-nums">{u.trade_count}</td>
+                <td className="p-2 font-mono text-[11px] text-slate-500">{formatDateTime(u.last_active)}</td>
+                <td className="p-2 font-mono text-[11px] text-slate-500">{formatDate(u.created_at)}</td>
               </tr>
             ))}
             {topUsers.length === 0 && (
@@ -607,12 +535,12 @@ function OverviewTab({ trades, feedback, users, waitlistCount, loading }) {
 //  TAB 2 — Users
 // ════════════════════════════════════════════════════════════════════════════
 
-function UsersTab({ users, trades, feedback, toast, onMutate }) {
+function UsersTab({ users, feedback, toast, onMutate }) {
   const confirm = useConfirm();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all"); // all | active | inactive
   const [page, setPage] = useState(1);
-  const [modal, setModal] = useState(null); // { kind: 'trades'|'feedback', user }
+  const [modal, setModal] = useState(null); // { user } — feedback viewer
   const [pwGate, setPwGate] = useState(null); // { user, kind: 'delete' }
   const [banned, setBanned] = useState(() => new Set(readJSON(BANNED_USERS_KEY, [])));
 
@@ -624,9 +552,9 @@ function UsersTab({ users, trades, feedback, toast, onMutate }) {
       const q = query.toLowerCase();
       list = list.filter((u) => (u.email || "").toLowerCase().includes(q) || (u.user_id || "").toLowerCase().includes(q));
     }
-    if (filter === "active") list = list.filter((u) => isWithinDays(u.last, 30));
-    if (filter === "inactive") list = list.filter((u) => !isWithinDays(u.last, 30));
-    return [...list].sort((a, b) => (b.last || "").localeCompare(a.last || ""));
+    if (filter === "active") list = list.filter((u) => isWithinDays(u.last_active, 30));
+    if (filter === "inactive") list = list.filter((u) => !isWithinDays(u.last_active, 30));
+    return [...list].sort((a, b) => (b.last_active || "").localeCompare(a.last_active || ""));
   }, [users, query, filter]);
 
   useEffect(() => { setPage(1); }, [query, filter]);
@@ -662,20 +590,14 @@ function UsersTab({ users, trades, feedback, toast, onMutate }) {
     const user = pwGate?.user;
     if (!user || !supabase) return;
     try {
-      if (user.user_id) {
-        const dr1 = await supabase.from("trades").delete().eq("user_id", user.user_id);
-        const dr2 = await supabase.from("feedback").delete().eq("user_id", user.user_id);
-        if (dr1.error) throw dr1.error;
-        if (dr2.error) throw dr2.error;
-      } else if (user.email) {
-        const dr = await supabase.from("feedback").delete().eq("user_email", user.email);
-        if (dr.error) throw dr.error;
-      }
+      if (!user.user_id) throw new Error("Missing user id");
+      const { error } = await supabase.rpc("admin_delete_user_data", { _target: user.user_id });
+      if (error) throw error;
       toast.success("User data deleted");
       setPwGate(null);
       onMutate?.();
     } catch (e) {
-      toast.error("Delete failed (RLS?): " + (e?.message || ""));
+      toast.error("Delete failed: " + (e?.message || ""));
       setPwGate(null);
     }
   };
@@ -685,7 +607,7 @@ function UsersTab({ users, trades, feedback, toast, onMutate }) {
       <header className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h2 className="text-sm font-bold text-white">Users</h2>
-          <p className="text-[11px] text-slate-500">Aggregated from trades + feedback (anon-key limit). {filtered.length} of {users.length} shown.</p>
+          <p className="text-[11px] text-slate-500">Real accounts from <code className="text-slate-400">auth.users</code> via <code className="text-slate-400">admin_users_list()</code>. {filtered.length} of {users.length} shown.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <div className="relative">
@@ -709,17 +631,13 @@ function UsersTab({ users, trades, feedback, toast, onMutate }) {
         </div>
       </header>
 
-      <GapNote>
-        Provider (Google/Email) requires Supabase service_role and is not available with anon key — column shows "—".
-      </GapNote>
-
       <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
               <tr className="text-slate-600 border-b border-[var(--border-subtle)] dark:border-white/[0.06] text-[10px] tracking-widest uppercase bg-white/[0.02]">
                 <th className="p-2 text-left font-semibold">Email</th>
-                <th className="p-2 text-left font-semibold">Joined (proxy)</th>
+                <th className="p-2 text-left font-semibold">Joined</th>
                 <th className="p-2 text-left font-semibold">Last activity</th>
                 <th className="p-2 text-right font-semibold">Trades</th>
                 <th className="p-2 text-left font-semibold">Provider</th>
@@ -729,30 +647,25 @@ function UsersTab({ users, trades, feedback, toast, onMutate }) {
             </thead>
             <tbody>
               {pageRows.map((u) => {
-                const active = isWithinDays(u.last, 30);
+                const active = isWithinDays(u.last_active, 30);
                 const isBanned = u.email && banned.has(u.email);
                 return (
-                  <tr key={u.key} className="border-b border-white/[0.04] hover:bg-white/[0.02]">
+                  <tr key={u.user_id} className="border-b border-white/[0.04] hover:bg-white/[0.02]">
                     <td className="p-2 font-mono text-slate-200" title={u.email || u.user_id}>
                       {shortEmail(u.email) || (u.user_id ? u.user_id.slice(0, 8) + "…" : "—")}
                       {isBanned && <Badge tone="rose">Banned</Badge>}
                     </td>
-                    <td className="p-2 font-mono text-[11px] text-slate-500">{formatDate(u.first)}</td>
-                    <td className="p-2 font-mono text-[11px] text-slate-500">{formatDateTime(u.last)}</td>
-                    <td className="p-2 font-mono text-right text-cyan-400 tabular-nums">{u.trades}</td>
-                    <td className="p-2 font-mono text-[11px] text-slate-600">—</td>
+                    <td className="p-2 font-mono text-[11px] text-slate-500">{formatDate(u.created_at)}</td>
+                    <td className="p-2 font-mono text-[11px] text-slate-500">{formatDateTime(u.last_active)}</td>
+                    <td className="p-2 font-mono text-right text-cyan-400 tabular-nums">{u.trade_count}</td>
+                    <td className="p-2 font-mono text-[11px] text-slate-400">{u.provider || "—"}</td>
                     <td className="p-2">
                       <Badge tone={active ? "emerald" : "slate"}>{active ? "Active" : "Inactive"}</Badge>
                     </td>
                     <td className="p-2">
                       <div className="flex items-center justify-end gap-1">
                         <button
-                          onClick={() => setModal({ kind: "trades", user: u })}
-                          title="View trades"
-                          className="p-1.5 rounded border border-cyan-500/30 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20"
-                        ><BookOpen size={11} /></button>
-                        <button
-                          onClick={() => setModal({ kind: "feedback", user: u })}
+                          onClick={() => setModal({ user: u })}
                           title="View feedback"
                           className="p-1.5 rounded border border-violet-500/30 bg-violet-500/10 text-violet-400 hover:bg-violet-500/20"
                         ><MessageCircle size={11} /></button>
@@ -786,18 +699,14 @@ function UsersTab({ users, trades, feedback, toast, onMutate }) {
         </div>
       </div>
 
-      {/* View Trades / Feedback modal */}
+      {/* Feedback viewer (trade content is never exposed to the admin panel) */}
       <Modal
         open={!!modal}
         onClose={() => setModal(null)}
-        title={modal ? `${modal.kind === "trades" ? "Trades" : "Feedback"} — ${modal.user.email || modal.user.user_id}` : ""}
+        title={modal ? `Feedback — ${modal.user.email || modal.user.user_id}` : ""}
         wide
       >
-        {modal && (modal.kind === "trades" ? (
-          <UserTradesView user={modal.user} trades={trades} />
-        ) : (
-          <UserFeedbackView user={modal.user} feedback={feedback} />
-        ))}
+        {modal && <UserFeedbackView user={modal.user} feedback={feedback} />}
       </Modal>
 
       <PasswordGate
@@ -808,47 +717,6 @@ function UsersTab({ users, trades, feedback, toast, onMutate }) {
         message={pwGate ? `Re-enter your password to delete all data for ${pwGate.user.email || pwGate.user.user_id}.` : ""}
       />
     </div>
-  );
-}
-
-function UserTradesView({ user, trades }) {
-  const list = useMemo(() => {
-    if (user.user_id) return trades.filter((t) => t.user_id === user.user_id);
-    return [];
-  }, [trades, user]);
-  if (!list.length) return <p className="text-xs text-slate-500">No trades for this user.</p>;
-  return (
-    <table className="w-full text-xs">
-      <thead>
-        <tr className="text-slate-600 border-b border-[var(--border-subtle)] dark:border-white/[0.06] text-[10px] tracking-widest uppercase">
-          <th className="p-2 text-left">Ticker</th>
-          <th className="p-2 text-left">Date</th>
-          <th className="p-2 text-left">Side</th>
-          <th className="p-2 text-right">Entry</th>
-          <th className="p-2 text-right">Exit</th>
-          <th className="p-2 text-right">P&amp;L</th>
-          <th className="p-2 text-left">Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {list.map((t) => {
-          const pnl = calcTradePnL(t);
-          return (
-            <tr key={t.id} className="border-b border-white/[0.04]">
-              <td className="p-2 font-mono font-bold text-white">{t.ticker}</td>
-              <td className="p-2 font-mono text-[11px] text-slate-500">{t.date || formatDate(t.createdAt)}</td>
-              <td className="p-2 text-[11px]">{t.side}</td>
-              <td className="p-2 font-mono text-right">${t.entry}</td>
-              <td className="p-2 font-mono text-right">{t.exit ? `$${t.exit}` : "—"}</td>
-              <td className={`p-2 font-mono text-right tabular-nums ${pnl == null ? "text-slate-600" : pnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                {pnl == null ? "—" : (pnl >= 0 ? "+" : "") + pnl.toFixed(2)}
-              </td>
-              <td className="p-2 text-[11px]">{t.status}</td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
   );
 }
 
@@ -879,89 +747,78 @@ function UserFeedbackView({ user, feedback }) {
 //  TAB 3 — Trades
 // ════════════════════════════════════════════════════════════════════════════
 
-function TradesTab({ trades, toast, onMutate }) {
+function TradesTab({ tradesList, agg, toast, onMutate }) {
   const confirm = useConfirm();
   const [filters, setFilters] = useState({
-    email: "", ticker: "", from: "", to: "", status: "all", hideDemo: false,
+    email: "", from: "", to: "", status: "all", hideDemo: false,
   });
   const [page, setPage] = useState(1);
   const PER_PAGE = 50;
 
-  // Trades table has no user_email column. Map user_id → email from existing feedback rows is
-  // out of scope here (we just expose ticker/email filter for future schema).
+  // tradesList is metadata only (no ticker/entry/exit/pnl/notes). Filtering
+  // happens client-side on the already-privacy-scrubbed rows.
   const filtered = useMemo(() => {
-    let list = trades;
+    let list = tradesList;
     if (filters.hideDemo) list = list.filter((t) => !t.is_demo);
-    if (filters.ticker) list = list.filter((t) => (t.ticker || "").toLowerCase().includes(filters.ticker.toLowerCase()));
     if (filters.email) list = list.filter((t) =>
       (t.user_id || "").toLowerCase().includes(filters.email.toLowerCase()) ||
       (t.user_email || "").toLowerCase().includes(filters.email.toLowerCase())
     );
     if (filters.status !== "all") list = list.filter((t) => t.status === filters.status);
-    if (filters.from) list = list.filter((t) => (t.date || t.createdAt || "") >= filters.from);
-    if (filters.to) list = list.filter((t) => (t.date || t.createdAt || "") <= filters.to + "T23:59:59");
+    if (filters.from) list = list.filter((t) => (t.trade_date || t.created_at || "") >= filters.from);
+    if (filters.to) list = list.filter((t) => (t.trade_date || t.created_at || "") <= filters.to + "T23:59:59");
     return list;
-  }, [trades, filters]);
+  }, [tradesList, filters]);
 
   useEffect(() => { setPage(1); }, [filters]);
 
-  const stats = useMemo(() => {
-    const closed = filtered.filter((t) => t.status === "CLOSED" && t.exit != null);
-    const pnls = closed.map((t) => calcTradePnL(t)).filter((v) => v != null);
-    const wins = pnls.filter((p) => p > 0).length;
-    const sumPnl = pnls.reduce((a, b) => a + b, 0);
-    const tickerCount = new Map();
-    filtered.forEach((t) => { if (t.ticker) tickerCount.set(t.ticker, (tickerCount.get(t.ticker) || 0) + 1); });
-    const top = Array.from(tickerCount.entries()).sort((a, b) => b[1] - a[1])[0];
-    return {
-      total: filtered.length,
-      winRate: closed.length ? ((wins / closed.length) * 100).toFixed(1) : "—",
-      avgPnl: pnls.length ? (sumPnl / pnls.length).toFixed(2) : "—",
-      topTicker: top ? top[0] : "—",
-    };
-  }, [filtered]);
+  // Platform-wide stats come from admin_trades_agg() — computed in the DB, only
+  // aggregate scalars ever leave the server.
+  const stats = {
+    total: agg?.total ?? 0,
+    winRate: agg?.win_rate == null ? "—" : `${agg.win_rate}%`,
+    avgPnl: agg?.avg_pnl == null ? "—" : `$${agg.avg_pnl}`,
+    topTicker: agg?.top_ticker || "—",
+  };
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const pageRows = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
   const deleteTrade = async (t) => {
     const ok = await confirm({
-      title: "Delete trade", message: `Remove ${t.ticker} ${t.side} from ${t.date || formatDate(t.createdAt)}?`,
+      title: "Delete trade", message: `Remove trade from ${t.trade_date || formatDate(t.created_at)} (${t.user_email || t.user_id || "—"})?`,
       confirmText: "Delete", cancelText: "Cancel", danger: true,
     });
     if (!ok) return;
     try {
-      const { error } = await supabase.from("trades").delete().eq("id", t.id);
+      const { error } = await supabase.rpc("admin_delete_trade", { _id: t.id });
       if (error) throw error;
       toast.success("Trade deleted");
       onMutate?.();
     } catch (e) {
-      toast.error("Delete failed (RLS?): " + (e?.message || ""));
+      toast.error("Delete failed: " + (e?.message || ""));
     }
   };
 
-  const exportCols = [
-    "id", "user_id", "ticker", "side", "date", "entry", "stop", "target",
-    "exit", "shares", "status", "setup", "pnl", "is_demo", "createdAt",
-  ];
+  // CSV is metadata-only — mirrors the privacy contract of admin_trades_list.
+  const exportCols = ["id", "user_email", "trade_date", "status", "is_demo", "has_stop", "has_setup"];
   const toCsvRow = (t) => ({
-    id: t.id, user_id: t.user_id, ticker: t.ticker, side: t.side, date: t.date,
-    entry: t.entry, stop: t.stop, target: t.target, exit: t.exit, shares: t.shares,
-    status: t.status, setup: t.setup, pnl: calcTradePnL(t)?.toFixed(2) ?? "",
-    is_demo: t.is_demo ? "true" : "false", createdAt: t.createdAt,
+    id: t.id, user_email: t.user_email || "", trade_date: t.trade_date || "",
+    status: t.status, is_demo: t.is_demo ? "true" : "false",
+    has_stop: t.has_stop ? "true" : "false", has_setup: t.has_setup ? "true" : "false",
   });
 
   return (
     <div className="space-y-3">
       <header>
         <h2 className="text-sm font-bold text-white">Trades</h2>
-        <p className="text-[11px] text-slate-500">Every trade across all users. {filtered.length} rows after filters.</p>
+        <p className="text-[11px] text-slate-500">Moderation metadata only — no ticker, price, P&amp;L, or notes. {filtered.length} rows after filters.</p>
       </header>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard label="Total" value={stats.total} accent="cyan" />
-        <KpiCard label="Win rate" value={stats.winRate === "—" ? "—" : `${stats.winRate}%`} accent="emerald" />
-        <KpiCard label="Avg P&L" value={stats.avgPnl === "—" ? "—" : `$${stats.avgPnl}`} accent="violet" />
+        <KpiCard label="Total (platform)" value={stats.total.toLocaleString()} accent="cyan" />
+        <KpiCard label="Win rate" value={stats.winRate} accent="emerald" />
+        <KpiCard label="Avg P&L" value={stats.avgPnl} accent="violet" />
         <KpiCard label="Top ticker" value={stats.topTicker} accent="amber" />
       </div>
 
@@ -971,12 +828,6 @@ function TradesTab({ trades, toast, onMutate }) {
           onChange={(e) => setFilters((f) => ({ ...f, email: e.target.value }))}
           placeholder="user id / email…"
           className="bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-[11px] text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none w-40 font-mono"
-        />
-        <input
-          value={filters.ticker}
-          onChange={(e) => setFilters((f) => ({ ...f, ticker: e.target.value }))}
-          placeholder="ticker…"
-          className="bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-[11px] text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none w-28 font-mono"
         />
         <input
           type="date"
@@ -1011,7 +862,7 @@ function TradesTab({ trades, toast, onMutate }) {
         </label>
         <div className="flex-1" />
         <button
-          onClick={() => downloadCSV(trades.map(toCsvRow), `swing-edge-trades-all-${new Date().toISOString().slice(0, 10)}.csv`, exportCols)}
+          onClick={() => downloadCSV(tradesList.map(toCsvRow), `swing-edge-trades-all-${new Date().toISOString().slice(0, 10)}.csv`, exportCols)}
           className="flex items-center gap-1 text-[10px] text-emerald-400 border border-emerald-500/30 rounded-lg px-2.5 py-1.5 hover:bg-emerald-500/10"
         ><Download size={11} /> All CSV</button>
         <button
@@ -1025,48 +876,37 @@ function TradesTab({ trades, toast, onMutate }) {
           <table className="w-full text-xs">
             <thead>
               <tr className="text-slate-600 border-b border-[var(--border-subtle)] dark:border-white/[0.06] text-[10px] tracking-widest uppercase bg-white/[0.02]">
-                <th className="p-2 text-left">Ticker</th>
                 <th className="p-2 text-left">User</th>
                 <th className="p-2 text-left">Date</th>
-                <th className="p-2 text-left">Side</th>
-                <th className="p-2 text-right">Entry</th>
-                <th className="p-2 text-right">Exit</th>
-                <th className="p-2 text-right">P&amp;L</th>
                 <th className="p-2 text-left">Status</th>
-                <th className="p-2 text-left">Setup</th>
+                <th className="p-2 text-left">Demo</th>
+                <th className="p-2 text-center">Stop</th>
+                <th className="p-2 text-center">Setup</th>
                 <th className="p-2 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {pageRows.map((t) => {
-                const pnl = calcTradePnL(t);
-                return (
-                  <tr key={t.id} className="border-b border-white/[0.04] hover:bg-white/[0.02]">
-                    <td className="p-2 font-mono font-bold text-white">{t.ticker}</td>
-                    <td className="p-2 font-mono text-[10px] text-slate-500" title={t.user_id}>
-                      {t.is_demo ? <Badge tone="amber">Demo</Badge> : t.user_id?.slice(0, 6) + "…"}
-                    </td>
-                    <td className="p-2 font-mono text-[10px] text-slate-500">{t.date || formatDate(t.createdAt)}</td>
-                    <td className="p-2 font-mono text-[11px]">{t.side}</td>
-                    <td className="p-2 font-mono text-right">${t.entry}</td>
-                    <td className="p-2 font-mono text-right">{t.exit != null ? `$${t.exit}` : "—"}</td>
-                    <td className={`p-2 font-mono text-right tabular-nums ${pnl == null ? "text-slate-600" : pnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                      {pnl == null ? "—" : (pnl >= 0 ? "+$" : "-$") + Math.abs(pnl).toFixed(2)}
-                    </td>
-                    <td className="p-2 text-[11px]">{t.status}</td>
-                    <td className="p-2 text-[11px] text-violet-400">{t.setup || "—"}</td>
-                    <td className="p-2 text-right">
-                      <button
-                        onClick={() => deleteTrade(t)}
-                        title="Delete"
-                        className="p-1.5 rounded border border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20"
-                      ><Trash2 size={11} /></button>
-                    </td>
-                  </tr>
-                );
-              })}
+              {pageRows.map((t) => (
+                <tr key={t.id} className="border-b border-white/[0.04] hover:bg-white/[0.02]">
+                  <td className="p-2 font-mono text-[10px] text-slate-400" title={t.user_id}>
+                    {t.user_email || (t.user_id ? t.user_id.slice(0, 8) + "…" : "—")}
+                  </td>
+                  <td className="p-2 font-mono text-[10px] text-slate-500">{t.trade_date || formatDate(t.created_at)}</td>
+                  <td className="p-2 text-[11px]">{t.status}</td>
+                  <td className="p-2">{t.is_demo ? <Badge tone="amber">Demo</Badge> : <span className="text-slate-600 text-[11px]">—</span>}</td>
+                  <td className="p-2 text-center">{t.has_stop ? <span className="text-emerald-400">✓</span> : <span className="text-slate-600">—</span>}</td>
+                  <td className="p-2 text-center">{t.has_setup ? <span className="text-emerald-400">✓</span> : <span className="text-slate-600">—</span>}</td>
+                  <td className="p-2 text-right">
+                    <button
+                      onClick={() => deleteTrade(t)}
+                      title="Delete"
+                      className="p-1.5 rounded border border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20"
+                    ><Trash2 size={11} /></button>
+                  </td>
+                </tr>
+              ))}
               {pageRows.length === 0 && (
-                <tr><td colSpan={10} className="p-6 text-center text-slate-600 text-xs">No trades match</td></tr>
+                <tr><td colSpan={7} className="p-6 text-center text-slate-600 text-xs">No trades match</td></tr>
               )}
             </tbody>
           </table>
@@ -1119,9 +959,9 @@ function FeedbackTab({ feedback, setFeedback, toast }) {
   const markResolved = async (id, resolved) => {
     try {
       const nextStatus = resolved ? "resolved" : "new";
-      const { data, error } = await supabase.from("feedback").update({ status: nextStatus }).eq("id", id).select();
+      const { data, error } = await supabase.rpc("admin_set_feedback_status", { _id: id, _status: nextStatus });
       if (error) throw error;
-      if (!data || data.length === 0) throw new Error("No rows updated (check permissions)");
+      if (!data) throw new Error("No rows updated (check permissions)");
       setFeedback((rs) => rs.map((r) => (r.id === id ? { ...r, status: nextStatus } : r)));
       toast.success(resolved ? "Resolved ✓" : "Reopened");
     } catch (e) {
@@ -1136,7 +976,7 @@ function FeedbackTab({ feedback, setFeedback, toast }) {
     });
     if (!ok) return;
     try {
-      const { error } = await supabase.from("feedback").delete().eq("id", id);
+      const { error } = await supabase.rpc("admin_delete_feedback", { _id: id });
       if (error) throw error;
       setFeedback((rs) => rs.filter((r) => r.id !== id));
       toast.success("Deleted");
@@ -1227,14 +1067,14 @@ function FeedbackTab({ feedback, setFeedback, toast }) {
 //  TAB 5 — System
 // ════════════════════════════════════════════════════════════════════════════
 
-function SystemTab({ trades, feedback, supaUp, toast, onMutate }) {
+function SystemTab({ agg, totalTrades, feedbackCount, supaUp, toast, onMutate }) {
   const confirm = useConfirm();
   const [flags, setFlags] = useState(() => ({ ...DEFAULT_FLAGS, ...readJSON(FEATURE_FLAGS_KEY, {}) }));
   const [pwGate, setPwGate] = useState(null); // 'clearDemos'
   const [healthTick, setHealthTick] = useState(0);
   const [health, setHealth] = useState({ ok: supaUp, latency: null });
 
-  const demoCount = useMemo(() => trades.filter((t) => t.is_demo).length, [trades]);
+  const demoCount = agg?.demo_count ?? 0;
 
   // Ping supabase every 30s
   useEffect(() => {
@@ -1273,13 +1113,13 @@ function SystemTab({ trades, feedback, supaUp, toast, onMutate }) {
 
   const executeClearDemos = async () => {
     try {
-      const { error } = await supabase.from("trades").delete().eq("is_demo", true);
+      const { error } = await supabase.rpc("admin_delete_demo_trades");
       if (error) throw error;
       toast.success("Demo trades cleared");
       setPwGate(null);
       onMutate?.();
     } catch (e) {
-      toast.error("Clear failed (RLS?): " + (e?.message || ""));
+      toast.error("Clear failed: " + (e?.message || ""));
       setPwGate(null);
     }
   };
@@ -1353,13 +1193,13 @@ function SystemTab({ trades, feedback, supaUp, toast, onMutate }) {
             icon={BookOpen}
             label="Trades rows"
             ok
-            detail={`${trades.length.toLocaleString()}`}
+            detail={`${Number(totalTrades || 0).toLocaleString()}`}
           />
           <HealthRow
             icon={MessageCircle}
             label="Feedback rows"
             ok
-            detail={`${feedback.length.toLocaleString()}`}
+            detail={`${Number(feedbackCount || 0).toLocaleString()}`}
           />
         </div>
         <GapNote>
@@ -1413,7 +1253,7 @@ function HealthRow({ icon: Icon, label, ok, detail }) {
 //  TAB 6 — Logs (synthesized feed)
 // ════════════════════════════════════════════════════════════════════════════
 
-function LogsTab({ trades, feedback }) {
+function LogsTab({ tradesList, feedback }) {
   const [filter, setFilter] = useState("all");
   const [tick, setTick] = useState(0);
 
@@ -1426,12 +1266,12 @@ function LogsTab({ trades, feedback }) {
   const feed = useMemo(() => {
     const events = [];
 
-    // Track first-seen email → "new user" event
+    // Track first-seen user → "new user" event
     const firstSeen = new Map();
-    [...trades].sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || "")).forEach((t) => {
+    [...tradesList].sort((a, b) => (a.created_at || "").localeCompare(b.created_at || "")).forEach((t) => {
       const k = t.user_id;
-      if (!k || firstSeen.has(k) || !t.createdAt) return;
-      firstSeen.set(k, { ts: t.createdAt, user: k });
+      if (!k || firstSeen.has(k) || !t.created_at) return;
+      firstSeen.set(k, { ts: t.created_at, user: t.user_email || k });
     });
     [...feedback].sort((a, b) => (a.created_at || "").localeCompare(b.created_at || "")).forEach((f) => {
       const k = f.user_email || f.user_id;
@@ -1445,11 +1285,11 @@ function LogsTab({ trades, feedback }) {
       });
     });
 
-    trades.forEach((t) => {
+    tradesList.forEach((t) => {
       events.push({
-        ts: t.createdAt, kind: "trade", category: "trades",
-        actor: t.user_id || "—",
-        summary: `added trade ${t.ticker || ""} ${t.side || ""}`.trim(),
+        ts: t.created_at, kind: "trade", category: "trades",
+        actor: t.user_email || t.user_id || "—",
+        summary: "added trade",
       });
     });
     feedback.forEach((f) => {
@@ -1464,7 +1304,7 @@ function LogsTab({ trades, feedback }) {
       .filter((e) => !!e.ts)
       .sort((a, b) => b.ts.localeCompare(a.ts))
       .slice(0, 200);
-  }, [trades, feedback, tick]);
+  }, [tradesList, feedback, tick]);
 
   const filtered = useMemo(() => {
     if (filter === "all") return feed;
