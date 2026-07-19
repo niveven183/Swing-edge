@@ -179,7 +179,19 @@ so outputs are unchanged. Invariant preserved (null→null). Must verify `test:c
 **Duplicate rule:** `ticker + date + entry` identical to an existing trade → flagged (skip / import-anyway).
 
 **Module layout:** `src/import/{parseFile,detectColumns,normalizeRow,buildImport,synonyms}.js`
-+ `src/components/ImportJournalModal.jsx`. New deps: `papaparse`, `xlsx` (pin current; xlsx ≥0.19.3).
++ `src/components/ImportJournalModal.jsx`.
+
+### Dependency provenance (⚠️ read before flagging as suspicious)
+- `papaparse@^5.5.4` — standard npm registry.
+- `xlsx@0.20.3` — sourced from **SheetJS's official vendor CDN**, NOT npm:
+  `https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz`.
+  **Reason:** the public npm registry is frozen at `xlsx@0.18.5`, which carries
+  CVE-2023-30533 (prototype pollution) and CVE-2024-22363 (ReDoS). SheetJS ships all patched
+  builds only via their own CDN. 0.20.3 is the patched release. `npm audit` = **0
+  vulnerabilities**. `package-lock.json` pins the tarball URL **and** an sha512 integrity hash
+  (`sha512-oLDq3jw7AcLqKWH2AhCpVTZl8mf6X2YReP+Neh0SJUzV/BdZYjth94tG5toiMB1PPrYtxOCfaoUCkvtuH+3AJA==`),
+  so Vercel/CI builds are deterministic. Decision made by Niv (2026-07-18). This is a
+  legitimate, intentional non-npm source — do not "fix" it back to npm 0.18.5.
 
 ---
 

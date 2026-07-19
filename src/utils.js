@@ -29,10 +29,14 @@ export const holdDays = (trade) => {
 
 export const calcTradeMetrics = (trade) => {
   if (!trade.exit) return { pnl: null, rMultiple: null };
-  const risk = Math.abs(trade.entry - trade.stop) * trade.shares;
   const pnl = trade.side === "LONG"
     ? (trade.exit - trade.entry) * trade.shares
     : (trade.entry - trade.exit) * trade.shares;
+  // Imported trades may have no stop (stop=null). P&L is still real, but R is
+  // undefined — never fabricate a risk value; report rMultiple as null so
+  // analytics show N/A rather than a synthetic number.
+  if (trade.stop == null) return { pnl, rMultiple: null };
+  const risk = Math.abs(trade.entry - trade.stop) * trade.shares;
   return { pnl, rMultiple: risk > 0 ? pnl / risk : 0 };
 };
 

@@ -1,0 +1,4 @@
+Symbol,Side,Entry,Exit,Qty,Date,Stop
+AAPL,Long,100,110,10,2026-03-01,95
+MSFT,Long,200,210,5,2026-03-02,190
+AAPL,Long,100,110,10,2026-03-01,95

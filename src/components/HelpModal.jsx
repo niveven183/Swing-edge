@@ -1,7 +1,7 @@
 import { HelpCircle, X, Compass } from "lucide-react";
 import { useId } from "react";
 import useModalA11y from "../hooks/useModalA11y.js";
-export default function HelpModal({ onClose, onStartTour, t, demoCount }) {
+export default function HelpModal({ onClose, onStartTour, t }) {
   const titleId = useId();
   const modalRef = useModalA11y({ active: true, onClose });
   return (
@@ -17,7 +17,6 @@ export default function HelpModal({ onClose, onStartTour, t, demoCount }) {
         <div className="p-5 space-y-3 text-sm text-slate-300">
           <p><span className="font-bold text-white">{t.helpQuickStartLabel}</span> {t.helpQuickStartPre} <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-[11px] font-mono">N</kbd> {t.helpQuickStartPost}</p>
           <p><span className="font-bold text-white">{t.helpRiskLabel}</span> {t.helpRisk}</p>
-          <p><span className="font-bold text-white">{t.helpDemoLabel}</span> {t.helpDemo.replace("{n}", demoCount)}</p>
           <p><span className="font-bold text-white">{t.helpLiveLabel}</span> {t.helpLive}</p>
           <div className="flex gap-3 py-1">
             <div className="w-7 h-7 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-sm flex-shrink-0">💡</div>

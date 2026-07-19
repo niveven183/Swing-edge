@@ -32,6 +32,7 @@ function lazyWithRetry(importFn) {
 }
 const AdminPanel = lazyWithRetry(() => import("./src/components/AdminPanel.jsx"));
 import EditTradeModal from "./src/components/EditTradeModal.jsx";
+import ImportJournalModal from "./src/components/ImportJournalModal.jsx";
 import ResetAllModal from "./src/components/ResetAllModal.jsx";
 import ChangePasswordModal from "./src/components/ChangePasswordModal.jsx";
 import { useTheme } from "./src/contexts/ThemeContext.jsx";
@@ -58,7 +59,7 @@ import {
   Download, FileText, Bell, Flame, Globe, LogOut, MessageCircle,
   Shield, Filter, Save, BarChart3, ChevronDown, HelpCircle, Lock,
   CreditCard, Smartphone, Wrench, Sun, Moon, Monitor, KeyRound, ExternalLink, RotateCcw, Pencil,
-  Users, GraduationCap, UserPlus, NotebookPen, CalendarCheck
+  Users, GraduationCap, UserPlus, NotebookPen, CalendarCheck, Upload, Undo2
 } from "lucide-react";
 import { getTranslations, LANGUAGES, isRTLLang, nTrades, labelFor } from "./src/i18n.js";
 import {
@@ -175,316 +176,6 @@ function purgeInvalidTrades(trades) {
       marketCondition: VALID_MARKETS_MAP[t.marketCondition] || t.marketCondition
     }));
 }
-
-// ─── DEMO TRADES (loaded via Settings/Journal → "Load Demo Trades") ───────
-// 30 trades · ~22 WIN · ~8 LOSS · Win rate ~73% · Mar 18 – Apr 24, 2026.
-// maxFavorable/maxAdverse = delta values (not absolute prices).
-// isDemo:true on each object — used for filtering real vs demo stats.
-const DEMO_TRADES = [
-  // שבוע 1: 18-22 מרץ 2026
-  {
-    id: "demo-1", ticker: "NVDA", side: "LONG", date: "2026-03-18",
-    entry: 164.50, stop: 161.20, target: 172.00, exit: 171.30, shares: 14,
-    status: "CLOSED", setup: "Higher Low", marketCondition: "Trending Up",
-    emotionAtEntry: "Confident", entryQuality: 9, followedPlan: true,
-    exitReason: "Hit Target",
-    notes: "NVDA יצר Higher Low ב-$164.27, פריצה עם volume גבוה. RSI עלה מ-38 ל-52.",
-    lessonLearned: "HL מעל תחתית קודמת = סיגנל חזק. הרי-טסט הראשון של reversal הכי משתלם.",
-    maxFavorable: 6.80, maxAdverse: -1.20, _capitalAtEntry: 2500, isDemo: true,
-  },
-  {
-    id: "demo-2", ticker: "AAPL", side: "LONG", date: "2026-03-19",
-    entry: 218.50, stop: 215.20, target: 226.00, exit: 225.80, shares: 11,
-    status: "CLOSED", setup: "Breakout", marketCondition: "Trending Up",
-    emotionAtEntry: "Calm", entryQuality: 8, followedPlan: true,
-    exitReason: "Hit Target",
-    notes: "AAPL פריצת קונסולידציה 4 ימים. Volume +120% מהממוצע, סגירה מעל $218.50.",
-    lessonLearned: "Breakouts עם volume confirmation = הסטאפ הכי חזק. לחכות לסגירת 15m מעל הרמה.",
-    maxFavorable: 7.30, maxAdverse: -0.80, _capitalAtEntry: 2595, isDemo: true,
-  },
-  {
-    id: "demo-3", ticker: "TSLA", side: "LONG", date: "2026-03-20",
-    entry: 381.30, stop: 374.50, target: 398.00, exit: 374.50, shares: 6,
-    status: "CLOSED", setup: "Failed Breakout", marketCondition: "Sideways",
-    emotionAtEntry: "FOMO", entryQuality: 4, followedPlan: false,
-    exitReason: "Stop Loss",
-    notes: "ניסיתי breakout ב-$381 על news. נכנסתי בלי לחכות לאישור volume, שוק choppy.",
-    lessonLearned: "FOMO + שוק sideways = הפסד בטוח. לא להיכנס על news בלי setup ברור.",
-    maxFavorable: 1.20, maxAdverse: -6.80, _capitalAtEntry: 2675, isDemo: true,
-  },
-  {
-    id: "demo-4", ticker: "BTC-USD", side: "LONG", date: "2026-03-22",
-    entry: 70250, stop: 68500, target: 73500, exit: 73100, shares: 0.035,
-    status: "CLOSED", setup: "Higher Low", marketCondition: "Sideways",
-    emotionAtEntry: "Patient", entryQuality: 8, followedPlan: true,
-    exitReason: "Hit Target",
-    notes: "BTC עשה HL ב-$68,800 מעל LL הקודם. פריצה של $70K עם volume גבוה, RSI ב-55.",
-    lessonLearned: "BTC על HL בולט עם volume = הזדמנות מצוינת אפילו בשוק sideways.",
-    maxFavorable: 2850, maxAdverse: -420, _capitalAtEntry: 2634, isDemo: true,
-  },
-  // שבוע 2: 25-29 מרץ 2026
-  {
-    id: "demo-5", ticker: "META", side: "LONG", date: "2026-03-25",
-    entry: 612.00, stop: 605.00, target: 628.00, exit: 626.50, shares: 4,
-    status: "CLOSED", setup: "EMA Bounce 50", marketCondition: "Trending Up",
-    emotionAtEntry: "Neutral", entryQuality: 7, followedPlan: true,
-    exitReason: "Hit Target",
-    notes: "META נגעה ב-50 EMA בדיוק, hammer candle ב-1H. RSI ב-45 מתאושש.",
-    lessonLearned: "EMA bounces עובדים מצוין כשהטרנד הראשי חזק. ה-50 EMA היא תמיכה דינמית.",
-    maxFavorable: 14.50, maxAdverse: -2.10, _capitalAtEntry: 2733, isDemo: true,
-  },
-  {
-    id: "demo-6", ticker: "AMD", side: "LONG", date: "2026-03-26",
-    entry: 165.40, stop: 161.50, target: 175.00, exit: 174.20, shares: 13,
-    status: "CLOSED", setup: "Cup and Handle", marketCondition: "Trending Up",
-    emotionAtEntry: "Confident", entryQuality: 10, followedPlan: true,
-    exitReason: "Hit Target",
-    notes: "AMD Cup and Handle מושלמת — Cup של 5 שבועות, Handle של 4 ימים. פריצת rim עם volume +180%.",
-    lessonLearned: "Cup and Handle = תבנית הכי אמינה. הסבלנות לחכות ל-handle pullback השתלמה.",
-    maxFavorable: 8.80, maxAdverse: -1.50, _capitalAtEntry: 2791, isDemo: true,
-  },
-  {
-    id: "demo-7", ticker: "SPY", side: "LONG", date: "2026-03-27",
-    entry: 588.50, stop: 585.20, target: 595.00, exit: 588.80, shares: 4,
-    status: "CLOSED", setup: "Range Breakout", marketCondition: "Sideways",
-    emotionAtEntry: "Hesitant", entryQuality: 5, followedPlan: "Partially",
-    exitReason: "Manual Exit",
-    notes: "Breakout ב-$588 אחרי 3 ימי דשדוש. Volume חלש, שוק ניטרלי.",
-    lessonLearned: "אם אני מהסס בכניסה — סימן שלא צריך להיכנס. סגרתי בזמן לפני שיהפוך ל-loss.",
-    maxFavorable: 2.10, maxAdverse: -1.80, _capitalAtEntry: 2905, isDemo: true,
-  },
-  {
-    id: "demo-8", ticker: "MSFT", side: "LONG", date: "2026-03-28",
-    entry: 415.80, stop: 410.50, target: 430.00, exit: 429.20, shares: 5,
-    status: "CLOSED", setup: "Pullback to 20 EMA", marketCondition: "Trending Up",
-    emotionAtEntry: "Calm", entryQuality: 9, followedPlan: true,
-    exitReason: "Hit Target",
-    notes: "MSFT פולבק נקי ל-20 EMA ב-$415.80, RSI עלה מ-42 ל-48, hammer candle ב-1H.",
-    lessonLearned: "MSFT + 20 EMA = הסטאפ הכי אמין שלי בלארג קאפ. תמיד לחכות לאישור.",
-    maxFavorable: 13.40, maxAdverse: -1.20, _capitalAtEntry: 2906, isDemo: true,
-  },
-  // שבוע 3: 1-5 אפריל 2026
-  {
-    id: "demo-9", ticker: "ETH-USD", side: "LONG", date: "2026-04-01",
-    entry: 3450, stop: 3360, target: 3650, exit: 3360, shares: 0.65,
-    status: "CLOSED", setup: "Range Breakout", marketCondition: "Volatile",
-    emotionAtEntry: "Angry", entryQuality: 2, followedPlan: false,
-    exitReason: "Stop Loss",
-    notes: "ניסיתי להחזיר הפסד TSLA. נכנסתי ל-ETH בלי setup ברור — revenge trade קלאסי.",
-    lessonLearned: "Revenge trading = הפסד מובטח. אחרי הפסד — הפסקה של שעה לפחות.",
-    maxFavorable: 45, maxAdverse: -90, _capitalAtEntry: 2973, isDemo: true,
-  },
-  {
-    id: "demo-10", ticker: "NVDA", side: "LONG", date: "2026-04-02",
-    entry: 175.40, stop: 171.30, target: 185.00, exit: 184.20, shares: 14,
-    status: "CLOSED", setup: "Pullback to 20 EMA", marketCondition: "Trending Up",
-    emotionAtEntry: "Confident", entryQuality: 9, followedPlan: true,
-    exitReason: "Hit Target",
-    notes: "NVDA פולבק נקי ל-20 EMA. RSI עלה מ-42 ל-52, wick rejection ב-$171.38 ב-4H.",
-    lessonLearned: "סבלנות עם setup נקי משתלמת. לא רדפתי, חיכיתי לרי-טסט מדויק.",
-    maxFavorable: 8.80, maxAdverse: -1.60, _capitalAtEntry: 2915, isDemo: true,
-  },
-  {
-    id: "demo-11", ticker: "TSLA", side: "SHORT", date: "2026-04-03",
-    entry: 388.50, stop: 395.00, target: 372.00, exit: 374.20, shares: 6,
-    status: "CLOSED", setup: "Failed Breakout", marketCondition: "Trending Down",
-    emotionAtEntry: "Patient", entryQuality: 8, followedPlan: true,
-    exitReason: "Hit Target",
-    notes: "TSLA כשל בפריצה של $395 (resistance). Short entry ב-$388.50 עם stop מעל high.",
-    lessonLearned: "Failed breakouts עובדים מצוין בכיוון ההפוך. השוק כבר היה חלש.",
-    maxFavorable: -14.30, maxAdverse: 3.20, _capitalAtEntry: 3038, isDemo: true,
-  },
-  {
-    id: "demo-12", ticker: "QQQ", side: "LONG", date: "2026-04-04",
-    entry: 490.20, stop: 485.50, target: 501.00, exit: 485.50, shares: 3,
-    status: "CLOSED", setup: "Breakout", marketCondition: "Volatile",
-    emotionAtEntry: "FOMO", entryQuality: 3, followedPlan: false,
-    exitReason: "Stop Loss",
-    notes: "נכנסתי ל-QQQ breakout בשוק volatile. Volume לא אישר, שוק היה choppy.",
-    lessonLearned: "Breakouts בשוק volatile ללא volume = false breakout. לבדוק VIX לפני entry.",
-    maxFavorable: 1.20, maxAdverse: -4.70, _capitalAtEntry: 3124, isDemo: true,
-  },
-  {
-    id: "demo-13", ticker: "AAPL", side: "LONG", date: "2026-04-07",
-    entry: 235.40, stop: 231.20, target: 244.00, exit: 243.20, shares: 12,
-    status: "CLOSED", setup: "Pullback to 20 EMA", marketCondition: "Trending Up",
-    emotionAtEntry: "Confident", entryQuality: 9, followedPlan: true,
-    exitReason: "Hit Target",
-    notes: "AAPL פולבק ל-20 EMA ב-$235. Volume נמוך על הפולבק — מוכרים מיצו כוח.",
-    lessonLearned: "Volume נמוך על pullback = מוכרים חלשים. כניסה עם RSI מ-45 ל-52.",
-    maxFavorable: 7.80, maxAdverse: -1.30, _capitalAtEntry: 3110, isDemo: true,
-  },
-  {
-    id: "demo-14", ticker: "AMD", side: "LONG", date: "2026-04-08",
-    entry: 195.80, stop: 191.50, target: 206.00, exit: 205.20, shares: 12,
-    status: "CLOSED", setup: "Higher Low", marketCondition: "Trending Up",
-    emotionAtEntry: "Calm", entryQuality: 8, followedPlan: true,
-    exitReason: "Hit Target",
-    notes: "AMD Higher Low ב-$194.80. Technicals מתיישרים, MA stack תקין.",
-    lessonLearned: "AMD מגיב טוב ל-HL בטרנד עולה. להמתין לאישור ב-1H לפני כניסה.",
-    maxFavorable: 9.40, maxAdverse: -1.80, _capitalAtEntry: 3215, isDemo: true,
-  },
-  {
-    id: "demo-15", ticker: "MSFT", side: "LONG", date: "2026-04-09",
-    entry: 418.20, stop: 413.50, target: 430.00, exit: 418.80, shares: 5,
-    status: "CLOSED", setup: "EMA Bounce 50", marketCondition: "Sideways",
-    emotionAtEntry: "Neutral", entryQuality: 6, followedPlan: "Partially",
-    exitReason: "Manual Exit",
-    notes: "MSFT bounce מ-50 EMA אבל שוק sideways. יצאתי מוקדם בפרופיט קטן.",
-    lessonLearned: "EMA bounces בשוק sideways = פחות אמינים. לקחת רווח קטן ולא להיות חמדן.",
-    maxFavorable: 3.20, maxAdverse: -2.10, _capitalAtEntry: 3326, isDemo: true,
-  },
-  {
-    id: "demo-16", ticker: "NVDA", side: "SHORT", date: "2026-04-10",
-    entry: 181.50, stop: 186.00, target: 172.00, exit: 172.80, shares: 13,
-    status: "CLOSED", setup: "Trend Continuation", marketCondition: "Trending Down",
-    emotionAtEntry: "Confident", entryQuality: 9, followedPlan: true,
-    exitReason: "Hit Target",
-    notes: "NVDA שבר תמיכה ב-$182. Trend continuation קצר — short עם momentum.",
-    lessonLearned: "Shorts בטרנד יורד = אותה לוגיקה כמו longs בטרנד עולה. לא לפחד.",
-    maxFavorable: -8.70, maxAdverse: 2.10, _capitalAtEntry: 3329, isDemo: true,
-  },
-  {
-    id: "demo-17", ticker: "META", side: "LONG", date: "2026-04-13",
-    entry: 632.00, stop: 625.50, target: 648.00, exit: 647.20, shares: 4,
-    status: "CLOSED", setup: "Cup and Handle", marketCondition: "Trending Up",
-    emotionAtEntry: "Patient", entryQuality: 10, followedPlan: true,
-    exitReason: "Hit Target",
-    notes: "META Cup and Handle קלאסית. Handle pullback ל-$628, פריצת rim ב-$632.",
-    lessonLearned: "מ-meta למדתי שהתבנית הזו צריכה זמן. הסבלנות שילמה.",
-    maxFavorable: 15.20, maxAdverse: -1.80, _capitalAtEntry: 3440, isDemo: true,
-  },
-  {
-    id: "demo-18", ticker: "BTC-USD", side: "LONG", date: "2026-04-14",
-    entry: 74500, stop: 72800, target: 78000, exit: 73200, shares: 0.032,
-    status: "CLOSED", setup: "Range Breakout", marketCondition: "Volatile",
-    emotionAtEntry: "Hesitant", entryQuality: 4, followedPlan: "Partially",
-    exitReason: "Stop Loss",
-    notes: "BTC breakout ב-$74.5K אבל crypto volatile. יצאתי ב-partial loss.",
-    lessonLearned: "Crypto volatile + hesitant = combination גרועה. לסחור עם conviction.",
-    maxFavorable: 800, maxAdverse: -1300, _capitalAtEntry: 3500, isDemo: true,
-  },
-  {
-    id: "demo-19", ticker: "TSLA", side: "LONG", date: "2026-04-16",
-    entry: 420.00, stop: 414.50, target: 434.00, exit: 414.50, shares: 7,
-    status: "CLOSED", setup: "Breakout", marketCondition: "Volatile",
-    emotionAtEntry: "FOMO", entryQuality: 3, followedPlan: false,
-    exitReason: "Stop Loss",
-    notes: "TSLA ניסה breakout ב-$420 אבל rejected. FOMO כניסה בלי אישור.",
-    lessonLearned: "TSLA volatile + FOMO = שילוב מסוכן. להמתין תמיד לאישור volume.",
-    maxFavorable: 2.50, maxAdverse: -5.50, _capitalAtEntry: 3458, isDemo: true,
-  },
-  {
-    id: "demo-20", ticker: "AAPL", side: "LONG", date: "2026-04-18",
-    entry: 268.50, stop: 264.20, target: 278.00, exit: 277.30, shares: 9,
-    status: "CLOSED", setup: "Pullback to 20 EMA", marketCondition: "Trending Up",
-    emotionAtEntry: "Patient", entryQuality: 9, followedPlan: true,
-    exitReason: "Hit Target",
-    notes: "AAPL pullback ל-20 EMA אחרי 12 ימי עלייה. Volume נמוך על הפולבק, RSI ב-48.",
-    lessonLearned: "Pullbacks לAAPL ב-20 EMA = entries איכותיים. הסבלנות חיונית.",
-    maxFavorable: 8.80, maxAdverse: -1.50, _capitalAtEntry: 3415, isDemo: true,
-  },
-  {
-    id: "demo-21", ticker: "AMD", side: "LONG", date: "2026-04-19",
-    entry: 290.40, stop: 285.00, target: 305.00, exit: 303.50, shares: 7,
-    status: "CLOSED", setup: "EMA Bounce 50", marketCondition: "Trending Up",
-    emotionAtEntry: "Calm", entryQuality: 8, followedPlan: true,
-    exitReason: "Hit Target",
-    notes: "AMD bounce מ-50 EMA ב-$290 אחרי 3 ימי דחיסה. RSI ב-50, volume סביר.",
-    lessonLearned: "AMD מגיב יפה ל-50 EMA. סבלנות עם הסטאפים הקלאסיים.",
-    maxFavorable: 12.60, maxAdverse: -2.30, _capitalAtEntry: 3494, isDemo: true,
-  },
-  {
-    id: "demo-22", ticker: "META", side: "LONG", date: "2026-04-22",
-    entry: 622.00, stop: 615.50, target: 638.00, exit: 615.50, shares: 4,
-    status: "CLOSED", setup: "Breakout", marketCondition: "Trending Down",
-    emotionAtEntry: "FOMO", entryQuality: 4, followedPlan: false,
-    exitReason: "Stop Loss",
-    notes: "ניסיתי breakout ב-$622 אבל השוק נחלש. Bull trap קלאסי.",
-    lessonLearned: "Breakouts בשוק יורד = bull traps. לבדוק כיוון השוק לפני כל entry.",
-    maxFavorable: 1.80, maxAdverse: -6.50, _capitalAtEntry: 3585, isDemo: true,
-  },
-  {
-    id: "demo-23", ticker: "NVDA", side: "LONG", date: "2026-04-23",
-    entry: 199.80, stop: 196.50, target: 208.00, exit: 207.20, shares: 12,
-    status: "CLOSED", setup: "Pullback to 20 EMA", marketCondition: "Trending Up",
-    emotionAtEntry: "Confident", entryQuality: 10, followedPlan: true,
-    exitReason: "Hit Target",
-    notes: "NVDA pullback ל-20 EMA ב-$199.80 עם hammer. Volume נמוך על הפולבק.",
-    lessonLearned: "NVDA + 20 EMA + Trending Up = setup מנצח. הסטאפ הכי רווחי שלי.",
-    maxFavorable: 7.40, maxAdverse: -1.20, _capitalAtEntry: 3559, isDemo: true,
-  },
-  {
-    id: "demo-24", ticker: "MSFT", side: "LONG", date: "2026-04-23",
-    entry: 424.20, stop: 419.50, target: 436.00, exit: 434.80, shares: 5,
-    status: "CLOSED", setup: "Post Earnings Strength", marketCondition: "Trending Up",
-    emotionAtEntry: "Confident", entryQuality: 9, followedPlan: true,
-    exitReason: "Hit Target",
-    notes: "MSFT אחרי דוחות חזקים — beat EPS ב-12%. Gap up + hold above $424.",
-    lessonLearned: "Post-earnings עם beat גדול = momentum trade מנצח. לא להחמיץ.",
-    maxFavorable: 11.80, maxAdverse: -1.60, _capitalAtEntry: 3647, isDemo: true,
-  },
-  {
-    id: "demo-25", ticker: "AMD", side: "LONG", date: "2026-04-24",
-    entry: 305.00, stop: 300.50, target: 315.00, exit: 313.20, shares: 7,
-    status: "CLOSED", setup: "Trend Continuation", marketCondition: "Trending Up",
-    emotionAtEntry: "Patient", entryQuality: 9, followedPlan: true,
-    exitReason: "Hit Target",
-    notes: "AMD trend continuation אחרי הרמת רף. Volume תקין, MA stack מושלם.",
-    lessonLearned: "AMD בטרנד חזק = עקבי. לא לחפש כניסות אגרסיביות, פשוט לעקוב.",
-    maxFavorable: 8.20, maxAdverse: -1.80, _capitalAtEntry: 3701, isDemo: true,
-  },
-  {
-    id: "demo-26", ticker: "BTC-USD", side: "LONG", date: "2026-04-24",
-    entry: 76200, stop: 74500, target: 79500, exit: 78850, shares: 0.030,
-    status: "CLOSED", setup: "Pullback to 20 EMA", marketCondition: "Trending Up",
-    emotionAtEntry: "Patient", entryQuality: 8, followedPlan: true,
-    exitReason: "Hit Target",
-    notes: "BTC pullback ל-20 EMA ב-$76.2K. Volume על הכניסה +200%.",
-    lessonLearned: "BTC עם EMA pullback + volume = נוסחה עובדת.",
-    maxFavorable: 2650, maxAdverse: -420, _capitalAtEntry: 3758, isDemo: true,
-  },
-  {
-    id: "demo-27", ticker: "TSLA", side: "LONG", date: "2026-04-22",
-    entry: 388.00, stop: 382.50, target: 402.00, exit: 384.50, shares: 6,
-    status: "CLOSED", setup: "Range Breakout", marketCondition: "Sideways",
-    emotionAtEntry: "Hesitant", entryQuality: 5, followedPlan: "Partially",
-    exitReason: "Manual Exit",
-    notes: "Breakout ב-$388 אבל volume לא משכנע. בשוק sideways יצאתי מוקדם.",
-    lessonLearned: "לא כל breakout שווה. ה-volume הוא המורה האמיתי.",
-    maxFavorable: 2.80, maxAdverse: -3.50, _capitalAtEntry: 3759, isDemo: true,
-  },
-  {
-    id: "demo-28", ticker: "AAPL", side: "SHORT", date: "2026-04-21",
-    entry: 282.50, stop: 287.00, target: 273.00, exit: 287.00, shares: 8,
-    status: "CLOSED", setup: "Failed Breakout", marketCondition: "Trending Up",
-    emotionAtEntry: "Angry", entryQuality: 3, followedPlan: false,
-    exitReason: "Stop Loss",
-    notes: "ניסיתי short ב-AAPL אחרי כישלון פריצה אבל שוק trending up.",
-    lessonLearned: "אסור לסחור short בשוק trending up חזק. הולך נגד המומנטום הראשי.",
-    maxFavorable: -2.40, maxAdverse: 4.50, _capitalAtEntry: 3736, isDemo: true,
-  },
-  {
-    id: "demo-29", ticker: "NVDA", side: "LONG", date: "2026-04-20",
-    entry: 191.00, stop: 187.50, target: 199.00, exit: 198.50, shares: 13,
-    status: "CLOSED", setup: "Higher Low", marketCondition: "Trending Up",
-    emotionAtEntry: "Confident", entryQuality: 9, followedPlan: true,
-    exitReason: "Hit Target",
-    notes: "NVDA HL ב-$190 אחרי טסט קצר. Volume על הrebound גבוה, RSI מתאושש.",
-    lessonLearned: "HL בטרנד עולה = entries הכי טובים שלי. לחכות לאישור ולהיכנס.",
-    maxFavorable: 7.50, maxAdverse: -1.20, _capitalAtEntry: 3700, isDemo: true,
-  },
-  {
-    id: "demo-30", ticker: "SPY", side: "LONG", date: "2026-04-24",
-    entry: 595.20, stop: 591.00, target: 604.00, exit: 603.20, shares: 6,
-    status: "CLOSED", setup: "Trend Continuation", marketCondition: "Trending Up",
-    emotionAtEntry: "Calm", entryQuality: 8, followedPlan: true,
-    exitReason: "Hit Target",
-    notes: "SPY trend continuation — כלל השוק trending up, MA stack מושלם.",
-    lessonLearned: "SPY בטרנד חזק = safe trade. לסחור עם השוק, לא נגדו.",
-    maxFavorable: 8.00, maxAdverse: -1.80, _capitalAtEntry: 3736, isDemo: true,
-  },
-];
 
 const POPULAR_TICKERS = [
   { symbol: "NVDA", name: "NVIDIA Corporation", exchange: "NASDAQ", type: "EQUITY" },
@@ -1269,6 +960,8 @@ export default function SwingEdge() {
 
   // Modals + PWA install
   const [showHelpModal, setShowHelpModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [lastImportIds, setLastImportIds] = useState([]);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showChartGuide, setShowChartGuide] = useState(false);
   const [showBillingModal, setShowBillingModal] = useState(false);
@@ -1780,7 +1473,6 @@ export default function SwingEdge() {
   }, [marketState, moRange]);
 
   const realTrades = useMemo(() => trades.filter(t => !t.isDemo), [trades]);
-  const demoTrades = useMemo(() => trades.filter(t => t.isDemo), [trades]);
   const equityCurve = useMemo(() => generateEquityCurve(capital, realTrades), [realTrades, capital]);
   const closedTrades = realTrades.filter(t => t.status === "CLOSED");
   const openTrades   = realTrades.filter(t => t.status === "OPEN");
@@ -2193,6 +1885,7 @@ export default function SwingEdge() {
       _prediction: predictionSnapshot,
     };
     setTrades(prev => [...prev, newTrade]);
+    setLastImportIds([]);
     // Sync new trade to Supabase (primary source of truth)
     if (isSupabaseConfigured && supabase && authUser?.id) {
       supabase.from("trades").insert(tradeForSupabase({ ...newTrade, user_id: authUser.id, is_demo: false }))
@@ -2221,6 +1914,7 @@ export default function SwingEdge() {
     // Close the loop: grade the prediction we made at entry.
     try { SwingEdgeAI.reinforceFromTrade(closedTrade); } catch { /* learning is best-effort */ }
     setTrades(prev => prev.map(t => t.id === closingTrade.id ? closedTrade : t));
+    setLastImportIds([]);
     // Sync close to Supabase
     if (isSupabaseConfigured && supabase && authUser?.id && closedTrade.id) {
       try {
@@ -2252,6 +1946,7 @@ export default function SwingEdge() {
     });
     if (ok) {
       setTrades(prev => prev.filter(t => t.id !== tradeId));
+      setLastImportIds([]);
       // Sync delete to Supabase
       if (isSupabaseConfigured && supabase && authUser?.id && tradeId) {
         try {
@@ -2281,6 +1976,7 @@ export default function SwingEdge() {
     if (!ok) return;
     const idSet = new Set(ids);
     setTrades(prev => prev.filter(t => !idSet.has(t.id)));
+    setLastImportIds([]);
     if (isSupabaseConfigured && supabase && authUser?.id) {
       try {
         const { error } = await supabase.from("trades")
@@ -2304,6 +2000,7 @@ export default function SwingEdge() {
   const handleEditSubmit = async (updated) => {
     if (!updated || !updated.id) return;
     setTrades(prev => prev.map(t => t.id === updated.id ? updated : t));
+    setLastImportIds([]);
     // Sync edit to Supabase
     if (isSupabaseConfigured && supabase && authUser?.id && updated.id) {
       try {
@@ -2318,51 +2015,39 @@ export default function SwingEdge() {
     toast.success(lang === "he" ? "העסקה עודכנה" : "Trade updated");
   };
 
-  // ─── DEMO TRADES LOADER ─────────────────────────────────────────────────
-  // Replaces any existing demo trades with the full 30-trade set,
-  // preserving all real (non-demo) trades. Each run assigns fresh UUIDs
-  // so re-loading is always clean. Persists via setTrades → useEffect.
-  const handleLoadDemoTrades = async () => {
-    const userId = authUser?.id || null;
+  // ─── JOURNAL IMPORT (Wave 10) ───────────────────────────────────────────
+  // Universal CSV/XLSX import. The wizard hands us ready-built trade objects
+  // (client-generated ids, isDemo:false). We append them, persist to Supabase
+  // for logged-in users, and remember the batch's ids so the import can be
+  // undone until the next add/close/edit/delete.
+  const handleImportTrades = (imported) => {
+    if (!imported || imported.length === 0) return;
+    const ids = imported.map(t => t.id);
+    setTrades(prev => [...prev, ...imported]);
+    setLastImportIds(ids);
+    setShowImportModal(false);
 
-    // 1. Keep only real trades, discard old demo trades
-    const realTrades = trades.filter(t => !t.isDemo);
-    const demoWithUserId = DEMO_TRADES.map((t, i) => {
-      // Deterministic 1–15 calendar-day swing hold, derived from index so the
-      // scatter spreads across the X-axis identically on every reload.
-      const holdD = (i % 15) + 1;
-      const close = new Date(t.date + "T20:00:00");
-      close.setDate(close.getDate() + holdD);   // local-time add → holdDays == holdD
-      const now = new Date();
-      if (close.getTime() > now.getTime()) close.setTime(now.getTime()); // never future
-      return {
-        ...t,
-        user_id: userId,
-        id: crypto.randomUUID(),        // fresh UUID every load — no stale IDs
-        createdAt: new Date(t.date + "T14:30:00").toISOString(),
-        closedAt:  close.toISOString(),
-        tradeImage: null,
-        _prediction: null,
-      };
-    });
-
-    // 2. Update state → useEffect auto-saves to localStorage
-    setTrades([...realTrades, ...demoWithUserId]);
-
-    // 3. Best-effort Supabase: delete old demos, insert fresh ones
-    if (isSupabaseConfigured && supabase && userId) {
-      try {
-        await supabase.from("trades")
-          .delete()
-          .eq("user_id", userId)
-          .eq("isDemo", true);
-        await supabase.from("trades")
-          .upsert(demoWithUserId, { onConflict: "id" });
-      } catch { /* ignore — local state is still saved */ }
+    if (isSupabaseConfigured && supabase && authUser?.id) {
+      supabase.from("trades")
+        .insert(imported.map(t => tradeForSupabase({ ...t, user_id: authUser.id, is_demo: false })))
+        .then(({ error }) => { if (error) console.warn("[import] supabase insert:", error.message); });
     }
 
-    toast.success(lang === "he" ? `נטענו ${demoWithUserId.length} עסקאות דמו` : `Loaded ${demoWithUserId.length} demo trades`);
+    toast.success(t.imp_success.replace("{n}", imported.length));
     setTab("journal");
+  };
+
+  // Session-only undo: drop the last imported batch from state (+ Supabase).
+  const handleUndoImport = () => {
+    if (lastImportIds.length === 0) return;
+    const idSet = new Set(lastImportIds);
+    setTrades(prev => prev.filter(t => !idSet.has(t.id)));
+    setLastImportIds([]);
+    if (isSupabaseConfigured && supabase && authUser?.id) {
+      supabase.from("trades").delete().in("id", lastImportIds).eq("user_id", authUser.id)
+        .then(({ error }) => { if (error) console.warn("[import] supabase undo:", error.message); });
+    }
+    toast.info(t.imp_undo_done);
   };
 
   // ── Mentoring (B4.2) ──────────────────────────────────────────────────
@@ -3284,11 +2969,18 @@ export default function SwingEdge() {
                   {t.welcomeBody1}<br/>
                   {t.welcomeBody2}
                 </p>
-                <button
-                  onClick={() => setTab('journal')}
-                  className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2.5 rounded-xl font-semibold transition-all shadow-lg shadow-blue-500/20">
-                  ➕ {t.addFirstTrade}
-                </button>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  <button
+                    onClick={() => setTab('journal')}
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2.5 rounded-xl font-semibold transition-all shadow-lg shadow-blue-500/20">
+                    ➕ {t.addFirstTrade}
+                  </button>
+                  <button
+                    onClick={() => setShowImportModal(true)}
+                    className="bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 px-6 py-2.5 rounded-xl font-semibold transition-all inline-flex items-center gap-1.5">
+                    <Upload size={15} /> {t.importJournalBtn}
+                  </button>
+                </div>
               </div>
             )}
             {/* KPI Row */}
@@ -3751,6 +3443,10 @@ export default function SwingEdge() {
                   className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:border-[#00C076]/30 hover:text-[var(--v3-accent)] transition">
                   <Download size={11} /> CSV
                 </button>
+                <button onClick={() => setShowImportModal(true)}
+                  className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:border-[#06b6d4]/30 hover:text-[var(--v3-info)] transition">
+                  <Upload size={11} /> {t.importJournalBtn}
+                </button>
                 {openTrades.length > 0 && pricesLastUpdated && (
                   <span className="text-[10px] text-slate-700 font-mono hidden md:inline">
                     {lang === "he" ? "עודכן" : "Updated"} {fmtTimeAgo(pricesLastUpdated)}
@@ -3887,16 +3583,16 @@ export default function SwingEdge() {
             ) : trades.length === 0 ? (
               <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-2xl p-12 text-center">
                 <BookOpen size={36} className="mx-auto text-slate-600 mb-4" />
-                <h3 className="se-serif text-2xl md:text-3xl text-white mb-2 tracking-tight">{lang === "he" ? "כאן מתחיל התיעוד שלך" : "Your record starts here"}</h3>
-                <p className="text-xs text-slate-500 mb-5 max-w-sm mx-auto leading-relaxed">{lang === "he" ? "כל עסקה היא נתון. הוסף את הראשונה — או טען 30 לדוגמה." : "Every trade is a data point. Add your first — or load 30 demo trades."}</p>
+                <h3 className="se-serif text-2xl md:text-3xl text-white mb-2 tracking-tight">{t.emptyTitle}</h3>
+                <p className="text-xs text-slate-500 mb-5 max-w-sm mx-auto leading-relaxed">{t.emptyBody}</p>
                 <div className="flex flex-wrap items-center justify-center gap-2">
                   <button data-tour="add-trade" onClick={() => { setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null }); setOcrStatus(null); setShowForm(true); }}
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--v3-accent)] text-black font-bold text-xs hover:opacity-90 transition">
                     <Plus size={13} /> {lang === "he" ? "עסקה ראשונה" : "Add First Trade"}
                   </button>
-                  <button onClick={handleLoadDemoTrades}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 text-amber-300 font-bold text-xs hover:opacity-90 transition">
-                    <Download size={13} /> 📊 {lang === "he" ? "טען עסקאות לדוגמה" : "Load Demo Trades"}
+                  <button onClick={() => setShowImportModal(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 font-bold text-xs hover:bg-cyan-500/25 transition">
+                    <Upload size={13} /> {t.importJournalBtn}
                   </button>
                 </div>
               </div>
@@ -5950,23 +5646,20 @@ export default function SwingEdge() {
                 </p>
               </div>
 
-              {/* ── DEMO TRADES ── */}
+              {/* ── IMPORT JOURNAL ── */}
               <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-3">
-                  <FlaskConical size={16} className="text-[var(--v3-info)]" />
-                  <h3 className="text-sm font-bold text-white">{t.demoTrades}</h3>
+                  <Upload size={16} className="text-[var(--v3-info)]" />
+                  <h3 className="text-sm font-bold text-white">{t.imp_title}</h3>
                 </div>
                 <p className="text-xs text-[var(--v3-text-lo)] mb-3">
-                  {t.loadDemoLong}
+                  {t.imp_step1_body}
                 </p>
                 <button
-                  onClick={handleLoadDemoTrades}
+                  onClick={() => setShowImportModal(true)}
                   className="w-full py-2.5 rounded-lg bg-[var(--v3-info-glow)] border border-[#06b6d4]/30 text-[var(--v3-info)] text-xs font-bold hover:bg-[#06b6d4]/20 transition flex items-center justify-center gap-2">
-                  <Download size={12} /> 📊 {t.loadDemoBtn}
+                  <Upload size={12} /> {t.importJournalBtn}
                 </button>
-                <p className="text-[10px] text-[var(--v3-text-lo)] mt-2">
-                  {t.loadDemoNote}
-                </p>
               </div>
 
               {/* ── TILTMETER ── */}
@@ -6778,7 +6471,29 @@ export default function SwingEdge() {
       )}
 
       {/* ── HELP MODAL ── */}
-      {showHelpModal && <HelpModal onClose={() => setShowHelpModal(false)} onStartTour={() => { setShowHelpModal(false); startTour(); }} t={t} demoCount={DEMO_TRADES.length} />}
+      {showHelpModal && <HelpModal onClose={() => setShowHelpModal(false)} onStartTour={() => { setShowHelpModal(false); startTour(); }} t={t} />}
+
+      {/* ── IMPORT JOURNAL MODAL ── */}
+      <ImportJournalModal
+        open={showImportModal}
+        lang={lang}
+        t={t}
+        capital={capital}
+        existingTrades={trades}
+        onClose={() => setShowImportModal(false)}
+        onImport={handleImportTrades}
+      />
+
+      {/* ── UNDO IMPORT BAR (session-only) ── */}
+      {lastImportIds.length > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[90] flex items-center gap-3 px-4 py-2.5 rounded-xl bg-[#0d1424] border border-white/10 shadow-2xl animate-fade-in">
+          <span className="text-xs text-slate-300">{t.imp_success.replace("{n}", lastImportIds.length)}</span>
+          <button onClick={handleUndoImport}
+            className="text-xs font-bold text-cyan-300 hover:text-cyan-200 inline-flex items-center gap-1">
+            <Undo2 size={13} /> {t.imp_undo}
+          </button>
+        </div>
+      )}
 
       {/* ── PRIVACY MODAL ── */}
       {showPrivacyModal && <PrivacyModal onClose={() => setShowPrivacyModal(false)} t={t} />}

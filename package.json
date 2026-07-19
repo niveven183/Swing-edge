@@ -9,7 +9,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:smoke": "playwright test",
-    "test:coach": "node scripts/coach-invariance-test.mjs"
+    "test:coach": "node scripts/coach-invariance-test.mjs",
+    "test:import": "node scripts/import-test.mjs"
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
@@ -19,10 +20,12 @@
     "date-fns": "^4.4.0",
     "html2canvas": "^1.4.1",
     "lucide-react": "^0.577.0",
+    "papaparse": "^5.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.18.1",
-    "recharts": "^2.13.3"
+    "recharts": "^2.13.3",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
