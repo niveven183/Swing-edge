@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test:smoke": "playwright test",
     "test:coach": "node scripts/coach-invariance-test.mjs",
-    "test:import": "node scripts/import-test.mjs"
+    "test:import": "node scripts/import-test.mjs",
+    "test:settings": "node scripts/userSettings-test.mjs"
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
