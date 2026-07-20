@@ -42,7 +42,7 @@ import MobileTradeCard from "./src/components/MobileTradeCard.jsx";
 import { TVTickerTape } from "./src/components/TradingViewWidgets.jsx";
 import { useToast, useConfirm } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured, tradeForSupabase } from "./src/supabaseClient.js";
-import { loadSettings, migrateFromLocalStorage } from "./src/lib/userSettings.js";
+import { loadSettings, saveSettings, flushSettings, migrateFromLocalStorage } from "./src/lib/userSettings.js";
 import { calcTradeMetrics, fmt$, fmtR, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays } from "./src/utils.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -870,6 +870,12 @@ export default function SwingEdge() {
   const authUser = session?.user || null;
   const isAdmin = (authUser?.email || "").toLowerCase() === "niveven183@gmail.com";
 
+  // Settings persistence gate (M2b): the persist effect must NOT fire before hydration
+  // resolves, or the first render pushes DEFAULT_CAPITAL to the DB and clobbers real data.
+  // hydratedRef gates the write; hydrationDone (state) re-triggers the betaWelcome decision.
+  const hydratedRef = useRef(false);
+  const [hydrationDone, setHydrationDone] = useState(false);
+
   // Toast + Confirm (UX infrastructure)
   const toast = useToast();
   const confirmDialog = useConfirm();
@@ -906,11 +912,14 @@ export default function SwingEdge() {
   const [showBetaWelcome, setShowBetaWelcome] = useState(false);
   useEffect(() => {
     if (!authUser) { setShowBetaWelcome(false); return; }
+    // Wait for hydration to decide: it may write the per-user key (and swingEdgeTourDone)
+    // from the DB, so deferring closes the new-device / tour race at its source.
+    if (!hydrationDone) return;
     try {
       const key = `swingEdgeBetaWelcome:${authUser.id}`;
       if (!localStorage.getItem(key)) setShowBetaWelcome(true);
     } catch {}
-  }, [authUser?.id]);
+  }, [authUser?.id, hydrationDone]);
 
   // Guided tour — runs once, right after BetaWelcome is dismissed (wave 3a).
   // Default false so plain reloads and existing users never auto-trigger; only
@@ -933,7 +942,7 @@ export default function SwingEdge() {
     try { localStorage.setItem(`swingEdgeBetaWelcome:${authUser.id}`, "1"); } catch {}
     setShowBetaWelcome(false);
     try {
-      if (!localStorage.getItem("swingEdgeTourDone")) { setTab("dashboard"); setShowTour(true); }
+      if (hydratedRef.current && !localStorage.getItem("swingEdgeTourDone")) { setTab("dashboard"); setShowTour(true); }
     } catch {}
   }, [authUser?.id]);
 
@@ -1250,7 +1259,14 @@ export default function SwingEdge() {
     // Snapshot presence of locally-saved collections BEFORE any await: the
     // watchlist/alerts persist effects (defined below) write defaults on mount and
     // would otherwise mask "the user had nothing local".
-    const had = (k) => { try { return !!localStorage.getItem(k); } catch { return false; } };
+    const had = (k) => {
+      try {
+        const raw = localStorage.getItem(k);
+        if (!raw) return false;
+        const t = raw.trim();
+        return t !== "" && t !== "{}" && t !== "[]";
+      } catch { return false; }
+    };
     const hadWatchlist = had("swingEdgeWatchlist");
     const hadAlerts = had("swingEdgePriceAlerts");
     const hadPlaybook = had("swingEdgePlaybook");
@@ -1258,7 +1274,8 @@ export default function SwingEdge() {
     const hydrate = async () => {
       await migrateFromLocalStorage(authUser.id); // DB row wins if it already exists
       const s = await loadSettings(authUser.id);
-      if (cancelled || !s) return;
+      if (cancelled) return;
+      if (!s) { hydratedRef.current = true; setHydrationDone(true); return; }
 
       if (typeof s.capital === "number" && s.capital > 0) {
         setCapital(s.capital);
@@ -1292,10 +1309,64 @@ export default function SwingEdge() {
       if (s.tourDone === true) {
         try { localStorage.setItem("swingEdgeTourDone", "1"); } catch {}
       }
+      // betaWelcome: if the DB says the user already dismissed it, set the per-user key
+      // so the (hydrationDone-gated) betaWelcome effect won't re-show it on a new device.
+      if (s.betaWelcome === true) {
+        try { localStorage.setItem(`swingEdgeBetaWelcome:${authUser.id}`, "1"); } catch {}
+      }
+
+      hydratedRef.current = true;
+      setHydrationDone(true);
     };
 
     hydrate();
     return () => { cancelled = true; };
+  }, [authUser?.id]);
+
+  // ── Persist user settings → DB (M2b). Watches the settings state and pushes via
+  // saveSettings (own merge + 1000ms debounce). Gated on hydratedRef so the initial
+  // default render can't clobber real DB data. tourDone/betaWelcome have no React state,
+  // so they're read from localStorage here and sync opportunistically on the next change.
+  useEffect(() => {
+    if (!authUser?.id || !hydratedRef.current) return;
+    let tourDone = false, betaWelcome = false;
+    try { tourDone = localStorage.getItem("swingEdgeTourDone") === "1"; } catch {}
+    try { betaWelcome = localStorage.getItem(`swingEdgeBetaWelcome:${authUser.id}`) === "1"; } catch {}
+
+    const patch = {
+      capital, riskPct, lang,
+      watchlist: watchlistItems,
+      priceAlerts,
+      playbook: playbookSetups,
+      tourDone,
+      betaWelcome,
+    };
+    // Onboarding: sync the authoritative mirror blob verbatim ({completed,answers,profile,
+    // completedAt}) instead of lossily rebuilding from the flattened userProfile. Whenever
+    // showOnboarding===false && userProfile, swingEdgeOnboarding is guaranteed present.
+    if (showOnboarding === false && userProfile) {
+      try {
+        const raw = localStorage.getItem("swingEdgeOnboarding");
+        if (raw) patch.onboarding = JSON.parse(raw);
+      } catch {}
+    }
+    saveSettings(authUser.id, patch);
+  }, [capital, riskPct, lang, watchlistItems, priceAlerts, playbookSetups, userProfile, showOnboarding]);
+
+  // Flush the pending debounced settings write on logout / user-switch / tab-hide, so the
+  // last change isn't lost. Gated on hydratedRef so a premature flush can't upsert an empty
+  // cache over freshly-migrated data.
+  useEffect(() => {
+    if (!authUser?.id) return;
+    const uid = authUser.id;
+    const flush = () => { if (hydratedRef.current) flushSettings(uid); };
+    window.addEventListener("beforeunload", flush);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("beforeunload", flush);
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
   }, [authUser?.id]);
 
   // Persist trades to localStorage
