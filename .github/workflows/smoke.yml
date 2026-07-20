@@ -27,7 +27,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Run smoke tests
         env:
-          TEST_URL: ${{ vars.TEST_URL || 'https://swing-edge.vercel.app' }}
+          TEST_URL: ${{ vars.TEST_URL || 'https://swing-edge.com' }}
         run: npx playwright test
       - name: Upload report + traces
         if: ${{ failure() }}

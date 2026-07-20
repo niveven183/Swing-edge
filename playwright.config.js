@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 // Smoke suite targets the deployed app (production by default). Override with TEST_URL.
-const BASE_URL = process.env.TEST_URL || 'https://swing-edge.vercel.app';
+const BASE_URL = process.env.TEST_URL || 'https://swing-edge.com';
 const CI = !!process.env.CI;
 
 export default defineConfig({

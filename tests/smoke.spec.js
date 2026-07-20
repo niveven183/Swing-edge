@@ -5,7 +5,7 @@ import { test, expect } from '@playwright/test';
 // flows (production /app is auth-gated; market data is verified via the public
 // /api/quote proxy that powers the Market Overview panel).
 
-const BASE_URL = process.env.TEST_URL || 'https://swing-edge.vercel.app';
+const BASE_URL = process.env.TEST_URL || 'https://swing-edge.com';
 const BASE_HOST = new URL(BASE_URL).host;
 
 // Substrings of console-error messages we intentionally ignore. Empty for now —

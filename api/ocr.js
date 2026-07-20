@@ -237,13 +237,14 @@ const SUPABASE_ANON_KEY =
 
 // Allow only the app's own origins to consume the endpoint cross-origin. Prod +
 // previews are *.vercel.app; local dev is localhost. Same-origin calls (the SPA
-// hitting its own /api/ocr) never hit CORS. Add custom domains here if adopted.
+// hitting its own /api/ocr) never hit CORS. Custom domain swing-edge.com is adopted.
 function resolveOrigin(origin) {
   if (!origin) return null;
   try {
     const host = new URL(origin).hostname;
     const ok =
-      host === "localhost" || host === "127.0.0.1" || host.endsWith(".vercel.app");
+      host === "localhost" || host === "127.0.0.1" || host.endsWith(".vercel.app") ||
+      host === "swing-edge.com" || host === "www.swing-edge.com";
     return ok ? origin : null;
   } catch {
     return null;
