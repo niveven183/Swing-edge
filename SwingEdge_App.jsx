@@ -42,6 +42,7 @@ import MobileTradeCard from "./src/components/MobileTradeCard.jsx";
 import { TVTickerTape } from "./src/components/TradingViewWidgets.jsx";
 import { useToast, useConfirm } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured, tradeForSupabase } from "./src/supabaseClient.js";
+import { loadSettings, migrateFromLocalStorage } from "./src/lib/userSettings.js";
 import { calcTradeMetrics, fmt$, fmtR, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays } from "./src/utils.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -1236,6 +1237,64 @@ export default function SwingEdge() {
       }
     };
     loadTrades();
+    return () => { cancelled = true; };
+  }, [authUser?.id]);
+
+  // ── Hydrate user settings: one-shot localStorage→DB migration bridge, then load
+  // the DB blob and selectively reconcile into existing state. Writes (setItem) are
+  // untouched here (M2b). Mirrors loadTrades (guard + cancelled + [authUser?.id]).
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase || !authUser?.id) return;
+    let cancelled = false;
+
+    // Snapshot presence of locally-saved collections BEFORE any await: the
+    // watchlist/alerts persist effects (defined below) write defaults on mount and
+    // would otherwise mask "the user had nothing local".
+    const had = (k) => { try { return !!localStorage.getItem(k); } catch { return false; } };
+    const hadWatchlist = had("swingEdgeWatchlist");
+    const hadAlerts = had("swingEdgePriceAlerts");
+    const hadPlaybook = had("swingEdgePlaybook");
+
+    const hydrate = async () => {
+      await migrateFromLocalStorage(authUser.id); // DB row wins if it already exists
+      const s = await loadSettings(authUser.id);
+      if (cancelled || !s) return;
+
+      if (typeof s.capital === "number" && s.capital > 0) {
+        setCapital(s.capital);
+        try { localStorage.setItem("swingEdgeCapital", String(s.capital)); } catch {}
+      }
+      if (typeof s.riskPct === "number" && s.riskPct >= 0.1 && s.riskPct <= 10) {
+        setRiskPct(s.riskPct);
+        try { localStorage.setItem("swingEdgeRiskPct", String(s.riskPct)); } catch {}
+      }
+      if (s.onboarding?.completed === true) {
+        setShowOnboarding(false);
+        setUserProfile({ ...s.onboarding.profile, ...(s.onboarding.answers || {}) });
+        try { localStorage.setItem("swingEdgeOnboarding", JSON.stringify(s.onboarding)); } catch {}
+      }
+      if (s.lang && s.lang !== lang) {
+        setLang(s.lang);
+        try { localStorage.setItem("swingEdgeLang", s.lang); } catch {}
+      }
+      if (Array.isArray(s.watchlist) && !hadWatchlist) {
+        setWatchlistItems(s.watchlist);
+        try { localStorage.setItem("swingEdgeWatchlist", JSON.stringify(s.watchlist)); } catch {}
+      }
+      if (s.priceAlerts && typeof s.priceAlerts === "object" && !hadAlerts) {
+        setPriceAlerts(s.priceAlerts);
+        try { localStorage.setItem("swingEdgePriceAlerts", JSON.stringify(s.priceAlerts)); } catch {}
+      }
+      if (Array.isArray(s.playbook) && !hadPlaybook) {
+        setPlaybookSetups(s.playbook);
+        try { localStorage.setItem("swingEdgePlaybook", JSON.stringify(s.playbook)); } catch {}
+      }
+      if (s.tourDone === true) {
+        try { localStorage.setItem("swingEdgeTourDone", "1"); } catch {}
+      }
+    };
+
+    hydrate();
     return () => { cancelled = true; };
   }, [authUser?.id]);
 
