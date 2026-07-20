@@ -424,6 +424,12 @@ A pre-distribution sprint: wire the onboarding→coach pipeline, fix data-viz ho
 
 The product is feature-complete; the launch is live.
 
+## 2026-07-20 — Infrastructure Day (CLOSED)
+- **Auth → custom domain** — Supabase Site URL + Redirect URLs moved to swing-edge.com.
+- **Settings persistence (M1/M2a/M2b)** — `user_settings` jsonb + RLS; `src/lib/userSettings.js` (load/save/flush/migrate); a hydration effect reconciles DB→state; a persist effect gated on `hydratedRef` so the first render can't clobber real data; localStorage stays a mirror.
+- **Defaults aligned to swing-edge.com** (`0132112`) — `/api/ocr` CORS allowlist + smoke/health/playwright fallbacks; `*.vercel.app` still allowed (previews).
+- **INC #5** closed. **Welcome modal** — one-time, all users, cross-device (`welcomeSeen` flag in `user_settings`); takes precedence over betaWelcome.
+
 ## Next up (הבא בתור)
 1. **Gate 2** — full **RLS audit** + **penetration** testing + **rate-limit** on `symbol-search` + **accessibility findings** from the Architecture Auditor report (alt / aria / RTL).
 2. **₪ + Stripe + pricing** — currency work is the central task (₪ pricing) + Stripe billing + **entitlement for founding users** (blocked on Privacy/ToS + identity/bank per the Sprint 2 backlog above).

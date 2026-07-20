@@ -7,6 +7,7 @@ import PrivacyModal from "./src/components/PrivacyModal.jsx";
 import ChartGuideModal from "./src/components/ChartGuideModal.jsx";
 import BillingModal from "./src/components/BillingModal.jsx";
 import BetaWelcome from "./src/components/BetaWelcome.jsx";
+import WelcomeAnnouncement from "./src/components/WelcomeAnnouncement.jsx";
 import OnboardingTour from "./src/components/OnboardingTour.jsx";
 import FeedbackTab from "./src/components/FeedbackTab.jsx";
 import IOSInstallBanner from "./src/components/IOSInstallBanner.jsx";
@@ -908,18 +909,35 @@ export default function SwingEdge() {
     setShowProfileDropdown(false);
   }, []);
 
-  // Beta welcome — shown once per user after first login
+  // Beta welcome — shown once per user after first login.
+  // Welcome announcement — one-time education modal for ALL users, tracked by the
+  // cross-device `welcomeSeen` flag in user_settings (loaded at hydration into
+  // welcomeSeenRef). It takes precedence over betaWelcome so the two never stack.
   const [showBetaWelcome, setShowBetaWelcome] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
+  const welcomeSeenRef = useRef(false); // "seen before this session", from the DB
   useEffect(() => {
-    if (!authUser) { setShowBetaWelcome(false); return; }
+    if (!authUser) { setShowBetaWelcome(false); setShowWelcome(false); return; }
     // Wait for hydration to decide: it may write the per-user key (and swingEdgeTourDone)
     // from the DB, so deferring closes the new-device / tour race at its source.
     if (!hydrationDone) return;
+    // Welcome announcement (all users, once, cross-device) takes precedence.
+    if (!welcomeSeenRef.current) {
+      if (showOnboarding === false) setShowWelcome(true); // mid-onboarding users wait
+      return; // never stack betaWelcome on top; it waits for the next session
+    }
+    // Welcome already seen (prior session) → normal betaWelcome logic.
     try {
       const key = `swingEdgeBetaWelcome:${authUser.id}`;
       if (!localStorage.getItem(key)) setShowBetaWelcome(true);
     } catch {}
-  }, [authUser?.id, hydrationDone]);
+  }, [authUser?.id, hydrationDone, showOnboarding]);
+
+  const dismissWelcome = useCallback(() => {
+    setShowWelcome(false);
+    welcomeSeenRef.current = true; // prevents betaWelcome popping this same session
+    if (authUser?.id) saveSettings(authUser.id, { welcomeSeen: true }); // merge+debounce; M2b flush covers unload
+  }, [authUser?.id]);
 
   // Guided tour — runs once, right after BetaWelcome is dismissed (wave 3a).
   // Default false so plain reloads and existing users never auto-trigger; only
@@ -1314,6 +1332,8 @@ export default function SwingEdge() {
       if (s.betaWelcome === true) {
         try { localStorage.setItem(`swingEdgeBetaWelcome:${authUser.id}`, "1"); } catch {}
       }
+      // welcomeSeen: cross-device one-time flag for the WelcomeAnnouncement modal.
+      welcomeSeenRef.current = s.welcomeSeen === true;
 
       hydratedRef.current = true;
       setHydrationDone(true);
@@ -2743,8 +2763,13 @@ export default function SwingEdge() {
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] dark:bg-[#0a0f1e] text-slate-200 font-sans flex flex-col" dir={isRTL ? "rtl" : "ltr"} style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
 
+      {/* ── WELCOME ANNOUNCEMENT (one-time, all users, cross-device) ── */}
+      {showWelcome && (
+        <WelcomeAnnouncement lang={lang} isRTL={isRTL} onStart={dismissWelcome} />
+      )}
+
       {/* ── BETA WELCOME (first login only) ── */}
-      {showBetaWelcome && (
+      {showBetaWelcome && !showWelcome && (
         <BetaWelcome
           userName={authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || userProfile?.profileName}
           onStart={dismissBetaWelcome}
