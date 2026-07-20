@@ -62,3 +62,25 @@ Every production incident gets one short entry: what broke, root cause, fix, pre
   especially in RTL. For `table-layout: auto` tables inside `overflow-x-auto` wrappers on mobile,
   either constrain/truncate the variable-width column explicitly or switch to `table-fixed` with
   measured column widths — don't rely on the browser to shrink content-driven columns to fit.
+
+## #5 — 2026-07-20 — Domain suspension (ICANN registrant verification) — first prod outage
+- **Symptom:** Both domains showed **Invalid Configuration** in Vercel; users hit
+  `ERR_CONNECTION_REFUSED`. The site was completely unreachable for ~24h (19/07 evening —
+  20/07 11:30). Code and deployments were entirely healthy — nothing in the app was at fault.
+- **Root cause:** A Namecheap "verify contact information" email (ICANN registrant verification)
+  with a **19/07 deadline** went unactioned. When the deadline passed the registrar **suspended
+  the domain**, which propagated through DNS and pulled the domains offline. Not a Vercel, build,
+  or DNS-config problem — a registrant-verification lapse.
+- **Misread precursor:** UptimeRobot began **flapping on the evening of 19/07**
+  (see `docs/HEALTH-FLAPPING-DIAGNOSIS.md`). It was attributed to transient blips; in reality it
+  was the suspension propagating through DNS. The `/api/health` hardening done in response
+  (`b98135e`) was chasing the wrong root cause but remains a legitimate improvement and stays.
+- **Process failure:** The Dispatcher agent classified the registrar email as "account noise,"
+  and Claude confirmed that classification — so a 🔴 infrastructure-critical message was triaged
+  away instead of surfaced.
+- **Fix:** Completed the registrant verification at 11:22 → domain returned to **ACTIVE**
+  immediately → DNS recovered within minutes and both domains resolved again.
+- **Prevention:** Auto-Renew confirmed **ON** (verified). Agent directive: **infrastructure email
+  (registrar / domain / DNS / hosting) is 🔴 and NEVER "noise"** — always surface it. Add an
+  UptimeRobot monitor on the **domain itself** (not just the app health endpoint). Calendar
+  reminder set for **June 2027** ahead of the next verification/renewal window.
