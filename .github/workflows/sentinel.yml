@@ -190,7 +190,8 @@ jobs:
 
           # ---- C. Domain expiry (RDAP) — daily only -------------------------
           if [ "$daily" = "1" ]; then
-            rdap="$(curl -sS --max-time 15 "https://rdap.org/domain/$DOMAIN" 2>/dev/null || echo '')"
+            # -L: rdap.org 302-redirects to the registry RDAP (Verisign for .com)
+            rdap="$(curl -sSL --max-time 15 "https://rdap.org/domain/$DOMAIN" 2>/dev/null || echo '')"
             expDate="$(echo "$rdap" | jq -r '.events[]? | select(.eventAction=="expiration") | .eventDate' 2>/dev/null | head -1 || echo '')"
             if [ -z "$expDate" ]; then
               add_fault "דומיין" "domain|rdap_unavailable" "yellow" "🟡" \
