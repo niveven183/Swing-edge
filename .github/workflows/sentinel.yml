@@ -1,0 +1,295 @@
+name: Sentinel
+
+# Independent public-domain watcher for https://swing-edge.com.
+# Probes the REAL apex domain (DNS/SSL/homepage/API/bundle) — the last 24h
+# outage was missed because every other monitor pointed at *.vercel.app.
+# Reports to Discord at :20/:50, de-duplicates repeat incidents via the Actions
+# cache, and its own silence is treated as a fault (heartbeat 4x/day).
+# Complements — never replaces — health.yml / smoke.yml.
+
+on:
+  schedule:
+    - cron: '20,50 * * * *'   # :20 and :50 every hour
+  workflow_dispatch:           # manual runs always post one status message
+
+concurrency:
+  group: sentinel
+  cancel-in-progress: true
+
+permissions:
+  contents: read               # zero repo writes from the run
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Restore incident state
+        uses: actions/cache/restore@v4
+        with:
+          path: .sentinel-state
+          key: sentinel-state-${{ github.run_id }}
+          restore-keys: |
+            sentinel-state-
+
+      - name: Run public checks
+        run: |
+          set -uo pipefail          # NOT -e: every check must run to completion
+          DOMAIN=swing-edge.com
+          BASE="https://$DOMAIN"
+          : > faults.ndjson
+          : > summary.ndjson
+
+          add_fault() { # component fp severity emoji checked got reason fix risk
+            jq -nc \
+              --arg component "$1" --arg fp "$2" --arg severity "$3" --arg emoji "$4" \
+              --arg checked "$5" --arg got "$6" --arg reason "$7" --arg fix "$8" --arg risk "$9" \
+              '{component:$component,fp:$fp,severity:$severity,emoji:$emoji,checked:$checked,got:$got,reason:$reason,fix:$fix,risk:$risk}' \
+              >> faults.ndjson
+          }
+          add_summary() { # label value
+            jq -nc --arg label "$1" --arg value "$2" '{label:$label,value:$value}' >> summary.ndjson
+          }
+
+          # ---- 1. DNS + SSL --------------------------------------------------
+          if ! command -v dig >/dev/null 2>&1; then
+            sudo apt-get update -qq && sudo apt-get install -y -qq bind9-dnsutils || true
+          fi
+          ip="$(dig +short "$DOMAIN" @8.8.8.8 A 2>/dev/null | grep -E '^[0-9]+\.' | head -1 || true)"
+          if [ -z "$ip" ]; then
+            add_fault "DNS" "dns|no_a_record" "red" "🔴" \
+              "dig $DOMAIN @8.8.8.8" "לא הוחזרה כתובת IP" "דורש אבחון" \
+              "בדוק רשומות DNS אצל ספק ה-DNS/Vercel" "עדכון DNS — בינוני, הפצה עולמית"
+          else
+            add_summary "דומיין" "IP $ip"
+          fi
+
+          exp="$(echo | openssl s_client -servername "$DOMAIN" -connect "$DOMAIN":443 2>/dev/null \
+                 | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2 || true)"
+          if [ -z "$exp" ]; then
+            add_fault "SSL" "ssl|no_cert" "red" "🔴" \
+              "openssl s_client $DOMAIN:443" "לא התקבלה תעודת SSL" "דורש אבחון" \
+              "בדוק את תצורת ה-TLS ב-Vercel" "חידוש תעודה — נמוך"
+          else
+            exp_epoch="$(date -d "$exp" +%s 2>/dev/null || echo 0)"
+            now="$(date +%s)"
+            days=$(( (exp_epoch - now) / 86400 ))
+            if [ "$exp_epoch" -eq 0 ] || [ "$days" -le 0 ]; then
+              add_fault "SSL" "ssl|expired" "red" "🔴" \
+                "תוקף תעודת SSL" "התעודה פקעה ($exp)" "דורש אבחון" \
+                "חדש/הנפק תעודה מחדש ב-Vercel" "חידוש תעודה — נמוך"
+            elif [ "$days" -le 14 ]; then
+              add_fault "SSL" "ssl|expiring" "amber" "🟠" \
+                "תוקף תעודת SSL" "פוקעת בעוד $days ימים ($exp)" "דורש אבחון" \
+                "ודא חידוש אוטומטי ב-Vercel; חדש ידנית אם צריך" "חידוש תעודה — נמוך"
+            else
+              add_summary "SSL" "בתוקף $days ימים"
+            fi
+          fi
+
+          # ---- 2. Homepage + www redirect -----------------------------------
+          ct="$(curl -sS -o home.html -w '%{http_code} %{time_total}' --max-time 20 "$BASE" 2>/dev/null || echo '000 0')"
+          code="${ct%% *}"; ttime="${ct##* }"
+          if [ "$code" != "200" ]; then
+            add_fault "Homepage" "homepage|http_non200" "red" "🔴" \
+              "GET $BASE" "HTTP $code (זמן $ttime s)" "דורש אבחון" \
+              "בדוק deploy אחרון ב-Vercel; גלגל לגרסה יציבה" "rollback — נמוך, מחזיר מצב ידוע-תקין"
+          elif ! grep -q "SwingEdge" home.html; then
+            add_fault "Homepage" "homepage|marker_missing" "red" "🔴" \
+              "GET $BASE (תוכן)" "HTTP 200 אך הטקסט \"SwingEdge\" חסר" "דורש אבחון" \
+              "בדוק שה-deploy הנכון עלה; ודא שה-HTML מלא" "rollback — נמוך"
+          elif awk "BEGIN{exit !($ttime>5)}"; then
+            add_fault "Homepage" "homepage|slow" "amber" "🟠" \
+              "GET $BASE (זמן תגובה)" "HTTP 200 אך זמן תגובה $ttime s (>5s)" "דורש אבחון" \
+              "בדוק עומס/קרות serverless ב-Vercel; שקול חימום" "אבחון בלבד — ללא סיכון"
+          else
+            add_summary "דף הבית" "200 · ${ttime}s · מכיל \"SwingEdge\""
+          fi
+
+          wcode="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 -I "https://www.$DOMAIN" 2>/dev/null || echo 000)"
+          wloc="$(curl -sS -o /dev/null -w '%{redirect_url}' --max-time 20 -I "https://www.$DOMAIN" 2>/dev/null || echo '')"
+          if { [ "$wcode" = "301" ] || [ "$wcode" = "308" ]; } && echo "$wloc" | grep -q "://$DOMAIN"; then
+            add_summary "www" "redirect $wcode → apex"
+          else
+            add_fault "www redirect" "www|bad_redirect" "red" "🔴" \
+              "HEAD https://www.$DOMAIN" "HTTP $wcode → '$wloc' (מצופה 301/308 ל-apex)" "דורש אבחון" \
+              "תקן את הפניית www→apex בהגדרות הדומיין ב-Vercel" "עדכון DNS/redirect — בינוני"
+          fi
+
+          # ---- 3. API health -------------------------------------------------
+          acode="$(curl -sS -o health.json -w '%{http_code}' --max-time 20 "$BASE/api/health" 2>/dev/null || echo 000)"
+          status="$(jq -r '.status // "unknown"' health.json 2>/dev/null || echo unknown)"
+          failing="$(jq -r '(.failing // []) | join(",")' health.json 2>/dev/null || echo '')"
+          warnings="$(jq -r '(.warnings // []) | join(",")' health.json 2>/dev/null || echo '')"
+          if [ "$acode" != "200" ] || [ "$status" != "ok" ] || echo ",$failing," | grep -q ",supabase,"; then
+            add_fault "API health" "api|down_or_supabase" "red" "🔴" \
+              "GET $BASE/api/health" "HTTP $acode · status=$status · failing=[$failing]" "דורש אבחון" \
+              "בדוק Supabase (זמינות/מכסה) ואת פונקציית ה-serverless" "אבחון תלוי-סיבה — הערך לפני פעולה"
+          elif [ -n "$warnings" ]; then
+            add_fault "API health" "api|external_degraded" "yellow" "🟡" \
+              "GET $BASE/api/health" "status=ok · warnings=[$warnings]" "ספק חיצוני מוגבל (rate-limit/timeout)" \
+              "מעקב בלבד — לא חוסם שימוש" "ללא פעולה"
+            add_summary "API/health" "ok · warnings=[$warnings]"
+          else
+            add_summary "API/health" "ok · Supabase תקין"
+          fi
+
+          # ---- 4. Bundle sanity ---------------------------------------------
+          bundle="$(grep -oE '/assets/index-[^\"]+\.js' home.html 2>/dev/null | head -1 || true)"
+          if [ -z "$bundle" ]; then
+            add_fault "Bundle" "bundle|not_found" "red" "🔴" \
+              "חילוץ /assets/index-*.js מהדף" "לא נמצא נתיב bundle ב-HTML" "דורש אבחון" \
+              "בדוק שה-build הפיק index JS; גלגל deploy" "rollback — נמוך"
+          else
+            bct="$(curl -sS -o /dev/null -w '%{http_code} %{content_type}' --max-time 20 "$BASE$bundle" 2>/dev/null || echo '000 none')"
+            bcode="${bct%% *}"; bctype="${bct#* }"
+            if [ "$bcode" != "200" ] || ! echo "$bctype" | grep -qi javascript; then
+              add_fault "Bundle" "bundle|broken" "red" "🔴" \
+                "GET $BASE$bundle" "HTTP $bcode · content-type=$bctype" "deploy תקוע/שבור (HTML נטען אך ה-JS לא)" \
+                "גלגל לגרסה יציבה ב-Vercel; ודא cache/assets" "rollback — נמוך, מחזיר מצב ידוע-תקין"
+            else
+              add_summary "Bundle" "200 · javascript"
+            fi
+          fi
+
+          # ---- aggregate -----------------------------------------------------
+          jq -s '.' faults.ndjson  > faults.json  2>/dev/null || echo '[]'  > faults.json
+          jq -s '.' summary.ndjson > summary.json 2>/dev/null || echo '[]' > summary.json
+          echo "faults:"; cat faults.json
+          echo "summary:"; cat summary.json
+
+      - name: Classify, dedup and report
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.SENTINEL_DISCORD_WEBHOOK }}
+          GH_EVENT: ${{ github.event_name }}
+        run: |
+          set -uo pipefail
+          THREE_H=10800
+          now="$(date +%s)"
+          hour="$(date -u +%H)"; min="$((10#$(date -u +%M)))"
+          stamp="$(date -u '+%Y-%m-%d %H:%M UTC')"
+
+          if [ -z "${DISCORD_WEBHOOK:-}" ]; then
+            echo "::warning::SENTINEL_DISCORD_WEBHOOK not set — skipping Discord."
+            NO_WEBHOOK=1
+          else
+            NO_WEBHOOK=0
+          fi
+
+          mkdir -p .sentinel-state
+          STATE=.sentinel-state/state.json
+          [ -f "$STATE" ] || echo '{"incidents":{}}' > "$STATE"
+          OLD="$(cat "$STATE")"
+          NEW='{"incidents":{}}'
+          sent_any=0
+
+          RED=15158332; AMBER=15844367; GREEN=3066993
+
+          post_embed() { # color description
+            [ "$NO_WEBHOOK" = "1" ] && { echo "[dry] $2"; return; }
+            set +x
+            local payload
+            payload="$(jq -n --arg u "SwingEdge Sentinel" --arg t "🛡️ Sentinel" \
+              --arg d "$2" --argjson c "$1" \
+              '{username:$u, embeds:[{title:$t, description:$d, color:$c}]}')"
+            curl -sS -X POST -H "Content-Type: application/json" -d "$payload" "$DISCORD_WEBHOOK" >/dev/null || true
+          }
+
+          # current fingerprints (space-delimited for membership tests)
+          cur_fps=" $(jq -r '.[].fp' faults.json | tr '\n' ' ') "
+
+          # ---- process current faults ---------------------------------------
+          while read -r f; do
+            [ -z "$f" ] && continue
+            fp="$(echo "$f" | jq -r '.fp')"
+            sev="$(echo "$f" | jq -r '.severity')"
+            comp="$(echo "$f" | jq -r '.component')"
+            emoji="$(echo "$f" | jq -r '.emoji')"
+            prev_last="$(echo "$OLD" | jq -r --arg fp "$fp" '.incidents[$fp].lastAlerted // empty')"
+            prev_first="$(echo "$OLD" | jq -r --arg fp "$fp" '.incidents[$fp].firstSeen // empty')"
+            prev_count="$(echo "$OLD" | jq -r --arg fp "$fp" '.incidents[$fp].count // 0')"
+            first="${prev_first:-$now}"
+            count=$((prev_count + 1))
+            last="${prev_last:-0}"
+
+            send=0
+            if [ "$sev" = "red" ] || [ "$sev" = "amber" ]; then
+              if [ -z "$prev_last" ] || [ "$((now - last))" -ge "$THREE_H" ]; then
+                send=1; last="$now"
+              fi
+            fi
+            # yellow: tracked/counted only, never an immediate alert
+
+            if [ "$send" = "1" ]; then
+              if [ -z "$prev_last" ]; then head="תקלה חדשה"; else head="תקלה נמשכת"; fi
+              desc="$(printf '%s\n' \
+                "$emoji $head — $comp" \
+                "• מה נבדק: $(echo "$f" | jq -r '.checked')" \
+                "• מה חזר: $(echo "$f" | jq -r '.got')" \
+                "• סיבה סבירה: $(echo "$f" | jq -r '.reason')" \
+                "• המלצת תיקון: $(echo "$f" | jq -r '.fix')" \
+                "• סיכון התיקון: $(echo "$f" | jq -r '.risk')" \
+                "• חזרות ב-3ש' האחרונות: $count" \
+                "נבדק: $stamp")"
+              if [ "$sev" = "red" ]; then post_embed "$RED" "$desc"; else post_embed "$AMBER" "$desc"; fi
+              sent_any=1
+            fi
+
+            inc="$(jq -nc --arg component "$comp" --arg emoji "$emoji" --arg severity "$sev" \
+                    --argjson firstSeen "$first" --argjson lastAlerted "$last" --argjson count "$count" \
+                    '{component:$component,emoji:$emoji,severity:$severity,firstSeen:$firstSeen,lastAlerted:$lastAlerted,count:$count}')"
+            NEW="$(echo "$NEW" | jq --arg fp "$fp" --argjson inc "$inc" '.incidents[$fp]=$inc')"
+          done < <(jq -c '.[]' faults.json)
+
+          # ---- recoveries: in OLD, no longer failing ------------------------
+          while read -r ofp; do
+            [ -z "$ofp" ] && continue
+            case "$cur_fps" in *" $ofp "*) continue;; esac
+            osev="$(echo "$OLD" | jq -r --arg fp "$ofp" '.incidents[$fp].severity')"
+            ocomp="$(echo "$OLD" | jq -r --arg fp "$ofp" '.incidents[$fp].component')"
+            if [ "$osev" = "red" ] || [ "$osev" = "amber" ]; then
+              rdesc="$(printf '%s\n' \
+                "✅ התאוששות — $ocomp" \
+                "הרכיב חזר לתקינות." \
+                "נבדק: $stamp")"
+              post_embed "$GREEN" "$rdesc"
+              sent_any=1
+            fi
+          done < <(echo "$OLD" | jq -r '.incidents | keys[]')
+
+          # ---- heartbeat / manual status ------------------------------------
+          overall=green
+          jq -e '[.[]|select(.severity=="red")]|length>0'   faults.json >/dev/null 2>&1 && overall=red
+          if [ "$overall" != "red" ]; then
+            jq -e '[.[]|select(.severity=="amber")]|length>0' faults.json >/dev/null 2>&1 && overall=amber
+          fi
+
+          is_hb=0
+          case " 06 12 18 22 " in *" $hour "*) [ "$min" -ge 45 ] && is_hb=1;; esac
+
+          if [ "$GH_EVENT" = "workflow_dispatch" ] && [ "$sent_any" = "0" ]; then
+            is_hb=1   # manual run always posts one status message
+          fi
+
+          if [ "$is_hb" = "1" ]; then
+            lines="$(jq -r '.[] | "• \(.label): \(.value)"' summary.json)"
+            warns="$(jq -r '.[]|select(.severity=="yellow")|"• ⚠️ \(.component): \(.got)"' faults.json 2>/dev/null || true)"
+            body="🟢 הכל תקין ✅"
+            [ "$overall" != "green" ] && body="🟠 פעיל עם אזהרות"
+            desc="$(printf '%s\n%s' "$body" "$lines")"
+            [ -n "$warns" ] && desc="$(printf '%s\n%s' "$desc" "$warns")"
+            desc="$(printf '%s\nנבדק: %s' "$desc" "$stamp")"
+            color="$GREEN"; [ "$overall" != "green" ] && color="$AMBER"
+            post_embed "$color" "$desc"
+          fi
+
+          # ---- persist new state (recovered/cleared incidents dropped) ------
+          echo "$NEW" > "$STATE"
+          echo "state written:"; cat "$STATE"
+
+      - name: Save incident state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .sentinel-state
+          key: sentinel-state-${{ github.run_id }}
