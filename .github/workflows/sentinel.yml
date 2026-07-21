@@ -106,14 +106,19 @@ jobs:
             add_summary "דף הבית" "200 · ${ttime}s · מכיל \"SwingEdge\""
           fi
 
-          wcode="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 -I "https://www.$DOMAIN" 2>/dev/null || echo 000)"
-          wloc="$(curl -sS -o /dev/null -w '%{redirect_url}' --max-time 20 -I "https://www.$DOMAIN" 2>/dev/null || echo '')"
-          if { [ "$wcode" = "301" ] || [ "$wcode" = "308" ]; } && echo "$wloc" | grep -q "://$DOMAIN"; then
-            add_summary "www" "redirect $wcode → apex"
+          # Healthy = redirect (301/308) to apex, OR a 200 that serves the app
+          # (Vercel serves www as a live alias, not a redirect). 🔴 only if www
+          # is unavailable or returns the wrong content.
+          wres="$(curl -sS -o www.html -w '%{http_code} %{redirect_url}' --max-time 20 "https://www.$DOMAIN" 2>/dev/null || echo '000 ')"
+          wcode="${wres%% *}"; wredir="${wres#* }"
+          if { [ "$wcode" = "301" ] || [ "$wcode" = "308" ]; } && echo "$wredir" | grep -q "://$DOMAIN"; then
+            add_summary "www" "תקין (alias)"
+          elif [ "$wcode" = "200" ] && grep -q "SwingEdge" www.html; then
+            add_summary "www" "תקין (alias)"
           else
-            add_fault "www redirect" "www|bad_redirect" "red" "🔴" \
-              "HEAD https://www.$DOMAIN" "HTTP $wcode → '$wloc' (מצופה 301/308 ל-apex)" "דורש אבחון" \
-              "תקן את הפניית www→apex בהגדרות הדומיין ב-Vercel" "עדכון DNS/redirect — בינוני"
+            add_fault "www" "www|unavailable" "red" "🔴" \
+              "GET https://www.$DOMAIN" "HTTP $wcode (לא redirect לאפקס ולא 200 עם \"SwingEdge\")" "דורש אבחון" \
+              "בדוק את הגדרת הדומיין www ב-Vercel (alias/redirect)" "עדכון הגדרת דומיין — בינוני"
           fi
 
           # ---- 3. API health -------------------------------------------------
@@ -188,11 +193,13 @@ jobs:
           post_embed() { # color description
             [ "$NO_WEBHOOK" = "1" ] && { echo "[dry] $2"; return; }
             set +x
-            local payload
+            local payload rc
             payload="$(jq -n --arg u "SwingEdge Sentinel" --arg t "🛡️ Sentinel" \
               --arg d "$2" --argjson c "$1" \
               '{username:$u, embeds:[{title:$t, description:$d, color:$c}]}')"
-            curl -sS -X POST -H "Content-Type: application/json" -d "$payload" "$DISCORD_WEBHOOK" >/dev/null || true
+            rc="$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" \
+              -d "$payload" "$DISCORD_WEBHOOK" 2>/dev/null || echo 000)"
+            echo "discord POST -> HTTP $rc"   # 204 = success; never prints the URL
           }
 
           # current fingerprints (space-delimited for membership tests)
