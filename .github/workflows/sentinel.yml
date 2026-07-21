@@ -1,8 +1,12 @@
 name: Sentinel
 
-# Independent public-domain watcher for https://swing-edge.com.
-# Probes the REAL apex domain (DNS/SSL/homepage/API/bundle) — the last 24h
-# outage was missed because every other monitor pointed at *.vercel.app.
+# Independent public-domain QA watcher for https://swing-edge.com.
+# S1 proved the site is UP (DNS/SSL/homepage/API/bundle). S1.5 makes it a QA
+# watcher: a real browser (Playwright, Layer A) catches JS errors/render breaks
+# users hit, plus Sentry new-issues (B), domain expiry (C, daily), security-
+# header depth + SSL chain + mixed content (D), public endpoints (E), and perf
+# baselines vs a rolling 7-run average (F). The last 24h outage was missed
+# because every other monitor pointed at *.vercel.app.
 # Reports to Discord at :20/:50, de-duplicates repeat incidents via the Actions
 # cache, and its own silence is treated as a fault (heartbeat 4x/day).
 # Complements — never replaces — health.yml / smoke.yml.
@@ -20,7 +24,40 @@ permissions:
   contents: read               # zero repo writes from the run
 
 jobs:
+  # ---- Layer A: real-browser QA (Playwright). Runs first and publishes its
+  # findings as an artifact that the `watch` job merges into the single report.
+  # Its own spec never hard-fails on a site problem (findings drive the report),
+  # so a red here means the harness/install itself broke. ----
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Install Chromium (OS deps always; binary skipped on cache hit)
+        run: npx playwright install --with-deps chromium
+      - name: Run Sentinel browser QA
+        run: npx playwright test --config playwright.sentinel.config.js
+      - name: Upload browser findings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-findings
+          path: browser-findings.json
+          if-no-files-found: warn
+
   watch:
+    needs: browser
+    if: always()               # report even if the browser job failed/crashed
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -32,13 +69,31 @@ jobs:
           restore-keys: |
             sentinel-state-
 
+      - name: Download browser findings
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: browser-findings
+
       - name: Run public checks
+        env:
+          GH_EVENT: ${{ github.event_name }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: |
           set -uo pipefail          # NOT -e: every check must run to completion
           DOMAIN=swing-edge.com
           BASE="https://$DOMAIN"
+          OLDSTATE=.sentinel-state/state.json
           : > faults.ndjson
           : > summary.ndjson
+
+          # Daily gate: Layers C (RDAP) + D (security headers/mixed-content) are
+          # "once a day" — only on the 06 UTC heartbeat run (06:50) or a manual
+          # dispatch. Every other layer runs on every scheduled run.
+          hour="$(date -u +%H)"; min="$((10#$(date -u +%M)))"
+          daily=0
+          [ "$hour" = "06" ] && [ "$min" -ge 45 ] && daily=1
+          [ "${GH_EVENT:-}" = "workflow_dispatch" ] && daily=1
 
           add_fault() { # component fp severity emoji checked got reason fix risk
             jq -nc \
@@ -87,9 +142,21 @@ jobs:
             fi
           fi
 
+          # SSL chain verification (every run) — a valid leaf with a broken chain
+          # still fails browsers. -verify_return_error makes openssl exit non-zero
+          # on any verification error.
+          if echo | openssl s_client -servername "$DOMAIN" -connect "$DOMAIN":443 \
+               -verify_return_error >/dev/null 2>&1; then
+            add_summary "שרשרת SSL" "תקינה"
+          else
+            add_fault "SSL" "ssl|chain" "red" "🔴" \
+              "openssl s_client -verify_return_error" "אימות שרשרת התעודה נכשל" "שרשרת תעודות שבורה/חסרה intermediate" \
+              "בדוק את שרשרת ה-TLS ב-Vercel; ודא intermediate CA" "חידוש/תיקון תעודה — נמוך"
+          fi
+
           # ---- 2. Homepage + www redirect -----------------------------------
-          ct="$(curl -sS -o home.html -w '%{http_code} %{time_total}' --max-time 20 "$BASE" 2>/dev/null || echo '000 0')"
-          code="${ct%% *}"; ttime="${ct##* }"
+          ct="$(curl -sS -o home.html -w '%{http_code} %{time_total} %{time_starttransfer}' --max-time 20 "$BASE" 2>/dev/null || echo '000 0 0')"
+          code="$(echo "$ct" | awk '{print $1}')"; ttime="$(echo "$ct" | awk '{print $2}')"; ttfb="$(echo "$ct" | awk '{print $3}')"
           if [ "$code" != "200" ]; then
             add_fault "Homepage" "homepage|http_non200" "red" "🔴" \
               "GET $BASE" "HTTP $code (זמן $ttime s)" "דורש אבחון" \
@@ -121,6 +188,58 @@ jobs:
               "בדוק את הגדרת הדומיין www ב-Vercel (alias/redirect)" "עדכון הגדרת דומיין — בינוני"
           fi
 
+          # ---- C. Domain expiry (RDAP) — daily only -------------------------
+          if [ "$daily" = "1" ]; then
+            rdap="$(curl -sS --max-time 15 "https://rdap.org/domain/$DOMAIN" 2>/dev/null || echo '')"
+            expDate="$(echo "$rdap" | jq -r '.events[]? | select(.eventAction=="expiration") | .eventDate' 2>/dev/null | head -1 || echo '')"
+            if [ -z "$expDate" ]; then
+              add_fault "דומיין" "domain|rdap_unavailable" "yellow" "🟡" \
+                "RDAP $DOMAIN" "RDAP לא זמין או לא נותח" "RDAP unreachable ≠ הדומיין פקע" \
+                "מעקב בלבד — בדוק ידנית מול הרשם אם חוזר" "ללא פעולה"
+            else
+              expEpoch="$(date -d "$expDate" +%s 2>/dev/null || echo 0)"
+              dnow="$(date +%s)"
+              ddays=$(( (expEpoch - dnow) / 86400 ))
+              if [ "$expEpoch" -eq 0 ]; then
+                add_fault "דומיין" "domain|rdap_unavailable" "yellow" "🟡" \
+                  "RDAP $DOMAIN" "תאריך תפוגה לא נותח ($expDate)" "פורמט RDAP לא צפוי" \
+                  "מעקב בלבד — בדוק ידנית מול הרשם" "ללא פעולה"
+              elif [ "$ddays" -le 7 ]; then
+                add_fault "דומיין" "domain|expired" "red" "🔴" \
+                  "תפוגת דומיין" "פוקע בעוד $ddays ימים ($expDate)" "הדומיין קרוב לפקיעה" \
+                  "חדש את הדומיין אצל הרשם מיידית" "חידוש דומיין — נמוך"
+              elif [ "$ddays" -le 30 ]; then
+                add_fault "דומיין" "domain|expiring" "amber" "🟠" \
+                  "תפוגת דומיין" "פוקע בעוד $ddays ימים ($expDate)" "הדומיין מתקרב לפקיעה" \
+                  "תזמן חידוש דומיין אצל הרשם" "חידוש דומיין — נמוך"
+              else
+                add_summary "תפוגת דומיין" "$ddays ימים"
+              fi
+            fi
+
+            # ---- D. Security depth (headers + mixed content) — daily only ----
+            hdr="$(curl -sS -D - -o /dev/null --max-time 20 "$BASE" 2>/dev/null | tr -d '\r' || echo '')"
+            missing=""
+            echo "$hdr" | grep -qi '^x-content-type-options:[[:space:]]*nosniff' || missing="$missing nosniff"
+            if ! echo "$hdr" | grep -qi '^x-frame-options:' \
+                 && ! echo "$hdr" | grep -qi '^content-security-policy:.*frame-ancestors'; then
+              missing="$missing frame-protection"
+            fi
+            if [ -n "$missing" ]; then
+              add_fault "אבטחה" "security|missing_headers" "yellow" "🟡" \
+                "כותרות אבטחה ב-/" "חסר:$missing" "כותרות הקשחה חסרות בתגובת ה-CDN" \
+                "הוסף nosniff + X-Frame-Options/CSP frame-ancestors (משימת תיקון נפרדת)" "ללא פעולה — מעקב"
+            else
+              add_summary "אבטחה" "כותרות תקינות"
+            fi
+
+            if grep -qiE '(src|href)="http://' home.html 2>/dev/null; then
+              add_fault "אבטחה" "security|mixed_content" "yellow" "🟡" \
+                "מקורות http:// בדף הבית" "נמצא משאב http:// במקור שלנו" "תוכן מעורב (mixed content)" \
+                "החלף לקישורי https:// בקוד/ה-assets" "ללא פעולה — מעקב"
+            fi
+          fi
+
           # ---- 3. API health -------------------------------------------------
           acode="$(curl -sS -o health.json -w '%{http_code}' --max-time 20 "$BASE/api/health" 2>/dev/null || echo 000)"
           status="$(jq -r '.status // "unknown"' health.json 2>/dev/null || echo unknown)"
@@ -139,15 +258,16 @@ jobs:
             add_summary "API/health" "ok · Supabase תקין"
           fi
 
-          # ---- 4. Bundle sanity ---------------------------------------------
+          # ---- 4. Bundle sanity + size (feeds perf baseline) ----------------
+          bsize=0
           bundle="$(grep -oE '/assets/index-[^\"]+\.js' home.html 2>/dev/null | head -1 || true)"
           if [ -z "$bundle" ]; then
             add_fault "Bundle" "bundle|not_found" "red" "🔴" \
               "חילוץ /assets/index-*.js מהדף" "לא נמצא נתיב bundle ב-HTML" "דורש אבחון" \
               "בדוק שה-build הפיק index JS; גלגל deploy" "rollback — נמוך"
           else
-            bct="$(curl -sS -o /dev/null -w '%{http_code} %{content_type}' --max-time 20 "$BASE$bundle" 2>/dev/null || echo '000 none')"
-            bcode="${bct%% *}"; bctype="${bct#* }"
+            bct="$(curl -sS -o /dev/null -w '%{http_code}|%{content_type}|%{size_download}' --max-time 20 "$BASE$bundle" 2>/dev/null || echo '000|none|0')"
+            bcode="$(echo "$bct" | cut -d'|' -f1)"; bctype="$(echo "$bct" | cut -d'|' -f2)"; bsize="$(echo "$bct" | cut -d'|' -f3)"
             if [ "$bcode" != "200" ] || ! echo "$bctype" | grep -qi javascript; then
               add_fault "Bundle" "bundle|broken" "red" "🔴" \
                 "GET $BASE$bundle" "HTTP $bcode · content-type=$bctype" "deploy תקוע/שבור (HTML נטען אך ה-JS לא)" \
@@ -157,8 +277,124 @@ jobs:
             fi
           fi
 
+          # ---- E. Public endpoints (every run) ------------------------------
+          ep_code() { curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$1" 2>/dev/null || echo 000; }
+
+          qcode="$(ep_code "$BASE/api/quote?symbols=AAPL")"
+          if [ "${qcode:0:1}" = "5" ]; then
+            add_fault "API quote" "endpoint|quote" "amber" "🟠" \
+              "GET /api/quote?symbols=AAPL" "HTTP $qcode" "פרוקסי ה-quote מחזיר 5xx" \
+              "בדוק את פונקציית ה-serverless quote ואת ספק ה-data" "אבחון תלוי-סיבה"
+          else
+            add_summary "API/quote" "$qcode"
+          fi
+
+          scode="$(ep_code "$BASE/api/symbol-search?text=AAPL")"
+          if [ "${scode:0:1}" = "5" ]; then
+            add_fault "API symbol-search" "endpoint|symbolsearch" "yellow" "🟡" \
+              "GET /api/symbol-search?text=AAPL" "HTTP $scode" "פרוקסי TradingView חיצוני מחזיר 5xx" \
+              "מעקב בלבד — תלוי ספק חיצוני (TradingView)" "ללא פעולה"
+          else
+            add_summary "API/symbol-search" "$scode"
+          fi
+
+          for p in terms privacy; do
+            pcode="$(ep_code "$BASE/$p")"
+            if [ "$pcode" != "200" ]; then
+              add_fault "עמוד $p" "endpoint|$p" "amber" "🟠" \
+                "GET /$p" "HTTP $pcode" "עמוד ציות (compliance) לא נגיש" \
+                "בדוק ניתוב/deploy של העמוד" "rollback — נמוך"
+            fi
+          done
+          add_summary "עמודים" "terms/privacy"
+
+          ogc="$(curl -sS -o /dev/null -w '%{http_code}|%{content_type}' --max-time 20 "$BASE/og-image.png" 2>/dev/null || echo '000|none')"
+          ogcode="$(echo "$ogc" | cut -d'|' -f1)"; ogtype="$(echo "$ogc" | cut -d'|' -f2)"
+          if [ "$ogcode" != "200" ] || ! echo "$ogtype" | grep -qi image; then
+            add_fault "og-image" "endpoint|og_image" "yellow" "🟡" \
+              "GET /og-image.png" "HTTP $ogcode · type=$ogtype" "תמונת שיתוף חסרה/שגויה" \
+              "ודא שה-asset עלה ב-deploy" "ללא פעולה — מעקב"
+          fi
+
+          fcode="$(ep_code "$BASE/favicon.svg")"
+          if [ "$fcode" != "200" ]; then
+            add_fault "favicon" "endpoint|favicon" "yellow" "🟡" \
+              "GET /favicon.svg" "HTTP $fcode" "favicon לא נגיש" \
+              "ודא שה-asset עלה ב-deploy" "ללא פעולה — מעקב"
+          fi
+
+          # ---- B. Sentry — new issues in the last 35 min (if token set) -----
+          if [ -n "${SENTRY_AUTH_TOKEN:-}" ]; then
+            set +x
+            sres="$(curl -sS --max-time 20 -G "https://sentry.io/api/0/organizations/swingedge/issues/" \
+              --data-urlencode "query=is:unresolved firstSeen:-35m" \
+              --data-urlencode "sort=date" --data-urlencode "limit=10" \
+              -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" 2>/dev/null || echo '[]')"
+            sn="$(echo "$sres" | jq 'if type=="array" then length else 0 end' 2>/dev/null || echo 0)"
+            if [ "${sn:-0}" -gt 0 ]; then
+              stitles="$(echo "$sres" | jq -r '.[0:3][] | "• \(.title) (\(.count) events) \(.permalink)"' 2>/dev/null | tr '\n' ' ' || echo '')"
+              add_fault "Sentry" "sentry|new_issue" "amber" "🟠" \
+                "Sentry issues (firstSeen ≤35m)" "$sn issues חדשים: $stitles" "שגיאות חדשות נרשמו ב-Sentry" \
+                "פתח את ה-issue ב-Sentry ובדוק stack/שחרור אחרון" "אבחון תלוי-סיבה"
+            else
+              add_summary "Sentry" "אין issues חדשים (35 דק')"
+            fi
+          else
+            add_summary "Sentry" "לא מוגדר"
+          fi
+
+          # ---- F. Perf baselines (rolling last-7 in state.perf) -------------
+          htmlBytes="$(wc -c < home.html 2>/dev/null | tr -d ' ' || echo 0)"
+          curTtfb="$(awk "BEGIN{printf \"%d\", ($ttfb*1000)}" 2>/dev/null || echo 0)"
+          curBundle="${bsize:-0}"; [ -z "$curBundle" ] && curBundle=0
+          bHist="$(jq -c '.perf.bundleBytes // []' "$OLDSTATE" 2>/dev/null || echo '[]')"
+          tHist="$(jq -c '.perf.ttfbMs // []'      "$OLDSTATE" 2>/dev/null || echo '[]')"
+          hHist="$(jq -c '.perf.htmlBytes // []'   "$OLDSTATE" 2>/dev/null || echo '[]')"
+          [ -z "$bHist" ] && bHist='[]'; [ -z "$tHist" ] && tHist='[]'; [ -z "$hHist" ] && hHist='[]'
+
+          if [ "$(echo "$bHist" | jq 'length')" -ge 7 ] && [ "$curBundle" -gt 0 ]; then
+            bAvg="$(echo "$bHist" | jq 'add/length')"
+            if awk "BEGIN{exit !($curBundle > 1.2*$bAvg)}"; then
+              add_fault "ביצועים" "perf|bundle_bloat" "yellow" "🟡" \
+                "גודל bundle מול ממוצע 7 ריצות" "$curBundle bytes (>1.2× ממוצע $bAvg)" "ה-bundle תפח מעל הרגיל" \
+                "בדוק תלויות/imports חדשים; שקול code-split" "ללא פעולה — מעקב"
+            fi
+          fi
+          if [ "$(echo "$tHist" | jq 'length')" -ge 7 ] && [ "$curTtfb" -gt 0 ]; then
+            tAvg="$(echo "$tHist" | jq 'add/length')"
+            if awk "BEGIN{exit !($curTtfb > 2*$tAvg && $curTtfb > 1500)}"; then
+              add_fault "ביצועים" "perf|ttfb" "amber" "🟠" \
+                "TTFB מול ממוצע 7 ריצות" "${curTtfb}ms (>2× ממוצע ${tAvg}ms וגם >1500ms)" "זמן תגובה ראשוני גבוה חריג" \
+                "בדוק קרות serverless/עומס ב-Vercel" "אבחון בלבד — ללא סיכון"
+            fi
+          fi
+          # Append current samples, keep last 7 → perf-new.json (Classify persists)
+          jq -n \
+            --argjson b "$(echo "$bHist" | jq --argjson v "$curBundle" '(. + [$v])[-7:]')" \
+            --argjson t "$(echo "$tHist" | jq --argjson v "$curTtfb" '(. + [$v])[-7:]')" \
+            --argjson h "$(echo "$hHist" | jq --argjson v "$htmlBytes" '(. + [$v])[-7:]')" \
+            '{bundleBytes:$b, ttfbMs:$t, htmlBytes:$h}' > perf-new.json
+          add_summary "ביצועים" "bundle ${curBundle}B · TTFB ${curTtfb}ms"
+
           # ---- aggregate -----------------------------------------------------
           jq -s '.' faults.ndjson  > faults.json  2>/dev/null || echo '[]'  > faults.json
+
+          # ---- merge Layer A browser findings -------------------------------
+          # download-artifact placed browser-findings.json here, unless the
+          # browser job crashed — then it is absent and we synthesize one 🟠
+          # fault so browser silence is never mistaken for green.
+          if [ -f browser-findings.json ]; then
+            jq -s '.[0] + .[1]' faults.json browser-findings.json > merged.json && mv merged.json faults.json
+            bcount="$(jq 'length' browser-findings.json 2>/dev/null || echo 0)"
+            add_summary "דפדפן" "נטען · $bcount ממצאים"
+          else
+            add_fault "דפדפן" "browser|unavailable" "amber" "🟠" \
+              "ריצת Playwright (Layer A)" "בדיקת הדפדפן לא רצה (artifact חסר)" "job הדפדפן קרס/לא הפיק ממצאים" \
+              "בדוק את לוג job ה-browser ב-Actions" "אבחון בלבד"
+            jq -s '.' faults.ndjson > faults.json 2>/dev/null || echo '[]' > faults.json
+            add_summary "דפדפן" "לא זמין"
+          fi
+
           jq -s '.' summary.ndjson > summary.json 2>/dev/null || echo '[]' > summary.json
           echo "faults:"; cat faults.json
           echo "summary:"; cat summary.json
@@ -290,7 +526,11 @@ jobs:
             post_embed "$color" "$desc"
           fi
 
-          # ---- persist new state (recovered/cleared incidents dropped) ------
+          # ---- persist new state (recovered/cleared incidents dropped; carry
+          #      the rolling perf history computed in the checks step) ---------
+          if [ -f perf-new.json ]; then
+            NEW="$(echo "$NEW" | jq --slurpfile p perf-new.json '.perf = $p[0]')"
+          fi
           echo "$NEW" > "$STATE"
           echo "state written:"; cat "$STATE"
 
