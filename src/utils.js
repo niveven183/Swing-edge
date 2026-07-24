@@ -98,7 +98,15 @@ export const fmt$ = (n) => n >= 0
   ? `+$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
   : `-$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
-export const fmtR = (r) => r >= 0 ? `+${r.toFixed(2)}R` : `${r.toFixed(2)}R`;
+// Single source of truth for "format or show em-dash" — never fabricate a
+// number for a non-numeric value (null/undefined/NaN).
+export const fmtNum = (v, digits = 2) =>
+  (typeof v === "number" && !Number.isNaN(v)) ? v.toFixed(digits) : "—";
+
+export const fmtR = (r) =>
+  (typeof r === "number" && !Number.isNaN(r))
+    ? (r >= 0 ? `+${r.toFixed(2)}R` : `${r.toFixed(2)}R`)
+    : "—";
 
 // Win-rate (and any 0..100 percentage) display — single source of truth for
 // percentage rounding, so the same value renders identically everywhere.

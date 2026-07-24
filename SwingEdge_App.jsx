@@ -3365,7 +3365,7 @@ export default function SwingEdge() {
                           <td className="py-2 pe-4 font-mono text-slate-300">${t.exit}</td>
                           <td className="py-2 pe-4 font-mono text-slate-400">{t.shares}</td>
                           <td className={`py-2 pe-4 font-bold font-mono ${win ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>{fmt$(Math.round(pnl))}</td>
-                          <td className={`py-2 pe-4 font-bold font-mono ${rMultiple >= 0 ? "text-cyan-400" : "text-[var(--v3-loss)]"}`}>{fmtR(rMultiple)}</td>
+                          <td className={`py-2 pe-4 font-bold font-mono ${rMultiple == null ? "text-slate-600" : rMultiple >= 0 ? "text-cyan-400" : "text-[var(--v3-loss)]"}`}>{fmtR(rMultiple)}</td>
                           <td className="py-2 pe-4"><span className="inline-flex items-center gap-1"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">{labelFor("setup", t.setup, lang)}</span><SetupTagTip setup={t.setup} isRTL={isRTL} /></span></td>
                         </tr>
                       );
@@ -3869,7 +3869,7 @@ export default function SwingEdge() {
                         <td className={`p-3 font-bold font-mono text-sm ${isOpen ? "text-slate-500" : win ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>
                           {isOpen ? "–" : fmt$(pnl)}
                         </td>
-                        <td className={`p-3 font-bold font-mono text-xs ${isOpen ? "text-slate-500" : rMultiple >= 0 ? "text-[var(--v3-info)]" : "text-[var(--v3-loss)]"}`}>
+                        <td className={`p-3 font-bold font-mono text-xs ${isOpen || rMultiple == null ? "text-slate-500" : rMultiple >= 0 ? "text-[var(--v3-info)]" : "text-[var(--v3-loss)]"}`}>
                           {isOpen ? "–" : fmtR(rMultiple)}
                         </td>
                         <td className="p-3 text-[10px] font-mono text-[var(--v3-purple)] whitespace-nowrap">
