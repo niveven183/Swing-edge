@@ -155,7 +155,7 @@ jobs:
           wlTot="$(psql_q "SELECT count(*) FROM public.waitlist;")"
           wl24="$(psql_q "SELECT count(*) FROM public.waitlist WHERE created_at >= now() - interval '24 hours';")"
           # top-3 sources: aggregate labels + counts only (no emails)
-          srcs="$(psql_q "SELECT coalesce(source,'direct') || ' ' || count(*) FROM public.waitlist GROUP BY 1 ORDER BY count(*) DESC LIMIT 3;")"
+          srcs="$(psql_q "SELECT coalesce(source,'direct') || ' ' || count(*) FROM public.waitlist GROUP BY coalesce(source,'direct') ORDER BY count(*) DESC LIMIT 3;")"
           top="$(printf '%s' "$srcs" | awk 'NF{ if(n++) printf " · "; printf "%s", $0 }')"
 
           show() { [ -n "$1" ] && printf '%s' "$1" || printf 'לא זמין'; }
