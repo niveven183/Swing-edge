@@ -83,8 +83,13 @@ jobs:
         run: |
           set -uo pipefail
           set +e                     # runner injects `bash -e`; disable so a degradable failure doesn't abort
-          RO="SET default_transaction_read_only = on;"
-          SQL="$RO
+          # SQL fed via stdin (not -c): psql only interpolates :'var' for script
+          # input, so campaign/lim bind safely instead of string-concat.
+          : > recipients.txt
+          psql -v ON_ERROR_STOP=1 -tAq \
+            -v campaign="$CAMPAIGN" -v lim="$LIMIT" \
+            "$SUPABASE_DB_URL" > recipients.txt 2>/tmp/fetcherr <<'SQLEOF'
+          SET default_transaction_read_only = on;
           SELECT email FROM public.waitlist w
           WHERE w.approved_at IS NOT NULL
             AND NOT EXISTS (SELECT 1 FROM public.email_campaign_log l
@@ -92,12 +97,8 @@ jobs:
                 AND lower(l.email) = lower(w.email)
                 AND l.status = 'sent')
           ORDER BY w.approved_at ASC
-          LIMIT :lim;"
-
-          : > recipients.txt
-          psql -v ON_ERROR_STOP=1 -tAq \
-            -v campaign="$CAMPAIGN" -v lim="$LIMIT" \
-            "$SUPABASE_DB_URL" -c "$SQL" > recipients.txt 2>/tmp/fetcherr
+          LIMIT :lim;
+          SQLEOF
           rc=$?
           if [ "$rc" -ne 0 ]; then
             err="$(head -3 /tmp/fetcherr 2>/dev/null)"     # never contains the conn string
@@ -182,13 +183,15 @@ jobs:
               rcpts = [ln.strip() for ln in f if ln.strip()]
 
           def log(email, status, err):
+              # SQL via stdin so psql interpolates :'var' (it does not for -c).
+              sql = ("INSERT INTO public.email_campaign_log(campaign,email,status,error) "
+                     "VALUES (:'c',:'e',:'s',NULLIF(:'err','')) ON CONFLICT DO NOTHING;")
               subprocess.run(
                   ["psql", "-v", "ON_ERROR_STOP=1", "-q",
                    "-v", "c=" + camp, "-v", "e=" + email,
                    "-v", "s=" + status, "-v", "err=" + (err or ""),
-                   dburl, "-c",
-                   "INSERT INTO public.email_campaign_log(campaign,email,status,error) "
-                   "VALUES (:'c',:'e',:'s',NULLIF(:'err','')) ON CONFLICT DO NOTHING;"],
+                   dburl],
+                  input=sql, text=True,
                   check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
           sent = failed = 0
@@ -239,10 +242,15 @@ jobs:
           set -uo pipefail
           set +e
           stamp="$(date -u '+%Y-%m-%d %H:%M UTC')"
-          # remaining = approved rows not yet logged as sent for this campaign
-          RO="SET default_transaction_read_only = on;"
-          remaining="$(psql -v ON_ERROR_STOP=1 -tAq -v campaign="$CAMPAIGN" "$SUPABASE_DB_URL" -c \
-            "$RO SELECT count(*) FROM public.waitlist w WHERE w.approved_at IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.email_campaign_log l WHERE l.campaign = :'campaign' AND lower(l.email)=lower(w.email) AND l.status='sent');" 2>/dev/null)"
+          # remaining = approved rows not yet logged as sent (SQL via stdin so :'var' binds)
+          remaining="$(psql -v ON_ERROR_STOP=1 -tAq -v campaign="$CAMPAIGN" "$SUPABASE_DB_URL" 2>/dev/null <<'SQLEOF'
+          SET default_transaction_read_only = on;
+          SELECT count(*) FROM public.waitlist w
+          WHERE w.approved_at IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM public.email_campaign_log l
+              WHERE l.campaign = :'campaign' AND lower(l.email)=lower(w.email) AND l.status='sent');
+          SQLEOF
+          )"
           [ -n "$remaining" ] || remaining="?"
 
           desc="$(printf '📧 Email Campaign — %s\n• נשלחו: %s\n• נכשלו: %s\n• נותרו בתור: %s\nנבדק: %s' \
