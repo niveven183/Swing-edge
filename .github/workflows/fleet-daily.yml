@@ -39,11 +39,17 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
-          set -uo pipefail          # NOT -e: every check must run to completion
+          set -uo pipefail
+          set +e                    # runner injects `bash -e`; disable it so a single failing query degrades per-metric instead of aborting
           RED=15158332; AMBER=15844367; GREEN=3066993
           stamp="$(date -u '+%Y-%m-%d %H:%M UTC')"
           RO="SET default_transaction_read_only = on;"
-          psql_q() { psql -v ON_ERROR_STOP=1 -tAq "$SUPABASE_DB_URL" -c "$RO $1" 2>/dev/null; }
+          psql_q() { # runs one read-only query; on error surfaces psql's first line (never the conn string) and returns empty
+            local out
+            out="$(psql -v ON_ERROR_STOP=1 -tAq "$SUPABASE_DB_URL" -c "$RO $1" 2>/tmp/psqlerr)" \
+              || echo "::warning::psql query failed: $(head -1 /tmp/psqlerr 2>/dev/null)" >&2
+            printf '%s' "$out"
+          }
 
           rank() { case "$1" in red) echo 3;; amber) echo 2;; *) echo 1;; esac; }
           worst=green
@@ -107,10 +113,16 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           set -uo pipefail
+          set +e                    # runner injects `bash -e`; disable it so a single failing query degrades per-metric instead of aborting
           GREEN=3066993; AMBER=15844367
           stamp="$(date -u '+%Y-%m-%d %H:%M UTC')"
           RO="SET default_transaction_read_only = on;"
-          psql_q() { psql -v ON_ERROR_STOP=1 -tAq "$SUPABASE_DB_URL" -c "$RO $1" 2>/dev/null; }
+          psql_q() { # runs one read-only query; on error surfaces psql's first line (never the conn string) and returns empty
+            local out
+            out="$(psql -v ON_ERROR_STOP=1 -tAq "$SUPABASE_DB_URL" -c "$RO $1" 2>/tmp/psqlerr)" \
+              || echo "::warning::psql query failed: $(head -1 /tmp/psqlerr 2>/dev/null)" >&2
+            printf '%s' "$out"
+          }
 
           mkdir -p .fleet-state
           PREV=.fleet-state/growth-prev.json
@@ -179,6 +191,7 @@ jobs:
           DISCORD_WEBHOOK: ${{ secrets.SENTINEL_DISCORD_WEBHOOK }}
         run: |
           set -uo pipefail
+          set +e                    # post both embeds even if the first errors
           if [ -z "${DISCORD_WEBHOOK:-}" ]; then
             echo "::warning::SENTINEL_DISCORD_WEBHOOK not set — skipping Discord."
             NO_WEBHOOK=1

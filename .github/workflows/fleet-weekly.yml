@@ -54,6 +54,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -uo pipefail
+          set +e                    # runner injects `bash -e`; disable it so one failing probe degrades per-metric instead of aborting
           GREEN=3066993; AMBER=15844367
           stamp="$(date -u '+%Y-%m-%d %H:%M UTC')"
           weekEnd="$(date -u +%Y-%m-%d)"
@@ -164,6 +165,7 @@ jobs:
           DISCORD_WEBHOOK: ${{ secrets.SENTINEL_DISCORD_WEBHOOK }}
         run: |
           set -uo pipefail
+          set +e
           if [ -z "${DISCORD_WEBHOOK:-}" ]; then
             echo "::warning::SENTINEL_DISCORD_WEBHOOK not set — skipping Discord."
             NO_WEBHOOK=1
