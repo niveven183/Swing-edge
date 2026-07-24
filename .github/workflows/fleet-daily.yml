@@ -1,0 +1,208 @@
+name: Fleet Daily
+
+# 24/7 replacement for two local Cowork agents (Cost Watchdog + Growth Pulse).
+# Runs in GitHub Actions so it no longer depends on Niv's Mac being awake and
+# Claude Desktop being open. Reports two Discord embeds (💰 Cost, 📈 Growth)
+# via the shared Sentinel webhook. Read-only: SELECT-only psql over the existing
+# SUPABASE_DB_URL, zero repo writes, aggregate numbers only (no PII, no secrets
+# in output). Day-over-day deltas persist via the Actions cache (Sentinel's
+# pattern). Complements — never replaces — Sentinel/health/smoke.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # 06:00 UTC = 09:00 Israel
+  workflow_dispatch:
+
+concurrency:
+  group: fleet-daily
+  cancel-in-progress: true
+
+permissions:
+  contents: read           # zero repo writes
+
+jobs:
+  fleet-daily:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Restore day-over-day state
+        uses: actions/cache/restore@v4
+        with:
+          path: .fleet-state
+          key: fleet-daily-state-${{ github.run_id }}
+          restore-keys: |
+            fleet-daily-state-
+
+      - name: Cost Watchdog
+        continue-on-error: true
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -uo pipefail          # NOT -e: every check must run to completion
+          RED=15158332; AMBER=15844367; GREEN=3066993
+          stamp="$(date -u '+%Y-%m-%d %H:%M UTC')"
+          RO="SET default_transaction_read_only = on;"
+          psql_q() { psql -v ON_ERROR_STOP=1 -tAq "$SUPABASE_DB_URL" -c "$RO $1" 2>/dev/null; }
+
+          rank() { case "$1" in red) echo 3;; amber) echo 2;; *) echo 1;; esac; }
+          worst=green
+          bump() { [ "$(rank "$1")" -gt "$(rank "$worst")" ] && worst="$1" || true; }
+
+          lines=""
+          add() { lines="$lines"$'\n'"$1"; }
+
+          # ---- Supabase (DB size vs 500MB Free tier + central row counts) -----
+          if [ -z "${SUPABASE_DB_URL:-}" ]; then
+            add "• Supabase: לא מוגדר"
+          else
+            size="$(psql_q 'SELECT pg_database_size(current_database());')"
+            if printf '%s' "$size" | grep -qE '^[0-9]+$'; then
+              pct=$(( size * 100 / 524288000 ))
+              mb="$(awk "BEGIN{printf \"%.1f\", $size/1048576}")"
+              if   [ "$pct" -ge 90 ]; then e="🔴"; bump red
+              elif [ "$pct" -ge 70 ]; then e="🟠"; bump amber
+              else e="🟢"; fi
+              add "• Supabase DB: $e ${mb}MB / 500MB (${pct}%)"
+            else
+              add "• Supabase DB: ⚪ לא זמין"
+            fi
+            tr="$(psql_q 'SELECT count(*) FROM public.trades;')";   [ -n "$tr" ] || tr="?"
+            fb="$(psql_q 'SELECT count(*) FROM public.feedback;')"; [ -n "$fb" ] || fb="?"
+            wl="$(psql_q 'SELECT count(*) FROM public.waitlist;')"; [ -n "$wl" ] || wl="?"
+            add "• Supabase שורות: trades $tr · feedback $fb · waitlist $wl"
+          fi
+
+          # ---- Vercel (projects + last deployment; bandwidth not in public API) --
+          if [ -z "${VERCEL_TOKEN:-}" ]; then
+            add "• Vercel: לא מוגדר"
+          else
+            set +x
+            vres="$(curl -sS --max-time 20 "https://api.vercel.com/v9/projects" \
+              -H "Authorization: Bearer $VERCEL_TOKEN" 2>/dev/null || echo '{}')"
+            vcount="$(echo "$vres" | jq '(.projects // []) | length' 2>/dev/null || echo 0)"
+            dres="$(curl -sS --max-time 20 "https://api.vercel.com/v6/deployments?limit=1" \
+              -H "Authorization: Bearer $VERCEL_TOKEN" 2>/dev/null || echo '{}')"
+            dstate="$(echo "$dres" | jq -r '.deployments[0].state // .deployments[0].readyState // "unknown"' 2>/dev/null || echo unknown)"
+            add "• Vercel: 🟢 ${vcount} פרויקטים · deployment אחרון ${dstate}"
+            add "   bandwidth/builds: לא זמין דרך API (מוצג ב-Dashboard)"
+          fi
+
+          # ---- Anthropic (usage/cost needs an Admin key, not ANTHROPIC_API_KEY) --
+          add "• Anthropic: ⚪ לא זמין (דורש Admin API key)"
+
+          case "$worst" in
+            red)   color=$RED;   tag="🔴 מעל 90% ממכסה";;
+            amber) color=$AMBER; tag="🟠 מעל 70%";;
+            *)     color=$GREEN; tag="🟢 מתחת ל-70%";;
+          esac
+          desc="$(printf '💰 Cost Watchdog — %s%s\nסיווג כולל: %s\nנבדק: %s' \
+            "$stamp" "$lines" "$tag" "$stamp")"
+          jq -n --argjson c "$color" --arg d "$desc" '{color:$c,description:$d}' > cost-embed.json
+          echo "cost-embed:"; cat cost-embed.json
+
+      - name: Growth Pulse
+        continue-on-error: true
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -uo pipefail
+          GREEN=3066993; AMBER=15844367
+          stamp="$(date -u '+%Y-%m-%d %H:%M UTC')"
+          RO="SET default_transaction_read_only = on;"
+          psql_q() { psql -v ON_ERROR_STOP=1 -tAq "$SUPABASE_DB_URL" -c "$RO $1" 2>/dev/null; }
+
+          mkdir -p .fleet-state
+          PREV=.fleet-state/growth-prev.json
+          [ -f "$PREV" ] || echo '{}' > "$PREV"
+          # arrow: compare today's value to yesterday's stored value for the same key
+          arrow() { # cur key
+            local c="$1" p
+            p="$(jq -r --arg k "$2" '.[$k] // empty' "$PREV" 2>/dev/null)"
+            { [ -z "$p" ] || [ -z "$c" ]; } && { echo ""; return; }
+            printf '%s%s' "$p" "$c" | grep -qE '^[0-9]+$' || { echo ""; return; }
+            if   [ "$c" -gt "$p" ]; then echo " (▲ מ-$p אתמול)"
+            elif [ "$c" -lt "$p" ]; then echo " (▼ מ-$p אתמול)"
+            else echo " (ללא שינוי)"; fi
+          }
+
+          color=$GREEN
+          if [ -z "${SUPABASE_DB_URL:-}" ]; then
+            desc="$(printf '📈 Growth Pulse — 24 שעות אחרונות\n• Supabase: לא מוגדר\nנבדק: %s' "$stamp")"
+            jq -n --argjson c "$color" --arg d "$desc" '{color:$c,description:$d}' > growth-embed.json
+            echo "growth-embed:"; cat growth-embed.json
+            exit 0
+          fi
+
+          # ---- aggregate SELECTs only — no email/name/user_id/trade content ----
+          s24="$(psql_q "SELECT count(*) FROM auth.users WHERE created_at >= now() - interval '24 hours';")"
+          tot="$(psql_q "SELECT count(*) FROM auth.users;")"
+          act="$(psql_q "SELECT count(DISTINCT user_id) FROM public.trades WHERE user_id IS NOT NULL;")"
+          pow="$(psql_q "SELECT count(*) FROM (SELECT user_id FROM public.trades WHERE user_id IS NOT NULL GROUP BY user_id HAVING count(*) >= 10) t;")"
+          tr24="$(psql_q "SELECT count(*) FROM public.trades WHERE \"createdAt\" >= now() - interval '24 hours';")"
+          wlTot="$(psql_q "SELECT count(*) FROM public.waitlist;")"
+          wl24="$(psql_q "SELECT count(*) FROM public.waitlist WHERE created_at >= now() - interval '24 hours';")"
+          # top-3 sources: aggregate labels + counts only (no emails)
+          srcs="$(psql_q "SELECT coalesce(source,'direct') || ' ' || count(*) FROM public.waitlist GROUP BY 1 ORDER BY count(*) DESC LIMIT 3;")"
+          top="$(printf '%s' "$srcs" | awk 'NF{ if(n++) printf " · "; printf "%s", $0 }')"
+
+          show() { [ -n "$1" ] && printf '%s' "$1" || printf 'לא זמין'; }
+          pctact=""
+          if printf '%s%s' "$act" "$tot" | grep -qE '^[0-9]+$' && [ "${tot:-0}" -gt 0 ]; then
+            pctact=" ($(( act * 100 / tot ))%)"
+          fi
+
+          lines=""
+          add() { lines="$lines"$'\n'"$1"; }
+          add "• נרשמים חדשים (24ש'): $(show "$s24")$(arrow "$s24" signups24)"
+          add "• סה\"כ משתמשים: $(show "$tot")$(arrow "$tot" total)"
+          add "• Activation (≥1 עסקה): $(show "$act")$pctact"
+          add "• Power users (≥10 עסקאות): $(show "$pow")"
+          add "• עסקאות שנוצרו (24ש'): $(show "$tr24")$(arrow "$tr24" trades24)"
+          add "• רשימת המתנה: $(show "$wlTot")$(arrow "$wl24" waitlist24 | sed 's/אתמול/ב-24ש/')"
+          [ -n "$top" ] && add "• מקורות מובילים: $top"
+
+          desc="$(printf '📈 Growth Pulse — 24 שעות אחרונות%s\nנבדק: %s' "$lines" "$stamp")"
+          jq -n --argjson c "$color" --arg d "$desc" '{color:$c,description:$d}' > growth-embed.json
+          echo "growth-embed:"; cat growth-embed.json
+
+          # persist today's snapshot for tomorrow's deltas (aggregate ints only)
+          jq -n \
+            --arg signups24 "${s24:-}" --arg total "${tot:-}" --arg trades24 "${tr24:-}" \
+            --arg waitlist24 "${wl24:-}" --arg activation "${act:-}" --arg power "${pow:-}" \
+            '{signups24:$signups24,total:$total,trades24:$trades24,waitlist24:$waitlist24,activation:$activation,power:$power}' \
+            > "$PREV"
+          echo "state:"; cat "$PREV"
+
+      - name: Report to Discord
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.SENTINEL_DISCORD_WEBHOOK }}
+        run: |
+          set -uo pipefail
+          if [ -z "${DISCORD_WEBHOOK:-}" ]; then
+            echo "::warning::SENTINEL_DISCORD_WEBHOOK not set — skipping Discord."
+            NO_WEBHOOK=1
+          else
+            NO_WEBHOOK=0
+          fi
+          post() { # embed-json-file
+            [ -f "$1" ] || { echo "::warning::$1 missing (step failed) — nothing to post"; return; }
+            local color desc payload rc
+            color="$(jq -r '.color' "$1")"; desc="$(jq -r '.description' "$1")"
+            if [ "$NO_WEBHOOK" = "1" ]; then echo "[dry] $desc"; return; fi
+            set +x
+            payload="$(jq -n --arg u "SwingEdge Fleet" --arg d "$desc" --argjson c "$color" \
+              '{username:$u, embeds:[{description:$d, color:$c}]}')"
+            rc="$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" \
+              -d "$payload" "$DISCORD_WEBHOOK" 2>/dev/null || echo 000)"
+            echo "discord POST -> HTTP $rc"   # 204 = success; never prints the URL
+          }
+          post cost-embed.json
+          post growth-embed.json
+
+      - name: Save day-over-day state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .fleet-state
+          key: fleet-daily-state-${{ github.run_id }}

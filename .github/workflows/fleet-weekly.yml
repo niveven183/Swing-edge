@@ -1,0 +1,191 @@
+name: Fleet Weekly
+
+# 24/7 replacement for the local Weekly Vitals Cowork agent. Runs in GitHub
+# Actions (independent of Niv's Mac) every Sunday and posts one Discord embed
+# (📊 Vitals) via the shared Sentinel webhook. Read-only across the board:
+# uptime proxy from Sentinel's own cache, Sentry new-issues, GitHub commits/
+# PRs/failed-runs, Vercel deployments, and trades/week from SUPABASE_DB_URL
+# (SELECT-only, aggregate). Rule [8.3]: surface the single metric that changed
+# most vs last week, with before → after. Zero repo writes; secrets never
+# printed; a missing secret degrades to a "לא מוגדר" line, never a failure.
+
+on:
+  schedule:
+    - cron: '0 7 * * 0'   # Sunday 07:00 UTC = 10:00 Israel
+  workflow_dispatch:
+
+concurrency:
+  group: fleet-weekly
+  cancel-in-progress: false
+
+permissions:
+  contents: read           # read commits (public repo)
+  actions: read            # list failed workflow runs — read-only
+  pull-requests: read       # count open PRs — read-only
+
+jobs:
+  fleet-weekly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Restore weekly state
+        uses: actions/cache/restore@v4
+        with:
+          path: .fleet-state
+          key: fleet-weekly-state-${{ github.run_id }}
+          restore-keys: |
+            fleet-weekly-state-
+
+      - name: Restore Sentinel state (uptime proxy, best-effort)
+        continue-on-error: true
+        uses: actions/cache/restore@v4
+        with:
+          path: .sentinel-state
+          key: sentinel-state-${{ github.run_id }}
+          restore-keys: |
+            sentinel-state-
+
+      - name: Weekly Vitals
+        continue-on-error: true
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          GREEN=3066993; AMBER=15844367
+          stamp="$(date -u '+%Y-%m-%d %H:%M UTC')"
+          weekEnd="$(date -u +%Y-%m-%d)"
+          SINCE="$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ)"
+
+          mkdir -p .fleet-state
+          PREV=.fleet-state/vitals-prev.json
+          [ -f "$PREV" ] || echo '{}' > "$PREV"
+
+          color=$GREEN
+          lines=""
+          add() { lines="$lines"$'\n'"$1"; }
+
+          # metric registry for rule [8.3] (key -> label -> current value)
+          : > metrics.tsv
+          reg() { printf '%s\t%s\t%s\n' "$1" "$2" "$3" >> metrics.tsv; }
+
+          # ---- Uptime proxy (Sentinel active-red incidents + live /api/health) ----
+          SSTATE=.sentinel-state/state.json
+          if [ -f "$SSTATE" ]; then
+            reds="$(jq '[.incidents[]? | select(.severity=="red")] | length' "$SSTATE" 2>/dev/null || echo 0)"
+          else
+            reds="?"
+          fi
+          hstatus="$(curl -sS --max-time 20 "https://swing-edge.com/api/health" 2>/dev/null | jq -r '.status // "unknown"' 2>/dev/null || echo unknown)"
+          if [ "$reds" = "0" ] && [ "$hstatus" = "ok" ]; then
+            add "• Uptime: 🟢 אין תקלות אדומות פעילות · /api/health = ok"
+          elif [ "$reds" = "?" ]; then
+            add "• Uptime: /api/health = $hstatus (state של Sentinel לא נגיש)"
+          else
+            add "• Uptime: 🟠 $reds תקלות אדומות פעילות · /api/health = $hstatus"
+            [ "$hstatus" = "ok" ] || color=$AMBER
+          fi
+
+          # ---- Sentry — new issues in the last 7 days ----
+          if [ -z "${SENTRY_AUTH_TOKEN:-}" ]; then
+            add "• Sentry: לא מוגדר"
+          else
+            set +x
+            sres="$(curl -sS --max-time 20 -G "https://sentry.io/api/0/organizations/swingedge/issues/" \
+              --data-urlencode "query=is:unresolved firstSeen:-7d" \
+              --data-urlencode "sort=date" --data-urlencode "limit=25" \
+              -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" 2>/dev/null || echo '[]')"
+            sn="$(echo "$sres" | jq 'if type=="array" then length else 0 end' 2>/dev/null || echo 0)"
+            add "• Sentry: $sn issues חדשים השבוע"
+            reg sentry "Sentry issues/שבוע" "$sn"
+          fi
+
+          # ---- GitHub — commits / open PRs / failed runs this week ----
+          commits="$(gh api "repos/$GITHUB_REPOSITORY/commits?since=$SINCE&per_page=100" --jq 'length' 2>/dev/null || echo '')"
+          prs="$(gh api "repos/$GITHUB_REPOSITORY/pulls?state=open&per_page=100" --jq 'length' 2>/dev/null || echo '')"
+          fails="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?status=failure&created=>=$SINCE" --jq '.total_count' 2>/dev/null || echo '')"
+          gv() { [ -n "$1" ] && printf '%s' "$1" || printf '?'; }
+          add "• GitHub: $(gv "$commits") commits · $(gv "$prs") PR פתוחים · $(gv "$fails") ריצות שנכשלו"
+          [ -n "$commits" ] && reg commits "commits/שבוע" "$commits"
+          [ -n "$fails" ]   && reg fails   "ריצות שנכשלו" "$fails"
+
+          # ---- Vercel — deployments in the last 7 days ----
+          if [ -z "${VERCEL_TOKEN:-}" ]; then
+            add "• Vercel: לא מוגדר"
+          else
+            set +x
+            since_ms="$(date -u -d '7 days ago' +%s000)"
+            dres="$(curl -sS --max-time 20 "https://api.vercel.com/v6/deployments?limit=100&since=$since_ms" \
+              -H "Authorization: Bearer $VERCEL_TOKEN" 2>/dev/null || echo '{}')"
+            deploys="$(echo "$dres" | jq '(.deployments // []) | length' 2>/dev/null || echo '')"
+            add "• Vercel: $(gv "$deploys") deployments השבוע"
+            [ -n "$deploys" ] && reg deploys "deployments/שבוע" "$deploys"
+          fi
+
+          # ---- trades/week (aggregate) — a strong [8.3] candidate ----
+          if [ -n "${SUPABASE_DB_URL:-}" ]; then
+            RO="SET default_transaction_read_only = on;"
+            tw="$(psql -v ON_ERROR_STOP=1 -tAq "$SUPABASE_DB_URL" -c "$RO SELECT count(*) FROM public.trades WHERE \"createdAt\" >= now() - interval '7 days';" 2>/dev/null || echo '')"
+            [ -n "$tw" ] && reg trades "עסקאות/שבוע" "$tw"
+          fi
+
+          # ---- Rule [8.3]: the one metric that moved the most vs last week ----
+          best_line="📌 שינוי השבוע [8.3]: בסיס ראשון, אין השוואה"
+          best_rel=-1
+          while IFS="$(printf '\t')" read -r k label cur; do
+            [ -z "$k" ] && continue
+            printf '%s' "$cur" | grep -qE '^[0-9]+$' || continue
+            prev="$(jq -r --arg k "$k" '.[$k] // empty' "$PREV" 2>/dev/null)"
+            printf '%s' "$prev" | grep -qE '^[0-9]+$' || continue
+            [ "$prev" -eq 0 ] && continue
+            rel="$(awk "BEGIN{d=$cur-$prev; if(d<0)d=-d; printf \"%d\", d*100/$prev}")"
+            if [ "$rel" -gt "$best_rel" ]; then
+              best_rel="$rel"
+              dir="▲"; sign="+"
+              [ "$cur" -lt "$prev" ] && { dir="▼"; sign="-"; }
+              best_line="📌 שינוי השבוע [8.3]: $label $prev → $cur ($dir ${sign}${rel}%)"
+            fi
+          done < metrics.tsv
+          add "• $best_line"
+
+          desc="$(printf '📊 Weekly Vitals — שבוע שהסתיים %s%s\nנבדק: %s' "$weekEnd" "$lines" "$stamp")"
+          jq -n --argjson c "$color" --arg d "$desc" '{color:$c,description:$d}' > vitals-embed.json
+          echo "vitals-embed:"; cat vitals-embed.json
+
+          # persist this week's metrics for next week's [8.3] comparison
+          jq -R -s 'split("\n") | map(select(length>0) | split("\t")) | map({(.[0]): .[2]}) | add // {}' \
+            metrics.tsv > "$PREV"
+          echo "state:"; cat "$PREV"
+
+      - name: Report to Discord
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.SENTINEL_DISCORD_WEBHOOK }}
+        run: |
+          set -uo pipefail
+          if [ -z "${DISCORD_WEBHOOK:-}" ]; then
+            echo "::warning::SENTINEL_DISCORD_WEBHOOK not set — skipping Discord."
+            NO_WEBHOOK=1
+          else
+            NO_WEBHOOK=0
+          fi
+          if [ ! -f vitals-embed.json ]; then
+            echo "::warning::vitals-embed.json missing (step failed) — nothing to post"
+            exit 0
+          fi
+          color="$(jq -r '.color' vitals-embed.json)"; desc="$(jq -r '.description' vitals-embed.json)"
+          if [ "$NO_WEBHOOK" = "1" ]; then echo "[dry] $desc"; exit 0; fi
+          set +x
+          payload="$(jq -n --arg u "SwingEdge Fleet" --arg d "$desc" --argjson c "$color" \
+            '{username:$u, embeds:[{description:$d, color:$c}]}')"
+          rc="$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" \
+            -d "$payload" "$DISCORD_WEBHOOK" 2>/dev/null || echo 000)"
+          echo "discord POST -> HTTP $rc"   # 204 = success; never prints the URL
+
+      - name: Save weekly state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .fleet-state
+          key: fleet-weekly-state-${{ github.run_id }}
