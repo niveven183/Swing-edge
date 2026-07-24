@@ -82,3 +82,19 @@ done
 ### 6. תעד אירוע
 כל אובדן/שחזור בפרודקשן = רשומה ב-`docs/INCIDENTS.md` (סימפטום, שורש, תיקון, מניעה),
 באותו commit של התיקון.
+
+---
+
+## שליחת קמפיין מייל (Email Campaign)
+
+מריצים ידנית מ-GitHub → Actions → **Email Campaign** → Run workflow. שולח **רק**
+לנמענים מאושרים (`waitlist.approved_at IS NOT NULL`) ומדלג על מי שכבר קיבל את
+הקמפיין (dedup מול `public.email_campaign_log`). דורש שהמיגרציה
+`supabase/migrations/*_email_campaign_log.sql` תרוץ תחילה (אחרת ה-fetch מציג
+`::warning` ומסיים ירוק בלי לשלוח).
+
+Inputs: `campaign` (מפתח הקמפיין, למשל `waitlist_launch`) · `subject` (שורת נושא) ·
+`template` (נתיב ל-HTML, ברירת מחדל `emails/waitlist_launch.html`) ·
+`dry_run` (**ברירת מחדל TRUE** — תצוגה מקדימה בלבד, לא שולח) · `limit` (תקרת
+נמענים לריצה, ברירת מחדל 10). לשליחה אמיתית: הרץ עם `dry_run=false`. אף כתובת
+מייל אינה מודפסת במלואה, ו-SMTP secrets לעולם לא נחשפים בלוג.

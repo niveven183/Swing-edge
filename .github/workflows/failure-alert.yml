@@ -7,7 +7,7 @@ name: Failure Alert
 # (already self-alarms on its own failure condition) — avoids duplicate mail.
 on:
   workflow_run:
-    workflows: ["Analyst", "Architecture Auditor", "Daily Digest", "Data Guardian", "Triage", "Sentinel", "Fleet Daily", "Fleet Weekly"]
+    workflows: ["Analyst", "Architecture Auditor", "Daily Digest", "Data Guardian", "Triage", "Sentinel", "Fleet Daily", "Fleet Weekly", "Email Campaign"]
     types: [completed]
 
 jobs:

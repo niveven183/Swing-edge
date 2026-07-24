@@ -1,0 +1,262 @@
+name: Email Campaign
+
+# Manual, opt-in marketing sender. Sends ONLY to approved waitlist rows
+# (waitlist.approved_at IS NOT NULL) and dedups against public.email_campaign_log
+# so nobody gets the same campaign twice. dry_run defaults to TRUE and limit
+# defaults to 10 — a real send is a deliberate, low-ceiling action. Read-only on
+# waitlist; the only writes are one row per send into email_campaign_log. No
+# email address is ever printed in full; SMTP secrets never echoed.
+#
+# The email_campaign_log table is created by a migration the operator runs
+# manually. Until then, the fetch below degrades to a clear ::warning and a
+# green finish (dry-run), never a hard failure.
+
+on:
+  workflow_dispatch:
+    inputs:
+      campaign:
+        description: "Campaign key (matches template + dedup ledger)"
+        required: true
+        default: waitlist_launch
+      subject:
+        description: "Email subject line"
+        required: true
+      template:
+        description: "Path to the HTML template"
+        required: false
+        default: emails/waitlist_launch.html
+      dry_run:
+        description: "TRUE = preview only, do not send (default)"
+        type: boolean
+        default: true
+      limit:
+        description: "Max recipients this run (safety ceiling)"
+        required: false
+        default: "10"
+
+concurrency:
+  group: email-campaign
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout (for the template)
+        uses: actions/checkout@v4
+
+      - name: Guard secrets & validate inputs
+        env:
+          MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          LIMIT: ${{ inputs.limit }}
+          TEMPLATE: ${{ inputs.template }}
+        run: |
+          set -uo pipefail
+          set +e
+          fail=0
+          if [ -z "${MAIL_USERNAME:-}" ] || [ -z "${MAIL_PASSWORD:-}" ]; then
+            echo "::error::MAIL_USERNAME/MAIL_PASSWORD not set — cannot send."; fail=1
+          fi
+          if [ -z "${SUPABASE_DB_URL:-}" ]; then
+            echo "::error::SUPABASE_DB_URL not set — cannot fetch recipients."; fail=1
+          fi
+          case "${LIMIT:-}" in
+            ''|*[!0-9]*) echo "::error::limit must be a positive integer (got '${LIMIT:-}')."; fail=1 ;;
+          esac
+          if [ ! -f "$TEMPLATE" ]; then
+            echo "::error::template not found: $TEMPLATE"; fail=1
+          fi
+          [ "$fail" = "0" ] || exit 1
+          echo "guard ok · limit=$LIMIT · template=$TEMPLATE"
+
+      - name: Fetch approved recipients (read-only, deduped)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          CAMPAIGN: ${{ inputs.campaign }}
+          LIMIT: ${{ inputs.limit }}
+        run: |
+          set -uo pipefail
+          set +e                     # runner injects `bash -e`; disable so a degradable failure doesn't abort
+          RO="SET default_transaction_read_only = on;"
+          SQL="$RO
+          SELECT email FROM public.waitlist w
+          WHERE w.approved_at IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM public.email_campaign_log l
+              WHERE l.campaign = :'campaign'
+                AND lower(l.email) = lower(w.email)
+                AND l.status = 'sent')
+          ORDER BY w.approved_at ASC
+          LIMIT :lim;"
+
+          : > recipients.txt
+          psql -v ON_ERROR_STOP=1 -tAq \
+            -v campaign="$CAMPAIGN" -v lim="$LIMIT" \
+            "$SUPABASE_DB_URL" -c "$SQL" > recipients.txt 2>/tmp/fetcherr
+          rc=$?
+          if [ "$rc" -ne 0 ]; then
+            err="$(head -3 /tmp/fetcherr 2>/dev/null)"     # never contains the conn string
+            if printf '%s' "$err" | grep -qiE 'email_campaign_log|does not exist'; then
+              echo "::warning::email_campaign_log לא קיימת — הרץ את המיגרציה supabase/migrations/20260724103403_email_campaign_log.sql"
+              : > recipients.txt
+              echo "TABLE_MISSING=1" >> "$GITHUB_ENV"
+            else
+              echo "::error::recipient fetch failed: $err"; exit 1
+            fi
+          fi
+
+          count="$(grep -cve '^$' recipients.txt 2>/dev/null)"; [ -n "$count" ] || count=0
+          echo "RCPT_COUNT=$count" >> "$GITHUB_ENV"
+          echo "recipients queued: $count"     # count only — never the addresses
+
+      - name: Dry-run preview (no send)
+        if: ${{ inputs.dry_run }}
+        env:
+          SUBJECT: ${{ inputs.subject }}
+          TEMPLATE: ${{ inputs.template }}
+          CAMPAIGN: ${{ inputs.campaign }}
+        run: |
+          set -uo pipefail
+          set +e
+          mask() {  # ab***@domain — never a full address
+            local e="$1" lp dom
+            lp="${e%@*}"; dom="${e#*@}"
+            printf '%s***@%s' "$(printf '%s' "$lp" | cut -c1-2)" "$dom"
+          }
+          echo "📧 Email Campaign (DRY RUN) — campaign=$CAMPAIGN"
+          echo "נמענים בתור: ${RCPT_COUNT:-0}"
+          if [ "${RCPT_COUNT:-0}" -gt 0 ]; then
+            echo "דוגמאות (ממוסך):"
+            head -3 recipients.txt | while IFS= read -r e; do [ -n "$e" ] && echo "  - $(mask "$e")"; done
+          else
+            echo "דוגמאות (ממוסך): (אין — 0 נמענים)"
+          fi
+          echo "subject: $SUBJECT"
+          echo "template preview (300):"
+          head -c 300 "$TEMPLATE"; echo
+          echo "לא נשלחו מיילים (dry_run=true)."
+
+      - name: Send emails
+        if: ${{ ! inputs.dry_run }}
+        env:
+          MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUBJECT: ${{ inputs.subject }}
+          TEMPLATE: ${{ inputs.template }}
+          CAMPAIGN: ${{ inputs.campaign }}
+        run: |
+          set -uo pipefail
+          set +e
+          set +x                     # never trace SMTP creds
+          if [ "${TABLE_MISSING:-0}" = "1" ]; then
+            echo "::error::email_campaign_log missing — run the migration before a real send (dedup/logging unavailable)."; exit 1
+          fi
+          if [ "${RCPT_COUNT:-0}" -eq 0 ]; then
+            echo "0 approved recipients — nothing to send."
+            echo "SENT=0" >> "$GITHUB_ENV"; echo "FAILED=0" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          cat > send.py <<'PYEOF'
+          import os, re, ssl, time, smtplib, subprocess, sys
+          from email.mime.multipart import MIMEMultipart
+          from email.mime.text import MIMEText
+
+          user = os.environ["MAIL_USERNAME"]
+          pw   = os.environ["MAIL_PASSWORD"]
+          subj = os.environ["SUBJECT"]
+          camp = os.environ["CAMPAIGN"]
+          dburl = os.environ["SUPABASE_DB_URL"]
+          with open(os.environ["TEMPLATE"], encoding="utf-8") as f:
+              html = f.read()
+          text = re.sub(r"<[^>]+>", "", html)
+          text = re.sub(r"\n\s*\n+", "\n\n", text).strip() or "SwingEdge"
+
+          with open("recipients.txt", encoding="utf-8") as f:
+              rcpts = [ln.strip() for ln in f if ln.strip()]
+
+          def log(email, status, err):
+              subprocess.run(
+                  ["psql", "-v", "ON_ERROR_STOP=1", "-q",
+                   "-v", "c=" + camp, "-v", "e=" + email,
+                   "-v", "s=" + status, "-v", "err=" + (err or ""),
+                   dburl, "-c",
+                   "INSERT INTO public.email_campaign_log(campaign,email,status,error) "
+                   "VALUES (:'c',:'e',:'s',NULLIF(:'err','')) ON CONFLICT DO NOTHING;"],
+                  check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+          sent = failed = 0
+          ctx = ssl.create_default_context()
+          try:
+              srv = smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30, context=ctx)
+              srv.login(user, pw)
+          except Exception as e:
+              print("::error::SMTP login failed"); sys.exit(1)
+
+          for i, rcpt in enumerate(rcpts):
+              try:
+                  msg = MIMEMultipart("alternative")
+                  msg["Subject"] = subj
+                  msg["From"] = "SwingEdge <%s>" % user
+                  msg["To"] = rcpt
+                  msg["Reply-To"] = user
+                  msg.attach(MIMEText(text, "plain", "utf-8"))
+                  msg.attach(MIMEText(html, "html", "utf-8"))
+                  srv.sendmail(user, [rcpt], msg.as_string())
+                  log(rcpt, "sent", "")
+                  sent += 1
+              except Exception as e:
+                  log(rcpt, "failed", str(e)[:200])
+                  failed += 1
+              if i < len(rcpts) - 1:
+                  time.sleep(3)
+          try:
+              srv.quit()
+          except Exception:
+              pass
+
+          print("sent=%d failed=%d" % (sent, failed))
+          with open(os.environ["GITHUB_ENV"], "a") as gh:
+              gh.write("SENT=%d\n" % sent)
+              gh.write("FAILED=%d\n" % failed)
+          PYEOF
+
+          python3 send.py
+
+      - name: Report to Discord
+        if: ${{ ! inputs.dry_run }}
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.SENTINEL_DISCORD_WEBHOOK }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          CAMPAIGN: ${{ inputs.campaign }}
+        run: |
+          set -uo pipefail
+          set +e
+          stamp="$(date -u '+%Y-%m-%d %H:%M UTC')"
+          # remaining = approved rows not yet logged as sent for this campaign
+          RO="SET default_transaction_read_only = on;"
+          remaining="$(psql -v ON_ERROR_STOP=1 -tAq -v campaign="$CAMPAIGN" "$SUPABASE_DB_URL" -c \
+            "$RO SELECT count(*) FROM public.waitlist w WHERE w.approved_at IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.email_campaign_log l WHERE l.campaign = :'campaign' AND lower(l.email)=lower(w.email) AND l.status='sent');" 2>/dev/null)"
+          [ -n "$remaining" ] || remaining="?"
+
+          desc="$(printf '📧 Email Campaign — %s\n• נשלחו: %s\n• נכשלו: %s\n• נותרו בתור: %s\nנבדק: %s' \
+            "$CAMPAIGN" "${SENT:-0}" "${FAILED:-0}" "$remaining" "$stamp")"
+
+          if [ -z "${DISCORD_WEBHOOK:-}" ]; then
+            echo "::warning::SENTINEL_DISCORD_WEBHOOK not set — skipping Discord."
+            echo "[dry] $desc"; exit 0
+          fi
+          set +x
+          GREEN=3066993; RED=15158332
+          color=$GREEN; [ "${FAILED:-0}" -gt 0 ] && color=$RED
+          payload="$(jq -n --arg u "SwingEdge Fleet" --arg d "$desc" --argjson c "$color" \
+            '{username:$u, embeds:[{description:$d, color:$c}]}')"
+          rc="$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" \
+            -d "$payload" "$DISCORD_WEBHOOK" 2>/dev/null || echo 000)"
+          echo "discord POST -> HTTP $rc"   # 204 = success; never prints the URL
