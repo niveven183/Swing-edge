@@ -304,6 +304,7 @@ export default function AdminPanel() {
   const [tradesList, setTradesList] = useState([]);
   const [newUsersSeries, setNewUsersSeries] = useState([]);
   const [feedback, setFeedback] = useState([]);
+  const [waitlist, setWaitlist] = useState([]);
   const [loading, setLoading] = useState(true);
   const [supaUp, setSupaUp] = useState(null);
   const toast = useToast();
@@ -325,21 +326,23 @@ export default function AdminPanel() {
     if (!isSupabaseConfigured || !supabase) { setSupaUp(false); setLoading(false); return; }
     setLoading(true);
     try {
-      const [ov, ul, ta, tl, nus, fb] = await Promise.all([
+      const [ov, ul, ta, tl, nus, fb, wl] = await Promise.all([
         supabase.rpc("admin_overview"),
         supabase.rpc("admin_users_list"),
         supabase.rpc("admin_trades_agg"),
         supabase.rpc("admin_trades_list", { _limit: 5000, _offset: 0, _status: null, _demo: null }),
         supabase.rpc("admin_new_users_series"),
         supabase.rpc("admin_feedback_list"),
+        supabase.rpc("admin_waitlist_list", { _limit: 500 }),
       ]);
-      for (const r of [ov, ul, ta, tl, nus, fb]) if (r.error) throw r.error;
+      for (const r of [ov, ul, ta, tl, nus, fb, wl]) if (r.error) throw r.error;
       setOverview(ov.data || null);
       setUsersList(ul.data || []);
       setTradesAgg(ta.data || null);
       setTradesList(tl.data || []);
       setNewUsersSeries(nus.data || []);
       setFeedback(fb.data || []);
+      setWaitlist(wl.data || []);
       setSupaUp(true);
     } catch (e) {
       setSupaUp(false);
@@ -421,7 +424,7 @@ export default function AdminPanel() {
       </div>
 
       {/* Tab bodies */}
-      {tab === "overview" && <OverviewTab overview={overview} series={newUsersSeries} users={usersList} loading={loading} />}
+      {tab === "overview" && <OverviewTab overview={overview} series={newUsersSeries} users={usersList} waitlist={waitlist} loading={loading} toast={toast} onMutate={loadAll} />}
       {tab === "users"    && <UsersTab users={usersList} feedback={feedback} toast={toast} onMutate={loadAll} />}
       {tab === "trades"   && <TradesTab tradesList={tradesList} agg={tradesAgg} toast={toast} onMutate={loadAll} />}
       {tab === "feedback" && <FeedbackTab feedback={feedback} setFeedback={setFeedback} toast={toast} />}
@@ -435,7 +438,7 @@ export default function AdminPanel() {
 //  TAB 1 — Overview
 // ════════════════════════════════════════════════════════════════════════════
 
-function OverviewTab({ overview, series, users, loading }) {
+function OverviewTab({ overview, series, users, waitlist = [], loading, toast, onMutate }) {
   const totalUsers = overview?.total_users ?? 0;
   const activeUsers = overview?.active_30d ?? 0;
   const totalTrades = overview?.total_trades ?? 0;
@@ -454,6 +457,11 @@ function OverviewTab({ overview, series, users, loading }) {
     [users]
   );
 
+  const pendingCount = useMemo(
+    () => waitlist.reduce((n, w) => (w.approved_at ? n : n + 1), 0),
+    [waitlist]
+  );
+
   return (
     <div className="space-y-5">
       <header>
@@ -468,7 +476,7 @@ function OverviewTab({ overview, series, users, loading }) {
         <KpiCard label="Avg trades / user" value={avgTradesPerUser} accent="amber" icon={TrendingUp} loading={loading} />
         <KpiCard label="New users this week" value={newUsersThisWeek} accent="rose" icon={Calendar} loading={loading} />
         <KpiCard label="Trades this week" value={tradesThisWeek} accent="slate" icon={Zap} loading={loading} />
-        <KpiCard label="Waitlist" value={waitlistCount == null ? "—" : Number(waitlistCount).toLocaleString()} accent="emerald" icon={Mail} sub="landing signups" loading={loading} />
+        <KpiCard label="Waitlist" value={waitlistCount == null ? "—" : Number(waitlistCount).toLocaleString()} accent="emerald" icon={Mail} sub={`${pendingCount} ממתינים לאישור`} loading={loading} />
       </div>
 
       <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-2xl p-4">
@@ -523,6 +531,137 @@ function OverviewTab({ overview, series, users, loading }) {
             ))}
             {topUsers.length === 0 && (
               <tr><td colSpan={4} className="p-6 text-center text-slate-600 text-xs">No data yet</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <WaitlistTable waitlist={waitlist} loading={loading} toast={toast} onMutate={onMutate} />
+    </div>
+  );
+}
+
+// Waitlist approval gate — pending rows are selectable; approving sets
+// approved_at server-side. Approval marks entry only; no email is sent here.
+function WaitlistTable({ waitlist = [], loading, toast, onMutate }) {
+  const confirm = useConfirm();
+  const [selected, setSelected] = useState(() => new Set());
+  const [busy, setBusy] = useState(false);
+
+  const pendingIds = useMemo(
+    () => waitlist.filter((w) => !w.approved_at).map((w) => w.id),
+    [waitlist]
+  );
+  const allPendingSelected = pendingIds.length > 0 && pendingIds.every((id) => selected.has(id));
+
+  const toggle = (id) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  const toggleAll = () =>
+    setSelected(allPendingSelected ? new Set() : new Set(pendingIds));
+
+  const approve = async () => {
+    const ids = [...selected];
+    if (!ids.length) return;
+    const ok = await confirm({
+      title: "אישור נבחרים",
+      message: `לאשר ${ids.length} נרשמים? פעולה חד-כיוונית (אין ביטול אישור). לא נשלח אימייל בשלב זה.`,
+      confirmText: "אשר",
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.rpc("admin_waitlist_approve", { _ids: ids });
+      if (error) throw error;
+      toast.success(`אושרו ${data ?? 0} נרשמים`);
+      setSelected(new Set());
+      await onMutate?.();
+    } catch (e) {
+      toast.error("אישור נכשל: " + (e?.message || "unknown"));
+    }
+    setBusy(false);
+  };
+
+  const exportCsv = () =>
+    downloadCSV(
+      waitlist,
+      `waitlist-${new Date().toISOString().slice(0, 10)}.csv`,
+      ["email", "source", "campaign", "created_at", "approved_at"]
+    );
+
+  return (
+    <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-2xl p-4">
+      <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+        <h3 className="text-xs font-bold text-white tracking-wide uppercase">Waitlist</h3>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={approve}
+            disabled={busy || selected.size === 0}
+            className="flex items-center gap-1 text-[10px] text-emerald-400 border border-emerald-500/30 rounded-lg px-2.5 py-1.5 hover:bg-emerald-500/10 disabled:opacity-40 disabled:cursor-not-allowed"
+          ><CheckCircle2 size={11} /> אשר נבחרים ({selected.size})</button>
+          <button
+            onClick={exportCsv}
+            disabled={waitlist.length === 0}
+            className="flex items-center gap-1 text-[10px] text-cyan-400 border border-cyan-500/30 rounded-lg px-2.5 py-1.5 hover:bg-cyan-500/10 disabled:opacity-40"
+          ><Download size={11} /> Export CSV</button>
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-slate-600 border-b border-[var(--border-subtle)] dark:border-white/[0.06] text-[10px] tracking-widest uppercase">
+              <th className="p-2 text-left font-semibold w-8">
+                <input
+                  type="checkbox"
+                  className="w-3.5 h-3.5"
+                  checked={allPendingSelected}
+                  onChange={toggleAll}
+                  disabled={pendingIds.length === 0}
+                  aria-label="select all pending"
+                />
+              </th>
+              <th className="p-2 text-left font-semibold">Email</th>
+              <th className="p-2 text-left font-semibold">Source</th>
+              <th className="p-2 text-left font-semibold">Campaign</th>
+              <th className="p-2 text-left font-semibold">Joined</th>
+              <th className="p-2 text-left font-semibold">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {waitlist.map((w) => {
+              const approved = !!w.approved_at;
+              return (
+                <tr key={w.id} className="border-b border-white/[0.04]">
+                  <td className="p-2">
+                    {!approved && (
+                      <input
+                        type="checkbox"
+                        className="w-3.5 h-3.5"
+                        checked={selected.has(w.id)}
+                        onChange={() => toggle(w.id)}
+                        aria-label={`select ${w.email}`}
+                      />
+                    )}
+                  </td>
+                  <td className="p-2 font-mono text-slate-200">{w.email || "—"}</td>
+                  <td className="p-2 font-mono text-[11px] text-slate-500">{w.source || "—"}</td>
+                  <td className="p-2 font-mono text-[11px] text-slate-500">{w.campaign || "—"}</td>
+                  <td className="p-2 font-mono text-[11px] text-slate-500">{formatDate(w.created_at)}</td>
+                  <td className="p-2">
+                    <Badge tone={approved ? "emerald" : "amber"}>{approved ? "מאושר" : "ממתין"}</Badge>
+                  </td>
+                </tr>
+              );
+            })}
+            {waitlist.length === 0 && (
+              <tr>
+                <td colSpan={6} className="p-6 text-center text-slate-600 text-xs">
+                  {loading ? "Loading…" : "No data yet"}
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
