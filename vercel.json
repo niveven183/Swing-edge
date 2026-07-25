@@ -1,6 +1,9 @@
 {
   "buildCommand": "npm install && npm run build",
   "outputDirectory": "dist",
+  "functions": {
+    "api/send-invites.js": { "maxDuration": 60, "includeFiles": "emails/**" }
+  },
   "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }],
   "headers": [
     {

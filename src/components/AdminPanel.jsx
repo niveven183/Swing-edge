@@ -567,20 +567,30 @@ function WaitlistTable({ waitlist = [], loading, toast, onMutate }) {
     const ids = [...selected];
     if (!ids.length) return;
     const ok = await confirm({
-      title: "אישור נבחרים",
-      message: `לאשר ${ids.length} נרשמים? פעולה חד-כיוונית (אין ביטול אישור). לא נשלח אימייל בשלב זה.`,
-      confirmText: "אשר",
+      title: "אישור ושליחת הזמנה",
+      message: `לאשר ולשלוח הזמנה ל-${ids.length} נרשמים? המייל יישלח מיידית. פעולה חד-כיוונית.`,
+      confirmText: "אשר ושלח",
     });
     if (!ok) return;
     setBusy(true);
     try {
-      const { data, error } = await supabase.rpc("admin_waitlist_approve", { _ids: ids });
-      if (error) throw error;
-      toast.success(`אושרו ${data ?? 0} נרשמים`);
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess?.session?.access_token;
+      if (!token) throw new Error("אין סשן פעיל");
+      const res = await fetch("/api/send-invites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ ids }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "שליחה נכשלה");
+      const sent = json.sent ?? 0;
+      const failed = json.failed ?? 0;
+      toast.success(`נשלחו ${sent} הזמנות ✅` + (failed > 0 ? `, ${failed} נכשלו` : ""));
       setSelected(new Set());
       await onMutate?.();
     } catch (e) {
-      toast.error("אישור נכשל: " + (e?.message || "unknown"));
+      toast.error(e?.message || "שליחה נכשלה");
     }
     setBusy(false);
   };
@@ -601,7 +611,7 @@ function WaitlistTable({ waitlist = [], loading, toast, onMutate }) {
             onClick={approve}
             disabled={busy || selected.size === 0}
             className="flex items-center gap-1 text-[10px] text-emerald-400 border border-emerald-500/30 rounded-lg px-2.5 py-1.5 hover:bg-emerald-500/10 disabled:opacity-40 disabled:cursor-not-allowed"
-          ><CheckCircle2 size={11} /> אשר נבחרים ({selected.size})</button>
+          ><CheckCircle2 size={11} /> {busy ? "שולח..." : `אשר ושלח הזמנה (${selected.size})`}</button>
           <button
             onClick={exportCsv}
             disabled={waitlist.length === 0}
