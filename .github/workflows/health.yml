@@ -1,8 +1,12 @@
 name: Health Monitor
 
+# DEPRECATED (2026-07-25): superseded by Sentinel (sentinel.yml), section
+# "3. API health", which performs this same /api/health probe on the same
+# domain and more (parses status, failing[] incl. Supabase, warnings[]).
+# Schedule removed to stop noise/concurrency conflicts with Sentinel; kept
+# dispatchable for manual backup. Do not delete.
+
 on:
-  schedule:
-    - cron: '*/30 * * * *'   # every 30 minutes
   workflow_dispatch:
 
 concurrency:

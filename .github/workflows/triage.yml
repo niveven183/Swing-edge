@@ -6,7 +6,7 @@ name: Triage
 
 on:
   workflow_run:
-    workflows: ["Health Monitor", "Smoke Tests", "Build", "Supabase Backup"]
+    workflows: ["Smoke Tests", "Build", "Supabase Backup"]
     types: [completed]
   workflow_dispatch:
     inputs:
