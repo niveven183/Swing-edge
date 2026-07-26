@@ -1,7 +1,7 @@
 # PLAN — Sentinel S2: שכבת QA מחוברת (יישום spec + חיווט)
 
 - **תאריך**: 2026-07-26
-- **סטטוס**: ממתין לאישור (הקומיט הזה אינו אישור לביצוע)
+- **סטטוס**: אושר 2026-07-26 עם שלושה תיקונים (חלון gate 45→09, `concurrency` ברמת ה-job, עדכון סעיף הסודות) — משולבים למטה
 - **קבצים שייגעו**: `tests-sentinel/sentinel-auth.spec.js` (חדש) · `.github/workflows/sentinel.yml`
 - **מקור אמת**: [docs/SENTINEL-S2-DIAGNOSIS-2026-07-25.md](../SENTINEL-S2-DIAGNOSIS-2026-07-25.md) (S2 שלב 1/2)
 
@@ -78,16 +78,20 @@ S2 סוגר את הפער: spec שני שמתחבר בחשבון QA ייעודי
 ## קובץ 2: `.github/workflows/sentinel.yml`
 
 1. **`workflow_dispatch.inputs.run_auth`** — boolean, `default: true` (ההרצה הידנית הראשונה בודקת את המסלול המלא).
-2. **`browser` job**: `timeout-minutes: 8 → 12`, ותוספת `outputs: { auth: "${{ steps.gate.outputs.auth }}" }`.
+2. **`browser` job**: `timeout-minutes: 8 → 12`, תוספת `outputs: { auth: "${{ steps.gate.outputs.auth }}" }`,
+   ו-**`concurrency: { group: sentinel-auth, cancel-in-progress: false }` ברמת ה-job** — חובה, בלי תלות בחלון:
+   שתי ריצות auth במקביל = מרוץ על יצירה/מחיקה של `SNTNL` ופוטנציאל לשורות יתומות. **זו ההגנה האמיתית; החלון הוא רק אופטימיזציה.**
+   `cancel-in-progress: false` (ולא `true` כמו ה-concurrency הגלובלי) כי קטילת ריצה באמצע מוטציה משאירה זבל.
 3. **צעד חדש `gate`** (לפני ריצת Playwright) שכותב ל-`$GITHUB_ENV` **וגם** ל-`$GITHUB_OUTPUT`:
    ```bash
    MIN="$((10#$(date -u +%M)))"
    auth=0
-   { [ "$MIN" -ge 45 ] || [ "$MIN" -le 14 ]; } && auth=1     # ריצת ה-:50 בלבד
+   { [ "$MIN" -ge 45 ] || [ "$MIN" -le 9 ]; } && auth=1      # ריצת ה-:50 בלבד
    [ "$GH_EVENT" = "workflow_dispatch" ] && { auth=0; [ "${RUN_AUTH:-true}" = "true" ] && auth=1; }
    ```
-   **החלון 45→14 ולא 45–59** (חריגה מודעת, שומרת על כוונת הבריף): מתזמן GitHub מאחר דרך קבע 5–15 דק', ריצת ה-`:50`
-   נוחתת לא פעם אחרי חצות השעה — עם 45–59 שכבת ה-auth הייתה **פשוט לא רצה** בשקט. ריצת ה-`:20` לא יכולה להקדים, ולכן לא נכנסת לחלון.
+   **החלון 45→09 ולא 45–59 ולא 45→14**: מתזמן GitHub מאחר דרך קבע 5–15 דק', וריצת ה-`:50` נוחתת לא פעם אחרי חצות
+   השעה — עם 45–59 שכבת ה-auth הייתה פשוט לא רצה בשקט. מצד שני 45→14 חופף לריצת `:20` שמאחרת ~55 דק', ואז שכבת
+   ה-auth רצה **פעמיים באותה שעה** על אותו חשבון QA. 45→09 נותן ~20 דק' סבילות לאיחור של ה-`:50` בלי החפיפה הזאת.
 4. **`env` לצעד ה-Playwright**: `SENTINEL_QA_EMAIL`, `SENTINEL_QA_PASSWORD`, `SUPABASE_URL`, `SUPABASE_ANON_KEY` (מ-`secrets`).
    `SENTINEL_AUTH` כבר זמין דרך `$GITHUB_ENV`.
 5. **artifact**: אותו artifact, שני נתיבים — `browser-findings.json` + `browser-findings-auth.json`.
@@ -105,30 +109,30 @@ S2 סוגר את הפער: spec שני שמתחבר בחשבון QA ייעודי
 
 ---
 
-## פעולה שדרושה מניב (לא חוסמת)
+## סטטוס הסודות (עודכן 2026-07-26)
 
-`SUPABASE_URL` ו-`SUPABASE_ANON_KEY` **אינם** secrets/vars בריפו (יש רק `SUPABASE_DB_URL` — connection string של פוסטגרס, לא REST).
-עד שיתווספו, ה-spec מדלג על **ניקוי ה-REST בלבד** (המחיקה ב-UI כן רצה) ומדווח 🟡 `browser-auth|cleanup-unconfigured`.
-**סודות מזין ניב בלבד — Claude לא מריץ `gh secret set`.** שני ה-secrets שנדרשים:
-- `SUPABASE_URL` — `https://zicstkfkwhzvmdkzpidm.supabase.co` (מזהה הפרויקט מהאבחון, סעיף 8)
-- `SUPABASE_ANON_KEY` — ה-anon הפומבי (מופיע ממילא ב-bundle)
+`SUPABASE_URL` ו-`SUPABASE_ANON_KEY` **הוזנו כעת** ל-GitHub Secrets ע"י ניב (בנוסף ל-`SUPABASE_DB_URL` הקיים,
+שהוא connection string של פוסטגרס ולא REST). כלומר הניקוי המובטח ב-REST נדלק כבר בהרצה הראשונה, ו-🟡
+`browser-auth|cleanup-unconfigured` נשאר רק כרשת ביטחון למקרה שהסוד יימחק.
 
-ברגע שיוגדרו, הניקוי המובטח נדלק לבד — אפס שינויי קוד. עד אז ההגנה היא sweep השרידים בשלב 3 של הריצה הבאה.
+**ה-`SUPABASE_ANON_KEY` הוא מפורמט `sb_publishable_` החדש, לא ה-JWT הלגסי (`eyJ…`).** שני הפורמטים אמורים לעבוד
+מול `/auth/v1/token` ומול PostgREST, אבל אם ההרצה הראשונה תחזיר **401/403 בשלב הניקוי — מדווחים ולא מנסים לעקוף**
+(אפס fallback לשירות-role, אפס שינוי RLS): ניב יחליף ל-legacy key מ-Supabase. הממצא במקרה כזה הוא
+🔴 `browser-auth|cleanup-failed` עם קוד ה-HTTP ב-`got`.
+
+**סודות מזין ניב בלבד — Claude לא מריץ `gh secret set`.**
 
 ---
 
 ## אימות
 
 1. **מסלול הדילוג** (ללא מוטציה): `npx playwright test --config playwright.sentinel.config.js` → הציבורי עובר, שכבת ה-auth מדולגת, `browser-findings-auth.json` לא נוצר.
-2. **מסלול מלא** — ⚠️ מבצע מוטציה חיה בחשבון ה-QA בפרודקשן (יוצר ומוחק `SNTNL`); יורץ רק באישור ניב:
-   ```
-   SENTINEL_AUTH=1 SENTINEL_QA_EMAIL=… SENTINEL_QA_PASSWORD=… \
-     npx playwright test --config playwright.sentinel.config.js tests-sentinel/sentinel-auth.spec.js
-   ```
-   מצפים ל-`[]` (או רק 🟡 `cleanup-unconfigured`) ב-`browser-findings-auth.json`, ולא לטוקן/סיסמה בפלט.
-3. **בדיקת שפיות ב-UI** אחרי הריצה: היומן מציג בדיוק 3 עסקאות (AAPL/NVDA/BTC-USD), אין `SNTNL`, ההון `$10,000`.
-4. **YAML**: `python3 -c "import yaml,sys; yaml.safe_load(open('.github/workflows/sentinel.yml'))"` + `jq` על בלוק המיזוג עם קבצי דמה.
-5. **אחרי push**: `gh workflow run Sentinel -f run_auth=true` → `gh run watch` → מאמתים ש-`gate` הדפיס `auth: 1`, שה-artifact מכיל שני קבצים, ושהודעת Discord אחת נשלחה.
+2. **המסלול המלא לא יורץ מקומית** — ההרצה החיה הראשונה תהיה דרך Actions, ביחד עם ניב (המסלול מבצע מוטציה
+   חיה בחשבון ה-QA בפרודקשן: יוצר ומוחק `SNTNL`).
+3. **YAML**: `python3 -c "import yaml,sys; yaml.safe_load(open('.github/workflows/sentinel.yml'))"` + `jq` על בלוק המיזוג עם קבצי דמה.
+4. **אחרי push, ביחד עם ניב**: `gh workflow run Sentinel -f run_auth=true` → `gh run watch` → מאמתים ש-`gate` הדפיס
+   `auth: 1`, שה-artifact מכיל שני קבצים, שהודעת Discord אחת נשלחה, ושבסוף ה-UI מציג בדיוק 3 עסקאות
+   (AAPL/NVDA/BTC-USD), אין `SNTNL`, וההון `$10,000`.
 
 ## סיום המשימה (אחרי אישור)
 `git add tests-sentinel/sentinel-auth.spec.js .github/workflows/sentinel.yml` → commit
