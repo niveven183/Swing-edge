@@ -295,9 +295,19 @@ test('authenticated journey: login → journal → create/delete SNTNL', async (
   // ---- 2. hydration gate. DEFAULT_CAPITAL (2500 → "2,500") renders before
   // the DB answers; asserting anything against defaults is a false green.
   // 25s and not 8s: the diagnosis was measured on a local Mac (1.8s/3.5s), while
-  // the shared runner against Supabase is materially slower — 8s never passed. ----
+  // the shared runner against Supabase is materially slower — margin is still right.
+  //
+  // Selector targets the TOP KPI card (data-tour="equity", SwingEdge_App.jsx:3143),
+  // which renders immediately in the KPI row. Its `sub` span is `${startedAt} $${capital}`
+  // → "התחלה $10,000" (he) / "Started at $10,000" (en) — the DB-loaded capital.
+  // NOT the equity-curve card (SwingEdge_App.jsx:4592, "הון התחלתי"), a chart deep
+  // in the page that hydrates late: the old /(הון התחלתי|starting capital)/ selector
+  // matched only that card and timed out 4/4 even though hydration had succeeded. ----
   const HYDRATION_TIMEOUT = 25_000;
-  const capital = page.locator('span').filter({ hasText: /(הון התחלתי|starting capital)\s*\$/ }).first();
+  const capital = page.locator('[data-tour="equity"]')
+    .locator('span')
+    .filter({ hasText: /(התחלה|Started at)\s*\$/ })
+    .first();
   let capitalVisible = false;
   try {
     await capital.waitFor({ state: 'visible', timeout: HYDRATION_TIMEOUT });
