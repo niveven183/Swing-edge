@@ -1,0 +1,31 @@
+#!/bin/sh
+# חוסם קבצי HANDOFF*.md מלהיכנס לקומיט.
+# הזרימה השגרתית משתמשת ב-git add . — בלי ההוק הזה קובץ העברת-סשן זמני
+# היה נכנס לריפו. .gitignore מונע את המקרה היומיומי; זו רשת הביטחון
+# למקרה של git add -f.
+set -u
+
+if git rev-parse --verify -q HEAD >/dev/null 2>&1; then
+	against=HEAD
+else
+	against=$(git hash-object -t tree /dev/null)
+fi
+
+# ACMRT ולא ACM: R (שינוי-שם) חומק אחרת.
+# D מוחרג בכוונה — הסרת HANDOFF מעוקב היא בדיוק התיקון הרצוי.
+offenders=$(
+	git diff-index --cached -z --name-only --diff-filter=ACMRT "$against" \
+		| tr '\0' '\n' \
+		| grep -E '(^|/)HANDOFF[^/]*\.md$'
+) || offenders=""
+
+[ -z "$offenders" ] && exit 0
+
+printf '\n⛔ הקומיט נחסם: קבצי HANDOFF נמצאו ב-staging.\n'
+printf 'קבצי HANDOFF הם הערות סשן זמניות, לא נכס של הריפו.\n\n'
+printf 'הקבצים החורגים:\n'
+printf '%s\n' "$offenders" | sed 's/^/  - /'
+printf '\nכדי להוציא אותם מה-staging הרץ בדיוק את הפקודה:\n'
+printf '%s\n' "$offenders" | sed "s|.*|  git restore --staged '&'|"
+printf '\nעקיפת חירום (מתעדים ב-docs/INCIDENTS.md): git commit --no-verify\n\n'
+exit 1

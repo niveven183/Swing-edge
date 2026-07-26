@@ -123,3 +123,57 @@ Inputs: `campaign` (מפתח הקמפיין, למשל `waitlist_launch`) · `sub
   רק את החלק הפעיל.
 - **מגבלת Gmail:** ~300-500 נמענים ליום. מעבר לכך נדרש שולח ייעודי (Resend) עם
   דומיין מאומת — החלפה של הגדרות ה-SMTP בלבד.
+
+---
+
+## התקנת git hooks (clone חדש)
+
+מתי: אחרי `git clone`, או אם הופיע קומיט עם `HANDOFF*.md` / התאפשר force-push.
+
+`core.hooksPath` הוא הגדרה **מקומית** ואינה עוברת ב-`clone`. clone בלי הפקודה הזו
+רץ בלי שום הגנה, **בשקט**.
+
+```bash
+git config core.hooksPath .githooks
+chmod +x .githooks/*
+```
+
+אימות שההתקנה תפסה:
+
+```bash
+git config --get core.hooksPath     # חייב להחזיר: .githooks
+ls -l .githooks                     # שני הקבצים חייבים להיות -rwxr-xr-x
+```
+
+⚠️ **hook שאינו executable מדולג בשקט** — כלומר fail-open בלי שום סימן. ה-`chmod` אינו אופציונלי.
+
+### מה כל hook חוסם
+
+| hook | חוסם | הערה |
+|------|-------|------|
+| `pre-commit` | `HANDOFF*.md` ב-staging | `D` (מחיקה) מוחרג — הסרת HANDOFF מעוקב מותרת |
+| `pre-push` | push שאינו fast-forward אל `main`, ומחיקת `main` המרוחק | ענפים אחרים, תגיות ו-push ראשון של ענף חדש — עוברים |
+
+### בדיקת ה-hooks בלי לסכן את main
+
+`pre-push` קורא מ-stdin `<local_ref> <local_sha> <remote_ref> <remote_sha>`, ולכן
+אפשר לבדוק אותו ישירות — **לא מריצים `--force` על הענף החי בשביל בדיקה**:
+
+```bash
+HEAD_SHA=$(git rev-parse HEAD); OLD_SHA=$(git rev-parse HEAD~1)
+# מקרה חוסם (לא-FF) — מצופה exit 1:
+echo "refs/heads/main $OLD_SHA refs/heads/main $HEAD_SHA" | .githooks/pre-push origin url; echo $?
+# מקרה עובר (FF תקין) — מצופה exit 0:
+echo "refs/heads/main $HEAD_SHA refs/heads/main $OLD_SHA" | .githooks/pre-push origin url; echo $?
+```
+
+### עקיפה
+
+`git commit --no-verify` / `git push --no-verify` — **חירום בלבד, ומתעדים ב-`docs/INCIDENTS.md`**.
+
+מקרה שייראה כמו תקלה אבל אינו: `git commit --amend` על קומיט שכבר נדחף מייצר push
+שאינו fast-forward ולכן ייחסם. זו התנהגות נכונה — ה-amend באמת משכתב היסטוריה שפורסמה.
+
+מקרה fail-open מכוון: אם ה-commit המרוחק לא קיים מקומית, ה-hook מנסה `fetch` שקט
+ואם עדיין חסר — **מזהיר וממשיך**. השרת דוחה non-FF בעצמו; חסימה כאן הייתה
+false-positive בכל פעם ש-`origin/main` זז בלי fetch, ומאמנת להקליד `--no-verify` רפלקסיבית.

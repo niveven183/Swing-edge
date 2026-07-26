@@ -1,0 +1,62 @@
+#!/bin/sh
+# חוסם push שאינו fast-forward אל main — כלומר force-push שמוחק היסטוריה שפורסמה.
+# git לא חושף את הדגל --force להוק; הדרך היחידה לזהות היא השוואת SHA-ים
+# מה-stdin: "<local_ref> <local_sha> <remote_ref> <remote_sha>".
+set -u
+
+PROTECTED_REF="refs/heads/main"
+remote_name="${1:-origin}"
+
+is_zero() { case "$1" in *[!0]*) return 1 ;; *) return 0 ;; esac; }
+
+status=0
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+	[ -z "${local_ref:-}" ] && continue
+	[ "$remote_ref" = "$PROTECTED_REF" ] || continue
+
+	if is_zero "$local_sha"; then
+		printf '\n⛔ הדחיפה נחסמה: ניסיון למחוק את הענף המרוחק main.\n'
+		printf 'מחיקת main משמידה היסטוריה שפורסמה — בדיוק כמו force-push.\n'
+		printf 'עקיפת חירום (מתעדים ב-docs/INCIDENTS.md): git push --no-verify\n\n'
+		status=1
+		continue
+	fi
+
+	is_zero "$remote_sha" && continue
+	[ "$local_sha" = "$remote_sha" ] && continue
+
+	if ! git cat-file -e "${remote_sha}^{commit}" 2>/dev/null; then
+		GIT_TERMINAL_PROMPT=0 git fetch --quiet "$remote_name" "$remote_ref" 2>/dev/null || true
+	fi
+
+	# fail-open מכוון: השרת דוחה non-FF בעצמו, וחסימה כאן היא false-positive
+	# מובטח בכל פעם ש-origin/main זז ולא עשינו fetch — מה שמאמן להקליד --no-verify.
+	if ! git cat-file -e "${remote_sha}^{commit}" 2>/dev/null; then
+		printf '\n⚠️  אזהרה: לא ניתן לאמת fast-forward — ה-commit המרוחק לא קיים מקומית.\n'
+		printf 'מומלץ: git fetch %s %s ואז לנסות שוב.\n' "$remote_name" "$remote_ref"
+		printf 'הדחיפה ממשיכה; השרת עצמו ידחה דחיפה שאינה fast-forward.\n\n'
+		continue
+	fi
+
+	# --is-ancestor מחזיר שלושה מצבים: 0=ancestor, 1=לא, 128=כשל טכני
+	git merge-base --is-ancestor "$remote_sha" "$local_sha" >/dev/null 2>&1
+	rc=$?
+	if [ "$rc" -eq 0 ]; then
+		continue
+	elif [ "$rc" -eq 1 ]; then
+		printf '\n⛔ הדחיפה נחסמה: הדחיפה ל-main אינה fast-forward.\n'
+		printf 'היא תמחק commit-ים שכבר פורסמו (force-push) — אסור בריפו הזה.\n'
+		printf '  מקומי:  %s\n' "$local_sha"
+		printf '  מרוחק:  %s\n' "$remote_sha"
+		printf '\nהדרך הנכונה לשלב את המרוחק:\n'
+		printf '  git pull %s main --rebase\n' "$remote_name"
+		printf '  git push %s main\n' "$remote_name"
+		printf '\nעקיפת חירום (מסוכן, מתעדים ב-docs/INCIDENTS.md): git push --no-verify\n\n'
+		status=1
+	else
+		printf '\n⚠️  אזהרה: בדיקת ה-fast-forward נכשלה טכנית (קוד %s). הדחיפה ממשיכה.\n\n' "$rc"
+	fi
+done
+
+exit "$status"

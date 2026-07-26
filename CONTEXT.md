@@ -206,7 +206,7 @@ Always compare with `=== true` / `=== false`; never rely on raw string equality 
 5. ❌ NEVER hardcode user-facing strings — ✅ `lang === 'he' ? '...' : '...'`
 6. ❌ NEVER add new tab to NAV_KEYS without consulting CONTEXT.md — current: `dashboard, journal, tools, analytics, intel, feedback`
 7. ❌ NEVER break TradingView widget config in Market Intel
-8. ❌ NEVER force-push to main without explicit user permission ("א" or "כן force")
+8. ❌ NEVER force-push to main. אסור מוחלט — ראה `CLAUDE.md` §5. נאכף ב-`.githooks/pre-push`.
 9. ❌ NEVER read-modify-write localStorage in render — ✅ `useState` + `useEffect`
 10. ❌ NEVER fetch from APIs without try/catch + fallback
 11. ❌ NEVER call `edgeScore`/`rankSetupEdges` inline — ✅ import from `src/intelligence/utils/statisticalModels.js`

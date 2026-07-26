@@ -7,3 +7,5 @@ dist
 playwright-report/
 test-results/
 /playwright/.cache/
+HANDOFF*.md
+browser-findings*.json
