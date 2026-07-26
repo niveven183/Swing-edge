@@ -84,3 +84,35 @@ Every production incident gets one short entry: what broke, root cause, fix, pre
   (registrar / domain / DNS / hosting) is 🔴 and NEVER "noise"** — always surface it. Add an
   UptimeRobot monitor on the **domain itself** (not just the app health endpoint). Calendar
   reminder set for **June 2027** ahead of the next verification/renewal window.
+
+## #6 — 2026-07-26 — Sentinel declared "recovery" for a layer that never ran
+- **Symptom:** Discord received a green "✅ התאוששות — דפדפן (מחובר)" at 18:33 on 25/07, implying the
+  authenticated QA layer had returned to health. It had not. That cycle ran at MIN=32 — outside the
+  45→09 gate — so the auth layer never executed. Every one of its three real runs (15:42 manual,
+  17:02, 20:47) failed with `browser-auth|hydration-failed`; there has never been a successful pass.
+- **Root cause A (fake recovery):** the recovery block in `sentinel.yml` declared recovery for any
+  fingerprint present in state and absent from the current findings, without ever asking whether the
+  layer that produces it had run. That assumption holds for the public layer (runs every cycle) but
+  not for the auth layer (runs once an hour). Because `NEW` is built exclusively from current faults,
+  the incident was also dropped from state — so the next auth run re-reported it as "תקלה חדשה".
+  Net effect: a recovered/new-fault flip twice an hour and a red incident that never accumulated a
+  persistent-fault count.
+- **Root cause B (no evidence):** the hydration gate waited 8s — a budget sized against a local Mac
+  measurement (1.8s/3.5s), not a shared runner talking to Supabase — and on failure reported a
+  hardcoded hypothesis ("ההגדרות לא נטענו מ-Supabase … DEFAULT_CAPITAL=2500") in the `reason` field.
+  Three failures produced no observation beyond "a locator timed out". A guess printed as fact also
+  anchored every subsequent diagnosis.
+- **Root cause C (blind to the actual cause):** the response listener in `sentinel-auth.spec.js`
+  discarded every non-own-origin response, so a failing Supabase call — the most likely reason
+  hydration never completes — was invisible by construction.
+- **Fix:** (A) skip recovery declaration for `browser-auth|*` fingerprints when `AUTH_EXPECTED != 1`
+  and carry those incidents into the new state verbatim, preserving firstSeen/lastAlerted/count;
+  `AUTH_EXPECTED` is now also passed to the classify step, which previously could not see it.
+  (B) 8s → 25s, split into `hydration-default` 🔴 (element present, value ≠ 10,000 = a real
+  production bug) and `hydration-timeout` 🟠 (element absent = infrastructure), with the observed
+  amount or a redacted page snippet in `got`, and the hypothesis removed from `reason`.
+  (C) capture 4xx/5xx from `*.supabase.co` as `browser-auth|supabase_request` 🟠. This commit.
+- **Prevention:** **A monitor must never infer health from the absence of a signal it did not
+  collect.** Any check that runs on a gate/schedule narrower than the reporting cycle must state
+  whether it ran, and the reporter must consult that before declaring anything recovered. Related:
+  a finding's `reason` field carries observations only — hypotheses belong in `fix`.

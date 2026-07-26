@@ -471,6 +471,7 @@ jobs:
         env:
           DISCORD_WEBHOOK: ${{ secrets.SENTINEL_DISCORD_WEBHOOK }}
           GH_EVENT: ${{ github.event_name }}
+          AUTH_EXPECTED: ${{ needs.browser.outputs.auth }}
         run: |
           set -uo pipefail
           THREE_H=10800
@@ -556,6 +557,24 @@ jobs:
           while read -r ofp; do
             [ -z "$ofp" ] && continue
             case "$cur_fps" in *" $ofp "*) continue;; esac
+            # The auth layer runs once an hour, so on every other run a browser-auth
+            # fingerprint is absent because the layer never ran — not because it
+            # recovered. Carry the incident into NEW untouched (NEW is built from
+            # current faults only, so anything not copied here is dropped) and let
+            # the next real auth run decide. Preserving firstSeen/lastAlerted/count
+            # keeps the next report "תקלה נמשכת" instead of "תקלה חדשה".
+            # The quotes are load-bearing: an unquoted browser-auth|* parses as case
+            # alternation and would match every fingerprint.
+            case "$ofp" in
+              'browser-auth|'*)
+                if [ "${AUTH_EXPECTED:-}" != "1" ]; then
+                  oinc="$(echo "$OLD" | jq -c --arg fp "$ofp" '.incidents[$fp]')"
+                  NEW="$(echo "$NEW" | jq --arg fp "$ofp" --argjson inc "$oinc" '.incidents[$fp]=$inc')"
+                  echo "auth layer did not run — carrying $ofp forward"
+                  continue
+                fi
+                ;;
+            esac
             osev="$(echo "$OLD" | jq -r --arg fp "$ofp" '.incidents[$fp].severity')"
             ocomp="$(echo "$OLD" | jq -r --arg fp "$ofp" '.incidents[$fp].component')"
             if [ "$osev" = "red" ] || [ "$osev" = "amber" ]; then
@@ -594,8 +613,9 @@ jobs:
             post_embed "$color" "$desc"
           fi
 
-          # ---- persist new state (recovered/cleared incidents dropped; carry
-          #      the rolling perf history computed in the checks step) ---------
+          # ---- persist new state (recovered/cleared incidents dropped, except
+          #      browser-auth incidents carried forward above when the auth layer
+          #      did not run; carry the rolling perf history from the checks step)
           if [ -f perf-new.json ]; then
             NEW="$(echo "$NEW" | jq --slurpfile p perf-new.json '.perf = $p[0]')"
           fi

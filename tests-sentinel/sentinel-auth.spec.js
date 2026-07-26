@@ -64,10 +64,38 @@ function ignored(text) {
   return IGNORE_SUBSTR.some((p) => t.includes(p));
 }
 
+// Findings are posted to Discord, and the logged-in UI renders the QA account's
+// address in the user menu.
+function redact(s) {
+  return String(s).replace(/[\w.+-]+@[\w.-]+\.\w+/g, '[email]');
+}
+
+// The finding must carry the amount actually rendered, never an assumption about it.
+async function readCapital(locator) {
+  let text = '';
+  try { text = (await locator.innerText()).replace(/\s+/g, ' ').trim(); }
+  catch (e) { return `אזור ההון לא ניתן לקריאה: ${e.message}`; }
+  const m = text.match(/\$\s*([\d,]+(?:\.\d+)?)/);
+  return m ? `מוצג: $${m[1]} (טקסט מלא: "${text}")` : `מוצג: "${text}" (לא נמצא סכום)`;
+}
+
+// Evidence for the timeout path: what the page showed instead. Redaction runs
+// before slicing so a half-cut address cannot survive it.
+async function pageStateSnippet(page) {
+  let body = '';
+  try { body = (await page.locator('body').innerText()).replace(/\s+/g, ' ').trim(); }
+  catch (e) { return `גוף הדף לא ניתן לקריאה: ${e.message}`; }
+  if (!body) return 'מצב הדף: גוף הדף ריק';
+  const safe = redact(body);
+  const hit = safe.match(/.{0,80}(?:הון התחלתי|starting capital).{0,80}/i);
+  return `מצב הדף: "${(hit ? hit[0] : safe).slice(0, 240)}"`;
+}
+
 function watch(page) {
   const consoleErrors = [];
   const pageErrors = [];
   const failedReq = [];
+  const supabaseFailedReq = [];
   page.on('console', (msg) => {
     if (msg.type() !== 'error') return;
     let src = '';
@@ -86,10 +114,16 @@ function watch(page) {
     if (res.status() < 400) return;
     let host = '';
     try { host = new URL(res.url()).host; } catch { return; }
-    if (host !== BASE_HOST) return; // own origin only
-    failedReq.push(`${res.status()} ${cleanUrl(res.url())}`);
+    if (host === BASE_HOST) {
+      failedReq.push(`${res.status()} ${cleanUrl(res.url())}`);
+      return;
+    }
+    // Kept separate from failedReq: an own-origin-only filter hides the direct
+    // answer to "why did hydration fail". cleanUrl drops the query, so no token
+    // from a Supabase URL reaches the finding.
+    if (host.endsWith('.supabase.co')) supabaseFailedReq.push(`${res.status()} ${cleanUrl(res.url())}`);
   });
-  return { consoleErrors, pageErrors, failedReq };
+  return { consoleErrors, pageErrors, failedReq, supabaseFailedReq };
 }
 
 function record(diag) {
@@ -115,6 +149,14 @@ function record(diag) {
       diag.failedReq.slice(0, 3).join(' | '),
       'בקשה מהמקור שלנו החזירה 4xx/5xx אחרי לוגין',
       'בדוק את ה-endpoint/asset שנכשל ב-Vercel',
+      'אבחון תלוי-סיבה — הערך לפני פעולה');
+  }
+  if (diag.supabaseFailedReq.length) {
+    add(COMPONENT, 'browser-auth|supabase_request', 'amber', '🟠',
+      'בקשות ל-Supabase במסך המחובר',
+      redact(diag.supabaseFailedReq.slice(0, 3).join(' | ')),
+      'קריאה ל-Supabase החזירה 4xx/5xx — הסיבה הישירה לכשל בטעינת הנתונים',
+      'לפי הסטטוס: 401/403 = RLS/מפתח, 429 = rate limit, 5xx = תקלת שירות',
       'אבחון תלוי-סיבה — הערך לפני פעולה');
   }
 }
@@ -251,20 +293,32 @@ test('authenticated journey: login → journal → create/delete SNTNL', async (
   }
 
   // ---- 2. hydration gate. DEFAULT_CAPITAL (2500 → "2,500") renders before
-  // the DB answers; asserting anything against defaults is a false green. ----
+  // the DB answers; asserting anything against defaults is a false green.
+  // 25s and not 8s: the diagnosis was measured on a local Mac (1.8s/3.5s), while
+  // the shared runner against Supabase is materially slower — 8s never passed. ----
+  const HYDRATION_TIMEOUT = 25_000;
   const capital = page.locator('span').filter({ hasText: /(הון התחלתי|starting capital)\s*\$/ }).first();
+  let capitalVisible = false;
   try {
-    await capital.waitFor({ state: 'visible', timeout: 8_000 });
-    await expect(capital).toContainText('10,000', { timeout: 8_000 });
+    await capital.waitFor({ state: 'visible', timeout: HYDRATION_TIMEOUT });
+    capitalVisible = true;
+    await expect(capital).toContainText('10,000', { timeout: HYDRATION_TIMEOUT });
   } catch (e) {
-    let shown = '';
-    try { shown = (await capital.innerText()).trim(); } catch { shown = ''; }
-    add(COMPONENT, 'browser-auth|hydration-failed', 'red', '🔴',
-      'הון התחלתי $10,000 — הסימן שההגדרות נטענו מה-DB',
-      shown ? `מוצג: "${shown}"` : `אזור ההון לא נראה תוך 8 שניות: ${e.message}`,
-      'ההגדרות לא נטענו מ-Supabase ומוצגות ברירות מחדל (DEFAULT_CAPITAL=2500)',
-      'בדוק זמינות Supabase, RLS על user_settings, ושגיאות fetch ב-console',
-      'אבחון תלוי-סיבה — הערך לפני פעולה');
+    if (capitalVisible) {
+      add(COMPONENT, 'browser-auth|hydration-default', 'red', '🔴',
+        'הון התחלתי $10,000 — הסימן שההגדרות נטענו מה-DB',
+        await readCapital(capital),
+        `אזור ההון קיים ומציג ערך שאינו 10,000 גם אחרי ${HYDRATION_TIMEOUT / 1000} שניות`,
+        'בדוק זמינות Supabase, RLS על user_settings, ושגיאות fetch ב-console',
+        'אבחון תלוי-סיבה — הערך לפני פעולה');
+    } else {
+      add(COMPONENT, 'browser-auth|hydration-timeout', 'amber', '🟠',
+        'הון התחלתי $10,000 — הסימן שההגדרות נטענו מה-DB',
+        await pageStateSnippet(page),
+        `אזור ההון לא נמצא בדף תוך ${HYDRATION_TIMEOUT / 1000} שניות: ${e.message}`,
+        'השווה את קטע הדף שנלכד למסך תקין; דף ריק מצביע על deploy/JS שנפל',
+        'אבחון תלוי-סיבה — הערך לפני פעולה');
+    }
     record(diag);
     return; // אין להמשיך: אימות מול ברירות מחדל = דיווח שקר
   }
