@@ -15,6 +15,11 @@ on:
   schedule:
     - cron: '20,50 * * * *'   # :20 and :50 every hour
   workflow_dispatch:           # manual runs always post one status message
+    inputs:
+      run_auth:
+        description: 'Run the authenticated QA layer (creates+deletes a SNTNL trade in the QA account)'
+        type: boolean
+        default: true
 
 concurrency:
   group: sentinel
@@ -30,7 +35,16 @@ jobs:
   # so a red here means the harness/install itself broke. ----
   browser:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 12
+    # Layer A2 mutates the live QA account (creates+deletes a SNTNL trade), so two
+    # browser jobs must never overlap: concurrent runs would race on create/delete
+    # and could leave orphan rows. cancel-in-progress is false — killing a run
+    # mid-mutation is exactly what leaves that garbage behind.
+    concurrency:
+      group: sentinel-auth
+      cancel-in-progress: false
+    outputs:
+      auth: ${{ steps.gate.outputs.auth }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -45,14 +59,43 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Install Chromium (OS deps always; binary skipped on cache hit)
         run: npx playwright install --with-deps chromium
+      # The authenticated layer (A2) runs once an hour, not twice: it logs into the
+      # live QA account and mutates data. The :50 run owns it. The window is
+      # 45→09 and not 45-59 because the GitHub scheduler is routinely 5-15 min
+      # late and a :50 run often lands past the hour; it stops at 09 so a :20 run
+      # that is ~55 min late cannot also claim the slot and mutate twice in one hour.
+      - name: Decide whether the authenticated layer runs
+        id: gate
+        env:
+          GH_EVENT: ${{ github.event_name }}
+          RUN_AUTH: ${{ inputs.run_auth }}
+        run: |
+          set -uo pipefail
+          MIN="$((10#$(date -u +%M)))"
+          auth=0
+          { [ "$MIN" -ge 45 ] || [ "$MIN" -le 9 ]; } && auth=1
+          if [ "${GH_EVENT:-}" = "workflow_dispatch" ]; then
+            auth=0
+            [ "${RUN_AUTH:-true}" = "true" ] && auth=1
+          fi
+          echo "SENTINEL_AUTH=$auth" >> "$GITHUB_ENV"
+          echo "auth=$auth" >> "$GITHUB_OUTPUT"
+          echo "minute=$MIN event=${GH_EVENT:-} auth=$auth"
       - name: Run Sentinel browser QA
+        env:
+          SENTINEL_QA_EMAIL: ${{ secrets.SENTINEL_QA_EMAIL }}
+          SENTINEL_QA_PASSWORD: ${{ secrets.SENTINEL_QA_PASSWORD }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: npx playwright test --config playwright.sentinel.config.js
       - name: Upload browser findings
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: browser-findings
-          path: browser-findings.json
+          path: |
+            browser-findings.json
+            browser-findings-auth.json
           if-no-files-found: warn
 
   watch:
@@ -79,6 +122,7 @@ jobs:
         env:
           GH_EVENT: ${{ github.event_name }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          AUTH_EXPECTED: ${{ needs.browser.outputs.auth }}
         run: |
           set -uo pipefail          # NOT -e: every check must run to completion
           DOMAIN=swing-edge.com
@@ -377,24 +421,47 @@ jobs:
             '{bundleBytes:$b, ttfbMs:$t, htmlBytes:$h}' > perf-new.json
           add_summary "ביצועים" "bundle ${curBundle}B · TTFB ${curTtfb}ms"
 
-          # ---- aggregate -----------------------------------------------------
-          jq -s '.' faults.ndjson  > faults.json  2>/dev/null || echo '[]'  > faults.json
-
-          # ---- merge Layer A browser findings -------------------------------
-          # download-artifact placed browser-findings.json here, unless the
-          # browser job crashed — then it is absent and we synthesize one 🟠
-          # fault so browser silence is never mistaken for green.
+          # ---- Layer A browser findings: decide, then aggregate once ----------
+          # download-artifact placed browser-findings.json (public, always) and
+          # browser-findings-auth.json (authenticated, only when the gate opened)
+          # here. A missing file is never silently green.
+          BROWSER_FILES=""
           if [ -f browser-findings.json ]; then
-            jq -s '.[0] + .[1]' faults.json browser-findings.json > merged.json && mv merged.json faults.json
+            BROWSER_FILES="browser-findings.json"
             bcount="$(jq 'length' browser-findings.json 2>/dev/null || echo 0)"
             add_summary "דפדפן" "נטען · $bcount ממצאים"
           else
             add_fault "דפדפן" "browser|unavailable" "amber" "🟠" \
               "ריצת Playwright (Layer A)" "בדיקת הדפדפן לא רצה (artifact חסר)" "job הדפדפן קרס/לא הפיק ממצאים" \
               "בדוק את לוג job ה-browser ב-Actions" "אבחון בלבד"
-            jq -s '.' faults.ndjson > faults.json 2>/dev/null || echo '[]' > faults.json
             add_summary "דפדפן" "לא זמין"
           fi
+
+          # AUTH_EXPECTED comes from the browser job's gate step: 1 = the
+          # authenticated layer was supposed to run, 0 = it was skipped by
+          # design, empty = the job never reached the gate (browser|unavailable
+          # above already covers that, so we invent nothing here).
+          if [ -f browser-findings-auth.json ]; then
+            BROWSER_FILES="$BROWSER_FILES browser-findings-auth.json"
+            acount="$(jq 'length' browser-findings-auth.json 2>/dev/null || echo 0)"
+            add_summary "דפדפן מחובר" "נטען · $acount ממצאים"
+          elif [ "${AUTH_EXPECTED:-}" = "1" ]; then
+            add_fault "דפדפן (מחובר)" "browser-auth|unavailable" "yellow" "🟡" \
+              "ריצת Playwright מחוברת (Layer A2)" "שכבת ה-QA המחוברת הייתה אמורה לרוץ אך לא הפיקה ממצאים" \
+              "ה-spec המחובר קרס לפני כתיבת הקובץ, או הסודות חסרים" \
+              "בדוק את לוג job ה-browser ואת SENTINEL_QA_EMAIL/PASSWORD ב-Secrets" "אבחון בלבד"
+            add_summary "דפדפן מחובר" "לא זמין"
+          else
+            add_summary "דפדפן מחובר" "לא רץ"
+          fi
+
+          # ---- aggregate -----------------------------------------------------
+          # NDJSON lines are objects and stay as-is; each findings file is an
+          # array and gets flattened. `jq -s add` would die on that mix.
+          # shellcheck disable=SC2086
+          jq -s '[ .[] | if type=="array" then .[] else . end ]' faults.ndjson $BROWSER_FILES > faults.json 2>/dev/null \
+            || jq -s '.' faults.ndjson > faults.json 2>/dev/null \
+            || echo '[]' > faults.json
 
           jq -s '.' summary.ndjson > summary.json 2>/dev/null || echo '[]' > summary.json
           echo "faults:"; cat faults.json

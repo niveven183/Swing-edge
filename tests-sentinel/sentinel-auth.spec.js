@@ -1,0 +1,388 @@
+import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
+
+// Sentinel S2 — Layer A2: real-browser QA of the AUTHENTICATED surface.
+// S1.5 only covers the anonymous surface, so anything that breaks after login
+// (the fmtR crash on a closed trade with no stop, a hydration failure that
+// silently shows DEFAULT_CAPITAL) was invisible. This spec logs into the
+// dedicated QA account, proves the settings really came from the DB, renders
+// the journal, then creates and deletes one throw-away trade.
+//
+// CRITICAL CONTRACT (same as sentinel-public.spec.js): a site problem is a
+// FINDING, never a hard failure. Every finding lands in browser-findings-auth.json
+// and the Sentinel `watch` job merges + classifies + de-dups + reports it.
+//
+// GUARD RAILS:
+// · The test trade always uses ticker SNTNL — never a real symbol.
+// · Every delete interaction is scoped to a table row containing SNTNL. The
+//   three permanent QA trades (AAPL/NVDA/BTC-USD) are sacred.
+// · afterAll runs a REST cleanup even if the journey crashed mid-way, so a
+//   crashed run cannot leave orphan rows behind in production.
+// · Passwords and tokens are never logged or written to findings.
+
+const BASE_URL = process.env.TEST_URL || 'https://swing-edge.com';
+const BASE_HOST = new URL(BASE_URL).host;
+const OUTPUT = process.env.BROWSER_FINDINGS_AUTH || 'browser-findings-auth.json';
+
+// Off by default: the workflow turns this on for one run an hour (the :50 slot).
+const AUTH_ON = process.env.SENTINEL_AUTH === '1';
+const QA_EMAIL = process.env.SENTINEL_QA_EMAIL || '';
+const QA_PASSWORD = process.env.SENTINEL_QA_PASSWORD || '';
+// Same fallback order as api/health.js / api/send-invites.js.
+const SUPA_URL = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\/+$/, '');
+const SUPA_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+
+const TICKER = 'SNTNL';
+const FIXED_TRADES = ['AAPL', 'NVDA', 'BTC-USD'];
+const COMPONENT = 'דפדפן (מחובר)';
+const ROWS = 'table.w-full.text-xs tbody tr';
+
+const IGNORE_SUBSTR = [
+  'vercel', 'va.vercel-scripts', '/_vercel/insights',
+  'sentry.io', 'ingest.sentry',
+  'google-analytics', 'googletagmanager', 'doubleclick', 'gtag',
+];
+// The Sentry SDK fires ~10 "Cannot listen to the event from the provided
+// iframe" console errors on mount. The message text has no "sentry" in it, so
+// only the source URL identifies it — hence a second, location-based list.
+const IGNORE_SOURCE = ['assets/sentry-'];
+
+const findings = [];
+let uiDeleteOk = false;
+
+function add(component, fp, severity, emoji, checked, got, reason, fix, risk) {
+  findings.push({ component, fp, severity, emoji, checked, got, reason, fix, risk });
+}
+
+function cleanUrl(u) {
+  try { const x = new URL(u); return `${x.origin}${x.pathname}`; }
+  catch { return String(u).split('?')[0]; }
+}
+
+function ignored(text) {
+  const t = (text || '').toLowerCase();
+  return IGNORE_SUBSTR.some((p) => t.includes(p));
+}
+
+function watch(page) {
+  const consoleErrors = [];
+  const pageErrors = [];
+  const failedReq = [];
+  page.on('console', (msg) => {
+    if (msg.type() !== 'error') return;
+    let src = '';
+    try { src = msg.location()?.url || ''; } catch { src = ''; }
+    if (IGNORE_SOURCE.some((p) => src.includes(p))) return;
+    const text = msg.text();
+    if (ignored(text)) return;
+    consoleErrors.push(text);
+  });
+  page.on('pageerror', (err) => {
+    const text = `${err.message}`;
+    if (ignored(text)) return;
+    pageErrors.push(text);
+  });
+  page.on('response', (res) => {
+    if (res.status() < 400) return;
+    let host = '';
+    try { host = new URL(res.url()).host; } catch { return; }
+    if (host !== BASE_HOST) return; // own origin only
+    failedReq.push(`${res.status()} ${cleanUrl(res.url())}`);
+  });
+  return { consoleErrors, pageErrors, failedReq };
+}
+
+function record(diag) {
+  if (diag.pageErrors.length) {
+    add(COMPONENT, 'browser-auth|pageerror', 'red', '🔴',
+      'שגיאות JS לא-תפוסות במסך המחובר',
+      diag.pageErrors.slice(0, 3).join(' | '),
+      'שגיאת JavaScript לא-תפוסה אחרי לוגין — שוברת את חווית המשתמש המחובר',
+      'בדוק את ה-stack ב-Sentry/console; גלגל deploy אם נשבר לאחרונה',
+      'rollback — נמוך, מחזיר מצב ידוע-תקין');
+  }
+  if (diag.consoleErrors.length) {
+    add(COMPONENT, 'browser-auth|console_error', 'amber', '🟠',
+      'console.error במסך המחובר',
+      diag.consoleErrors.slice(0, 3).join(' | '),
+      'שגיאות console מהמקור שלנו — עלול להצביע על תקלה נסתרת',
+      'בדוק את מקור השגיאה; לרוב לא חוסם אך שווה בדיקה',
+      'אבחון בלבד — ללא סיכון');
+  }
+  if (diag.failedReq.length) {
+    add(COMPONENT, 'browser-auth|failed_request', 'amber', '🟠',
+      'בקשות רשת במסך המחובר',
+      diag.failedReq.slice(0, 3).join(' | '),
+      'בקשה מהמקור שלנו החזירה 4xx/5xx אחרי לוגין',
+      'בדוק את ה-endpoint/asset שנכשל ב-Vercel',
+      'אבחון תלוי-סיבה — הערך לפני פעולה');
+  }
+}
+
+// The desktop table only. The md:hidden mobile cards render the same trades
+// (6 delete buttons for 3 trades), and scoping here keeps them out of reach.
+function sntnlRows(page) {
+  return page.locator(ROWS).filter({ hasText: TICKER });
+}
+
+async function openJournal(page) {
+  await page.locator('[data-tour-tab="journal"]').click();
+  await page.locator('table.w-full.text-xs').waitFor({ state: 'visible', timeout: 15_000 });
+}
+
+// Deletes the SNTNL row through the UI, exactly the way a user would.
+// Refuses to click anything unless exactly one row matches SNTNL.
+async function deleteSntnlRow(page) {
+  const rows = sntnlRows(page);
+  const n = await rows.count();
+  if (n !== 1) throw new Error(`expected exactly 1 ${TICKER} row, found ${n}`);
+  const row = rows.first();
+  const rowText = (await row.innerText()).toUpperCase();
+  if (!rowText.includes(TICKER)) throw new Error(`row guard failed: no ${TICKER} in row text`);
+  await row.locator('button[title="מחיקה"], button[title="Delete"]').first().click();
+  const dialog = page.locator('[role="dialog"]');
+  await dialog.waitFor({ state: 'visible', timeout: 10_000 });
+  await dialog.getByRole('button', { name: /^(מחק|Delete)$/ }).click();
+  await expect(sntnlRows(page)).toHaveCount(0, { timeout: 15_000 });
+}
+
+// Guaranteed cleanup: runs even when the journey crashed before its own delete.
+// RLS ("users own trades") limits this to the QA account's own SNTNL rows.
+async function restCleanup() {
+  if (!SUPA_URL || !SUPA_KEY) {
+    add(COMPONENT, 'browser-auth|cleanup-unconfigured', 'yellow', '🟡',
+      `ניקוי REST של עסקאות ${TICKER}`,
+      'SUPABASE_URL/SUPABASE_ANON_KEY לא מוגדרים — ניקוי ה-REST דולג',
+      'ה-secrets של Supabase חסרים ב-CI; המחיקה ב-UI רצה אך אין רשת ביטחון',
+      'הוסף SUPABASE_URL + SUPABASE_ANON_KEY ל-GitHub Secrets',
+      'הוספת secret — ללא סיכון');
+    return;
+  }
+
+  let token = '';
+  try {
+    const res = await fetch(`${SUPA_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { apikey: SUPA_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: QA_EMAIL, password: QA_PASSWORD }),
+    });
+    if (!res.ok) throw new Error(`auth HTTP ${res.status}`);
+    token = (await res.json())?.access_token || '';
+    if (!token) throw new Error('auth response had no access_token');
+  } catch (e) {
+    add(COMPONENT, 'browser-auth|cleanup-failed', 'red', '🔴',
+      `הנפקת טוקן לניקוי ${TICKER} (auth/v1/token)`,
+      `${e.message}`,
+      'ה-spec לא יכול לנקות אחרי עצמו — עסקאות בדיקה יצטברו בפרודקשן כל שעה',
+      'בדוק את SUPABASE_URL/ANON_KEY ואת סיסמת חשבון ה-QA; 401/403 = מפתח לא מתאים',
+      'אבחון תלוי-סיבה — הערך לפני פעולה');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${SUPA_URL}/rest/v1/trades?ticker=eq.${TICKER}`, {
+      method: 'DELETE',
+      headers: {
+        apikey: SUPA_KEY,
+        Authorization: `Bearer ${token}`,
+        Prefer: 'return=representation',
+      },
+    });
+    if (!res.ok) throw new Error(`delete HTTP ${res.status}`);
+    const rows = await res.json();
+    const n = Array.isArray(rows) ? rows.length : 0;
+    // eslint-disable-next-line no-console
+    console.log(`sentinel rest cleanup: removed ${n} ${TICKER} row(s)`);
+    if (n > 0 && uiDeleteOk) {
+      add(COMPONENT, 'browser-auth|ui-delete-incomplete', 'amber', '🟠',
+        'האם המחיקה ב-UI באמת הגיעה ל-DB',
+        `המחיקה ב-UI דווחה כהצליחה אך ${n} שורות ${TICKER} עוד היו ב-DB`,
+        'ה-UI מסיר את השורה מה-state אך המחיקה ב-Supabase לא נשמרה',
+        'בדוק את handleDeleteTrade ב-SwingEdge_App.jsx ואת שגיאות ה-delete ב-console',
+        'אבחון תלוי-סיבה — הערך לפני פעולה');
+    }
+  } catch (e) {
+    add(COMPONENT, 'browser-auth|cleanup-failed', 'red', '🔴',
+      `DELETE /rest/v1/trades?ticker=eq.${TICKER}`,
+      `${e.message}`,
+      'ה-spec לא יכול לנקות אחרי עצמו — עסקאות בדיקה יצטברו בפרודקשן כל שעה',
+      'בדוק זמינות Supabase ואת מדיניות ה-RLS על trades; 401/403 = מפתח לא מתאים',
+      'אבחון תלוי-סיבה — הערך לפני פעולה');
+  }
+}
+
+test.skip(!AUTH_ON, 'SENTINEL_AUTH != 1 — authenticated layer is off for this run');
+
+// One continuous journey, not seven tests: Playwright gives every test a fresh
+// context, which would mean seven logins. The config's 60s per-test budget is
+// too small for a 7-step journey where a failing step can burn 15s, and a
+// timeout would truncate the findings.
+test('authenticated journey: login → journal → create/delete SNTNL', async ({ page }) => {
+  test.setTimeout(180_000);
+
+  if (!QA_EMAIL || !QA_PASSWORD) {
+    add(COMPONENT, 'browser-auth|secrets-missing', 'yellow', '🟡',
+      'פרטי חשבון ה-QA (SENTINEL_QA_EMAIL/PASSWORD)',
+      'שכבת ה-QA המחוברת הופעלה אך פרטי ההתחברות חסרים',
+      'ה-secrets לא הועברו ל-job — השכבה המחוברת לא נבדקה בכלל',
+      'ודא SENTINEL_QA_EMAIL + SENTINEL_QA_PASSWORD ב-GitHub Secrets',
+      'הוספת secret — ללא סיכון');
+    return;
+  }
+
+  const diag = watch(page);
+
+  // ---- 1. login. The URL does not change (SPA) — wait for the tab bar. ----
+  try {
+    await page.goto('/app', { waitUntil: 'load' });
+    await page.locator('input[type="email"]').fill(QA_EMAIL);
+    await page.locator('input[autocomplete="current-password"]').fill(QA_PASSWORD);
+    await page.locator('button[type="submit"]').first().click();
+    await page.locator('[data-tour-tab="dashboard"]').waitFor({ state: 'visible', timeout: 20_000 });
+  } catch (e) {
+    add(COMPONENT, 'browser-auth|login-failed', 'red', '🔴',
+      'התחברות חשבון ה-QA ב-/app',
+      `סרגל הטאבים לא נראה אחרי הכניסה: ${e.message}`,
+      'אף משתמש לא מצליח להיכנס — Supabase Auth למטה, deploy שבור, או טופס ההתחברות נשבר',
+      'בדוק Supabase Auth ואת ה-deploy האחרון; זו התקלה הכי יקרה — טפל ראשון',
+      'rollback — נמוך, מחזיר מצב ידוע-תקין');
+    record(diag);
+    return;
+  }
+
+  // ---- 2. hydration gate. DEFAULT_CAPITAL (2500 → "2,500") renders before
+  // the DB answers; asserting anything against defaults is a false green. ----
+  const capital = page.locator('span').filter({ hasText: /(הון התחלתי|starting capital)\s*\$/ }).first();
+  try {
+    await capital.waitFor({ state: 'visible', timeout: 8_000 });
+    await expect(capital).toContainText('10,000', { timeout: 8_000 });
+  } catch (e) {
+    let shown = '';
+    try { shown = (await capital.innerText()).trim(); } catch { shown = ''; }
+    add(COMPONENT, 'browser-auth|hydration-failed', 'red', '🔴',
+      'הון התחלתי $10,000 — הסימן שההגדרות נטענו מה-DB',
+      shown ? `מוצג: "${shown}"` : `אזור ההון לא נראה תוך 8 שניות: ${e.message}`,
+      'ההגדרות לא נטענו מ-Supabase ומוצגות ברירות מחדל (DEFAULT_CAPITAL=2500)',
+      'בדוק זמינות Supabase, RLS על user_settings, ושגיאות fetch ב-console',
+      'אבחון תלוי-סיבה — הערך לפני פעולה');
+    record(diag);
+    return; // אין להמשיך: אימות מול ברירות מחדל = דיווח שקר
+  }
+
+  // ---- 3. journal + leftover sweep ----
+  try {
+    await openJournal(page);
+  } catch (e) {
+    add(COMPONENT, 'browser-auth|journal-open', 'red', '🔴',
+      'פתיחת טאב היומן וטבלת העסקאות',
+      `הטבלה לא נראתה תוך 15 שניות: ${e.message}`,
+      'היומן לא רונדר אף שההגדרות נטענו — ייתכן שגיאת JS חוסמת בטאב',
+      'בדוק pageerror ב-Sentry ואת רינדור טבלת היומן',
+      'rollback — נמוך, מחזיר מצב ידוע-תקין');
+    record(diag);
+    return;
+  }
+
+  try {
+    if (await sntnlRows(page).count() > 0) {
+      add(COMPONENT, 'browser-auth|stale-testdata', 'amber', '🟠',
+        `שרידי עסקת בדיקה (${TICKER}) ביומן`,
+        'נמצאה שורת SNTNL מריצה קודמת — הניקוי הקודם לא הושלם',
+        'המחיקה ב-UI או ניקוי ה-REST של הריצה הקודמת נכשלו',
+        'נמחקה אוטומטית בריצה זו; בדוק את לוג הריצה הקודמת ב-Actions',
+        'מחיקת שורת בדיקה בלבד — ללא סיכון');
+      await deleteSntnlRow(page);
+    }
+  } catch (e) {
+    add(COMPONENT, 'browser-auth|sweep-failed', 'amber', '🟠',
+      `ניקוי שרידי ${TICKER} ב-UI`,
+      `${e.message}`,
+      'שורת בדיקה ישנה נשארה ביומן — ה-REST של afterAll עוד ינסה להסיר אותה',
+      'אם חוזר: בדוק את זרימת המחיקה ב-UI ואת ניקוי ה-REST',
+      'מחיקת שורת בדיקה בלבד — ללא סיכון');
+  }
+
+  // ---- 4. journal render — the live fmtR check (AAPL is closed with no stop) ----
+  try {
+    const rows = page.locator(ROWS);
+    const n = await rows.count();
+    if (n < FIXED_TRADES.length) throw new Error(`נמצאו ${n} שורות, מצופה ${FIXED_TRADES.length} לפחות`);
+    const missing = [];
+    for (const sym of FIXED_TRADES) {
+      if (await rows.filter({ hasText: sym }).count() === 0) missing.push(sym);
+    }
+    if (missing.length) throw new Error(`עסקאות קבע חסרות: ${missing.join(', ')}`);
+  } catch (e) {
+    add(COMPONENT, 'browser-auth|journal-render', 'red', '🔴',
+      'רינדור 3 עסקאות הקבע (AAPL סגורה ללא stop = בדיקת fmtR החיה)',
+      `${e.message}`,
+      'טבלת היומן לא רונדרה כראוי — ייתכן ערך null שמפיל את החישוב',
+      'בדוק fmtR (src/utils.js:106) ו-calcTradeMetrics (src/utils.js:38) ואת ה-pageerror ב-Sentry',
+      'rollback — נמוך, מחזיר מצב ידוע-תקין');
+  }
+
+  // ---- 5. create. Scroll to top first: the FAB gets pointer-events-none
+  // when the page is scrolled down. .last() is the global FAB (the empty-state
+  // journal renders a second element with the same data-tour). ----
+  let created = false;
+  try {
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.locator('[data-tour="add-trade"]').last().click();
+    await page.locator('#log-ticker').fill(TICKER);
+    await page.locator('#log-entry').fill('100');
+    await page.locator('#log-stop').fill('99'); // LONG → stop < entry (validateTradeInputs)
+    await page.locator('#log-target').fill('102');
+    await page.getByRole('button', { name: /Log Trade/ }).click();
+    // The toast disappears — the row in the table is the real proof.
+    await expect(sntnlRows(page)).toHaveCount(1, { timeout: 20_000 });
+    created = true;
+  } catch (e) {
+    add(COMPONENT, 'browser-auth|create-failed', 'red', '🔴',
+      `יצירת עסקה חדשה (${TICKER}) דרך הטופס`,
+      `${e.message}`,
+      'משתמשים לא יכולים לתעד עסקה — הפעולה המרכזית באפליקציה שבורה',
+      'בדוק את טופס היצירה (handleSubmit) ואת כתיבת trades ל-Supabase',
+      'rollback — נמוך, מחזיר מצב ידוע-תקין');
+  }
+
+  // ---- 6. tabs (3 tabs — there is no Coach tab) ----
+  try {
+    await page.locator('[data-tour-tab="analytics"]').click();
+    await page.locator('[data-tour-tab="dashboard"]').click();
+    await openJournal(page);
+  } catch (e) {
+    add(COMPONENT, 'browser-auth|tab-switch', 'red', '🔴',
+      'מעבר טאבים ניתוח ביצועים → לוח בקרה → יומן',
+      `${e.message}`,
+      'טאב לא נטען — חלק מהאפליקציה לא נגיש למשתמש מחובר',
+      'בדוק שגיאות JS בטאב שנפל ואת ה-deploy האחרון',
+      'rollback — נמוך, מחזיר מצב ידוע-תקין');
+  }
+
+  // ---- 7. delete through the UI ----
+  if (created) {
+    try {
+      await deleteSntnlRow(page);
+      uiDeleteOk = true;
+    } catch (e) {
+      add(COMPONENT, 'browser-auth|delete-failed', 'red', '🔴',
+        `מחיקת עסקת ${TICKER} דרך ה-UI (כולל דיאלוג האישור)`,
+        `${e.message}`,
+        'משתמשים לא יכולים למחוק עסקה — או שדיאלוג האישור נשבר',
+        'בדוק את handleDeleteTrade ואת ConfirmProvider (src/components/ToastProvider.jsx)',
+        'rollback — נמוך, מחזיר מצב ידוע-תקין');
+    }
+  }
+
+  await page.waitForTimeout(1_500); // settle for late console/network errors
+  record(diag);
+  expect(true).toBe(true); // never hard-fail: findings drive the report
+});
+
+test.afterAll(async () => {
+  if (!AUTH_ON) return; // public-only run: no output file at all
+  await restCleanup();
+  fs.writeFileSync(OUTPUT, JSON.stringify(findings, null, 2));
+  // eslint-disable-next-line no-console
+  console.log(`sentinel auth findings: ${findings.length} → ${OUTPUT}`);
+});
