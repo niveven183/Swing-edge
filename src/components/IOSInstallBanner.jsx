@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Share, Plus, X, Smartphone } from "lucide-react";
+import { readConsent, subscribeConsent } from "../lib/consent.js";
 
 const DISMISS_KEY = "swingEdgeIosInstallDismissed";
 
@@ -29,8 +30,20 @@ export default function IOSInstallBanner() {
       if (localStorage.getItem(DISMISS_KEY) === "1") return;
     } catch {}
     if (!isIOS() || isStandalone()) return;
-    const timer = setTimeout(() => setVisible(true), 1500);
-    return () => clearTimeout(timer);
+
+    // Two banners stacked at the bottom would bury the consent banner, which has to
+    // stay visible. Hold until the consent choice is made, then arm normally.
+    let timer;
+    const arm = () => {
+      timer = setTimeout(() => setVisible(true), 1500);
+    };
+    if (readConsent() !== null) arm();
+    const unsubscribe = subscribeConsent(arm);
+
+    return () => {
+      clearTimeout(timer);
+      unsubscribe();
+    };
   }, []);
 
   const dismiss = () => {

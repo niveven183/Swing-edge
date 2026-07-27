@@ -3,7 +3,7 @@
 > מתעדכן ע"י Claude Code **בסיום כל משימה**, לפי סיום משימה ולא לפי לוח שנה.
 > קובץ מצב, לא ארכיון — מה שנסגר נגזם, לא נצבר.
 
-עודכן: 2026-07-27 · HEAD: 29c71b5
+עודכן: 2026-07-27 · HEAD: 7e957bb
 <!-- HEAD = הקומיט שהמצב הזה מתאר. פיגור של קומיט אחד הוא מובנה: הקובץ נכתב לפני שה-hash קיים. -->
 
 
@@ -11,13 +11,14 @@
 
 ## 🔴 עכשיו
 
-**שבוע הבנת משתמשים** — GA4 להתקנה (Measurement ID: `G-VC8PKL4NL1`, Property ID:
-`547224198`) · retention day-7 · מייל ל-5 פעילים.
+**שבוע הבנת משתמשים** — GA4 הותקן ✅. נותרו: **צעד ידני חובה בקונסולת GA4** (ראה למטה) ·
+retention day-7 · מייל ל-5 פעילים.
 
 ## ⏭️ הבא בתור
 
-1. **שבוע הבנת משתמשים** — GA4 להתקנה (Measurement ID: `G-VC8PKL4NL1`, Property ID:
-   `547224198`) · retention day-7 · מייל ל-5 פעילים
+1. **שבוע הבנת משתמשים** — ⚠️ **Enhanced Measurement → "Page changes based on browser
+   history events" חייב להיות ON** (SwingEdge הוא SPA; בלעדיו אף מסלול פנימי לא נספר
+   ו-`/app` ייראה מת) · אימות חי של `gcs=G100`/`G101` · retention day-7 · מייל ל-5 פעילים
 2. **חובות מוצר במנוע** — סתירת כרטיס ההון · +0.00R בלי stop · PROFIT FACTOR ∞.
    כולם ב-`calcTradeMetrics`; משימה נפרדת עם בדיקות
 3. **חובות מוצר בקופי** — תג CLOSED בקריפטו · waitlist בלנדינג · ניסוח דוח Growth
@@ -40,6 +41,16 @@
 
 ## ✅ נסגר השבוע
 
+- **GA4 + Consent Mode v2 + באנר הסכמה + /privacy** (`G-VC8PKL4NL1`): בלוק ב-`index.html`
+  עם `consent default` **denied** כ-`dataLayer[0]` ללא תנאי + שחזור אישור שמור ב-head
+  (כדי שמשתמש חוזר לא יאבד את ה-pageview הראשון). `src/lib/consent.js` — מקור-אמת-אחד
+  ל-`swingEdgeConsent` (`{v,analytics,ts}`), `revokeAnalytics` מוחק גם עוגיות `_ga*`.
+  באנר עברי לא-מודאלי ב-`z-index:91`, מעוגן ל-inline-start ב-lane יורש-כיוון
+  (`pointer-events:none`) — אי-חפיפה עם ה-FAB נכונה **מעצם המבנה**, לא בזכות z-index.
+  שני הכפתורים חולקים מחלקה אחת (דרישה רגולטורית). `/privacy`: כפתור ביטול פעיל
+  (`ConsentControl`) + הסבר מפורש למה `@vercel/analytics` אינו מגודר.
+  **הגנת זיהום דאטה:** route-abort ל-googletagmanager בשלושת ה-specs + קליק
+  `consent-decline` ב-sentinel-auth, אחרת ~100 pageviews סינתטיים/יום מול 29 משתמשים.
 - **רוטציית Discord webhook** — בוצעה ידנית 27.07, אומתה חי (☀️ ב-13:39)
 - **S2 — מחזור מלא ראשון בפרודקשן** (26.07 23:16, ריצה ידנית, `411d1dc`): לוגין →
   hydration → יומן → יצירת SNTNL → טאבים → מחיקה → ניקוי REST. ✅ התאוששות דווחה.
@@ -72,6 +83,13 @@
 
 ## ⚠️ סיכונים פתוחים
 
+- **ה-pageview הראשון של משתמש שמאשר הוא חסר-עוגייה** — האישור מגיע אחרי ה-`g/collect`
+  הראשון ו-GA4 לא שולח מחדש. landing → הרשמה ממודלת ולא מיוחסת בעמוד הראשון.
+  **מקבלים במודע** — `page_view` ידני היה יוצר ספירה כפולה
+- **`OnboardingTour` (`fixed inset-0 z-[120]`) מכסה את הבאנר** בדיוק למשתמש החדש.
+  הבאנר נשאר שם אחרי הסיור. **אין להעלות את z-index של הבאנר מעל 120**
+- **CSP עתידי ישבור את שני ה-inline scripts ב-head** (theme resolver + GA). יידרשו
+  nonce/hash + `script-src` ל-googletagmanager + `connect-src` ל-`*.google-analytics.com`
 - שכבת auth רצה פעם בשעה בעוד הדיווח כל 20 דק' → אזור עיוור מובנה
 - `core.hooksPath` הוא config מקומי — clone חדש נשאר בלי הגנת hooks, בשקט
 - `smoke.yml` לא מקבל צעד דיסקורד (במכוון — גם מופעל על כל push ל-main, לא רק

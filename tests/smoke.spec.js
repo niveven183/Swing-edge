@@ -8,9 +8,16 @@ import { test, expect } from '@playwright/test';
 const BASE_URL = process.env.TEST_URL || 'https://swing-edge.com';
 const BASE_HOST = new URL(BASE_URL).host;
 
-// Substrings of console-error messages we intentionally ignore. Empty for now —
-// populate only with known-benign third-party noise, after inspecting a real run.
-const CONSOLE_ERROR_ALLOWLIST = [];
+// Substrings of console-error messages we intentionally ignore: known-benign
+// third-party noise only. GA is blocked at the route level below, so nothing here
+// should ever fire — these four are the safety net if another load path slips through.
+const CONSOLE_ERROR_ALLOWLIST = ['google-analytics', 'googletagmanager', 'doubleclick', 'gtag'];
+
+// Never let CI traffic reach GA4. sentinel.yml alone is 48 runs/day against ~29 real
+// users; synthetic pageviews would drown the signal with no error surfacing anywhere.
+async function blockAnalytics(page) {
+  await page.route('**/googletagmanager.com/**', (route) => route.abort());
+}
 
 // Attach diagnostics to a page: uncaught console errors, page errors, and any
 // 5xx from the deployment's own origin (third-party 5xx must not fail our smoke).
@@ -41,6 +48,7 @@ function assertClean({ consoleErrors, serverErrors }) {
 }
 
 test('landing page loads with hero and no errors', async ({ page }) => {
+  await blockAnalytics(page);
   const diag = watchErrors(page);
   await page.goto('/', { waitUntil: 'load' });
   await expect(page).toHaveTitle(/SwingEdge/i);
@@ -50,6 +58,7 @@ test('landing page loads with hero and no errors', async ({ page }) => {
 
 for (const path of ['/terms', '/privacy']) {
   test(`${path} renders with an h1 and Hebrew content`, async ({ page }) => {
+    await blockAnalytics(page);
     const diag = watchErrors(page);
     await page.goto(path, { waitUntil: 'load' });
     await expect(page.locator('h1').first()).toBeVisible();
@@ -61,6 +70,7 @@ for (const path of ['/terms', '/privacy']) {
 }
 
 test('/app loads to auth screen or dashboard with no errors', async ({ page }) => {
+  await blockAnalytics(page);
   const diag = watchErrors(page);
   await page.goto('/app', { waitUntil: 'load' });
   // Either the AuthScreen (SWINGEDGE heading) or the authenticated dashboard
@@ -70,6 +80,28 @@ test('/app loads to auth screen or dashboard with no errors', async ({ page }) =
     .or(page.getByRole('banner'));
   await expect(authOrDash.first()).toBeVisible();
   assertClean(diag);
+});
+
+// The load-bearing invariant: consent must be denied at dataLayer[0], before anything
+// else is queued. If this drifts, the tag collects before consent and nothing errors.
+// gtag.js is still route-blocked here — the inline head block populates dataLayer on
+// its own, so the assertion holds without emitting a synthetic hit to GA4.
+test('consent defaults to denied before any choice is made', async ({ page }) => {
+  await blockAnalytics(page);
+  await page.goto('/', { waitUntil: 'load' });
+
+  const first = await page.evaluate(() => Array.from(window.dataLayer[0]));
+  expect(first[0]).toBe('consent');
+  expect(first[1]).toBe('default');
+  expect(first[2]).toMatchObject({
+    ad_storage: 'denied',
+    ad_user_data: 'denied',
+    ad_personalization: 'denied',
+    analytics_storage: 'denied',
+  });
+
+  const stored = await page.evaluate(() => localStorage.getItem('swingEdgeConsent'));
+  expect(stored).toBeNull();
 });
 
 test('production market-data API returns live data within 30s', async ({ request }) => {

@@ -1,0 +1,122 @@
+/* ConsentBanner — hand-written CSS, not Tailwind: src/index.css §override remaps the
+   text-colour utilities onto CSS variables, which is unsafe for a surface that must
+   render identically everywhere. Precedent: LandingPage.css.
+
+   Geometry, at a 720px viewport:
+     lane   inset-inline:0                    ->  0 … 720
+            padding:12px (both inline sides)  ->  content box 12 … 708 = 696px
+     card   min(640, 696 - 104) = 592         ->  card spans 12 … 604
+     FAB    right-6 (24) + w-14 (56)          ->  FAB spans 640 … 696
+                                       gap    =  640 - 604 = 36px
+   The 104px reserve = 24px inset + 56px FAB + 24px breathing room. It is coupled to
+   the FAB at SwingEdge_App.jsx:6671 and enforced by a bounding-box assertion in
+   tests-sentinel/sentinel-auth.spec.js — drift there fails the run, not silently.
+
+   Every inset is logical. No physical left/right anywhere in this file: the lane
+   inherits direction from documentElement (the same source Tailwind's rtl: variant
+   keys off), so anchoring to inline-start always lands opposite the FAB. */
+
+.se-consent {
+  position: fixed;
+  inset-inline: 0;
+  inset-block-end: 0;
+  z-index: 91; /* above z-[90] (iOS install banner, undo bar); below the z-[95]
+                  full-screen overlays in ToastProvider.jsx:109 / AdminPanel.jsx:248,
+                  and below --z-dropdown:100 / --z-modal:300 / --z-toast:400.
+                  Never raise past 120 — it would punch through OnboardingTour. */
+  display: flex;
+  justify-content: flex-start;
+  padding: 12px;
+  padding-block-end: calc(12px + env(safe-area-inset-bottom));
+  pointer-events: none; /* the lane spans the viewport and must never eat a click */
+}
+
+.se-consent__card {
+  pointer-events: auto;
+  inline-size: min(640px, calc(100% - 104px));
+  box-sizing: border-box;
+  padding: 16px 18px;
+  border: 1px solid var(--v3-line, rgba(255, 255, 255, 0.08));
+  border-radius: var(--v3-radius-card, 20px);
+  background: var(--v3-bg-panel, #0a100d);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5);
+  color: var(--v3-text-mid, #c7d0cc);
+  font-family: "Heebo", "Inter", system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  animation: se-consent-in 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.se-consent__text {
+  margin: 0 0 14px;
+}
+
+.se-consent__link {
+  color: var(--v3-accent, #00c076);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.se-consent__actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* Regulatory: both buttons share this one class and must stay identical in size,
+   radius, weight, colour and contrast. No accent tint on "accept", no de-emphasis
+   on "decline" — equal visual weight is a legal requirement, not a design choice. */
+.se-consent__btn {
+  flex: 1 1 0;
+  min-inline-size: 0;
+  padding: 10px 16px;
+  border: 1px solid var(--v3-line, rgba(255, 255, 255, 0.08));
+  border-radius: var(--v3-radius-pill, 999px);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--v3-text-hi, #fff);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background var(--v3-transition, 150ms) ease;
+}
+
+.se-consent__btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.se-consent__btn:focus-visible {
+  outline: 2px solid var(--v3-accent, #00c076);
+  outline-offset: 2px;
+}
+
+@keyframes se-consent-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Below 720px the horizontal reserve stops fitting, so the card goes full-width and
+   the whole lane lifts above the FAB — the clearance turns from horizontal to vertical. */
+@media (max-width: 719px) {
+  .se-consent {
+    padding-block-end: calc(92px + env(safe-area-inset-bottom));
+  }
+  .se-consent__card {
+    inline-size: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .se-consent__card {
+    animation: none;
+  }
+  .se-consent__btn {
+    transition: none;
+  }
+}

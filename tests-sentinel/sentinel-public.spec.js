@@ -26,6 +26,12 @@ const IGNORE_SUBSTR = [
   'google-analytics', 'googletagmanager', 'doubleclick', 'gtag',
 ];
 
+// Sentinel runs 48×/day. Letting it reach GA4 would bury ~29 real users under
+// synthetic pageviews, silently — block the tag before it ever loads.
+async function blockAnalytics(page) {
+  await page.route('**/googletagmanager.com/**', (route) => route.abort());
+}
+
 const findings = [];
 
 function add(component, fp, severity, emoji, checked, got, reason, fix, risk) {
@@ -99,6 +105,7 @@ function record(label, pageKey, diag) {
 }
 
 test('landing (/) renders in a real browser', async ({ page }) => {
+  await blockAnalytics(page);
   const diag = watch(page);
   try {
     await page.goto('/', { waitUntil: 'load' });
@@ -118,6 +125,7 @@ test('landing (/) renders in a real browser', async ({ page }) => {
 });
 
 test('/app renders the auth screen in a real browser', async ({ page }) => {
+  await blockAnalytics(page);
   const diag = watch(page);
   try {
     await page.goto('/app', { waitUntil: 'load' });

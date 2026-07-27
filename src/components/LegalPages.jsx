@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Logo from "./Logo.jsx";
+import { readConsent, grantAnalytics, revokeAnalytics } from "../lib/consent.js";
 
 /* Static legal pages (/terms, /privacy). Content is the FINAL Hebrew copy —
    rendered verbatim, never machine-translated. For non-Hebrew UI we show a
@@ -44,6 +46,55 @@ function Item({ lead, children }) {
   );
 }
 
+// Withdrawing consent has to be as easy as giving it — a button, not an instruction
+// to clear localStorage by hand.
+function ConsentControl() {
+  const [analytics, setAnalytics] = useState(null);
+
+  useEffect(() => {
+    setAnalytics(readConsent());
+  }, []);
+
+  const granted = analytics === "granted";
+  const label =
+    analytics === null
+      ? "עדיין לא בחרת."
+      : granted
+        ? "כרגע: אישרת איסוף נתוני שימוש ב-Google Analytics."
+        : "כרגע: לא מאושר. Google Analytics אינו שומר עוגיות ואינו יוצר מזהה מתמשך.";
+
+  const toggle = () => {
+    if (granted) revokeAnalytics();
+    else grantAnalytics();
+    setAnalytics(granted ? "denied" : "granted");
+  };
+
+  return (
+    <p style={paraStyle}>
+      <strong style={leadStyle}>ההסכמה שלך: </strong>
+      {label}{" "}
+      <button
+        type="button"
+        onClick={toggle}
+        style={{
+          marginInlineStart: 8,
+          padding: "8px 16px",
+          border: `1px solid ${C.accent}`,
+          borderRadius: 999,
+          background: "transparent",
+          color: C.accent,
+          font: "inherit",
+          fontSize: 15,
+          fontWeight: 600,
+          cursor: "pointer",
+        }}
+      >
+        {granted ? "בטל את ההסכמה" : "אשר איסוף נתוני שימוש"}
+      </button>
+    </p>
+  );
+}
+
 function LegalShell({ title, updated, children }) {
   const showEnNotice = getLang() !== "he";
   return (
@@ -69,7 +120,8 @@ function LegalShell({ title, updated, children }) {
         </div>
       </header>
 
-      <main style={{ maxWidth: 780, margin: "0 auto", padding: "clamp(32px,5vw,56px) clamp(16px,4vw,40px) 80px" }}>
+      {/* Bottom padding is generous so the consent banner can't clip the last paragraph on mobile. */}
+      <main style={{ maxWidth: 780, margin: "0 auto", padding: "clamp(32px,5vw,56px) clamp(16px,4vw,40px) clamp(80px,24vh,240px)" }}>
         {showEnNotice && (
           <div
             dir="ltr"
@@ -99,13 +151,15 @@ function LegalShell({ title, updated, children }) {
 
 export function PrivacyPage() {
   return (
-    <LegalShell title="מדיניות פרטיות" updated="עודכן: יולי 2026">
+    <LegalShell title="מדיניות פרטיות" updated="עודכן: 27 ביולי 2026">
       <Para lead="מי אנחנו:">SwingEdge — יומן מסחר אישי. יצירת קשר: niveven183@gmail.com</Para>
-      <Para lead="מה אנחנו אוספים:">(א) כתובת מייל וסיסמה מוצפנת — לצורך חשבון; (ב) נתוני העסקאות והיומן שאתה מזין — לתפעול השירות עבורך בלבד; (ג) נתוני שימוש אנונימיים (עמודים, ביצועים) — לשיפור המוצר; (ד) דיווחי שגיאות טכניים; (ה) כתובת מייל שנמסרה בהרשמה לרשימת המתנה — לצורך עדכון על פתיחת הגישה למוצר בלבד; ניתן להסרה בכל עת בפנייה במייל.</Para>
-      <Para lead="איפה זה נשמר:">בספקי ענן מאובטחים — Supabase (בסיס נתונים ואימות), Vercel (אירוח ואנליטיקה), Sentry (שגיאות). הנתונים מוצפנים בתעבורה ובמנוחה אצל הספקים.</Para>
+      <Para lead="מה אנחנו אוספים:">(א) כתובת מייל וסיסמה מוצפנת — לצורך חשבון; (ב) נתוני העסקאות והיומן שאתה מזין — לתפעול השירות עבורך בלבד; (ג) נתוני שימוש: מדידת תנועה בסיסית של Vercel Analytics — ללא עוגיות וללא מזהה אישי, פועלת תמיד; ובנוסף Google Analytics 4 — רק לאחר אישורך המפורש; (ד) דיווחי שגיאות טכניים; (ה) כתובת מייל שנמסרה בהרשמה לרשימת המתנה — לצורך עדכון על פתיחת הגישה למוצר בלבד; ניתן להסרה בכל עת בפנייה במייל.</Para>
+      <Para lead="איפה זה נשמר:">בספקי ענן מאובטחים — Supabase (בסיס נתונים ואימות), Vercel (אירוח ומדידת תנועה), Sentry (שגיאות), ובאישורך גם Google (Analytics 4). הנתונים מוצפנים בתעבורה ובמנוחה אצל הספקים. נתוני Google Analytics מעובדים גם מחוץ לישראל, תחת תנאי עיבוד הנתונים של Google ותניות חוזיות סטנדרטיות (SCCs), ונשמרים אצל Google עד 14 חודשים.</Para>
       <Para lead="מה אנחנו לא עושים:">לא מוכרים ולא מעבירים את הנתונים שלך לצד שלישי לצרכי שיווק. לא ניגשים לחשבון המסחר האמיתי שלך — SwingEdge אינו מחובר לברוקר ואינו מבצע עסקאות.</Para>
       <Para lead={`הזכויות שלך (לפי חוק הגנת הפרטיות, התשמ"א-1981):`}>עיון בנתוניך, תיקונם ומחיקתם. מחיקת חשבון = מחיקת כל נתוני היומן שלך. פנה במייל ונטפל תוך 30 יום.</Para>
-      <Para lead="עוגיות:">משתמשים באחסון מקומי (local storage) הנחוץ לתפעול בלבד — התחברות והעדפות. אין עוגיות פרסום.</Para>
+      <Para lead="עוגיות:">אנחנו משתמשים באחסון מקומי (local storage) הנחוץ לתפעול — התחברות והעדפות — ובמפתח <code>swingEdgeConsent</code> ששומר את בחירת ההסכמה שלך. Google Analytics 4 מותקן במצב Consent Mode v2: בכל טעינת עמוד, ולפני שהתג נטען, ארבעת המפתחות <code>analytics_storage</code>, <code>ad_storage</code>, <code>ad_user_data</code> ו-<code>ad_personalization</code> מוגדרים כ-denied. כל עוד לא אישרת, לא נשמרות עוגיות <code>_ga</code> ולא נוצר מזהה מתמשך בדפדפן שלך. אין עוגיות פרסום, Google Signals כבוי, ואיננו עושים רימרקטינג.</Para>
+      <ConsentControl />
+      <Para lead="למה Vercel Analytics אינו מותנה באישור:">הקו שאנחנו מותחים הוא עוגיות מול ללא-עוגיות, לא "אנליטיקס מול לא אנליטיקס". Vercel Analytics מודד ספירת עמודים בלבד, אינו כותב עוגייה ואינו יוצר מזהה מתמשך שניתן לעקוב אחריו בין ביקורים — ולכן הוא פועל תמיד ומהווה את קו הבסיס היחיד שלנו. Google Analytics 4 לעומתו כותב עוגיות <code>_ga</code> מתמידות, ולכן הוא מותנה באישורך המפורש וניתן לביטול בכפתור שלמעלה.</Para>
       <Para lead="קטינים:">השירות מיועד לבני 18 ומעלה.</Para>
       <Para lead="שינויים:">נעדכן עמוד זה בכל שינוי מהותי; המשך שימוש = הסכמה לגרסה המעודכנת.</Para>
     </LegalShell>

@@ -95,6 +95,47 @@
       })();
     </script>
 
+    <!-- Google Analytics 4 + Consent Mode v2.
+         Order in this block is load-bearing:
+           1. dataLayer + shim   2. consent DEFAULT (all denied)
+           3. replay saved grant  4. config   5. gtag.js async
+         gtag.js is async and appears after this block, so it cannot run first —
+         document order guarantees `denied` is dataLayer[0] on every load.
+         A future CSP needs a nonce/hash for this block and the theme resolver above. -->
+    <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() { dataLayer.push(arguments); }
+      window.gtag = gtag;
+
+      gtag('consent', 'default', {
+        ad_storage:            'denied',
+        ad_user_data:          'denied',
+        ad_personalization:    'denied',
+        analytics_storage:     'denied',
+        functionality_storage: 'granted',
+        security_storage:      'granted'
+      });
+      gtag('set', 'ads_data_redaction', true);
+
+      // Replay a previously stored grant. Reading our own consent record is not tracking
+      // and writes nothing. Any parse failure / missing key / version mismatch falls
+      // through and stays denied (fail-closed).
+      try {
+        var seConsentRaw = localStorage.getItem('swingEdgeConsent');
+        if (seConsentRaw) {
+          var seConsent = JSON.parse(seConsentRaw);
+          if (seConsent && seConsent.v === 1 && seConsent.analytics === 'granted') {
+            gtag('consent', 'update', { analytics_storage: 'granted' });
+          }
+        }
+      } catch (e) {}
+
+      gtag('js', new Date());
+      gtag('config', 'G-VC8PKL4NL1', { anonymize_ip: true, send_page_view: true });
+    </script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-VC8PKL4NL1"></script>
+
     <!-- Boot loader styling: shown inside #root while the JS bundle loads so the page is
          never a blank white/dark rectangle. React clears #root on mount, removing it. -->
     <style>

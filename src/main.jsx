@@ -8,6 +8,7 @@ import LandingGate from "./components/LandingGate.jsx";
 import { TermsPage, PrivacyPage } from "./components/LegalPages.jsx";
 import { ToastProvider, ConfirmProvider } from "./components/ToastProvider.jsx";
 import { ThemeProvider } from "./contexts/ThemeContext.jsx";
+import ConsentBanner from "./components/ConsentBanner.jsx";
 import { inject } from "@vercel/analytics";
 
 inject();
@@ -68,6 +69,7 @@ createRoot(document.getElementById("root")).render(
                 <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
+              <ConsentBanner />
             </BrowserRouter>
           </ConfirmProvider>
         </ToastProvider>

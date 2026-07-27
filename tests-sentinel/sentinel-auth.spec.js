@@ -282,6 +282,9 @@ test('authenticated journey: login → journal → create/delete SNTNL', async (
     return;
   }
 
+  // Sentinel runs 48×/day against ~29 real users. Its traffic must never reach GA4.
+  await page.route('**/googletagmanager.com/**', (route) => route.abort());
+
   const diag = watch(page);
 
   // ---- 1. login. The URL does not change (SPA) — wait for the tab bar. ----
@@ -393,6 +396,41 @@ test('authenticated journey: login → journal → create/delete SNTNL', async (
       'טבלת היומן לא רונדרה כראוי — ייתכן ערך null שמפיל את החישוב',
       'בדוק fmtR (src/utils.js:106) ו-calcTradeMetrics (src/utils.js:38) ואת ה-pageerror ב-Sentry',
       'rollback — נמוך, מחזיר מצב ידוע-תקין');
+  }
+
+  // ---- 4b. consent banner. The context is fresh every run, so the banner is always
+  // up. Its clearance from the FAB is a CSS constant (104px) coupled to
+  // SwingEdge_App.jsx:6671 — assert the boxes don't overlap rather than hoping the
+  // click lands, then decline so Sentinel traffic never reaches GA4 even if the
+  // route-abort above is ever missed. The banner is optional: never fail the run. ----
+  try {
+    const card = page.locator('.se-consent__card');
+    if (await card.count() > 0 && await card.isVisible()) {
+      const a = await card.boundingBox();
+      const b = await page.locator('[data-tour="add-trade"]').last().boundingBox();
+      if (a && b) {
+        const clear =
+          a.x + a.width <= b.x || b.x + b.width <= a.x ||
+          a.y + a.height <= b.y || b.y + b.height <= a.y;
+        if (!clear) {
+          add(COMPONENT, 'browser-auth|consent-overlaps-fab', 'red', '🔴',
+            'באנר ההסכמה אינו חופף לכפתור הוספת העסקה',
+            `banner ${JSON.stringify(a)} · FAB ${JSON.stringify(b)}`,
+            'הבאנר מכסה את ה-FAB — משתמשים לא יכולים לתעד עסקה עד שיבחרו',
+            'בדוק את ה-gutter 104px/92px ב-ConsentBanner.css מול ה-FAB ב-SwingEdge_App.jsx',
+            'שינוי CSS בלבד — נמוך');
+        }
+      }
+      await page.locator('[data-testid="consent-decline"]').click();
+      await card.waitFor({ state: 'detached', timeout: 5_000 });
+    }
+  } catch (e) {
+    add(COMPONENT, 'browser-auth|consent-check-failed', 'yellow', '🟡',
+      'בדיקת באנר ההסכמה',
+      `${e.message}`,
+      'לא ניתן היה לאמת את הבאנר — הבדיקה עצמה נכשלה, לא בהכרח המוצר',
+      'בדוק ש-.se-consent__card ו-data-testid="consent-decline" עדיין קיימים',
+      'בדיקה בלבד — ללא סיכון');
   }
 
   // ---- 5. create. Scroll to top first: the FAB gets pointer-events-none
