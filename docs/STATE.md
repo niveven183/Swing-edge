@@ -3,7 +3,7 @@
 > מתעדכן ע"י Claude Code **בסיום כל משימה**, לפי סיום משימה ולא לפי לוח שנה.
 > קובץ מצב, לא ארכיון — מה שנסגר נגזם, לא נצבר.
 
-עודכן: 2026-07-27 · HEAD: f6f29f3
+עודכן: 2026-07-27 · HEAD: 29c71b5
 <!-- HEAD = הקומיט שהמצב הזה מתאר. פיגור של קומיט אחד הוא מובנה: הקובץ נכתב לפני שה-hash קיים. -->
 
 
@@ -11,24 +11,25 @@
 
 ## 🔴 עכשיו
 
-**רוטציית Discord webhook** (4 סוכנים) — אחרי 2 בלבד, אחרת מעדכנים סוד ואז מוסיפים צרכנים.
+**שבוע הבנת משתמשים** — GA4 להתקנה (Measurement ID: `G-VC8PKL4NL1`, Property ID:
+`547224198`) · retention day-7 · מייל ל-5 פעילים.
 
 ## ⏭️ הבא בתור
 
-1. **רוטציית Discord webhook** (4 סוכנים) — אחרי 2 בלבד, אחרת מעדכנים סוד ואז מוסיפים צרכנים
-2. **שבוע הבנת משתמשים** — GA4 (לא מותקן) · שאילתת retention day-7 · מייל ל-5 פעילים
-3. **חובות מוצר במנוע** — סתירת כרטיס ההון · +0.00R בלי stop · PROFIT FACTOR ∞.
+1. **שבוע הבנת משתמשים** — GA4 להתקנה (Measurement ID: `G-VC8PKL4NL1`, Property ID:
+   `547224198`) · retention day-7 · מייל ל-5 פעילים
+2. **חובות מוצר במנוע** — סתירת כרטיס ההון · +0.00R בלי stop · PROFIT FACTOR ∞.
    כולם ב-`calcTradeMetrics`; משימה נפרדת עם בדיקות
-4. **חובות מוצר בקופי** — תג CLOSED בקריפטו · waitlist בלנדינג · ניסוח דוח Growth
-5. **מיפוי קבצים במחשב** — read-only, דוח מקומי, לא לריפו
-6. **סידור בפועל** — מחשב + ריפו
-7. **Dispatcher → Actions** (IMAP)
-8. **Trader Persona → Actions**
-9. **Gate 2.2** — RLS audit מלא + בדיקת חדירה + rate-limit ל-symbol-search + נגישות
-10. **₪ + Stripe + entitlement** — אין ₪ בקוד כלל
-11. **B1 Multi-Account**
-12. **Track A — לנדינג V2**
-13. **אודיט 4 קבצי הידע** מול הקאנון (Minervini / O'Neil / Weinstein / Tharp)
+3. **חובות מוצר בקופי** — תג CLOSED בקריפטו · waitlist בלנדינג · ניסוח דוח Growth
+4. **מיפוי קבצים במחשב** — read-only, דוח מקומי, לא לריפו
+5. **סידור בפועל** — מחשב + ריפו
+6. **Dispatcher → Actions** (IMAP)
+7. **Trader Persona → Actions**
+8. **Gate 2.2** — RLS audit מלא + בדיקת חדירה + rate-limit ל-symbol-search + נגישות
+9. **₪ + Stripe + entitlement** — אין ₪ בקוד כלל
+10. **B1 Multi-Account**
+11. **Track A — לנדינג V2**
+12. **אודיט 4 קבצי הידע** מול הקאנון (Minervini / O'Neil / Weinstein / Tharp)
 
 ## ⏸️ חסום / ממתין לניב
 
@@ -36,10 +37,10 @@
 - רשם הדומיין — איש קשר + Auto-Renew
 - מלאי סודות
 - החלטת ריפו פרטי מול דקות Actions
-- GA4 Measurement ID
 
 ## ✅ נסגר השבוע
 
+- **רוטציית Discord webhook** — בוצעה ידנית 27.07, אומתה חי (☀️ ב-13:39)
 - **S2 — מחזור מלא ראשון בפרודקשן** (26.07 23:16, ריצה ידנית, `411d1dc`): לוגין →
   hydration → יומן → יצירת SNTNL → טאבים → מחיקה → ניקוי REST. ✅ התאוששות דווחה.
   שפיות ביומן: 3 עסקאות בדיוק (AAPL / NVDA / BTC-USD), אפס SNTNL
@@ -78,7 +79,6 @@
 - `actions/download-artifact@v7` מול `upload-artifact@v7` ב-`sentinel.yml` (שורות 93,
   117) טרם אומת בריצה אמיתית ב-Actions — v4 עלה ל-v7 בשני הצדדים יחד, אך אין הרצה
   שאישרה שההורדה עדיין תופסת את ה-artifact
-- `api/send-invites.js:133` (`reportDiscord`) קורא `process.env.SENTINEL_DISCORD_WEBHOOK`
-  — משתנה סביבה של **Vercel**, נפרד לגמרי מ-secret בשם זהה ב-GitHub Actions. אם לא מוגדר
-  ב-Vercel, `if (!webhook) return;` יוצא בשקט (בלי דיווח, בלי שגיאה). קוד אומת (grep); אם
-  המשתנה בפועל מוגדר ב-Vercel **לא** אומת בסשן הזה — ניב צריך לבדוק
+- `api/send-invites.js:133` (`reportDiscord`) קורא `SENTINEL_DISCORD_WEBHOOK` שאינו קיים
+  ב-Vercel env — `if (!webhook) return;` יוצא בשקט. הדיווח 📧 מעולם לא ירה משם; מה שנצפה
+  ב-25.07 הגיע מ-`email-campaign.yml`
