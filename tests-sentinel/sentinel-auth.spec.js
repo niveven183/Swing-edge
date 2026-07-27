@@ -42,10 +42,18 @@ const IGNORE_SUBSTR = [
   'sentry.io', 'ingest.sentry',
   'google-analytics', 'googletagmanager', 'doubleclick', 'gtag',
 ];
-// The Sentry SDK fires ~10 "Cannot listen to the event from the provided
-// iframe" console errors on mount. The message text has no "sentry" in it, so
-// only the source URL identifies it — hence a second, location-based list.
-const IGNORE_SOURCE = ['assets/sentry-'];
+// Source-based ignores: the message text cannot identify these, so the console
+// message's location URL is what matches.
+// · assets/sentry- — the SDK fires ~10 "Cannot listen to the event from the
+//   provided iframe" errors on mount; the text has no "sentry" in it.
+// · financialmodelingprep.com — TickerLogo (src/components/TickerLogo.jsx:18)
+//   loads a logo by symbol. SNTNL is not a real symbol, so the 404 is certain
+//   and the letter-badge fallback handles it — noise the test creates for
+//   itself, not a product fault.
+// Matched by host only. Never match on "404" or "Failed to load resource":
+// that would hide a real 404 from our own API — the exact silent failure
+// Sentinel exists to catch.
+const IGNORE_SOURCE = ['assets/sentry-', 'financialmodelingprep.com'];
 
 const findings = [];
 let uiDeleteOk = false;
@@ -122,6 +130,8 @@ function watch(page) {
     // answer to "why did hydration fail". cleanUrl drops the query, so no token
     // from a Supabase URL reaches the finding.
     if (host.endsWith('.supabase.co')) supabaseFailedReq.push(`${res.status()} ${cleanUrl(res.url())}`);
+    // Any other third-party host (the financialmodelingprep.com logo among
+    // them) falls through both buckets by design — no filter needed here.
   });
   return { consoleErrors, pageErrors, failedReq, supabaseFailedReq };
 }
