@@ -1,0 +1,123 @@
+name: User Analytics
+
+# Daily "what do users actually DO after signup" report — funnel, stuckness,
+# fill quality, anomalies, feedback, day-over-day. Phase A: built entirely on
+# data Supabase already stores. Zero instrumentation, zero writes, zero schema
+# change. Full design + rejected alternatives: docs/plans/PLAN-2026-07-27-user-analytics.md
+#
+# PRIVACY — this repo is PUBLIC, so run logs, job summaries and artifacts are
+# world-readable. Therefore:
+#   • the detailed report goes out by EMAIL only (MAIL_USERNAME/MAIL_PASSWORD);
+#   • Discord gets a short aggregate summary (no per-user lines);
+#   • stdout carries aggregate integers only;
+#   • there is NO artifact upload and NO job summary write, deliberately.
+# Journal content (notes / lessonLearned / journal_notes / mentor_notes) is never
+# read — only counted and measured for length. scripts/user-analytics.mjs enforces
+# all of this with guards that throw rather than degrade.
+
+on:
+  # cron enabled after first verified dispatch — see PLAN-2026-07-27
+  # schedule:
+  #   - cron: '30 6 * * *'   # 06:30 UTC = 09:30 Israel — after fleet-daily (06:00)
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Verification run: compute and print aggregate counts, send nothing'
+        type: boolean
+        default: true
+
+concurrency:
+  group: user-analytics
+  cancel-in-progress: false
+
+permissions:
+  contents: read           # zero repo writes
+
+jobs:
+  user-analytics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+      MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+      # Empty (falsy) on a schedule trigger, so the daily run always reports.
+      DRY_RUN: ${{ inputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Day-over-day needs yesterday's numbers, and a DELETION is invisible to any
+      # time-window query — 173 trades vanished on 2026-07-27 and no "last 24h"
+      # query could have seen it. The cached file holds AGGREGATE INTEGERS ONLY
+      # (counts and medians, no user ids), which is why persisting it is acceptable
+      # even though the Actions cache is readable on a public repo.
+      - name: Restore day-over-day state
+        uses: actions/cache/restore@v4
+        with:
+          path: .analytics-state
+          key: user-analytics-state-${{ github.run_id }}
+          restore-keys: |
+            user-analytics-state-
+
+      - name: Compose analytics report
+        id: analytics
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: node scripts/user-analytics.mjs
+
+      - name: Email report
+        if: ${{ env.DRY_RUN != 'true' && env.MAIL_USERNAME != '' && env.MAIL_PASSWORD != '' }}
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          from: SwingEdge Analytics <${{ secrets.MAIL_USERNAME }}>
+          to: niveven183@gmail.com
+          subject: "👥 SwingEdge — התנהגות משתמשים (${{ steps.analytics.outputs.date }})"
+          body: ${{ steps.analytics.outputs.report }}
+
+      - name: Note missing mail secrets
+        if: ${{ env.DRY_RUN != 'true' && (env.MAIL_USERNAME == '' || env.MAIL_PASSWORD == '') }}
+        run: |
+          echo "::warning::MAIL_USERNAME/MAIL_PASSWORD not set — the detailed report was NOT delivered. It is deliberately not printed here, because this repo is public."
+
+      - name: Report to Discord
+        if: ${{ env.DRY_RUN != 'true' }}
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.SENTINEL_DISCORD_WEBHOOK }}
+          UA_SUMMARY: ${{ steps.analytics.outputs.summary }}
+          UA_COLOR: ${{ steps.analytics.outputs.color }}
+        run: |
+          set -uo pipefail
+          if [ -z "${DISCORD_WEBHOOK:-}" ]; then
+            echo "::warning::SENTINEL_DISCORD_WEBHOOK not set — skipping Discord."
+            exit 0
+          fi
+          if [ -z "${UA_SUMMARY:-}" ]; then
+            # The compose step produced no summary at all. Per CLAUDE.md §2 this must
+            # not be silent — post red rather than skip.
+            UA_SUMMARY="🔴 User Analytics — צעד החישוב לא הפיק סיכום. בדוק את לוג ה-Action."
+            UA_COLOR=15158332
+          fi
+          payload="$(jq -n --arg u "SwingEdge User Analytics" --arg d "$UA_SUMMARY" --argjson c "${UA_COLOR:-15844367}" \
+            '{username:$u, embeds:[{description:$d, color:$c}]}')"
+          curl -sS -o /dev/null -w 'discord POST -> HTTP %{http_code}\n' \
+            -X POST -H "Content-Type: application/json" -d "$payload" "$DISCORD_WEBHOOK"
+
+      - name: Note dry run
+        if: ${{ env.DRY_RUN == 'true' }}
+        run: echo "::notice::dry_run=true — email and Discord were skipped by design."
+
+      - name: Save day-over-day state
+        if: ${{ env.DRY_RUN != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: .analytics-state
+          key: user-analytics-state-${{ github.run_id }}
