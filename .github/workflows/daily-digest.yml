@@ -64,13 +64,22 @@ jobs:
         env:
           DISCORD_WEBHOOK: ${{ secrets.SENTINEL_DISCORD_WEBHOOK }}
           D_DATE: ${{ steps.digest.outputs.date }}
+          FB_UNRESOLVED: ${{ steps.digest.outputs.feedback_unresolved }}
+          FB_SNIPPET: ${{ steps.digest.outputs.feedback_snippet }}
         run: |
           if [ -z "${DISCORD_WEBHOOK:-}" ]; then
             echo "::warning::SENTINEL_DISCORD_WEBHOOK not set — skipping Discord."
             exit 0
           fi
+          COLOR=3066993
           DESC="$(printf '%s\n' "סיכום יומי הושלם ($D_DATE)." "פירוט מלא נשלח במייל.")"
-          payload="$(jq -n --arg u "SwingEdge Digest" --arg t "☀️ Daily Digest" --arg d "$DESC" --argjson c 3066993 \
+          # Numeric guard also covers a partial deploy where this output doesn't exist yet —
+          # falls back to the old behavior instead of breaking.
+          if printf '%s' "${FB_UNRESOLVED:-}" | grep -qE '^[0-9]+$' && [ "${FB_UNRESOLVED:-0}" -gt 0 ]; then
+            COLOR=15844367
+            DESC="$(printf '%s\n' "$DESC" "💬 ${FB_UNRESOLVED} פידבקים ממתינים" "${FB_SNIPPET:-}")"
+          fi
+          payload="$(jq -n --arg u "SwingEdge Digest" --arg t "☀️ Daily Digest" --arg d "$DESC" --argjson c "$COLOR" \
             '{username:$u, embeds:[{title:$t, description:$d, color:$c}]}')"
           curl -sS -o /dev/null -w 'discord POST -> HTTP %{http_code}\n' \
             -X POST -H "Content-Type: application/json" -d "$payload" "$DISCORD_WEBHOOK"

@@ -158,11 +158,34 @@ jobs:
           srcs="$(psql_q "SELECT coalesce(source,'direct') || ' ' || count(*) FROM public.waitlist GROUP BY coalesce(source,'direct') ORDER BY count(*) DESC LIMIT 3;")"
           top="$(printf '%s' "$srcs" | awk 'NF{ if(n++) printf " · "; printf "%s", $0 }')"
 
+          # ---- threshold-only windows (deliberately NOT the 24h windows shown above,
+          # so a threshold breach never looks like a duplicate/contradictory metric) ----
+          tr48="$(psql_q "SELECT count(*) FROM public.trades WHERE \"createdAt\" >= now() - interval '48 hours';")"
+          s72="$(psql_q "SELECT count(*) FROM auth.users WHERE created_at >= now() - interval '72 hours';")"
+
           show() { [ -n "$1" ] && printf '%s' "$1" || printf 'לא זמין'; }
           pctact=""
+          act_pct_num=""
           if printf '%s%s' "$act" "$tot" | grep -qE '^[0-9]+$' && [ "${tot:-0}" -gt 0 ]; then
-            pctact=" ($(( act * 100 / tot ))%)"
+            act_pct_num=$(( act * 100 / tot ))
+            pctact=" (${act_pct_num}%)"
           fi
+
+          # ---- thresholds: zero new state — each fed straight from a query/value above,
+          # same act_pct_num the display line uses, so there is no drift between shown and
+          # checked numbers ----
+          warn_lines=""
+          warn() { warn_lines="$warn_lines"$'\n'"$1"; }
+          if printf '%s' "$tr48" | grep -qE '^[0-9]+$' && [ "$tr48" -eq 0 ]; then
+            warn "🟠 אין עסקאות חדשות ב-48 השעות האחרונות"
+          fi
+          if printf '%s' "$s72" | grep -qE '^[0-9]+$' && [ "$s72" -eq 0 ]; then
+            warn "🟠 אין נרשמים חדשים ב-72 השעות האחרונות"
+          fi
+          if [ -n "$act_pct_num" ] && [ "$act_pct_num" -lt 25 ]; then
+            warn "🟠 Activation מתחת ל-25%"
+          fi
+          [ -n "$warn_lines" ] && color=$AMBER
 
           lines=""
           add() { lines="$lines"$'\n'"$1"; }
@@ -174,11 +197,16 @@ jobs:
           add "• רשימת המתנה: $(show "$wlTot")$(arrow "$wl24" waitlist24 | sed 's/אתמול/ב-24ש/')"
           [ -n "$top" ] && add "• מקורות מובילים: $top"
 
-          desc="$(printf '📈 Growth Pulse — 24 שעות אחרונות%s\nנבדק: %s' "$lines" "$stamp")"
+          header="📈 Growth Pulse — 24 שעות אחרונות"
+          if [ -n "$warn_lines" ]; then
+            header="$header"$'\n'"⚠️ דורש תשומת לב:$warn_lines"
+          fi
+          desc="$(printf '%s%s\nנבדק: %s' "$header" "$lines" "$stamp")"
           jq -n --argjson c "$color" --arg d "$desc" '{color:$c,description:$d}' > growth-embed.json
           echo "growth-embed:"; cat growth-embed.json
 
-          # persist today's snapshot for tomorrow's deltas (aggregate ints only)
+          # persist today's snapshot for tomorrow's deltas (aggregate ints only) — tr48/s72/
+          # act_pct_num are threshold-only and deliberately NOT persisted (zero new state)
           jq -n \
             --arg signups24 "${s24:-}" --arg total "${tot:-}" --arg trades24 "${tr24:-}" \
             --arg waitlist24 "${wl24:-}" --arg activation "${act:-}" --arg power "${pow:-}" \

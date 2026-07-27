@@ -3,7 +3,7 @@
 > מתעדכן ע"י Claude Code **בסיום כל משימה**, לפי סיום משימה ולא לפי לוח שנה.
 > קובץ מצב, לא ארכיון — מה שנסגר נגזם, לא נצבר.
 
-עודכן: 2026-07-27 · HEAD: 665c3a7
+עודכן: 2026-07-27 · HEAD: f6f29f3
 <!-- HEAD = הקומיט שהמצב הזה מתאר. פיגור של קומיט אחד הוא מובנה: הקובץ נכתב לפני שה-hash קיים. -->
 
 
@@ -45,7 +45,15 @@
   שפיות ביומן: 3 עסקאות בדיוק (AAPL / NVDA / BTC-USD), אפס SNTNL
 - **S2.3 — סינון 404 של לוגו הסימבול**: `financialmodelingprep.com` נוסף ל-`IGNORE_SOURCE`
   (חסימה לפי מקור בלבד, לעולם לא לפי הטקסט "404"). מסלול ה-network נבדק ולא שונה —
-  host צד-שלישי אינו נכנס ל-`failedReq` ולא ל-`supabaseFailedReq`.
+  host צד-שלישי אינו נכנס ל-`failedReq` ולא ל-`supabaseFailedReq`. **אומת חי**: ריצת
+  Sentinel `30253015899` (2026-07-27T09:13:31Z) מכילה `AUTH_EXPECTED: 1` — שכבת ה-auth
+  אכן רצה, ההתאוששות שדווחה אמיתית (ראה `DECISIONS.md` 2026-07-27).
+- **Watchdog + ספי Growth Pulse + פידבק ל-Discord**: `watchdog.yml` חדש — 4 קטגוריות
+  (טרי/מאחר/מעולם לא הצליח/הבדיקה עצמה נכשלה) + בדיקת עקביות עצמית מול טבלת ה-max-age,
+  דיווח יומי תמיד (fallback 🔴 אם צעד הבדיקה קרס). `fleet-daily.yml` Growth Pulse: 3 ספי
+  🟠 (0 עסקאות ב-48ש' / 0 נרשמים ב-72ש' / activation מתחת ל-25%), אפס state חדש. פידבק
+  משתמש לא-פתור מוצג עכשיו גם בדיסקורד (`daily-digest.yml`, כתום + snippet מסונן).
+  `restore-drill.yml`: רבעוני → חודשי. `failure-alert.yml`: Watchdog נוסף לרשימת המעקב.
 - **ניקוי מאוחד** (`665c3a7` תוכנית, ביצוע בקומיט הבא): `npm audit fix` תיקן
   `brace-expansion`; `react-router` high נותר במכוון (CVE לא ישים — ראה `DECISIONS.md`
   2026-07-27) · try/catch fail-open ל-`api/_lib/rateLimit.js` · timeout 8s
@@ -70,3 +78,7 @@
 - `actions/download-artifact@v7` מול `upload-artifact@v7` ב-`sentinel.yml` (שורות 93,
   117) טרם אומת בריצה אמיתית ב-Actions — v4 עלה ל-v7 בשני הצדדים יחד, אך אין הרצה
   שאישרה שההורדה עדיין תופסת את ה-artifact
+- `api/send-invites.js:133` (`reportDiscord`) קורא `process.env.SENTINEL_DISCORD_WEBHOOK`
+  — משתנה סביבה של **Vercel**, נפרד לגמרי מ-secret בשם זהה ב-GitHub Actions. אם לא מוגדר
+  ב-Vercel, `if (!webhook) return;` יוצא בשקט (בלי דיווח, בלי שגיאה). קוד אומת (grep); אם
+  המשתנה בפועל מוגדר ב-Vercel **לא** אומת בסשן הזה — ניב צריך לבדוק

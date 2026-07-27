@@ -1,0 +1,145 @@
+name: Watchdog
+
+# Catches the "silent death" gap that failure-alert.yml cannot: it fires only when a
+# workflow's own run *fails*. If a workflow never runs at all (cron disabled, secret
+# expired, repo transferred, workflow file broken) failure-alert never sees a `failure`
+# event and stays silent — silence then looks identical to health. Watchdog checks, once
+# a day, "when did each scheduled workflow last succeed?" against a fixed max-age table,
+# and always posts to Discord — the only workflow required to post green every single day.
+# Read-only: gh api only (actions:read), zero repo writes, zero new secrets.
+#
+# Known limitation (documented, not solved by design): the max-age table below is a
+# manual list. A newly-added scheduled workflow is not auto-discovered by GitHub's API —
+# the consistency check further down only *flags* the gap (🟠 "workflow מתוזמן לא
+# מנוטר"), it does not close it. See docs/plans/PLAN-2026-07-27-watchdog-thresholds.md.
+
+on:
+  schedule:
+    - cron: '0 8 * * *'   # 08:00 UTC = 11:00 Israel — after every other daily/hourly cron has had a chance to run
+  workflow_dispatch:
+
+concurrency:
+  group: watchdog
+  cancel-in-progress: false
+
+permissions:
+  contents: read           # to check out the repo for the consistency check
+  actions: read            # to read workflow-run history
+
+jobs:
+  watchdog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check scheduled workflows
+        id: check
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+          set +e                    # runner injects `bash -e`; disable it so one bad check degrades, not aborts
+          RED=15158332; AMBER=15844367; GREEN=3066993
+
+          # ---- fixed max-age table (hours) — one entry per scheduled workflow file ----
+          declare -A MAXAGE=(
+            [sentinel.yml]=3
+            [daily-digest.yml]=30
+            [fleet-daily.yml]=30
+            [smoke.yml]=30
+            [data-guardian.yml]=80
+            [fleet-weekly.yml]=192
+            [analyst.yml]=192
+            [arch-auditor.yml]=192
+            [backup.yml]=192
+            [restore-drill.yml]=840
+          )
+
+          now_epoch=$(date -u +%s)
+          stale_lines=""; never_lines=""; failcheck_lines=""; consistency_lines=""
+          n_problem=0
+
+          for wf in "${!MAXAGE[@]}"; do
+            max_h="${MAXAGE[$wf]}"
+            resp="$(gh api "/repos/$REPO/actions/workflows/$wf/runs?status=success&per_page=1" 2>/tmp/gherr)"
+            rc=$?
+            if [ $rc -ne 0 ]; then
+              failcheck_lines="${failcheck_lines}\n🔴 $wf — הבדיקה עצמה נכשלה: $(head -1 /tmp/gherr 2>/dev/null || echo 'gh api error')"
+              n_problem=$((n_problem+1))
+              continue
+            fi
+            updated="$(printf '%s' "$resp" | jq -r '.workflow_runs[0].updated_at // empty' 2>/dev/null)"
+            if [ -z "$updated" ]; then
+              never_lines="${never_lines}\n🔴 $wf — מעולם לא הצליח (אין ריצה מוצלחת בהיסטוריה)"
+              n_problem=$((n_problem+1))
+              continue
+            fi
+            upd_epoch="$(date -u -d "$updated" +%s 2>/dev/null)"
+            if [ -z "$upd_epoch" ]; then
+              failcheck_lines="${failcheck_lines}\n🔴 $wf — הבדיקה עצמה נכשלה: timestamp לא תקין ($updated)"
+              n_problem=$((n_problem+1))
+              continue
+            fi
+            age_h=$(( (now_epoch - upd_epoch) / 3600 ))
+            if [ "$age_h" -gt "$max_h" ]; then
+              stale_lines="${stale_lines}\n🟠 $wf — ריצה מוצלחת אחרונה לפני ${age_h}ש' (סף: ${max_h}ש', $updated)"
+              n_problem=$((n_problem+1))
+            fi
+          done
+
+          # ---- consistency check: every workflow file with a `schedule:` trigger must be
+          # in MAXAGE, and every MAXAGE key must correspond to a real file. Cheap grep over
+          # the checked-out tree — keeps the table from silently drifting when a new cron
+          # job is added or a workflow file is renamed/removed. ----
+          for f in .github/workflows/*.yml; do
+            base="$(basename "$f")"
+            [ "$base" = "watchdog.yml" ] && continue   # self: deliberately not in MAXAGE
+            if grep -qE '^\s*schedule:\s*$' "$f" && [ -z "${MAXAGE[$base]+x}" ]; then
+              consistency_lines="${consistency_lines}\n⚠️ workflow מתוזמן לא מנוטר: $base"
+              n_problem=$((n_problem+1))
+            fi
+          done
+          for wf in "${!MAXAGE[@]}"; do
+            if [ ! -f ".github/workflows/$wf" ]; then
+              consistency_lines="${consistency_lines}\n⚠️ ערך יתום בטבלה: $wf"
+              n_problem=$((n_problem+1))
+            fi
+          done
+
+          if [ "$n_problem" -eq 0 ]; then
+            color=$GREEN
+            desc="🐕 Watchdog — כל ${#MAXAGE[@]} הסוכנים המתוזמנים רצו בזמן"
+          else
+            if [ -n "$never_lines" ] || [ -n "$failcheck_lines" ]; then color=$RED; else color=$AMBER; fi
+            desc="$(printf '🐕 Watchdog — %s ממצא/ים:%b%b%b%b' "$n_problem" "$stale_lines" "$never_lines" "$failcheck_lines" "$consistency_lines")"
+          fi
+
+          jq -n --argjson c "$color" --arg d "$desc" '{color:$c,description:$d}' > watchdog-result.json
+          echo "watchdog-result:"; cat watchdog-result.json
+
+      - name: Report to Discord
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.SENTINEL_DISCORD_WEBHOOK }}
+        run: |
+          set -uo pipefail
+          if [ -z "${DISCORD_WEBHOOK:-}" ]; then
+            echo "::warning::SENTINEL_DISCORD_WEBHOOK not set — skipping Discord."
+            exit 0
+          fi
+          if [ -f watchdog-result.json ]; then
+            color="$(jq -r '.color' watchdog-result.json)"
+            desc="$(jq -r '.description' watchdog-result.json)"
+          else
+            # The check step crashed before producing a result at all — this must NOT be
+            # silent. Post red rather than skipping, per CLAUDE.md §2 (zero silent failure).
+            color=15158332
+            desc="🔴 Watchdog — צעד הבדיקה קרס לפני שהפיק תוצאה. בדוק את לוג ה-Action."
+          fi
+          payload="$(jq -n --arg u "SwingEdge Watchdog" --arg d "$desc" --argjson c "$color" \
+            '{username:$u, embeds:[{description:$d, color:$c}]}')"
+          curl -sS -o /dev/null -w 'discord POST -> HTTP %{http_code}\n' \
+            -X POST -H "Content-Type: application/json" -d "$payload" "$DISCORD_WEBHOOK"

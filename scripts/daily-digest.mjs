@@ -165,7 +165,7 @@ async function gatherOpen() {
 // ── (d) Feedback: unresolved count (Sunday: + theme breakdown) ───────────────
 
 function gatherFeedback() {
-  const fb = { unresolved: null, themes: null, error: null };
+  const fb = { unresolved: null, themes: null, snippet: null, error: null };
   if (!SUPABASE_DB_URL) {
     fb.error = "no-db-url";
     return fb;
@@ -173,6 +173,13 @@ function gatherFeedback() {
   try {
     const n = parseInt(psqlScalar("SELECT count(*) FROM feedback WHERE status IS DISTINCT FROM 'resolved'"), 10);
     fb.unresolved = Number.isFinite(n) ? n : null;
+    if (fb.unresolved && fb.unresolved > 0) {
+      const msg = psqlScalar(
+        "SELECT message FROM feedback WHERE status IS DISTINCT FROM 'resolved' ORDER BY created_at DESC LIMIT 1"
+      );
+      // Sanitized here in JS (not in bash) before it ever reaches a workflow env/run block.
+      fb.snippet = msg ? msg.replace(/\r?\n/g, " ").slice(0, 100) : null;
+    }
     if (IS_SUNDAY) {
       const rows = psqlRows(
         "SELECT type, count(*) FROM feedback WHERE status IS DISTINCT FROM 'resolved' GROUP BY type ORDER BY 2 DESC"
@@ -332,13 +339,18 @@ async function composeWithClaude(facts) {
 
 // ── output plumbing ──────────────────────────────────────────────────────────
 
-function emitOutputs(digest, attention) {
+function emitOutputs(digest, attention, feedback) {
   const gho = process.env.GITHUB_OUTPUT;
   if (gho) {
-    const delim = `DIGEST_${Date.now()}`;
+    const digestDelim = `DIGEST_${Date.now()}`;
+    const fbDelim = `FBSNIP_${Date.now()}`;
+    const fbUnresolved = feedback && Number.isFinite(feedback.unresolved) ? feedback.unresolved : 0;
+    const fbSnippet = feedback && feedback.snippet ? feedback.snippet : "";
     appendFileSync(gho, `date=${DATE}\n`);
     appendFileSync(gho, `attention=${attention}\n`);
-    appendFileSync(gho, `digest<<${delim}\n${digest}\n${delim}\n`);
+    appendFileSync(gho, `feedback_unresolved=${fbUnresolved}\n`);
+    appendFileSync(gho, `feedback_snippet<<${fbDelim}\n${fbSnippet}\n${fbDelim}\n`);
+    appendFileSync(gho, `digest<<${digestDelim}\n${digest}\n${digestDelim}\n`);
   }
   const summary = process.env.GITHUB_STEP_SUMMARY;
   if (summary) appendFileSync(summary, `### ☀️ סיכום יומי (${DATE})\n\n${digest}\n`);
@@ -360,12 +372,12 @@ async function main() {
   facts.attentionCount = countAttention(facts);
 
   const digest = (await composeWithClaude(facts)) || fallbackDigest(facts);
-  emitOutputs(digest, facts.attentionCount);
+  emitOutputs(digest, facts.attentionCount, feedback);
 }
 
 main().catch((e) => {
   // Absolute last resort: never fail the workflow over the digest itself.
   console.error("::warning::daily-digest failed unexpectedly — emitting minimal notice");
   const notice = "🟡 סוכן הסיכום היומי נתקל בשגיאה בהרכבת הדיווח. בדוק את לוג ה-Action.";
-  emitOutputs(notice, 1);
+  emitOutputs(notice, 1, null);
 });
