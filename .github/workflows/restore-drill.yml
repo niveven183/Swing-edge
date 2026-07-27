@@ -195,6 +195,42 @@ jobs:
         if: ${{ env.MAIL_USERNAME == '' || env.MAIL_PASSWORD == '' }}
         run: echo "::warning::MAIL_USERNAME/MAIL_PASSWORD not set — email skipped, result is in the job log/summary above."
 
+      - name: Report success to Discord
+        if: ${{ steps.compare.outputs.status == 'pass' }}
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.SENTINEL_DISCORD_WEBHOOK }}
+          RD_DATE: ${{ steps.compare.outputs.date }}
+          RD_ROWS: ${{ steps.compare.outputs.rows }}
+          RD_TABLES: ${{ steps.compare.outputs.tables }}
+        run: |
+          if [ -z "${DISCORD_WEBHOOK:-}" ]; then
+            echo "::warning::SENTINEL_DISCORD_WEBHOOK not set — skipping Discord."
+            exit 0
+          fi
+          DESC="$(printf '%s\n' "שחזור אומת: $RD_ROWS שורות ב-$RD_TABLES טבלאות ($RD_DATE)." "כולל כל האינדקסים.")"
+          payload="$(jq -n --arg u "SwingEdge Restore Drill" --arg t "✅ Restore Drill" --arg d "$DESC" --argjson c 3066993 \
+            '{username:$u, embeds:[{title:$t, description:$d, color:$c}]}')"
+          curl -sS -o /dev/null -w 'discord POST -> HTTP %{http_code}\n' \
+            -X POST -H "Content-Type: application/json" -d "$payload" "$DISCORD_WEBHOOK"
+
+      - name: Report failure to Discord
+        if: ${{ always() && steps.compare.outputs.status != 'pass' }}
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.SENTINEL_DISCORD_WEBHOOK }}
+          RD_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "${DISCORD_WEBHOOK:-}" ]; then
+            echo "::warning::SENTINEL_DISCORD_WEBHOOK not set — skipping Discord."
+            exit 0
+          fi
+          DESC="$(printf '%s\n' "תרגיל שחזור הגיבוי נכשל — הגיבוי אולי אינו ניתן לשחזור. טפל מיד." "ריצה: $RD_RUN_URL")"
+          payload="$(jq -n --arg u "SwingEdge Restore Drill" --arg t "🚨 Restore Drill FAILED" --arg d "$DESC" --argjson c 15158332 \
+            '{username:$u, embeds:[{title:$t, description:$d, color:$c}]}')"
+          curl -sS -o /dev/null -w 'discord POST -> HTTP %{http_code}\n' \
+            -X POST -H "Content-Type: application/json" -d "$payload" "$DISCORD_WEBHOOK"
+
       - name: Enforce drill result (red on mismatch)
         if: always()
         run: |

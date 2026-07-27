@@ -88,7 +88,7 @@ jobs:
           rm -f dump.pgcustom.gz
 
       - name: Upload encrypted artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: supabase-backup-${{ env.BACKUP_DATE }}
           path: |
@@ -97,3 +97,21 @@ jobs:
           retention-days: 30
           if-no-files-found: error   # fail loudly if the .enc/manifest somehow aren't there
           compression-level: 0       # already gzipped+encrypted; don't re-compress
+
+      - name: Report success to Discord
+        if: ${{ success() }}
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.SENTINEL_DISCORD_WEBHOOK }}
+          B_DATE: ${{ env.BACKUP_DATE }}
+          B_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "${DISCORD_WEBHOOK:-}" ]; then
+            echo "::warning::SENTINEL_DISCORD_WEBHOOK not set — skipping Discord."
+            exit 0
+          fi
+          DESC="$(printf '%s\n' "תאריך: $B_DATE" "ריצה: $B_RUN_URL")"
+          payload="$(jq -n --arg u "SwingEdge Backup" --arg t "💾 Supabase Backup ✅" --arg d "$DESC" --argjson c 3066993 \
+            '{username:$u, embeds:[{title:$t, description:$d, color:$c}]}')"
+          curl -sS -o /dev/null -w 'discord POST -> HTTP %{http_code}\n' \
+            -X POST -H "Content-Type: application/json" -d "$payload" "$DISCORD_WEBHOOK"

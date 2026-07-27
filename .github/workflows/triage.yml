@@ -162,6 +162,29 @@ jobs:
         if: ${{ env.MAIL_USERNAME == '' || env.MAIL_PASSWORD == '' }}
         run: echo "::warning::MAIL_USERNAME/MAIL_PASSWORD not set — email skipped, diagnosis is in the job summary above."
 
+      - name: Report to Discord
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.SENTINEL_DISCORD_WEBHOOK }}
+          T_WF_NAME: ${{ steps.target.outputs.wf_name }}
+          T_CONCLUSION: ${{ steps.target.outputs.conclusion }}
+          T_CLASS: ${{ steps.diagnose.outputs.class }}
+          T_COMPONENT: ${{ steps.diagnose.outputs.component }}
+          T_RUN_URL: ${{ steps.diagnose.outputs.run_url }}
+        run: |
+          if [ -z "${DISCORD_WEBHOOK:-}" ]; then
+            echo "::warning::SENTINEL_DISCORD_WEBHOOK not set — skipping Discord."
+            exit 0
+          fi
+          DESC="$(printf '%s\n' \
+            "$T_WF_NAME ($T_CONCLUSION) — class: $T_CLASS · component: $T_COMPONENT" \
+            "אבחון מלא נשלח במייל." \
+            "ריצה: $T_RUN_URL")"
+          payload="$(jq -n --arg u "SwingEdge Triage" --arg t "🔍 Triage" --arg d "$DESC" --argjson c 15844367 \
+            '{username:$u, embeds:[{title:$t, description:$d, color:$c}]}')"
+          curl -sS -o /dev/null -w 'discord POST -> HTTP %{http_code}\n' \
+            -X POST -H "Content-Type: application/json" -d "$payload" "$DISCORD_WEBHOOK"
+
       # ---- Step C: safe-fix, lockfile-only. Skips unless CLASS==our-bug + install signature ----
       - name: Detect lockfile-fix eligibility
         id: eligible

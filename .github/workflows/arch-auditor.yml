@@ -65,6 +65,27 @@ jobs:
         if: ${{ steps.audit.outputs.findings != '0' && (env.MAIL_USERNAME == '' || env.MAIL_PASSWORD == '') }}
         run: echo "::warning::MAIL_USERNAME/MAIL_PASSWORD not set — email skipped, findings are in the job summary above."
 
+      - name: Report to Discord
+        if: ${{ steps.audit.outputs.findings != '0' }}
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.SENTINEL_DISCORD_WEBHOOK }}
+          AA_DATE: ${{ steps.audit.outputs.date }}
+          AA_FINDINGS: ${{ steps.audit.outputs.findings }}
+        run: |
+          if [ -z "${DISCORD_WEBHOOK:-}" ]; then
+            echo "::warning::SENTINEL_DISCORD_WEBHOOK not set — skipping Discord."
+            exit 0
+          fi
+          DESC="$(printf '%s\n' \
+            "$AA_FINDINGS ממצא(ים) נמצאו ($AA_DATE), מדורגים לפי impact ÷ effort." \
+            "נפתח/עודכן issue מתגלגל בתווית architecture." \
+            "פירוט מלא נשלח במייל.")"
+          payload="$(jq -n --arg u "SwingEdge Architecture Auditor" --arg t "🏗️ Architecture Auditor" --arg d "$DESC" --argjson c 15844367 \
+            '{username:$u, embeds:[{title:$t, description:$d, color:$c}]}')"
+          curl -sS -o /dev/null -w 'discord POST -> HTTP %{http_code}\n' \
+            -X POST -H "Content-Type: application/json" -d "$payload" "$DISCORD_WEBHOOK"
+
       - name: Create or update architecture issue
         if: ${{ steps.audit.outputs.findings != '0' }}
         uses: actions/github-script@v7

@@ -16,6 +16,12 @@ import { rateLimit, clientIp } from "./_lib/rateLimit.js";
 const SECRET = process.env.TURNSTILE_SECRET_KEY;
 const SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 
+const fetchWithTimeout = (url, opts = {}, ms = 8000) => {
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(), ms);
+  return fetch(url, { ...opts, signal: c.signal }).finally(() => clearTimeout(t));
+};
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -71,11 +77,11 @@ export default async function handler(req, res) {
     form.append("response", token);
     if (ip && ip !== "unknown") form.append("remoteip", ip);
 
-    const cfRes = await fetch(SITEVERIFY_URL, {
+    const cfRes = await fetchWithTimeout(SITEVERIFY_URL, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: form,
-    });
+    }, 8000);
     data = await cfRes.json();
   } catch (err) {
     // Cloudflare unreachable / timeout → 5xx so the client fails open.

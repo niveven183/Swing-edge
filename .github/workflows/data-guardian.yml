@@ -55,6 +55,27 @@ jobs:
         if: ${{ steps.guard.outputs.findings != '0' && (env.MAIL_USERNAME == '' || env.MAIL_PASSWORD == '') }}
         run: echo "::warning::MAIL_USERNAME/MAIL_PASSWORD not set — email skipped, findings are in the job summary above."
 
+      - name: Report to Discord
+        if: ${{ steps.guard.outputs.findings != '0' }}
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.SENTINEL_DISCORD_WEBHOOK }}
+          DG_DATE: ${{ steps.guard.outputs.date }}
+          DG_FINDINGS: ${{ steps.guard.outputs.findings }}
+        run: |
+          if [ -z "${DISCORD_WEBHOOK:-}" ]; then
+            echo "::warning::SENTINEL_DISCORD_WEBHOOK not set — skipping Discord."
+            exit 0
+          fi
+          DESC="$(printf '%s\n' \
+            "$DG_FINDINGS ממצא(ים) נמצאו ($DG_DATE)." \
+            "נפתח/עודכן issue בתווית data-quality." \
+            "פירוט מלא נשלח במייל.")"
+          payload="$(jq -n --arg u "SwingEdge Data Guardian" --arg t "🛡️ Data Guardian" --arg d "$DESC" --argjson c 15844367 \
+            '{username:$u, embeds:[{title:$t, description:$d, color:$c}]}')"
+          curl -sS -o /dev/null -w 'discord POST -> HTTP %{http_code}\n' \
+            -X POST -H "Content-Type: application/json" -d "$payload" "$DISCORD_WEBHOOK"
+
       - name: Create or update data-quality issue
         if: ${{ steps.guard.outputs.findings != '0' }}
         uses: actions/github-script@v7

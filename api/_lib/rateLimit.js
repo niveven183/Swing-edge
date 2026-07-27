@@ -28,23 +28,28 @@ function sweep(now) {
  *   expires (0 when allowed=true).
  */
 export function rateLimit(key, { windowMs, max }) {
-  const now = Date.now();
-  if (buckets.size > SWEEP_THRESHOLD) sweep(now);
+  try {
+    const now = Date.now();
+    if (buckets.size > SWEEP_THRESHOLD) sweep(now);
 
-  const entry = buckets.get(key) || { hits: [], windowMs };
-  entry.windowMs = windowMs;
-  entry.hits = entry.hits.filter((t) => now - t < windowMs);
+    const entry = buckets.get(key) || { hits: [], windowMs };
+    entry.windowMs = windowMs;
+    entry.hits = entry.hits.filter((t) => now - t < windowMs);
 
-  if (entry.hits.length >= max) {
+    if (entry.hits.length >= max) {
+      buckets.set(key, entry);
+      const oldest = entry.hits[0];
+      const retryAfter = Math.max(1, Math.ceil((windowMs - (now - oldest)) / 1000));
+      return { allowed: false, retryAfter };
+    }
+
+    entry.hits.push(now);
     buckets.set(key, entry);
-    const oldest = entry.hits[0];
-    const retryAfter = Math.max(1, Math.ceil((windowMs - (now - oldest)) / 1000));
-    return { allowed: false, retryAfter };
+    return { allowed: true, retryAfter: 0 };
+  } catch (err) {
+    console.error(`[rateLimit] fail-open: ${err?.message || err}`);
+    return { allowed: true, retryAfter: 0 };
   }
-
-  entry.hits.push(now);
-  buckets.set(key, entry);
-  return { allowed: true, retryAfter: 0 };
 }
 
 /** IP from x-forwarded-for: first entry is the original client per Vercel's chain. */

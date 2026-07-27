@@ -63,6 +63,29 @@ jobs:
         if: ${{ steps.analyst.outputs.email_he != '' && (env.MAIL_USERNAME == '' || env.MAIL_PASSWORD == '') }}
         run: echo "::warning::MAIL_USERNAME/MAIL_PASSWORD not set — email skipped, the report is in the job summary above."
 
+      - name: Report to Discord
+        if: ${{ steps.analyst.outputs.email_he != '' }}
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.SENTINEL_DISCORD_WEBHOOK }}
+          A_DATE: ${{ steps.analyst.outputs.date }}
+          A_PROPOSAL: ${{ steps.analyst.outputs.has_proposal }}
+        run: |
+          if [ -z "${DISCORD_WEBHOOK:-}" ]; then
+            echo "::warning::SENTINEL_DISCORD_WEBHOOK not set — skipping Discord."
+            exit 0
+          fi
+          if [ "$A_PROPOSAL" = "1" ]; then
+            LINE2="הצעת כיול בביטחון גבוה נפתחה כ-PR — ממתינה לאישור ניב."
+          else
+            LINE2="אין הצעת כיול הפעם (מתחת לסף הביטחון)."
+          fi
+          DESC="$(printf '%s\n' "ניתוח שבועי הושלם ($A_DATE)" "$LINE2" "פירוט מלא נשלח במייל.")"
+          payload="$(jq -n --arg u "SwingEdge Analyst" --arg t "🧠 Analyst" --arg d "$DESC" --argjson c 3066993 \
+            '{username:$u, embeds:[{title:$t, description:$d, color:$c}]}')"
+          curl -sS -o /dev/null -w 'discord POST -> HTTP %{http_code}\n' \
+            -X POST -H "Content-Type: application/json" -d "$payload" "$DISCORD_WEBHOOK"
+
       # ── Dormant PR path — only when a high-confidence proposal was written ──
       - name: Push calibration branch
         id: branch

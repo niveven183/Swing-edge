@@ -38,3 +38,20 @@ jobs:
       - name: Note missing mail secrets
         if: ${{ env.MAIL_USERNAME == '' || env.MAIL_PASSWORD == '' }}
         run: echo "::warning::MAIL_USERNAME/MAIL_PASSWORD not set — email skipped."
+
+      - name: Report to Discord
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.SENTINEL_DISCORD_WEBHOOK }}
+          FA_WF_NAME: ${{ github.event.workflow_run.name }}
+          FA_RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          if [ -z "${DISCORD_WEBHOOK:-}" ]; then
+            echo "::warning::SENTINEL_DISCORD_WEBHOOK not set — skipping Discord."
+            exit 0
+          fi
+          DESC="$(printf '%s\n' "הריצה של $FA_WF_NAME נכשלה." "פרטים: $FA_RUN_URL")"
+          payload="$(jq -n --arg u "SwingEdge Failure Alert" --arg t "🚨 Failure Alert" --arg d "$DESC" --argjson c 15158332 \
+            '{username:$u, embeds:[{title:$t, description:$d, color:$c}]}')"
+          curl -sS -o /dev/null -w 'discord POST -> HTTP %{http_code}\n' \
+            -X POST -H "Content-Type: application/json" -d "$payload" "$DISCORD_WEBHOOK"
