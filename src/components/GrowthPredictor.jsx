@@ -238,12 +238,8 @@ export default function GrowthPredictor({ trades = [], stats = {}, capital = 0, 
       return { monthlyReturn: 0, monthsOfData: 0 };
     }
     const dates = closedTrades
-      .map((t) => {
-        const a = t.date ? new Date(t.date).getTime() : null;
-        const b = t.exitDate ? new Date(t.exitDate).getTime() : null;
-        return [a, b].filter((x) => x && !Number.isNaN(x));
-      })
-      .flat();
+      .map((t) => (t.date ? new Date(t.date).getTime() : null))
+      .filter((x) => x && !Number.isNaN(x));
     if (dates.length < 2) return { monthlyReturn: 0, monthsOfData: 0 };
     const first = Math.min(...dates);
     const last = Math.max(...dates);

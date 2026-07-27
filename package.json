@@ -12,7 +12,8 @@
     "test:coach": "node scripts/coach-invariance-test.mjs",
     "test:import": "node scripts/import-test.mjs",
     "test:settings": "node scripts/userSettings-test.mjs",
-    "verify": "npm run test:coach && npm run test:import && npm run test:settings && npm run build"
+    "test:datachain": "node scripts/dataChain-test.mjs",
+    "verify": "npm run test:coach && npm run test:import && npm run test:settings && npm run test:datachain && npm run build"
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",

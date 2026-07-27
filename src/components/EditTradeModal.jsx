@@ -5,7 +5,8 @@ import InfoTooltip from "./ui/InfoTooltip.jsx";
 import SmartSelect from "./ui/SmartSelect.jsx";
 import useModalA11y from "../hooks/useModalA11y.js";
 import { getTradeSelectProps, CATEGORY_TOOLTIP } from "../data/tradeOptions.jsx";
-import { qstars } from "../utils.js";
+import { qstars, localDayKey } from "../utils.js";
+import { deriveCloseState } from "../lib/tradeCloseState.js";
 
 const EXIT_REASONS = ["Hit Target", "Hit Stop", "Manual Exit", "Trailing Stop", "Other"];
 
@@ -81,7 +82,6 @@ export default function EditTradeModal({ trade, lang, onClose, onSave }) {
       ticker: String(form.ticker || "").toUpperCase(),
       side: form.side,
       date: form.date,
-      exitDate: form.exitDate || trade.exitDate || null,
       entry: Number(form.entry),
       stop: Number(form.stop),
       target: form.target === "" ? null : Number(form.target),
@@ -91,14 +91,15 @@ export default function EditTradeModal({ trade, lang, onClose, onSave }) {
       marketCondition: form.marketCondition,
       emotionAtEntry: form.emotionAtEntry,
       entryQuality: form.entryQuality,
-      status: exitN != null ? "CLOSED" : form.status,
       exit: exitN,
       exitReason: form.exitReason,
       followedPlan: form.followedPlan,
       lessonLearned: form.lessonLearned,
       maxFavorable: form.maxFavorable === "" ? null : Number(form.maxFavorable),
       maxAdverse: form.maxAdverse === "" ? null : Number(form.maxAdverse),
-      closedAt: exitN != null ? (trade.closedAt || new Date().toISOString()) : trade.closedAt,
+      // status + closedAt are derived together — clearing the exit price must
+      // reopen the trade, not leave a CLOSED row with no exit.
+      ...deriveCloseState({ exit: exitN, exitDay: form.exitDay, prev: trade }),
     };
     onSave?.(updated);
   }
@@ -171,8 +172,8 @@ export default function EditTradeModal({ trade, lang, onClose, onSave }) {
               <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{isHe ? "תאריך יציאה" : "Exit Date"}</label>
               <input
                 type="date"
-                value={form.exitDate || ""}
-                onChange={(e) => setField("exitDate", e.target.value)}
+                value={form.exitDay || ""}
+                onChange={(e) => setField("exitDay", e.target.value)}
                 className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none transition font-mono"
               />
             </div>
@@ -403,7 +404,7 @@ export default function EditTradeModal({ trade, lang, onClose, onSave }) {
 function initForm(trade) {
   if (!trade) {
     return {
-      ticker: "", side: "LONG", date: "", exitDate: "",
+      ticker: "", side: "LONG", date: "", exitDay: "",
       entry: "", stop: "", target: "", shares: "",
       setup: "Breakout", notes: "",
       marketCondition: "Trending Up", emotionAtEntry: "Neutral",
@@ -417,7 +418,7 @@ function initForm(trade) {
     ticker: trade.ticker || "",
     side: trade.side || "LONG",
     date: trade.date || "",
-    exitDate: trade.exitDate || "",
+    exitDay: localDayKey(trade.closedAt) || "",
     entry: trade.entry != null ? String(trade.entry) : "",
     stop: trade.stop != null ? String(trade.stop) : "",
     target: trade.target != null ? String(trade.target) : "",

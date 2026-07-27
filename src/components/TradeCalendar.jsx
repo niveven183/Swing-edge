@@ -11,10 +11,10 @@ import { localDayKey } from '../utils.js';
 import DayTradesModal from './DayTradesModal.jsx';
 
 // Day a CLOSED trade belongs to = the day it was closed (its realized P&L lands then).
-// `closedAt` is a full ISO timestamp written on close; `date`/`exitDate` may be a plain
+// `closedAt` is a full ISO timestamp written on close; `date` is a plain
 // 'YYYY-MM-DD'. Demo/legacy trades carry only `date` (entry) → fall back to it.
 function dayKeyOf(t) {
-  return localDayKey(t.closedAt || t.exitDate || t.date || t.openDate || t.createdAt);
+  return localDayKey(t.closedAt || t.date || t.openDate || t.createdAt);
 }
 
 // trades: array of trade objects (closed trades preferred — open trades show 0 P&L).

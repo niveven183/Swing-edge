@@ -13,13 +13,12 @@ export const localDayKey = (raw) => {
   return isNaN(d.getTime()) ? null : format(d, "yyyy-MM-dd");
 };
 
-// Hold time in calendar days: the day a trade was closed (`closedAt`,
-// falling back to the legacy `exitDate`) minus the day it was entered
-// (`date`). `closedAt` is written on every close; `exitDate` is never
-// written by the normal close flow, only by manual edits.
+// Hold time in calendar days: the day a trade was closed (`closedAt`) minus
+// the day it was entered (`date`). `closedAt` is the only close timestamp —
+// it is written by every close path, including the Exit Date input.
 export const holdDays = (trade) => {
   const startKey = localDayKey(trade?.date);
-  const endKey = localDayKey(trade?.closedAt || trade?.exitDate);
+  const endKey = localDayKey(trade?.closedAt);
   if (!startKey || !endKey) return null;
   const d1 = new Date(startKey + "T00:00:00").getTime();
   const d2 = new Date(endKey + "T00:00:00").getTime();

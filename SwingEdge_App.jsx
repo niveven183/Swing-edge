@@ -42,7 +42,8 @@ import TickerLogo from "./src/components/TickerLogo.jsx";
 import MobileTradeCard from "./src/components/MobileTradeCard.jsx";
 import { TVTickerTape } from "./src/components/TradingViewWidgets.jsx";
 import { useToast, useConfirm } from "./src/components/ToastProvider.jsx";
-import { supabase, isSupabaseConfigured, tradeForSupabase } from "./src/supabaseClient.js";
+import { supabase, isSupabaseConfigured, tradeForSupabase, tradeFromSupabase } from "./src/supabaseClient.js";
+import { cleanTrades, purgeInvalidTrades } from "./src/lib/cleanTrades.js";
 import { loadSettings, saveSettings, flushSettings, migrateFromLocalStorage } from "./src/lib/userSettings.js";
 import { calcTradeMetrics, fmt$, fmtR, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays } from "./src/utils.js";
 import {
@@ -81,7 +82,7 @@ import InfoTooltip from "./src/components/ui/InfoTooltip.jsx";
 import TermTooltip from "./src/components/ui/TermTooltip.jsx";
 import SmartSelect from "./src/components/ui/SmartSelect.jsx";
 import useModalA11y from "./src/hooks/useModalA11y.js";
-import { getTradeSelectProps, CATEGORY_TOOLTIP, EMOTION_VALUES } from "./src/data/tradeOptions.jsx";
+import { getTradeSelectProps, CATEGORY_TOOLTIP } from "./src/data/tradeOptions.jsx";
 import { TRADING_TOOLTIPS, resolveSetupKey } from "./src/data/tooltips.js";
 import { getSetupTooltip } from "./src/intelligence/knowledgeGlue.js";
 import { TradeCalendar } from "./src/components/TradeCalendar.jsx";
@@ -111,73 +112,6 @@ function SetupTagTip({ setup, isRTL }) {
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const MOCK_TRADES = [];
-
-// ─── TRADE DATA SANITIZER ────────────────────────────────────────────────────
-// Cleans legacy localStorage entries: maps Hive/SIM setup codes to friendly
-// names, normalizes invalid emotions, strips SIM- ticker prefix, and flags
-// demo trades.
-function cleanTrades(trades) {
-  const SETUP_MAP = {
-    'Hive-S1_premarket': 'Gap and Go',
-    'Hive-S2_open': 'ORB Breakout',
-    'Hive-S3_midday': 'Bull Flag',
-    'Hive-S4_close': 'Power Hour Break',
-    'Hive-S5_postmarket': 'Earnings Gap Play',
-    'Hive-setup': 'Breakout',
-    'Hive-Earnings Gap Play': 'Earnings Gap Play',
-    'Hive-Overnight Reversal': 'Overnight Reversal',
-    'Hive-MOC Fade': 'MOC Fade',
-    'Hive-Power Hour Break': 'Power Hour Break',
-    'Hive-Gap and Go': 'Gap and Go',
-    'Hive-Overnight Hold': 'Overnight Hold',
-    'SIM-PREMARKET': 'Gap and Go',
-    'SIM-OPEN': 'ORB Breakout',
-    'SIM-MIDDAY': 'Bull Flag',
-    'SIM-CLOSE': 'Power Hour Break',
-    'SIM-POSTMARKET': 'Earnings Gap Play',
-    'SIM-SETUPTEST': 'Breakout',
-    '50 EMA Bounce': 'EMA Bounce 50',
-    'Revenge Trade': 'Range Breakout'
-  };
-  const VALID_EMOTIONS = EMOTION_VALUES;
-  if (!Array.isArray(trades)) return trades;
-  return trades.map(t => {
-    const isSimTicker = typeof t.ticker === 'string' && t.ticker.startsWith('SIM-');
-    const isHiveSetup = typeof t.setup === 'string' && t.setup.startsWith('Hive-');
-    return {
-      ...t,
-      ticker: isSimTicker ? t.ticker.replace('SIM-', '') : t.ticker,
-      setup: SETUP_MAP[t.setup] || t.setup,
-      emotionAtEntry: VALID_EMOTIONS.includes(t.emotionAtEntry) ? t.emotionAtEntry : 'Neutral',
-      // Supabase stores followedPlan as text → reads return "true"/"false".
-      // Normalize to boolean so every `=== true` consumer works. "Partially"/null pass through.
-      followedPlan:
-        t.followedPlan === true  || t.followedPlan === "true"  ? true  :
-        t.followedPlan === false || t.followedPlan === "false" ? false :
-        t.followedPlan,
-      isDemo: t.isDemo || isSimTicker || isHiveSetup || false,
-    };
-  });
-}
-
-function purgeInvalidTrades(trades) {
-  const FAKE_TICKERS = [
-    'PREMARKET','CLOSE','OPEN','MIDDAY',
-    'POSTMARKET','SETUPTEST'
-  ];
-  const VALID_MARKETS_MAP = {
-    'Trend': 'Trending Up',
-    'Unknown': 'Sideways',
-    'Mixed': 'Volatile'
-  };
-  if (!Array.isArray(trades)) return trades;
-  return trades
-    .filter(t => !FAKE_TICKERS.includes(t.ticker))
-    .map(t => ({
-      ...t,
-      marketCondition: VALID_MARKETS_MAP[t.marketCondition] || t.marketCondition
-    }));
-}
 
 const POPULAR_TICKERS = [
   { symbol: "NVDA", name: "NVIDIA Corporation", exchange: "NASDAQ", type: "EQUITY" },
@@ -212,14 +146,13 @@ const generateEquityCurve = (cap, trades = []) => {
   const data = [];
   const sortedTrades = [...trades]
     .filter(t => t.status === "CLOSED")
-    .sort((a, b) => new Date(a.date || a.exitDate) - new Date(b.date || b.exitDate));
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
   sortedTrades.forEach(t => {
     const pnl = calcTradeMetrics(t).pnl || 0;
     balance += pnl;
-    const d = t.date || t.exitDate;
-    data.push({ date: d, equity: Math.round(balance), ticker: t.ticker, pnl: Math.round(pnl) });
+    data.push({ date: t.date, equity: Math.round(balance), ticker: t.ticker, pnl: Math.round(pnl) });
   });
-  const firstRaw = sortedTrades[0]?.date || sortedTrades[0]?.exitDate;
+  const firstRaw = sortedTrades[0]?.date;
   const anchorDate = firstRaw
     ? new Date(new Date(firstRaw).getTime() - 86_400_000).toISOString().slice(0, 10)
     : new Date().toISOString().slice(0, 10);
@@ -1257,7 +1190,7 @@ export default function SwingEdge() {
           return;
         }
         // REPLACE — not merge
-        const cleaned = purgeInvalidTrades(cleanTrades(data || []));
+        const cleaned = purgeInvalidTrades(cleanTrades((data || []).map(tradeFromSupabase)));
         setTrades(cleaned);
       } catch (e) {
         console.error("Supabase load failed:", e);
@@ -2319,7 +2252,7 @@ export default function SwingEdge() {
         .eq("user_id", menteeId)
         .order("date", { ascending: false });
       if (error) { toast.error(error.message); setMenteeTrades([]); return; }
-      setMenteeTrades(purgeInvalidTrades(cleanTrades(data || [])));
+      setMenteeTrades(purgeInvalidTrades(cleanTrades((data || []).map(tradeFromSupabase))));
     } finally {
       setMenteeLoading(false);
     }
@@ -4873,7 +4806,7 @@ export default function SwingEdge() {
               // 2. P&L by Month
               const monthMap = {};
               closedTrades.forEach(t => {
-                const d = t.exitDate || t.date;
+                const d = t.date;
                 if (!d) return;
                 const { pnl } = calcTradeMetrics(t);
                 if (pnl == null) return;

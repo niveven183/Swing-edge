@@ -2,9 +2,9 @@
 // MonthlyReport.js — Trading DNA Monthly Report engine
 //
 // Pure, local, no-API analysis of a trader's performance for a single calendar
-// month. Buckets CLOSED trades by their realized month (exitDate, falling back to
-// entry date) and produces summary metrics, ranked strengths/weaknesses, chart
-// series, action items, and an A–F grade.
+// month. Buckets CLOSED trades by their entry month and produces summary
+// metrics, ranked strengths/weaknesses, chart series, action items, and an
+// A–F grade.
 //
 // pnl / rMultiple are NOT stored on trades — always pass calcMetrics(trade) in.
 // Insights are returned as i18n template ids (`tid`) + params so the UI can
@@ -30,9 +30,9 @@ function parseDate(s) {
   return isNaN(dt.getTime()) ? null : dt;
 }
 
-// The date a trade's P&L is realized in (exit first, entry fallback).
+// The date a trade's P&L is attributed to.
 function realizedDate(t) {
-  return parseDate(t.exitDate) || parseDate(t.date);
+  return parseDate(t.date);
 }
 
 function inMonth(t, month, year) {
