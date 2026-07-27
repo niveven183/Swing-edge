@@ -73,12 +73,24 @@ function q(sql, label) {
     return null;
   }
   try {
-    const out = execFileSync("psql", [SUPABASE_DB_URL, "-v", "ON_ERROR_STOP=1", "-tAF", "|", "-c", `${RO} ${sql}`], {
-      encoding: "utf8",
-      timeout: 30000,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    return out.trim() === "" ? [] : out.trim().split("\n").map((l) => l.split("|"));
+    // -q is load-bearing, not cosmetic. Without it psql prints the command tag
+    // "SET" for the read-only preamble on stdout, so rows[0] becomes ["SET"] and
+    // every metric silently reads one row off. Caught in dispatch run #1
+    // (trades=NaN, warnings=0). fleet-daily.yml uses -tAq for the same reason.
+    const out = execFileSync(
+      "psql",
+      [SUPABASE_DB_URL, "-v", "ON_ERROR_STOP=1", "-tAqF", "|", "-c", `${RO} ${sql}`],
+      { encoding: "utf8", timeout: 30000, stdio: ["ignore", "pipe", "pipe"] },
+    );
+    if (out.trim() === "") return [];
+    const rows = out.trim().split("\n").map((l) => l.split("|"));
+    // Belt and braces: if a bare command tag ever reappears, say so instead of
+    // letting it masquerade as data.
+    if (rows.length && rows[0].length === 1 && /^(SET|BEGIN|COMMIT)$/.test(rows[0][0])) {
+      warn(`${label}: psql emitted a command tag ("${rows[0][0]}") as a data row — dropped`);
+      rows.shift();
+    }
+    return rows;
   } catch (e) {
     // Surface psql's first line only — never the connection string.
     const first = String(e.stderr || e.message || "").split("\n").find(Boolean) || "unknown psql error";
@@ -161,7 +173,16 @@ function determinismProbe() {
   const runs = [];
   for (let i = 1; i <= 3; i++) {
     const r = one(q(`SELECT count(*), count(DISTINCT user_id) FROM public.trades;`, `determinism run${i}`));
-    runs.push(r ? { n: num(r[0]), users: num(r[1]) } : null);
+    if (!r) { runs.push(null); continue; }
+    const n = num(r[0]), users = num(r[1]);
+    // A count that does not parse as a finite number means the row we read was
+    // not the row we asked for. That must be an alarm, not a NaN printed calmly.
+    if (!Number.isFinite(n) || !Number.isFinite(users)) {
+      warn(`determinism run${i}: count did not parse as a number — psql output shape is wrong`);
+      runs.push(null);
+      continue;
+    }
+    runs.push({ n, users });
   }
   const ok = runs.every((r) => r && runs[0] && r.n === runs[0].n && r.users === runs[0].users);
   return { runs, ok };
