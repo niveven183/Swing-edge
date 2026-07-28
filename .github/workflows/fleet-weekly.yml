@@ -132,6 +132,30 @@ jobs:
             [ -n "$tw" ] && reg trades "עסקאות/שבוע" "$tw"
           fi
 
+          # ---- docs/TRUTH.md staleness (copy source-of-truth for the creatives repo) ----
+          # Self-contained on purpose: there is no checkout in this job, and github.token
+          # cannot read the private creatives repo. So we compare the last commit that
+          # touched TRUTH.md against the hash this job recorded last week, in the same
+          # .fleet-state cache. Not registered in metrics.tsv — a hash is not a metric.
+          THASH_FILE=.fleet-state/truth-hash.txt
+          thash="$(gh api "repos/$GITHUB_REPOSITORY/commits?path=docs/TRUTH.md&per_page=1" --jq '.[0].sha // empty' 2>/dev/null || echo '')"
+          if [ -z "$thash" ]; then
+            add "• TRUTH: 🟠 לא ניתן לקרוא את ה-hash של docs/TRUTH.md"
+            color=$AMBER
+          else
+            tshort="$(printf '%s' "$thash" | cut -c1-7)"
+            tprev="$(cat "$THASH_FILE" 2>/dev/null || echo '')"
+            if [ -z "$tprev" ]; then
+              add "• TRUTH: \`$tshort\` — בסיס ראשון, אין השוואה"
+            elif [ "$tprev" = "$thash" ]; then
+              add "• TRUTH: \`$tshort\` — ללא שינוי מאז הדוח הקודם"
+            else
+              add "• ⚠️ TRUTH השתנה מאז הדוח הקודם — בדוק התיישנות קופי (\`$(printf '%s' "$tprev" | cut -c1-7)\` → \`$tshort\`)"
+              color=$AMBER
+            fi
+            printf '%s' "$thash" > "$THASH_FILE"
+          fi
+
           # ---- Rule [8.3]: the one metric that moved the most vs last week ----
           best_line="📌 שינוי השבוע [8.3]: בסיס ראשון, אין השוואה"
           best_rel=-1
