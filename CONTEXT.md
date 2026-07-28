@@ -10,8 +10,11 @@ SwingEdge הוא יומן מסחר מקצועי לסוחרי סווינג.
 - **Supabase project:** zicstkfkwhzvmdkzpidm
 
 ## Current Build
-- **JS bundle:** `index-BiZNq5OR.js` · **CSS bundle:** `index-DC62v2Bu.css`
-- ⚠️ These hashes drift on every build and the Vercel-deployed hash will always differ from a local build (Vercel rebuilds independently) — see "Verify live deploys" below.
+- ⚠️ **Bundle hashes are deliberately not pinned here.** They drift on every build, and the
+  Vercel-deployed hash will always differ from a local one (Vercel rebuilds independently), so a
+  hash written into this file is stale the moment it is committed and misleads the next reader.
+  What matters is that the bundle **rolled**, not that hashes match — see "Verify live deploys".
+  For the current live hash use the Vercel connector or `fleet-weekly.yml`'s vitals step.
 
 ## Architecture
 - `SwingEdge_App.jsx` — root component, ~5200 lines (single-file by design, post-launch split planned).
@@ -46,7 +49,9 @@ Both the **Log New Trade** form and the standalone **Trade Analyzer** run on one
 - **B1 — Multi-Account: NOT built.** Diagnosed/audited only. Deferred decisions (recorded here so they aren't re-litigated): per-account capital, real+paper account types only, `ON DELETE RESTRICT`, mentor sees all of a mentee's accounts.
 
 ## Tabs Structure (NAV_KEYS)
-`dashboard | journal | tools | analytics | intel | feedback`
+`dashboard | journal | notebook | weeklyReview | tools | analytics | intel | feedback` —
+**8 tabs**, defined at `SwingEdge_App.jsx:644`. Note `id` ≠ `key`: the i18n keys for the last four
+are `notebookTab`, `weeklyReviewTab`, `marketIntel`, `feedback`.
 
 ⚠️ The `tools` tab has a sub-nav: `'analyzer' | 'calc' | 'report'`.
 If the URL points to `/analyzer` or `/position`, a `useEffect` routes the user into the `tools` tab automatically.
@@ -55,12 +60,23 @@ The `report` sub-tab renders the Trading DNA Monthly Report.
 ## Data Schema
 localStorage key: `swingEdgeTrades`
 
+⚠️ **The client shape below is not the DB shape.** The authoritative column list is
+`TRADE_COLUMNS` in **`src/supabaseClient.js:29`** — 25 columns, verified against
+`information_schema` on 2026-07-27. There is **no `create table public.trades` anywhere in the
+repo** (14 migrations, none declaring columns), so `TRADE_COLUMNS` is the only written source of
+truth for what the table actually holds. A documentation-only migration that declares the schema
+is an open gap.
+
 ```ts
 Trade = {
   id: string,
   ticker: string,
   date: "YYYY-MM-DD",        // entry date
-  exitDate: "YYYY-MM-DD",    // exit date (closed trades only)
+  // ⚠️ exitDate is NOT a DB column and never was. It survives only as an *import*
+  // field (src/import/synonyms.js) and is folded into `closedAt` by deriveCloseState.
+  // Never persist it; never read it as a close date. See "Data chain" below.
+  closedAt: string | null,   // ISO — the real close timestamp column
+  createdAt: string,         // ISO — ⚠️ for imported trades this is the CSV date, not write time
   side: "LONG" | "SHORT",    // ⚠️ NOT t.direction
   status: "OPEN" | "CLOSED",
   setup: string,
@@ -84,6 +100,181 @@ Compute via: `const { pnl, rMultiple } = calcTradeMetrics(trade)`
 ⚠️ **followedPlan normalization:** Supabase stores this as text and returns `"true"` / `"false"` strings.
 The load path in App (line ~112) normalizes to boolean: `"true"→true`, `"false"→false`, `"Partially"` passes through.
 Always compare with `=== true` / `=== false`; never rely on raw string equality elsewhere.
+
+## Data chain — the boundary layer (FIN Group 1, 2026-07-27)
+
+Every trade crossing the Supabase boundary goes through **one pair of sister functions** in
+`src/supabaseClient.js`. They exist because the asymmetry between them *was* the bug: `is_demo`
+was written but never read back, so demo trades silently became real after a reload.
+
+- **`tradeForSupabase(trade)` (`:67`)** — write side. Drops anything not in `TRADE_COLUMNS`.
+  A dropped key that is **not** in `LOCAL_ONLY` (`:60` — `tradeImage`, `tradeImagePreview`,
+  `_prediction`, `openDate`) triggers `console.error` naming the keys and the trade id. This is
+  the mechanism that previously swallowed `exitDate` in silence.
+- **`tradeFromSupabase(row)` (`:92`)** — read side. Undoes the single rename the write side
+  performs. `is_demo` that is null/absent stays **absent**, so the client never sees a fabricated
+  `isDemo: false`.
+- **`isDemo: undefined` omits the column** rather than writing `false` — a save cannot clobber a
+  flag it does not know about.
+- **`src/lib/cleanTrades.js`** — `cleanTrades` / `purgeInvalidTrades`, extracted out of
+  `SwingEdge_App.jsx` as pure logic. `cleanTrades` is what strips `SIM-` / `Hive-` prefixes, which
+  means the old demo-detection heuristic erased its own input and could only ever work once.
+- **`src/lib/tradeCloseState.js`** — `deriveCloseState({ exit, exitDay, prev })`. `status` is
+  **derived from the presence of `exit`**, so `CLOSED` without an `exit` is not merely undesirable,
+  it is inexpressible. Clearing `exit` reopens the trade and clears `closedAt`.
+- **`npm run test:datachain`** (`scripts/dataChain-test.mjs`, 22 assertions) guards all of the
+  above and runs inside `npm run verify`.
+
+## Fleet & monitoring layer (17 workflow files)
+
+`.github/workflows/` — 17 files, 12 of them on a `schedule`. Two watchers sit above the rest and
+catch **different** failure modes; neither replaces the other:
+
+- **`failure-alert.yml`** — `workflow_run` on 11 named workflows, fires on `conclusion == 'failure'`.
+  Catches **"ran and failed", immediately.** Deliberately excludes Smoke Tests / Build /
+  Supabase Backup (covered by `triage.yml`'s own `workflow_run` list) and Restore Drill
+  (self-alarms on `always() && status != 'pass'`) to avoid duplicate mail.
+- **`watchdog.yml`** (08:00 UTC) — asks "when did each scheduled workflow last *succeed*?" against
+  a fixed `MAXAGE` table (hours), and **always** posts to Discord, green included. Catches
+  **"never ran at all"** — cron disabled, secret expired, workflow file broken — which
+  `failure-alert` structurally cannot see, because no `failure` event is ever emitted.
+  It also greps the checked-out tree for `schedule:` triggers missing from `MAXAGE` and for
+  `MAXAGE` keys with no file, so the table cannot drift silently. **`watchdog.yml` excludes
+  itself from `MAXAGE` by design (`:100`) — its own silent death is the one uncovered case.**
+
+| Workflow | Cron (UTC) | Role |
+|---|---|---|
+| `sentinel.yml` | `20,50 * * * *` | Public-domain + authenticated QA against **production**, real browser (Playwright). De-dupes repeat incidents via the Actions cache; its own silence is treated as a fault (heartbeat 4×/day) |
+| `daily-digest.yml` | `0 4 * * *` | Daily digest; unresolved user feedback also goes to Discord |
+| `smoke.yml` | `0 4 * * *` | Playwright smoke; also runs on every push to `main` |
+| `fleet-daily.yml` | `0 6 * * *` | Fleet vitals + Growth Pulse (3 🟠 thresholds: 0 trades/48h, 0 signups/72h, activation < 25%) |
+| `user-analytics.yml` | `30 6 * * *` | Daily user-behaviour report — see below |
+| `fleet-weekly.yml` | `0 7 * * 0` | Weekly vitals + `TRUTH.md` staleness check |
+| `watchdog.yml` | `0 8 * * *` | Watches the watchers |
+| `arch-auditor.yml` | `0 5 * * 0` | Architecture audit |
+| `analyst.yml` | `0 6 * * 0` | Analyst report |
+| `backup.yml` | `0 3 * * 0` | Encrypted Supabase backup |
+| `data-guardian.yml` | `0 5 */3 * *` | Data invariants |
+| `restore-drill.yml` | `0 4 1 * *` | Monthly restore drill (was quarterly) |
+
+Non-scheduled: `build.yml`, `health.yml`, `triage.yml`, `email-campaign.yml`, `failure-alert.yml`.
+
+### Discord reporting pattern (the standard for new workflows)
+`env:` **at step level** + a runtime gate + `continue-on-error: true` + `jq` for the payload:
+
+```yaml
+- name: Report to Discord
+  continue-on-error: true          # a reporting failure must never fail the job
+  env:
+    DISCORD_WEBHOOK: ${{ secrets.SENTINEL_DISCORD_WEBHOOK }}
+    X_SUMMARY: ${{ steps.foo.outputs.summary }}
+  run: |
+    if [ -z "${DISCORD_WEBHOOK:-}" ]; then
+      echo "::warning::SENTINEL_DISCORD_WEBHOOK not set — skipping Discord."; exit 0
+    fi
+    payload="$(jq -n --arg d "$X_SUMMARY" --argjson c 3066993 '{embeds:[{description:$d,color:$c}]}')"
+    curl -sS -o /dev/null -w 'discord POST -> HTTP %{http_code}\n' \
+      -X POST -H "Content-Type: application/json" -d "$payload" "$DISCORD_WEBHOOK"
+```
+
+Rules this encodes:
+- **`${{ }}` belongs in `env:`, never inside `run:`.** Interpolating an expression directly into a
+  shell body is a command-injection vector — the value is pasted as *script text*, not as data.
+- A **runtime** gate (`[ -z … ]` + `::warning::`), not `if: env.X != ''`, so a missing secret is
+  announced rather than silently skipped.
+- `jq -n` builds the JSON; never hand-concatenate a payload containing user or report text.
+- ⚠️ **Two files still deviate: `triage.yml` and `restore-drill.yml`** carry `${{ }}` inside `run:`
+  blocks. Known, not yet migrated — do not copy that shape into anything new.
+
+### 🔒 Public-repo constraint (load-bearing)
+The repo is **public**, so run logs, job summaries, artifacts **and the Actions cache** are all
+world-readable. Consequences that are already baked into the fleet:
+- Per-user detail goes out by **email only**; Discord gets aggregates; stdout carries aggregate
+  integers.
+- **GitHub Actions logs an action's `with:` inputs.** Content handed to an action inline is
+  therefore published. Sensitive bodies are passed **by file path**
+  (`body: file://analytics-report.txt`), never inline. See `docs/INCIDENTS.md` #8.
+- `::add-mask::` any value that must not appear in a log, at the moment it is created.
+
+### `user-analytics.yml` + `scripts/user-analytics.mjs`
+Daily "what do users actually do after signup" report, built entirely on data Supabase already
+stores: **zero instrumentation, zero writes, zero schema change.** Four privacy red lines are
+enforced by guards that **throw rather than degrade**: journal content (`notes`, `lessonLearned`,
+`journal_notes.*`, `mentor_notes.*`) is never read, only counted and measured for length; user ids
+are truncated to 8 chars; behaviour and structure only; **k-anonymity** — any segment under 3 users
+is reported as `"1-2"`. Day-over-day state (aggregate integers only) lives in the Actions cache,
+plus a **volume-swing alarm**: any aggregate moving more than ±20% against yesterday gets its own
+🟠 line, and a >20% *drop* turns the report red. That guard exists because a user deleted 173 rows
+on 2026-07-27 and — with no `deleted_at` and no `updatedAt` on `trades` — **no time-window query
+could see it**; it went unnoticed for ~3 hours.
+
+## Analytics & privacy (GA4 + Consent Mode v2)
+
+- **GA4 `G-VC8PKL4NL1`**, configured in `index.html` in a fixed 5-step order: dataLayer + shim →
+  `consent default` **all denied** → replay a stored grant → `config` → async `gtag.js`. The order
+  is load-bearing: `gtag.js` is async and appears *after* the block, so it cannot run first.
+- **Deny by default.** The consent default is pushed as `dataLayer[0]` unconditionally.
+  `gcs=G100` → `G101` on the wire is the proof that a grant took effect.
+- **`src/lib/consent.js`** is the single source of truth for the `swingEdgeConsent` record
+  (`{v, analytics, ts}`): `readConsent` / `grantAnalytics` / `denyAnalytics` / `revokeAnalytics`
+  (which also deletes `_ga*` cookies) / `subscribeConsent`.
+- `src/components/ConsentBanner.jsx` — non-modal Hebrew banner; `ConsentControl` on `/privacy`
+  gives a working opt-out.
+- ⚠️ **`anonymize_ip` is a no-op in GA4** (it is a Universal Analytics parameter; it is passed in
+  `config` but carries no compliance weight). Compliance comes from **Consent Mode**, not from it.
+- **`@vercel/analytics` is deliberately not gated** (`src/main.jsx:12`) — it is cookieless and
+  stores no identifier on the device. The reasoning is spelled out to the user on `/privacy`.
+- **Data-pollution guard:** the Playwright specs abort requests to googletagmanager and
+  `sentinel-auth` clicks decline — otherwise the monitoring fleet would manufacture ~100 synthetic
+  pageviews/day against a real user base of ~29.
+
+## Financial-integrity audit (2026-07-27) — reference, not duplicated here
+
+Full document: **`docs/audits/AUDIT-2026-07-27-financial-integrity.md`** — 46 findings
+(🔴 27 · 🟠 14 · 🟡 4 · ⚪ 1). Read it there; do not restate its findings elsewhere.
+
+The one structural fact worth carrying in context, because it explains most of the symptoms:
+**the app has two parallel statistical universes that disagree on three axes at once.**
+
+| | `src/hooks/useTradingStats.js` | `src/intelligence/utils/statisticalModels.js` |
+|---|---|---|
+| winRate scale | 0–100 | 0–1 |
+| drawdown | percent | fraction |
+| break-even | neither win nor loss | **counted as a loss** |
+| "closed" | `status === "CLOSED"` | `status === "CLOSED" && exit != null` |
+
+On top of both, `SwingEdge_App.jsx` recomputes equity curve, position size, W/L counts and total
+P&L **inline** — a third path answerable to neither.
+
+Repair order is fixed: **Group 1 (data chain) → 2 (single source of truth) → 3 (the R contract) →
+4 (dates)**. **Group 1 is done** (see "Data chain" above). Note that the audit's own stop-rate
+numbers were re-measured on 2026-07-28 after a 173-row deletion — the corrected figures are at the
+top of §6 of the audit.
+
+## Journal import — known state
+
+Pipeline: `parseFile` → `detectColumns` → `normalizeRow` → `buildImport` (`src/import/`).
+`REQUIRED_FIELDS = ["ticker", "entry", "shares"]` (`synonyms.js:24`) — a row missing any of the
+three is rejected.
+
+🔴 **The dictionary is missing `שער`** — the standard Hebrew word for *price* at Israeli brokers.
+`FIELD_SYNONYMS.entry` (`synonyms.js:9`) lists `מחיר כניסה`, `כניסה`, `מחיר קנייה`, `מחיר קניה`,
+and nothing else in Hebrew. Verified by reading the file. Consequence: an IBI or Altshuler export
+maps **no** `entry` column, `entry` is required, and **every row is rejected** — the user sees an
+import that produces zero valid trades with no obvious reason.
+
+Broker-specific facts (observed by Niv in real exports — **not** verifiable from this repo):
+- **IBI** — headers on **row 11**, signed quantity, and **6 of 8 action types are not trades** at
+  all (dividends, fees, transfers…). Price column: *שער עלות ממוצע*.
+- **Altshuler** — headers on **row 1**, unsigned quantity, `side` must be read from a text column,
+  symbol column present. Price column: *שער ביצוע*.
+
+Two conclusions that should shape any import work:
+1. **There is no "Israeli format" — there is a profile per broker.** The two differ on header row,
+   sign convention, and how direction is expressed.
+2. **The current model assumes "one row = one complete trade".** Brokers export an **action
+   ledger**: a trade is opened by one row and closed by another, possibly months apart, with
+   non-trade rows interleaved. Mapping columns better will not bridge that gap on its own.
 
 ## Key Components
 
@@ -204,12 +395,34 @@ Always compare with `=== true` / `=== false`; never rely on raw string equality 
 3. ❌ NEVER use `t.reason` / `t.lesson` — ✅ `t.notes` / `t.lessonLearned`
 4. ❌ NEVER add a new `useState` without checking if existing state can be reused
 5. ❌ NEVER hardcode user-facing strings — ✅ `lang === 'he' ? '...' : '...'`
-6. ❌ NEVER add new tab to NAV_KEYS without consulting CONTEXT.md — current: `dashboard, journal, tools, analytics, intel, feedback`
+6. ❌ NEVER add new tab to NAV_KEYS without consulting CONTEXT.md — current 8: `dashboard, journal, notebook, weeklyReview, tools, analytics, intel, feedback`
 7. ❌ NEVER break TradingView widget config in Market Intel
 8. ❌ NEVER force-push to main. אסור מוחלט — ראה `CLAUDE.md` §5. נאכף ב-`.githooks/pre-push`.
 9. ❌ NEVER read-modify-write localStorage in render — ✅ `useState` + `useEffect`
 10. ❌ NEVER fetch from APIs without try/catch + fallback
 11. ❌ NEVER call `edgeScore`/`rankSetupEdges` inline — ✅ import from `src/intelligence/utils/statisticalModels.js`
+
+### Procedures that changed (2026-07) — these override the older text above
+- **Plan Mode is no longer the approval channel.** `CLAUDE.md` §9: approval to leave Plan Mode is
+  permission to **write files only**. The first and only action after leaving it is writing the
+  full plan to `docs/plans/PLAN-YYYY-MM-DD-<slug>.md`, its own commit
+  (`docs(plan): … — awaiting approval`), push, **then stop**. Claude re-reads the pushed file from
+  origin — not from memory — before execution begins. Plans travel through the repo, not the chat.
+- **Git hooks are mandatory and are not inherited by `clone`.** `.githooks/pre-commit` (blocks
+  `HANDOFF*.md`) and `.githooks/pre-push` (blocks non-fast-forward). `core.hooksPath` is **local
+  config**, so a fresh clone has no protection until:
+  `git config core.hooksPath .githooks && chmod +x .githooks/*`
+- **`npm run verify` is now 5 steps:** `test:coach` → `test:import` → `test:settings` →
+  `test:datachain` → `build`. Paste the full output; "passed" is not proof.
+- **`git add` names files explicitly.** Never `git add .` / `-A` — it is how `.env`, report files
+  and stray artifacts get committed.
+- **Measurement: `count(*)`, never `reltuples`.** The `rows` value from Supabase MCP `list_tables`
+  is `pg_class.reltuples` — a planner estimate refreshed only by autovacuum. Any number that
+  reaches a report or a document must come from an exact count, and must carry the date it was
+  measured, or it goes stale in silence.
+- **A difference between two measurements: check what changed in the data before suspecting the
+  tool.** On 2026-07-27 a 285→114 gap was attributed to measurement instability; it was a real
+  deletion of 173 rows, and both read paths had been correct the whole time.
 
 ## Mandatory Prompt Structure (every Claude Code prompt)
 - 🎯 Model: Sonnet (CSS/fix) or Opus (architecture/design/new feature)
@@ -222,19 +435,27 @@ Always compare with `=== true` / `=== false`; never rely on raw string equality 
 
 ## Mandatory Git Block (end of every prompt)
 ```bash
-npm run build
-git add .
+npm run verify                      # 5 steps — paste the full output, not a summary
+git add path/to/file …              # explicit paths only — never `git add .` or `-A`
 git commit -m "[descriptive message]"
-git pull origin main --rebase
 git push origin main
 git log --oneline -1
-# echo "סיימתי ✅"
+# "סיימתי" is valid only if the push output contains `..HEAD -> main`
 ```
 
 ## Auto-recovery Rules
-- Conflict → `git checkout --theirs . && git add . && git commit`
-- Build fail → `npm install && npm run build`
-- Push rejected → `git pull origin main --rebase && git push origin main`
+⚠️ **This section was rewritten 2026-07-28. The previous version told the agent to run
+`git checkout --theirs .` on conflict — that discards work with no confirmation and directly
+contradicts `CLAUDE.md` §4. It must not be reintroduced.**
+
+- **Unclean tree or a failed `pull` → STOP and report.** No auto-`stash`, no `checkout --`, no
+  "I'll sort it out". An unfamiliar file may be Niv's work in progress.
+- **Merge conflict → STOP and report.** Never resolve by picking a side wholesale.
+- **Push rejected → STOP and report.** Never force-push: no `--force`, no `--force-with-lease`,
+  not "with approval" (`CLAUDE.md` §5, enforced by `.githooks/pre-push`).
+- Build fail → `npm install && npm run build`, then read the actual error before changing anything.
+- Bypassing a hook is `--no-verify` only, emergencies only, **and it is logged in
+  `docs/INCIDENTS.md`**.
 
 ## Pending Tasks (Roadmap)
 
