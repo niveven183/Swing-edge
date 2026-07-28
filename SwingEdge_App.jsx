@@ -45,7 +45,7 @@ import { useToast, useConfirm } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured, tradeForSupabase, tradeFromSupabase } from "./src/supabaseClient.js";
 import { cleanTrades, purgeInvalidTrades } from "./src/lib/cleanTrades.js";
 import { loadSettings, saveSettings, flushSettings, migrateFromLocalStorage } from "./src/lib/userSettings.js";
-import { calcTradeMetrics, fmt$, fmtR, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays } from "./src/utils.js";
+import { calcTradeMetrics, fmt$, fmtR, fmtNum, numOrNull, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays } from "./src/utils.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell,
@@ -238,7 +238,7 @@ const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity) => 
   const monthPnL = monthStats.totalPnL;
   const winRate = formatPct(stats.winRate);
   const monthWinRate = formatPct(monthStats.winRate);
-  const avgR = stats.avgR.toFixed(2);
+  const avgR = stats.avgR;
   // Unified full Account Equity (closed + live open P&L), passed from the
   // component so the report matches the dashboard exactly.
   const curEquity = accountEquity;
@@ -270,7 +270,9 @@ const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity) => 
   const tradeRows = [...monthClosed].reverse().map(t => {
     const m = calcTradeMetrics(t);
     const pnl = m.pnl != null ? m.pnl : 0;
-    const r = m.rMultiple != null ? m.rMultiple : 0;
+    // `: 0` printed "+0.00R" for a trade that had no stop — an exported,
+    // archived document asserting a measurement that was never taken.
+    const r = m.rMultiple;
     return `
       <tr>
         <td>${t.date}</td>
@@ -280,7 +282,7 @@ const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity) => 
         <td>$${t.entry}</td>
         <td>${t.exit != null ? "$" + t.exit : "-"}</td>
         <td style="color:${pnlColor(pnl)};font-weight:600">${fmtDollar(pnl)}</td>
-        <td style="color:${pnlColor(r)};font-weight:600">${r >= 0 ? "+" : ""}${r.toFixed(2)}R</td>
+        <td style="color:${r == null ? "#94a3b8" : pnlColor(r)};font-weight:600">${fmtR(r)}</td>
         <td>${t.followedPlan === "Partially" ? "◐" : t.followedPlan != null ? (t.followedPlan ? "✓" : "✗") : "-"}</td>
       </tr>`;
   }).join("");
@@ -306,6 +308,7 @@ const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity) => 
   .kpi { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px 16px; }
   .kpi-label { font-size:10px; color:#64748b; text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px; }
   .kpi-value { font-size:20px; font-weight:700; font-family:monospace; }
+  .kpi-sub { font-size:9px; color:#94a3b8; margin-top:3px; }
   table { width:100%; border-collapse:collapse; font-size:12px; }
   th { background:#f1f5f9; text-align:left; padding:7px 10px; font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:#475569; font-weight:600; }
   td { padding:7px 10px; border-bottom:1px solid #f1f5f9; }
@@ -355,7 +358,8 @@ const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity) => 
     </div>
     <div class="kpi">
       <div class="kpi-label">Avg R-Multiple</div>
-      <div class="kpi-value" style="color:${avgR >= 0 ? "#10b981" : "#ef4444"}">${avgR >= 0 ? "+" : ""}${avgR}R</div>
+      <div class="kpi-value" style="color:${avgR == null ? "#64748b" : pnlColor(avgR)}">${fmtR(avgR)}</div>
+      <div class="kpi-sub">${stats.rSampleSize}/${stats.totalTrades} with a stop</div>
     </div>
     <div class="kpi">
       <div class="kpi-label">Closed Trades</div>
@@ -433,6 +437,12 @@ const fmtTimeAgo = (dateStr) => {
   if (hours < 24) return `${hours}h ago`;
   return `${Math.floor(hours / 24)}d ago`;
 };
+
+// Sub-line under every avg-R figure. An average of R is only over the trades
+// that had a stop, so the card carries its own denominator rather than letting
+// the reader assume it covers every closed trade.
+const rSampleSub = (t, s) =>
+  t.avgRSample.replace("{n}", s.rSampleSize ?? 0).replace("{total}", s.totalTrades ?? 0);
 
 // ─── SMART LESSONS GENERATOR ─────────────────────────────────────────────────
 // "overnight_hold" → "Overnight Hold". Safe on already-clean labels ("Breakout").
@@ -1991,8 +2001,8 @@ export default function SwingEdge() {
       exitReason: closeForm.exitReason,
       followedPlan: closeForm.followedPlan,
       lessonLearned: closeForm.lessonLearned,
-      maxFavorable: parseFloat(closeForm.maxFavorable) || null,
-      maxAdverse: parseFloat(closeForm.maxAdverse) || null,
+      maxFavorable: numOrNull(closeForm.maxFavorable),
+      maxAdverse: numOrNull(closeForm.maxAdverse),
     };
     // Close the loop: grade the prediction we made at entry.
     try { SwingEdgeAI.reinforceFromTrade(closedTrade); } catch { /* learning is best-effort */ }
@@ -2945,7 +2955,7 @@ export default function SwingEdge() {
                     {/* Core stat cards from the mentee's own stats */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <StatCard label={t.winRate}      value={formatPct(menteeStats.winRate)} sub={`${menteeStats.wins}W / ${menteeStats.losses}L`} icon={Target}     accent="purple" />
-                      <StatCard label={t.avgRMultiple} value={fmtR(menteeStats.avgR)}         sub={t.perClosedTrade}                                icon={Activity}   accent="amber" />
+                      <StatCard label={t.avgRMultiple} value={fmtR(menteeStats.avgR)}         sub={rSampleSub(t, menteeStats)}                      icon={Activity}   accent="amber" />
                       <StatCard label={t.netPnlClosed} value={fmt$(Math.round(menteeStats.totalPnL * 100) / 100)} sub={`${menteeStats.total} ${t.closedTrades}`} icon={TrendingUp} accent={menteeStats.totalPnL >= 0 ? "green" : "red"} />
                       <StatCard label={t.streakCounter} value={menteeStats.currentStreak}      sub={`${t.bestStreak}: ${menteeStats.bestStreak}`}    icon={Zap}        accent={menteeStats.currentStreak >= 3 ? "green" : "amber"} />
                     </div>
@@ -3079,7 +3089,7 @@ export default function SwingEdge() {
                   : `Equity = your capital base ($${capital.toLocaleString()}) plus cumulative P&L from closed & open trades. Per-trade risk is always sized from your fixed capital base — not current equity.`} />
               <StatCard label={t.netPnlClosed} value={fmt$(Math.round(totalPnL * 100) / 100)} sub={`${closedTrades.length} ${t.closedTrades}`} trend={stats.returnPct} trendText={formatReturnPct(stats.returnPct)} icon={TrendingUp} accent={totalPnL >= 0 ? "green" : "red"} />
               <StatCard label={<span className="flex items-center gap-1">{t.winRate}<TermTooltip term="winRate" lang={lang} /></span>} value={formatPct(winRate)} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length}W / ${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)<0).length}L`} icon={Target} accent="purple" />
-              <StatCard label={<span className="flex items-center gap-1">{t.avgRMultiple}<TermTooltip term="avgR" lang={lang} /></span>} value={fmtR(avgR)} sub={t.perClosedTrade} icon={Activity} accent="amber" />
+              <StatCard label={<span className="flex items-center gap-1">{t.avgRMultiple}<TermTooltip term="avgR" lang={lang} /></span>} value={fmtR(avgR)} sub={rSampleSub(t, stats)} icon={Activity} accent="amber" />
               <StatCard label={t.dailyPnl} value={fmt$(Math.round(dailyPnL))} sub={t.todayTrades} icon={DollarSign} accent={dailyPnL >= 0 ? "green" : "red"} />
               <StatCard label={t.streakCounter} value={<span className="flex items-center gap-1">{currentStreak > 0 && <Flame size={18} className="text-orange-400" />}{currentStreak}</span>} sub={`${t.bestStreak}: ${bestStreak}`} icon={Zap} accent={currentStreak >= 3 ? "green" : "amber"} />
             </div>
@@ -3320,14 +3330,20 @@ export default function SwingEdge() {
               const MAX_RISK_PCT = maxRiskPct; // % of capital — derived from per-trade risk state
               const maxRiskDollar = capital * (MAX_RISK_PCT / 100);
 
+              // An open trade with no stop has UNKNOWN risk, not zero risk.
+              // `Math.abs(entry - null)` is `entry`, so it used to charge the
+              // meter the full position value — the single largest source of a
+              // wrong "you are over your risk limit" reading.
               const openRisks = openTrades.map(t => {
-                const riskDollar = Math.abs(t.entry - t.stop) * t.shares;
-                const riskPct = capital > 0 ? (riskDollar / capital) * 100 : 0;
-                const rrRatio = t.target ? priceBasedRR(t.entry, t.stop, t.target) : null;
-                return { ...t, riskDollar, riskPct, rrRatio };
+                const hasStop = t.stop != null && t.shares > 0;
+                const riskDollar = hasStop ? Math.abs(t.entry - t.stop) * t.shares : null;
+                const riskPct = hasStop && capital > 0 ? (riskDollar / capital) * 100 : null;
+                const rrRatio = hasStop && t.target ? priceBasedRR(t.entry, t.stop, t.target) : null;
+                return { ...t, hasStop, riskDollar, riskPct, rrRatio };
               });
 
-              const totalRiskDollar = openRisks.reduce((s, t) => s + t.riskDollar, 0);
+              const unmeasuredRiskCount = openRisks.filter(t => !t.hasStop).length;
+              const totalRiskDollar = openRisks.reduce((s, t) => s + (t.riskDollar ?? 0), 0);
               const totalRiskPct = capital > 0 ? (totalRiskDollar / capital) * 100 : 0;
               const usedPct = Math.min((totalRiskPct / MAX_RISK_PCT) * 100, 100);
               const isOverLimit = totalRiskPct > MAX_RISK_PCT;
@@ -3367,7 +3383,14 @@ export default function SwingEdge() {
                       <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 block mb-1">{t.totalOpenRisk}</span>
                       <span className={`text-2xl font-bold font-mono ${meterColor.text}`}>{totalRiskPct.toFixed(2)}%</span>
                       <span className="text-xs text-slate-500 block mt-0.5 font-mono">${totalRiskDollar.toFixed(2)}</span>
-                      <span className="text-[10px] text-slate-600 mt-1 block">{openTrades.length} {t.openTradesCount}</span>
+                      <span className="text-[10px] text-slate-600 mt-1 block">
+                        {openTrades.length - unmeasuredRiskCount}/{openTrades.length} {t.openTradesCount}
+                      </span>
+                      {unmeasuredRiskCount > 0 && (
+                        <span className="text-[10px] text-amber-400/90 mt-1 block">
+                          {t.riskUnmeasured.replace("{n}", unmeasuredRiskCount)}
+                        </span>
+                      )}
                     </div>
 
                     {/* Max allowed risk */}
@@ -3425,7 +3448,9 @@ export default function SwingEdge() {
                           </thead>
                           <tbody>
                             {openRisks.map(t => {
-                              const rowColor = t.riskPct > MAX_RISK_PCT
+                              const rowColor = !t.hasStop
+                                ? "text-slate-500"
+                                : t.riskPct > MAX_RISK_PCT
                                 ? "text-[var(--v3-loss)]"
                                 : t.riskPct > MAX_RISK_PCT * 0.5
                                 ? "text-amber-400"
@@ -3435,7 +3460,7 @@ export default function SwingEdge() {
                                 : t.riskPct > MAX_RISK_PCT * 0.5
                                 ? "bg-amber-400"
                                 : "bg-[var(--v3-accent)]";
-                              const barWidth = Math.min((t.riskPct / MAX_RISK_PCT) * 100, 100);
+                              const barWidth = t.hasStop ? Math.min((t.riskPct / MAX_RISK_PCT) * 100, 100) : 0;
                               return (
                                 <tr key={t.id} className="border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors">
                                   <td className="py-2 pe-4 font-bold text-white font-mono">{t.ticker}</td>
@@ -3445,10 +3470,10 @@ export default function SwingEdge() {
                                     </span>
                                   </td>
                                   <td className="py-2 pe-4 font-mono text-slate-300">${t.entry}</td>
-                                  <td className="py-2 pe-4 font-mono text-[var(--v3-loss)]">${t.stop}</td>
+                                  <td className="py-2 pe-4 font-mono text-[var(--v3-loss)]">{t.hasStop ? `$${t.stop}` : "—"}</td>
                                   <td className="py-2 pe-4 font-mono text-slate-400">{t.shares}</td>
-                                  <td className={`py-2 pe-4 font-bold font-mono ${rowColor}`}>${t.riskDollar.toFixed(2)}</td>
-                                  <td className={`py-2 pe-4 font-bold font-mono ${rowColor}`}>{t.riskPct.toFixed(2)}%</td>
+                                  <td className={`py-2 pe-4 font-bold font-mono ${rowColor}`}>{t.hasStop ? `$${t.riskDollar.toFixed(2)}` : "—"}</td>
+                                  <td className={`py-2 pe-4 font-bold font-mono ${rowColor}`}>{t.hasStop ? `${t.riskPct.toFixed(2)}%` : "—"}</td>
                                   <td className="py-2 pe-4 font-mono text-slate-400">
                                     {t.rrRatio !== null ? `${t.rrRatio.toFixed(2)}:1` : "—"}
                                   </td>
@@ -4554,7 +4579,7 @@ export default function SwingEdge() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <StatCard label={t.totalTrades}  value={realTrades.length} sub={t.allTime}      icon={Layers}    accent="cyan"   />
               <StatCard label={<span className="flex items-center gap-1">{t.winRate}<TermTooltip term="winRate" lang={lang} /></span>} value={formatPct(winRate)} sub={`${stats.wins} ${t.wins}`} icon={CheckCircle} accent="green" />
-              <StatCard label={<span className="flex items-center gap-1">{t.avgRMultiple}<TermTooltip term="avgR" lang={lang} /></span>} value={fmtR(avgR)} sub={t.closedTrades} icon={Activity}  accent="purple" />
+              <StatCard label={<span className="flex items-center gap-1">{t.avgRMultiple}<TermTooltip term="avgR" lang={lang} /></span>} value={fmtR(avgR)} sub={rSampleSub(t, stats)} icon={Activity}  accent="purple" />
               <StatCard label={t.totalReturn}   value={formatReturnPct(stats.returnPct)} sub={`$${Math.round(Math.abs(totalPnL)).toLocaleString()} P&L`} icon={TrendingUp} accent={totalPnL>=0?"green":"red"} />
             </div>
 
@@ -4588,7 +4613,10 @@ export default function SwingEdge() {
                     <div key={s.name} className="bg-white/3 rounded-xl p-3 border border-[var(--border-subtle)] dark:border-white/[0.06]">
                       <div className="text-xs font-semibold text-[var(--v3-purple)] mb-2 truncate" title={labelFor("setup", s.name, lang)}>{labelFor("setup", s.name, lang)}</div>
                       <div className="font-bold text-white text-lg font-mono">{formatPct(s.winRate)}</div>
-                      <div className="text-[10px] text-slate-500">{nTrades(s.count, lang)} · {s.totalR.toFixed(1)}R {t.rTotal}</div>
+                      <div className="text-[10px] text-slate-500">
+                        {nTrades(s.count, lang)} · {s.totalR == null ? "—" : `${fmtNum(s.totalR, 1)}R`} {t.rTotal}
+                        {s.rSampleSize !== s.count && ` (${s.rSampleSize}/${s.count})`}
+                      </div>
                       <div className="mt-2 h-1.5 bg-white/5 rounded-full overflow-hidden">
                         <div className="h-full bg-gradient-to-r from-[var(--v3-purple)] to-[var(--v3-info)] rounded-full transition-all" style={{ width: `${s.winRate}%` }} />
                       </div>
@@ -4857,7 +4885,8 @@ export default function SwingEdge() {
                 wins: s.wins,
                 totalR: s.totalR,
                 winRate: s.count ? Math.round(s.winRate) : 0,
-                avgR: s.count ? s.avgR.toFixed(2) : "0",
+                avgR: s.avgR,
+                rSampleSize: s.rSampleSize,
                 totalPnL: Math.round(s.totalPnL),
               })).sort((a, b) => b.totalPnL - a.totalPnL);
 
@@ -5042,7 +5071,12 @@ export default function SwingEdge() {
                                   : "bg-rose-500/15 text-rose-400"
                                 }`}>{formatPct(s.winRate)}</span>
                               </td>
-                              <td className="py-2.5 px-1 sm:px-0 text-center font-mono text-[10px] sm:text-sm text-slate-300">{s.avgR}R</td>
+                              <td className="py-2.5 px-1 sm:px-0 text-center font-mono text-[10px] sm:text-sm text-slate-300">
+                                {fmtR(s.avgR)}
+                                {s.rSampleSize !== s.count && (
+                                  <span className="block text-[9px] text-slate-500">{s.rSampleSize}/{s.count}</span>
+                                )}
+                              </td>
                               <td className={`py-2.5 px-1 sm:px-0 text-end font-mono font-bold text-[10px] sm:text-sm ${s.totalPnL >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>
                                 {fmt$(s.totalPnL)}
                               </td>

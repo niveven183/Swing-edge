@@ -48,7 +48,10 @@ function enrich(t, calcMetrics) {
     raw: t,
     ticker: t.ticker || "—",
     pnl,
-    r: typeof m.rMultiple === "number" ? m.rMultiple : 0,
+    // number | null. `: 0` here fabricated a flat-0R outcome for every trade
+    // without a stop, which then sat in the numerator AND the denominator of
+    // every R average downstream.
+    r: Number.isFinite(m.rMultiple) ? m.rMultiple : null,
     win: pnl > 0,
     setup: (t.setup || "").trim() || "Unspecified",
     emotion: (t.emotionAtEntry || "").trim() || "Unspecified",
@@ -62,14 +65,15 @@ function enrich(t, calcMetrics) {
 // Core numeric summary for a set of enriched trades.
 function summarize(list) {
   const n = list.length;
-  if (n === 0) return { totalTrades: 0, wins: 0, losses: 0, winRate: 0, netPnL: 0, avgR: 0, rValues: [] };
+  if (n === 0) return { totalTrades: 0, wins: 0, losses: 0, winRate: 0, netPnL: 0, avgR: null, rSampleSize: 0, rValues: [] };
   let wins = 0, net = 0, rSum = 0;
+  // Only measurable R enters `rValues` — it feeds the consistency term of the
+  // grade, and a synthetic 0 there reads as a perfectly repeatable outcome.
   const rValues = [];
   for (const e of list) {
     if (e.win) wins++;
     net += e.pnl;
-    rSum += e.r;
-    rValues.push(e.r);
+    if (e.r != null) { rSum += e.r; rValues.push(e.r); }
   }
   return {
     totalTrades: n,
@@ -77,7 +81,8 @@ function summarize(list) {
     losses: n - wins,
     winRate: round((wins / n) * 100),
     netPnL: round(net, 2),
-    avgR: round(rSum / n, 2),
+    avgR: rValues.length ? round(rSum / rValues.length, 2) : null,
+    rSampleSize: rValues.length,
     rValues,
   };
 }
@@ -88,24 +93,38 @@ function groupBy(list, keyFn, minN = 1) {
   for (const e of list) {
     const k = keyFn(e);
     if (k == null || k === "Unspecified") continue;
-    if (!map.has(k)) map.set(k, { name: k, count: 0, wins: 0, net: 0, r: 0 });
+    if (!map.has(k)) map.set(k, { name: k, count: 0, wins: 0, net: 0, rSum: 0, rN: 0 });
     const g = map.get(k);
     g.count++;
     if (e.win) g.wins++;
     g.net += e.pnl;
-    g.r += e.rMultiple;
+    // Was `g.r += e.rMultiple` — `enrich` emits `r`, not `rMultiple`, so this
+    // added `undefined` and every group avgR collapsed to NaN, which `round`
+    // then laundered into a clean 0.00. Read the field that actually exists,
+    // and count only the trades that contributed to the sum.
+    if (e.r != null) { g.rSum += e.r; g.rN++; }
   }
   return [...map.values()]
     .filter(g => g.count >= minN)
-    .map(g => ({ name: g.name, count: g.count, wins: g.wins, winRate: round((g.wins / g.count) * 100), netPnL: round(g.net, 2), avgR: round(g.r / g.count, 2) }));
+    .map(g => ({
+      name: g.name,
+      count: g.count,
+      wins: g.wins,
+      winRate: round((g.wins / g.count) * 100),
+      netPnL: round(g.net, 2),
+      avgR: g.rN ? round(g.rSum / g.rN, 2) : null,
+      rSampleSize: g.rN,
+    }));
 }
 
 function bestWorst(groups) {
   if (!groups.length) return { best: null, worst: null };
   // Rank by the canonical edge metric (Wilson × expectancy) so small samples
   // (e.g. 2/2) don't outrank proven setups. Same definition as Dashboard/Lessons.
+  // `?? 0` is a declared neutral for the ranking score: a group with no
+  // measurable R ranks on its Wilson lower bound alone.
   const sorted = [...groups].sort((a, b) =>
-    edgeScore(b.wins, b.count, b.avgR) - edgeScore(a.wins, a.count, a.avgR) || b.count - a.count);
+    edgeScore(b.wins, b.count, b.avgR ?? 0) - edgeScore(a.wins, a.count, a.avgR ?? 0) || b.count - a.count);
   return { best: sorted[0], worst: sorted[sorted.length - 1] };
 }
 
@@ -119,7 +138,10 @@ function stdDev(values) {
 // ── GRADE ────────────────────────────────────────────────────────────────────
 function computeGrade(sum, disciplineRatio) {
   const winScore = clamp(sum.winRate, 0, 100);            // 40%
-  const rScore = clamp(50 + sum.avgR * 40, 0, 100);       // 30%  (0R→50, +1R→90)
+  // A month with no measurable R scores neutral on this axis, explicitly —
+  // not because `null * 40` happens to be 0, which would look identical to a
+  // real 0R month while resting on nothing.
+  const rScore = sum.avgR == null ? 50 : clamp(50 + sum.avgR * 40, 0, 100); // 30% (0R→50, +1R→90)
   const discScore = clamp(disciplineRatio * 100, 0, 100); // 20%
   const consScore = clamp(100 - stdDev(sum.rValues) * 25, 0, 100); // 10%
   const score = winScore * 0.4 + rScore * 0.3 + discScore * 0.2 + consScore * 0.1;
@@ -158,7 +180,7 @@ export function generateMonthlyReport(trades, month, year, calcMetrics) {
       period,
       hasEnoughData: false,
       minTrades: MIN_TRADES,
-      summary: { totalTrades: cur.length, wins: sum.wins, losses: sum.losses, winRate: sum.winRate, netPnL: sum.netPnL, avgR: sum.avgR },
+      summary: { totalTrades: cur.length, wins: sum.wins, losses: sum.losses, winRate: sum.winRate, netPnL: sum.netPnL, avgR: sum.avgR, rSampleSize: sum.rSampleSize },
     };
   }
 
@@ -218,8 +240,8 @@ export function generateMonthlyReport(trades, month, year, calcMetrics) {
     const pct = Math.round(disciplineRatio * 100);
     strengths.push({ tid: "mr_s_discipline", cat: "mr_cat_discipline", params: { pct }, data: `${pct}%`, detail: `Strong discipline — you followed your plan on ${pct}% of trades` });
   }
-  if (sum.avgR > 0.2) {
-    strengths.push({ tid: "mr_s_expectancy", cat: "mr_cat_expectancy", params: { avgR: sum.avgR }, data: `${sum.avgR}R`, detail: `Positive expectancy — averaging ${sum.avgR}R per trade` });
+  if (sum.avgR != null && sum.avgR > 0.2) {
+    strengths.push({ tid: "mr_s_expectancy", cat: "mr_cat_expectancy", params: { avgR: sum.avgR, n: sum.rSampleSize }, data: `${sum.avgR}R`, detail: `Positive expectancy — averaging ${sum.avgR}R across ${sum.rSampleSize} trades with a measurable stop` });
   }
   if (bestStreak >= 3) {
     strengths.push({ tid: "mr_s_winStreak", cat: "mr_cat_momentum", params: { n: bestStreak }, data: `×${bestStreak}`, detail: `Great momentum — a run of ${bestStreak} wins this month` });
@@ -316,6 +338,7 @@ export function generateMonthlyReport(trades, month, year, calcMetrics) {
     winRate: sum.winRate,
     netPnL: sum.netPnL,
     avgR: sum.avgR,
+    rSampleSize: sum.rSampleSize,
     bestTrade,
     worstTrade,
     vsLastMonth: {

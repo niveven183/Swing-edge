@@ -11,7 +11,7 @@
 // Only fires on setups with MIN_HISTORY_N historical trades and MIN_RECENT_N
 // recent trades — avoids false alarms on thin samples.
 
-import { getClosed, avgR, winRate } from "../utils/statisticalModels.js";
+import { getClosed, rStats, winRate } from "../utils/statisticalModels.js";
 
 const MIN_HISTORY_N = 8;   // minimum all-time trades for a setup to be tracked
 const MIN_RECENT_N  = 3;   // minimum recent trades to make a comparison
@@ -34,11 +34,13 @@ const isRecent = (trade, nowMs) => {
 };
 
 // E[R] proxy score: winRate × avgR (not true expectancy — used for relative decay detection).
+// null when R is not measurable for this set — the score is a product with
+// avgR, and a missing factor makes the whole product undefined, not zero.
 const edgeProxyScore = (trades) => {
-  if (!trades.length) return 0;
-  const wr  = winRate(trades);
-  const ar  = avgR(trades);
-  return Number((wr * ar).toFixed(3));
+  if (!trades.length) return null;
+  const { avg } = rStats(trades);
+  if (avg == null) return null;
+  return Number((winRate(trades) * avg).toFixed(3));
 };
 
 const decayLevel = (drop) => {
@@ -90,8 +92,15 @@ export const detectEdgeDecay = (trades = [], nowMs = Date.now()) => {
     if (all.length < MIN_HISTORY_N) continue;
     if (recent.length < MIN_RECENT_N) continue;
 
-    const historicalAvgR = avgR(all);
-    const recentAvgR     = avgR(recent);
+    // The alert IS an R comparison, so both minimums apply to the population
+    // in which R exists — not to the trade count. Five recent trades of which
+    // one has a stop is a one-trade measurement wearing a five-trade label.
+    const histR   = rStats(all);
+    const recentR = rStats(recent);
+    if (histR.n < MIN_HISTORY_N || recentR.n < MIN_RECENT_N) continue;
+
+    const historicalAvgR = histR.avg;
+    const recentAvgR     = recentR.avg;
     const drop           = Number((historicalAvgR - recentAvgR).toFixed(2));
     const level          = decayLevel(drop);
 
@@ -108,10 +117,12 @@ export const detectEdgeDecay = (trades = [], nowMs = Date.now()) => {
       recentAvgR:     Number(recentAvgR.toFixed(2)),
       historicalN:    all.length,
       recentN:        recent.length,
+      historicalRSampleSize: histR.n,
+      recentRSampleSize:     recentR.n,
       expectancyDrop: Number((edgeProxyScore(all) - edgeProxyScore(recent)).toFixed(3)),
       message: {
-        he: `"${setup}" מראה דעיכת Edge — ממוצע R ירד מ-${historicalAvgR.toFixed(2)} ל-${recentAvgR.toFixed(2)} ב-${recent.length} עסקאות אחרונות (${RECENT_DAYS} יום).`,
-        en: `"${setup}" edge is decaying — avg R dropped from ${historicalAvgR.toFixed(2)} to ${recentAvgR.toFixed(2)} over the last ${recent.length} trades (${RECENT_DAYS}d).`,
+        he: `"${setup}" מראה דעיכת Edge — ממוצע R ירד מ-${historicalAvgR.toFixed(2)} ל-${recentAvgR.toFixed(2)} ב-${recentR.n} מתוך ${recent.length} עסקאות אחרונות (${RECENT_DAYS} יום).`,
+        en: `"${setup}" edge is decaying — avg R dropped from ${historicalAvgR.toFixed(2)} to ${recentAvgR.toFixed(2)} over ${recentR.n} of the last ${recent.length} trades (${RECENT_DAYS}d).`,
       },
       detail: {
         he: `WR היסטורי: ${wrH}% → אחרון: ${wr}%`,

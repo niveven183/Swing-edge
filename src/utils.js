@@ -36,7 +36,9 @@ export const calcTradeMetrics = (trade) => {
   // analytics show N/A rather than a synthetic number.
   if (trade.stop == null) return { pnl, rMultiple: null };
   const risk = Math.abs(trade.entry - trade.stop) * trade.shares;
-  return { pnl, rMultiple: risk > 0 ? pnl / risk : 0 };
+  // risk === 0 means stop === entry (or zero shares): the denominator is
+  // undefined, not small. Reporting 0 would show a winning trade as 0.00R.
+  return { pnl, rMultiple: risk > 0 ? pnl / risk : null };
 };
 
 // Price-only Reward/Risk ratio for a planned setup — independent of position
@@ -96,6 +98,15 @@ export const validateTradeInputs = (entry, stop, target, side) => {
 export const fmt$ = (n) => n >= 0
   ? `+$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
   : `-$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+
+// Numeric field parsing at the input boundary. `0` is a value, not a blank:
+// `parseFloat(v) || null` silently turned a real MFE/MAE of 0 into "not filled
+// in". Garbage still becomes null rather than a stored NaN.
+export const numOrNull = (v) => {
+  if (v === "" || v == null) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
 
 // Single source of truth for "format or show em-dash" — never fabricate a
 // number for a non-numeric value (null/undefined/NaN).

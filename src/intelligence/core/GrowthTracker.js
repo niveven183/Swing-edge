@@ -3,7 +3,8 @@
 // consistency, edge utilisation and emotional control — with a monthly report.
 
 import {
-  getClosed, isWin, pnlOf, rOf, avgR, winRate, stddev, groupBy, to100,
+  getClosed, isWin, pnlOf, rValues, rStats, winRate, stddev, groupBy, to100,
+  MIN_SAMPLE_R,
 } from "../utils/statisticalModels.js";
 import { disciplineRate } from "../utils/psychologyPatterns.js";
 import { matchIdeaToEdge } from "./EdgeFinder.js";
@@ -27,7 +28,10 @@ const disciplineScore = (trades) => {
 const riskMgmtScore = (trades, capitalAtEntryDefault = DEFAULT_CAPITAL) => {
   const closed = getClosed(trades);
   if (!closed.length) return 50;
-  const pcts = closed.map(t => {
+  // A trade without a stop has no measurable risk. `Math.abs(entry - null)` is
+  // `entry`, so including it charged the score the FULL POSITION VALUE as risk —
+  // a positive number, which the `> 0` filter below happily let through.
+  const pcts = closed.filter(t => t.stop != null && t.shares > 0).map(t => {
     const capital = t._capitalAtEntry || capitalAtEntryDefault;
     const rd = Math.abs(t.entry - t.stop) * t.shares;
     return capital > 0 ? rd / capital : 0;
@@ -41,7 +45,10 @@ const riskMgmtScore = (trades, capitalAtEntryDefault = DEFAULT_CAPITAL) => {
 const consistencyScore = (trades) => {
   const closed = getClosed(trades);
   if (closed.length < 3) return 50;
-  const rs = closed.map(rOf);
+  // Only the measurable population. Unmeasurable R used to enter as null and
+  // read as 0 inside stddev, inventing a cluster of perfectly-consistent trades.
+  const rs = rValues(closed);
+  if (rs.length < MIN_SAMPLE_R) return 50;
   const sd = stddev(rs);
   // Lower SD → higher consistency. SD of 3R → fully inconsistent.
   return to100(Math.max(0, 1 - Math.min(1, sd / 3)));
@@ -124,10 +131,12 @@ export const generateGrowthReport = (trades = [], edgeReport = null, now = new D
   const top3Weaknesses = [...ranked].sort((a, b) => a.score - b.score).slice(0, 3);
 
   // Concrete month stats, so the trader has context beyond the abstract score.
+  const { avg: monthAvgR, n: monthRSample } = rStats(thisTrades);
   const stats = {
     closedTrades: thisTrades.length,
     winRate:      Math.round(winRate(thisTrades) * 100),
-    avgR:         Number(avgR(thisTrades).toFixed(2)),
+    avgR:         monthAvgR == null ? null : Number(monthAvgR.toFixed(2)),
+    rSampleSize:  monthRSample,
     netPnl:       Math.round(thisTrades.reduce((s, t) => s + pnlOf(t), 0)),
   };
 

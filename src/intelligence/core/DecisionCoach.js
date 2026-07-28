@@ -3,14 +3,14 @@
 // swing trader would shout over your shoulder, and returns a compact verdict.
 
 import {
-  getClosed, isWin, rOf, avgR, median, percentile, groupBy, dayOfWeek, rrBucket,
+  getClosed, isWin, rStats, median, percentile, groupBy, dayOfWeek, rrBucket,
 } from "../utils/statisticalModels.js";
 import { tradesToday, trailingLossRun, isRevengeWindow } from "../utils/psychologyPatterns.js";
 import { matchIdeaToEdge, matchIdeaToAntiEdge } from "./EdgeFinder.js";
 import { getPersonalizedRecommendations } from "./TradeDNA.js";
 import { isSetupCompatible } from "./MarketRegime.js";
 import { getSetupRegimeKnowledge } from "../knowledgeGlue.js";
-import { qstars } from "../../utils.js";
+import { qstars, fmtR } from "../../utils.js";
 import { getEmotionWeight } from "../calibration.js";
 
 // Utility — build a derived "idea" from the raw trade form fields.
@@ -44,10 +44,15 @@ const historicalContextFor = (trades, idea) => {
   const similar = idea.setup ? closed.filter(t => t.setup === idea.setup) : closed;
   if (!similar.length) return null;
   const wins = similar.filter(isWin).length;
+  // `avgReturn` is a number|null, not a pre-formatted string: the caller needs
+  // to distinguish "averaged 0.00R" from "R was never measurable here", and a
+  // string collapses both into something that reads like a measurement.
+  const { avg, n: rN } = rStats(similar);
   return {
     similarTrades: similar.length,
     successRate:   Math.round((wins / similar.length) * 100),
-    avgReturn:     avgR(similar).toFixed(2),
+    avgReturn:     avg,
+    rSampleSize:   rN,
   };
 };
 
@@ -483,13 +488,15 @@ export const coachTrade = ({ form, trades = [], dna = null, edges = null, regime
 
   // Expected R — calibrate from similar historical trades when possible.
   const history = historicalContextFor(trades, idea);
-  const expectedR = history ? Number(history.avgReturn) : null;
-  if (expectedR != null && history && history.similarTrades >= 3) {
+  // Gated on the R sample, not the trade count: the expectation rests on the
+  // trades where R could be measured, and that is the number the card names.
+  const expectedR = history ? history.avgReturn : null;
+  if (expectedR != null && history.rSampleSize >= 3) {
     checks.push({
       id: "expected_r", icon: "📈", kind: "info", weight: 0,
       text: {
-        en: `Expected return based on ${history.similarTrades} similar trades: ${expectedR >= 0 ? "+" : ""}${expectedR.toFixed(2)}R.`,
-        he: `תשואה צפויה לפי ${history.similarTrades} עסקאות דומות: ${expectedR >= 0 ? "+" : ""}${expectedR.toFixed(2)}R.`,
+        en: `Expected return based on ${history.rSampleSize} similar trades with a measurable stop: ${fmtR(expectedR)}.`,
+        he: `תשואה צפויה לפי ${history.rSampleSize} עסקאות דומות עם סטופ מדיד: ${fmtR(expectedR)}.`,
       },
     });
   }

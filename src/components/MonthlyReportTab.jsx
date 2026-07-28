@@ -11,7 +11,7 @@ import {
 } from "recharts";
 import { TrendingUp, TrendingDown, CheckCircle, AlertTriangle, Award } from "lucide-react";
 import { generateMonthlyReport, MONTH_NAMES } from "../intelligence/core/MonthlyReport.js";
-import { formatPct } from "../utils.js";
+import { formatPct, fmtR } from "../utils.js";
 import TermTooltip from "./ui/TermTooltip.jsx";
 
 // ── helpers ──
@@ -177,7 +177,10 @@ export default function MonthlyReportTab({ trades, calcMetrics, t, lang, isRTL }
         {sCard(t.mr_totalTrades, summary.totalTrades, summary.vsLastMonth.hasPrev ? <Delta value={summary.vsLastMonth.trades} t={t} /> : <span className="text-[10px] text-slate-400">{summary.wins}W / {summary.losses}L</span>)}
         {sCard(t.mr_winRate, formatPct(summary.winRate), summary.vsLastMonth.hasPrev ? <Delta value={summary.vsLastMonth.winRate} suffix="%" t={t} /> : null, "winRate")}
         {sCard(t.mr_netPnL, <span className={summary.netPnL >= 0 ? "text-emerald-500 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"}>{summary.netPnL >= 0 ? "+" : ""}${summary.netPnL.toLocaleString()}</span>, summary.vsLastMonth.hasPrev ? <Delta value={summary.vsLastMonth.netPnL} money t={t} /> : null)}
-        {sCard(t.mr_avgR, <span className={summary.avgR >= 0 ? "text-emerald-500 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"}>{summary.avgR >= 0 ? "+" : ""}{summary.avgR}R</span>, summary.bestTrade ? <span className="text-[10px] text-slate-400 dark:text-slate-500">{t.mr_best}: {summary.bestTrade.ticker}</span> : null, "avgR")}
+        {sCard(t.mr_avgR, <span className={summary.avgR == null ? "text-slate-400 dark:text-slate-500" : summary.avgR >= 0 ? "text-emerald-500 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"}>{fmtR(summary.avgR)}</span>, <span className="text-[10px] text-slate-400 dark:text-slate-500">
+          {summary.bestTrade && <>{t.mr_best}: {summary.bestTrade.ticker}<br /></>}
+          {interp(t.avgRSample, { n: summary.rSampleSize, total: summary.totalTrades })}
+        </span>, "avgR")}
       </div>
 
       {/* STRENGTHS */}

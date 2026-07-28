@@ -2,6 +2,18 @@ import { useMemo } from "react";
 import { isFollowedPlan, isOffPlan, qstars, holdDays } from "../utils.js";
 import { edgeScore, wilsonLowerBound } from "../intelligence/utils/statisticalModels.js";
 
+// R over an array of enriched metrics ({ ...trade, pnl, rMultiple }). `avg` is
+// null when no item in the set has a measurable R — a trade without a stop did
+// not do 0R, and letting it sit in the denominator drags every average toward
+// zero in proportion to how many stops are missing.
+function rSumStats(items) {
+  let sum = 0, n = 0;
+  for (const m of items) {
+    if (Number.isFinite(m.rMultiple)) { sum += m.rMultiple; n += 1; }
+  }
+  return { total: n ? sum : null, avg: n ? sum / n : null, n };
+}
+
 /**
  * useTradingStats — Master Stats Hub
  *
@@ -34,7 +46,7 @@ export function useTradingStats(trades, capital, calcTradeMetrics) {
     const profitFactor = totalLoss > 0 ? totalWin / totalLoss : (totalWin > 0 ? Infinity : 0);
     const avgWin       = winners.length ? totalWin / winners.length : 0;
     const avgLoss      = losers.length  ? totalLoss / losers.length : 0;
-    const avgR         = metrics.reduce((s, m) => s + (m.rMultiple || 0), 0) / metrics.length;
+    const { avg: avgR, n: rSampleSize } = rSumStats(metrics);
     const bestWin      = winners.length ? Math.max(...winners.map(m => m.pnl)) : 0;
     const worstLoss    = losers.length  ? Math.min(...losers.map(m => m.pnl)) : 0;
 
@@ -132,7 +144,7 @@ export function useTradingStats(trades, capital, calcTradeMetrics) {
       winRate, lossRate, profitFactor,
 
       // averages
-      avgWin, avgLoss, avgR, bestWin, worstLoss,
+      avgWin, avgLoss, avgR, rSampleSize, bestWin, worstLoss,
 
       // equity — CLOSED baseline only (single source for realized equity).
       // Full Account Equity = currentEquity + live open P&L, assembled once at
@@ -190,7 +202,7 @@ function EMPTY_STATS(capital) {
     totalTrades: 0, total: 0, openTrades: 0, wins: 0, losses: 0,
     totalPnL: 0, totalWin: 0, totalLoss: 0,
     winRate: 0, lossRate: 0, profitFactor: 0,
-    avgWin: 0, avgLoss: 0, avgR: 0, bestWin: 0, worstLoss: 0,
+    avgWin: 0, avgLoss: 0, avgR: null, rSampleSize: 0, bestWin: 0, worstLoss: 0,
     currentEquity: capital, capital, returnPct: 0,
     equityCurve: [], maxDrawdown: 0, maxDD: 0, currentDrawdown: 0,
     currentStreak: 0, maxWinStreak: 0, maxLossStreak: 0, bestStreak: 0,
@@ -218,7 +230,7 @@ function groupAndAnalyze(metrics, field, keyFn) {
     const sumWin  = wins.reduce((s, m) => s + m.pnl, 0);
     const sumLoss = Math.abs(items.filter(m => (m.pnl || 0) < 0).reduce((s, m) => s + m.pnl, 0));
     const totalPnL = items.reduce((s, m) => s + (m.pnl || 0), 0);
-    const totalR   = items.reduce((s, m) => s + (m.rMultiple || 0), 0);
+    const r        = rSumStats(items);
     return {
       name,
       count: items.length,
@@ -226,8 +238,9 @@ function groupAndAnalyze(metrics, field, keyFn) {
       winRate: (wins.length / items.length) * 100,
       totalPnL,
       avgPnL: totalPnL / items.length,
-      totalR,
-      avgR: totalR / items.length,
+      totalR: r.total,
+      avgR: r.avg,
+      rSampleSize: r.n,
       profitFactor: sumLoss > 0 ? sumWin / sumLoss : (sumWin > 0 ? Infinity : 0),
     };
   }).sort((a, b) => b.totalPnL - a.totalPnL);
@@ -285,7 +298,10 @@ function findEdges(metrics, type) {
     .map(([name, items]) => {
       const wins = items.filter(m => (m.pnl || 0) > 0).length;
       const n = items.length;
-      const avgR = items.reduce((s, m) => s + (m.rMultiple || 0), 0) / n;
+      const { avg: avgR, n: rSampleSize } = rSumStats(items);
+      // `?? 0` in the two ranking scores is a declared neutral, not a
+      // measurement: a combo with no measurable R ranks on Wilson alone.
+      const rScore = avgR ?? 0;
       return {
         name,
         setup: items[0].setup || "?",
@@ -294,17 +310,18 @@ function findEdges(metrics, type) {
         winRate: (wins / n) * 100,
         totalPnL: items.reduce((s, m) => s + (m.pnl || 0), 0),
         avgR,
-        score: edgeScore(wins, n, avgR),
-        antiScore: (1 - wilsonLowerBound(wins, n)) * (1 + Math.max(0, -avgR)),
+        rSampleSize,
+        score: edgeScore(wins, n, rScore),
+        antiScore: (1 - wilsonLowerBound(wins, n)) * (1 + Math.max(0, -rScore)),
       };
     });
   if (type === "top") {
     return scored
-      .sort((a, b) => b.score - a.score || b.avgR - a.avgR)
+      .sort((a, b) => b.score - a.score || (b.avgR ?? 0) - (a.avgR ?? 0))
       .slice(0, 5);
   }
   return scored
-    .filter(c => c.winRate < 50 || c.avgR < 0)
-    .sort((a, b) => b.antiScore - a.antiScore || a.avgR - b.avgR)
+    .filter(c => c.winRate < 50 || (c.avgR != null && c.avgR < 0))
+    .sort((a, b) => b.antiScore - a.antiScore || (a.avgR ?? 0) - (b.avgR ?? 0))
     .slice(0, 5);
 }

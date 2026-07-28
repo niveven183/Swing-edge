@@ -3,10 +3,10 @@
 // R/R } from the closed trade history. Returns Top Edges and Anti-Edges.
 
 import {
-  getClosed, isWin, rOf, avgR, wilsonLowerBound, edgeScore, dayOfWeek, dayLabel, rrBucket,
+  getClosed, isWin, rStats, wilsonLowerBound, edgeScore, dayOfWeek, dayLabel, rrBucket,
   MIN_SAMPLE_EDGE,
 } from "../utils/statisticalModels.js";
-import { qstars } from "../../utils.js";
+import { qstars, fmtR } from "../../utils.js";
 import { labelFor } from "../../i18n.js";
 
 // The dimensions we explore. Keep the combination space small enough that a
@@ -54,14 +54,18 @@ const prettyPattern = (key, lang = "en") => key.split(" + ").map(s => {
 const scorePattern = (list) => {
   const wins = list.filter(isWin).length;
   const n = list.length;
+  // Reported avgR stays null when unmeasurable; the two ranking scores fall
+  // back to a declared neutral of 0 so such a pattern ranks on Wilson alone.
+  const { avg: aR, n: rN } = rStats(list);
   return {
     n,
     wins,
     winRate: n ? wins / n : 0,
-    avgR: avgR(list),
+    avgR: aR,
+    rSampleSize: rN,
     // Ranking metric: canonical edge definition (Wilson × expectancy signal).
-    score: edgeScore(wins, n, avgR(list)),
-    antiScore: (1 - wilsonLowerBound(wins, n)) * (1 + Math.max(0, -avgR(list))),
+    score: edgeScore(wins, n, aR ?? 0),
+    antiScore: (1 - wilsonLowerBound(wins, n)) * (1 + Math.max(0, -(aR ?? 0))),
   };
 };
 
@@ -93,19 +97,26 @@ const enumeratePatterns = (trades, dimSize = 3) => {
 };
 
 // Build a human message from the pattern result, in both languages.
+// The R figure carries its own denominator: the win rate rests on all `n`
+// trades, but the average R rests only on the ones where R is measurable.
+// Naming a single sample size for both would attribute the R to trades that
+// never contributed to it.
 const messagesFor = (result, sign) => {
   const prettyEn = prettyPattern(result.key, "en");
   const prettyHe = prettyPattern(result.key, "he");
   const wr = Math.round(result.winRate * 100);
+  const rN = result.rSampleSize;
+  const rEn = rN ? `avg ${fmtR(result.avgR)} across ${rN} of ${result.n}` : `R not measurable across ${result.n}`;
+  const rHe = rN ? `${fmtR(result.avgR)} ממוצע ב-${rN} מתוך ${result.n}` : `R לא מדיד ב-${result.n}`;
   if (sign === "edge") {
     return {
-      en: `Pattern "${prettyEn}" → ${wr}% win rate, avg ${result.avgR.toFixed(2)}R across ${result.n} trades. Lean into it.`,
-      he: `הדפוס "${prettyHe}" → ${wr}% הצלחה, ${result.avgR.toFixed(2)}R ממוצע ב-${result.n} עסקאות. זה ה-Edge שלך.`,
+      en: `Pattern "${prettyEn}" → ${wr}% win rate, ${rEn} trades. Lean into it.`,
+      he: `הדפוס "${prettyHe}" → ${wr}% הצלחה, ${rHe} עסקאות. זה ה-Edge שלך.`,
     };
   }
   return {
-    en: `Avoid "${prettyEn}" — ${wr}% win rate, ${result.avgR.toFixed(2)}R avg across ${result.n} trades.`,
-    he: `הימנע מ-"${prettyHe}" — ${wr}% הצלחה, ${result.avgR.toFixed(2)}R ב-${result.n} עסקאות.`,
+    en: `Avoid "${prettyEn}" — ${wr}% win rate, ${rEn} trades.`,
+    he: `הימנע מ-"${prettyHe}" — ${wr}% הצלחה, ${rHe} עסקאות.`,
   };
 };
 
@@ -114,8 +125,10 @@ export const findEdges = (trades, { topK = 3 } = {}) => {
   const results = enumeratePatterns(trades, 3);
   if (!results.length) return { edges: [], antiEdges: [], sampleSize: 0 };
 
+  const round2 = (v) => v == null ? null : Number(v.toFixed(2));
+
   const edges = [...results]
-    .sort((a, b) => b.score - a.score || b.avgR - a.avgR)
+    .sort((a, b) => b.score - a.score || (b.avgR ?? 0) - (a.avgR ?? 0))
     .slice(0, topK)
     .map(r => ({
       pattern: prettyPattern(r.key, "en"),
@@ -123,14 +136,15 @@ export const findEdges = (trades, { topK = 3 } = {}) => {
       key: r.key,
       winRate: Math.round(r.winRate * 100),
       trades: r.n,
-      avgR: Number(r.avgR.toFixed(2)),
+      avgR: round2(r.avgR),
+      rSampleSize: r.rSampleSize,
       confidence: Number(r.score.toFixed(3)),
       message: messagesFor(r, "edge"),
     }));
 
   const antiEdges = [...results]
-    .sort((a, b) => b.antiScore - a.antiScore || a.avgR - b.avgR)
-    .filter(r => r.winRate < 0.5 || r.avgR < 0)
+    .sort((a, b) => b.antiScore - a.antiScore || (a.avgR ?? 0) - (b.avgR ?? 0))
+    .filter(r => r.winRate < 0.5 || (r.avgR != null && r.avgR < 0))
     .slice(0, topK)
     .map(r => ({
       pattern: prettyPattern(r.key, "en"),
@@ -138,7 +152,8 @@ export const findEdges = (trades, { topK = 3 } = {}) => {
       key: r.key,
       winRate: Math.round(r.winRate * 100),
       trades: r.n,
-      avgR: Number(r.avgR.toFixed(2)),
+      avgR: round2(r.avgR),
+      rSampleSize: r.rSampleSize,
       message: messagesFor(r, "anti"),
     }));
 

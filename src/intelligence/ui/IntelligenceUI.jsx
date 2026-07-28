@@ -8,6 +8,7 @@ import InfoTooltip from "../../components/ui/InfoTooltip.jsx";
 import TermTooltip from "../../components/ui/TermTooltip.jsx";
 import { TRADING_TOOLTIPS } from "../../data/tooltips.js";
 import { dayLabel } from "../utils/statisticalModels.js";
+import { fmtR } from "../../utils.js";
 import { nTrades, labelFor } from "../../i18n.js";
 import { getRegimeKnowledge } from "../knowledgeGlue.js";
 import {
@@ -156,8 +157,9 @@ export const EdgeCard = ({ edge, lang = "he", variant = "edge" }) => {
         <span>·</span>
         <span>{nTrades(edge.trades, lang)}</span>
         <span>·</span>
-        <span className={edge.avgR >= 0 ? "text-emerald-400" : "text-rose-400"}>
-          {edge.avgR >= 0 ? "+" : ""}{edge.avgR}R
+        <span className={edge.avgR == null ? "text-slate-500" : edge.avgR >= 0 ? "text-emerald-400" : "text-rose-400"}>
+          {fmtR(edge.avgR)}
+          {edge.rSampleSize !== edge.trades && ` (${edge.rSampleSize}/${edge.trades})`}
         </span>
       </div>
       <div className="mt-2 text-[11px] text-slate-400 leading-relaxed">
@@ -207,13 +209,18 @@ const collectMoreText = (n, lang) => ({
   pt: `Reúna mais operações para uma análise precisa (${n}/10).`,
   ar: `اجمع المزيد من الصفقات للحصول على تحليل دقيق (${n}/10).`,
 }[lang] || `Collect more trades for an accurate read (${n}/10).`);
-const historyText = (hc, lang) => ({
-  en: `Similar trades: ${hc.similarTrades} count, ${hc.successRate}% win, avg ${hc.avgReturn}R.`,
-  he: `בעסקאות דומות: ${hc.similarTrades} עסקאות, ${hc.successRate}% הצלחה, תשואה ממוצעת ${hc.avgReturn}R.`,
-  es: `Operaciones similares: ${hc.similarTrades}, ${hc.successRate}% aciertos, promedio ${hc.avgReturn}R.`,
-  pt: `Operações similares: ${hc.similarTrades}, ${hc.successRate}% acertos, média ${hc.avgReturn}R.`,
-  ar: `صفقات مشابهة: ${hc.similarTrades}، ${hc.successRate}% نجاح، متوسط ${hc.avgReturn}R.`,
-}[lang] || `Similar trades: ${hc.similarTrades} count, ${hc.successRate}% win, avg ${hc.avgReturn}R.`);
+// The win rate rests on all similar trades; the average R rests only on those
+// with a measurable stop, so the R figure names its own sample size.
+const historyText = (hc, lang) => {
+  const r = `${fmtR(hc.avgReturn)} (${hc.rSampleSize}/${hc.similarTrades})`;
+  return {
+    en: `Similar trades: ${hc.similarTrades} count, ${hc.successRate}% win, avg ${r}.`,
+    he: `בעסקאות דומות: ${hc.similarTrades} עסקאות, ${hc.successRate}% הצלחה, תשואה ממוצעת ${r}.`,
+    es: `Operaciones similares: ${hc.similarTrades}, ${hc.successRate}% aciertos, promedio ${r}.`,
+    pt: `Operações similares: ${hc.similarTrades}, ${hc.successRate}% acertos, média ${r}.`,
+    ar: `صفقات مشابهة: ${hc.similarTrades}، ${hc.successRate}% نجاح، متوسط ${r}.`,
+  }[lang] || `Similar trades: ${hc.similarTrades} count, ${hc.successRate}% win, avg ${r}.`;
+};
 
 export const DecisionCoachPanel = ({ coaching, lang = "he" }) => {
   if (!coaching || coaching.verdict === "PENDING") {

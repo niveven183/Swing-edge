@@ -13,9 +13,9 @@
 // }
 
 import {
-  getClosed, isWin, pnlOf, rOf, winRate, avgR, expectedValueR,
+  getClosed, isWin, pnlOf, rValues, rStats, winRate, avgR, expectedValueR,
   profitFactor, sharpeR, streaks, kellyFraction, groupBy, dayOfWeek,
-  wilsonLowerBound, to100,
+  wilsonLowerBound, to100, MIN_SAMPLE_R,
   MIN_SAMPLE_DNA, MIN_SAMPLE_PATTERNS, MIN_SAMPLE_FORECAST, MIN_SAMPLE_ML,
 } from "../utils/statisticalModels.js";
 import { disciplineRate, emotionPerformance } from "../utils/psychologyPatterns.js";
@@ -34,11 +34,13 @@ const maturityFor = (n) => {
 const scoreGroup = (list) => {
   const wins = list.filter(isWin).length;
   const n = list.length;
+  const { avg, n: rN } = rStats(list);
   return {
     n,
     wins,
     winRate: n ? wins / n : 0,
-    avgR: avgR(list),
+    avgR: avg,               // number | null
+    rSampleSize: rN,
     totalPnl: list.reduce((s, t) => s + pnlOf(t), 0),
     confidence: wilsonLowerBound(wins, n),
   };
@@ -52,15 +54,19 @@ const rankGroups = (trades, keyFn, { minN = 3, topK = 3 } = {}) => {
     .map(([k, list]) => ({ key: k, ...scoreGroup(list) }))
     .filter(e => e.n >= minN);
 
+  // `?? 0` is a declared neutral for a tiebreaker, not a measurement: a group
+  // with no measurable R is ordered on Wilson confidence alone. The filters
+  // below compare against null deliberately — null is neither > 0 nor < 0, so
+  // an unmeasurable group qualifies on its win rate or not at all.
   const strengths = [...entries]
-    .sort((a, b) => b.confidence - a.confidence || b.avgR - a.avgR)
+    .sort((a, b) => b.confidence - a.confidence || (b.avgR ?? 0) - (a.avgR ?? 0))
     .slice(0, topK)
-    .filter(e => e.winRate > 0.5 || e.avgR > 0);
+    .filter(e => e.winRate > 0.5 || (e.avgR != null && e.avgR > 0));
 
   const weaknesses = [...entries]
-    .sort((a, b) => a.confidence - b.confidence || a.avgR - b.avgR)
+    .sort((a, b) => a.confidence - b.confidence || (a.avgR ?? 0) - (b.avgR ?? 0))
     .slice(0, topK)
-    .filter(e => e.winRate < 0.5 || e.avgR < 0);
+    .filter(e => e.winRate < 0.5 || (e.avgR != null && e.avgR < 0));
 
   return { strengths, weaknesses };
 };
@@ -131,19 +137,25 @@ const computeScores = (trades) => {
   const dRate = disciplineRate(closed);
   const discipline = dRate == null ? 50 : to100(dRate);
 
-  // Consistency — penalise high variance of R-outcomes.
-  const rs = closed.map(rOf);
-  const meanR = rs.reduce((s, x) => s + x, 0) / rs.length;
-  const variance = rs.reduce((s, x) => s + (x - meanR) ** 2, 0) / rs.length;
-  const sd = Math.sqrt(variance);
-  const consistency = to100(Math.max(0, 1 - Math.min(1, sd / 3)));
+  // Consistency — penalise high variance of R-outcomes, over the measurable
+  // population only. A null R entering this sum used to read as 0 and pull the
+  // variance down, scoring an unmeasurable book as highly consistent.
+  const rs = rValues(closed);
+  let consistency = 50;
+  if (rs.length >= MIN_SAMPLE_R) {
+    const meanR = rs.reduce((s, x) => s + x, 0) / rs.length;
+    const variance = rs.reduce((s, x) => s + (x - meanR) ** 2, 0) / rs.length;
+    const sd = Math.sqrt(variance);
+    consistency = to100(Math.max(0, 1 - Math.min(1, sd / 3)));
+  }
 
-  // Growth — rolling equity slope over the last 20 closed trades.
-  const recent = closed.slice(-20);
+  // Growth — rolling equity slope over the last 20 measurable closed trades.
+  // A single null in this cumulative sum turned the whole curve to NaN.
+  const recentR = rValues(closed).slice(-20);
   const startEquity = 1;
   let balance = startEquity;
   const series = [startEquity];
-  for (const t of recent) series.push(balance += rOf(t));
+  for (const r of recentR) series.push(balance += r);
   const slope = series.length > 1 ? (series[series.length - 1] - series[0]) / series.length : 0;
   const growth = to100(0.5 + Math.max(-0.5, Math.min(0.5, slope / 2)));
 
@@ -208,7 +220,8 @@ export const calculateTradeDNA = (allTrades = []) => {
     },
     metrics: {
       winRate:      winRate(closed),
-      avgR:         avgR(closed),
+      avgR:         avgR(closed),          // number | null
+      rSampleSize:  rValues(closed).length,
       expectancyR:  expectedValueR(closed),
       profitFactor: profitFactor(closed),
       sharpe:       sharpeR(closed),

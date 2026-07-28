@@ -8,6 +8,7 @@ export const MIN_SAMPLE_DNA = 10;        // basic DNA insight threshold
 export const MIN_SAMPLE_PATTERNS = 50;   // pattern recognition threshold
 export const MIN_SAMPLE_FORECAST = 100;  // predictive forecasting threshold
 export const MIN_SAMPLE_ML = 500;        // ML-grade modeling threshold
+export const MIN_SAMPLE_R = 2;           // below this there is no dispersion to measure
 
 // ─── BASIC DESCRIPTIVES ──────────────────────────────────────────────────────
 export const mean = (xs) => xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : 0;
@@ -36,8 +37,31 @@ export const percentile = (xs, p) => {
 export const getClosed = (trades) => (trades || []).filter(t => t && t.status === "CLOSED" && t.exit != null);
 
 export const pnlOf = (t) => calcTradeMetrics(t).pnl || 0;
-export const rOf   = (t) => calcTradeMetrics(t).rMultiple || 0;
 export const isWin = (t) => pnlOf(t) > 0;
+
+// ─── THE R CONTRACT ───────────────────────────────────────────────────────────
+// `rMultiple` is null whenever R is not measurable (no exit, no stop, or
+// stop === entry). A trade without a stop did not do 0R — it cannot be
+// expressed in R at all. Coercing that null to 0 keeps the trade in the
+// denominator while contributing nothing to the numerator, which silently
+// drags every R-based metric toward zero.
+//
+// Rule: a value that leaves the numerator leaves the denominator too, and any
+// metric derived from R reports the sample size it actually rests on.
+export const rOf = (t) => calcTradeMetrics(t).rMultiple;   // number | null
+
+// The only population in which R can be measured. Number.isFinite rejects
+// null, NaN and Infinity in one pass.
+export const rValues = (trades) => (trades || []).map(rOf).filter(Number.isFinite);
+
+// Single source of truth for every R-based figure: the value and the sample
+// size it was computed over, always travelling together.
+export const rStats = (trades) => {
+  const values = rValues(trades);
+  return { avg: values.length ? mean(values) : null, n: values.length, values };
+};
+
+export const rSampleSize = (trades) => rValues(trades).length;
 
 // ─── SCALE CONVENTION ─────────────────────────────────────────────────────────
 // All win-rate functions in this module return a fraction (0..1).
@@ -48,20 +72,41 @@ export const winRate = (trades) => {
   return trades.filter(isWin).length / trades.length;
 };
 
-export const avgR = (trades) => mean(trades.map(rOf));
+// number | null — null means "not measurable", which is not the same as 0.
+export const avgR = (trades) => rStats(trades).avg;
 
 export const avgPnl = (trades) => mean(trades.map(pnlOf));
 
-// Expected value per trade, in R units.
+// Split the measurable population into the three outcomes that actually exist.
+// Break-even is its own bucket: `isWin` is `pnl > 0`, so `!isWin` swept every
+// BE trade into the losses and biased expectancy and Kelly downward.
+const rPopulations = (trades) => {
+  const measurable = (trades || []).filter(t => Number.isFinite(rOf(t)));
+  return {
+    measurable,
+    wins:   measurable.filter(t => pnlOf(t) > 0),
+    losses: measurable.filter(t => pnlOf(t) < 0),
+    be:     measurable.filter(t => pnlOf(t) === 0),
+  };
+};
+
+// Exposed so the weighting can be asserted directly: the three must sum to 1.
+export const expectancyWeights = (trades) => {
+  const { measurable, wins, losses, be } = rPopulations(trades);
+  const n = measurable.length;
+  if (!n) return { win: 0, loss: 0, be: 0, n: 0 };
+  return { win: wins.length / n, loss: losses.length / n, be: be.length / n, n };
+};
+
+// Expected value per trade, in R units. Break-even trades stay in the
+// denominator — they are real outcomes — but contribute 0R to the numerator.
 export const expectedValueR = (trades) => {
-  if (!trades.length) return 0;
-  const wins = trades.filter(isWin);
-  const losses = trades.filter(t => !isWin(t));
-  if (!wins.length && !losses.length) return 0;
-  const wr = wins.length / trades.length;
-  const avgWin = wins.length ? mean(wins.map(rOf)) : 0;
-  const avgLoss = losses.length ? mean(losses.map(rOf)) : 0;
-  return wr * avgWin + (1 - wr) * avgLoss;
+  const { measurable, wins, losses, be } = rPopulations(trades);
+  const n = measurable.length;
+  if (!n) return null;
+  return (wins.length / n)   * (wins.length   ? mean(wins.map(rOf))   : 0)
+       + (losses.length / n) * (losses.length ? mean(losses.map(rOf)) : 0)
+       + (be.length / n)     * 0;
 };
 
 // Profit factor: gross wins / |gross losses|
@@ -76,11 +121,14 @@ export const profitFactor = (trades) => {
   return grossWin / grossLoss;
 };
 
-// Sharpe-like ratio on per-trade R outcomes.
+// Sharpe-like ratio on per-trade R outcomes. Returns null rather than 0 when
+// there is nothing to measure: `stddev` yields 0 for n < 2, and a Sharpe of
+// "0" reads as a measurement of no edge instead of an absence of data.
 export const sharpeR = (trades) => {
-  const rs = trades.map(rOf);
+  const rs = rValues(trades);
+  if (rs.length < MIN_SAMPLE_R) return null;
   const sd = stddev(rs);
-  return sd > 0 ? mean(rs) / sd : 0;
+  return sd > 0 ? mean(rs) / sd : null;
 };
 
 // Max drawdown from an equity sequence (array of equity values or R cumsum).
@@ -135,15 +183,18 @@ export const rankSetupEdges = (trades, { minSample = MIN_SAMPLE_EDGE } = {}) => 
     const n = list.length;
     if (n < minSample) continue;
     const wins = list.filter(isWin).length;
-    const aR = avgR(list);
+    const { avg: aR, n: rN } = rStats(list);
     ranked.push({
       setup, n, wins,
       winRate: Math.round((wins / n) * 100),
-      avgR: Number(aR.toFixed(2)),
-      score: edgeScore(wins, n, aR),
+      avgR: aR == null ? null : Number(aR.toFixed(2)),
+      rSampleSize: rN,
+      // `?? 0` here is a declared neutral for a ranking score, not a coerced
+      // measurement: a setup with no measurable R ranks on Wilson alone.
+      score: edgeScore(wins, n, aR ?? 0),
     });
   }
-  return ranked.sort((a, b) => b.score - a.score || b.avgR - a.avgR);
+  return ranked.sort((a, b) => b.score - a.score || (b.avgR ?? 0) - (a.avgR ?? 0));
 };
 
 // Streaks — longest consecutive wins and losses (chronological order expected).
@@ -158,14 +209,15 @@ export const streaks = (trades) => {
 };
 
 // Kelly fraction from win rate and average win/loss R-multiples.
+// Needs both a win and a loss population to be defined at all — null, not 0,
+// when either is missing. Break-even trades stay in the denominator.
 export const kellyFraction = (trades) => {
-  const wins = trades.filter(isWin);
-  const losses = trades.filter(t => !isWin(t));
-  if (!wins.length || !losses.length) return 0;
-  const wr = wins.length / trades.length;
+  const { measurable, wins, losses } = rPopulations(trades);
+  if (!wins.length || !losses.length) return null;
+  const wr = wins.length / measurable.length;
   const b = Math.abs(mean(losses.map(rOf)));
-  if (b <= 0) return 0;
   const w = mean(wins.map(rOf));
+  if (b <= 0 || w <= 0) return null;
   return Math.max(0, Math.min(1, wr - (1 - wr) * (b / w)));
 };
 

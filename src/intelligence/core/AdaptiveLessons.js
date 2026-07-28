@@ -12,8 +12,15 @@ import { labelFor } from '../../i18n.js';
 const pnlOf = (t, calc) => {
   try { return calc(t)?.pnl ?? 0; } catch { return 0; }
 };
+// number | null. `?? 0` here used to give every stop-less trade a flat 0R,
+// which reads as "closed under 1R" and as "stayed inside 1.5R" at the same
+// time — so one lesson over-counted and the other under-counted, from the
+// same fabricated value.
 const rOf = (t, calc) => {
-  try { return calc(t)?.rMultiple ?? 0; } catch { return 0; }
+  try {
+    const r = calc(t)?.rMultiple;
+    return Number.isFinite(r) ? r : null;
+  } catch { return null; }
 };
 
 // "overnight_hold" → "Overnight Hold". Safe on already-clean labels ("Breakout").
@@ -76,7 +83,9 @@ const PATTERNS = [
     id: 'cut_winners_early',
     severity: 'high',
     detect: (trades, calc) => {
-      const winners = trades.filter(t => pnlOf(t, calc) > 0);
+      // Scoped to winners whose R is measurable: the claim is "closed under
+      // 1R", and a trade with no stop has no position relative to 1R at all.
+      const winners = trades.filter(t => pnlOf(t, calc) > 0 && rOf(t, calc) != null);
       if (winners.length < 5) return null;
       const early = winners.filter(t => rOf(t, calc) < 1.0);
       if (early.length / winners.length < 0.5) return null;
@@ -96,7 +105,7 @@ const PATTERNS = [
     id: 'stop_discipline',
     severity: 'critical',
     detect: (trades, calc) => {
-      const losses = trades.filter(t => pnlOf(t, calc) < 0);
+      const losses = trades.filter(t => pnlOf(t, calc) < 0 && rOf(t, calc) != null);
       if (losses.length < 3) return null;
       const big = losses.filter(t => Math.abs(rOf(t, calc)) > 1.5);
       if (big.length < 2) return null;

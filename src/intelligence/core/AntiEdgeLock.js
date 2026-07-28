@@ -12,7 +12,7 @@
 // A locked setup blocks new trade entry and must be manually unlocked
 // (or auto-unlocks after one winning week).
 
-import { getClosed, avgR, winRate, expectedValueR } from "../utils/statisticalModels.js";
+import { getClosed, rStats, winRate, expectedValueR } from "../utils/statisticalModels.js";
 
 const LOCK_WEEKS     = 4;   // consecutive losing weeks before hard lock
 const WARN_WEEKS     = 3;   // weeks before soft warning
@@ -66,8 +66,10 @@ const recentContiguousWeeks = (weekMap, n) => {
   return contiguous; // most-recent first
 };
 
+// number | null. null means the week held no trade whose R could be measured —
+// which is not the same as a week that broke even, and must never lock a setup.
 const weekExpectancy = (trades) => {
-  if (!trades.length) return 0;
+  if (!trades.length) return null;
   return expectedValueR(trades);
 };
 
@@ -131,6 +133,7 @@ export const checkAntiEdgeLocks = (trades = [], nowMs = Date.now()) => {
   for (const [setup, weekMap] of setupWeeks.entries()) {
     const allTrades = [...weekMap.values()].flat();
     if (allTrades.length < MIN_TOTAL_N) continue;
+    const overallR = rStats(allTrades);
 
     const recentWeeks = recentContiguousWeeks(weekMap, LOCK_WEEKS);
     if (recentWeeks.length < WARN_WEEKS) continue;
@@ -138,13 +141,17 @@ export const checkAntiEdgeLocks = (trades = [], nowMs = Date.now()) => {
     const weeksData = recentWeeks.map((wk) => {
       const wTrades = weekMap.get(wk) || [];
       const ev      = weekExpectancy(wTrades);
+      const { avg: wAvgR, n: wRn } = rStats(wTrades);
       return {
         week: wk,
         n:    wTrades.length,
-        expectancy: Number(ev.toFixed(2)),
-        avgR: Number(avgR(wTrades).toFixed(2)),
+        expectancy: ev == null ? null : Number(ev.toFixed(2)),
+        avgR: wAvgR == null ? null : Number(wAvgR.toFixed(2)),
+        rSampleSize: wRn,
         winRate: Math.round(winRate(wTrades) * 100),
-        negative: ev < 0,
+        // An unmeasurable week is not a negative week. Locking a setup blocks
+        // real entries, so absence of evidence never counts as evidence.
+        negative: ev != null && ev < 0,
       };
     });
 
@@ -155,7 +162,8 @@ export const checkAntiEdgeLocks = (trades = [], nowMs = Date.now()) => {
       setup,
       negativeWeeks,
       weeksData,
-      overallAvgR: Number(avgR(allTrades).toFixed(2)),
+      overallAvgR: overallR.avg == null ? null : Number(overallR.avg.toFixed(2)),
+      overallRSampleSize: overallR.n,
       overallWR:   Math.round(winRate(allTrades) * 100),
       totalTrades: allTrades.length,
       manuallyUnlocked,

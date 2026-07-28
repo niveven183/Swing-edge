@@ -104,7 +104,7 @@ export const calibrationReport = () => {
   const byVerdict = {};
   for (const e of cal) {
     const v = e.verdict || "UNKNOWN";
-    if (!byVerdict[v]) byVerdict[v] = { n: 0, correct: 0, avgR: 0 };
+    if (!byVerdict[v]) byVerdict[v] = { n: 0, correct: 0, rSum: 0, rSampleSize: 0, avgR: null };
     byVerdict[v].n += 1;
     // A GO is "correct" when the trade won; a SKIP is "correct" when it lost.
     const correct =
@@ -112,11 +112,18 @@ export const calibrationReport = () => {
       (v === "SKIP"    && e.outcome === -1) ||
       (v === "CAUTION" && true);
     if (correct) byVerdict[v].correct += 1;
-    byVerdict[v].avgR += e.r || 0;
+    // The log stores `r: null` for trades where R was never measurable. Those
+    // entries still count toward accuracy — the verdict was still right or
+    // wrong — but they cannot enter an R average in either position.
+    if (Number.isFinite(e.r)) {
+      byVerdict[v].rSum += e.r;
+      byVerdict[v].rSampleSize += 1;
+    }
   }
   for (const v of Object.keys(byVerdict)) {
-    byVerdict[v].avgR /= byVerdict[v].n;
-    byVerdict[v].accuracy = byVerdict[v].correct / byVerdict[v].n;
+    const b = byVerdict[v];
+    b.avgR = b.rSampleSize ? b.rSum / b.rSampleSize : null;
+    b.accuracy = b.correct / b.n;
   }
 
   const totalCorrect = Object.values(byVerdict).reduce((s, x) => s + x.correct, 0);
