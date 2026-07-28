@@ -168,3 +168,47 @@ Every production incident gets one short entry: what broke, root cause, fix, pre
 - **Process miss (disclosed):** `CLAUDE.md` §10 requires a CI incident to be logged **in the same
   commit as its fix**. `84418fd` shipped without this entry; it is being added in a follow-up commit
   rather than quietly folded into unrelated work.
+
+## #9 — 2026-07-28 — A correct numerator over a population that could not hold the field
+- **Symptom:** The live User Analytics report stated that `followedPlan`, `exitReason`,
+  `maxFavorable` and `lessonLearned` were filled in **33%** of trades. Four independent optional
+  fields returning the identical figure is not a behavioural finding — it is the signature of a
+  shared denominator. The number was read as a user-discipline gap and a product conclusion was
+  built on it (that the close form was missing those inputs). It was not.
+- **Root cause:** the `FIELDS` loop measured every field against the CTE `clean` with no population
+  filter. Close-time fields are written by the close modal, which an **open** trade never reaches,
+  so open trades entered the denominator as guaranteed zeros. `33%` was therefore exactly the
+  **closed-trade share** — the metric was measuring how many trades were closed, under five
+  different field names. Scoped to closed trades: `followedPlan` 100%, `exitReason` 100%,
+  `maxFavorable`/`maxAdverse`/`lessonLearned` 60%. The fields were in the close form all along
+  (`SwingEdge_App.jsx:6483`/`6488`/`6495`, persisted at `1992-1995`).
+- **Scope:** every daily report since the agent went live, plus the ad-hoc analysis derived from it.
+  No user-facing surface and no data were affected — the defect was in measurement and in the
+  decisions it invited.
+- **The same error, three times in 48h:** "61% without `stop`" (denominator included demo trades),
+  "47% demo loss" (denominator included accounts that never traded), "33% close fields" (this one).
+  In all three the numerator was right. A rate is only falsifiable when its denominator is visible,
+  so the fix is not "be careful" — it is to make the denominator impossible to omit.
+- **Fix (commit `e9060c9`):** every measured field carries an explicit population (`POP_ALL` /
+  `POP_CLOSED`) with **no default** — adding a field forces the choice rather than inheriting a
+  wrong one. Every rendered rate prints numerator, denominator and population name by construction
+  (`41/41 סגורות`), and `assertRatiosCarryDenominator()` **throws** if a line with `%` lacks them
+  (verified by negative test: injecting `• המרה: 28%` exits 1 and sends nothing). The funnel, which
+  had been printing bare ratios, was brought under the same guard. `CLAUDE.md` §2 carries the rule
+  for ad-hoc queries and prompts, where two of the three instances originated and where no assert
+  can reach.
+- **The rule caught its own author, immediately.** While writing this fix I reported the corrected
+  `maxFavorable`/`maxAdverse` as **80%/30%**. Re-deriving them against the script's own CTE gave
+  **60%/60%**. The cause was the same class of defect one level up: my cohort was "users with ≥3
+  trades" where the corrected metric uses "users with ≥3 **closed** trades". I had stated a rate
+  without stating its denominator, so nothing — not even the paragraph arguing for denominators —
+  had made it checkable. **A rule that its author can violate inside the commit that introduces it
+  is a rule that must be enforced mechanically, not remembered.** That is the entire argument for
+  the assert and for §2 existing in the repo rather than in a habit.
+- **Prevention:** before reporting any rate, ask **"can this denominator contain the thing I am
+  counting?"** If not, the number measures population size, not behaviour. Two independent
+  populations returning the same percentage for unrelated fields is a denominator alarm, not a
+  correlation. And exposing the denominator is not cosmetic — it invalidates bad conclusions in
+  the line itself: the corrected close-field cohort is **one user**, which the report now prints as
+  "קוהורט 1-2 משתמשים", so "100% followedPlan" disqualifies itself on sight without anyone
+  needing to recall who is in the cohort.

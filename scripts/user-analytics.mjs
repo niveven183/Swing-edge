@@ -125,6 +125,12 @@ const share = (a, b, noun) =>
 // counted: "61% בלי stop", "47% אובדן דמו", "33% מילוי שדות סגירה". A bare percentage
 // reads as behaviour when it is arithmetic — the denominator is what makes it
 // falsifiable. So no rate leaves this script without one.
+//
+// Not a hypothetical: while writing this guard its author reported the corrected
+// MFE/MAE as 80%/30%; re-deriving them against the CTE below gave 60%/60% (the
+// cohort was "≥3 trades" instead of "≥3 CLOSED trades") — a bare rate stated inside
+// the commit that bans bare rates. Hence a throw, not a convention.
+// Full write-up: docs/INCIDENTS.md #9.
 const RATE_NOUNS = ["עסקאות", "סגורות", "נרשמים"];
 
 function assertRatiosCarryDenominator(lines, where) {
