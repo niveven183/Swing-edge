@@ -111,6 +111,44 @@ const show = (v) => (v === null || v === undefined || Number.isNaN(v) ? "לא ז
 // user cannot be isolated by cross-referencing segments.
 const kAnon = (n) => (n === null ? "לא זמין" : n === 0 ? "0" : n >= 3 ? String(n) : "1-2");
 
+// "לא זמין%" is not a percentage. Only a real number gets the sign.
+const asPct = (v) => (v === null || v === undefined || Number.isNaN(v) ? "לא זמין" : `${v}%`);
+
+// A share, rendered so it cannot be read without its denominator: "8/32 נרשמים = 25%".
+const share = (a, b, noun) =>
+  a !== null && a !== undefined && b ? ` (${a}/${b} ${noun} = ${Math.round((a * 100) / b)}%)` : "";
+
+// ── ratio guard ──────────────────────────────────────────────────────────────
+//
+// Three times in 48h (27-28.07) this project reported a rate whose numerator was
+// correct and whose denominator included rows that could not contain the thing being
+// counted: "61% בלי stop", "47% אובדן דמו", "33% מילוי שדות סגירה". A bare percentage
+// reads as behaviour when it is arithmetic — the denominator is what makes it
+// falsifiable. So no rate leaves this script without one.
+const RATE_NOUNS = ["עסקאות", "סגורות", "נרשמים"];
+
+function assertRatiosCarryDenominator(lines, where) {
+  for (const l of lines) {
+    if (!/\d%/.test(l)) continue; // nothing measured — "לא זמין" lines are exempt
+    if (!/\d+\/\d+/.test(l) || !RATE_NOUNS.some((n) => l.includes(n))) {
+      throw new Error(
+        `ratio guard: percentage without a denominator in ${where}: ${l.trim().slice(0, 90)}`
+      );
+    }
+  }
+}
+
+// One rendered fill-rate line, denominator included by construction.
+function fillLine(f) {
+  if (f.total === 0) return `${f.label}: אין אוכלוסייה למדידה (0 ${f.noun})`;
+  const flag = f.median !== null && f.median < 40 ? "🟠 " : "";
+  return (
+    `${flag}${f.label}: חציון ${asPct(f.median)} · 7 ימים ${asPct(f.median7d)} · ` +
+    `מצטבר ${asPct(f.pooled)} (${show(f.filled)}/${show(f.total)} ${f.noun}, ` +
+    `קוהורט ${kAnon(f.users)} משתמשים)`
+  );
+}
+
 // ── import detection ─────────────────────────────────────────────────────────
 //
 // A trade is "import residue" if ANY of three independent signals fires:
@@ -152,20 +190,38 @@ marked AS (SELECT *, (sig_predates OR sig_1130 OR sig_batch) AS is_import FROM t
 clean AS (SELECT * FROM marked WHERE NOT is_import)
 `;
 
+// Population a field is measured against. A field that can only be answered once the
+// trade is closed MUST NOT be measured against open trades: the resulting rate tracks
+// the closed-trade share, not user behaviour. On 2026-07-28 that produced a false
+// "33% discipline gap" — followedPlan/maxFavorable/maxAdverse read 33%, which was
+// exactly the closed-trade share; scoped to closed trades they are 100%/80%/30%.
+// The fields were in the close form all along (SwingEdge_App.jsx:6483/6488/6495).
+const POP_ALL = { pred: "TRUE", noun: "עסקאות" };
+const POP_CLOSED = {
+  // upper(): the column default is `'open'::text` lowercase while the app writes
+  // "OPEN"/"CLOSED" (docs/STATE.md §סיכונים פתוחים). A case-sensitive compare would
+  // silently drop every row ever inserted without an explicit status.
+  pred: `upper(status) = 'CLOSED'`,
+  noun: "סגורות",
+};
+
 // Optional fields whose fill-rate we track. Text fields are '' -> NULL normalised.
 // notes/lessonLearned appear ONLY inside count(NULLIF(...)) — we count whether, never what.
+// Third element is the population: entry-time fields vs every trade, close-time fields
+// vs closed trades only. There is no default on purpose — adding a field forces a choice.
 const FIELDS = [
-  ["stop", "stop"],
-  ["target", "target"],
-  ["setup", "NULLIF(setup,'')"],
-  ["emotionAtEntry", `NULLIF("emotionAtEntry",'')`],
-  ["followedPlan", `NULLIF("followedPlan",'')`],
-  ["marketCondition", `NULLIF("marketCondition",'')`],
-  ["entryQuality", `NULLIF("entryQuality",'')`],
-  ["maxFavorable", `"maxFavorable"`],
-  ["maxAdverse", `"maxAdverse"`],
-  ["notes (אם, לא מה)", "NULLIF(notes,'')"],
-  ["lessonLearned (אם, לא מה)", `NULLIF("lessonLearned",'')`],
+  ["stop", "stop", POP_ALL],
+  ["target", "target", POP_ALL],
+  ["setup", "NULLIF(setup,'')", POP_ALL],
+  ["emotionAtEntry", `NULLIF("emotionAtEntry",'')`, POP_ALL],
+  ["marketCondition", `NULLIF("marketCondition",'')`, POP_ALL],
+  ["entryQuality", `NULLIF("entryQuality",'')`, POP_ALL],
+  ["notes (אם, לא מה)", "NULLIF(notes,'')", POP_ALL],
+  ["followedPlan", `NULLIF("followedPlan",'')`, POP_CLOSED],
+  ["exitReason", `NULLIF("exitReason",'')`, POP_CLOSED],
+  ["maxFavorable", `"maxFavorable"`, POP_CLOSED],
+  ["maxAdverse", `"maxAdverse"`, POP_CLOSED],
+  ["lessonLearned (אם, לא מה)", `NULLIF("lessonLearned",'')`, POP_CLOSED],
 ];
 
 // ── gatherers ────────────────────────────────────────────────────────────────
@@ -294,27 +350,37 @@ function gatherStuck() {
 // pooled `stop` fill to 22% while the per-user median was 100%.
 function gatherFillRates() {
   const perField = [];
-  for (const [label, expr] of FIELDS) {
+  for (const [label, expr, pop] of FIELDS) {
     const r = one(
       q(
         `${CTE}
          SELECT
            (SELECT round(percentile_cont(0.5) WITHIN GROUP (ORDER BY pct)::numeric, 0)
               FROM (SELECT count(${expr})*100.0/count(*) AS pct
-                      FROM clean GROUP BY user_id HAVING count(*) >= 3) a),
+                      FROM clean WHERE ${pop.pred}
+                     GROUP BY user_id HAVING count(*) >= 3) a),
            (SELECT round(percentile_cont(0.5) WITHIN GROUP (ORDER BY pct)::numeric, 0)
               FROM (SELECT count(${expr})*100.0/count(*) AS pct
-                      FROM clean WHERE "createdAt" >= now() - interval '7 days'
+                      FROM clean WHERE ${pop.pred}
+                       AND "createdAt" >= now() - interval '7 days'
                      GROUP BY user_id HAVING count(*) >= 3) b),
-           (SELECT round(count(${expr})*100.0/NULLIF(count(*),0), 0) FROM clean);`,
+           (SELECT round(count(${expr})*100.0/NULLIF(count(*),0), 0) FROM clean WHERE ${pop.pred}),
+           (SELECT count(${expr}) FROM clean WHERE ${pop.pred}),
+           (SELECT count(*) FROM clean WHERE ${pop.pred}),
+           (SELECT count(*) FROM (SELECT user_id FROM clean WHERE ${pop.pred}
+                                   GROUP BY user_id HAVING count(*) >= 3) c);`,
         `fill:${label}`
       )
     );
     perField.push({
       label,
+      noun: pop.noun,
       median: r ? num(r[0]) : null,
       median7d: r ? num(r[1]) : null,
       pooled: r ? num(r[2]) : null,
+      filled: r ? num(r[3]) : null,
+      total: r ? num(r[4]) : null,
+      users: r ? num(r[5]) : null,
     });
   }
   const cohort = one(
@@ -542,6 +608,9 @@ function buildReport(d) {
     }
     if (!moved) p("• ללא שינוי בכל המדדים המצטברים.");
     p(`• (בסיס ההשוואה: ${d.prev.date || "לא ידוע"})`);
+    // Not run through assertRatiosCarryDenominator: this is a change-over-time, not a
+    // share of a population. Its base is `was`, and `was → cur` is printed on the same
+    // line — the number is already falsifiable without an X/Y denominator.
     for (const s of volumeSwings(d)) {
       p(`• 🟠 ${s.label}: שינוי של ${s.pct}% מאתמול (${s.was} → ${s.cur}, ${s.diff > 0 ? "+" : ""}${s.diff})`);
     }
@@ -553,10 +622,13 @@ function buildReport(d) {
   if (!d.funnel) p("• לא זמין");
   else {
     const f = d.funnel;
-    const pct = (a, b) => (a !== null && b ? ` (${Math.round((a * 100) / b)}%)` : "");
+    const funnelLines = [
+      `• עסקה ראשונה: ${show(f.firstTrade)}${share(f.firstTrade, f.signedUp, "נרשמים")}`,
+      `• 5+ עסקאות: ${show(f.fiveTrades)}${share(f.fiveTrades, f.signedUp, "נרשמים")}`,
+    ];
+    assertRatiosCarryDenominator(funnelLines, "funnel");
     p(`• נרשמו: ${show(f.signedUp)}`);
-    p(`• עסקה ראשונה: ${show(f.firstTrade)}${pct(f.firstTrade, f.signedUp)}`);
-    p(`• 5+ עסקאות: ${show(f.fiveTrades)}${pct(f.fiveTrades, f.signedUp)}`);
+    for (const l of funnelLines) p(l);
     p(`• פעילים ב-7 הימים האחרונים: ${show(f.active7d)}`);
     p(`• חציון ימים מהרשמה לעסקה ראשונה: ${show(f.medianDaysToFirst)}`);
     p(`  (ספירות המשפך אינן מוסתרות — הן סך-הכול, לא חתך שמזהה יחיד.)`);
@@ -579,14 +651,13 @@ function buildReport(d) {
   p("── איכות מילוי ──");
   if (!d.fill) p("• לא זמין");
   else {
-    p(`• מדד ראשי: חציון בין משתמשים עם ≥3 עסקאות (קוהורט: ${kAnon(d.fill.cohortUsers)} משתמשים).`);
+    p(`• מדד ראשי: חציון בין משתמשים עם ≥3 עסקאות באוכלוסייה של אותו שדה.`);
     p(`• "מצטבר" הוא מספר משני ו**מוטה-ריכוזיות** — משתמש כבד אחד מזיז אותו. אל תסיק ממנו.`);
-    for (const f of d.fill.perField) {
-      const flag = f.median !== null && f.median < 40 ? "🟠 " : "";
-      p(
-        `  ${flag}${f.label}: חציון ${show(f.median)}% · 7 ימים ${show(f.median7d)}% · מצטבר ${show(f.pooled)}%`
-      );
-    }
+    p(`• כל שיעור נושא את המכנה שלו. שדות-סגירה נמדדים מול עסקאות סגורות בלבד —`);
+    p(`  מדידתם מול עסקאות פתוחות מחזירה את שיעור הסגורות, לא את התנהגות המשתמש.`);
+    const fillLines = d.fill.perField.map(fillLine);
+    assertRatiosCarryDenominator(fillLines, "fill rates");
+    for (const l of fillLines) p("  " + l);
     p(`• תמונת גרף — לא נמדד: אין עמודה כזו ואין Storage bucket (ראה PLAN §0.4).`);
   }
   p("");
