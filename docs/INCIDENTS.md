@@ -116,3 +116,55 @@ Every production incident gets one short entry: what broke, root cause, fix, pre
   collect.** Any check that runs on a gate/schedule narrower than the reporting cycle must state
   whether it ran, and the reporter must consult that before declaring anything recovered. Related:
   a finding's `reason` field carries observations only — hypotheses belong in `fix`.
+
+## #7 — 2026-07-28 — User Analytics reported green while every metric was off by one row
+- **Symptom:** The first `workflow_dispatch` run of `user-analytics.yml` (`dry_run=true`) finished
+  **green with zero warnings**, and printed `count-run-1: trades=NaN distinct_users=NaN`. The query
+  itself was fine — the psql call returned data — but every metric in the report was reading one row
+  higher than it should.
+- **Root cause:** `scripts/user-analytics.mjs` prefixes each query with
+  `SET default_transaction_read_only = on;`. Without `-q`, psql prints the command tag `SET` on
+  stdout, so `rows[0]` was `["SET"]` and every subsequent index was shifted by one. `fleet-daily.yml`
+  has always used `-tAq`; the new script used `-tAF '|'` and dropped the `-q`. Worse, nothing
+  asserted that a count parsed as a number, so `NaN` propagated through the whole report silently —
+  a textbook §2 violation authored by me.
+- **Scope:** The verification dispatch only. Nothing was emailed or posted (the run was a dry run),
+  and no cron existed yet — which is exactly why the dry run was mandated before enabling it.
+- **Fix:** `-tAqF '|'` (commit `ed6903a`), plus two independent guards: a command-tag detector that
+  drops a leading `SET`/`BEGIN`/`COMMIT` row **and warns**, and a `Number.isFinite` assertion on the
+  determinism probe that fails loudly instead of carrying `NaN` forward.
+- **Prevention:** **`-q` is load-bearing whenever a query is prefixed with `SET`** — treat it as part
+  of the psql contract, not formatting. And **any number that reaches a report must be asserted
+  finite at the point it is parsed**; a `NaN` that renders as "NaN" and still colours the run green
+  is a silent failure regardless of how visible the string looks. New reporting workflows ship
+  `workflow_dispatch`-only with a `dry_run` default of `true`, and the cron is enabled in a separate
+  commit only after a human reads the raw counts.
+
+## #8 — 2026-07-28 — Per-user analytics lines printed into a world-readable Actions log
+- **Symptom:** The first **live** run of `user-analytics.yml` (`30346816924`) succeeded, but a scan
+  of its public log found three short user IDs (`user_92a06c0c`, `user_ad1a0494`, `user_1ad72482`)
+  in plain text. This repo is PUBLIC, so the log is world-readable.
+- **Root cause:** **GitHub Actions logs an action's `with:` inputs.** The email step passed the full
+  report inline as `body: ${{ steps.analytics.outputs.report }}`, so the entire detailed report —
+  including the per-user anomaly lines that the whole design exists to keep off public surfaces —
+  was echoed to stdout before the mail was ever sent. The plan explicitly forbade artifacts and job
+  summaries and I honoured both; I did not consider the step log itself as a third channel.
+- **Scope:** One run's log. No journal content was involved (it is never read — only counted), no
+  emails or full UUIDs appeared, and no secret was exposed. The leaked values were 8-character ID
+  prefixes.
+- **Fix:** Commit `84418fd` — the report is written to `analytics-report.txt` and passed as
+  `body: file://analytics-report.txt` (the `file://` prefix was verified against the action's own
+  `action.yml` and `main.js` before relying on it, so the log now shows only the path); the `report`
+  output was removed from `GITHUB_OUTPUT` entirely, leaving only `date`/`color`/`summary`, all
+  aggregate; every short ID is registered with `::add-mask::` the moment it is created, so any future
+  step that echoes one prints `***`; the file is written **outside** `.analytics-state` because that
+  directory is persisted to the Actions cache, which is also public-readable; both paths are
+  gitignored. Verification run `30347127540`: 0 short IDs, 0 emails, 0 non-infra UUIDs.
+- **Prevention:** **On a public repo, an action's `with:` inputs are a publication channel — enumerate
+  it alongside artifacts, job summaries and stdout.** Sensitive content is handed to an action by
+  file path, never inline. Any value that must not appear in a log gets `::add-mask::` at creation
+  time as defence in depth, not at the point of use. Every new reporting workflow's first live run is
+  followed by a grep of its public log for IDs, addresses and UUIDs before it is left to run daily.
+- **Process miss (disclosed):** `CLAUDE.md` §10 requires a CI incident to be logged **in the same
+  commit as its fix**. `84418fd` shipped without this entry; it is being added in a follow-up commit
+  rather than quietly folded into unrelated work.
