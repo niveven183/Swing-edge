@@ -2,8 +2,8 @@ name: Fleet Daily
 
 # 24/7 replacement for two local Cowork agents (Cost Watchdog + Growth Pulse).
 # Runs in GitHub Actions so it no longer depends on Niv's Mac being awake and
-# Claude Desktop being open. Reports two Discord embeds (💰 Cost, 📈 Growth)
-# via the shared Sentinel webhook. Read-only: SELECT-only psql over the existing
+# Claude Desktop being open. Reports three Discord embeds (💰 Cost, 📈 Growth,
+# 🐕 Watchdog liveness) via the shared Sentinel webhook. Read-only: SELECT-only psql over the existing
 # SUPABASE_DB_URL, zero repo writes, aggregate numbers only (no PII, no secrets
 # in output). Day-over-day deltas persist via the Actions cache (Sentinel's
 # pattern). Complements — never replaces — Sentinel/health/smoke.
@@ -19,6 +19,7 @@ concurrency:
 
 permissions:
   contents: read           # zero repo writes
+  actions: read            # to read watchdog.yml's run history (Watchdog liveness step)
 
 jobs:
   fleet-daily:
@@ -214,6 +215,55 @@ jobs:
             > "$PREV"
           echo "state:"; cat "$PREV"
 
+      - name: Watchdog liveness
+        # Mutual watch: watchdog.yml checks the 11 scheduled agents, and this step checks
+        # watchdog.yml. An agent cannot report its own death — watchdog listing itself in
+        # its own MAXAGE table would only ever be evaluated on runs where it *did* run.
+        # Fleet Daily (06:00 UTC) precedes Watchdog (08:00 UTC), so it always reads a run
+        # that has already finished, never one in flight.
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          WATCHED_WF: watchdog.yml
+          MAX_H: '30'
+        run: |
+          set -uo pipefail
+          set +e                    # runner injects `bash -e`; a failed API call must degrade to 🔴, not abort
+          RED=15158332; GREEN=3066993
+          stamp="$(date -u '+%Y-%m-%d %H:%M UTC')"
+
+          resp="$(gh api "/repos/$REPO/actions/workflows/$WATCHED_WF/runs?status=success&per_page=1" 2>/tmp/gherr)"
+          rc=$?
+          if [ $rc -ne 0 ]; then
+            color=$RED
+            line="🔴 בדיקת ה-Watchdog עצמה נכשלה: $(head -1 /tmp/gherr 2>/dev/null || echo 'gh api error')"
+          else
+            updated="$(printf '%s' "$resp" | jq -r '.workflow_runs[0].updated_at // empty' 2>/dev/null)"
+            upd_epoch=""
+            [ -n "$updated" ] && upd_epoch="$(date -u -d "$updated" +%s 2>/dev/null)"
+            if [ -z "$updated" ]; then
+              color=$RED
+              line="🐕 Watchdog מעולם לא רץ בהצלחה — שומר הצי עצמו שקט"
+            elif [ -z "$upd_epoch" ]; then
+              color=$RED
+              line="🔴 בדיקת ה-Watchdog עצמה נכשלה: timestamp לא תקין ($updated)"
+            else
+              age_h=$(( ( $(date -u +%s) - upd_epoch ) / 3600 ))
+              if [ "$age_h" -gt "$MAX_H" ]; then
+                color=$RED
+                line="🐕 Watchdog לא רץ בהצלחה מאז $updated (לפני ${age_h}ש', סף ${MAX_H}ש') — שומר הצי עצמו שקט"
+              else
+                color=$GREEN
+                line="🐕 Watchdog: 🟢 ריצה מוצלחת אחרונה לפני ${age_h}ש' (סף ${MAX_H}ש', $updated)"
+              fi
+            fi
+          fi
+
+          desc="$(printf '🐕 Watchdog Liveness — מי שומר על השומר\n%s\nנבדק: %s' "$line" "$stamp")"
+          jq -n --argjson c "$color" --arg d "$desc" '{color:$c,description:$d}' > watchdog-embed.json
+          echo "watchdog-embed:"; cat watchdog-embed.json
+
       - name: Report to Discord
         env:
           DISCORD_WEBHOOK: ${{ secrets.SENTINEL_DISCORD_WEBHOOK }}
@@ -240,6 +290,7 @@ jobs:
           }
           post cost-embed.json
           post growth-embed.json
+          post watchdog-embed.json
 
       - name: Save day-over-day state
         if: always()

@@ -97,7 +97,7 @@ jobs:
           # job is added or a workflow file is renamed/removed. ----
           for f in .github/workflows/*.yml; do
             base="$(basename "$f")"
-            [ "$base" = "watchdog.yml" ] && continue   # self: deliberately not in MAXAGE
+            [ "$base" = "watchdog.yml" ] && continue   # self: watched by fleet-daily.yml instead — an agent cannot report its own death
             if grep -qE '^\s*schedule:\s*$' "$f" && [ -z "${MAXAGE[$base]+x}" ]; then
               consistency_lines="${consistency_lines}\n⚠️ workflow מתוזמן לא מנוטר: $base"
               n_problem=$((n_problem+1))
