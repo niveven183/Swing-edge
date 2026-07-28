@@ -452,6 +452,30 @@ function writeState(snapshot) {
   }
 }
 
+// Added after 2026-07-27 — 173 rows were deleted and nobody knew for 3 hours.
+// A per-metric "went down" line is not enough: it looks the same whether one
+// trade vanished or 60% of the table did. Any swing over ±20% against yesterday
+// gets its own alarm, in both the e-mail and the Discord summary.
+const VOLUME_SWING_PCT = 20;
+
+function volumeSwings(d) {
+  if (!d.prev || !d.snapshot || !d.prev.snapshot) return [];
+  const out = [];
+  for (const [k, label] of Object.entries(SNAPSHOT_LABELS)) {
+    const cur = d.snapshot[k], was = d.prev.snapshot[k];
+    if (!Number.isFinite(cur) || !Number.isFinite(was)) continue;
+    // A jump away from zero is real movement but has no meaningful percentage.
+    if (was === 0) {
+      if (cur > 0) out.push({ label, was, cur, diff: cur, pct: "∞" });
+      continue;
+    }
+    const diff = cur - was;
+    const pct = Math.round((diff / was) * 1000) / 10;
+    if (Math.abs(pct) >= VOLUME_SWING_PCT) out.push({ label, was, cur, diff, pct });
+  }
+  return out;
+}
+
 // ── report composition ───────────────────────────────────────────────────────
 
 function buildReport(d) {
@@ -506,6 +530,9 @@ function buildReport(d) {
     }
     if (!moved) p("• ללא שינוי בכל המדדים המצטברים.");
     p(`• (בסיס ההשוואה: ${d.prev.date || "לא ידוע"})`);
+    for (const s of volumeSwings(d)) {
+      p(`• 🟠 ${s.label}: שינוי של ${s.pct}% מאתמול (${s.was} → ${s.cur}, ${s.diff > 0 ? "+" : ""}${s.diff})`);
+    }
   }
   p("");
 
@@ -617,6 +644,10 @@ function buildSummary(d) {
       })
       .map(([k]) => SNAPSHOT_LABELS[k]);
     if (drops.length) L.push(`• 🔴 ירידה במדדים: ${drops.join(", ")} — ייתכן שנמחקו נתונים`);
+    // Magnitude, not just direction — see volumeSwings().
+    for (const s of volumeSwings(d)) {
+      L.push(`• 🟠 ${s.label}: ${s.pct}% מאתמול (${s.was} → ${s.cur})`);
+    }
   } else {
     L.push(`• שינוי מאתמול: אין בסיס להשוואה`);
   }
@@ -684,8 +715,12 @@ async function main() {
   assertNoIdentifiers(summary, "summary");
 
   const RED = 15158332, AMBER = 15844367, GREEN = 3066993;
+  const swings = volumeSwings(d);
   let color = GREEN;
   if (warnings.length || (d.fill && d.fill.perField.some((f) => f.median !== null && f.median < 40))) color = AMBER;
+  if (swings.length) color = AMBER;
+  // A >20% LOSS of rows outranks everything else the report can say.
+  if (swings.some((s) => s.diff < 0)) color = RED;
   if (!probe.ok || (status && status.unexpected.length)) color = RED;
 
   emit(report, summary, color);

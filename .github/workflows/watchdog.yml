@@ -49,6 +49,7 @@ jobs:
             [sentinel.yml]=3
             [daily-digest.yml]=30
             [fleet-daily.yml]=30
+            [user-analytics.yml]=30
             [smoke.yml]=30
             [data-guardian.yml]=80
             [fleet-weekly.yml]=192

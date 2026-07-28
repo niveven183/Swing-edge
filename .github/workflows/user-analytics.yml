@@ -16,9 +16,8 @@ name: User Analytics
 # all of this with guards that throw rather than degrade.
 
 on:
-  # cron enabled after first verified dispatch — see PLAN-2026-07-27
-  # schedule:
-  #   - cron: '30 6 * * *'   # 06:30 UTC = 09:30 Israel — after fleet-daily (06:00)
+  schedule:
+    - cron: '30 6 * * *'   # 06:30 UTC = 09:30 Israel — after fleet-daily (06:00)
   workflow_dispatch:
     inputs:
       dry_run:
