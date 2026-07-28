@@ -79,7 +79,10 @@ jobs:
           from: SwingEdge Analytics <${{ secrets.MAIL_USERNAME }}>
           to: niveven183@gmail.com
           subject: "👥 SwingEdge — התנהגות משתמשים (${{ steps.analytics.outputs.date }})"
-          body: ${{ steps.analytics.outputs.report }}
+          # file:// and NOT a step output. Actions logs an action's `with:` inputs,
+          # so passing the report inline printed every per-user line into a public
+          # log on the first live run. Only this path is logged now.
+          body: file://analytics-report.txt
 
       - name: Note missing mail secrets
         if: ${{ env.DRY_RUN != 'true' && (env.MAIL_USERNAME == '' || env.MAIL_PASSWORD == '') }}

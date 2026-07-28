@@ -23,6 +23,10 @@ const SUPABASE_DB_URL = process.env.SUPABASE_DB_URL || "";
 const DRY_RUN = String(process.env.DRY_RUN || "").toLowerCase() === "true";
 const STATE_DIR = ".analytics-state";
 const STATE_FILE = `${STATE_DIR}/prev.json`;
+// Deliberately NOT inside STATE_DIR — that directory is persisted to the Actions
+// cache, which is readable by anyone on a public repo. This file lives and dies
+// inside the single job run.
+const REPORT_FILE = "analytics-report.txt";
 const STAMP = new Date().toISOString().replace("T", " ").slice(0, 16) + " UTC";
 
 const warnings = []; // non-fatal degradations, surfaced in the report
@@ -343,7 +347,15 @@ function gatherAnomalies() {
     "anomalies"
   );
   if (!rows) return null;
-  return rows.map(([uid, kind, n]) => ({ uid, kind, n: num(n) }));
+  const out = rows.map(([uid, kind, n]) => ({ uid, kind, n: num(n) }));
+  // Defence in depth. The report body is handed to the mail action via file://
+  // precisely so it never reaches the log, but ANY step that ever echoes a short
+  // ID on a public repo is a leak. Registering each one with ::add-mask:: makes
+  // the runner redact it everywhere for the rest of the job.
+  // Added after the first live run, where `body: ${{ steps.*.outputs.report }}`
+  // caused Actions to print all three anomaly lines into a world-readable log.
+  for (const a of out) if (a.uid) console.log(`::add-mask::user_${a.uid}`);
+  return out;
 }
 
 function gatherFeedbackMentoring() {
@@ -670,16 +682,25 @@ function buildSummary(d) {
 // ── output ───────────────────────────────────────────────────────────────────
 
 function emit(report, summary, color) {
-  // GITHUB_OUTPUT is consumed by the workflow's mail/Discord steps. It is NOT the
-  // job summary and NOT an artifact — neither of which may carry per-user lines on
-  // a public repo.
+  // The detailed report is written to a FILE and handed to the mail action as
+  // `body: file://...`. It is deliberately NOT a step output: GitHub Actions logs
+  // an action's `with:` inputs, so `body: ${{ steps.*.outputs.report }}` printed
+  // the whole report — short IDs included — into a world-readable log on the first
+  // live run. Only the file path appears in the log now.
+  // The file lives OUTSIDE .analytics-state on purpose: that directory rides the
+  // Actions cache, which is also readable on a public repo.
+  try {
+    writeFileSync(REPORT_FILE, report);
+  } catch (e) {
+    warn(`report file write failed: ${String(e.message).slice(0, 120)}`);
+  }
+
+  // Only aggregate, identifier-free values become step outputs.
   const gho = process.env.GITHUB_OUTPUT;
   if (gho) {
-    const d1 = `REPORT_${Date.now()}`;
     const d2 = `SUMMARY_${Date.now()}`;
     appendFileSync(gho, `date=${new Date().toISOString().slice(0, 10)}\n`);
     appendFileSync(gho, `color=${color}\n`);
-    appendFileSync(gho, `report<<${d1}\n${report}\n${d1}\n`);
     appendFileSync(gho, `summary<<${d2}\n${summary}\n${d2}\n`);
   }
 }

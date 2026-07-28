@@ -9,3 +9,7 @@ test-results/
 /playwright/.cache/
 HANDOFF*.md
 browser-findings*.json
+# User Analytics: report body + day-over-day state. Carry short user IDs and
+# per-user counts — must never land in a public repo.
+analytics-report.txt
+.analytics-state/
