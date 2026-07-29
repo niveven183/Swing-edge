@@ -4,13 +4,13 @@
 // SwingEdge has no fees column, so it is dropped after detection.
 
 export const FIELD_SYNONYMS = {
-  ticker:   ["ticker", "symbol", "instrument", "asset", "stock", "סימול", "נייר", "מניה", "שם נייר", "שם המניה"],
-  side:     ["side", "direction", "position", "type", "action", "l/s", "long", "short", "buy", "sell", "כיוון", "סוג", "פעולה", "קנייה", "קניה", "מכירה"],
-  entry:    ["entry", "entry price", "buy price", "open price", "price in", "avg price", "average price", "cost", "cost basis", "מחיר כניסה", "כניסה", "מחיר קנייה", "מחיר קניה"],
-  exit:     ["exit", "exit price", "sell price", "close price", "price out", "מחיר יציאה", "יציאה", "מחיר מכירה"],
-  shares:   ["qty", "quantity", "shares", "size", "position size", "volume", "units", "amount", "no. of shares", "כמות", "יחידות", "מניות"],
-  date:     ["date", "entry date", "trade date", "open date", "opened", "תאריך", "תאריך כניסה", "תאריך פתיחה", "יום"],
-  exitDate: ["exit date", "close date", "closed", "closed date", "תאריך יציאה", "תאריך סגירה"],
+  ticker:   ["ticker", "symbol", "instrument", "asset", "stock", "סימול", "נייר", "מניה", "שם נייר", "שם המניה", "שם הנייר", "מספר נייר", "מס נייר", "מס' נייר"],
+  side:     ["side", "direction", "position", "type", "action", "l/s", "long", "short", "buy", "sell", "כיוון", "סוג", "פעולה", "קנייה", "קניה", "מכירה", "סוג פעולה", "סוג הפעולה", "סוג עסקה"],
+  entry:    ["entry", "entry price", "buy price", "open price", "price in", "avg price", "average price", "cost", "cost basis", "מחיר כניסה", "כניסה", "מחיר קנייה", "מחיר קניה", "שער", "שער ביצוע", "שער עלות", "שער עלות ממוצע", "שער קנייה", "שער קניה", "מחיר ביצוע", "מחיר"],
+  exit:     ["exit", "exit price", "sell price", "close price", "price out", "מחיר יציאה", "יציאה", "מחיר מכירה", "שער מכירה", "מחיר סגירה"],
+  shares:   ["qty", "quantity", "shares", "size", "position size", "volume", "units", "amount", "no. of shares", "כמות", "יחידות", "מניות", "כמות ניירות", "כמות יחידות"],
+  date:     ["date", "entry date", "trade date", "open date", "opened", "תאריך", "תאריך כניסה", "תאריך פתיחה", "יום", "תאריך ביצוע", "תאריך הוראה", "תאריך עסקה"],
+  exitDate: ["exit date", "close date", "closed", "closed date", "תאריך יציאה", "תאריך סגירה", "תאריך מכירה"],
   stop:     ["stop", "stop loss", "stoploss", "sl", "stop price", "סטופ", "סטופ לוס", "מחיר סטופ"],
   target:   ["target", "take profit", "takeprofit", "tp", "target price", "יעד", "מטרה", "מחיר יעד"],
   fees:     ["fees", "fee", "commission", "commissions", "comm", "עמלה", "עמלות"],
@@ -42,19 +42,46 @@ const SYNONYM_TO_FIELD = (() => {
   return map;
 })();
 
-// Exact-ish header → field (after normalization). Returns null when unknown.
-export const fieldForHeader = (header) => {
+// Token-subset fallback candidates. Tokens are matched as substrings so Hebrew
+// prefixes still hit ("סוג הפעולה" contains "פעולה"), which in turn makes short
+// tokens dangerous: "l/s" normalizes to "l s", and a bare `includes("l")` +
+// `includes("s")` claims "stop loss price" and "total shares sold" for `side`.
+// Hence the length floors — a 2-char token is only trustworthy when it has to
+// co-occur with others, and a lone token needs 3.
+const FALLBACK_CANDIDATES = (() => {
+  const out = [];
+  for (const [syn, field] of SYNONYM_TO_FIELD) {
+    const tokens = syn.split(" ");
+    const floor = tokens.length > 1 ? 2 : 3;
+    if (tokens.some((tok) => tok.length < floor)) continue;
+    out.push({ tokens, field, score: syn.replace(/ /g, "").length });
+  }
+  return out;
+})();
+
+// Exact header matches must outrank every token-subset match, whatever its length.
+const EXACT_BONUS = 1000;
+
+// header → { field, score } | null. The score exists so callers can rank
+// competing columns. Within the fallback the longest synonym wins, which is
+// what makes specific beat generic regardless of field declaration order:
+// "מחיר יעד" (7) beats "מחיר" (4), "שער עלות ממוצע" (12) beats "שער" (3).
+export const matchHeader = (header) => {
   const k = normKey(header);
   if (!k) return null;
-  if (SYNONYM_TO_FIELD.has(k)) return SYNONYM_TO_FIELD.get(k);
-  // Token-subset fallback: e.g. "trade entry price ($)" → "entry price" tokens.
-  for (const [syn, field] of SYNONYM_TO_FIELD) {
-    if (k === syn) return field;
-    const synTokens = syn.split(" ");
-    if (synTokens.length > 1 && synTokens.every((tok) => k.includes(tok))) return field;
+  if (SYNONYM_TO_FIELD.has(k)) return { field: SYNONYM_TO_FIELD.get(k), score: EXACT_BONUS + k.length };
+  let best = null;
+  for (const cand of FALLBACK_CANDIDATES) {
+    if (!cand.tokens.every((tok) => k.includes(tok))) continue;
+    if (!best || cand.score > best.score || (cand.score === best.score && cand.tokens.length > best.tokens.length)) {
+      best = { field: cand.field, score: cand.score, tokens: cand.tokens };
+    }
   }
-  return null;
+  return best ? { field: best.field, score: best.score } : null;
 };
+
+// Exact-ish header → field (after normalization). Returns null when unknown.
+export const fieldForHeader = (header) => matchHeader(header)?.field ?? null;
 
 // Side value normalization: text → "LONG" | "SHORT" | null.
 export const normalizeSide = (raw) => {

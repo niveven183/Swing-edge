@@ -3,7 +3,7 @@
 // all dates -> date; all L/S tokens -> side). Also infers the date format
 // (DD/MM vs MM/DD) from the data, defaulting to DD/MM for the Israeli audience.
 
-import { fieldForHeader, normalizeSide, MAPPABLE_FIELDS } from "./synonyms.js";
+import { matchHeader, normalizeSide, MAPPABLE_FIELDS } from "./synonyms.js";
 
 const DATE_TEXT_RE = /^\s*\d{1,4}[/\-.]\d{1,2}[/\-.]\d{1,4}\s*$/;
 const ISO_RE = /^\s*\d{4}-\d{2}-\d{2}([ T].*)?$/;
@@ -25,6 +25,15 @@ export const looksLikeDate = (v) => {
 };
 
 export const looksLikeSide = (v) => normalizeSide(v) != null;
+
+// A tradable ticker, deliberately US-shaped: AAPL, BRK.B, RDS-A. Used only to
+// break a tie between two columns that both claim `ticker` — a broker file
+// often carries both a display name and the symbol, and only the symbol can be
+// priced or charted. Known limit: Israeli numeric security IDs (e.g. 1159250)
+// do NOT match, and such a file falls back to the header score. That is
+// intentional here; broker profiles (phase B) are where numeric IDs belong.
+const SYMBOL_RE = /^[A-Z][A-Z0-9.\-]{0,5}$/;
+export const looksLikeSymbol = (v) => SYMBOL_RE.test(String(v ?? "").trim());
 
 const colValues = (rows, idx) =>
   rows.map((r) => r[idx]).filter((v) => v != null && String(v).trim() !== "");
@@ -70,14 +79,32 @@ export function detectColumns(headers, rows) {
     usedCols.add(idx);
   };
 
-  // Pass 1 — header synonyms.
+  const sample = rows.slice(0, 40);
+
+  // Pass 1 — header synonyms. When several columns claim the same field the
+  // winner is the strongest header match, not the leftmost column: brokers
+  // order their columns differently, and Altshuler puts the company name
+  // ("שם נייר") before the actual symbol ("מס' נייר / סימול").
+  const candidates = new Map();
   headers.forEach((h, idx) => {
-    const field = fieldForHeader(h);
-    if (field && MAPPABLE_FIELDS.includes(field)) assign(field, idx);
+    const m = matchHeader(h);
+    if (!m || !MAPPABLE_FIELDS.includes(m.field)) return;
+    if (!candidates.has(m.field)) candidates.set(m.field, []);
+    candidates.get(m.field).push({ idx, score: m.score });
   });
+  for (const [field, list] of candidates) {
+    // For `ticker`, content outranks the header: an exactly-matching "שם נייר"
+    // would otherwise beat a fallback-matched symbol column and leave us with
+    // untradable display text. Same principle pass 2 already uses for date/side.
+    let pool = list;
+    if (field === "ticker" && list.length > 1) {
+      const symbolic = list.filter((c) => majority(colValues(sample, c.idx), looksLikeSymbol));
+      if (symbolic.length > 0) pool = symbolic;
+    }
+    assign(field, pool.reduce((a, b) => (b.score > a.score ? b : a)).idx);
+  }
 
   // Pass 2 — content sniffing for still-unmapped critical columns.
-  const sample = rows.slice(0, 40);
   headers.forEach((_, idx) => {
     if (usedCols.has(idx)) return;
     const vals = colValues(sample, idx);

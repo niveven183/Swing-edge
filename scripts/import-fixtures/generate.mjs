@@ -73,4 +73,40 @@ for (let i = 0; i < 200; i++) {
 }
 w("perf-200.csv", perf);
 
+// 7) IBI-style broker export. "שם נייר" carries the symbol while "מספר נייר"
+// carries the numeric Israeli security ID — both claim `ticker`, and the
+// numeric one even scores higher on the header. Content must break the tie.
+w("ibi-style.csv",
+`שם נייר,מספר נייר,פעולה,כמות,שער עלות ממוצע,תאריך הוראה
+AAPL,1159250,קנייה,10,150,2026-01-05
+TSLA,1159251,מכירה,5,250,2026-01-06
+NVDA,1159252,קנייה,20,100,2026-01-07
+`);
+
+// 8) Altshuler-style broker export. Company name precedes the symbol column,
+// so leftmost-wins would map `ticker` onto untradable display text.
+w("altshuler-style.csv",
+`תאריך,סוג פעולה,שם נייר,מס' נייר / סימול,כמות,שער ביצוע,מטבע
+2026-02-03,קנייה,META PLATFORMS INC,PLTR,12,25.5,$
+2026-02-04,מכירה,דיסקונט א,NFLX,4,600,$
+2026-02-05,קנייה,ALPHABET INC,GOOG,7,180,$
+`);
+
+// 9) Specific-beats-generic: "שער ביצוע" must not be stolen by "שער", and
+// "מחיר יעד"/"מחיר סטופ" must not be stolen by "מחיר". Last column is in no
+// dictionary and must stay unmapped.
+w("precedence.csv",
+`סימול,כמות,שער ביצוע,מחיר יעד,מחיר סטופ,הערות למסחר
+AAPL,10,150,165,145,ניסיון ראשון
+TSLA,5,250,270,240,לפי התוכנית
+`);
+
+// 10) The "l/s" trap: both headers contain an 'l' and an 's', which the old
+// token-subset fallback read as the `side` synonym "l/s".
+w("lstrap.csv",
+`Symbol,total shares sold,stop loss price,Entry,Date
+AAPL,10,145,150,2026-03-02
+MSFT,8,290,300,2026-03-03
+`);
+
 console.log("fixtures generated in", DIR);
