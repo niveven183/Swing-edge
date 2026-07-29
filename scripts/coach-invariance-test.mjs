@@ -10,12 +10,15 @@
 //   3. adaptCoaching never mutates its input.
 //   4. experience 'intermediate' returns insights deep-equal to the raw engine
 //      output (declared identity = enforced identity).
+//   5. every non-empty fixture history actually passes getClosed() — guards
+//      against the fixtures silently falling out of the stats pipeline again.
 //
 // Pure Node, no browser. Run: `node scripts/coach-invariance-test.mjs`.
 
 import assert from "node:assert/strict";
 import { SwingEdgeAI } from "../src/intelligence/SwingEdgeAI.js";
 import { adaptCoaching } from "../src/intelligence/core/CoachPersona.js";
+import { getClosed } from "../src/intelligence/utils/statisticalModels.js";
 
 // ── Profiles under test: {beginner,intermediate,advanced} × {swing,day} + null ──
 const PROFILES = {
@@ -48,10 +51,14 @@ const SCENARIOS = [
 ];
 
 // A small closed-trade history (best-effort; the invariance must hold regardless).
+// status must be "CLOSED" (uppercase) and exit/shares must be present — getClosed()
+// (statisticalModels.js) requires status === "CLOSED" && exit != null, and
+// calcTradeMetrics (utils.js) needs entry/exit/stop/shares to derive real pnl/rMultiple.
+// shares: 20 reproduces the declared pnl/rMultiple below exactly (verified, not coincidence).
 const mkClosed = (i, setup, win) => ({
   id: `t${i}`, ticker: "AAPL", side: "LONG", setup, marketCondition: "Trending Up",
-  entry: 100, stop: 95, target: 115, exitPrice: win ? 115 : 95,
-  pnl: win ? 300 : -100, rMultiple: win ? 3 : -1, status: "closed", closed: true,
+  entry: 100, stop: 95, target: 115, exit: win ? 115 : 95, shares: 20,
+  pnl: win ? 300 : -100, rMultiple: win ? 3 : -1, status: "CLOSED", closed: true,
   closedAt: `2026-01-${String(10 + i).padStart(2, "0")}T15:00:00Z`,
   openedAt: `2026-01-${String(10 + i).padStart(2, "0")}T14:00:00Z`,
 });
@@ -71,6 +78,15 @@ let checks = 0;
 const fail = (msg) => { console.error(`\n❌ ${msg}`); process.exit(1); };
 
 for (const [histName, trades] of Object.entries(HISTORIES)) {
+  // (5) Guard: a non-empty fixture history must actually satisfy getClosed()'s
+  // contract (status === "CLOSED" && exit != null). This is exactly what broke
+  // silently before — every fixture trade was filtered out and every history
+  // looked "empty" to the stats engine. See docs/DECISIONS.md 2026-07-28.
+  if (trades.length > 0) {
+    try { assert.strictEqual(getClosed(trades).length, trades.length); checks++; }
+    catch { fail(`[${histName}] fixture trades don't all pass getClosed() — statistics would silently see fewer samples than intended.`); }
+  }
+
   for (const sc of SCENARIOS) {
     const optsOf = (profile) => ({ ...sc.opts, profile });
     const label = `[${histName}] ${sc.name}`;
