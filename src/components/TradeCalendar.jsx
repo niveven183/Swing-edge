@@ -8,6 +8,7 @@ import { he as heLocale } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { nTrades, getTranslations } from '../i18n.js';
 import { localDayKey } from '../utils.js';
+import { outcomeRates } from '../intelligence/utils/statisticalModels.js';
 import DayTradesModal from './DayTradesModal.jsx';
 
 // Day a CLOSED trade belongs to = the day it was closed (its realized P&L lands then).
@@ -70,11 +71,15 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he' }) {
     const prefix = format(currentMonth, 'yyyy-MM');
     const monthTrades = trades.filter(t => (dayKeyOf(t) || '').startsWith(prefix));
     const pnl = monthTrades.reduce((s, t) => s + (metricsOf(t).pnl || 0), 0);
-    const wins = monthTrades.filter(t => (metricsOf(t).pnl || 0) > 0).length;
+    // Win rate via the shared three-outcome rule — a break-even is neither a win
+    // nor a loss here, exactly as on the dashboard. The month window is local
+    // (the engine groups by weekday and rolling windows, not calendar months),
+    // but the CLASSIFICATION is not.
+    const { winRate } = outcomeRates(monthTrades, t => metricsOf(t).pnl || 0);
     return {
       count: monthTrades.length,
       pnl,
-      winRate: monthTrades.length ? Math.round((wins / monthTrades.length) * 100) : 0,
+      winRate: Math.round(winRate * 100),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMonth, trades]);

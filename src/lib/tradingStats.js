@@ -1,5 +1,15 @@
 import { isFollowedPlan, isOffPlan, qstars, holdDays } from "../utils.js";
-import { edgeScore, wilsonLowerBound } from "../intelligence/utils/statisticalModels.js";
+import {
+  edgeScore, wilsonLowerBound,
+  getClosed, outcomeRates, grossPnl, profitFactorFromPnls,
+} from "../intelligence/utils/statisticalModels.js";
+
+// P&L accessor for the already-enriched metric objects this module works with.
+// Passed into the shared statisticalModels primitives so they reuse the P&L
+// computed once at the top of computeTradingStats instead of re-deriving it —
+// same three-outcome rule, one arithmetic path, no second pass over
+// calcTradeMetrics.
+const pnlOfMetric = (m) => m.pnl || 0;
 
 // R over an array of enriched metrics ({ ...trade, pnl, rMultiple }). `avg` is
 // null when no item in the set has a measurable R — a trade without a stop did
@@ -29,22 +39,35 @@ function rSumStats(items) {
  * @returns {Object} Comprehensive stats object (see EMPTY_STATS for shape).
  */
 export function computeTradingStats(trades, capital, calcTradeMetrics) {
-  const closed = (trades || []).filter(t => t.status === "CLOSED");
+  // "Closed" has ONE definition, and it lives in statisticalModels.getClosed:
+  // status CLOSED *and* an exit price. A row marked closed with no exit has no
+  // realized P&L to contribute — counting it inflates the denominator of every
+  // rate on the dashboard while adding nothing to the numerator (T3 · decision 1).
+  const closed = getClosed(trades);
   const open   = (trades || []).filter(t => t.status === "OPEN");
 
   if (closed.length === 0) return EMPTY_STATS(capital);
 
   // ─── Base metrics ──────────────────────────────────────────
   const metrics = closed.map(t => ({ ...t, ...calcTradeMetrics(t) }));
-  const winners = metrics.filter(m => (m.pnl || 0) > 0);
-  const losers  = metrics.filter(m => (m.pnl || 0) < 0);
 
-  const totalPnL     = metrics.reduce((s, m) => s + (m.pnl || 0), 0);
-  const totalWin     = winners.reduce((s, m) => s + m.pnl, 0);
-  const totalLoss    = Math.abs(losers.reduce((s, m) => s + m.pnl, 0));
-  const winRate      = (winners.length / closed.length) * 100;
-  const lossRate     = (losers.length  / closed.length) * 100;
-  const profitFactor = totalLoss > 0 ? totalWin / totalLoss : (totalWin > 0 ? Infinity : 0);
+  // Three buckets, not two — break-even is its own outcome (T3 · decision 2).
+  const rates   = outcomeRates(metrics, pnlOfMetric);
+  const winners = rates.wins;
+  const losers  = rates.losses;
+  const breakEvens = rates.be;
+
+  const totalPnL = metrics.reduce((s, m) => s + (m.pnl || 0), 0);
+  const { grossWin: totalWin, grossLoss: totalLoss } = grossPnl(metrics.map(pnlOfMetric));
+
+  // SCALE BOUNDARY — the one and only place this module leaves the 0..1
+  // convention of statisticalModels and enters the 0..100 convention its UI
+  // consumers read (T3 · decision 3). Every rate below is multiplied here, once.
+  const winRate  = rates.winRate  * 100;
+  const lossRate = rates.lossRate * 100;
+  const beRate   = rates.beRate   * 100;
+
+  const profitFactor = profitFactorFromPnls(metrics.map(pnlOfMetric));
   const avgWin       = winners.length ? totalWin / winners.length : 0;
   const avgLoss      = losers.length  ? totalLoss / losers.length : 0;
   const { avg: avgR, n: rSampleSize } = rSumStats(metrics);
@@ -85,6 +108,12 @@ export function computeTradingStats(trades, capital, calcTradeMetrics) {
   let tw = 0;
   let tl = 0;
   let currentStreak = 0;
+  // Chronological run-length list — [{ type, length }] — emitted from the SAME
+  // pass that computes the streak maxima, so the run history and the headline
+  // "best streak" can never disagree. Break-even trades are transparent here:
+  // they neither extend nor break a run, matching the maxima above.
+  const streakRuns = [];
+  let runType = null, runLen = 0;
   sorted.forEach((m, i) => {
     const p = m.pnl || 0;
     if (p > 0) {
@@ -94,18 +123,22 @@ export function computeTradingStats(trades, capital, calcTradeMetrics) {
       tl++; tw = 0;
       if (tl > maxLossStreak) maxLossStreak = tl;
     }
+    if (p !== 0) {
+      const nt = p > 0 ? "win" : "loss";
+      if (runType === null || runType === nt) { runType = nt; runLen++; }
+      else { streakRuns.push({ type: runType, length: runLen }); runType = nt; runLen = 1; }
+    }
     if (i === sorted.length - 1) currentStreak = tw > 0 ? tw : -tl;
   });
+  if (runLen > 0 && runType) streakRuns.push({ type: runType, length: runLen });
 
   // ─── Behavioral ────────────────────────────────────────────
   const planYes = metrics.filter(m => isFollowedPlan(m.followedPlan));
   const planNo  = metrics.filter(m => isOffPlan(m.followedPlan));
-  const planFollowedWR = planYes.length
-    ? (planYes.filter(m => (m.pnl || 0) > 0).length / planYes.length) * 100
-    : 0;
-  const planIgnoredWR = planNo.length
-    ? (planNo.filter(m => (m.pnl || 0) > 0).length / planNo.length) * 100
-    : 0;
+  // Same win-rate rule as everywhere else (BE in the denominator, not the
+  // numerator); outcomeRates already returns 0 for an empty population.
+  const planFollowedWR = outcomeRates(planYes, pnlOfMetric).winRate * 100;  // scale boundary
+  const planIgnoredWR  = outcomeRates(planNo,  pnlOfMetric).winRate * 100;  // scale boundary
 
   // ─── Time-based ────────────────────────────────────────────
   const now = Date.now();
@@ -137,12 +170,15 @@ export function computeTradingStats(trades, capital, calcTradeMetrics) {
     openTrades:  open.length,
     wins:        winners.length,
     losses:      losers.length,
+    be:          breakEvens.length,
 
     // pnl
     totalPnL, totalWin, totalLoss,
 
-    // rates
-    winRate, lossRate, profitFactor,
+    // rates — all 0..100 (see SCALE BOUNDARY above).
+    // winRate + lossRate + beRate === 100 exactly; `beRate` exists so that
+    // identity holds instead of the BE slice silently going missing.
+    winRate, lossRate, beRate, profitFactor,
 
     // averages
     avgWin, avgLoss, avgR, rSampleSize, bestWin, worstLoss,
@@ -166,6 +202,7 @@ export function computeTradingStats(trades, capital, calcTradeMetrics) {
     maxWinStreak,
     maxLossStreak,
     bestStreak: maxWinStreak,             // alias
+    streakRuns,                           // [{ type: "win"|"loss", length }]
 
     // behavioral
     planFollowedWR,
@@ -199,13 +236,13 @@ export function computeTradingStats(trades, capital, calcTradeMetrics) {
 
 function EMPTY_STATS(capital) {
   return {
-    totalTrades: 0, total: 0, openTrades: 0, wins: 0, losses: 0,
+    totalTrades: 0, total: 0, openTrades: 0, wins: 0, losses: 0, be: 0,
     totalPnL: 0, totalWin: 0, totalLoss: 0,
-    winRate: 0, lossRate: 0, profitFactor: 0,
+    winRate: 0, lossRate: 0, beRate: 0, profitFactor: 0,
     avgWin: 0, avgLoss: 0, avgR: null, rSampleSize: 0, bestWin: 0, worstLoss: 0,
     currentEquity: capital, capital, returnPct: 0,
     equityCurve: [], maxDrawdown: 0, maxDD: 0, currentDrawdown: 0,
-    currentStreak: 0, maxWinStreak: 0, maxLossStreak: 0, bestStreak: 0,
+    currentStreak: 0, maxWinStreak: 0, maxLossStreak: 0, bestStreak: 0, streakRuns: [],
     planFollowedWR: 0, planIgnoredWR: 0, planAdherence: 0,
     avgHoldHours: 0, avgHold: 0,
     lastWeekStats:  { count: 0, pnl: 0, winRate: 0 },
@@ -226,22 +263,29 @@ function groupAndAnalyze(metrics, field, keyFn) {
     groups[key].push(m);
   });
   return Object.entries(groups).map(([name, items]) => {
-    const wins    = items.filter(m => (m.pnl || 0) > 0);
-    const sumWin  = wins.reduce((s, m) => s + m.pnl, 0);
-    const sumLoss = Math.abs(items.filter(m => (m.pnl || 0) < 0).reduce((s, m) => s + m.pnl, 0));
+    // Same three-outcome rule and same profit-factor path as the top-level
+    // figures — a group's win rate must mean what the headline win rate means.
+    const rates    = outcomeRates(items, pnlOfMetric);
     const totalPnL = items.reduce((s, m) => s + (m.pnl || 0), 0);
     const r        = rSumStats(items);
     return {
       name,
       count: items.length,
-      wins: wins.length,
-      winRate: (wins.length / items.length) * 100,
+      wins:   rates.wins.length,
+      losses: rates.losses.length,
+      be:     rates.be.length,
+      winRate:  rates.winRate  * 100,   // scale boundary (see computeTradingStats)
+      lossRate: rates.lossRate * 100,
+      beRate:   rates.beRate   * 100,
       totalPnL,
       avgPnL: totalPnL / items.length,
       totalR: r.total,
       avgR: r.avg,
       rSampleSize: r.n,
-      profitFactor: sumLoss > 0 ? sumWin / sumLoss : (sumWin > 0 ? Infinity : 0),
+      // Infinity is possible here exactly as it is at the top level. Any
+      // consumer that renders this must guard with Number.isFinite — see the
+      // journal profit-factor tile in SwingEdge_App.jsx.
+      profitFactor: profitFactorFromPnls(items.map(pnlOfMetric)),
     };
   }).sort((a, b) => b.totalPnL - a.totalPnL);
 }
@@ -259,23 +303,25 @@ function analyzeByDay(metrics) {
   return buckets
     .filter(d => d.items.length > 0)
     .map(d => {
-      const wins = d.items.filter(m => (m.pnl || 0) > 0);
+      const rates = outcomeRates(d.items, pnlOfMetric);
       return {
         name: d.name,
         count: d.items.length,
-        winRate: (wins.length / d.items.length) * 100,
+        winRate: rates.winRate * 100,   // scale boundary
+        beRate:  rates.beRate  * 100,
         totalPnL: d.items.reduce((s, m) => s + (m.pnl || 0), 0),
       };
     });
 }
 
 function summarize(metrics) {
-  if (!metrics.length) return { count: 0, pnl: 0, winRate: 0 };
-  const wins = metrics.filter(m => (m.pnl || 0) > 0);
+  if (!metrics.length) return { count: 0, pnl: 0, winRate: 0, beRate: 0 };
+  const rates = outcomeRates(metrics, pnlOfMetric);
   return {
     count: metrics.length,
     pnl: metrics.reduce((s, m) => s + (m.pnl || 0), 0),
-    winRate: (wins.length / metrics.length) * 100,
+    winRate: rates.winRate * 100,   // scale boundary
+    beRate:  rates.beRate  * 100,
   };
 }
 
@@ -296,7 +342,8 @@ function findEdges(metrics, type) {
   const scored = Object.entries(combos)
     .filter(([, items]) => items.length >= minCount)
     .map(([name, items]) => {
-      const wins = items.filter(m => (m.pnl || 0) > 0).length;
+      const rates = outcomeRates(items, pnlOfMetric);
+      const wins = rates.wins.length;
       const n = items.length;
       const { avg: avgR, n: rSampleSize } = rSumStats(items);
       // `?? 0` in the two ranking scores is a declared neutral, not a
@@ -307,7 +354,8 @@ function findEdges(metrics, type) {
         setup: items[0].setup || "?",
         emotion: items[0].emotionAtEntry || "?",
         count: n,
-        winRate: (wins / n) * 100,
+        winRate: rates.winRate * 100,   // scale boundary
+        beRate:  rates.beRate  * 100,
         totalPnL: items.reduce((s, m) => s + (m.pnl || 0), 0),
         avgR,
         rSampleSize,

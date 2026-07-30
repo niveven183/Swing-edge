@@ -19,6 +19,15 @@
 //      T3 (behavior unification) is expected to update this baseline
 //      deliberately, with the diff reviewed and the plan doc explaining why.
 //
+// BASELINE VERSION: v2 (T3 · docs/plans/PLAN-2026-07-30-fin-group2-unify.md).
+// v1 → v2 was captured after the group-2 unification. The full structural diff
+// was: 123 field ADDITIONS, 0 removals, and 0 changed values — every existing
+// number in all five v1 fixtures survived byte-for-byte, including profitFactor
+// (the one accumulation-order risk the plan flagged in §2.ב). The additions are
+// `be` / `beRate` / `losses` / `lossRate` at every grouping level plus the new
+// `streakRuns`, all of them decision 2 ("break-even is an explicit third bucket
+// everywhere") and the streak-history extraction. Scenario 6 is new in v2.
+//
 // lastWeekStats/lastMonthStats read the wall clock (Date.now()) inside
 // computeTradingStats — the one non-pure dependency in an otherwise pure
 // function (see PLAN doc §0.a). Date.now is stubbed to a fixed timestamp for
@@ -47,6 +56,29 @@ const close = (name, actual, expected, eps = 1e-9) =>
   check(`${name} → ≈${expected} (got ${actual})`, Math.abs(actual - expected) < eps);
 
 const CAPITAL = 2500;
+
+// ── Population-completeness gate ────────────────────────────────────────────
+// Every input trade must land in exactly one of: the closed population that
+// feeds `totalTrades`, the open population that feeds `openTrades`, or a
+// declared remainder. The remainder is passed in explicitly per fixture, so a
+// trade that silently falls out of BOTH populations — the failure mode
+// decision 1 introduces by tightening "closed" to `status && exit != null` —
+// fails this test instead of quietly shrinking a denominator on screen.
+const completeness = (label, input, s, expectedUnaccounted) => {
+  const unaccounted = input.length - s.totalTrades - s.openTrades;
+  check(
+    `${label} — population complete: ${s.totalTrades} closed + ${s.openTrades} open + ${unaccounted} unaccounted = ${input.length} input`,
+    unaccounted === expectedUnaccounted && s.totalTrades + s.openTrades + unaccounted === input.length,
+  );
+};
+
+// The three rates are a partition of the closed population — they must sum to
+// exactly 100, not "about" 100 (decision 2).
+const ratesSumTo100 = (label, s) => {
+  if (s.isEmpty) return;
+  close(`${label} — winRate + lossRate + beRate === 100`, s.winRate + s.lossRate + s.beRate, 100);
+  eq(`${label} — wins + losses + be === totalTrades`, s.wins + s.losses + s.be, s.totalTrades);
+};
 
 // ── Frozen clock — lastWeekStats/lastMonthStats depend on Date.now() ────────
 const FIXED_NOW = new Date("2026-02-15T12:00:00.000Z").getTime();
@@ -80,6 +112,10 @@ const mk = (over) => ({
   eq("equityCurve.length", s.equityCurve.length, 0);
   eq("bySetup.length", s.bySetup.length, 0);
   eq("topEdges.length", s.topEdges.length, 0);
+  eq("be", s.be, 0);
+  eq("beRate", s.beRate, 0);
+  eq("streakRuns", s.streakRuns.length, 0);
+  completeness("empty", [], s, 0);
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -131,6 +167,21 @@ const mk = (over) => ({
   // No BE trades: wins + losses === totalTrades, winRate + lossRate === 100.
   eq("wins + losses === totalTrades (no BE in this fixture)", s.wins + s.losses, s.totalTrades);
   close("winRate + lossRate === 100 (no BE in this fixture)", s.winRate + s.lossRate, 100);
+  eq("be (none in this fixture)", s.be, 0);
+  eq("beRate", s.beRate, 0);
+  ratesSumTo100("normal", s);
+  completeness("normal", NORMAL, s, 0);
+  // Chronological runs: t6(+) t5(−) t4(+) t8(−) t3(+) t2(−) t1(+) t7(+)
+  eq("streakRuns", JSON.stringify(s.streakRuns), JSON.stringify([
+    { type: "win", length: 1 }, { type: "loss", length: 1 },
+    { type: "win", length: 1 }, { type: "loss", length: 1 },
+    { type: "win", length: 1 }, { type: "loss", length: 1 },
+    { type: "win", length: 2 },
+  ]));
+  eq("streakRuns longest win run === maxWinStreak",
+    Math.max(...s.streakRuns.filter(r => r.type === "win").map(r => r.length)), s.maxWinStreak);
+  eq("streakRuns longest loss run === maxLossStreak",
+    Math.max(...s.streakRuns.filter(r => r.type === "loss").map(r => r.length)), s.maxLossStreak);
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -176,6 +227,18 @@ const mk = (over) => ({
   eq("lastWeekStats.count", s.lastWeekStats.count, 1);
   close("lastWeekStats.pnl", s.lastWeekStats.pnl, 0);
   eq("lastMonthStats.count", s.lastMonthStats.count, 1);
+  // T3 · decision 2 — the BE trades are now NAMED, not merely absent. winRate
+  // and lossRate are unchanged from v1; the missing third is no longer silent.
+  eq("be", s.be, 2);
+  close("beRate", s.beRate, (2 / 6) * 100);
+  ratesSumTo100("withBreakEven", s);
+  completeness("withBreakEven", WITH_BE, s, 0);
+  // BE trades neither extend nor break a run: w1 w2 (2 wins) then l1 l2 (2 losses).
+  eq("streakRuns — BE is transparent to runs", JSON.stringify(s.streakRuns),
+    JSON.stringify([{ type: "loss", length: 2 }, { type: "win", length: 2 }]));
+  eq("bySetup[0] carries the same BE bucket", s.bySetup[0].be, 2);
+  close("bySetup[0] rates sum to 100",
+    s.bySetup[0].winRate + s.bySetup[0].lossRate + s.bySetup[0].beRate, 100);
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -205,6 +268,9 @@ const mk = (over) => ({
   check("avgR is a number, not null, when at least one trade is measurable", s.avgR !== null);
   close("bestWin", s.bestWin, 300); // n1, unmeasurable in R but very much a real winner in $
   close("worstLoss", s.worstLoss, -200);
+  eq("be", s.be, 0);
+  ratesSumTo100("missingStops", s);
+  completeness("missingStops", NO_STOPS, s, 0);
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -235,16 +301,72 @@ const mk = (over) => ({
     s.closedMetrics.every((m) => m.id !== "o1" && m.id !== "o2"));
   eq("lastWeekStats.count (only c1)", s.lastWeekStats.count, 1);
   eq("lastMonthStats.count (c1,c2,c3)", s.lastMonthStats.count, 3);
+  ratesSumTo100("openPositions", s);
+  // The 2 OPEN trades are accounted for by openTrades — nothing is unaccounted.
+  completeness("openPositions", WITH_OPEN, s, 2 - 2);
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// 6 · Infinity sweep — profitFactor (top-level AND every breakdown group) is
+// 6 · CLOSED WITHOUT EXIT — the population contract of T3 · decision 1.
+//     A row flagged CLOSED with no exit price has no realized P&L. Before the
+//     unification it was counted in `closed` and contributed pnl 0, which is
+//     indistinguishable from a genuine break-even: it inflated the denominator
+//     of every rate and shifted the equity curve by a phantom flat point.
+//     `getClosed` now requires `exit != null`, so it leaves the population —
+//     and, because it is not OPEN either, it leaves the stats object entirely.
+//     That disappearance is asserted here rather than being left implicit.
+//     Production count of such rows on 2026-07-30: 0/102 closed trades.
+// ─────────────────────────────────────────────────────────────────────────
+{
+  console.log("\n6 · CLOSED without exit — excluded from the closed population, and declared missing");
+  const CLOSED_NO_EXIT = [
+    mk({ id: "x1", entry: 100, stop: 90, exit: 120,  shares: 10, date: daysAgo(3) }),  // pnl 200 r 2
+    mk({ id: "x2", entry: 100, stop: 90, exit: 80,   shares: 10, date: daysAgo(10) }), // pnl -200 r -2
+    mk({ id: "ghost", entry: 100, stop: 90, exit: null, shares: 10, date: daysAgo(6) }), // CLOSED, no exit
+    mk({ id: "o1", entry: 100, stop: 90, exit: null, shares: 10, date: daysAgo(1), status: "OPEN" }),
+  ];
+  const s = computeTradingStats(CLOSED_NO_EXIT, CAPITAL, calcTradeMetrics);
+  eq("totalTrades — the CLOSED-without-exit row is NOT counted", s.totalTrades, 2);
+  eq("openTrades — nor is it silently reclassified as open", s.openTrades, 1);
+  check("the ghost row never reaches closedMetrics",
+    s.closedMetrics.every(m => m.id !== "ghost"));
+  eq("be — a missing exit is NOT a break-even", s.be, 0);
+  close("winRate — 1 of 2, not 1 of 3", s.winRate, 50);
+  ratesSumTo100("closedWithoutExit", s);
+  eq("equityCurve has no phantom flat point", s.equityCurve.length, 2);
+  // THE POINT OF THIS FIXTURE: exactly one input trade is in neither bucket.
+  completeness("closedWithoutExit", CLOSED_NO_EXIT, s, 1);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 6b · FIN-006 lock — `followedPlan` is a tri-state that arrives from CSV
+//      import as a STRING. The string "false" is truthy in JS, so a raw
+//      `filter(t => t.followedPlan)` counts a trade the user explicitly marked
+//      as off-plan as discipline. isFollowedPlan/isOffPlan own that parsing.
+//      Already correct at T3 start; this asserts it stays that way.
+// ─────────────────────────────────────────────────────────────────────────
+{
+  console.log("\n6b · FIN-006 — the STRING \"false\" is not discipline");
+  const PLAN_STRINGS = [
+    mk({ id: "p1", entry: 100, stop: 90, exit: 120, shares: 10, date: daysAgo(3),  followedPlan: "false" }),
+    mk({ id: "p2", entry: 100, stop: 90, exit: 120, shares: 10, date: daysAgo(5),  followedPlan: "true" }),
+    mk({ id: "p3", entry: 100, stop: 90, exit: 80,  shares: 10, date: daysAgo(8),  followedPlan: false }),
+    mk({ id: "p4", entry: 100, stop: 90, exit: 80,  shares: 10, date: daysAgo(12), followedPlan: true }),
+  ];
+  const s = computeTradingStats(PLAN_STRINGS, CAPITAL, calcTradeMetrics);
+  close('planAdherence — 2 of 4, not 4 of 4 ("false" is not truthy here)', s.planAdherence, 50);
+  close("planFollowedWR — p2 won, p4 lost → 50%", s.planFollowedWR, 50);
+  close("planIgnoredWR — p1 won, p3 lost → 50%", s.planIgnoredWR, 50);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 7 · Infinity sweep — profitFactor (top-level AND every breakdown group) is
 //     the one field in this module's output that can legitimately be
 //     Infinity. Confirms no OTHER field goes non-finite on a no-losses
 //     portfolio, and documents where Infinity can surface for consumers.
 // ─────────────────────────────────────────────────────────────────────────
 {
-  console.log("\n6 · Infinity sweep — only profitFactor (top-level + breakdown groups) may be Infinity");
+  console.log("\n7 · Infinity sweep — only profitFactor (top-level + breakdown groups) may be Infinity");
   const NO_LOSSES = [
     mk({ id: "a", entry: 100, stop: 90, exit: 120, shares: 10, date: daysAgo(3), setup: "Breakout" }),
     mk({ id: "b", entry: 100, stop: 90, exit: 120, shares: 10, date: daysAgo(5), setup: "Breakout" }),
@@ -252,9 +374,25 @@ const mk = (over) => ({
   ];
   const s = computeTradingStats(NO_LOSSES, CAPITAL, calcTradeMetrics);
   eq("profitFactor is Infinity when there are wins and zero losses", s.profitFactor, Infinity);
-  check("bySetup[0].profitFactor is ALSO Infinity under the same condition (latent — currently unrendered, see PLAN doc hunt findings)",
+  check("bySetup[0].profitFactor is ALSO Infinity under the same condition — same declared sentinel, one arithmetic path",
     s.bySetup[0].profitFactor === Infinity);
-  const SCALARS = ["winRate", "lossRate", "avgWin", "avgLoss", "avgR", "totalPnL", "bestWin",
+  // T3 task §3 — the latent risk T2 flagged: every breakdown array carries a
+  // profitFactor that can go Infinity, and NOTHING ELSE in a group may. A
+  // consumer that renders a group figure needs exactly one guard, on one field.
+  const GROUPED = ["bySetup", "byEmotion", "byMarket", "byEntryQuality", "byDayOfWeek", "topEdges", "antiEdges"];
+  for (const arr of GROUPED) {
+    for (const g of s[arr]) {
+      for (const [k, v] of Object.entries(g)) {
+        if (typeof v !== "number") continue;
+        check(`${arr}[${g.name}].${k} — finite unless it is profitFactor`,
+          Number.isFinite(v) || k === "profitFactor");
+      }
+      if ("winRate" in g && "lossRate" in g && "beRate" in g) {
+        close(`${arr}[${g.name}] rates sum to 100`, g.winRate + g.lossRate + g.beRate, 100);
+      }
+    }
+  }
+  const SCALARS = ["winRate", "lossRate", "beRate", "avgWin", "avgLoss", "avgR", "totalPnL", "bestWin",
     "worstLoss", "currentEquity", "returnPct", "maxDrawdown", "maxDD", "currentDrawdown",
     "avgHoldHours", "avgHold", "planFollowedWR", "planIgnoredWR", "planAdherence"];
   for (const k of SCALARS) {
@@ -263,13 +401,13 @@ const mk = (over) => ({
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// 7 · FROZEN BASELINE — full-object regression gate for all 5 fixtures.
+// 8 · FROZEN BASELINE — full-object regression gate for all 6 fixtures.
 //     First run on a clean checkout writes the baseline (and the assertion
 //     trivially passes); every run after that diffs against the committed
 //     file. This is the T3 tripwire referenced in the plan doc.
 // ─────────────────────────────────────────────────────────────────────────
 {
-  console.log("\n7 · frozen full-object baseline (scripts/fixtures/tradingstats-baseline.json)");
+  console.log("\n8 · frozen full-object baseline v2 (scripts/fixtures/tradingstats-baseline.json)");
   const scenarios = {
     empty: computeTradingStats([], CAPITAL, calcTradeMetrics),
     normal: computeTradingStats([
@@ -303,6 +441,13 @@ const mk = (over) => ({
       mk({ id: "c3", entry: 100, stop: 95, exit: 110, shares: 10, date: daysAgo(20) }),
       mk({ id: "o1", entry: 100, stop: 90, exit: null, shares: 10, date: daysAgo(1), status: "OPEN" }),
       mk({ id: "o2", entry: 50,  stop: 45, exit: null, shares: 10, date: daysAgo(1), status: "OPEN" }),
+    ], CAPITAL, calcTradeMetrics),
+    // New in v2 — the population contract of decision 1 (see scenario 6).
+    closedWithoutExit: computeTradingStats([
+      mk({ id: "x1", entry: 100, stop: 90, exit: 120,  shares: 10, date: daysAgo(3) }),
+      mk({ id: "x2", entry: 100, stop: 90, exit: 80,   shares: 10, date: daysAgo(10) }),
+      mk({ id: "ghost", entry: 100, stop: 90, exit: null, shares: 10, date: daysAgo(6) }),
+      mk({ id: "o1", entry: 100, stop: 90, exit: null, shares: 10, date: daysAgo(1), status: "OPEN" }),
     ], CAPITAL, calcTradeMetrics),
   };
 

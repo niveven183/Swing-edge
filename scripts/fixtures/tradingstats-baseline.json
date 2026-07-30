@@ -5,11 +5,13 @@
     "openTrades": 0,
     "wins": 0,
     "losses": 0,
+    "be": 0,
     "totalPnL": 0,
     "totalWin": 0,
     "totalLoss": 0,
     "winRate": 0,
     "lossRate": 0,
+    "beRate": 0,
     "profitFactor": 0,
     "avgWin": 0,
     "avgLoss": 0,
@@ -28,6 +30,7 @@
     "maxWinStreak": 0,
     "maxLossStreak": 0,
     "bestStreak": 0,
+    "streakRuns": [],
     "planFollowedWR": 0,
     "planIgnoredWR": 0,
     "planAdherence": 0,
@@ -59,11 +62,13 @@
     "openTrades": 0,
     "wins": 5,
     "losses": 3,
+    "be": 0,
     "totalPnL": 230,
     "totalWin": 510,
     "totalLoss": 280,
     "winRate": 62.5,
     "lossRate": 37.5,
+    "beRate": 0,
     "profitFactor": 1.8214285714285714,
     "avgWin": 102,
     "avgLoss": 93.33333333333333,
@@ -139,6 +144,36 @@
     "maxWinStreak": 2,
     "maxLossStreak": 1,
     "bestStreak": 2,
+    "streakRuns": [
+      {
+        "type": "win",
+        "length": 1
+      },
+      {
+        "type": "loss",
+        "length": 1
+      },
+      {
+        "type": "win",
+        "length": 1
+      },
+      {
+        "type": "loss",
+        "length": 1
+      },
+      {
+        "type": "win",
+        "length": 1
+      },
+      {
+        "type": "loss",
+        "length": 1
+      },
+      {
+        "type": "win",
+        "length": 2
+      }
+    ],
     "planFollowedWR": 60,
     "planIgnoredWR": 66.66666666666666,
     "planAdherence": 62.5,
@@ -147,19 +182,25 @@
     "lastWeekStats": {
       "count": 3,
       "pnl": 100,
-      "winRate": 66.66666666666666
+      "winRate": 66.66666666666666,
+      "beRate": 0
     },
     "lastMonthStats": {
       "count": 6,
       "pnl": 140,
-      "winRate": 66.66666666666666
+      "winRate": 66.66666666666666,
+      "beRate": 0
     },
     "bySetup": [
       {
         "name": "Breakout",
         "count": 4,
         "wins": 3,
+        "losses": 1,
+        "be": 0,
         "winRate": 75,
+        "lossRate": 25,
+        "beRate": 0,
         "totalPnL": 140,
         "avgPnL": 35,
         "totalR": 4.25,
@@ -171,7 +212,11 @@
         "name": "Pullback",
         "count": 4,
         "wins": 2,
+        "losses": 2,
+        "be": 0,
         "winRate": 50,
+        "lossRate": 50,
+        "beRate": 0,
         "totalPnL": 90,
         "avgPnL": 22.5,
         "totalR": 2.5,
@@ -185,7 +230,11 @@
         "name": "Confident",
         "count": 3,
         "wins": 2,
+        "losses": 1,
+        "be": 0,
         "winRate": 66.66666666666666,
+        "lossRate": 33.33333333333333,
+        "beRate": 0,
         "totalPnL": 100,
         "avgPnL": 33.333333333333336,
         "totalR": 2.25,
@@ -197,7 +246,11 @@
         "name": "FOMO",
         "count": 3,
         "wins": 2,
+        "losses": 1,
+        "be": 0,
         "winRate": 66.66666666666666,
+        "lossRate": 33.33333333333333,
+        "beRate": 0,
         "totalPnL": 70,
         "avgPnL": 23.333333333333332,
         "totalR": 3,
@@ -209,7 +262,11 @@
         "name": "Neutral",
         "count": 2,
         "wins": 1,
+        "losses": 1,
+        "be": 0,
         "winRate": 50,
+        "lossRate": 50,
+        "beRate": 0,
         "totalPnL": 60,
         "avgPnL": 30,
         "totalR": 1.5,
@@ -223,7 +280,11 @@
         "name": "Trending Up",
         "count": 8,
         "wins": 5,
+        "losses": 3,
+        "be": 0,
         "winRate": 62.5,
+        "lossRate": 37.5,
+        "beRate": 0,
         "totalPnL": 230,
         "avgPnL": 28.75,
         "totalR": 6.75,
@@ -237,7 +298,11 @@
         "name": "3★",
         "count": 8,
         "wins": 5,
+        "losses": 3,
+        "be": 0,
         "winRate": 62.5,
+        "lossRate": 37.5,
+        "beRate": 0,
         "totalPnL": 230,
         "avgPnL": 28.75,
         "totalR": 6.75,
@@ -251,36 +316,42 @@
         "name": "Monday",
         "count": 1,
         "winRate": 100,
+        "beRate": 0,
         "totalPnL": 120
       },
       {
         "name": "Tuesday",
         "count": 1,
         "winRate": 0,
+        "beRate": 0,
         "totalPnL": -100
       },
       {
         "name": "Wednesday",
         "count": 1,
         "winRate": 100,
+        "beRate": 0,
         "totalPnL": 150
       },
       {
         "name": "Thursday",
         "count": 2,
         "winRate": 50,
+        "beRate": 0,
         "totalPnL": -20
       },
       {
         "name": "Friday",
         "count": 1,
         "winRate": 100,
+        "beRate": 0,
         "totalPnL": 150
       },
       {
         "name": "Saturday",
         "count": 2,
         "winRate": 50,
+        "beRate": 0,
         "totalPnL": -70
       }
     ],
@@ -291,6 +362,7 @@
         "emotion": "Confident",
         "count": 3,
         "winRate": 66.66666666666666,
+        "beRate": 0,
         "totalPnL": 100,
         "avgR": 0.75,
         "rSampleSize": 3,
@@ -461,11 +533,13 @@
     "openTrades": 0,
     "wins": 2,
     "losses": 2,
+    "be": 2,
     "totalPnL": 50,
     "totalWin": 400,
     "totalLoss": 350,
     "winRate": 33.33333333333333,
     "lossRate": 33.33333333333333,
+    "beRate": 33.33333333333333,
     "profitFactor": 1.1428571428571428,
     "avgWin": 200,
     "avgLoss": 175,
@@ -527,6 +601,16 @@
     "maxWinStreak": 2,
     "maxLossStreak": 2,
     "bestStreak": 2,
+    "streakRuns": [
+      {
+        "type": "loss",
+        "length": 2
+      },
+      {
+        "type": "win",
+        "length": 2
+      }
+    ],
     "planFollowedWR": 33.33333333333333,
     "planIgnoredWR": 0,
     "planAdherence": 100,
@@ -535,19 +619,25 @@
     "lastWeekStats": {
       "count": 1,
       "pnl": 0,
-      "winRate": 0
+      "winRate": 0,
+      "beRate": 100
     },
     "lastMonthStats": {
       "count": 1,
       "pnl": 0,
-      "winRate": 0
+      "winRate": 0,
+      "beRate": 100
     },
     "bySetup": [
       {
         "name": "Breakout",
         "count": 6,
         "wins": 2,
+        "losses": 2,
+        "be": 2,
         "winRate": 33.33333333333333,
+        "lossRate": 33.33333333333333,
+        "beRate": 33.33333333333333,
         "totalPnL": 50,
         "avgPnL": 8.333333333333334,
         "totalR": 0.5,
@@ -561,7 +651,11 @@
         "name": "Confident",
         "count": 6,
         "wins": 2,
+        "losses": 2,
+        "be": 2,
         "winRate": 33.33333333333333,
+        "lossRate": 33.33333333333333,
+        "beRate": 33.33333333333333,
         "totalPnL": 50,
         "avgPnL": 8.333333333333334,
         "totalR": 0.5,
@@ -575,7 +669,11 @@
         "name": "Trending Up",
         "count": 6,
         "wins": 2,
+        "losses": 2,
+        "be": 2,
         "winRate": 33.33333333333333,
+        "lossRate": 33.33333333333333,
+        "beRate": 33.33333333333333,
         "totalPnL": 50,
         "avgPnL": 8.333333333333334,
         "totalR": 0.5,
@@ -589,7 +687,11 @@
         "name": "3★",
         "count": 6,
         "wins": 2,
+        "losses": 2,
+        "be": 2,
         "winRate": 33.33333333333333,
+        "lossRate": 33.33333333333333,
+        "beRate": 33.33333333333333,
         "totalPnL": 50,
         "avgPnL": 8.333333333333334,
         "totalR": 0.5,
@@ -603,36 +705,42 @@
         "name": "Monday",
         "count": 1,
         "winRate": 0,
+        "beRate": 0,
         "totalPnL": -200
       },
       {
         "name": "Tuesday",
         "count": 1,
         "winRate": 100,
+        "beRate": 0,
         "totalPnL": 200
       },
       {
         "name": "Wednesday",
         "count": 1,
         "winRate": 0,
+        "beRate": 100,
         "totalPnL": 0
       },
       {
         "name": "Thursday",
         "count": 1,
         "winRate": 100,
+        "beRate": 0,
         "totalPnL": 200
       },
       {
         "name": "Friday",
         "count": 1,
         "winRate": 0,
+        "beRate": 100,
         "totalPnL": 0
       },
       {
         "name": "Saturday",
         "count": 1,
         "winRate": 0,
+        "beRate": 0,
         "totalPnL": -150
       }
     ],
@@ -643,6 +751,7 @@
         "emotion": "Confident",
         "count": 6,
         "winRate": 33.33333333333333,
+        "beRate": 33.33333333333333,
         "totalPnL": 50,
         "avgR": 0.08333333333333333,
         "rSampleSize": 6,
@@ -657,6 +766,7 @@
         "emotion": "Confident",
         "count": 6,
         "winRate": 33.33333333333333,
+        "beRate": 33.33333333333333,
         "totalPnL": 50,
         "avgR": 0.08333333333333333,
         "rSampleSize": 6,
@@ -788,11 +898,13 @@
     "openTrades": 0,
     "wins": 3,
     "losses": 2,
+    "be": 0,
     "totalPnL": 300,
     "totalWin": 600,
     "totalLoss": 300,
     "winRate": 60,
     "lossRate": 40,
+    "beRate": 0,
     "profitFactor": 2,
     "avgWin": 200,
     "avgLoss": 150,
@@ -847,6 +959,28 @@
     "maxWinStreak": 1,
     "maxLossStreak": 1,
     "bestStreak": 1,
+    "streakRuns": [
+      {
+        "type": "win",
+        "length": 1
+      },
+      {
+        "type": "loss",
+        "length": 1
+      },
+      {
+        "type": "win",
+        "length": 1
+      },
+      {
+        "type": "loss",
+        "length": 1
+      },
+      {
+        "type": "win",
+        "length": 1
+      }
+    ],
     "planFollowedWR": 60,
     "planIgnoredWR": 0,
     "planAdherence": 100,
@@ -855,19 +989,25 @@
     "lastWeekStats": {
       "count": 1,
       "pnl": 200,
-      "winRate": 100
+      "winRate": 100,
+      "beRate": 0
     },
     "lastMonthStats": {
       "count": 5,
       "pnl": 300,
-      "winRate": 60
+      "winRate": 60,
+      "beRate": 0
     },
     "bySetup": [
       {
         "name": "Breakout",
         "count": 5,
         "wins": 3,
+        "losses": 2,
+        "be": 0,
         "winRate": 60,
+        "lossRate": 40,
+        "beRate": 0,
         "totalPnL": 300,
         "avgPnL": 60,
         "totalR": 0,
@@ -881,7 +1021,11 @@
         "name": "Confident",
         "count": 5,
         "wins": 3,
+        "losses": 2,
+        "be": 0,
         "winRate": 60,
+        "lossRate": 40,
+        "beRate": 0,
         "totalPnL": 300,
         "avgPnL": 60,
         "totalR": 0,
@@ -895,7 +1039,11 @@
         "name": "Trending Up",
         "count": 5,
         "wins": 3,
+        "losses": 2,
+        "be": 0,
         "winRate": 60,
+        "lossRate": 40,
+        "beRate": 0,
         "totalPnL": 300,
         "avgPnL": 60,
         "totalR": 0,
@@ -909,7 +1057,11 @@
         "name": "3★",
         "count": 5,
         "wins": 3,
+        "losses": 2,
+        "be": 0,
         "winRate": 60,
+        "lossRate": 40,
+        "beRate": 0,
         "totalPnL": 300,
         "avgPnL": 60,
         "totalR": 0,
@@ -923,30 +1075,35 @@
         "name": "Monday",
         "count": 1,
         "winRate": 0,
+        "beRate": 0,
         "totalPnL": -100
       },
       {
         "name": "Tuesday",
         "count": 1,
         "winRate": 100,
+        "beRate": 0,
         "totalPnL": 200
       },
       {
         "name": "Wednesday",
         "count": 1,
         "winRate": 100,
+        "beRate": 0,
         "totalPnL": 100
       },
       {
         "name": "Thursday",
         "count": 1,
         "winRate": 0,
+        "beRate": 0,
         "totalPnL": -200
       },
       {
         "name": "Saturday",
         "count": 1,
         "winRate": 100,
+        "beRate": 0,
         "totalPnL": 300
       }
     ],
@@ -957,6 +1114,7 @@
         "emotion": "Confident",
         "count": 5,
         "winRate": 60,
+        "beRate": 0,
         "totalPnL": 300,
         "avgR": 0,
         "rSampleSize": 2,
@@ -1070,11 +1228,13 @@
     "openTrades": 2,
     "wins": 2,
     "losses": 1,
+    "be": 0,
     "totalPnL": 100,
     "totalWin": 300,
     "totalLoss": 200,
     "winRate": 66.66666666666666,
     "lossRate": 33.33333333333333,
+    "beRate": 0,
     "profitFactor": 1.5,
     "avgWin": 150,
     "avgLoss": 200,
@@ -1115,6 +1275,20 @@
     "maxWinStreak": 1,
     "maxLossStreak": 1,
     "bestStreak": 1,
+    "streakRuns": [
+      {
+        "type": "win",
+        "length": 1
+      },
+      {
+        "type": "loss",
+        "length": 1
+      },
+      {
+        "type": "win",
+        "length": 1
+      }
+    ],
     "planFollowedWR": 66.66666666666666,
     "planIgnoredWR": 0,
     "planAdherence": 100,
@@ -1123,19 +1297,25 @@
     "lastWeekStats": {
       "count": 1,
       "pnl": 200,
-      "winRate": 100
+      "winRate": 100,
+      "beRate": 0
     },
     "lastMonthStats": {
       "count": 3,
       "pnl": 100,
-      "winRate": 66.66666666666666
+      "winRate": 66.66666666666666,
+      "beRate": 0
     },
     "bySetup": [
       {
         "name": "Breakout",
         "count": 3,
         "wins": 2,
+        "losses": 1,
+        "be": 0,
         "winRate": 66.66666666666666,
+        "lossRate": 33.33333333333333,
+        "beRate": 0,
         "totalPnL": 100,
         "avgPnL": 33.333333333333336,
         "totalR": 2,
@@ -1149,7 +1329,11 @@
         "name": "Confident",
         "count": 3,
         "wins": 2,
+        "losses": 1,
+        "be": 0,
         "winRate": 66.66666666666666,
+        "lossRate": 33.33333333333333,
+        "beRate": 0,
         "totalPnL": 100,
         "avgPnL": 33.333333333333336,
         "totalR": 2,
@@ -1163,7 +1347,11 @@
         "name": "Trending Up",
         "count": 3,
         "wins": 2,
+        "losses": 1,
+        "be": 0,
         "winRate": 66.66666666666666,
+        "lossRate": 33.33333333333333,
+        "beRate": 0,
         "totalPnL": 100,
         "avgPnL": 33.333333333333336,
         "totalR": 2,
@@ -1177,7 +1365,11 @@
         "name": "3★",
         "count": 3,
         "wins": 2,
+        "losses": 1,
+        "be": 0,
         "winRate": 66.66666666666666,
+        "lossRate": 33.33333333333333,
+        "beRate": 0,
         "totalPnL": 100,
         "avgPnL": 33.333333333333336,
         "totalR": 2,
@@ -1191,12 +1383,14 @@
         "name": "Monday",
         "count": 1,
         "winRate": 100,
+        "beRate": 0,
         "totalPnL": 100
       },
       {
         "name": "Thursday",
         "count": 2,
         "winRate": 50,
+        "beRate": 0,
         "totalPnL": 0
       }
     ],
@@ -1207,6 +1401,7 @@
         "emotion": "Confident",
         "count": 3,
         "winRate": 66.66666666666666,
+        "beRate": 0,
         "totalPnL": 100,
         "avgR": 0.6666666666666666,
         "rSampleSize": 3,
@@ -1272,6 +1467,204 @@
         "date": "2026-01-26",
         "pnl": 100,
         "rMultiple": 2
+      }
+    ],
+    "isEmpty": false
+  },
+  "closedWithoutExit": {
+    "totalTrades": 2,
+    "total": 2,
+    "openTrades": 1,
+    "wins": 1,
+    "losses": 1,
+    "be": 0,
+    "totalPnL": 0,
+    "totalWin": 200,
+    "totalLoss": 200,
+    "winRate": 50,
+    "lossRate": 50,
+    "beRate": 0,
+    "profitFactor": 1,
+    "avgWin": 200,
+    "avgLoss": 200,
+    "avgR": 0,
+    "rSampleSize": 2,
+    "bestWin": 200,
+    "worstLoss": -200,
+    "currentEquity": 2500,
+    "capital": 2500,
+    "returnPct": 0,
+    "equityCurve": [
+      {
+        "index": 1,
+        "date": "2026-02-05",
+        "equity": 2300,
+        "pnl": -200,
+        "drawdown": 8
+      },
+      {
+        "index": 2,
+        "date": "2026-02-12",
+        "equity": 2500,
+        "pnl": 200,
+        "drawdown": 0
+      }
+    ],
+    "maxDrawdown": 8,
+    "maxDD": 200,
+    "currentDrawdown": 0,
+    "currentStreak": 1,
+    "maxWinStreak": 1,
+    "maxLossStreak": 1,
+    "bestStreak": 1,
+    "streakRuns": [
+      {
+        "type": "loss",
+        "length": 1
+      },
+      {
+        "type": "win",
+        "length": 1
+      }
+    ],
+    "planFollowedWR": 50,
+    "planIgnoredWR": 0,
+    "planAdherence": 100,
+    "avgHoldHours": 0,
+    "avgHold": 0,
+    "lastWeekStats": {
+      "count": 1,
+      "pnl": 200,
+      "winRate": 100,
+      "beRate": 0
+    },
+    "lastMonthStats": {
+      "count": 2,
+      "pnl": 0,
+      "winRate": 50,
+      "beRate": 0
+    },
+    "bySetup": [
+      {
+        "name": "Breakout",
+        "count": 2,
+        "wins": 1,
+        "losses": 1,
+        "be": 0,
+        "winRate": 50,
+        "lossRate": 50,
+        "beRate": 0,
+        "totalPnL": 0,
+        "avgPnL": 0,
+        "totalR": 0,
+        "avgR": 0,
+        "rSampleSize": 2,
+        "profitFactor": 1
+      }
+    ],
+    "byEmotion": [
+      {
+        "name": "Confident",
+        "count": 2,
+        "wins": 1,
+        "losses": 1,
+        "be": 0,
+        "winRate": 50,
+        "lossRate": 50,
+        "beRate": 0,
+        "totalPnL": 0,
+        "avgPnL": 0,
+        "totalR": 0,
+        "avgR": 0,
+        "rSampleSize": 2,
+        "profitFactor": 1
+      }
+    ],
+    "byMarket": [
+      {
+        "name": "Trending Up",
+        "count": 2,
+        "wins": 1,
+        "losses": 1,
+        "be": 0,
+        "winRate": 50,
+        "lossRate": 50,
+        "beRate": 0,
+        "totalPnL": 0,
+        "avgPnL": 0,
+        "totalR": 0,
+        "avgR": 0,
+        "rSampleSize": 2,
+        "profitFactor": 1
+      }
+    ],
+    "byEntryQuality": [
+      {
+        "name": "3★",
+        "count": 2,
+        "wins": 1,
+        "losses": 1,
+        "be": 0,
+        "winRate": 50,
+        "lossRate": 50,
+        "beRate": 0,
+        "totalPnL": 0,
+        "avgPnL": 0,
+        "totalR": 0,
+        "avgR": 0,
+        "rSampleSize": 2,
+        "profitFactor": 1
+      }
+    ],
+    "byDayOfWeek": [
+      {
+        "name": "Thursday",
+        "count": 2,
+        "winRate": 50,
+        "beRate": 0,
+        "totalPnL": 0
+      }
+    ],
+    "topEdges": [],
+    "antiEdges": [],
+    "closedMetrics": [
+      {
+        "id": "x1",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Breakout",
+        "emotionAtEntry": "Confident",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": true,
+        "closedAt": "2026-02-12T20:00:00.000Z",
+        "entry": 100,
+        "stop": 90,
+        "exit": 120,
+        "shares": 10,
+        "date": "2026-02-12",
+        "pnl": 200,
+        "rMultiple": 2
+      },
+      {
+        "id": "x2",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Breakout",
+        "emotionAtEntry": "Confident",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": true,
+        "closedAt": "2026-02-05T20:00:00.000Z",
+        "entry": 100,
+        "stop": 90,
+        "exit": 80,
+        "shares": 10,
+        "date": "2026-02-05",
+        "pnl": -200,
+        "rMultiple": -2
       }
     ],
     "isEmpty": false

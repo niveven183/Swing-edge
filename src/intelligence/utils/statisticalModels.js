@@ -63,31 +63,65 @@ export const rStats = (trades) => {
 
 export const rSampleSize = (trades) => rValues(trades).length;
 
+// ─── THE THREE-OUTCOME RULE ───────────────────────────────────────────────────
+// A closed trade ends in exactly one of three states: profit, loss, or flat.
+// Break-even is a real outcome, not a rounding artefact, and it is NOT a loss —
+// `isWin` is `pnl > 0`, so a `!isWin` split sweeps every BE trade into the
+// losses and biases every downstream rate, expectancy and Kelly figure.
+//
+// This is the single definition of that split. `pnlFn` lets a caller that has
+// already computed P&L (e.g. lib/tradingStats.js, which enriches its trades
+// once up front) reuse those values instead of recomputing calcTradeMetrics —
+// same rule, no second arithmetic path.
+//
+// No `|| []` guard: passing a non-array is a caller bug and must throw, exactly
+// as it does today, rather than quietly reporting an empty population.
+export const outcomeSplit = (items, pnlFn = pnlOf) => {
+  const wins = [], losses = [], be = [];
+  for (const it of items) {
+    const p = pnlFn(it);
+    if (p > 0) wins.push(it);
+    else if (p < 0) losses.push(it);
+    else be.push(it);
+  }
+  return { n: items.length, wins, losses, be };
+};
+
 // ─── SCALE CONVENTION ─────────────────────────────────────────────────────────
 // All win-rate functions in this module return a fraction (0..1).
 // Intelligence modules (MonthlyReport, EdgeFinder, AntiEdgeLock) convert to
 // 0-100 at their public output boundary before returning to App code.
-export const winRate = (trades) => {
-  if (!trades.length) return 0;
-  return trades.filter(isWin).length / trades.length;
+//
+// The three rates sum to exactly 1 whenever n > 0 — that is the point of
+// reporting `beRate` at all. A consumer that shows only win/loss is showing a
+// pair that does not add up, and the missing slice is invisible.
+// Carries the three populations alongside the three rates, under the same names
+// `rPopulations` uses, so a caller never has to re-split to get at the members.
+export const outcomeRates = (items, pnlFn = pnlOf) => {
+  const { n, wins, losses, be } = outcomeSplit(items, pnlFn);
+  if (!n) return { winRate: 0, lossRate: 0, beRate: 0, wins, losses, be, n: 0 };
+  return {
+    winRate:  wins.length / n,
+    lossRate: losses.length / n,
+    beRate:   be.length / n,
+    wins, losses, be, n,
+  };
 };
+
+export const winRate = (trades) => outcomeRates(trades).winRate;
 
 // number | null — null means "not measurable", which is not the same as 0.
 export const avgR = (trades) => rStats(trades).avg;
 
 export const avgPnl = (trades) => mean(trades.map(pnlOf));
 
-// Split the measurable population into the three outcomes that actually exist.
-// Break-even is its own bucket: `isWin` is `pnl > 0`, so `!isWin` swept every
-// BE trade into the losses and biased expectancy and Kelly downward.
-const rPopulations = (trades) => {
+// The R-measurable population, split by the same three-outcome rule above.
+// Exported (T3 · decision 5): lib/tradingStats.js imports its shared primitives
+// from here rather than keeping a parallel copy of the same definitions.
+export const rPopulations = (trades) => {
   const measurable = (trades || []).filter(t => Number.isFinite(rOf(t)));
-  return {
-    measurable,
-    wins:   measurable.filter(t => pnlOf(t) > 0),
-    losses: measurable.filter(t => pnlOf(t) < 0),
-    be:     measurable.filter(t => pnlOf(t) === 0),
-  };
+  const { wins, losses, be } = outcomeSplit(measurable);
+  return { measurable, wins, losses, be };
 };
 
 // Exposed so the weighting can be asserted directly: the three must sum to 1.
@@ -109,17 +143,32 @@ export const expectedValueR = (trades) => {
        + (be.length / n)     * 0;
 };
 
-// Profit factor: gross wins / |gross losses|
-export const profitFactor = (trades) => {
+// ─── PROFIT FACTOR — ONE ARITHMETIC PATH (FIN-005) ────────────────────────────
+// Gross wins and |gross losses| from a P&L series, in one accumulation pass.
+// Everything that reports a profit factor — the dashboard hub, every breakdown
+// group, TradeDNA — goes through the two functions below, so the three former
+// copies of this formula can no longer drift apart.
+export const grossPnl = (pnls) => {
   let grossWin = 0, grossLoss = 0;
-  for (const t of trades) {
-    const p = pnlOf(t);
+  for (const p of pnls) {
     if (p > 0) grossWin += p;
     else grossLoss += Math.abs(p);
   }
+  return { grossWin, grossLoss };
+};
+
+// `Infinity` is a DECLARED sentinel for "wins with no losses to divide by", and
+// it must stay Infinity. It is deliberately not `null`: `Number(null) === 0`, so
+// `isFinite(null)` is `true` — a null here would sail straight through the
+// `isFinite(...)` guard every consumer already has and then throw on
+// `.toFixed(2)`, turning a readable "∞" into a blank screen.
+export const profitFactorFromPnls = (pnls) => {
+  const { grossWin, grossLoss } = grossPnl(pnls);
   if (grossLoss === 0) return grossWin > 0 ? Infinity : 0;
   return grossWin / grossLoss;
 };
+
+export const profitFactor = (trades) => profitFactorFromPnls(trades.map(pnlOf));
 
 // Sharpe-like ratio on per-trade R outcomes. Returns null rather than 0 when
 // there is nothing to measure: `stddev` yields 0 for n < 2, and a Sharpe of
@@ -132,7 +181,11 @@ export const sharpeR = (trades) => {
 };
 
 // Max drawdown from an equity sequence (array of equity values or R cumsum).
-export const maxDrawdown = (equitySeq) => {
+// Returns a FRACTION (0..1), per this module's scale convention. The name says
+// so (T3 · decision 4): `tradingStats.maxDrawdown` is a percent and is a
+// different number entirely — two identically-named exports on different scales
+// is how a 6.6% drawdown gets rendered as 660%.
+export const maxDrawdownFraction = (equitySeq) => {
   let peak = -Infinity, maxDD = 0;
   for (const v of equitySeq) {
     if (v > peak) peak = v;

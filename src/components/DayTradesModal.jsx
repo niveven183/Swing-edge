@@ -9,6 +9,7 @@ import InfoTooltip from './ui/InfoTooltip.jsx';
 import { EMOTION_OPTIONS } from '../data/tradeOptions.jsx';
 import { isFollowedPlan, isOffPlan } from '../utils.js';
 import { getSetupTooltip } from '../intelligence/knowledgeGlue.js';
+import { outcomeRates } from '../intelligence/utils/statisticalModels.js';
 
 const EMOTION_EMOJI = Object.fromEntries(EMOTION_OPTIONS.map(o => [o.value, o.emoji]));
 
@@ -55,11 +56,13 @@ export default function DayTradesModal({ dateKey, trades = [], calcMetrics, lang
 
   const totals = useMemo(() => {
     const pnl = rows.reduce((s, r) => s + (r.pnl || 0), 0);
-    const wins = rows.filter(r => (r.pnl || 0) > 0).length;
+    // Same three-outcome rule as everywhere else: a break-even day trade is not
+    // a loss, so it lowers the win rate without inflating the loss count.
+    const { winRate } = outcomeRates(rows, r => r.pnl || 0);
     return {
       count: rows.length,
       pnl,
-      winRate: rows.length ? Math.round((wins / rows.length) * 100) : 0,
+      winRate: Math.round(winRate * 100),
     };
   }, [rows]);
 

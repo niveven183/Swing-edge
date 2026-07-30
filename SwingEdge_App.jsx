@@ -73,7 +73,13 @@ import {
 import { POPULAR_TICKERS as STATIC_TICKERS, getTickerMeta, searchTickers as searchStaticTickers } from "./src/data/tickers.js";
 import { SwingEdgeAI } from "./src/intelligence/SwingEdgeAI.js";
 import { calculateTradeDNA } from "./src/intelligence/core/TradeDNA.js";
-import { dayLabel } from "./src/intelligence/utils/statisticalModels.js";
+// getClosed is THE definition of a closed trade (status CLOSED *and* an exit
+// price). Every population in this file that feeds a statistic goes through it,
+// so the dashboard, the journal counter, the calendar and the equity curve can
+// never disagree about which trades count.
+// outcomeRates is THE win/loss/break-even classifier (0..1 scale) — used here
+// only where a population cannot come from the stats hub (raw Supabase rows).
+import { dayLabel, getClosed, outcomeRates } from "./src/intelligence/utils/statisticalModels.js";
 import {
   DNACard, EdgeCard, DecisionCoachPanel, TiltShield, GrowthChart, RegimeIndicator, PatternTags,
 } from "./src/intelligence/ui/IntelligenceUI.jsx";
@@ -144,8 +150,8 @@ const SCANNER_DATA = [
 const generateEquityCurve = (cap, trades = []) => {
   let balance = cap;
   const data = [];
-  const sortedTrades = [...trades]
-    .filter(t => t.status === "CLOSED")
+  // getClosed returns a fresh array, so sorting in place does not mutate `trades`.
+  const sortedTrades = getClosed(trades)
     .sort((a, b) => new Date(a.date) - new Date(b.date));
   sortedTrades.forEach(t => {
     const pnl = calcTradeMetrics(t).pnl || 0;
@@ -228,7 +234,7 @@ const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity) => 
   const thisMonth = now.getMonth();
   const thisYear = now.getFullYear();
 
-  const allClosed = trades.filter(t => t.status === "CLOSED");
+  const allClosed = getClosed(trades);
   const monthClosed = allClosed.filter(t => {
     const d = new Date(t.date + "T12:00:00");
     return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
@@ -444,46 +450,38 @@ const fmtTimeAgo = (dateStr) => {
 const rSampleSub = (t, s) =>
   t.avgRSample.replace("{n}", s.rSampleSize ?? 0).replace("{total}", s.totalTrades ?? 0);
 
+// Win-rate tile subtitle. The BE segment appears ONLY when break-evens exist, so
+// the badge stays "12W / 8L" for the common case but can never silently fold a
+// break-even into the loss count: W + L + BE === totalTrades, always.
+const winLossBeSub = (s) =>
+  `${s.wins}W / ${s.losses}L${s.be > 0 ? ` / ${s.be}BE` : ""}`;
+
 // ─── SMART LESSONS GENERATOR ─────────────────────────────────────────────────
 // "overnight_hold" → "Overnight Hold". Safe on already-clean labels ("Breakout").
 const snakeToTitle = (s) =>
   String(s || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
-const generateSmartLessons = (closedTrades, calcFn, lang = 'he') => {
+// `stats` is the Master Stats Hub output (useTradingStats). Every rate, average
+// and grouping in this generator is READ from it — nothing is recomputed here,
+// so a lesson card can never contradict the dashboard tile above it.
+const generateSmartLessons = (closedTrades, stats, calcFn, lang = 'he') => {
   if (closedTrades.length < 2) return [];
   const he = lang === 'he';
   const lessons = [];
 
-  // Analyze patterns
-  const winners = closedTrades.filter(t => (calcFn(t).pnl || 0) > 0);
-  const losers = closedTrades.filter(t => (calcFn(t).pnl || 0) < 0);
+  // Classification via the shared three-outcome rule: a break-even is a
+  // break-even here exactly as it is everywhere else (it is NOT a loss).
+  const losers = outcomeRates(closedTrades, t => calcFn(t).pnl || 0).losses;
   const followedPlanLosers = losers.filter(t => t.followedPlan === false);
-  const fomoTrades = closedTrades.filter(t => t.emotionAtEntry === "FOMO");
-  const fomoLosers = fomoTrades.filter(t => (calcFn(t).pnl || 0) < 0);
 
-  // Best setup
-  const setupMap = {};
-  closedTrades.forEach(t => {
-    if (!setupMap[t.setup]) setupMap[t.setup] = { wins: 0, losses: 0, totalPnl: 0 };
-    const pnl = calcFn(t).pnl || 0;
-    if (pnl > 0) setupMap[t.setup].wins++;
-    else setupMap[t.setup].losses++;
-    setupMap[t.setup].totalPnl += pnl;
-  });
-  // Tiebreak: win rate, then sample size — matches Analytics so both surfaces
-  // name the SAME "strongest setup" when two setups share a win rate. (#3)
-  const bestSetup = Object.entries(setupMap).sort((a, b) => {
-    const wrA = a[1].wins / (a[1].wins + a[1].losses);
-    const wrB = b[1].wins / (b[1].wins + b[1].losses);
-    const nA = a[1].wins + a[1].losses;
-    const nB = b[1].wins + b[1].losses;
-    return (wrB - wrA) || (nB - nA);
-  })[0];
+  // Best setup — read off the hub's bySetup grouping, re-sorted by win rate then
+  // sample size so this card and Analytics name the SAME strongest setup. (#3)
+  const bestSetup = [...stats.bySetup].sort((a, b) => (b.winRate - a.winRate) || (b.count - a.count))[0];
 
-  if (bestSetup && bestSetup[1].wins + bestSetup[1].losses >= 2) {
-    const n = bestSetup[1].wins + bestSetup[1].losses;
-    const wr = Math.round(bestSetup[1].wins / n * 100);
-    const setup = labelFor("setup", snakeToTitle(bestSetup[0]), lang);
+  if (bestSetup && bestSetup.count >= 2) {
+    const n = bestSetup.count;
+    const wr = Math.round(bestSetup.winRate);
+    const setup = labelFor("setup", snakeToTitle(bestSetup.name), lang);
     lessons.push(he ? {
       channel: "best_setup",
       type: "strength",
@@ -513,8 +511,11 @@ const generateSmartLessons = (closedTrades, calcFn, lang = 'he') => {
     });
   }
 
-  if (fomoTrades.length >= 2 && fomoLosers.length > 0) {
-    const fomoLossRate = Math.round(fomoLosers.length / fomoTrades.length * 100);
+  // FOMO loss rate — read off the hub's byEmotion grouping (same population,
+  // same three-outcome rule) instead of counting losers by hand.
+  const fomo = stats.byEmotion.find(e => e.name === "FOMO");
+  if (fomo && fomo.count >= 2 && fomo.losses > 0) {
+    const fomoLossRate = Math.round(fomo.lossRate);
     lessons.push(he ? {
       channel: "fomo",
       type: "warning",
@@ -530,10 +531,10 @@ const generateSmartLessons = (closedTrades, calcFn, lang = 'he') => {
     });
   }
 
-  // Average winner vs average loser
-  if (winners.length > 0 && losers.length > 0) {
-    const avgWin = winners.reduce((s, t) => s + (calcFn(t).pnl || 0), 0) / winners.length;
-    const avgLoss = Math.abs(losers.reduce((s, t) => s + (calcFn(t).pnl || 0), 0) / losers.length);
+  // Average winner vs average loser — straight off the hub. stats.avgLoss is
+  // already a positive magnitude, so no Math.abs is needed (or wanted) here.
+  if (stats.wins > 0 && stats.losses > 0) {
+    const { avgWin, avgLoss } = stats;
     if (avgLoss > avgWin * 1.5) {
       lessons.push(he ? {
         type: "insight",
@@ -1567,12 +1568,12 @@ export default function SwingEdge() {
 
   const realTrades = useMemo(() => trades.filter(t => !t.isDemo), [trades]);
   const equityCurve = useMemo(() => generateEquityCurve(capital, realTrades), [realTrades, capital]);
-  const closedTrades = realTrades.filter(t => t.status === "CLOSED");
+  const closedTrades = getClosed(realTrades);
   const openTrades   = realTrades.filter(t => t.status === "OPEN");
   // Journal header counter: counts over the SAME base the journal list renders
   // (all trades incl. demo), so total/open/closed stay internally consistent.
   const openCountAll   = useMemo(() => trades.filter(t => t.status === "OPEN").length, [trades]);
-  const closedCountAll = useMemo(() => trades.filter(t => t.status === "CLOSED").length, [trades]);
+  const closedCountAll = useMemo(() => getClosed(trades).length, [trades]);
 
   // Stable reference for the pure calcTradeMetrics function — prevents
   // useTradingStats from re-running its useMemo on every render.
@@ -1782,7 +1783,7 @@ export default function SwingEdge() {
 
   // Smart lessons
   const smartLessons = useMemo(() => {
-    const base = generateSmartLessons(closedTrades, calcTradeMetrics, lang) || [];
+    const base = generateSmartLessons(closedTrades, stats, calcTradeMetrics, lang) || [];
     const adaptive = AdaptiveLessons.generate(closedTrades, calcTradeMetrics, lang) || [];
     // Adaptive lessons that describe the SAME signal as a base lesson map onto a
     // shared semantic channel, so the strip never shows two "strongest setup" or
@@ -1800,7 +1801,7 @@ export default function SwingEdge() {
       if (ch) seenCh.add(ch);
     }
     return merged;
-  }, [closedTrades, lang]);
+  }, [closedTrades, stats, lang]);
 
   // Top ticker ribbon — fixed 8 tickers updated with live prices
   const TOP_RIBBON = ["NVDA", "AAPL", "TSLA", "MSFT", "META", "AMD", "BTC-USD", "SPY"];
@@ -2232,17 +2233,18 @@ export default function SwingEdge() {
       const byUser = {};
       for (const row of data) {
         if (row.is_demo) continue; // teaser mirrors real trades only
-        const u = row.user_id;
-        (byUser[u] ||= { count: 0, closed: 0, wins: 0 });
-        byUser[u].count += 1;
-        if (row.status === "CLOSED") {
-          byUser[u].closed += 1;
-          if ((calcTradeMetrics(row).pnl || 0) > 0) byUser[u].wins += 1;
-        }
+        (byUser[row.user_id] ||= { count: 0, closed: [] }).count += 1;
+      }
+      // Population and classification both come from the shared primitives, so a
+      // mentee's teaser win rate can never disagree with the number that mentee
+      // sees on their own dashboard.
+      for (const row of getClosed(data)) {
+        if (row.is_demo) continue;
+        byUser[row.user_id].closed.push(row);
       }
       const teasers = {};
       for (const [u, s] of Object.entries(byUser)) {
-        teasers[u] = { count: s.count, winRate: s.closed ? (s.wins / s.closed) * 100 : 0 };
+        teasers[u] = { count: s.count, winRate: outcomeRates(s.closed).winRate * 100 };
       }
       if (!cancelled) setMenteeTeasers(teasers);
     })();
@@ -2954,7 +2956,7 @@ export default function SwingEdge() {
 
                     {/* Core stat cards from the mentee's own stats */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <StatCard label={t.winRate}      value={formatPct(menteeStats.winRate)} sub={`${menteeStats.wins}W / ${menteeStats.losses}L`} icon={Target}     accent="purple" />
+                      <StatCard label={t.winRate}      value={formatPct(menteeStats.winRate)} sub={winLossBeSub(menteeStats)} icon={Target}     accent="purple" />
                       <StatCard label={t.avgRMultiple} value={fmtR(menteeStats.avgR)}         sub={rSampleSub(t, menteeStats)}                      icon={Activity}   accent="amber" />
                       <StatCard label={t.netPnlClosed} value={fmt$(Math.round(menteeStats.totalPnL * 100) / 100)} sub={`${menteeStats.total} ${t.closedTrades}`} icon={TrendingUp} accent={menteeStats.totalPnL >= 0 ? "green" : "red"} />
                       <StatCard label={t.streakCounter} value={menteeStats.currentStreak}      sub={`${t.bestStreak}: ${menteeStats.bestStreak}`}    icon={Zap}        accent={menteeStats.currentStreak >= 3 ? "green" : "amber"} />
@@ -3088,7 +3090,7 @@ export default function SwingEdge() {
                   ? `הון = בסיס ההון שהגדרת ($${capital.toLocaleString()}) בתוספת P&L מצטבר מעסקאות סגורות ופתוחות. הסיכון לכל עסקה מחושב תמיד מבסיס ההון הקבוע — לא מההון הנוכחי.`
                   : `Equity = your capital base ($${capital.toLocaleString()}) plus cumulative P&L from closed & open trades. Per-trade risk is always sized from your fixed capital base — not current equity.`} />
               <StatCard label={t.netPnlClosed} value={fmt$(Math.round(totalPnL * 100) / 100)} sub={`${closedTrades.length} ${t.closedTrades}`} trend={stats.returnPct} trendText={formatReturnPct(stats.returnPct)} icon={TrendingUp} accent={totalPnL >= 0 ? "green" : "red"} />
-              <StatCard label={<span className="flex items-center gap-1">{t.winRate}<TermTooltip term="winRate" lang={lang} /></span>} value={formatPct(winRate)} sub={`${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)>0).length}W / ${closedTrades.filter(t=>(calcTradeMetrics(t).pnl||0)<0).length}L`} icon={Target} accent="purple" />
+              <StatCard label={<span className="flex items-center gap-1">{t.winRate}<TermTooltip term="winRate" lang={lang} /></span>} value={formatPct(winRate)} sub={winLossBeSub(stats)} icon={Target} accent="purple" />
               <StatCard label={<span className="flex items-center gap-1">{t.avgRMultiple}<TermTooltip term="avgR" lang={lang} /></span>} value={fmtR(avgR)} sub={rSampleSub(t, stats)} icon={Activity} accent="amber" />
               <StatCard label={t.dailyPnl} value={fmt$(Math.round(dailyPnL))} sub={t.todayTrades} icon={DollarSign} accent={dailyPnL >= 0 ? "green" : "red"} />
               <StatCard label={t.streakCounter} value={<span className="flex items-center gap-1">{currentStreak > 0 && <Flame size={18} className="text-orange-400" />}{currentStreak}</span>} sub={`${t.bestStreak}: ${bestStreak}`} icon={Zap} accent={currentStreak >= 3 ? "green" : "amber"} />
@@ -3596,7 +3598,7 @@ export default function SwingEdge() {
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{t.profitFactor}<TermTooltip term="profitFactor" lang={lang} /></div>
-                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-info)]">{isFinite(journalStats.profitFactor) ? journalStats.profitFactor.toFixed(2) : "∞"}</div>
+                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-info)]">{Number.isFinite(journalStats.profitFactor) ? journalStats.profitFactor.toFixed(2) : "∞"}</div>
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{t.maxDD}<TermTooltip term="maxDD" lang={lang} /></div>
@@ -3689,7 +3691,7 @@ export default function SwingEdge() {
 
             {journalView === 'calendar' ? (
               <TradeCalendar
-                trades={filteredTrades.filter(t => t.status === 'CLOSED')}
+                trades={getClosed(filteredTrades)}
                 calcMetrics={calcTradeMetrics}
                 lang={lang}
               />
@@ -4710,16 +4712,15 @@ export default function SwingEdge() {
                 .sort((a, b) => (b.winRate - a.winRate) || (b.count - a.count))
                 .map(s => ({ setup: s.name, winRate: s.winRate, count: s.count }))[0];
 
-              // Best Emotion — local whitelist aggregation over the hub's enriched
-              // closed metrics (pnl from the single source). Kept local because the
-              // whitelist excludes missing-emotion trades, unlike byEmotion grouping.
+              // Best Emotion — from the hub's emotion breakdown (single source).
+              // The whitelist only narrows WHICH groups are eligible; the win rate
+              // itself is the hub's, so this card and the emotion chart agree.
+              // Same win-rate-then-sample-size tiebreak as Best Setup above.
               const EMOTIONS = ["Confident","Calm","Patient","Neutral","Hesitant","Nervous","FOMO","Angry"];
-              const emotionStats = EMOTIONS.map(em => {
-                const e = stats.closedMetrics.filter(m => m.emotionAtEntry === em);
-                const wins = e.filter(m => (m.pnl || 0) > 0).length;
-                const wr = e.length ? wins / e.length * 100 : 0;
-                return { emotion: em, winRate: wr, count: e.length };
-              }).filter(e => e.count > 0).sort((a, b) => b.winRate - a.winRate);
+              const emotionStats = stats.byEmotion
+                .filter(e => EMOTIONS.includes(e.name))
+                .map(e => ({ emotion: e.name, winRate: e.winRate, count: e.count }))
+                .sort((a, b) => (b.winRate - a.winRate) || (b.count - a.count));
               const bestEmotion = emotionStats[0];
 
               return (
@@ -4847,35 +4848,22 @@ export default function SwingEdge() {
                 .sort((a, b) => a.month.localeCompare(b.month))
                 .map(m => ({ ...m, pnl: Math.round(m.pnl) }));
 
-              // 3. Emotion Performance — over the hub's enriched closed metrics
-              const emoMap = {};
-              stats.closedMetrics.forEach(m => {
-                const e = m.emotionAtEntry || "Neutral";
-                if (!emoMap[e]) emoMap[e] = { emotion: e, count: 0, wins: 0, totalPnL: 0 };
-                emoMap[e].count++;
-                if ((m.pnl ?? 0) > 0) emoMap[e].wins++;
-                emoMap[e].totalPnL += m.pnl ?? 0;
-              });
-              const emotionStatsArr = Object.values(emoMap).map(e => ({
-                ...e,
+              // 3. Emotion Performance — the hub's emotion breakdown, verbatim.
+              // A trade with no recorded emotion lands in the hub's "Unknown"
+              // bucket instead of being silently counted as "Neutral": a missing
+              // emotion is not a calm one.
+              const emotionStatsArr = stats.byEmotion.map(e => ({
+                emotion: e.name,
+                count: e.count,
+                wins: e.wins,
                 totalPnL: Math.round(e.totalPnL),
-                winRate: e.count ? Math.round(e.wins / e.count * 100) : 0,
+                winRate: Math.round(e.winRate),
               }));
 
-              // 4. Streak History
-              const sorted = [...closedTrades].sort((a, b) =>
-                new Date(a.date || 0) - new Date(b.date || 0));
-              const streaks = [];
-              let cur = 0, curType = null;
-              sorted.forEach(t => {
-                const { pnl } = calcTradeMetrics(t);
-                if (pnl == null || pnl === 0) return;
-                const isWin = pnl > 0;
-                const nt = isWin ? "win" : "loss";
-                if (curType === null || curType === nt) { curType = nt; cur++; }
-                else { streaks.push({ type: curType, length: cur }); curType = nt; cur = 1; }
-              });
-              if (cur > 0 && curType) streaks.push({ type: curType, length: cur });
+              // 4. Streak History — the hub's streakRuns, emitted from the same
+              // chronological pass that produces currentStreak/maxWinStreak, so
+              // the streak list and the streak counter can never disagree.
+              const streaks = stats.streakRuns;
               const maxStreak = streaks.reduce((m, s) => Math.max(m, s.length), 1);
 
               // 5. Setup Matrix — from the hub's setup breakdown (single source)
@@ -5425,12 +5413,14 @@ export default function SwingEdge() {
           const tiltBg = tiltLevel === "safe" ? "border-[#00C076]/25 bg-[var(--v3-accent-glow)]" : tiltLevel === "warning" ? "border-[#F59E0B]/25 bg-[var(--v3-warn-glow)]" : "border-[#F43F5E]/25 bg-[#F43F5E]/5";
           const tiltPct = Math.min(tiltCount / 6 * 100, 100);
 
-          // ── Playbook: calculate success rate per setup from journal ──
+          // ── Playbook: success rate per setup, read off the hub's bySetup ──
+          // Same population and same win-rate convention as the Analytics setup
+          // matrix, so a playbook card and the matrix can never show two numbers
+          // for one setup. Returns null when the setup has no closed trades.
           const calcSetupSuccess = (setupName) => {
-            const matched = realTrades.filter(t => t.setup === setupName && t.status === "CLOSED");
-            if (matched.length === 0) return null;
-            const wins = matched.filter(t => (calcTradeMetrics(t).pnl || 0) > 0).length;
-            return { rate: Math.round(wins / matched.length * 100), count: matched.length };
+            const g = stats.bySetup.find(s => s.name === setupName);
+            if (!g || g.count === 0) return null;
+            return { rate: Math.round(g.winRate), count: g.count };
           };
 
           const savePlaybook = (updated) => {
