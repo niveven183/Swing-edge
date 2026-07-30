@@ -1,0 +1,1279 @@
+{
+  "empty": {
+    "totalTrades": 0,
+    "total": 0,
+    "openTrades": 0,
+    "wins": 0,
+    "losses": 0,
+    "totalPnL": 0,
+    "totalWin": 0,
+    "totalLoss": 0,
+    "winRate": 0,
+    "lossRate": 0,
+    "profitFactor": 0,
+    "avgWin": 0,
+    "avgLoss": 0,
+    "avgR": null,
+    "rSampleSize": 0,
+    "bestWin": 0,
+    "worstLoss": 0,
+    "currentEquity": 2500,
+    "capital": 2500,
+    "returnPct": 0,
+    "equityCurve": [],
+    "maxDrawdown": 0,
+    "maxDD": 0,
+    "currentDrawdown": 0,
+    "currentStreak": 0,
+    "maxWinStreak": 0,
+    "maxLossStreak": 0,
+    "bestStreak": 0,
+    "planFollowedWR": 0,
+    "planIgnoredWR": 0,
+    "planAdherence": 0,
+    "avgHoldHours": 0,
+    "avgHold": 0,
+    "lastWeekStats": {
+      "count": 0,
+      "pnl": 0,
+      "winRate": 0
+    },
+    "lastMonthStats": {
+      "count": 0,
+      "pnl": 0,
+      "winRate": 0
+    },
+    "bySetup": [],
+    "byEmotion": [],
+    "byMarket": [],
+    "byEntryQuality": [],
+    "byDayOfWeek": [],
+    "topEdges": [],
+    "antiEdges": [],
+    "closedMetrics": [],
+    "isEmpty": true
+  },
+  "normal": {
+    "totalTrades": 8,
+    "total": 8,
+    "openTrades": 0,
+    "wins": 5,
+    "losses": 3,
+    "totalPnL": 230,
+    "totalWin": 510,
+    "totalLoss": 280,
+    "winRate": 62.5,
+    "lossRate": 37.5,
+    "profitFactor": 1.8214285714285714,
+    "avgWin": 102,
+    "avgLoss": 93.33333333333333,
+    "avgR": 0.84375,
+    "rSampleSize": 8,
+    "bestWin": 150,
+    "worstLoss": -120,
+    "currentEquity": 2730,
+    "capital": 2500,
+    "returnPct": 9.2,
+    "equityCurve": [
+      {
+        "index": 1,
+        "date": "2025-12-17",
+        "equity": 2650,
+        "pnl": 150,
+        "drawdown": 0
+      },
+      {
+        "index": 2,
+        "date": "2026-01-01",
+        "equity": 2590,
+        "pnl": -60,
+        "drawdown": 2.2641509433962264
+      },
+      {
+        "index": 3,
+        "date": "2026-01-26",
+        "equity": 2710,
+        "pnl": 120,
+        "drawdown": 0
+      },
+      {
+        "index": 4,
+        "date": "2026-01-31",
+        "equity": 2590,
+        "pnl": -120,
+        "drawdown": 4.428044280442804
+      },
+      {
+        "index": 5,
+        "date": "2026-02-05",
+        "equity": 2630,
+        "pnl": 40,
+        "drawdown": 2.952029520295203
+      },
+      {
+        "index": 6,
+        "date": "2026-02-10",
+        "equity": 2530,
+        "pnl": -100,
+        "drawdown": 6.642066420664207
+      },
+      {
+        "index": 7,
+        "date": "2026-02-13",
+        "equity": 2680,
+        "pnl": 150,
+        "drawdown": 1.107011070110701
+      },
+      {
+        "index": 8,
+        "date": "2026-02-14",
+        "equity": 2730,
+        "pnl": 50,
+        "drawdown": 0
+      }
+    ],
+    "maxDrawdown": 6.642066420664207,
+    "maxDD": 180,
+    "currentDrawdown": 0,
+    "currentStreak": 2,
+    "maxWinStreak": 2,
+    "maxLossStreak": 1,
+    "bestStreak": 2,
+    "planFollowedWR": 60,
+    "planIgnoredWR": 66.66666666666666,
+    "planAdherence": 62.5,
+    "avgHoldHours": 0,
+    "avgHold": 0,
+    "lastWeekStats": {
+      "count": 3,
+      "pnl": 100,
+      "winRate": 66.66666666666666
+    },
+    "lastMonthStats": {
+      "count": 6,
+      "pnl": 140,
+      "winRate": 66.66666666666666
+    },
+    "bySetup": [
+      {
+        "name": "Breakout",
+        "count": 4,
+        "wins": 3,
+        "winRate": 75,
+        "totalPnL": 140,
+        "avgPnL": 35,
+        "totalR": 4.25,
+        "avgR": 1.0625,
+        "rSampleSize": 4,
+        "profitFactor": 2.4
+      },
+      {
+        "name": "Pullback",
+        "count": 4,
+        "wins": 2,
+        "winRate": 50,
+        "totalPnL": 90,
+        "avgPnL": 22.5,
+        "totalR": 2.5,
+        "avgR": 0.625,
+        "rSampleSize": 4,
+        "profitFactor": 1.5
+      }
+    ],
+    "byEmotion": [
+      {
+        "name": "Confident",
+        "count": 3,
+        "wins": 2,
+        "winRate": 66.66666666666666,
+        "totalPnL": 100,
+        "avgPnL": 33.333333333333336,
+        "totalR": 2.25,
+        "avgR": 0.75,
+        "rSampleSize": 3,
+        "profitFactor": 2
+      },
+      {
+        "name": "FOMO",
+        "count": 3,
+        "wins": 2,
+        "winRate": 66.66666666666666,
+        "totalPnL": 70,
+        "avgPnL": 23.333333333333332,
+        "totalR": 3,
+        "avgR": 1,
+        "rSampleSize": 3,
+        "profitFactor": 1.5833333333333333
+      },
+      {
+        "name": "Neutral",
+        "count": 2,
+        "wins": 1,
+        "winRate": 50,
+        "totalPnL": 60,
+        "avgPnL": 30,
+        "totalR": 1.5,
+        "avgR": 0.75,
+        "rSampleSize": 2,
+        "profitFactor": 2
+      }
+    ],
+    "byMarket": [
+      {
+        "name": "Trending Up",
+        "count": 8,
+        "wins": 5,
+        "winRate": 62.5,
+        "totalPnL": 230,
+        "avgPnL": 28.75,
+        "totalR": 6.75,
+        "avgR": 0.84375,
+        "rSampleSize": 8,
+        "profitFactor": 1.8214285714285714
+      }
+    ],
+    "byEntryQuality": [
+      {
+        "name": "3★",
+        "count": 8,
+        "wins": 5,
+        "winRate": 62.5,
+        "totalPnL": 230,
+        "avgPnL": 28.75,
+        "totalR": 6.75,
+        "avgR": 0.84375,
+        "rSampleSize": 8,
+        "profitFactor": 1.8214285714285714
+      }
+    ],
+    "byDayOfWeek": [
+      {
+        "name": "Monday",
+        "count": 1,
+        "winRate": 100,
+        "totalPnL": 120
+      },
+      {
+        "name": "Tuesday",
+        "count": 1,
+        "winRate": 0,
+        "totalPnL": -100
+      },
+      {
+        "name": "Wednesday",
+        "count": 1,
+        "winRate": 100,
+        "totalPnL": 150
+      },
+      {
+        "name": "Thursday",
+        "count": 2,
+        "winRate": 50,
+        "totalPnL": -20
+      },
+      {
+        "name": "Friday",
+        "count": 1,
+        "winRate": 100,
+        "totalPnL": 150
+      },
+      {
+        "name": "Saturday",
+        "count": 2,
+        "winRate": 50,
+        "totalPnL": -70
+      }
+    ],
+    "topEdges": [
+      {
+        "name": "Breakout + Confident",
+        "setup": "Breakout",
+        "emotion": "Confident",
+        "count": 3,
+        "winRate": 66.66666666666666,
+        "totalPnL": 100,
+        "avgR": 0.75,
+        "rSampleSize": 3,
+        "score": 0.3633961714713538,
+        "antiScore": 0.7923450448735121
+      }
+    ],
+    "antiEdges": [],
+    "closedMetrics": [
+      {
+        "id": "t1",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Breakout",
+        "emotionAtEntry": "Confident",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": true,
+        "closedAt": "2026-02-13T20:00:00.000Z",
+        "entry": 100,
+        "stop": 95,
+        "exit": 115,
+        "shares": 10,
+        "date": "2026-02-13",
+        "pnl": 150,
+        "rMultiple": 3
+      },
+      {
+        "id": "t2",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Breakout",
+        "emotionAtEntry": "Confident",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": true,
+        "closedAt": "2026-02-10T20:00:00.000Z",
+        "entry": 100,
+        "stop": 95,
+        "exit": 90,
+        "shares": 10,
+        "date": "2026-02-10",
+        "pnl": -100,
+        "rMultiple": -2
+      },
+      {
+        "id": "t3",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Breakout",
+        "emotionAtEntry": "FOMO",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": false,
+        "closedAt": "2026-02-05T20:00:00.000Z",
+        "entry": 100,
+        "stop": 98,
+        "exit": 104,
+        "shares": 10,
+        "date": "2026-02-05",
+        "pnl": 40,
+        "rMultiple": 2
+      },
+      {
+        "id": "t4",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Pullback",
+        "emotionAtEntry": "Neutral",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": true,
+        "closedAt": "2026-01-26T20:00:00.000Z",
+        "entry": 50,
+        "stop": 48,
+        "exit": 56,
+        "shares": 20,
+        "date": "2026-01-26",
+        "pnl": 120,
+        "rMultiple": 3
+      },
+      {
+        "id": "t5",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Pullback",
+        "emotionAtEntry": "Neutral",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": true,
+        "closedAt": "2026-01-01T20:00:00.000Z",
+        "entry": 50,
+        "stop": 48,
+        "exit": 47,
+        "shares": 20,
+        "date": "2026-01-01",
+        "pnl": -60,
+        "rMultiple": -1.5
+      },
+      {
+        "id": "t6",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Pullback",
+        "emotionAtEntry": "FOMO",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": false,
+        "closedAt": "2025-12-17T20:00:00.000Z",
+        "entry": 200,
+        "stop": 190,
+        "exit": 230,
+        "shares": 5,
+        "date": "2025-12-17",
+        "pnl": 150,
+        "rMultiple": 3
+      },
+      {
+        "id": "t7",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Breakout",
+        "emotionAtEntry": "Confident",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": true,
+        "closedAt": "2026-02-14T20:00:00.000Z",
+        "entry": 100,
+        "stop": 96,
+        "exit": 105,
+        "shares": 10,
+        "date": "2026-02-14",
+        "pnl": 50,
+        "rMultiple": 1.25
+      },
+      {
+        "id": "t8",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Pullback",
+        "emotionAtEntry": "FOMO",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": false,
+        "closedAt": "2026-01-31T20:00:00.000Z",
+        "entry": 50,
+        "stop": 47,
+        "exit": 44,
+        "shares": 20,
+        "date": "2026-01-31",
+        "pnl": -120,
+        "rMultiple": -2
+      }
+    ],
+    "isEmpty": false
+  },
+  "withBreakEven": {
+    "totalTrades": 6,
+    "total": 6,
+    "openTrades": 0,
+    "wins": 2,
+    "losses": 2,
+    "totalPnL": 50,
+    "totalWin": 400,
+    "totalLoss": 350,
+    "winRate": 33.33333333333333,
+    "lossRate": 33.33333333333333,
+    "profitFactor": 1.1428571428571428,
+    "avgWin": 200,
+    "avgLoss": 175,
+    "avgR": 0.08333333333333333,
+    "rSampleSize": 6,
+    "bestWin": 200,
+    "worstLoss": -200,
+    "currentEquity": 2550,
+    "capital": 2500,
+    "returnPct": 2,
+    "equityCurve": [
+      {
+        "index": 1,
+        "date": "2025-12-17",
+        "equity": 2500,
+        "pnl": 0,
+        "drawdown": 0
+      },
+      {
+        "index": 2,
+        "date": "2025-12-22",
+        "equity": 2300,
+        "pnl": -200,
+        "drawdown": 8
+      },
+      {
+        "index": 3,
+        "date": "2025-12-27",
+        "equity": 2150,
+        "pnl": -150,
+        "drawdown": 14.000000000000002
+      },
+      {
+        "index": 4,
+        "date": "2026-01-01",
+        "equity": 2350,
+        "pnl": 200,
+        "drawdown": 6
+      },
+      {
+        "index": 5,
+        "date": "2026-01-06",
+        "equity": 2550,
+        "pnl": 200,
+        "drawdown": 0
+      },
+      {
+        "index": 6,
+        "date": "2026-02-13",
+        "equity": 2550,
+        "pnl": 0,
+        "drawdown": 0
+      }
+    ],
+    "maxDrawdown": 14.000000000000002,
+    "maxDD": 350,
+    "currentDrawdown": 0,
+    "currentStreak": 2,
+    "maxWinStreak": 2,
+    "maxLossStreak": 2,
+    "bestStreak": 2,
+    "planFollowedWR": 33.33333333333333,
+    "planIgnoredWR": 0,
+    "planAdherence": 100,
+    "avgHoldHours": 0,
+    "avgHold": 0,
+    "lastWeekStats": {
+      "count": 1,
+      "pnl": 0,
+      "winRate": 0
+    },
+    "lastMonthStats": {
+      "count": 1,
+      "pnl": 0,
+      "winRate": 0
+    },
+    "bySetup": [
+      {
+        "name": "Breakout",
+        "count": 6,
+        "wins": 2,
+        "winRate": 33.33333333333333,
+        "totalPnL": 50,
+        "avgPnL": 8.333333333333334,
+        "totalR": 0.5,
+        "avgR": 0.08333333333333333,
+        "rSampleSize": 6,
+        "profitFactor": 1.1428571428571428
+      }
+    ],
+    "byEmotion": [
+      {
+        "name": "Confident",
+        "count": 6,
+        "wins": 2,
+        "winRate": 33.33333333333333,
+        "totalPnL": 50,
+        "avgPnL": 8.333333333333334,
+        "totalR": 0.5,
+        "avgR": 0.08333333333333333,
+        "rSampleSize": 6,
+        "profitFactor": 1.1428571428571428
+      }
+    ],
+    "byMarket": [
+      {
+        "name": "Trending Up",
+        "count": 6,
+        "wins": 2,
+        "winRate": 33.33333333333333,
+        "totalPnL": 50,
+        "avgPnL": 8.333333333333334,
+        "totalR": 0.5,
+        "avgR": 0.08333333333333333,
+        "rSampleSize": 6,
+        "profitFactor": 1.1428571428571428
+      }
+    ],
+    "byEntryQuality": [
+      {
+        "name": "3★",
+        "count": 6,
+        "wins": 2,
+        "winRate": 33.33333333333333,
+        "totalPnL": 50,
+        "avgPnL": 8.333333333333334,
+        "totalR": 0.5,
+        "avgR": 0.08333333333333333,
+        "rSampleSize": 6,
+        "profitFactor": 1.1428571428571428
+      }
+    ],
+    "byDayOfWeek": [
+      {
+        "name": "Monday",
+        "count": 1,
+        "winRate": 0,
+        "totalPnL": -200
+      },
+      {
+        "name": "Tuesday",
+        "count": 1,
+        "winRate": 100,
+        "totalPnL": 200
+      },
+      {
+        "name": "Wednesday",
+        "count": 1,
+        "winRate": 0,
+        "totalPnL": 0
+      },
+      {
+        "name": "Thursday",
+        "count": 1,
+        "winRate": 100,
+        "totalPnL": 200
+      },
+      {
+        "name": "Friday",
+        "count": 1,
+        "winRate": 0,
+        "totalPnL": 0
+      },
+      {
+        "name": "Saturday",
+        "count": 1,
+        "winRate": 0,
+        "totalPnL": -150
+      }
+    ],
+    "topEdges": [
+      {
+        "name": "Breakout + Confident",
+        "setup": "Breakout",
+        "emotion": "Confident",
+        "count": 6,
+        "winRate": 33.33333333333333,
+        "totalPnL": 50,
+        "avgR": 0.08333333333333333,
+        "rSampleSize": 6,
+        "score": 0.10483344360581824,
+        "antiScore": 0.9032306674407832
+      }
+    ],
+    "antiEdges": [
+      {
+        "name": "Breakout + Confident",
+        "setup": "Breakout",
+        "emotion": "Confident",
+        "count": 6,
+        "winRate": 33.33333333333333,
+        "totalPnL": 50,
+        "avgR": 0.08333333333333333,
+        "rSampleSize": 6,
+        "score": 0.10483344360581824,
+        "antiScore": 0.9032306674407832
+      }
+    ],
+    "closedMetrics": [
+      {
+        "id": "w1",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Breakout",
+        "emotionAtEntry": "Confident",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": true,
+        "closedAt": "2026-01-06T20:00:00.000Z",
+        "entry": 100,
+        "stop": 90,
+        "exit": 120,
+        "shares": 10,
+        "date": "2026-01-06",
+        "pnl": 200,
+        "rMultiple": 2
+      },
+      {
+        "id": "w2",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Breakout",
+        "emotionAtEntry": "Confident",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": true,
+        "closedAt": "2026-01-01T20:00:00.000Z",
+        "entry": 100,
+        "stop": 90,
+        "exit": 120,
+        "shares": 10,
+        "date": "2026-01-01",
+        "pnl": 200,
+        "rMultiple": 2
+      },
+      {
+        "id": "l1",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Breakout",
+        "emotionAtEntry": "Confident",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": true,
+        "closedAt": "2025-12-27T20:00:00.000Z",
+        "entry": 100,
+        "stop": 90,
+        "exit": 85,
+        "shares": 10,
+        "date": "2025-12-27",
+        "pnl": -150,
+        "rMultiple": -1.5
+      },
+      {
+        "id": "l2",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Breakout",
+        "emotionAtEntry": "Confident",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": true,
+        "closedAt": "2025-12-22T20:00:00.000Z",
+        "entry": 100,
+        "stop": 90,
+        "exit": 80,
+        "shares": 10,
+        "date": "2025-12-22",
+        "pnl": -200,
+        "rMultiple": -2
+      },
+      {
+        "id": "be1",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Breakout",
+        "emotionAtEntry": "Confident",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": true,
+        "closedAt": "2026-02-13T20:00:00.000Z",
+        "entry": 100,
+        "stop": 90,
+        "exit": 100,
+        "shares": 10,
+        "date": "2026-02-13",
+        "pnl": 0,
+        "rMultiple": 0
+      },
+      {
+        "id": "be2",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Breakout",
+        "emotionAtEntry": "Confident",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": true,
+        "closedAt": "2025-12-17T20:00:00.000Z",
+        "entry": 100,
+        "stop": 90,
+        "exit": 100,
+        "shares": 5,
+        "date": "2025-12-17",
+        "pnl": 0,
+        "rMultiple": 0
+      }
+    ],
+    "isEmpty": false
+  },
+  "missingStops": {
+    "totalTrades": 5,
+    "total": 5,
+    "openTrades": 0,
+    "wins": 3,
+    "losses": 2,
+    "totalPnL": 300,
+    "totalWin": 600,
+    "totalLoss": 300,
+    "winRate": 60,
+    "lossRate": 40,
+    "profitFactor": 2,
+    "avgWin": 200,
+    "avgLoss": 150,
+    "avgR": 0,
+    "rSampleSize": 2,
+    "bestWin": 300,
+    "worstLoss": -200,
+    "currentEquity": 2800,
+    "capital": 2500,
+    "returnPct": 12,
+    "equityCurve": [
+      {
+        "index": 1,
+        "date": "2026-01-21",
+        "equity": 2600,
+        "pnl": 100,
+        "drawdown": 0
+      },
+      {
+        "index": 2,
+        "date": "2026-01-26",
+        "equity": 2500,
+        "pnl": -100,
+        "drawdown": 3.8461538461538463
+      },
+      {
+        "index": 3,
+        "date": "2026-01-31",
+        "equity": 2800,
+        "pnl": 300,
+        "drawdown": 0
+      },
+      {
+        "index": 4,
+        "date": "2026-02-05",
+        "equity": 2600,
+        "pnl": -200,
+        "drawdown": 7.142857142857142
+      },
+      {
+        "index": 5,
+        "date": "2026-02-10",
+        "equity": 2800,
+        "pnl": 200,
+        "drawdown": 0
+      }
+    ],
+    "maxDrawdown": 7.142857142857142,
+    "maxDD": 200,
+    "currentDrawdown": 0,
+    "currentStreak": 1,
+    "maxWinStreak": 1,
+    "maxLossStreak": 1,
+    "bestStreak": 1,
+    "planFollowedWR": 60,
+    "planIgnoredWR": 0,
+    "planAdherence": 100,
+    "avgHoldHours": 0,
+    "avgHold": 0,
+    "lastWeekStats": {
+      "count": 1,
+      "pnl": 200,
+      "winRate": 100
+    },
+    "lastMonthStats": {
+      "count": 5,
+      "pnl": 300,
+      "winRate": 60
+    },
+    "bySetup": [
+      {
+        "name": "Breakout",
+        "count": 5,
+        "wins": 3,
+        "winRate": 60,
+        "totalPnL": 300,
+        "avgPnL": 60,
+        "totalR": 0,
+        "avgR": 0,
+        "rSampleSize": 2,
+        "profitFactor": 2
+      }
+    ],
+    "byEmotion": [
+      {
+        "name": "Confident",
+        "count": 5,
+        "wins": 3,
+        "winRate": 60,
+        "totalPnL": 300,
+        "avgPnL": 60,
+        "totalR": 0,
+        "avgR": 0,
+        "rSampleSize": 2,
+        "profitFactor": 2
+      }
+    ],
+    "byMarket": [
+      {
+        "name": "Trending Up",
+        "count": 5,
+        "wins": 3,
+        "winRate": 60,
+        "totalPnL": 300,
+        "avgPnL": 60,
+        "totalR": 0,
+        "avgR": 0,
+        "rSampleSize": 2,
+        "profitFactor": 2
+      }
+    ],
+    "byEntryQuality": [
+      {
+        "name": "3★",
+        "count": 5,
+        "wins": 3,
+        "winRate": 60,
+        "totalPnL": 300,
+        "avgPnL": 60,
+        "totalR": 0,
+        "avgR": 0,
+        "rSampleSize": 2,
+        "profitFactor": 2
+      }
+    ],
+    "byDayOfWeek": [
+      {
+        "name": "Monday",
+        "count": 1,
+        "winRate": 0,
+        "totalPnL": -100
+      },
+      {
+        "name": "Tuesday",
+        "count": 1,
+        "winRate": 100,
+        "totalPnL": 200
+      },
+      {
+        "name": "Wednesday",
+        "count": 1,
+        "winRate": 100,
+        "totalPnL": 100
+      },
+      {
+        "name": "Thursday",
+        "count": 1,
+        "winRate": 0,
+        "totalPnL": -200
+      },
+      {
+        "name": "Saturday",
+        "count": 1,
+        "winRate": 100,
+        "totalPnL": 300
+      }
+    ],
+    "topEdges": [
+      {
+        "name": "Breakout + Confident",
+        "setup": "Breakout",
+        "emotion": "Confident",
+        "count": 5,
+        "winRate": 60,
+        "totalPnL": 300,
+        "avgR": 0,
+        "rSampleSize": 2,
+        "score": 0.23071993220883702,
+        "antiScore": 0.769280067791163
+      }
+    ],
+    "antiEdges": [],
+    "closedMetrics": [
+      {
+        "id": "s1",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Breakout",
+        "emotionAtEntry": "Confident",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": true,
+        "closedAt": "2026-02-10T20:00:00.000Z",
+        "entry": 100,
+        "stop": 90,
+        "exit": 120,
+        "shares": 10,
+        "date": "2026-02-10",
+        "pnl": 200,
+        "rMultiple": 2
+      },
+      {
+        "id": "s2",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Breakout",
+        "emotionAtEntry": "Confident",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": true,
+        "closedAt": "2026-02-05T20:00:00.000Z",
+        "entry": 100,
+        "stop": 90,
+        "exit": 80,
+        "shares": 10,
+        "date": "2026-02-05",
+        "pnl": -200,
+        "rMultiple": -2
+      },
+      {
+        "id": "n1",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Breakout",
+        "emotionAtEntry": "Confident",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": true,
+        "closedAt": "2026-01-31T20:00:00.000Z",
+        "entry": 100,
+        "stop": null,
+        "exit": 130,
+        "shares": 10,
+        "date": "2026-01-31",
+        "pnl": 300,
+        "rMultiple": null
+      },
+      {
+        "id": "n2",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Breakout",
+        "emotionAtEntry": "Confident",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": true,
+        "closedAt": "2026-01-26T20:00:00.000Z",
+        "entry": 100,
+        "stop": null,
+        "exit": 90,
+        "shares": 10,
+        "date": "2026-01-26",
+        "pnl": -100,
+        "rMultiple": null
+      },
+      {
+        "id": "n3",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Breakout",
+        "emotionAtEntry": "Confident",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": true,
+        "closedAt": "2026-01-21T20:00:00.000Z",
+        "entry": 100,
+        "stop": null,
+        "exit": 110,
+        "shares": 10,
+        "date": "2026-01-21",
+        "pnl": 100,
+        "rMultiple": null
+      }
+    ],
+    "isEmpty": false
+  },
+  "openPositions": {
+    "totalTrades": 3,
+    "total": 3,
+    "openTrades": 2,
+    "wins": 2,
+    "losses": 1,
+    "totalPnL": 100,
+    "totalWin": 300,
+    "totalLoss": 200,
+    "winRate": 66.66666666666666,
+    "lossRate": 33.33333333333333,
+    "profitFactor": 1.5,
+    "avgWin": 150,
+    "avgLoss": 200,
+    "avgR": 0.6666666666666666,
+    "rSampleSize": 3,
+    "bestWin": 200,
+    "worstLoss": -200,
+    "currentEquity": 2600,
+    "capital": 2500,
+    "returnPct": 4,
+    "equityCurve": [
+      {
+        "index": 1,
+        "date": "2026-01-26",
+        "equity": 2600,
+        "pnl": 100,
+        "drawdown": 0
+      },
+      {
+        "index": 2,
+        "date": "2026-02-05",
+        "equity": 2400,
+        "pnl": -200,
+        "drawdown": 7.6923076923076925
+      },
+      {
+        "index": 3,
+        "date": "2026-02-12",
+        "equity": 2600,
+        "pnl": 200,
+        "drawdown": 0
+      }
+    ],
+    "maxDrawdown": 7.6923076923076925,
+    "maxDD": 200,
+    "currentDrawdown": 0,
+    "currentStreak": 1,
+    "maxWinStreak": 1,
+    "maxLossStreak": 1,
+    "bestStreak": 1,
+    "planFollowedWR": 66.66666666666666,
+    "planIgnoredWR": 0,
+    "planAdherence": 100,
+    "avgHoldHours": 0,
+    "avgHold": 0,
+    "lastWeekStats": {
+      "count": 1,
+      "pnl": 200,
+      "winRate": 100
+    },
+    "lastMonthStats": {
+      "count": 3,
+      "pnl": 100,
+      "winRate": 66.66666666666666
+    },
+    "bySetup": [
+      {
+        "name": "Breakout",
+        "count": 3,
+        "wins": 2,
+        "winRate": 66.66666666666666,
+        "totalPnL": 100,
+        "avgPnL": 33.333333333333336,
+        "totalR": 2,
+        "avgR": 0.6666666666666666,
+        "rSampleSize": 3,
+        "profitFactor": 1.5
+      }
+    ],
+    "byEmotion": [
+      {
+        "name": "Confident",
+        "count": 3,
+        "wins": 2,
+        "winRate": 66.66666666666666,
+        "totalPnL": 100,
+        "avgPnL": 33.333333333333336,
+        "totalR": 2,
+        "avgR": 0.6666666666666666,
+        "rSampleSize": 3,
+        "profitFactor": 1.5
+      }
+    ],
+    "byMarket": [
+      {
+        "name": "Trending Up",
+        "count": 3,
+        "wins": 2,
+        "winRate": 66.66666666666666,
+        "totalPnL": 100,
+        "avgPnL": 33.333333333333336,
+        "totalR": 2,
+        "avgR": 0.6666666666666666,
+        "rSampleSize": 3,
+        "profitFactor": 1.5
+      }
+    ],
+    "byEntryQuality": [
+      {
+        "name": "3★",
+        "count": 3,
+        "wins": 2,
+        "winRate": 66.66666666666666,
+        "totalPnL": 100,
+        "avgPnL": 33.333333333333336,
+        "totalR": 2,
+        "avgR": 0.6666666666666666,
+        "rSampleSize": 3,
+        "profitFactor": 1.5
+      }
+    ],
+    "byDayOfWeek": [
+      {
+        "name": "Monday",
+        "count": 1,
+        "winRate": 100,
+        "totalPnL": 100
+      },
+      {
+        "name": "Thursday",
+        "count": 2,
+        "winRate": 50,
+        "totalPnL": 0
+      }
+    ],
+    "topEdges": [
+      {
+        "name": "Breakout + Confident",
+        "setup": "Breakout",
+        "emotion": "Confident",
+        "count": 3,
+        "winRate": 66.66666666666666,
+        "totalPnL": 100,
+        "avgR": 0.6666666666666666,
+        "rSampleSize": 3,
+        "score": 0.3460915918774798,
+        "antiScore": 0.7923450448735121
+      }
+    ],
+    "antiEdges": [],
+    "closedMetrics": [
+      {
+        "id": "c1",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Breakout",
+        "emotionAtEntry": "Confident",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": true,
+        "closedAt": "2026-02-12T20:00:00.000Z",
+        "entry": 100,
+        "stop": 90,
+        "exit": 120,
+        "shares": 10,
+        "date": "2026-02-12",
+        "pnl": 200,
+        "rMultiple": 2
+      },
+      {
+        "id": "c2",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Breakout",
+        "emotionAtEntry": "Confident",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": true,
+        "closedAt": "2026-02-05T20:00:00.000Z",
+        "entry": 100,
+        "stop": 90,
+        "exit": 80,
+        "shares": 10,
+        "date": "2026-02-05",
+        "pnl": -200,
+        "rMultiple": -2
+      },
+      {
+        "id": "c3",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Breakout",
+        "emotionAtEntry": "Confident",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": true,
+        "closedAt": "2026-01-26T20:00:00.000Z",
+        "entry": 100,
+        "stop": 95,
+        "exit": 110,
+        "shares": 10,
+        "date": "2026-01-26",
+        "pnl": 100,
+        "rMultiple": 2
+      }
+    ],
+    "isEmpty": false
+  }
+}

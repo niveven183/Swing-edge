@@ -14,7 +14,8 @@
     "test:settings": "node scripts/userSettings-test.mjs",
     "test:datachain": "node scripts/dataChain-test.mjs",
     "test:rcontract": "node scripts/rContract-test.mjs",
-    "verify": "npm run test:coach && npm run test:import && npm run test:settings && npm run test:datachain && npm run test:rcontract && npm run build"
+    "test:tradingstats": "node scripts/tradingstats-test.mjs",
+    "verify": "npm run test:coach && npm run test:import && npm run test:settings && npm run test:datachain && npm run test:rcontract && npm run test:tradingstats && npm run build"
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
