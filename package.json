@@ -15,7 +15,8 @@
     "test:datachain": "node scripts/dataChain-test.mjs",
     "test:rcontract": "node scripts/rContract-test.mjs",
     "test:tradingstats": "node scripts/tradingstats-test.mjs",
-    "verify": "npm run test:coach && npm run test:import && npm run test:settings && npm run test:datachain && npm run test:rcontract && npm run test:tradingstats && npm run build"
+    "test:ocr": "node scripts/ocr-contract-test.mjs",
+    "verify": "npm run test:coach && npm run test:import && npm run test:settings && npm run test:datachain && npm run test:rcontract && npm run test:tradingstats && npm run test:ocr && npm run build"
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
