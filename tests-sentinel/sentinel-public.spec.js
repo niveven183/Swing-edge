@@ -55,11 +55,18 @@ function watch(page) {
   const consoleErrors = [];
   const pageErrors = [];
   const failedReq = [];
+  const thirdPartyServerErrors = [];
   page.on('console', (msg) => {
     if (msg.type() !== 'error') return;
     const text = msg.text();
     if (ignored(text)) return;
-    consoleErrors.push(text);
+    // The message text is whatever the app chose to print and often names no
+    // resource; the location is the only thing that always identifies where it
+    // came from. Appended, never used to filter — filtering here would be a new
+    // silence, and this exists to remove one.
+    let src = '';
+    try { src = msg.location()?.url || ''; } catch { src = ''; }
+    consoleErrors.push(src ? `${text} @ ${cleanUrl(src)}` : text);
   });
   page.on('pageerror', (err) => {
     const text = `${err.message}`;
@@ -70,10 +77,14 @@ function watch(page) {
     if (res.status() < 400) return;
     let host = '';
     try { host = new URL(res.url()).host; } catch { return; }
-    if (host !== BASE_HOST) return; // own origin only — 3rd-party 4xx/5xx ignored
-    failedReq.push(`${res.status()} ${cleanUrl(res.url())}`);
+    const url = cleanUrl(res.url());
+    if (host === BASE_HOST) { failedReq.push(`${res.status()} ${url}`); return; }
+    // Third-party 4xx stays ignored (TickerLogo-style misses). A 5xx is not
+    // noise: it is a named resource that broke during the load, and dropping it
+    // is what leaves a console.error with no address to chase.
+    if (res.status() >= 500 && !ignored(url)) thirdPartyServerErrors.push(`${res.status()} ${url}`);
   });
-  return { consoleErrors, pageErrors, failedReq };
+  return { consoleErrors, pageErrors, failedReq, thirdPartyServerErrors };
 }
 
 // Turn a page's collected diagnostics into findings. label is Hebrew page name.
@@ -101,6 +112,14 @@ function record(label, pageKey, diag) {
       'בקשה מהמקור שלנו החזירה 4xx/5xx בזמן טעינת הדף',
       'בדוק את ה-endpoint/asset שנכשל ב-Vercel',
       'אבחון תלוי-סיבה — הערך לפני פעולה');
+  }
+  if (diag.thirdPartyServerErrors.length) {
+    add('דפדפן', `browser|thirdparty_5xx|${pageKey}`, 'yellow', '🟡',
+      `5xx מספק חיצוני בטעינת ${label}`,
+      diag.thirdPartyServerErrors.slice(0, 3).join(' | '),
+      'משאב צד-שלישי החזיר 5xx בזמן טעינת הדף — לרוב זה המקור של שגיאת console בלי כתובת',
+      'זהה את הספק מהכתובת; מעקב בלבד כל עוד הדף רונדר',
+      'ללא פעולה — מעקב');
   }
 }
 

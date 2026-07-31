@@ -104,6 +104,7 @@ function watch(page) {
   const pageErrors = [];
   const failedReq = [];
   const supabaseFailedReq = [];
+  const thirdPartyServerErrors = [];
   page.on('console', (msg) => {
     if (msg.type() !== 'error') return;
     let src = '';
@@ -111,7 +112,10 @@ function watch(page) {
     if (IGNORE_SOURCE.some((p) => src.includes(p))) return;
     const text = msg.text();
     if (ignored(text)) return;
-    consoleErrors.push(text);
+    // src already decided whether to keep this message; it must also reach the
+    // report. The text is whatever the app chose to print and often names no
+    // resource — the location is the only part that always identifies one.
+    consoleErrors.push(src ? `${text} @ ${cleanUrl(src)}` : text);
   });
   page.on('pageerror', (err) => {
     const text = `${err.message}`;
@@ -129,11 +133,14 @@ function watch(page) {
     // Kept separate from failedReq: an own-origin-only filter hides the direct
     // answer to "why did hydration fail". cleanUrl drops the query, so no token
     // from a Supabase URL reaches the finding.
-    if (host.endsWith('.supabase.co')) supabaseFailedReq.push(`${res.status()} ${cleanUrl(res.url())}`);
-    // Any other third-party host (the financialmodelingprep.com logo among
-    // them) falls through both buckets by design — no filter needed here.
+    if (host.endsWith('.supabase.co')) { supabaseFailedReq.push(`${res.status()} ${cleanUrl(res.url())}`); return; }
+    // Third-party 4xx still falls through by design (the financialmodelingprep
+    // logo among them). A 5xx does not: it is a named resource that broke during
+    // the load, and dropping it is what leaves a console.error with no address.
+    const url = cleanUrl(res.url());
+    if (res.status() >= 500 && !ignored(url)) thirdPartyServerErrors.push(`${res.status()} ${url}`);
   });
-  return { consoleErrors, pageErrors, failedReq, supabaseFailedReq };
+  return { consoleErrors, pageErrors, failedReq, supabaseFailedReq, thirdPartyServerErrors };
 }
 
 function record(diag) {
@@ -168,6 +175,14 @@ function record(diag) {
       'קריאה ל-Supabase החזירה 4xx/5xx — הסיבה הישירה לכשל בטעינת הנתונים',
       'לפי הסטטוס: 401/403 = RLS/מפתח, 429 = rate limit, 5xx = תקלת שירות',
       'אבחון תלוי-סיבה — הערך לפני פעולה');
+  }
+  if (diag.thirdPartyServerErrors.length) {
+    add(COMPONENT, 'browser-auth|thirdparty_5xx', 'yellow', '🟡',
+      '5xx מספק חיצוני במסך המחובר',
+      redact(diag.thirdPartyServerErrors.slice(0, 3).join(' | ')),
+      'משאב צד-שלישי החזיר 5xx אחרי לוגין — לרוב זה המקור של שגיאת console בלי כתובת',
+      'זהה את הספק מהכתובת; מעקב בלבד כל עוד המסך רונדר',
+      'ללא פעולה — מעקב');
   }
 }
 
