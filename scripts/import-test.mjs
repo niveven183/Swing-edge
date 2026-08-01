@@ -11,6 +11,7 @@ import { detectColumns } from "../src/import/detectColumns.js";
 import { buildImport } from "../src/import/buildImport.js";
 import { normalizeRow } from "../src/import/normalizeRow.js";
 import { detectProfile, applyProfile } from "../src/import/brokerProfiles.js";
+import { normalizeSide } from "../src/import/synonyms.js";
 
 const FIX = join(dirname(fileURLToPath(import.meta.url)), "import-fixtures");
 let failures = 0;
@@ -66,6 +67,8 @@ const runProfile = (file) => {
     capital: 2500,
     sideResolver: applied.sideResolver,
     tickerResolver: applied.tickerResolver,
+    skipped: applied.skipped,
+    skippedByKind: applied.skippedByKind,
   });
   return { parsed, profile, applied, det, res };
 };
@@ -281,9 +284,51 @@ console.log("test:import — pipeline over 13 fixtures\n");
   }
 }
 
+// 16) The visible counter (ת1). Every row of the file must land in exactly one
+//     bucket — a skipped row that no bucket claims is a row lost in silence.
+{
+  console.log("16) counter — skipped rows counted and itemised");
+  for (const [file, expect] of [
+    ["ibi-full.xlsx", { valid: 4, skipped: 5 }],
+    ["altshuler-full.csv", { valid: 6, skipped: 5 }],
+  ]) {
+    const { res, applied } = runProfile(file);
+    check(`${file} counts.skipped`, res.counts.skipped, expect.skipped);
+    check(`${file} counts.valid`, res.counts.valid, expect.valid);
+    // The denominator must be able to hold everything counted (CLAUDE.md §2).
+    check(`${file} buckets sum to total`,
+      res.counts.valid + res.counts.rejected + res.counts.duplicates + res.counts.skipped,
+      res.counts.total);
+    const kindSum = Object.values(res.skippedByKind).reduce((a, b) => a + b, 0);
+    check(`${file} kinds sum to skipped`, kindSum, res.counts.skipped);
+    check(`${file} every kind is named`,
+      Object.keys(res.skippedByKind).every((k) => k.length > 0), true);
+    check(`${file} skippedByKind passed through`,
+      JSON.stringify(res.skippedByKind), JSON.stringify(applied.skippedByKind));
+  }
+
+  // Generic route: nothing skipped, and the counter still has a denominator.
+  const { parsed } = runProfile("generic-baseline.csv");
+  const det = detectColumns(parsed.headers, parsed.rows);
+  const res = buildImport(parsed.rows, det.mapping, { dateFormat: det.dateFormat, capital: 2500 });
+  check("generic counts.skipped", res.counts.skipped, 0);
+  check("generic skippedByKind empty", JSON.stringify(res.skippedByKind), "{}");
+  check("generic total unmoved", res.counts.total, parsed.rows.length);
+}
+
+// 17) `מכר` — the past-tense spelling the `מכיר` term cannot reach.
+{
+  console.log("17) normalizeSide — מכר reads as SHORT");
+  check("מכר", normalizeSide("מכר"), "SHORT");
+  check("מכר ניירות", normalizeSide("מכר ניירות"), "SHORT");
+  check("מכירה still SHORT", normalizeSide("מכירה"), "SHORT");
+  check("קנייה still LONG", normalizeSide("קנייה"), "LONG");
+  check("unknown still null", normalizeSide("דיבידנד"), null);
+}
+
 console.log("");
 if (failures > 0) {
   console.error(`❌ test:import — ${failures} assertion(s) failed`);
   process.exit(1);
 }
-console.log("✅ test:import — all fixtures passed (15 scenarios)");
+console.log("✅ test:import — all fixtures passed (17 scenarios)");

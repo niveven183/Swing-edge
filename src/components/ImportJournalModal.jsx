@@ -5,6 +5,7 @@ import { parseFile } from "../import/parseFile.js";
 import { detectColumns } from "../import/detectColumns.js";
 import { buildImport, rejectedToCSV } from "../import/buildImport.js";
 import { MAPPABLE_FIELDS, REQUIRED_FIELDS } from "../import/synonyms.js";
+import { detectProfile, applyProfile } from "../import/brokerProfiles.js";
 
 // Universal journal import wizard (Wave 10). Three steps: upload -> map -> review.
 // Pipeline lives entirely in src/import/*; this component is the UI shell and
@@ -20,6 +21,7 @@ export default function ImportJournalModal({ open, lang, t: tr = {}, capital = 0
   const [step, setStep] = useState(1);              // 1 upload · 2 map · 3 review
   const [fileName, setFileName] = useState("");
   const [parsed, setParsed] = useState(null);       // { headers, rows, sheetNames?, file }
+  const [applied, setApplied] = useState(null);     // broker profile result, or null for the generic route
   const [sheetNames, setSheetNames] = useState([]);
   const [colField, setColField] = useState([]);     // per-column field | ""
   const [dateFormat, setDateFormat] = useState("DD/MM");
@@ -35,7 +37,7 @@ export default function ImportJournalModal({ open, lang, t: tr = {}, capital = 0
 
   useEffect(() => {
     if (!open) return;
-    setStep(1); setFileName(""); setParsed(null); setSheetNames([]);
+    setStep(1); setFileName(""); setParsed(null); setApplied(null); setSheetNames([]);
     setColField([]); setDateFormat("DD/MM"); setImportDupes(false);
     setError(null); setBusy(false);
   }, [open]);
@@ -57,8 +59,12 @@ export default function ImportJournalModal({ open, lang, t: tr = {}, capital = 0
     if (step !== 3 || !parsed) return null;
     return buildImport(parsed.rows, mapping, {
       dateFormat, capital, existingTrades,
+      sideResolver: applied?.sideResolver,
+      tickerResolver: applied?.tickerResolver,
+      skipped: applied?.skipped,
+      skippedByKind: applied?.skippedByKind,
     });
-  }, [step, parsed, mapping, dateFormat, capital, existingTrades]);
+  }, [step, parsed, applied, mapping, dateFormat, capital, existingTrades]);
 
   if (!open) return null;
 
@@ -70,31 +76,68 @@ export default function ImportJournalModal({ open, lang, t: tr = {}, capital = 0
     setDateFormat(det.dateFormat);
   };
 
+  const firstNonBlank = (matrix) => {
+    const row = (matrix || []).find((r) => Array.isArray(r) && r.some((c) => String(c ?? "").trim() !== ""));
+    return row ? row.filter((c) => String(c ?? "").trim() !== "").join(" | ").slice(0, 80) : "";
+  };
+
+  // A broker profile engages only on a full column fingerprint. When one does, it
+  // — not the first non-blank line — decides where the header sits and which rows
+  // are trades. No profile means the generic route, byte-for-byte unchanged.
+  // Returns the {headers, rows} to display, or null when it has already errored.
+  const ingest = (res) => {
+    const profile = detectProfile(res.matrix);
+    if (!profile) {
+      setApplied(null);
+      applyDetection(res.headers, res.rows);
+      return { headers: res.headers, rows: res.rows };
+    }
+    const ap = applyProfile(profile, res.matrix);
+    if (ap.headerIdx < 0) {
+      setApplied(null);
+      setError(t("imp_no_header_found", { firstRow: firstNonBlank(res.matrix) }));
+      return null;
+    }
+    setApplied(ap);
+    applyDetection(ap.headers, ap.rows);
+    return { headers: ap.headers, rows: ap.rows };
+  };
+
+  const reportFailure = (e, ctx) => {
+    console.error("[import] parse failed:", ctx, e);
+    const reason = e?.message ? String(e.message) : String(e);
+    setError(`${t("imp_parse_error")} — ${reason}`);
+  };
+
   const handleFile = async (file, sheetName) => {
     if (!file) return;
-    setBusy(true); setError(null);
+    setBusy(true); setError(null); setApplied(null);
     try {
       const res = await parseFile(file, sheetName);
       if (!res.rows || res.rows.length === 0) { setError(t("imp_empty_file")); setBusy(false); return; }
+      const view = ingest(res);
+      if (!view) { setBusy(false); return; }
       setFileName(file.name);
-      setParsed({ ...res, file });
+      setParsed({ ...res, ...view, file });
       setSheetNames(res.sheetNames && res.sheetNames.length > 1 ? res.sheetNames : []);
-      applyDetection(res.headers, res.rows);
       setStep(2);
     } catch (e) {
-      setError(t("imp_parse_error"));
+      reportFailure(e, { file: file?.name, size: file?.size, sheet: sheetName ?? null });
     }
     setBusy(false);
   };
 
   const pickSheet = async (name) => {
     if (!parsed?.file) return;
-    setBusy(true);
+    setBusy(true); setError(null);
     try {
       const res = await parseFile(parsed.file, name);
-      setParsed({ ...res, file: parsed.file });
-      applyDetection(res.headers, res.rows);
-    } catch { setError(t("imp_parse_error")); }
+      const view = ingest(res);
+      if (!view) { setBusy(false); return; }
+      setParsed({ ...res, ...view, file: parsed.file });
+    } catch (e) {
+      reportFailure(e, { file: parsed.file?.name, size: parsed.file?.size, sheet: name });
+    }
     setBusy(false);
   };
 
@@ -180,10 +223,30 @@ export default function ImportJournalModal({ open, lang, t: tr = {}, capital = 0
                 </div>
               )}
 
+              {applied && (
+                <div className="inline-flex items-center gap-1.5 text-[11px] text-cyan-200 bg-cyan-500/10 border border-cyan-500/30 rounded-lg px-2.5 py-1">
+                  <CheckCircle2 size={12} className="shrink-0" />
+                  <span>{t("imp_profile_detected", { label: applied.profile.label })}</span>
+                </div>
+              )}
+
               {missingRequired.length > 0 && (
                 <div className="flex items-start gap-2 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
                   <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-                  <span>{t("imp_missing_required", { fields: missingRequired.map(fieldLabel).join(", ") })}</span>
+                  <div className="space-y-1">
+                    <div>{t("imp_missing_required", { fields: missingRequired.map(fieldLabel).join(", ") })}</div>
+                    {/* Say what we saw, not only what we lack: a user told the file
+                        has 13 columns and 0 recognised ones knows where to look. */}
+                    {!applied && (
+                      <div className="text-amber-300/70">
+                        {t("imp_profile_unknown", {
+                          n: parsed.headers.length,
+                          rows: parsed.rows.length,
+                          missing: missingRequired.map(fieldLabel).join(", "),
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -273,6 +336,32 @@ export default function ImportJournalModal({ open, lang, t: tr = {}, capital = 0
                   <div className="text-lg font-bold text-amber-300">{result.counts.duplicates}</div>
                   <div className="text-[10px] text-amber-400/80">{t("imp_count_dupes", { n: result.counts.duplicates })}</div>
                 </div>
+              </div>
+
+              {/* Shown even at zero. A counter that appears only when there is
+                  something to report teaches the reader that its absence means
+                  "everything went in" — which is exactly where a silent loss hides. */}
+              <div className="rounded-xl bg-white/[0.03] border border-white/10 p-3 space-y-1">
+                <div className="text-xs text-slate-200">
+                  {result.counts.skipped > 0
+                    ? t("imp_skipped_summary", { valid: result.counts.valid, skipped: result.counts.skipped })
+                    : t("imp_skipped_none", { valid: result.counts.valid })}
+                </div>
+                {result.counts.skipped > 0 && (
+                  <div className="text-[11px] text-slate-400">
+                    {t("imp_skipped_kinds", {
+                      kinds: Object.entries(result.skippedByKind)
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([kind, n]) => `${kind} ${n}`)
+                        .join(" · "),
+                    })}
+                  </div>
+                )}
+                {result.counts.unresolvedSymbol > 0 && (
+                  <div className="text-[11px] text-amber-300/90">
+                    {t("imp_unresolved_symbols", { n: result.counts.unresolvedSymbol })}
+                  </div>
+                )}
               </div>
 
               {result.noStopCount > 0 && (

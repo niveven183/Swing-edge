@@ -10,6 +10,11 @@ const dupKey = (t) => `${String(t.ticker).toUpperCase()}|${t.date}|${Number(t.en
 // rows: string[][]; mapping: {field:index}; opts: { dateFormat, capital,
 // todayISO, existingTrades: [] }.
 export function buildImport(rows, mapping, opts = {}) {
+  // Rows a broker profile dropped before we ever saw them. They are not rejects
+  // — they were never trades — but they must still be counted and named, or the
+  // difference between "the file had 55 trades" and "we lost 51 rows" is invisible.
+  const skipped = opts.skipped || [];
+  const skippedByKind = opts.skippedByKind || {};
   const existing = opts.existingTrades || [];
   const existingKeys = new Set(existing.map(dupKey));
   const seenInFile = new Set();
@@ -45,12 +50,15 @@ export function buildImport(rows, mapping, opts = {}) {
     rejected,       // { rowNumber, code, detail, raw }
     noStopCount,    // among valid+duplicates, how many have stop=null
     unresolvedSymbols, // imported under a security name; no live quote until resolved
+    skipped,        // [{ rowNumber, kind }] — dropped by a broker profile, not a trade
+    skippedByKind,  // { kind: count }
     counts: {
-      total: rows.length,
+      total: rows.length + skipped.length,
       valid: valid.length,
       duplicates: duplicates.length,
       rejected: rejected.length,
       unresolvedSymbol: unresolvedSymbols.length,
+      skipped: skipped.length,
     },
   };
 }

@@ -88,7 +88,10 @@ export const normalizeSide = (raw) => {
   const k = normKey(raw);
   if (!k) return null;
   if (/^(long|buy|b|l|קנייה|קניה)$/.test(k) || k.includes("long") || k.includes("buy")) return "LONG";
-  if (/^(short|sell|s)$/.test(k) || k.includes("short") || k.includes("sell") || k.includes("מכיר")) return "SHORT";
+  // `מכר` is the past-tense spelling; the `מכיר` term above cannot match it (no
+  // yod), so without this an entire column of sells reads as null and every row
+  // falls through to inferSide.
+  if (/^(short|sell|s)$/.test(k) || k.includes("short") || k.includes("sell") || k.includes("מכיר") || k.includes("מכר")) return "SHORT";
   if (k.includes("קני")) return "LONG";
   return null;
 };
