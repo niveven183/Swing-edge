@@ -63,6 +63,10 @@ export default function ImportJournalModal({ open, lang, t: tr = {}, capital = 0
       tickerResolver: applied?.tickerResolver,
       skipped: applied?.skipped,
       skippedByKind: applied?.skippedByKind,
+      // A broker file is a transaction log — one row per buy, one per sell — so
+      // its rows have to be matched before they are trades. A generic file
+      // already carries entry and exit on one row and must never be matched.
+      fifo: !!applied,
     });
   }, [step, parsed, applied, mapping, dateFormat, capital, existingTrades]);
 
@@ -356,6 +360,17 @@ export default function ImportJournalModal({ open, lang, t: tr = {}, capital = 0
                         .join(" · "),
                     })}
                   </div>
+                )}
+                {/* An addition to the line above, not a replacement: that one
+                    counts file rows, this one counts the trades they became.
+                    They are different populations and must not be read as one. */}
+                {result.fifo && (
+                  <div className="text-[11px] text-cyan-300/90">
+                    {t("imp_fifo_summary", { closed: result.counts.closed, open: result.counts.open })}
+                  </div>
+                )}
+                {result.fifo?.log?.reversedFileOrder && (
+                  <div className="text-[11px] text-slate-400">{t("imp_fifo_reversed")}</div>
                 )}
                 {result.counts.unresolvedSymbol > 0 && (
                   <div className="text-[11px] text-amber-300/90">

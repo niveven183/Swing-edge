@@ -150,6 +150,29 @@ const ibiWb = XLSX.utils.book_new();
 XLSX.utils.book_append_sheet(ibiWb, XLSX.utils.aoa_to_sheet(ibiAoa), "תנועות");
 w("ibi-full.xlsx", XLSX.write(ibiWb, { type: "buffer", bookType: "xlsx" }));
 
+// 11b) IBI export built for FIFO: a 1:1 pair, a sell that splits across two
+// buys, a buy nothing closes, and a sell with no buy before it. Hand-computed
+// expectations live in scripts/import-test.mjs §19.
+const ibiFifoAoa = [
+  blank11(),
+  ["תנועות היסטוריות", "", "", "", "", "", "", "", "", "", ""],
+  ["חשבון: 0-00000", "", "", "", "", "", "", "", "", "", ""],
+  blank11(),
+  IBI_HEADERS,
+  ibiRow("ACME CORP", 1100001, "קנייה", 100, 150, "05/01/2026"),
+  ibiRow("WIDGET LTD", 1100002, "קנייה", 20, 100, "06/01/2026"),
+  ibiRow("WIDGET LTD", 1100002, "קנייה", 30, 110, "07/01/2026"),
+  ibiRow("AAPL", 1100004, "קנייה", 5, 200, "08/01/2026"),
+  ibiRow("ACME CORP", 1100001, "מכירה", -40, 160, "09/01/2026"),
+  ibiRow("WIDGET LTD", 1100002, "מכירה", -50, 120, "10/01/2026"),
+  ibiRow("GLOBEX PLC", 1100003, "מכירה", -7, 90, "11/01/2026"),
+  ibiRow("ACME CORP", 1100001, "מכירה", -60, 170, "12/01/2026"),
+  ibiRow("ACME CORP", 1100001, "דיבידנד - תשלום", 10, 0.5, "13/01/2026"),
+];
+const ibiFifoWb = XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(ibiFifoWb, XLSX.utils.aoa_to_sheet(ibiFifoAoa), "תנועות");
+w("ibi-fifo.xlsx", XLSX.write(ibiFifoWb, { type: "buffer", bookType: "xlsx" }));
+
 // 12) Altshuler export. Header on row 1, quantity positive on sells too, and a
 // foreign security whose symbol hides in the *name* column while the symbol
 // column sits empty.
