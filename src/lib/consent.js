@@ -103,6 +103,16 @@ export function revokeAnalytics() {
   notify("denied");
 }
 
+// Aggregate product telemetry. Params must be low-cardinality enums only —
+// never a ticker, a price, a user id or anything else that identifies a trade.
+// Silently no-ops without a grant, so any rate derived from these events has
+// the consenting population as its denominator, not the whole user base.
+export function trackEvent(name, params) {
+  if (readConsent() !== "granted") return;
+  if (typeof window === "undefined" || typeof window.gtag !== "function") return;
+  window.gtag("event", name, params);
+}
+
 // Fires on every decision change. Returns an unsubscribe function.
 export function subscribeConsent(fn) {
   listeners.add(fn);

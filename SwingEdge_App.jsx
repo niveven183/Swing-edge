@@ -65,6 +65,7 @@ import {
   Users, GraduationCap, UserPlus, NotebookPen, CalendarCheck, Upload, Undo2
 } from "lucide-react";
 import { getTranslations, LANGUAGES, isRTLLang, nTrades, labelFor } from "./src/i18n.js";
+import { trackEvent } from "./src/lib/consent.js";
 import {
   fetchPrices, fmtVolume, fmtMarketCap, searchTickers,
   fetchQuote, fetchEarnings, getMarketState, getMarketStateBadge, getRefreshInterval, MARKET_STATE,
@@ -114,6 +115,43 @@ function SetupTagTip({ setup, isRTL }) {
       </div>
     </InfoTooltip>
   );
+}
+
+// What the OCR actually contributed. Derived from the response, not from the form:
+// a price the trader typed by hand is not an OCR success, and a price OCR read is
+// not a failure just because the manual field won the merge.
+function ocrDetection(result) {
+  const has = (v) => v !== null && v !== undefined;
+  if (!result) return "none";
+  if (has(result.entry) && has(result.stop) && has(result.target)) return "full";
+  if (has(result.entry)) return "partial";
+  if (has(result.ticker)) return "ticker_only";
+  return "none";
+}
+
+// The one badge decision, shared by all three OCR screens. Returns a semantic tone
+// KEY rather than classes: each screen owns its palette (the chart badge floats over
+// the chart and needs opaque colours), and Tailwind JIT needs literal class strings.
+// A response is only green when prices were actually read — confidence alone is not
+// evidence that anything landed in the form.
+function ocrBadgeState({ status, confidence, detection }, t) {
+  if (status === "processing") return { tone: "info", icon: "spin", text: t.ocrProcessing };
+  if (status === "config_error") return { tone: "bad", icon: "warn", text: t.ocrConfigError };
+  if (status === "error") return { tone: "bad", icon: "warn", text: t.ocrError };
+  const conf = confidence ?? 0;
+  if (detection === "full" && conf >= 70) return { tone: "ok", icon: "check", text: `OCR ✓ ${conf}%` };
+  if (detection === "full" && conf >= 40) return { tone: "warn", icon: "check", text: `OCR ~ ${conf}%` };
+  if (detection === "partial") return { tone: "warn", icon: "warn", text: t.ocrPartial };
+  if (detection === "ticker_only") return { tone: "warn", icon: "warn", text: t.ocrTickerOnly };
+  return { tone: "bad", icon: "warn", text: t.ocrLowConfidence };
+}
+
+const confidenceBucket = (c) => (c >= 70 ? "high" : c >= 40 ? "mid" : "low");
+
+function ocrBadgeIcon(icon) {
+  if (icon === "spin") return <RefreshCw size={12} className="animate-spin shrink-0" />;
+  if (icon === "check") return <CheckCircle size={12} className="shrink-0" />;
+  return <AlertTriangle size={12} className="shrink-0" />;
 }
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -1031,6 +1069,13 @@ export default function SwingEdge() {
   const [form, setForm] = useState({ ticker: "", side: "LONG", entry: "", stop: "", target: "", shares: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
   const [showTradeContext, setShowTradeContext] = useState(false);
   const [ocrStatus, setOcrStatus] = useState(null);
+  // Holds the ticker of an OCR read that came back WITHOUT an entry price. While it
+  // matches, the live quote must not fill Entry: the trader is looking at a chart
+  // whose entry we failed to read, and a current price sitting in that field is
+  // indistinguishable from a successful reading. Keyed by ticker so a different
+  // symbol releases it on its own; a ref, not state, because the quote effect runs
+  // after commit and must see the flag on that same pass.
+  const formOcrTickerRef = useRef(null);
   // Live quote shown in the Add Trade modal (auto-fills Entry Price).
   const [formQuote, setFormQuote] = useState(null);
   const [formQuoteLoading, setFormQuoteLoading] = useState(false);
@@ -1056,9 +1101,11 @@ export default function SwingEdge() {
   const [analyzerImagePreview, setAnalyzerImagePreview] = useState(null);
   const [analyzerResult, setAnalyzerResult] = useState(null);
   // OCR (Claude Vision via /api/ocr): chosen side disambiguates stop vs target;
-  // analyzerOcrResult drives the confidence badge. { status, confidence }.
+  // analyzerOcrResult drives the confidence badge. { status, confidence, detection }.
   const [analyzerOcrSide, setAnalyzerOcrSide] = useState("LONG");
   const [analyzerOcrResult, setAnalyzerOcrResult] = useState(null);
+  // Analyzer twin of formOcrTickerRef — see the comment there.
+  const analyzerOcrTickerRef = useRef(null);
   const [analyzerLoading, setAnalyzerLoading] = useState(false);
   // Live quote shown in the Analyzer (auto-fills Entry Price). Mirrors the Add-Trade form mechanism.
   const [analyzerQuote, setAnalyzerQuote] = useState(null);
@@ -1891,12 +1938,21 @@ export default function SwingEdge() {
       setForm(f => {
         if (f.ticker.toUpperCase() !== ticker.toUpperCase()) return f;
         if (!force && f.entry) return f;
+        // An OCR read that failed to produce an entry leaves the field empty on
+        // purpose. Filling it with the live price here is exactly the silent
+        // failure we are closing: the trader cannot tell it from a reading.
+        if (!force && formOcrTickerRef.current === ticker.toUpperCase()) return f;
         return { ...f, entry: String(q.price.toFixed(2)) };
       });
     } finally {
       setFormQuoteLoading(false);
     }
   }, []);
+
+  // Clearing the badge is the one signal that no OCR read is in effect any more —
+  // form reset, image removed, modal reopened. Releasing the suspension here covers
+  // every one of those call sites instead of asking each to remember.
+  useEffect(() => { if (!ocrStatus) formOcrTickerRef.current = null; }, [ocrStatus]);
 
   useEffect(() => {
     if (!showForm) return;
@@ -1920,12 +1976,16 @@ export default function SwingEdge() {
       setAnalyzerForm(f => {
         if (f.ticker.toUpperCase() !== ticker.toUpperCase()) return f;
         if (!force && f.entry) return f;
+        // See fetchFormQuote — a failed OCR must not hand the live price to Entry.
+        if (!force && analyzerOcrTickerRef.current === ticker.toUpperCase()) return f;
         return { ...f, entry: String(q.price.toFixed(2)) };
       });
     } finally {
       setAnalyzerQuoteLoading(false);
     }
   }, []);
+
+  useEffect(() => { if (!analyzerOcrResult) analyzerOcrTickerRef.current = null; }, [analyzerOcrResult]);
 
   useEffect(() => {
     if (!(tab === "tools" && toolsTab === "analyzer")) return;
@@ -2399,6 +2459,7 @@ export default function SwingEdge() {
       const sideAtUpload = form.side; // capture before async — avoids a stale form.side from an older closure
       // Reset prior read before analyzing a new image.
       setForm(f => ({ ...f, ticker: "", entry: "", stop: "", target: "", tradeImage: file, tradeImagePreview: dataURL }));
+      formOcrTickerRef.current = null; // a read that never returns must not leave the field suspended
       setOcrStatus({ status: "processing", confidence: 0 });
       // Vision can take 3–8s; bail out at 15s so the UI never hangs.
       const controller = new AbortController();
@@ -2412,6 +2473,11 @@ export default function SwingEdge() {
           return;
         }
         const result = await res.json();
+        const detection = ocrDetection(result);
+        // Set before the ticker reaches the form: the quote effect runs after this
+        // commit and must already see the flag. A successful read never touches it.
+        formOcrTickerRef.current =
+          result.entry == null && result.ticker ? result.ticker.toUpperCase() : null;
         // Never overwrite a field the trader already filled by hand.
         setForm(f => ({
           ...f,
@@ -2420,7 +2486,11 @@ export default function SwingEdge() {
           stop:   f.stop   || (result.stop   != null ? String(result.stop.toFixed(2))   : f.stop),
           target: f.target || (result.target != null ? String(result.target.toFixed(2)) : f.target),
         }));
-        setOcrStatus({ status: "ok", confidence: result.confidence ?? 0 });
+        setOcrStatus({ status: "ok", confidence: result.confidence ?? 0, detection });
+        trackEvent("ocr_result", {
+          detected: detection,
+          confidence_bucket: confidenceBucket(result.confidence ?? 0),
+        });
       } catch {
         clearTimeout(timer);
         setOcrStatus({ status: "error", confidence: 0 });
@@ -2438,6 +2508,7 @@ export default function SwingEdge() {
       const sideAtUpload = analyzerOcrSide; // capture before async — avoids a stale side from an older closure
       setAnalyzerImage(file);
       setAnalyzerImagePreview(dataURL);
+      analyzerOcrTickerRef.current = null; // see handleImageUpload
       setAnalyzerOcrResult({ status: "processing", confidence: 0 });
       // Vision can take 3–8s; bail out at 15s so the UI never hangs.
       const controller = new AbortController();
@@ -2454,6 +2525,11 @@ export default function SwingEdge() {
           return;
         }
         const result = await res.json();
+        const detection = ocrDetection(result);
+        // See handleImageUpload — the flag must be set before the commit that
+        // writes the ticker, because the quote effect reads it on that pass.
+        analyzerOcrTickerRef.current =
+          result.entry == null && result.ticker ? result.ticker.toUpperCase() : null;
         // Never overwrite a field the trader already filled by hand.
         setAnalyzerForm(f => ({
           ...f,
@@ -2462,7 +2538,11 @@ export default function SwingEdge() {
           stop:   f.stop   || (result.stop   != null ? String(result.stop.toFixed(2))   : f.stop),
           target: f.target || (result.target != null ? String(result.target.toFixed(2)) : f.target),
         }));
-        setAnalyzerOcrResult({ status: "ok", confidence: result.confidence ?? 0 });
+        setAnalyzerOcrResult({ status: "ok", confidence: result.confidence ?? 0, detection });
+        trackEvent("ocr_result", {
+          detected: detection,
+          confidence_bucket: confidenceBucket(result.confidence ?? 0),
+        });
       } catch {
         clearTimeout(timer);
         setAnalyzerOcrResult({ status: "error", confidence: 0 });
@@ -2556,7 +2636,11 @@ export default function SwingEdge() {
   // overwrites a field the trader already filled by hand (mirrors handleImageUpload).
   const routeChartOcr = (result, target, dataURL) => {
     const confidence = result.confidence ?? 0;
+    const detection = ocrDetection(result);
     if (target === "position") {
+      // posCalc has no live-quote effect: its price fill hangs off the ticker
+      // input's onChange, which this path never triggers. If that ever moves to
+      // an effect it needs the same guard the journal and analyzer forms carry.
       setPosCalc(f => ({
         ...f,
         ticker: result.ticker || f.ticker,
@@ -2567,6 +2651,8 @@ export default function SwingEdge() {
       }));
       setTab("position");
     } else {
+      formOcrTickerRef.current =
+        result.entry == null && result.ticker ? result.ticker.toUpperCase() : null;
       setForm(f => ({
         ...f,
         ticker: f.ticker || result.ticker || f.ticker,
@@ -2575,10 +2661,11 @@ export default function SwingEdge() {
         target: f.target || (result.target != null ? String(result.target.toFixed(2)) : f.target),
         tradeImagePreview: f.tradeImagePreview || dataURL, // show the captured frame for verification
       }));
-      setOcrStatus({ status: "ok", confidence }); // journal-modal badge, matches handleImageUpload
+      setOcrStatus({ status: "ok", confidence, detection }); // journal-modal badge, matches handleImageUpload
       setShowForm(true);
     }
-    setChartOcrStatus({ status: "ok", confidence });
+    setChartOcrStatus({ status: "ok", confidence, detection });
+    trackEvent("ocr_result", { detected: detection, confidence_bucket: confidenceBucket(confidence) });
   };
 
   // Shared OCR call for BOTH the capture path and the file-fallback path. Mirrors
@@ -4111,26 +4198,15 @@ export default function SwingEdge() {
               </div>
               {/* OCR confidence badge */}
               {analyzerOcrResult && (() => {
-                const { status, confidence } = analyzerOcrResult;
-                const ok = status === "ok";
-                const high = ok && confidence >= 70;
-                const mid = ok && confidence >= 40 && confidence < 70;
-                const low = ok && confidence < 40;
-                const tone =
-                  status === "processing" ? "bg-[var(--v3-info)]/5 border-[var(--v3-info)]/20 text-[var(--v3-info)]" :
-                  high ? "bg-[var(--v3-accent)]/5 border-[var(--v3-accent)]/20 text-[var(--v3-accent)]" :
-                  mid  ? "bg-[var(--v3-warn)]/5 border-[var(--v3-warn)]/20 text-[var(--v3-warn)]" :
-                         "bg-[var(--v3-loss)]/5 border-[var(--v3-loss)]/20 text-[var(--v3-loss)]";
-                let icon, text;
-                if (status === "processing") { icon = <RefreshCw size={12} className="animate-spin" />; text = lang === "he" ? "קורא גרף…" : "Reading chart…"; }
-                else if (status === "config_error") { icon = <AlertTriangle size={12} />; text = lang === "he" ? "מפתח API חסר — פנה לאדמין" : "API key missing — contact admin"; }
-                else if (status === "error") { icon = <AlertTriangle size={12} />; text = lang === "he" ? "שגיאת OCR — נסה שוב" : "OCR failed — try again"; }
-                else if (high) { icon = <CheckCircle size={12} />; text = `OCR ✓ ${confidence}%`; }
-                else if (mid)  { icon = <CheckCircle size={12} />; text = `OCR ~ ${confidence}%`; }
-                else { icon = <AlertTriangle size={12} />; text = lang === "he" ? "לא זוהה — ודא ידנית" : "Not detected — verify manually"; }
+                const { tone, icon, text } = ocrBadgeState(analyzerOcrResult, t);
+                const cls =
+                  tone === "info" ? "bg-[var(--v3-info)]/5 border-[var(--v3-info)]/20 text-[var(--v3-info)]" :
+                  tone === "ok"   ? "bg-[var(--v3-accent)]/5 border-[var(--v3-accent)]/20 text-[var(--v3-accent)]" :
+                  tone === "warn" ? "bg-[var(--v3-warn)]/5 border-[var(--v3-warn)]/20 text-[var(--v3-warn)]" :
+                                    "bg-[var(--v3-loss)]/5 border-[var(--v3-loss)]/20 text-[var(--v3-loss)]";
                 return (
-                  <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-[11px] ${tone}`}>
-                    {icon}<span>{text}</span>
+                  <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-[11px] ${cls}`}>
+                    {ocrBadgeIcon(icon)}<span className="leading-snug">{text}</span>
                   </div>
                 );
               })()}
@@ -5168,25 +5244,15 @@ export default function SwingEdge() {
                 <div data-tour="chart-ocr" className="mt-2 z-10 flex flex-row flex-wrap justify-end gap-2 md:mt-0 md:absolute md:bottom-4 md:right-4 rtl:md:right-auto rtl:md:left-4 md:flex-col md:flex-nowrap md:justify-start">
                   {/* Capture/OCR status — announced to assistive tech */}
                   {chartOcrStatus && (() => {
-                    const { status, confidence } = chartOcrStatus;
-                    const ok = status === "ok";
-                    const high = ok && confidence >= 70;
-                    const mid  = ok && confidence >= 40 && confidence < 70;
-                    const tone =
-                      status === "processing" ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-200" :
-                      high ? "bg-emerald-500/10 border-emerald-500/30 text-[#10b981]" :
-                      mid  ? "bg-amber-500/10 border-amber-500/30 text-amber-300" :
-                             "bg-[#ef4444]/10 border-[#ef4444]/30 text-[#fca5a5]";
-                    let icon, text;
-                    if (status === "processing") { icon = <RefreshCw size={12} className="animate-spin" />; text = t.ocrProcessing; }
-                    else if (status === "config_error") { icon = <AlertTriangle size={12} />; text = t.ocrConfigError; }
-                    else if (status === "error") { icon = <AlertTriangle size={12} />; text = t.ocrError; }
-                    else if (high) { icon = <CheckCircle size={12} />; text = `OCR ✓ ${confidence}%`; }
-                    else if (mid)  { icon = <CheckCircle size={12} />; text = `OCR ~ ${confidence}%`; }
-                    else { icon = <AlertTriangle size={12} />; text = t.ocrLowConfidence; }
+                    const { tone, icon, text } = ocrBadgeState(chartOcrStatus, t);
+                    const cls =
+                      tone === "info" ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-200" :
+                      tone === "ok"   ? "bg-emerald-500/10 border-emerald-500/30 text-[#10b981]" :
+                      tone === "warn" ? "bg-amber-500/10 border-amber-500/30 text-amber-300" :
+                                        "bg-[#ef4444]/10 border-[#ef4444]/30 text-[#fca5a5]";
                     return (
-                      <div role="status" aria-live="polite" className={`flex items-center justify-center gap-2 px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold shadow-xl backdrop-blur-md ${tone}`}>
-                        {icon}<span>{text}</span>
+                      <div role="status" aria-live="polite" className={`flex items-center justify-center gap-2 px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold shadow-xl backdrop-blur-md md:max-w-[16rem] ${cls}`}>
+                        {ocrBadgeIcon(icon)}<span className="leading-snug">{text}</span>
                       </div>
                     );
                   })()}
@@ -6372,25 +6438,15 @@ export default function SwingEdge() {
 
               {/* OCR confidence badge — graded, mirrors the Analyzer */}
               {ocrStatus && (() => {
-                const { status, confidence } = ocrStatus;
-                const ok = status === "ok";
-                const high = ok && confidence >= 70;
-                const mid  = ok && confidence >= 40 && confidence < 70;
-                const tone =
-                  status === "processing" ? "bg-[var(--v3-info)]/5 border-[var(--v3-info)]/20 text-[var(--v3-info)]" :
-                  high ? "bg-[var(--v3-accent)]/5 border-[var(--v3-accent)]/20 text-[var(--v3-accent)]" :
-                  mid  ? "bg-[var(--v3-warn)]/5 border-[var(--v3-warn)]/20 text-[var(--v3-warn)]" :
-                         "bg-[var(--v3-loss)]/5 border-[var(--v3-loss)]/20 text-[var(--v3-loss)]";
-                let icon, text;
-                if (status === "processing") { icon = <RefreshCw size={12} className="animate-spin" />; text = lang === "he" ? "קורא גרף…" : "Reading chart…"; }
-                else if (status === "config_error") { icon = <AlertTriangle size={12} />; text = lang === "he" ? "מפתח API חסר — פנה לאדמין" : "API key missing — contact admin"; }
-                else if (status === "error") { icon = <AlertTriangle size={12} />; text = lang === "he" ? "שגיאת OCR — נסה שוב" : "OCR failed — try again"; }
-                else if (high) { icon = <CheckCircle size={12} />; text = `OCR ✓ ${confidence}%`; }
-                else if (mid)  { icon = <CheckCircle size={12} />; text = `OCR ~ ${confidence}%`; }
-                else { icon = <AlertTriangle size={12} />; text = lang === "he" ? "לא זוהה — ודא ידנית" : "Not detected — verify manually"; }
+                const { tone, icon, text } = ocrBadgeState(ocrStatus, t);
+                const cls =
+                  tone === "info" ? "bg-[var(--v3-info)]/5 border-[var(--v3-info)]/20 text-[var(--v3-info)]" :
+                  tone === "ok"   ? "bg-[var(--v3-accent)]/5 border-[var(--v3-accent)]/20 text-[var(--v3-accent)]" :
+                  tone === "warn" ? "bg-[var(--v3-warn)]/5 border-[var(--v3-warn)]/20 text-[var(--v3-warn)]" :
+                                    "bg-[var(--v3-loss)]/5 border-[var(--v3-loss)]/20 text-[var(--v3-loss)]";
                 return (
-                  <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--v3-radius-chip)] border text-[11px] ${tone}`}>
-                    {icon}<span>{text}</span>
+                  <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--v3-radius-chip)] border text-[11px] ${cls}`}>
+                    {ocrBadgeIcon(icon)}<span className="leading-snug">{text}</span>
                   </div>
                 );
               })()}

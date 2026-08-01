@@ -418,8 +418,12 @@ export default async function handler(req, res) {
       modelConf === null ? 0 : Math.max(0, Math.min(100, Math.round(modelConf)));
 
     // No Position tool → no levels to compute (fallback C lands separately).
+    // The model's certainty here is certainty that there is NO position tool — it
+    // says nothing about prices, and there are none. Cap below MIN_CONFIDENCE so
+    // every badge reads it as failure, but keep it non-zero: the low end still
+    // separates "sure there's no tool" from "could not read the image at all".
     if (parsed.hasPositionTool !== true) {
-      res.status(200).json({ ...nullResult, ticker, confidence: modelConf });
+      res.status(200).json({ ...nullResult, ticker, confidence: Math.min(modelConf, 25) });
       return;
     }
 

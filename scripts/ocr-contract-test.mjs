@@ -74,8 +74,8 @@ const FROZEN = {
   },
   B: {
     status: 200,
-    note: "F2 will lower confidence here. Updating this row is the point of F2.",
-    body: { ticker: "AFRM", entry: null, stop: null, target: null, side: "LONG", confidence: 85, rrRatio: null },
+    note: "MOVED BY F2 (2026-08-01): confidence 85 -> 25. The model's 85 was certainty about the ticker, not about a trade that was never read. 25 sits below MIN_CONFIDENCE so every badge reads it as failure.",
+    body: { ticker: "AFRM", entry: null, stop: null, target: null, side: "LONG", confidence: 25, rrRatio: null },
   },
   C: {
     status: 200,
