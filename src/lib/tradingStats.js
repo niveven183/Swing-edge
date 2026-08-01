@@ -1,4 +1,4 @@
-import { isFollowedPlan, isOffPlan, qstars, holdDays } from "../utils.js";
+import { isFollowedPlan, isOffPlan, qstars, holdDays, realizedAt, realizedDayKey } from "../utils.js";
 import {
   edgeScore, wilsonLowerBound,
   getClosed, outcomeRates, grossPnl, profitFactorFromPnls,
@@ -75,11 +75,10 @@ export function computeTradingStats(trades, capital, calcTradeMetrics) {
   const worstLoss    = losers.length  ? Math.min(...losers.map(m => m.pnl)) : 0;
 
   // ─── Equity curve + Max Drawdown ───────────────────────────
-  const sorted = [...metrics].sort((a, b) => {
-    const da = a.date ? new Date(a.date).getTime() : 0;
-    const db = b.date ? new Date(b.date).getTime() : 0;
-    return da - db;
-  });
+  // Ordered by close, not entry: drawdown is a statement about the sequence the
+  // account actually lived through, so a January entry closed in June belongs
+  // after everything closed in between.
+  const sorted = [...metrics].sort((a, b) => (realizedAt(a) ?? 0) - (realizedAt(b) ?? 0));
   let equity = capital;
   let peak = capital;
   let maxDDPct = 0;       // % drawdown from peak equity
@@ -96,7 +95,7 @@ export function computeTradingStats(trades, capital, calcTradeMetrics) {
     const ddDoll = pnlPeak - pnlEquity;
     if (ddPct  > maxDDPct)     maxDDPct = ddPct;
     if (ddDoll > maxDDDollars) maxDDDollars = ddDoll;
-    return { index: i + 1, date: m.date, equity, pnl, drawdown: ddPct };
+    return { index: i + 1, date: realizedDayKey(m), equity, pnl, drawdown: ddPct };
   });
   const currentDrawdown = equityCurve.length
     ? equityCurve[equityCurve.length - 1].drawdown
@@ -142,8 +141,10 @@ export function computeTradingStats(trades, capital, calcTradeMetrics) {
 
   // ─── Time-based ────────────────────────────────────────────
   const now = Date.now();
-  const lastWeek  = metrics.filter(m => m.date && new Date(m.date).getTime() >= now - 7  * 86400000);
-  const lastMonth = metrics.filter(m => m.date && new Date(m.date).getTime() >= now - 30 * 86400000);
+  // Windowed on close, not entry: "last week's P&L" means P&L realized last
+  // week. WeeklyReviewTab mirrors this predicate and must stay in step with it.
+  const lastWeek  = metrics.filter(m => realizedAt(m) >= now - 7  * 86400000);
+  const lastMonth = metrics.filter(m => realizedAt(m) >= now - 30 * 86400000);
 
   // ─── Breakdowns ────────────────────────────────────────────
   const bySetup        = groupAndAnalyze(metrics, "setup");

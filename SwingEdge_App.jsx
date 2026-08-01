@@ -45,7 +45,7 @@ import { useToast, useConfirm } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured, tradeForSupabase, tradeFromSupabase } from "./src/supabaseClient.js";
 import { cleanTrades, purgeInvalidTrades } from "./src/lib/cleanTrades.js";
 import { loadSettings, saveSettings, flushSettings, migrateFromLocalStorage } from "./src/lib/userSettings.js";
-import { calcTradeMetrics, fmt$, fmtR, fmtNum, numOrNull, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays } from "./src/utils.js";
+import { calcTradeMetrics, fmt$, fmtR, fmtNum, numOrNull, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays, localDayKey, realizedAt, realizedDayKey } from "./src/utils.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell,
@@ -314,17 +314,19 @@ const generateEquityCurve = (cap, trades = []) => {
   let balance = cap;
   const data = [];
   // getClosed returns a fresh array, so sorting in place does not mutate `trades`.
+  // Ordered and plotted by close, not entry: a trade's P&L lands on the curve on
+  // the day it was realized, which is what makes the curve chronological.
   const sortedTrades = getClosed(trades)
-    .sort((a, b) => new Date(a.date) - new Date(b.date));
+    .sort((a, b) => (realizedAt(a) ?? 0) - (realizedAt(b) ?? 0));
   sortedTrades.forEach(t => {
     const pnl = calcTradeMetrics(t).pnl || 0;
     balance += pnl;
-    data.push({ date: t.date, equity: Math.round(balance), ticker: t.ticker, pnl: Math.round(pnl) });
+    data.push({ date: realizedDayKey(t), equity: Math.round(balance), ticker: t.ticker, pnl: Math.round(pnl) });
   });
-  const firstRaw = sortedTrades[0]?.date;
+  const firstRaw = realizedAt(sortedTrades[0]);
   const anchorDate = firstRaw
-    ? new Date(new Date(firstRaw).getTime() - 86_400_000).toISOString().slice(0, 10)
-    : new Date().toISOString().slice(0, 10);
+    ? localDayKey(new Date(firstRaw - 86_400_000))
+    : localDayKey(new Date());
   return [{ date: anchorDate, equity: cap, ticker: "START", pnl: 0 }, ...data];
 };
 
@@ -1956,8 +1958,8 @@ export default function SwingEdge() {
 
   // Daily P&L calculation
   const dailyPnL = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const todayClosed = closedTrades.filter(t => t.date === today);
+    const today = localDayKey(new Date());
+    const todayClosed = closedTrades.filter(t => realizedDayKey(t) === today);
     const closedToday = todayClosed.reduce((s, t) => s + (calcTradeMetrics(t).pnl || 0), 0);
     // Open P&L change today (approximation using current live prices)
     return closedToday + openPnL.value;

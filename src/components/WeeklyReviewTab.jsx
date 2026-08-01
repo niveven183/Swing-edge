@@ -9,6 +9,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { CalendarCheck, TrendingUp, Target, Flame, AlertTriangle, Sparkles, Hash } from "lucide-react";
 import { useTradingStats } from "../hooks/useTradingStats.js";
+import { realizedAt } from "../utils.js";
 import { SwingEdgeAI } from "../intelligence/SwingEdgeAI.js";
 import { supabase, isSupabaseConfigured } from "../supabaseClient.js";
 
@@ -43,14 +44,15 @@ export default function WeeklyReviewTab({ trades, capital, calcMetrics, authUser
 
   const canDB = isSupabaseConfigured && supabase && authUser?.id;
 
-  // Rolling last-7-days window. Same predicate the engine's lastWeekStats uses,
-  // so trade counts / win rate / P&L match Analytics exactly.
+  // Rolling last-7-days window, keyed on realized time — the same predicate
+  // tradingStats.lastWeek uses, so counts / win rate / P&L match Analytics
+  // exactly. Open trades have no close stamp and fall back to entry, so a
+  // position opened this week still counts as this week's activity.
   const weekly = useMemo(() => {
     const cutoff = Date.now() - WEEK_MS;
     return (trades || []).filter((tr) => {
-      const raw = tr.date || tr.createdAt;
-      if (!raw) return false;
-      return new Date(raw).getTime() >= cutoff;
+      const at = realizedAt(tr);
+      return at != null && at >= cutoff;
     });
   }, [trades]);
 
@@ -106,7 +108,10 @@ export default function WeeklyReviewTab({ trades, capital, calcMetrics, authUser
   const streak = wStats.currentStreak || 0;
   const streakLabel = streak > 0 ? `${streak}W` : streak < 0 ? `${Math.abs(streak)}L` : "—";
 
-  const empty = wStats.total === 0;
+  // Emptiness is a statement about the window this screen renders, which
+  // includes open positions; wStats.total counts closed trades only, so a week
+  // of nothing but entries would have shown "no activity".
+  const empty = weekly.length === 0;
 
   return (
     <div className="max-w-3xl mx-auto space-y-5" dir={isRTL ? "rtl" : "ltr"}>

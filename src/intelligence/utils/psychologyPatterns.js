@@ -2,7 +2,7 @@
 // Detects emotional / behavioural patterns in trading history.
 
 import { getClosed, isWin, pnlOf, groupBy } from "./statisticalModels.js";
-import { isFollowedPlan, isOffPlan } from "../../utils.js";
+import { isFollowedPlan, isOffPlan, localDayKey } from "../../utils.js";
 
 // Chronological timestamp for a trade. Prefer createdAt, fall back to date.
 export const tradeTs = (t) => {
@@ -58,7 +58,7 @@ export const isRevengeWindow = (trades, nowTs = Date.now(), minutes = 30) => {
 // ─── OVERTRADING ─────────────────────────────────────────────────────────────
 // Count of trades opened on the same calendar date (local time).
 export const tradesToday = (trades, now = new Date()) => {
-  const ymd = now.toISOString().slice(0, 10);
+  const ymd = localDayKey(now);
   return (trades || []).filter(t => !t.isDemo && (t.date || "").slice(0, 10) === ymd).length;
 };
 

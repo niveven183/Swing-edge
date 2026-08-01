@@ -27,11 +27,15 @@ const isoWeekKey = (trade) => {
   if (!raw) return null;
   const d = new Date(raw);
   if (isNaN(d.getTime())) return null;
-  // ISO week: Thursday-based.  Simple but correct for grouping.
-  const jan4 = new Date(d.getFullYear(), 0, 4);
-  const dayOfYear = Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 86_400_000);
-  const weekOfYear = Math.ceil((dayOfYear + jan4.getDay()) / 7);
-  return `${d.getFullYear()}-W${String(weekOfYear).padStart(2, "0")}`;
+  // ISO-8601 week: buckets run Monday..Sunday and belong to the year owning
+  // their Thursday. Anchoring on that Thursday is what keeps a bucket from
+  // straddling two real trading weeks, and makes the turn of the year behave.
+  const thu = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  thu.setDate(thu.getDate() + 3 - ((thu.getDay() + 6) % 7));
+  const week1 = new Date(thu.getFullYear(), 0, 4);
+  week1.setDate(week1.getDate() + 3 - ((week1.getDay() + 6) % 7));
+  const weekOfYear = 1 + Math.round((thu - week1) / (7 * 86_400_000));
+  return `${thu.getFullYear()}-W${String(weekOfYear).padStart(2, "0")}`;
 };
 
 // Returns sorted array of the most-recent contiguous week keys that each

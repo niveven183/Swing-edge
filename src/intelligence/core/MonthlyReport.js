@@ -2,7 +2,7 @@
 // MonthlyReport.js — Trading DNA Monthly Report engine
 //
 // Pure, local, no-API analysis of a trader's performance for a single calendar
-// month. Buckets CLOSED trades by their entry month and produces summary
+// month. Buckets CLOSED trades by the month they were CLOSED in and produces summary
 // metrics, ranked strengths/weaknesses, chart series, action items, and an
 // A–F grade.
 //
@@ -11,7 +11,7 @@
 // localize them; an English `detail` string is included as a safe fallback.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { isFollowedPlan, isOffPlan } from "../../utils.js";
+import { isFollowedPlan, isOffPlan, localDayKey } from "../../utils.js";
 import { edgeScore } from "../utils/statisticalModels.js";
 import { getSetupActionKnowledge } from "../knowledgeGlue.js";
 
@@ -30,9 +30,10 @@ function parseDate(s) {
   return isNaN(dt.getTime()) ? null : dt;
 }
 
-// The date a trade's P&L is attributed to.
+// The date a trade's P&L is attributed to: the close, falling back to entry for
+// rows with no close stamp. A June close belongs to June's report, not January's.
 function realizedDate(t) {
-  return parseDate(t.date);
+  return parseDate(t.closedAt) || parseDate(t.date);
 }
 
 function inMonth(t, month, year) {
@@ -219,7 +220,7 @@ export function generateMonthlyReport(trades, month, year, calcMetrics) {
   const perDay = new Map();
   for (const e of cur) {
     if (!e.date) continue;
-    const k = e.date.toISOString().slice(0, 10);
+    const k = localDayKey(e.date);
     perDay.set(k, (perDay.get(k) || 0) + 1);
   }
   const dayCounts = [...perDay.values()];
@@ -301,7 +302,7 @@ export function generateMonthlyReport(trades, month, year, calcMetrics) {
   const dailyMap = new Map();
   for (const e of cur) {
     if (!e.date) continue;
-    const k = e.date.toISOString().slice(0, 10);
+    const k = localDayKey(e.date);
     dailyMap.set(k, (dailyMap.get(k) || 0) + e.pnl);
   }
   const dailyPnL = [...dailyMap.entries()]

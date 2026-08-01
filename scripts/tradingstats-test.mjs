@@ -360,6 +360,55 @@ const mk = (over) => ({
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// 6c · FIN-019/020 — the equity sequence is ordered by CLOSE, not entry.
+//      Every other fixture in this file is built by mk(), which derives
+//      closedAt from date, so close day always equals entry day and NO other
+//      scenario — including the frozen baseline — can tell the two orderings
+//      apart. This one can: LONGHOLD is entered first and closed last.
+//
+//      Hand-verified. P&L: LONGHOLD +300, FEB -200, MAR -150, APR +200.
+//      By close (correct):  2300 → 2150 → 2350 → 2650, peak 2500, trough 2150
+//                           maxDD = 350/2500 = 14%
+//      By entry (the bug):  2800 → 2600 → 2450 → 2650, peak 2800, trough 2450
+//                           maxDD = 350/2800 = 12.5%
+//      Same trades, same total P&L, different drawdown — because drawdown is a
+//      claim about the order the account actually lived through.
+// ─────────────────────────────────────────────────────────────────────────
+{
+  console.log("\n6c · FIN-019/020 — equity sequence ordered by close, not entry");
+  const held = (id, date, closeDay, exit) => ({
+    id, ticker: id, side: "LONG", status: "CLOSED", setup: "Breakout",
+    emotionAtEntry: "Confident", marketCondition: "Trending Up", entryQuality: 3,
+    followedPlan: true, entry: 100, stop: 90, shares: 10,
+    date, closedAt: `${closeDay}T20:00:00.000Z`, exit,
+  });
+  const CROSS = [
+    held("LONGHOLD", "2026-01-05", "2026-06-15", 130), // opened FIRST, closed LAST
+    held("FEB",      "2026-02-10", "2026-02-12",  80),
+    held("MAR",      "2026-03-10", "2026-03-12",  85),
+    held("APR",      "2026-04-10", "2026-04-12", 120),
+  ];
+  const s = computeTradingStats(CROSS, CAPITAL, calcTradeMetrics);
+
+  eq("curve order is close order",
+    s.equityCurve.map(p => p.date).join(","),
+    "2026-02-12,2026-03-12,2026-04-12,2026-06-15");
+  eq("LONGHOLD lands last, not first", s.equityCurve[3].pnl, 300);
+  eq("equity path follows the close order",
+    s.equityCurve.map(p => p.equity).join(","), "2300,2150,2350,2650");
+  close("maxDrawdown = 14% (by close), NOT 12.5% (by entry)", s.maxDrawdown, 14, 1e-9);
+  eq("curve dates are day keys, never full ISO timestamps",
+    s.equityCurve.every(p => /^\d{4}-\d{2}-\d{2}$/.test(p.date)), true);
+  // Ordering changes the run-length history too: by entry it reads W,LL,W.
+  eq("streakRuns follow close order (LL then WW)",
+    JSON.stringify(s.streakRuns),
+    JSON.stringify([{ type: "loss", length: 2 }, { type: "win", length: 2 }]));
+  // Order-invariant totals must NOT move — this fix reorders, it does not re-price.
+  eq("totalPnL unchanged by ordering", s.totalPnL, 150);
+  eq("currentEquity unchanged by ordering", s.currentEquity, 2650);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // 7 · Infinity sweep — profitFactor (top-level AND every breakdown group) is
 //     the one field in this module's output that can legitimately be
 //     Infinity. Confirms no OTHER field goes non-finite on a no-losses

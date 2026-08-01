@@ -13,6 +13,19 @@ export const localDayKey = (raw) => {
   return isNaN(d.getTime()) ? null : format(d, "yyyy-MM-dd");
 };
 
+// When a trade's P&L was realized, as a sortable instant. Open trades have no
+// close stamp, so they fall back to entry and sort as if realized on entry day.
+export const realizedAt = (trade) => {
+  const raw = trade?.closedAt || trade?.date;
+  if (!raw) return null;
+  const ms = new Date(raw).getTime();
+  return isNaN(ms) ? null : ms;
+};
+
+// The LOCAL calendar day a trade's P&L belongs to. Separate from realizedAt
+// because bucketing needs a local day while ordering needs the exact instant.
+export const realizedDayKey = (trade) => localDayKey(trade?.closedAt || trade?.date);
+
 // Hold time in calendar days: the day a trade was closed (`closedAt`) minus
 // the day it was entered (`date`). `closedAt` is the only close timestamp —
 // it is written by every close path, including the Exit Date input.
