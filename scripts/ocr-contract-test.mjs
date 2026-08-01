@@ -120,23 +120,23 @@ const FROZEN = {
   // scenarios a planned fix is allowed to move — anything else moving is a bug.
   A: {
     status: 200,
-    note: "REGRESSION CONTRACT — no fix may move this. A working read stays working.",
-    body: { ticker: "AFRM", entry: 74.7726334478, stop: 70.3826334478, target: 86.9326334478, side: "LONG", confidence: 95, rrRatio: 2.76993166287 },
+    note: "REGRESSION CONTRACT — no fix may move this. A working read stays working. F4 (2026-08-01) ADDED the two direction fields and moved NO existing value: entry/stop/target/side/confidence/rrRatio are byte-identical to the 2026-08-01 capture. sideSource 'tool' because A carries no stopPrice/targetPrice, so nothing was measurable and the model's own label wins.",
+    body: { ticker: "AFRM", entry: 74.7726334478, stop: 70.3826334478, target: 86.9326334478, side: "LONG", sideSource: "tool", sideConflict: false, confidence: 95, rrRatio: 2.76993166287 },
   },
   B: {
     status: 200,
-    note: "MOVED BY F2 (2026-08-01): confidence 85 -> 25. The model's 85 was certainty about the ticker, not about a trade that was never read. 25 sits below MIN_CONFIDENCE so every badge reads it as failure.",
-    body: { ticker: "AFRM", entry: null, stop: null, target: null, side: "LONG", confidence: 25, rrRatio: null },
+    note: "MOVED BY F2 (2026-08-01): confidence 85 -> 25. The model's 85 was certainty about the ticker, not about a trade that was never read. 25 sits below MIN_CONFIDENCE so every badge reads it as failure. F4 ADDED the two direction fields and moved NO existing value. sideSource 'user': nothing was read, so nothing may override the trader — and the caller's toggle was LONG, so no conflict.",
+    body: { ticker: "AFRM", entry: null, stop: null, target: null, side: "LONG", sideSource: "user", sideConflict: false, confidence: 25, rrRatio: null },
   },
   C: {
     status: 200,
-    note: "Already degrades correctly (confidence 0). No fix should touch it.",
-    body: { ticker: null, entry: null, stop: null, target: null, side: "LONG", confidence: 0, rrRatio: null },
+    note: "Already degrades correctly (confidence 0). No fix should touch it. F4 raised max_tokens 300 -> 340 for the two new prompt fields; C is byte-identical afterwards on every pre-existing field, which is the check Niv required. The ceiling can only ever reduce truncation, never introduce it — C truncates on a fixed stub string, so it keeps proving that a cut JSON still degrades to confidence 0.",
+    body: { ticker: null, entry: null, stop: null, target: null, side: "LONG", sideSource: "user", sideConflict: false, confidence: 0, rrRatio: null },
   },
   D: {
     status: 200,
-    note: "confidence 90 on a negative stop delta — out of scope for F1-F3, frozen so it can't drift while unfixed.",
-    body: { ticker: "AFRM", entry: 74.7709524688, stop: null, target: 86.9309524688, side: "LONG", confidence: 90, rrRatio: 2.77 },
+    note: "confidence 90 on a negative stop delta — out of scope for F1-F3 AND for F4, frozen so it can't drift while unfixed. F4 ADDED the two direction fields and moved NO existing value; confidence is still 90 because F4 addressed direction, not confidence on self-contradictory input.",
+    body: { ticker: "AFRM", entry: 74.7709524688, stop: null, target: 86.9309524688, side: "LONG", sideSource: "tool", sideConflict: false, confidence: 90, rrRatio: 2.77 },
   },
   E: {
     status: 200,
