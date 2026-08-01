@@ -502,7 +502,8 @@ const SNAPSHOT_LABELS = {
   open: "פתוחות",
   closed: "סגורות",
   feedback: "פידבק",
-  waitlist: "רשימת המתנה",
+  // Raw row count of the waitlist table, not a queue length — see fleet-daily.yml.
+  waitlist: "סך שורות waitlist",
 };
 
 function readPrevState() {

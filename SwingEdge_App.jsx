@@ -64,7 +64,7 @@ import {
   CreditCard, Smartphone, Wrench, Sun, Moon, Monitor, KeyRound, ExternalLink, RotateCcw, Pencil,
   Users, GraduationCap, UserPlus, NotebookPen, CalendarCheck, Upload, Undo2
 } from "lucide-react";
-import { getTranslations, LANGUAGES, isRTLLang, nTrades, labelFor } from "./src/i18n.js";
+import { getTranslations, LANGUAGES, isRTLLang, nTrades, labelFor, plural } from "./src/i18n.js";
 import { trackEvent } from "./src/lib/consent.js";
 import {
   fetchPrices, fmtVolume, fmtMarketCap, searchTickers,
@@ -153,6 +153,112 @@ function ocrBadgeIcon(icon) {
   if (icon === "check") return <CheckCircle size={12} className="shrink-0" />;
   return <AlertTriangle size={12} className="shrink-0" />;
 }
+
+// ─── OCR REVIEW CARD ─────────────────────────────────────────────────────────
+// The Analyzer's OCR response no longer flows straight into the form. It lands
+// here first: the trader sees exactly what the model read — INCLUDING what it
+// failed to read, spelled out as "לא זוהה" rather than left as an innocent empty
+// box — corrects anything wrong, and only then presses Apply. Nothing reaches
+// the form without that press.
+//
+// Module scope + memo + local draft state (CLAUDE.md §13 anti-flicker): typing
+// in this card must not re-render the analyzer tree on every keystroke. The
+// draft is seeded once per mount, so the caller passes a `key` that changes per
+// OCR response to reseed it.
+const OcrReviewCard = memo(function OcrReviewCard({ review, t, lang, isRTL, onApply, onDiscard }) {
+  const fmt = (v) => (v != null ? String(v.toFixed(2)) : "");
+  const [draft, setDraft] = useState(() => ({
+    ticker: review.ticker ? String(review.ticker).toUpperCase() : "",
+    entry: fmt(review.entry),
+    stop: fmt(review.stop),
+    target: fmt(review.target),
+    side: review.side === "SHORT" ? "SHORT" : "LONG",
+  }));
+
+  // "Not detected" is a property of the RESPONSE, not of the current draft — a
+  // value the trader just typed in still marks the field as one OCR missed.
+  const missed = {
+    ticker: !review.ticker,
+    entry: review.entry == null,
+    stop: review.stop == null,
+    target: review.target == null,
+  };
+  const FIELDS = [
+    ["ticker", t.ticker],
+    ["entry", t.entry],
+    ["stop", t.stopLoss],
+    ["target", t.target],
+  ];
+  const conf = review.confidence ?? 0;
+  const confCls = conf >= 70 ? "text-[var(--v3-accent)]" : conf >= 40 ? "text-[var(--v3-warn)]" : "text-[var(--v3-loss)]";
+
+  return (
+    <div className="rounded-lg border border-[var(--v3-info)]/25 bg-[var(--v3-info)]/[0.04] p-2.5 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-[11px] font-semibold text-[var(--v3-info)]">{t.ocrReviewTitle}</div>
+        <div className={`text-[10px] font-mono ${confCls}`}>{conf}%</div>
+      </div>
+      <div className="text-[10px] text-slate-500 leading-snug">{t.ocrReviewHint}</div>
+
+      <div className="grid grid-cols-2 gap-1.5">
+        {FIELDS.map(([key, label]) => (
+          <div key={key}>
+            <label className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">
+              {String(label).replace(/\s*\*$/, "")}
+              {missed[key] && <span className="text-[8px] normal-case tracking-normal text-[var(--v3-warn)]">· {t.ocrReviewNotDetected}</span>}
+            </label>
+            <input
+              value={draft[key]}
+              onChange={(e) => {
+                const v = key === "ticker" ? e.target.value.toUpperCase() : e.target.value;
+                setDraft((d) => ({ ...d, [key]: v }));
+              }}
+              inputMode={key === "ticker" ? "text" : "decimal"}
+              dir="ltr"
+              placeholder={missed[key] ? "—" : ""}
+              // Tailwind JIT needs literal class strings — no interpolated colours.
+              className={`w-full mt-0.5 bg-white/5 border rounded px-2 py-1 text-xs font-mono text-slate-200 focus:outline-none ${
+                missed[key]
+                  ? "border-[var(--v3-warn)]/45 focus:border-[var(--v3-warn)]"
+                  : "border-[var(--v3-line)] focus:border-[var(--v3-info)]"
+              }`}
+            />
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-1.5">
+        <span className="text-[9px] uppercase tracking-widest text-slate-600 shrink-0">
+          {lang === "he" ? "כיוון" : "Side"}
+        </span>
+        {["LONG", "SHORT"].map((s) => (
+          <button key={s} type="button" onClick={() => setDraft((d) => ({ ...d, side: s }))}
+            aria-pressed={draft.side === s}
+            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase border transition ${
+              draft.side === s
+                ? (s === "LONG"
+                    ? "bg-[var(--v3-accent)]/10 border-[var(--v3-accent)]/40 text-[var(--v3-accent)]"
+                    : "bg-[var(--v3-loss)]/10 border-[var(--v3-loss)]/40 text-[var(--v3-loss)]")
+                : "bg-white/5 border-[var(--v3-line)] text-slate-500 hover:text-slate-300"
+            }`}>
+            {s === "LONG" ? (lang === "he" ? "לונג" : "Long") : (lang === "he" ? "שורט" : "Short")}
+          </button>
+        ))}
+      </div>
+
+      <div className={`flex gap-1.5 ${isRTL ? "flex-row-reverse" : ""}`}>
+        <button type="button" onClick={() => onApply(draft)}
+          className="flex-1 px-3 py-1.5 rounded-[var(--v3-radius-chip)] text-[11px] font-semibold bg-[var(--v3-info)]/15 border border-[var(--v3-info)]/40 text-[var(--v3-info)] hover:bg-[var(--v3-info)]/25 transition">
+          {t.ocrReviewApply}
+        </button>
+        <button type="button" onClick={onDiscard}
+          className="px-3 py-1.5 rounded-[var(--v3-radius-chip)] text-[11px] font-semibold bg-white/5 border border-[var(--v3-line)] text-slate-400 hover:text-slate-200 transition">
+          {t.ocrReviewDiscard}
+        </button>
+      </div>
+    </div>
+  );
+});
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const MOCK_TRADES = [];
@@ -1104,6 +1210,9 @@ export default function SwingEdge() {
   // analyzerOcrResult drives the confidence badge. { status, confidence, detection }.
   const [analyzerOcrSide, setAnalyzerOcrSide] = useState("LONG");
   const [analyzerOcrResult, setAnalyzerOcrResult] = useState(null);
+  // The raw OCR response held for the trader's confirmation. Non-null = the
+  // review card is open and NOTHING has been written to analyzerForm yet.
+  const [analyzerOcrReview, setAnalyzerOcrReview] = useState(null);
   // Analyzer twin of formOcrTickerRef — see the comment there.
   const analyzerOcrTickerRef = useRef(null);
   const [analyzerLoading, setAnalyzerLoading] = useState(false);
@@ -1683,9 +1792,16 @@ export default function SwingEdge() {
   // ─── JOURNAL PRO: filtered view + stats ─────────────────────────────────────
   const holdTimeDays = (t) => holdDays(t);
 
-  const filteredTrades = useMemo(() => {
+  // An unmeasurable trade (no stop → rMultiple === null) is ALWAYS visible while the
+  // R filter is idle, and is EXCLUDED — never coerced to 0 — the moment it is active.
+  // Coercing null to 0 made visibility a coin flip: `null < 1` is true so "R above 1"
+  // hid it, `null > -1` is true so "R above -1" kept it, with nothing on screen either
+  // way. Exclusions are counted and reported next to the filter instead.
+  const { filteredTrades, rHiddenCount } = useMemo(() => {
     const f = journalFilters;
-    return trades.filter(tr => {
+    const rActive = f.rMin !== "" || f.rMax !== "";
+    let hidden = 0;
+    const list = trades.filter(tr => {
       if (f.ticker && !String(tr.ticker || "").toUpperCase().includes(f.ticker.toUpperCase())) return false;
       if (f.setup !== "all" && tr.setup !== f.setup) return false;
       if (f.from && tr.date && tr.date < f.from) return false;
@@ -1697,10 +1813,16 @@ export default function SwingEdge() {
         if (f.result === "loss" && !(pnl < 0)) return false;
         if (f.result === "be" && !(pnl === 0)) return false;
       }
-      if (f.rMin !== "" && rMultiple < parseFloat(f.rMin)) return false;
-      if (f.rMax !== "" && rMultiple > parseFloat(f.rMax)) return false;
+      if (rActive) {
+        // isFinite (not `!= null`) — it rejects NaN too, and matches the population
+        // definition used by rValues() in statisticalModels.js.
+        if (!Number.isFinite(rMultiple)) { hidden++; return false; }
+        if (f.rMin !== "" && rMultiple < parseFloat(f.rMin)) return false;
+        if (f.rMax !== "" && rMultiple > parseFloat(f.rMax)) return false;
+      }
       return true;
     });
+    return { filteredTrades: list, rHiddenCount: hidden };
   }, [trades, journalFilters]);
 
   // Single source of order for both desktop table and mobile cards.
@@ -2526,19 +2648,18 @@ export default function SwingEdge() {
         }
         const result = await res.json();
         const detection = ocrDetection(result);
-        // See handleImageUpload — the flag must be set before the commit that
-        // writes the ticker, because the quote effect reads it on that pass.
-        analyzerOcrTickerRef.current =
-          result.entry == null && result.ticker ? result.ticker.toUpperCase() : null;
-        // Never overwrite a field the trader already filled by hand.
-        setAnalyzerForm(f => ({
-          ...f,
-          ticker: f.ticker || result.ticker || f.ticker,
-          entry:  f.entry  || (result.entry  != null ? String(result.entry.toFixed(2))  : f.entry),
-          stop:   f.stop   || (result.stop   != null ? String(result.stop.toFixed(2))   : f.stop),
-          target: f.target || (result.target != null ? String(result.target.toFixed(2)) : f.target),
-        }));
-        setAnalyzerOcrResult({ status: "ok", confidence: result.confidence ?? 0, detection });
+        // The response goes to the review card, NOT to the form. No field moves
+        // until applyAnalyzerOcrReview runs — including analyzerOcrTickerRef,
+        // which is armed there from the FINAL values rather than from the raw
+        // response, because the trader may fix the ticker or type the entry the
+        // model missed. Until then no ticker reaches the form, so the live-quote
+        // effect has nothing to fire on.
+        setAnalyzerOcrReview({ ...result, detection, token: Date.now() });
+        // "review" has no early return in ocrBadgeState, so the badge resolves on
+        // `detection` exactly as "ok" does — same four states, no new branch.
+        setAnalyzerOcrResult({ status: "review", confidence: result.confidence ?? 0, detection });
+        // Fired here, not on Apply: this event measures what the MODEL read.
+        // What the trader did with it afterwards is a different question.
         trackEvent("ocr_result", {
           detected: detection,
           confidence_bucket: confidenceBucket(result.confidence ?? 0),
@@ -2549,6 +2670,42 @@ export default function SwingEdge() {
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  // The trader confirmed the reading — only now do values enter the form.
+  const applyAnalyzerOcrReview = (draft) => {
+    const ticker = String(draft.ticker || "").trim().toUpperCase();
+    const entryNum = parseFloat(draft.entry);
+    // Armed BEFORE the commit that writes the ticker — the live-quote effect
+    // reads this ref on that same pass. Computed from the CONFIRMED values, not
+    // from the raw response: if the trader typed the entry OCR missed, the block
+    // must release; if he corrected the symbol, it must re-arm on the new one.
+    analyzerOcrTickerRef.current =
+      !Number.isFinite(entryNum) && ticker ? ticker : null;
+    // Confirmed values win over whatever sits in the form. The old "never
+    // overwrite a manual field" rule guarded against a silent OCR write; here
+    // the trader is looking at both and pressing Apply, so silence is gone. An
+    // empty field in the card still cannot erase a value he already typed.
+    setAnalyzerForm(f => ({
+      ...f,
+      ticker: ticker || f.ticker,
+      entry:  draft.entry  !== "" ? draft.entry  : f.entry,
+      stop:   draft.stop   !== "" ? draft.stop   : f.stop,
+      target: draft.target !== "" ? draft.target : f.target,
+    }));
+    // Keep the upload toggle in step with the direction he just confirmed.
+    if (draft.side) setAnalyzerOcrSide(draft.side);
+    setAnalyzerOcrReview(null);
+    setAnalyzerOcrResult(r => (r ? { ...r, status: "ok" } : r));
+  };
+
+  // Discarded — nothing entered the form, so nothing needs undoing. The badge
+  // goes with it: leaving "OCR ✓ 82%" next to an untouched form would claim a
+  // fill that never happened.
+  const discardAnalyzerOcrReview = () => {
+    setAnalyzerOcrReview(null);
+    analyzerOcrTickerRef.current = null;
+    setAnalyzerOcrResult(null);
   };
 
   const handleAnalyzerReset = () => {
@@ -2562,6 +2719,7 @@ export default function SwingEdge() {
     setAnalyzerResult(null);
     setAnalyzerOcrSide("LONG");
     setAnalyzerOcrResult(null);
+    setAnalyzerOcrReview(null);
   };
 
   const analyzeTradeStandalone = () => {
@@ -3477,7 +3635,7 @@ export default function SwingEdge() {
                       </span>
                       {unmeasuredRiskCount > 0 && (
                         <span className="text-[10px] text-amber-400/90 mt-1 block">
-                          {t.riskUnmeasured.replace("{n}", unmeasuredRiskCount)}
+                          {plural(t, "riskUnmeasured", unmeasuredRiskCount)}
                         </span>
                       )}
                     </div>
@@ -3685,7 +3843,17 @@ export default function SwingEdge() {
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{t.profitFactor}<TermTooltip term="profitFactor" lang={lang} /></div>
-                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-info)]">{Number.isFinite(journalStats.profitFactor) ? journalStats.profitFactor.toFixed(2) : "∞"}</div>
+                  {/* profitFactor is Infinity when there are wins and no losses — a
+                      DECLARED sentinel that must stay Infinity in the engine (see
+                      statisticalModels.js:159-164; null would pass isFinite and throw
+                      on .toFixed). "∞" read as a broken number to traders, so the
+                      translation happens here, in the display layer only. Smaller,
+                      non-mono type marks it as a state rather than a measurement. */}
+                  {Number.isFinite(journalStats.profitFactor) ? (
+                    <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-info)]">{journalStats.profitFactor.toFixed(2)}</div>
+                  ) : (
+                    <div className="text-xs font-bold mt-0.5 text-[var(--v3-info)]" title={t.pfNoLosses}>{t.pfNoLosses}</div>
+                  )}
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{t.maxDD}<TermTooltip term="maxDD" lang={lang} /></div>
@@ -3744,6 +3912,12 @@ export default function SwingEdge() {
                   <input type="number" step="0.1" value={journalFilters.rMax} onChange={e => setJournalFilters(f => ({ ...f, rMax: e.target.value }))}
                     placeholder="5" className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-mono text-white placeholder-slate-600 focus:border-[#06b6d4]/50 focus:outline-none" />
                 </div>
+                {rHiddenCount > 0 && (
+                  <div className="col-span-2 md:col-span-4 lg:col-span-7 text-[10px] text-amber-400/90 flex items-center gap-1">
+                    <AlertTriangle size={11} className="shrink-0" />
+                    {plural(t, "rFilterHidden", rHiddenCount)}
+                  </div>
+                )}
                 <div className="col-span-2 md:col-span-4 lg:col-span-7 flex justify-end">
                   <button onClick={() => setJournalFilters({ ticker: "", setup: "all", result: "all", from: "", to: "", rMin: "", rMax: "" })}
                     className="text-[10px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition">
@@ -4210,10 +4384,21 @@ export default function SwingEdge() {
                   </div>
                 );
               })()}
+              {/* Confirmation gate — the OCR result waits here until the trader
+                  approves it. `key` reseeds the card's draft on a new response. */}
+              {analyzerOcrReview && (
+                <OcrReviewCard
+                  key={analyzerOcrReview.token}
+                  review={analyzerOcrReview}
+                  t={t} lang={lang} isRTL={isRTL}
+                  onApply={applyAnalyzerOcrReview}
+                  onDiscard={discardAnalyzerOcrReview}
+                />
+              )}
               {analyzerImagePreview && (
                 <div className="relative rounded-lg overflow-hidden border border-white/10">
                   <img src={analyzerImagePreview} alt="Trade chart" className="w-full h-40 object-cover" />
-                  <button onClick={() => { setAnalyzerImage(null); setAnalyzerImagePreview(null); setAnalyzerOcrResult(null); }}
+                  <button onClick={() => { setAnalyzerImage(null); setAnalyzerImagePreview(null); setAnalyzerOcrResult(null); setAnalyzerOcrReview(null); }}
                     aria-label={lang === "he" ? "הסר תמונה" : "Remove image"}
                     className="absolute top-2 right-2 rtl:right-auto rtl:left-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-slate-300 hover:text-white">
                     <X size={11} />

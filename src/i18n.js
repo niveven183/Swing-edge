@@ -124,6 +124,15 @@ const en = {
   perClosedTrade: "Per closed trade",
   avgRSample: "{n}/{total} closed trades had a stop",
   riskUnmeasured: "{n} open trades have no stop — risk not measurable, excluded from the total",
+  riskUnmeasured_one: "1 open trade has no stop — risk not measurable, excluded from the total",
+  rFilterHidden: "{n} trades without R hidden",
+  rFilterHidden_one: "1 trade without R hidden",
+  pfNoLosses: "No losses",
+  ocrReviewTitle: "Check what was detected",
+  ocrReviewHint: "Correct any value before it goes into the form.",
+  ocrReviewNotDetected: "Not detected",
+  ocrReviewApply: "Apply to form",
+  ocrReviewDiscard: "Discard",
   equityCurve: "Equity Curve",
   dataPts: "data pts",
   openPositions: "Open Positions",
@@ -790,6 +799,15 @@ const he = {
   perClosedTrade: "לעסקה סגורה",
   avgRSample: "ל-{n} מתוך {total} עסקאות סגורות היה סטופ",
   riskUnmeasured: "ל-{n} עסקאות פתוחות אין סטופ — הסיכון אינו מדיד ואינו נכלל בסכום",
+  riskUnmeasured_one: "לעסקה פתוחה אחת אין סטופ — הסיכון אינו מדיד ואינו נכלל בסכום",
+  rFilterHidden: "{n} עסקאות ללא R מוסתרות",
+  rFilterHidden_one: "עסקה אחת ללא R מוסתרת",
+  pfNoLosses: "אין הפסדים",
+  ocrReviewTitle: "בדוק מה זוהה",
+  ocrReviewHint: "תקן כל ערך לפני שהוא נכנס לטופס.",
+  ocrReviewNotDetected: "לא זוהה",
+  ocrReviewApply: "החל על הטופס",
+  ocrReviewDiscard: "בטל",
   equityCurve: "עקומת הון",
   dataPts: "נקודות נתונים",
   openPositions: "פוזיציות פתוחות",
@@ -1487,6 +1505,15 @@ const es = {
   perClosedTrade: "Por operación cerrada",
   avgRSample: "{n}/{total} operaciones cerradas tenían stop",
   riskUnmeasured: "{n} operaciones abiertas sin stop — riesgo no medible, excluido del total",
+  riskUnmeasured_one: "1 operación abierta sin stop — riesgo no medible, excluido del total",
+  rFilterHidden: "{n} operaciones sin R ocultas",
+  rFilterHidden_one: "1 operación sin R oculta",
+  pfNoLosses: "Sin pérdidas",
+  ocrReviewTitle: "Revisa lo detectado",
+  ocrReviewHint: "Corrige cualquier valor antes de aplicarlo al formulario.",
+  ocrReviewNotDetected: "No detectado",
+  ocrReviewApply: "Aplicar al formulario",
+  ocrReviewDiscard: "Descartar",
   equityCurve: "Curva de Capital",
   dataPts: "puntos de datos",
   openPositions: "Posiciones Abiertas",
@@ -1918,6 +1945,15 @@ const pt = {
   perClosedTrade: "Por operação fechada",
   avgRSample: "{n}/{total} operações fechadas tinham stop",
   riskUnmeasured: "{n} operações abertas sem stop — risco não mensurável, excluído do total",
+  riskUnmeasured_one: "1 operação aberta sem stop — risco não mensurável, excluído do total",
+  rFilterHidden: "{n} operações sem R ocultas",
+  rFilterHidden_one: "1 operação sem R oculta",
+  pfNoLosses: "Sem perdas",
+  ocrReviewTitle: "Confira o que foi detectado",
+  ocrReviewHint: "Corrija qualquer valor antes de aplicá-lo ao formulário.",
+  ocrReviewNotDetected: "Não detectado",
+  ocrReviewApply: "Aplicar ao formulário",
+  ocrReviewDiscard: "Descartar",
   equityCurve: "Curva de Patrimônio",
   dataPts: "pontos de dados",
   openPositions: "Posições Abertas",
@@ -2349,6 +2385,17 @@ const ar = {
   perClosedTrade: "لكل صفقة مغلقة",
   avgRSample: "‏{n} من {total} صفقة مغلقة كان لها وقف خسارة",
   riskUnmeasured: "‏{n} صفقات مفتوحة بلا وقف خسارة — المخاطرة غير قابلة للقياس ومستثناة من الإجمالي",
+  riskUnmeasured_one: "صفقة مفتوحة واحدة بلا وقف خسارة — المخاطرة غير قابلة للقياس ومستثناة من الإجمالي",
+  riskUnmeasured_two: "صفقتان مفتوحتان بلا وقف خسارة — المخاطرة غير قابلة للقياس ومستثناة من الإجمالي",
+  rFilterHidden: "‏{n} صفقات بلا R مخفية",
+  rFilterHidden_one: "صفقة واحدة بلا R مخفية",
+  rFilterHidden_two: "صفقتان بلا R مخفيتان",
+  pfNoLosses: "لا خسائر",
+  ocrReviewTitle: "تحقق مما تم اكتشافه",
+  ocrReviewHint: "صحّح أي قيمة قبل تطبيقها على النموذج.",
+  ocrReviewNotDetected: "لم يتم الاكتشاف",
+  ocrReviewApply: "تطبيق على النموذج",
+  ocrReviewDiscard: "تجاهل",
   equityCurve: "منحنى الرصيد",
   dataPts: "نقاط البيانات",
   openPositions: "المراكز المفتوحة",
@@ -2707,6 +2754,24 @@ export function labelFor(category, value, lang = "en") {
   if (value == null || lang === "en") return value;
   const entry = DISPLAY_LABELS[category]?.[value];
   return (entry && entry[lang]) || value;
+}
+
+// Minimal plural selection: a base key plus optional `_one` / `_two` siblings.
+// Deliberately not a library — the app needs two extra forms, not CLDR.
+//   `${key}`      → the general/plural form (required)
+//   `${key}_one`  → n === 1
+//   `${key}_two`  → n === 2, present only for Arabic's dual
+// Fail-open exactly like labelFor: a missing sibling falls back to the base form,
+// so adding a key in one language never blanks the others.
+// ⚠️ Known limit: Arabic also distinguishes 3–10 from 11+. The base form is written
+// to read correctly for 3–10; 11+ is grammatically approximate. Recorded in STATE.md.
+export function plural(t, key, n) {
+  const form =
+    (n === 1 && t[`${key}_one`]) ||
+    (n === 2 && t[`${key}_two`]) ||
+    t[key] ||
+    "";
+  return String(form).replace("{n}", n);
 }
 
 const translations = { en, he, es, pt, ar };

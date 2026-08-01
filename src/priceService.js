@@ -150,7 +150,16 @@ const parseChartResult = (result, yahooSymbol) => {
   const preMarketPrice = typeof meta.preMarketPrice === "number" ? meta.preMarketPrice : null;
   const postMarketPrice = typeof meta.postMarketPrice === "number" ? meta.postMarketPrice : null;
 
-  const state = getMarketState();
+  // getMarketState() is the US equity session clock (NYSE hours, Eastern,
+  // weekends closed). Applying it to crypto stamped a moving BTC price with a
+  // CLOSED badge every night and all weekend — the badge contradicted the
+  // ticking number right next to it. Crypto never closes, so it is OPEN always.
+  // Detection prefers Yahoo's own instrumentType and falls back to the -USD
+  // suffix used by toYahooSymbol for the four mapped coins.
+  const isCrypto =
+    String(meta.instrumentType || "").toUpperCase() === "CRYPTOCURRENCY" ||
+    /-USD$/.test(String(yahooSymbol || "").toUpperCase());
+  const state = isCrypto ? MARKET_STATE.OPEN : getMarketState();
   // Display price picks the freshest tick relative to current market state
   const displayPrice =
     state === MARKET_STATE.PRE && preMarketPrice != null

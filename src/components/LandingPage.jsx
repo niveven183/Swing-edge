@@ -86,11 +86,14 @@ const STR = {
     privacy: "פרטיות", terms: "תנאי שימוש", soon: "בקרוב",
     heroDisclaimer: "SwingEdge אינו ייעוץ השקעות. מסחר כרוך בסיכון לאובדן כספך — כל החלטה באחריותך בלבד.",
     disclaimer: "SwingEdge הוא כלי לניהול וניתוח יומן מסחר בלבד. אין לראות בתוכן באפליקציה או בדף זה ייעוץ השקעות, המלצה לרכישה או מכירה של נייר ערך כלשהו, או תחליף לייעוץ פיננסי מקצועי. מסחר בשוק ההון כרוך בסיכון להפסד הון. ביצועי עבר אינם מעידים על ביצועים עתידיים. כל החלטת מסחר היא באחריות המשתמש בלבד.",
+    // Copy anchored to docs/TRUTH.md — only 🟢 rows, in their approved phrasing:
+    // "העסקה נבדקת מול כל מה שסחרת עד היום" + "המספר שלך מופיע לפני שאתה לוחץ".
+    // Leads with what the trader gets, not with the queue he joins.
     waitlistKicker: "רשימת המתנה",
-    waitlistTitle: "שריין את המקום שלך",
-    waitlistSub: "אנחנו פותחים גישה בהדרגה. השאר אימייל ותהיה מהראשונים שיקבלו הזמנה — בלי ספאם, רק העדכון החשוב.",
+    waitlistTitle: "תראה את המספר שלך לפני שאתה לוחץ",
+    waitlistSub: "SwingEdge בודק כל עסקה מול כל מה שסחרת עד היום, ומראה לך את אחוז ההצלחה שלך ב-setup הזה — לפני Save, לא אחרי. השאר אימייל ונודיע לך ברגע שהגישה שלך נפתחת.",
     waitlistPlaceholder: "האימייל שלך",
-    waitlistCta: "שריין מקום",
+    waitlistCta: "אני רוצה גישה",
     waitlistSending: "רגע…",
     waitlistSuccess: "אתה בפנים 🎯 נודיע לך ברגע שנפתח לך גישה.",
     waitlistDup: "אתה כבר ברשימה 🎯 נודיע לך ברגע שנצא לדרך.",
@@ -175,11 +178,12 @@ const STR = {
     privacy: "Privacy", terms: "Terms", soon: "Soon",
     heroDisclaimer: "SwingEdge is not investment advice. Trading involves risk of losing your money — every decision is your responsibility alone.",
     disclaimer: "SwingEdge is a tool for managing and analyzing a trading journal only. Nothing in the app or on this page constitutes investment advice, a recommendation to buy or sell any security, or a substitute for professional financial advice. Trading the capital markets involves risk of loss of capital. Past performance is not indicative of future results. Every trading decision is the sole responsibility of the user.",
+    // See the Hebrew block — same TRUTH.md anchors, same order.
     waitlistKicker: "Waitlist",
-    waitlistTitle: "Reserve your spot",
-    waitlistSub: "We're opening access gradually. Drop your email to be among the first to get an invite — no spam, just the one that matters.",
+    waitlistTitle: "See your own number before you click",
+    waitlistSub: "SwingEdge checks every trade against everything you've traded so far, and shows your win rate for that setup — before you hit Save, not after. Leave your email and we'll tell you the moment your access opens.",
     waitlistPlaceholder: "Your email",
-    waitlistCta: "Reserve my spot",
+    waitlistCta: "Get me access",
     waitlistSending: "One sec…",
     waitlistSuccess: "You're in 🎯 We'll let you know the moment your access opens.",
     waitlistDup: "You're already on the list 🎯 We'll be in touch the moment we launch.",

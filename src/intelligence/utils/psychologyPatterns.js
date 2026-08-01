@@ -109,16 +109,36 @@ export const disciplineRate = (trades) => {
   return closed.filter(t => isFollowedPlan(t.followedPlan)).length / closed.length;
 };
 
+// `v == null` is checked BEFORE Number() on purpose: Number(null) === 0 and
+// Number.isFinite(0) === true, so the naive `Number.isFinite(Number(v))` gate
+// silently turns a missing value into a real 0 — the same trap documented in
+// DECISIONS for profitFactor.
+const numOrNull = (v) => {
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
 // MAE / MFE behavioural flag — trades that went deeply against plan before
 // reversing hint at panic management or loose stops.
+//
+// MAE and MFE are recorded independently: a trade may carry one and not the
+// other. The previous implementation admitted a trade on `maxAdverse != null ||
+// maxFavorable != null` and then let `Number(t.maxAdverse) || 0` fabricate a 0
+// for whichever side was missing — that 0 landed in the numerator while the
+// denominator counted the whole array, dragging both averages toward zero.
+// Each metric now carries its own denominator (`maeN` / `mfeN`) = the count of
+// values genuinely present; numerator and denominator move together. Nothing
+// measurable → `null`, never 0. `n` remains the closed-trade population so a
+// caller can see the coverage, per CLAUDE.md §2 ("אפס מנה בלי מכנה").
 export const avgMaeMfe = (trades) => {
-  const closed = getClosed(trades).filter(t => t.maxAdverse != null || t.maxFavorable != null);
-  if (!closed.length) return { avgMae: 0, avgMfe: 0, n: 0 };
-  const mae = closed.map(t => Math.abs(Number(t.maxAdverse) || 0));
-  const mfe = closed.map(t => Math.abs(Number(t.maxFavorable) || 0));
+  const closed = getClosed(trades);
+  const mae = closed.map(t => numOrNull(t.maxAdverse)).filter(v => v !== null).map(Math.abs);
+  const mfe = closed.map(t => numOrNull(t.maxFavorable)).filter(v => v !== null).map(Math.abs);
+  const avg = (a) => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : null);
   return {
-    avgMae: mae.reduce((s, x) => s + x, 0) / mae.length,
-    avgMfe: mfe.reduce((s, x) => s + x, 0) / mfe.length,
+    avgMae: avg(mae), maeN: mae.length,
+    avgMfe: avg(mfe), mfeN: mfe.length,
     n: closed.length,
   };
 };

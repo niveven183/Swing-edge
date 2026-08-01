@@ -195,7 +195,10 @@ jobs:
           add "• Activation (≥1 עסקה): $(show "$act")$pctact"
           add "• Power users (≥10 עסקאות): $(show "$pow")"
           add "• עסקאות שנוצרו (24ש'): $(show "$tr24")$(arrow "$tr24" trades24)"
-          add "• רשימת המתנה: $(show "$wlTot")$(arrow "$wl24" waitlist24 | sed 's/אתמול/ב-24ש/')"
+          # "רשימת המתנה: N" read as "N people waiting". The number is the raw row
+          # count of the waitlist table — it includes rows already invited and rows
+          # already converted, so it is a table size, not a queue length.
+          add "• סך שורות waitlist: $(show "$wlTot")$(arrow "$wl24" waitlist24 | sed 's/אתמול/ב-24ש/')"
           [ -n "$top" ] && add "• מקורות מובילים: $top"
 
           header="📈 Growth Pulse — 24 שעות אחרונות"

@@ -131,7 +131,17 @@ function htmlToText(html) {
 // Best-effort Discord report — mirrors the workflow's 📧 embed. Never throws.
 async function reportDiscord(campaign, sent, failed) {
   const webhook = process.env.SENTINEL_DISCORD_WEBHOOK;
-  if (!webhook) return;
+  if (!webhook) {
+    // A bare `return` here meant a misconfigured deploy silently stopped
+    // reporting campaigns to Discord — invites kept going out and nobody knew
+    // the report was gone. Naming the variable makes the cause greppable in the
+    // Vercel function log (CLAUDE.md §2 — אפס כשל שקט).
+    console.error(
+      "[send-invites] SENTINEL_DISCORD_WEBHOOK is not set — Discord campaign report skipped " +
+        `(campaign=${campaign}, sent=${sent}, failed=${failed})`
+    );
+    return;
+  }
   try {
     const stamp = new Date().toISOString().replace("T", " ").slice(0, 16) + " UTC";
     const desc =

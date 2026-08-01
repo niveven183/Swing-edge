@@ -212,3 +212,33 @@ Every production incident gets one short entry: what broke, root cause, fix, pre
   the line itself: the corrected close-field cohort is **one user**, which the report now prints as
   "קוהורט 1-2 משתמשים", so "100% followedPlan" disqualifies itself on sight without anyone
   needing to recall who is in the cohort.
+
+---
+
+## #10 — 2026-08-01 — A key rotation left every existing backup undecryptable, and the drill found it 12h later
+
+- **Symptom:** the quarterly Restore Drill (`restore-drill.yml`, 01.08 04:00 UTC) failed. It pulled
+  the latest green backup — the 26.07 artifact — and `openssl enc -d` rejected it. The workflow was
+  correct, the backup file was intact, and the drill was right to be red.
+- **Root cause:** `BACKUP_PASSPHRASE` was rotated. Rotation replaces the key used for **future**
+  encryption; it does nothing to artifacts already on disk. Every stored backup had been encrypted
+  with the previous key, and that key was gone. The next scheduled `backup.yml` run (Sunday 03:00
+  UTC) would have produced the first artifact readable with the new key — so from the moment of
+  rotation until that run, **the effective restore capability was zero**.
+- **Why nobody knew for ~12 hours:** nothing in the system asserts "a backup exists that the
+  *current* key can open." `backup.yml` was green (it had not run since), the secret was set
+  correctly, and the app was unaffected. The only mechanism that could detect this state is the
+  drill, and the drill runs quarterly. The gap was found by the calendar, not by a guard.
+- **Scope:** no data was lost and no user was affected. What was lost was the *ability to recover*
+  had anything gone wrong in that window — the worst class of silent failure, because it is
+  invisible precisely until the moment it matters.
+- **Closure (same day, ~1h):** a manual Backup #10 was run, producing an artifact encrypted with the
+  current key, followed immediately by Restore Drill #4 — green: **189 rows across 11 tables**, and
+  a full manifest match including indexes. The exposure window was closed within the hour of
+  discovery.
+- **Lesson:** **a key rotation is not complete until a backup encrypted with the new key exists and
+  has been restored.** Rotating the secret is one third of the procedure; the manual backup and the
+  drill are the other two, and all three belong in the same sitting. Waiting for the next cron run
+  means accepting a restore-capability outage of up to a week, with nothing on any dashboard saying so.
+- **Prevention:** `docs/RUNBOOK.md` now carries the three-step rotation procedure inline, so the
+  backup and the drill cannot be read as optional follow-ups.
