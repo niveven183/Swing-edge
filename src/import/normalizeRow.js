@@ -57,6 +57,9 @@ export function num(value) {
   const neg = /^\(.*\)$/.test(s);
   s = s.replace(/[()]/g, "").replace(/[$₪€£%,\s]/g, "").replace(/[^\d.\-]/g, "");
   if (s === "" || s === "-" || s === ".") return null;
+  // Trailing-minus ("19-") is how several broker exports write a negative
+  // quantity. Number() reads it as NaN, which used to silently drop the row.
+  if (/^[\d.]+-$/.test(s)) s = `-${s.slice(0, -1)}`;
   const n = Number(s);
   if (!Number.isFinite(n)) return null;
   return neg ? -Math.abs(n) : n;
@@ -69,7 +72,10 @@ const REASONS = {
   bad_stop:  { he: "סטופ בצד הלא נכון של הכניסה", en: "Stop on the wrong side of entry" },
 };
 
-// mapping: { field: columnIndex }. opts: { dateFormat, capital, todayISO }.
+// mapping: { field: columnIndex }. opts: { dateFormat, capital, todayISO,
+// sideResolver?, tickerResolver? }. The two resolvers are how a broker profile
+// overrides what the column mapping alone cannot decide; when absent this runs
+// exactly as it ran before they existed.
 // Returns { ok:true, trade } or { ok:false, code, detail? }.
 export function normalizeRow(row, mapping, opts = {}) {
   const dateFormat = opts.dateFormat || "DD/MM";
@@ -80,9 +86,18 @@ export function normalizeRow(row, mapping, opts = {}) {
     return idx == null || idx < 0 ? "" : row[idx];
   };
 
-  const ticker = String(cell("ticker") ?? "").trim().toUpperCase();
+  const resolvedSide =
+    typeof opts.sideResolver === "function" ? opts.sideResolver(row) : null;
+  const resolvedTicker =
+    typeof opts.tickerResolver === "function" ? opts.tickerResolver(row) : null;
+
+  const tickerRaw = resolvedTicker ? resolvedTicker.ticker : cell("ticker");
+  const ticker = String(tickerRaw ?? "").trim().toUpperCase();
   const entry = num(cell("entry"));
-  const shares = num(cell("shares"));
+  // When the sign of the quantity was consumed as the direction it must not be
+  // read a second time as the size — otherwise every sell fails on shares <= 0.
+  let shares = num(cell("shares"));
+  if (resolvedSide && shares != null) shares = Math.abs(shares);
   const stop = num(cell("stop"));
   const target = num(cell("target"));
   const exit = num(cell("exit"));
@@ -91,7 +106,7 @@ export function normalizeRow(row, mapping, opts = {}) {
   if (entry == null || entry <= 0) return { ok: false, code: "no_entry", detail: REASONS.no_entry };
   if (shares == null || shares <= 0) return { ok: false, code: "no_qty", detail: REASONS.no_qty };
 
-  let side = normalizeSide(cell("side"));
+  let side = resolvedSide || normalizeSide(cell("side"));
   if (!side) side = inferSide(entry, stop, target);
 
   // Geometry check only when a stop is present (decision #1: no stop is allowed).
@@ -138,6 +153,9 @@ export function normalizeRow(row, mapping, opts = {}) {
     _prediction: null,
     isDemo: false,
   };
+  // The flag rides alongside the trade, never inside it: it is import-time
+  // knowledge, and the trade object is what gets persisted.
+  if (resolvedTicker?.unresolved) return { ok: true, trade, unresolvedSymbol: true };
   return { ok: true, trade };
 }
 

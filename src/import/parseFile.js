@@ -9,16 +9,28 @@ import * as XLSX from "xlsx";
 
 const stripBOM = (s) => (typeof s === "string" ? s.replace(/^﻿/, "") : s);
 
-// Trim a matrix to a rectangular { headers, rows }: first non-empty row is the
-// header; blank trailing rows are dropped.
-function matrixToTable(matrix) {
-  const rowsRaw = (matrix || []).filter(
-    (r) => Array.isArray(r) && r.some((c) => String(c ?? "").trim() !== "")
-  );
-  if (rowsRaw.length === 0) return { headers: [], rows: [] };
-  const headers = rowsRaw[0].map((h) => String(h ?? "").trim());
+// Trim a matrix to a rectangular { headers, rows }. With headerIdx === null the
+// first non-empty row is the header (the generic route, unchanged). With an
+// explicit headerIdx that row is the header and everything above it is dropped —
+// broker exports bury the header under a preamble.
+export function matrixToTable(matrix, headerIdx = null) {
+  const notBlank = (r) => r.some((c) => String(c ?? "").trim() !== "");
+  const all = (matrix || []).filter((r) => Array.isArray(r));
+  let headerRaw;
+  let bodyRaw;
+  if (headerIdx == null) {
+    const rowsRaw = all.filter(notBlank);
+    if (rowsRaw.length === 0) return { headers: [], rows: [] };
+    headerRaw = rowsRaw[0];
+    bodyRaw = rowsRaw.slice(1);
+  } else {
+    if (!all[headerIdx]) return { headers: [], rows: [] };
+    headerRaw = all[headerIdx];
+    bodyRaw = all.slice(headerIdx + 1).filter(notBlank);
+  }
+  const headers = headerRaw.map((h) => String(h ?? "").trim());
   const width = headers.length;
-  const rows = rowsRaw.slice(1).map((r) => {
+  const rows = bodyRaw.map((r) => {
     const out = new Array(width);
     for (let i = 0; i < width; i++) out[i] = r[i] ?? "";
     return out;
@@ -36,7 +48,8 @@ export function parseCSV(text) {
       throw new Error(fatal.message || "CSV parse error");
     }
   }
-  return matrixToTable(res.data);
+  const matrix = (res.data || []).filter(Array.isArray);
+  return { ...matrixToTable(matrix), matrix };
 }
 
 // Parse XLSX/XLS from an ArrayBuffer/Uint8Array/Buffer. Returns the same
@@ -45,11 +58,11 @@ export function parseCSV(text) {
 export function parseXLSX(data, sheetName) {
   const wb = XLSX.read(data, { type: "array" });
   const sheetNames = wb.SheetNames || [];
-  if (sheetNames.length === 0) return { headers: [], rows: [], sheetNames };
+  if (sheetNames.length === 0) return { headers: [], rows: [], matrix: [], sheetNames };
   const name = sheetName && sheetNames.includes(sheetName) ? sheetName : sheetNames[0];
   const ws = wb.Sheets[name];
   const matrix = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: "" });
-  return { ...matrixToTable(matrix), sheetNames, sheet: name };
+  return { ...matrixToTable(matrix), matrix, sheetNames, sheet: name };
 }
 
 const readAsText = (file) =>

@@ -17,6 +17,7 @@ export function buildImport(rows, mapping, opts = {}) {
   const valid = [];
   const rejected = [];
   const duplicates = [];
+  const unresolvedSymbols = [];
   let noStopCount = 0;
 
   rows.forEach((row, i) => {
@@ -26,6 +27,7 @@ export function buildImport(rows, mapping, opts = {}) {
       return;
     }
     const t = res.trade;
+    if (res.unresolvedSymbol) unresolvedSymbols.push({ rowNumber: i + 1, ticker: t.ticker });
     const key = dupKey(t);
     const isDup = existingKeys.has(key) || seenInFile.has(key);
     seenInFile.add(key);
@@ -42,11 +44,13 @@ export function buildImport(rows, mapping, opts = {}) {
     duplicates,     // flagged; user chooses skip / import anyway
     rejected,       // { rowNumber, code, detail, raw }
     noStopCount,    // among valid+duplicates, how many have stop=null
+    unresolvedSymbols, // imported under a security name; no live quote until resolved
     counts: {
       total: rows.length,
       valid: valid.length,
       duplicates: duplicates.length,
       rejected: rejected.length,
+      unresolvedSymbol: unresolvedSymbols.length,
     },
   };
 }

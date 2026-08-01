@@ -9,6 +9,8 @@ import "./import-fixtures/generate.mjs";
 import { parseCSV, parseXLSX } from "../src/import/parseFile.js";
 import { detectColumns } from "../src/import/detectColumns.js";
 import { buildImport } from "../src/import/buildImport.js";
+import { normalizeRow } from "../src/import/normalizeRow.js";
+import { detectProfile, applyProfile } from "../src/import/brokerProfiles.js";
 
 const FIX = join(dirname(fileURLToPath(import.meta.url)), "import-fixtures");
 let failures = 0;
@@ -47,7 +49,28 @@ const detectOnly = (file) => {
   return detectColumns(headers, rows);
 };
 
-console.log("test:import — pipeline over 10 fixtures\n");
+const parseAny = (file) =>
+  file.endsWith(".xlsx")
+    ? parseXLSX(new Uint8Array(readFileSync(join(FIX, file))))
+    : parseCSV(readFileSync(join(FIX, file), "utf8"));
+
+// Full broker route: raw matrix -> profile -> mapping -> trades.
+const runProfile = (file) => {
+  const parsed = parseAny(file);
+  const profile = detectProfile(parsed.matrix);
+  if (!profile) return { parsed, profile: null };
+  const applied = applyProfile(profile, parsed.matrix);
+  const det = detectColumns(applied.headers, applied.rows);
+  const res = buildImport(applied.rows, det.mapping, {
+    dateFormat: det.dateFormat,
+    capital: 2500,
+    sideResolver: applied.sideResolver,
+    tickerResolver: applied.tickerResolver,
+  });
+  return { parsed, profile, applied, det, res };
+};
+
+console.log("test:import — pipeline over 13 fixtures\n");
 
 // 0) Baseline regression — blocking gate.
 {
@@ -169,9 +192,98 @@ console.log("test:import — pipeline over 10 fixtures\n");
   check("side not claimed", m.side, undefined);
 }
 
+// 11) IBI profile — header buried under a preamble, whitelist, side from the
+//     sign of the quantity, ticker falling back to the security name.
+{
+  console.log("11) ibi-full.xlsx — broker profile");
+  const { profile, applied, det, res } = runProfile("ibi-full.xlsx");
+  check("profile detected", profile?.id, "ibi");
+  check("header row index", applied.headerIdx, 10);
+  check("width 11 preserved", applied.headers.length, 11);
+  check("trade rows kept", applied.rows.length, 4);
+  check("non-trade rows skipped", applied.skipped.length, 5);
+  check("skipped kinds named", Object.keys(applied.skippedByKind).sort().join(","),
+    "דיבידנד - תשלום,המרת מט״ח,חיוב ריבית חובה,משיכת כספים,מתנה");
+  check("valid", res.counts.valid, 4);
+  check("rejected", res.counts.rejected, 0);
+  const sell = res.valid.find((t) => t.date === "2026-01-09");
+  check("negative qty -> SHORT", sell?.side, "SHORT");
+  check("negative qty -> positive shares", sell?.shares, 10);
+  check("symbol row resolved", res.valid.find((t) => t.ticker === "AAPL")?.ticker, "AAPL");
+  check("name rows flagged", res.counts.unresolvedSymbol, 3);
+  check("AAPL not flagged", res.unresolvedSymbols.some((u) => u.ticker === "AAPL"), false);
+  check("ticker beats mapped column", det.mapping.ticker, 1); // 'מספר נייר' — resolver overrides
+}
+
+// 12) Altshuler profile — side from the action text on all 6 trade spellings.
+{
+  console.log("12) altshuler-full.csv — broker profile");
+  const { profile, applied, res } = runProfile("altshuler-full.csv");
+  check("profile detected", profile?.id, "altshuler");
+  check("header row index", applied.headerIdx, 0);
+  check("width 13 preserved", applied.headers.length, 13);
+  check("trade rows kept", applied.rows.length, 6);
+  check("non-trade rows skipped", applied.skipped.length, 5);
+  check("משיכה skipped", applied.skippedByKind["משיכה"], 1);
+  check("הפקדה skipped", applied.skippedByKind["הפקדה"], 1);
+  check("דיבדנד skipped", applied.skippedByKind["דיבדנד"], 1);
+  check("valid", res.counts.valid, 6);
+  check("longs from text", res.valid.filter((t) => t.side === "LONG").length, 3);
+  check("shorts from text", res.valid.filter((t) => t.side === "SHORT").length, 3);
+  check("positive qty on sells", res.valid.every((t) => t.shares > 0), true);
+  check("'NFLX US' -> NFLX", res.valid.filter((t) => t.ticker === "NFLX").length, 2);
+  check("hebrew names flagged", res.counts.unresolvedSymbol, 4);
+}
+
+// 13) Declared-generic file — no profile, old road, unchanged output.
+{
+  console.log("13) generic-baseline.csv");
+  const { parsed } = runProfile("generic-baseline.csv");
+  check("no profile", detectProfile(parsed.matrix), null);
+  const det = detectColumns(parsed.headers, parsed.rows);
+  const res = buildImport(parsed.rows, det.mapping, { dateFormat: det.dateFormat, capital: 2500 });
+  check("mapping", JSON.stringify(det.mapping),
+    '{"ticker":0,"side":1,"entry":2,"exit":3,"shares":4,"date":5,"stop":6}');
+  check("valid", res.counts.valid, 2);
+  check("no unresolved flag on generic route", res.counts.unresolvedSymbol, 0);
+}
+
+// 14) The real gate: no profile may swallow a pre-existing fixture.
+{
+  console.log("14) profiles do not claim the 10 original fixtures");
+  for (const f of ["en-standard.csv", "he-semicolon.csv", "xlsx-serial.xlsx", "bad-rows.csv",
+                   "duplicates.csv", "perf-200.csv", "ibi-style.csv", "altshuler-style.csv",
+                   "precedence.csv", "lstrap.csv"]) {
+    check(`no profile for ${f}`, detectProfile(parseAny(f).matrix), null);
+  }
+}
+
+// 15) normalizeRow on the generic route returns exactly what it returned before
+//     the resolvers existed — same result keys, same trade shape.
+{
+  console.log("15) normalizeRow shape frozen without resolvers");
+  const TRADE_KEYS = "id,ticker,date,createdAt,side,entry,stop,target,exit,shares,status,setup,notes," +
+    "marketCondition,emotionAtEntry,entryQuality,tradeImage,exitReason,followedPlan,lessonLearned," +
+    "maxFavorable,maxAdverse,closedAt,_capitalAtEntry,_prediction,isDemo";
+  for (const f of ["en-standard.csv", "he-semicolon.csv", "bad-rows.csv"]) {
+    const { headers, rows } = parseCSV(readFileSync(join(FIX, f), "utf8"));
+    const det = detectColumns(headers, rows);
+    let okRows = 0;
+    let resultKeys = new Set();
+    let tradeKeys = new Set();
+    for (const row of rows) {
+      const r = normalizeRow(row, det.mapping, { dateFormat: det.dateFormat, capital: 2500 });
+      resultKeys.add(Object.keys(r).join(","));
+      if (r.ok) { okRows++; tradeKeys.add(Object.keys(r.trade).join(",")); }
+    }
+    check(`${f} result keys`, [...resultKeys].filter((k) => k.startsWith("ok,trade")).join("|"), "ok,trade");
+    check(`${f} trade keys`, [...tradeKeys].join("|"), okRows ? TRADE_KEYS : "");
+  }
+}
+
 console.log("");
 if (failures > 0) {
   console.error(`❌ test:import — ${failures} assertion(s) failed`);
   process.exit(1);
 }
-console.log("✅ test:import — all fixtures passed (10 scenarios)");
+console.log("✅ test:import — all fixtures passed (15 scenarios)");

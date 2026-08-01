@@ -109,4 +109,70 @@ AAPL,10,145,150,2026-03-02
 MSFT,8,290,300,2026-03-03
 `);
 
+// ── Broker-profile fixtures ─────────────────────────────────────────────────
+// Structure only is taken from the real broker exports: column names, their
+// order, and the action-type strings. Every symbol, name, quantity, price and
+// date below is invented.
+
+// 11) IBI export. Built as XLSX because that is the real format and because the
+// blank preamble rows survive it — a CSV would have them collapsed by the
+// parser, and the whole point is that the header sits at index 10.
+const IBI_HEADERS = [
+  "שם נייר", "מספר נייר", "פעולה", "כמות", "שער עלות ממוצע", "שווי במטבע",
+  "שווי כולל בש”ח", "תאריך הוראה", "תאריך נכונות", "אחוז מס",
+  "סכום מס משוער בישראל",
+];
+const blank11 = () => new Array(11).fill("");
+const ibiRow = (name, id, action, qty, price, date) =>
+  [name, id, action, qty, price, qty * price, qty * price * 3.6, date, date, 25, 0];
+
+const ibiAoa = [
+  blank11(), blank11(), blank11(),
+  ["תנועות היסטוריות", "", "", "", "", "", "", "", "", "", ""],
+  ["חשבון: 0-00000", "", "", "", "", "", "", "", "", "", ""],
+  ["תאריך הפקת הקובץ: 01/01/2026", "", "", "", "", "", "", "", "", "", ""],
+  ["תאריך נכונות הנתונים: 01/01/2026", "", "", "", "", "", "", "", "", "", ""],
+  blank11(),
+  ["תאריכים הנכללים בתקופה: 01/01/2026 עד 31/01/2026", "", "", "", "", "", "", "", "", "", ""],
+  blank11(),
+  IBI_HEADERS,
+  ibiRow("ACME CORP", 1100001, "קנייה", 10, 150, "05/01/2026"),
+  ibiRow("ACME CORP", 1100001, "מכירה", -10, 160, "09/01/2026"),
+  ibiRow("WIDGET LTD", 1100002, "קנייה", 20, 100, "06/01/2026"),
+  ibiRow("AAPL", 1100004, "קנייה", 5, 200, "07/01/2026"),
+  ibiRow("GLOBEX PLC", 1100003, "המרת מט״ח", 5000, 1, "08/01/2026"),
+  ibiRow("ACME CORP", 1100001, "דיבידנד - תשלום", 10, 0.5, "10/01/2026"),
+  ibiRow("", "", "חיוב ריבית חובה", 0, 0, "11/01/2026"),
+  ibiRow("", "", "מתנה", 1, 0, "12/01/2026"),
+  ibiRow("", "", "משיכת כספים", 1000, 1, "13/01/2026"),
+];
+const ibiWb = XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(ibiWb, XLSX.utils.aoa_to_sheet(ibiAoa), "תנועות");
+w("ibi-full.xlsx", XLSX.write(ibiWb, { type: "buffer", bookType: "xlsx" }));
+
+// 12) Altshuler export. Header on row 1, quantity positive on sells too, and a
+// foreign security whose symbol hides in the *name* column while the symbol
+// column sits empty.
+w("altshuler-full.csv",
+`תאריך,סוג פעולה,שם נייר,מס' נייר / סימבול,כמות,שער ביצוע,מטבע,עמלת פעולה,עמלות נלוות,תמורה במט"ח,תמורה בשקלים,יתרה שקלית,אומדן מס רווחי הון
+03/02/2026,קניה חול מטח,NFLX US,,12,25.5,$,1,0,-306,-1100,5000,0
+04/02/2026,מכירה חול מטח,NFLX US,,12,30,$,1,0,360,1300,6300,50
+05/02/2026,קניה רצף,מניה ישראלית א,1234567,30,40,₪,2,0,-1200,-1200,5100,0
+06/02/2026,מכירה רצף,מניה ישראלית א,1234567,30,45,₪,2,0,1350,1350,6450,20
+07/02/2026,קניה שח,מניה ישראלית ב,7654321,15,80,₪,2,0,-1200,-1200,5250,0
+08/02/2026,מכירה שח,מניה ישראלית ב,7654321,15,88,₪,2,0,1320,1320,6570,30
+09/02/2026,משיכה,,,1000,1,₪,0,0,-1000,-1000,5570,0
+10/02/2026,הפקדה,,,2000,1,₪,0,0,2000,2000,7570,0
+11/02/2026,דיבדנד,NFLX US,,0,0,$,0,0,12,43,7613,0
+12/02/2026,ריבית מזומן בשח,,,0,0,₪,0,0,3,3,7616,0
+13/02/2026,העברה מזומן בשח,,,0,0,₪,0,0,5,5,7621,0
+`);
+
+// 13) Declared-generic file: must match no profile and travel the old road.
+w("generic-baseline.csv",
+`Symbol,Side,Entry,Exit,Qty,Date,Stop
+ZZZ,Long,10,12,3,2026-05-01,9
+YYY,Short,20,18,4,2026-05-02,22
+`);
+
 console.log("fixtures generated in", DIR);
