@@ -7,6 +7,8 @@
 // Scenario A is the regression contract — it must not move by one byte. B/C/D are
 // characterization: their frozen values describe what the endpoint does today, and
 // any change to them is a deliberate edit to this file in the same commit.
+// E–H cover the direction decision (F4). G and H are Niv's two live QA reads of
+// 01.08 replayed as logic — the bug report itself, frozen so it cannot come back.
 //
 //   node scripts/ocr-contract-test.mjs            assert against the frozen table
 //   node scripts/ocr-contract-test.mjs --print    dump actual output (baseline capture)
@@ -60,6 +62,55 @@ const SCENARIOS = [
       rrRatio: 2.77, hasPositionTool: true, confidence: 85,
     }),
   },
+  // ─── F4 · direction ───────────────────────────────────────────────────────
+  // The deltas are unsigned, so `side` alone decides whether the stop lands above
+  // or below the entry. E–H pin down which source wins that decision and what the
+  // caller is told about it. G and H are Niv's two live QA reads of 01.08, replayed
+  // as logic: they are the reason this hierarchy exists.
+  {
+    id: "E",
+    title: "geometry beats the user's toggle — LONG lines, form on SHORT",
+    side: "SHORT",
+    modelText: JSON.stringify({
+      ticker: "AFRM", entry: 75, direction: "LONG",
+      stopDelta: 4.39, stopPercent: 5.871, stopPrice: 70.38,
+      targetDelta: 12.16, targetPercent: 16.263, targetPrice: 86.93,
+      rrRatio: 2.77, hasPositionTool: true, confidence: 85,
+    }),
+  },
+  {
+    id: "F",
+    title: "no Position tool — nothing measured, the user's toggle stands",
+    side: "SHORT",
+    modelText: JSON.stringify({
+      ticker: "AFRM", entry: null, direction: null,
+      stopDelta: null, stopPercent: null, stopPrice: null,
+      targetDelta: null, targetPercent: null, targetPrice: null,
+      rrRatio: null, hasPositionTool: false, confidence: 85,
+    }),
+  },
+  {
+    id: "G",
+    title: "Niv QA #1 (AFRM 01.08) — model labelled SHORT, the lines say LONG",
+    side: "LONG",
+    modelText: JSON.stringify({
+      ticker: "AFRM", entry: 74.09, direction: "SHORT",
+      stopDelta: 5.65, stopPercent: 7.626, stopPrice: 68.44,
+      targetDelta: 10.66, targetPercent: 14.388, targetPrice: 84.75,
+      rrRatio: 1.89, hasPositionTool: true, confidence: 88,
+    }),
+  },
+  {
+    id: "H",
+    title: "Niv QA #2 (MRVL 01.08) — perfect read, form left on SHORT",
+    side: "SHORT",
+    modelText: JSON.stringify({
+      ticker: "MRVL", entry: 187.44, direction: "LONG",
+      stopDelta: 26.54, stopPercent: 14.159, stopPrice: 160.9,
+      targetDelta: 64.41, targetPercent: 34.363, targetPrice: 251.85,
+      rrRatio: 2.43, hasPositionTool: true, confidence: 90,
+    }),
+  },
 ];
 
 // ─── Frozen contract ────────────────────────────────────────────────────────
@@ -87,15 +138,35 @@ const FROZEN = {
     note: "confidence 90 on a negative stop delta — out of scope for F1-F3, frozen so it can't drift while unfixed.",
     body: { ticker: "AFRM", entry: 74.7709524688, stop: null, target: 86.9309524688, side: "LONG", confidence: 90, rrRatio: 2.77 },
   },
+  E: {
+    status: 200,
+    note: "F4: stop/target lines read at 70.38/86.93 sit either side of the entry the LONG way, and each distance matches its trusted delta — measured geometry, so sideSource 'geometry' outranks the SHORT toggle. sideConflict true: the client SHOWS this, it does not flip the toggle.",
+    body: { ticker: "AFRM", entry: 74.7726334478, stop: 70.3826334478, target: 86.9326334478, side: "LONG", sideSource: "geometry", sideConflict: true, confidence: 95, rrRatio: 2.76993166287 },
+  },
+  F: {
+    status: 200,
+    note: "F4: nothing was measured, so nothing may override the trader. side follows body.side ('SHORT'), sideSource 'user', no conflict. Confidence still capped at 25 by F2 — the ticker survived, the trade was never read.",
+    body: { ticker: "AFRM", entry: null, stop: null, target: null, side: "SHORT", sideSource: "user", sideConflict: false, confidence: 25, rrRatio: null },
+  },
+  G: {
+    status: 200,
+    note: "F4: Niv's AFRM read of 01.08 replayed. The model labelled the panel SHORT; the lines it read are unambiguously LONG. Geometry wins, so the levels come out 68.44/84.75 — the chart's own numbers — instead of the inverted 79.74/63.43 that shipped that day. sideConflict is FALSE because geometry agrees with the toggle the trader was already on: the fix turns this read into a clean fill, not a prompt. confidence 73 = 88 +5 converged +5 vision-entry agrees -25 geometry contradicts the label.",
+    body: { ticker: "AFRM", entry: 74.0890815779, stop: 68.4390815779, target: 84.7490815779, side: "LONG", sideSource: "geometry", sideConflict: false, confidence: 73, rrRatio: 1.88672566372 },
+  },
+  H: {
+    status: 200,
+    note: "F4: Niv's MRVL read of 01.08 replayed. Levels were already correct that day; the failure was that the form stayed on SHORT and validation blocked a perfect extraction. sideConflict true is precisely that state, now reported instead of left for the trader to deduce from a red banner.",
+    body: { ticker: "MRVL", entry: 187.441297526, stop: 160.901297526, target: 251.851297526, side: "LONG", sideSource: "geometry", sideConflict: true, confidence: 100, rrRatio: 2.42690278824 },
+  },
 };
 
 const realFetch = globalThis.fetch;
 
-function stubFetch(modelText) {
+function stubFetch(modelText, userId) {
   globalThis.fetch = async (url) => {
     const u = String(url);
     if (u.includes("/auth/v1/user")) {
-      return { ok: true, json: async () => ({ id: "contract-test-user" }) };
+      return { ok: true, json: async () => ({ id: userId }) };
     }
     if (u === ANTHROPIC_URL) {
       return { ok: true, json: async () => ({ content: [{ type: "text", text: modelText }] }) };
@@ -116,7 +187,11 @@ function makeRes() {
 }
 
 async function run(scenario, handler) {
-  stubFetch(scenario.modelText);
+  // One synthetic user PER scenario. The endpoint's per-minute cap is 10, so a
+  // shared id would silently turn scenario 11 into a 429 instead of a contract
+  // check — a ceiling that grows into a false failure the day someone adds one
+  // more case. Per-scenario ids remove it for good.
+  stubFetch(scenario.modelText, `contract-test-${scenario.id}`);
   const { res, out } = makeRes();
   const req = {
     method: "POST",
@@ -134,8 +209,6 @@ const { default: handler } = await import("../api/ocr.js");
 
 const results = [];
 for (const s of SCENARIOS) {
-  // Each scenario gets its own user id would be cleaner, but the per-minute cap is
-  // 10 and we send 4 — no scenario is ever the one that trips it.
   const out = await run(s, handler);
   results.push({ scenario: s, out });
 }

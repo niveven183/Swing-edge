@@ -6,13 +6,21 @@
 // Position tool ("Stop: 4.39 (5.871%)"), and THIS CODE derives all prices. Entry is
 // computed as delta/(percent/100) — deterministic math, no Vision reading required.
 // Stop/target are then entry ± delta. Vision's read entry is used only as a cross-check
-// signal that adjusts confidence, never as a price source. Side is read from the tool
-// direction (body.side as fallback). Failed validation nulls the specific field rather
-// than surfacing a guess; low confidence or a suspect Vision entry nulls all prices.
+// signal that adjusts confidence, never as a price source. Failed validation nulls the
+// specific field rather than surfacing a guess; low confidence or a suspect Vision
+// entry nulls all prices.
+//
+// DIRECTION is its own decision, because the deltas are unsigned: `side` alone decides
+// whether the stop lands above or below the entry, so getting it wrong yields a
+// plausible, fully-populated, WRONG trade. Three ranked sources, reported in
+// `sideSource`: measured geometry (which side of the entry each read line sits on,
+// magnitude-verified against the trusted delta) → the model's own LONG/SHORT label →
+// the caller's toggle. `sideConflict` says the answer differs from that toggle; the
+// client must SHOW that conflict, never resolve it silently.
 //
 //   POST /api/ocr
 //   body : { image: "<base64 or data:...;base64,...>", side: "LONG"|"SHORT" }
-//   200  : { ticker, entry, stop, target, side, confidence, rrRatio }
+//   200  : { ticker, entry, stop, target, side, sideSource, sideConflict, confidence, rrRatio }
 //
 // entry/stop/target are computed PRICES; deltas/percents/direction stay internal.
 // Low confidence or failed validation → null, never a guess. On any upstream or
@@ -46,6 +54,11 @@ const MIN_CONFIDENCE = 40;
 // and targetDelta/stopDelta vs the shown R/R ratio.
 const PCT_TOL = 0.5;
 const RR_TOL = 0.1;
+
+// A read absolute stop/target price is admitted as direction evidence only when its
+// DISTANCE from the entry matches the delta we already trust, within this fraction of
+// the entry. Same tolerance guards the computed levels against the read ones.
+const GEO_TOL = 0.005;
 
 const ALLOWED_MEDIA = new Set([
   "image/png",
@@ -145,6 +158,21 @@ function computeEntry(stopDelta, stopPercent, targetDelta, targetPercent) {
   return { value: null, source: "none", converged: null };
 }
 
+// Direction from ONE read absolute price. The magnitude is verified against the delta
+// that was read separately and already trusted; only then is the price's SIGN relative
+// to the entry admitted as evidence. That verification is the whole point: it makes
+// this a measurement cross-checked by a second measurement, rather than one more label
+// the model classified. A price that is off by more than GEO_TOL (a misread digit, the
+// tick count, the Amount) proves nothing and returns null instead of a coin flip.
+// `longIsAbove` says where that line sits on a LONG: target above the entry, stop below.
+function dirFromPrice(entry, price, delta, longIsAbove) {
+  if (!(entry > 0) || price === null || delta === null || !(delta > 0)) return null;
+  const diff = price - entry;
+  if (diff === 0) return null;
+  if (Math.abs(Math.abs(diff) - delta) / entry > GEO_TOL) return null;
+  return (diff > 0) === longIsAbove ? "LONG" : "SHORT";
+}
+
 // Double cross-check. Each leg's delta must agree with its own percent
 // (delta/entry*100), and targetDelta/stopDelta must agree with the R/R ratio.
 // When entry was computed FROM a leg, that leg's check is tautological — pass
@@ -200,6 +228,15 @@ function buildPrompt() {
     "shown in the price scale or live price panel. The panel header says BUY (long) or SELL (short).",
     "The entry price is a full price (e.g. 75.00), much larger than the deltas.",
     "",
+    "TWO EXTRA READINGS, taken from the CHART itself and not from the labels:",
+    "  - stopPrice   : the absolute PRICE level where the horizontal STOP line sits.",
+    "  - targetPrice : the absolute PRICE level where the horizontal TARGET line sits.",
+    "Both are full prices on the same scale as the entry (e.g. 70.61 and 87.16) — never a",
+    "distance, never a percentage, never the tick count or the Amount. Read each one off the",
+    "price scale at the height of that line. They exist only to confirm WHICH SIDE of the entry",
+    "each line is on. If you cannot read a line's price level confidently, return null for it:",
+    "a null here costs nothing, a wrong number here is worse than no number at all.",
+    "",
     "Read the actual numbers off the chart and return:",
     "- ticker          : instrument symbol, uppercase, no exchange prefix (e.g. AFRM, BTCUSD), else null.",
     "- entry           : the entry PRICE (absolute), else null.",
@@ -207,19 +244,21 @@ function buildPrompt() {
     '                    above the entry; "SHORT" if SELL / Short Position / target below entry; else null.',
     "- stopDelta       : the Stop label's first number (price distance), else null.",
     "- stopPercent     : the Stop label's parenthesized percent (number only), else null.",
+    "- stopPrice       : the absolute PRICE level of the stop line, else null.",
     "- targetDelta     : the Target label's first number, else null.",
     "- targetPercent   : the Target label's parenthesized percent (number only), else null.",
+    "- targetPrice     : the absolute PRICE level of the target line, else null.",
     "- rrRatio         : the risk/reward ratio if the tool shows one (e.g. 2.77), else null.",
     "- hasPositionTool : true only if a Long/Short Position tool is clearly present, else false.",
     "- confidence      : integer 0-100 — your certainty about the numbers you read.",
     "",
     "Return STRICTLY one JSON object and nothing else (no prose, no markdown):",
-    '{"ticker": <string|null>, "entry": <number|null>, "direction": <"LONG"|"SHORT"|null>, "stopDelta": <number|null>, "stopPercent": <number|null>, "targetDelta": <number|null>, "targetPercent": <number|null>, "rrRatio": <number|null>, "hasPositionTool": <boolean>, "confidence": <integer 0-100>}',
+    '{"ticker": <string|null>, "entry": <number|null>, "direction": <"LONG"|"SHORT"|null>, "stopDelta": <number|null>, "stopPercent": <number|null>, "stopPrice": <number|null>, "targetDelta": <number|null>, "targetPercent": <number|null>, "targetPrice": <number|null>, "rrRatio": <number|null>, "hasPositionTool": <boolean>, "confidence": <integer 0-100>}',
     "",
     "Rules:",
     "- Read digits exactly. Do not round, infer or compute. Unsure about a value → null for THAT field. Never guess.",
     "- All numbers plain: no %, no $, no thousands separators.",
-    "- No Position tool → hasPositionTool=false and entry/deltas/percents/direction = null.",
+    "- No Position tool → hasPositionTool=false and entry/deltas/percents/prices/direction = null.",
   ].join("\n");
 }
 
@@ -345,13 +384,17 @@ export default async function handler(req, res) {
     return;
   }
 
-  // A safe, no-guess result used whenever the model output can't be trusted.
+  // A safe, no-guess result used whenever the model output can't be trusted. Nothing
+  // was read, so the direction is the caller's own toggle handed straight back —
+  // sideSource "user", and by definition no conflict.
   const nullResult = {
     ticker: null,
     entry: null,
     stop: null,
     target: null,
     side,
+    sideSource: "user",
+    sideConflict: false,
     confidence: 0,
     rrRatio: null,
   };
@@ -368,7 +411,10 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           model: MODEL,
-          max_tokens: 300,
+          // 340, not 300: stopPrice/targetPrice add two number fields to the JSON.
+          // Scenario C in the contract test is exactly a max_tokens truncation, and
+          // it stays frozen — the ceiling moved, the truncation behaviour did not.
+          max_tokens: 340,
           messages: [
             {
               role: "user",
@@ -432,6 +478,8 @@ export default async function handler(req, res) {
     const targetDelta = num(parsed.targetDelta);
     const stopPercent = num(parsed.stopPercent);
     const targetPercent = num(parsed.targetPercent);
+    const stopPriceRead = num(parsed.stopPrice);     // absolute — direction evidence + cross-check
+    const targetPriceRead = num(parsed.targetPrice); // absolute — direction evidence + cross-check
     const rrRatioRead = num(parsed.rrRatio);
 
     // Compute entry deterministically from delta/percent pairs (direction-agnostic).
@@ -439,12 +487,52 @@ export default async function handler(req, res) {
     const computed = computeEntry(stopDelta, stopPercent, targetDelta, targetPercent);
     const entry = computed.value !== null ? computed.value : visionEntry;
 
-    // Side: the read direction wins; the UI hint (body.side) is the fallback.
+    // ─── Direction — one explicit, ranked hierarchy ────────────────────────
+    // The deltas are unsigned magnitudes, so this single decision determines
+    // whether the stop lands above or below the entry. A wrong answer here does
+    // not look like a failure: it produces a complete, plausible, inverted trade.
+    // Hence three ranked sources, and the winner is reported in `sideSource`:
+    //   1 "geometry" — measured: which side of the entry each read line sits on,
+    //                  with its distance verified against the trusted delta.
+    //   2 "tool"     — the model's own LONG/SHORT classification of the panel.
+    //                  This is a judgement call by the model; it misread Niv's
+    //                  AFRM chart on 01.08, which is why it is no longer first.
+    //   3 "user"     — the toggle the caller's form was on. Last, but never
+    //                  overridden silently: see `sideConflict`.
+    const geoFromTarget = dirFromPrice(entry, targetPriceRead, targetDelta, true);
+    const geoFromStop = dirFromPrice(entry, stopPriceRead, stopDelta, false);
+    // Two geometric legs that disagree are not evidence, they are noise → null.
+    const geoDir =
+      geoFromTarget && geoFromStop
+        ? geoFromTarget === geoFromStop
+          ? geoFromTarget
+          : null
+        : geoFromTarget || geoFromStop;
     const visionDir =
       parsed.direction === "LONG" || parsed.direction === "SHORT"
         ? parsed.direction
         : null;
-    const resolvedSide = visionDir || side;
+
+    let resolvedSide, sideSource;
+    if (geoDir !== null) {
+      resolvedSide = geoDir;
+      sideSource = "geometry";
+    } else if (visionDir !== null) {
+      resolvedSide = visionDir;
+      sideSource = "tool";
+    } else {
+      resolvedSide = side;
+      sideSource = "user";
+    }
+    // The answer differs from what the caller's toggle said. This is a CONFLICT
+    // for the client to show and the trader to resolve — never a licence to flip
+    // the toggle quietly: a silent flip makes an inverted trade internally
+    // consistent and lets it past the last validation net (CLAUDE.md §2).
+    const sideConflict = resolvedSide !== side;
+    // Measured geometry contradicting the model's own label is the exact
+    // signature of a misread direction. Geometry wins; confidence pays for it.
+    const dirContradiction =
+      geoDir !== null && visionDir !== null && geoDir !== visionDir;
 
     const { stopOk, targetOk, rrOk, stopChecked, targetChecked } = validate({
       entry,
@@ -471,6 +559,8 @@ export default async function handler(req, res) {
         stop: null,
         target: null,
         side: resolvedSide,
+        sideSource,
+        sideConflict,
         confidence: bothLegsFail ? Math.min(modelConf, 30) : modelConf,
         rrRatio: null,
       });
@@ -480,6 +570,15 @@ export default async function handler(req, res) {
     let { stop, target } = computeLevels(entry, stopDelta, targetDelta, resolvedSide);
     if (!stopOk) stop = null;
     if (!targetOk) target = null;
+
+    // Final cross-check: a computed level must land where the read line actually
+    // sits. The read price is never the source — it only gets to veto. This alone
+    // catches an inverted direction at the server: computing 79.74 for a stop line
+    // read at 68.44 is not a rounding difference, it is the wrong side of the entry.
+    if (stop !== null && stopPriceRead !== null && Math.abs(stop - stopPriceRead) / entry > GEO_TOL)
+      stop = null;
+    if (target !== null && targetPriceRead !== null && Math.abs(target - targetPriceRead) / entry > GEO_TOL)
+      target = null;
 
     // Confidence: aggregate signals from computed-entry quality and R/R agreement,
     // then clamp to [MIN_CONFIDENCE, 100]. A Vision-entry mismatch lowers confidence
@@ -494,6 +593,7 @@ export default async function handler(req, res) {
       }
     }
     if (!rrOk) confAdj -= 15;
+    if (dirContradiction) confAdj -= 25;   // geometry and the model's label disagree
 
     const confidence = Math.max(MIN_CONFIDENCE, Math.min(100, modelConf + confAdj));
 
@@ -505,7 +605,7 @@ export default async function handler(req, res) {
 
     res
       .status(200)
-      .json({ ticker, entry, stop, target, side: resolvedSide, confidence, rrRatio });
+      .json({ ticker, entry, stop, target, side: resolvedSide, sideSource, sideConflict, confidence, rrRatio });
   } catch {
     // Network / unexpected error — recoverable, degrade gracefully.
     res.status(502).json({ error: "vision_failed" });

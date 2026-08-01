@@ -134,10 +134,17 @@ function ocrDetection(result) {
 // the chart and needs opaque colours), and Tailwind JIT needs literal class strings.
 // A response is only green when prices were actually read — confidence alone is not
 // evidence that anything landed in the form.
-function ocrBadgeState({ status, confidence, detection }, t) {
+function ocrBadgeState({ status, confidence, detection, contradicted }, t) {
   if (status === "processing") return { tone: "info", icon: "spin", text: t.ocrProcessing };
   if (status === "config_error") return { tone: "bad", icon: "warn", text: t.ocrConfigError };
   if (status === "error") return { tone: "bad", icon: "warn", text: t.ocrError };
+  // F4c: prices landed, and the form they landed in is geometrically impossible for
+  // the direction it is on. Something here is wrong — the levels, the toggle, or a
+  // hand-typed field — and the badge is in no position to say which. What it must
+  // NOT do is sit at a green "✓ 92%" beside a red "invalid input" banner: two
+  // confident, contradictory verdicts on the same three numbers.
+  if (contradicted && (detection === "full" || detection === "partial"))
+    return { tone: "bad", icon: "warn", text: t.ocrContradicted };
   const conf = confidence ?? 0;
   if (detection === "full" && conf >= 70) return { tone: "ok", icon: "check", text: `OCR ✓ ${conf}%` };
   if (detection === "full" && conf >= 40) return { tone: "warn", icon: "check", text: `OCR ~ ${conf}%` };
@@ -226,6 +233,18 @@ const OcrReviewCard = memo(function OcrReviewCard({ review, t, lang, isRTL, onAp
           </div>
         ))}
       </div>
+
+      {/* F4 — the direction the levels above were computed in differs from the one the
+          uploader was set to. Here the whole card is already a "confirm before it
+          enters the form" gate, so the seeded toggle IS the conflict being shown:
+          the trader sees both the read direction and the levels that belong to it,
+          and can flip it back before pressing Apply. The note names what changed. */}
+      {review.sideConflict === true && (
+        <div className="flex items-start gap-1.5 text-[10px] leading-snug text-[var(--v3-warn)]">
+          <AlertTriangle size={11} className="shrink-0 mt-0.5" />
+          <span>{t.ocrSideConflictReview.replace("{tool}", review.side === "SHORT" ? "SHORT" : "LONG")}</span>
+        </div>
+      )}
 
       <div className="flex items-center gap-1.5">
         <span className="text-[9px] uppercase tracking-widest text-slate-600 shrink-0">
@@ -2601,14 +2620,32 @@ export default function SwingEdge() {
         formOcrTickerRef.current =
           result.entry == null && result.ticker ? result.ticker.toUpperCase() : null;
         // Never overwrite a field the trader already filled by hand.
+        // Direction (F4): the levels below were computed in `result.side`, so the
+        // toggle and the numbers must describe one trade. When the server did NOT
+        // contradict the trader (sideConflict false) the sync is silent — normally
+        // a no-op, and a restore if the toggle drifted during the request. When it
+        // DID contradict him the toggle stays exactly where he put it and the
+        // banner below asks him to decide: flipping it here would make an inverted
+        // trade internally consistent and walk it straight past validateTradeInputs
+        // — the one net that caught the AFRM misread on 01.08.
         setForm(f => ({
           ...f,
+          side: result.sideConflict === false && result.side ? result.side : f.side,
           ticker: f.ticker || result.ticker || f.ticker,
           entry:  f.entry  || (result.entry  != null ? String(result.entry.toFixed(2))  : f.entry),
           stop:   f.stop   || (result.stop   != null ? String(result.stop.toFixed(2))   : f.stop),
           target: f.target || (result.target != null ? String(result.target.toFixed(2)) : f.target),
         }));
-        setOcrStatus({ status: "ok", confidence: result.confidence ?? 0, detection });
+        setOcrStatus({
+          status: "ok",
+          confidence: result.confidence ?? 0,
+          detection,
+          // Kept as the RESPONSE's direction, not as a conflict boolean: the banner
+          // compares it against the live toggle, so resolving the conflict by hand
+          // dismisses the banner without any extra bookkeeping.
+          ocrSide: result.side ?? null,
+          sideSource: result.sideSource ?? null,
+        });
         trackEvent("ocr_result", {
           detected: detection,
           confidence_bucket: confidenceBucket(result.confidence ?? 0),
@@ -2799,6 +2836,10 @@ export default function SwingEdge() {
       // posCalc has no live-quote effect: its price fill hangs off the ticker
       // input's onChange, which this path never triggers. If that ever moves to
       // an effect it needs the same guard the journal and analyzer forms carry.
+      // Direction (F4) is deliberately not routed here: posCalc has no `side`
+      // field, and it sizes off |entry − stop| — identical whichever way the
+      // trade points. A misread direction cannot move a share count. The day
+      // this calculator grows a direction, it needs the journal's conflict path.
       setPosCalc(f => ({
         ...f,
         ticker: result.ticker || f.ticker,
@@ -2813,13 +2854,21 @@ export default function SwingEdge() {
         result.entry == null && result.ticker ? result.ticker.toUpperCase() : null;
       setForm(f => ({
         ...f,
+        side: result.sideConflict === false && result.side ? result.side : f.side, // see handleImageUpload
         ticker: f.ticker || result.ticker || f.ticker,
         entry:  f.entry  || (result.entry  != null ? String(result.entry.toFixed(2))  : f.entry),
         stop:   f.stop   || (result.stop   != null ? String(result.stop.toFixed(2))   : f.stop),
         target: f.target || (result.target != null ? String(result.target.toFixed(2)) : f.target),
         tradeImagePreview: f.tradeImagePreview || dataURL, // show the captured frame for verification
       }));
-      setOcrStatus({ status: "ok", confidence, detection }); // journal-modal badge, matches handleImageUpload
+      // journal-modal badge, matches handleImageUpload — including ocrSide, so the
+      // conflict banner behaves identically whether the image came from a file or
+      // from a screen capture.
+      setOcrStatus({
+        status: "ok", confidence, detection,
+        ocrSide: result.side ?? null,
+        sideSource: result.sideSource ?? null,
+      });
       setShowForm(true);
     }
     setChartOcrStatus({ status: "ok", confidence, detection });
@@ -6400,6 +6449,22 @@ export default function SwingEdge() {
                 </div>
               </div>
 
+              {/* F4 — direction conflict. The chart tool and the toggle disagree, and the
+                  levels below belong to the chart's reading. Shown, never auto-resolved:
+                  flipping the toggle for him would silently produce a coherent trade in
+                  the wrong direction. Compares against the LIVE toggle, so it disappears
+                  the moment he picks a side — either side. */}
+              {ocrStatus?.ocrSide && ocrStatus.ocrSide !== form.side && (
+                <div className="flex items-start gap-2 p-2.5 rounded-[var(--v3-radius-chip)] border text-xs bg-[var(--v3-warn)]/5 border-[var(--v3-warn)]/25 text-[var(--v3-warn)]">
+                  <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+                  <span className="leading-snug">
+                    {t.ocrSideConflict
+                      .replace("{tool}", ocrStatus.ocrSide)
+                      .replace("{form}", form.side)}
+                  </span>
+                </div>
+              )}
+
               {/* Live quote badge + Open/High/Low/Pre/After */}
               {form.ticker && (() => {
                 const badge = getMarketStateBadge(formQuote?.marketState || marketState);
@@ -6623,7 +6688,14 @@ export default function SwingEdge() {
 
               {/* OCR confidence badge — graded, mirrors the Analyzer */}
               {ocrStatus && (() => {
-                const { tone, icon, text } = ocrBadgeState(ocrStatus, t);
+                // F4c: the badge sits in the same modal as the invalid-input banner and
+                // must not contradict it. `contradicted` is read from the live form, not
+                // from the response — the response cannot know what the trader typed
+                // next to what it read.
+                const { tone, icon, text } = ocrBadgeState(
+                  { ...ocrStatus, contradicted: entryN > 0 && stopN > 0 && !tradeValidity.valid },
+                  t
+                );
                 const cls =
                   tone === "info" ? "bg-[var(--v3-info)]/5 border-[var(--v3-info)]/20 text-[var(--v3-info)]" :
                   tone === "ok"   ? "bg-[var(--v3-accent)]/5 border-[var(--v3-accent)]/20 text-[var(--v3-accent)]" :
