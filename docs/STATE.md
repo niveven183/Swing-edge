@@ -502,6 +502,25 @@ BE, ונעלמת **בהצהרה** ולא בשקט.
   "3 workflows" שגה. 30/דקה = פי ~150 מהשיא. ה-CORS נשאר `*` במכוון (ניטור חיצוני)
 - ✅ **`api/feedback.js` — דלף הודעת Postgres ללקוח נסגר** (שלב א'). `detail:
   dbError.message` הוחלף בלוג צד-שרת; הלקוח מקבל `insert_failed` בלבד
+- ✅ **CSP ב-Report-Only + HSTS** נדחפו ל-`vercel.json` (שלב ב'). `vercel.json`
+  אינו תומך בהערות, ולכן **מקור כל source מתועד כאן**. המיפוי נעשה **מהבאנדל
+  החי, לא מ-grep על `src/`** — וזה מה שתפס את `api.emailjs.com`, ש-grep סטטי
+  פספס לגמרי והוא יושב על מסלול הפידבק. מכאן והלאה: מיפוי מקורות = חילוץ מבאנדל.
+  | source | מאיפה נמדד |
+  |---|---|
+  | `zicstkfkwhzvmdkzpidm.supabase.co` | הבאנדל החי + `list_projects` |
+  | `o4511416120049664.ingest.us.sentry.io` | DSN בתוך `assets/sentry-*.js` (אזור US) |
+  | `api.emailjs.com` | `FeedbackTab.jsx:189` דרך הבאנדל — **פספוס ב-grep הסטטי** |
+  | `challenges.cloudflare.com` | Turnstile — script + iframe |
+  | `s3.tradingview.com` · `www.tradingview.com` | `TradingViewWidgets.jsx:3` + iframe שהוידג'ט מזריק |
+  | `va.vercel-scripts.com` · `vitals.vercel-insights.com` | Vercel Analytics — script + beacon |
+  | `www.googletagmanager.com` · `*.google-analytics.com` | GA4, `index.html` |
+  | `fonts.googleapis.com`/`gstatic` · `api.fontshare.com`/`cdn.fontshare.com` | `index.html` + ה-CSS ש-fontshare מחזיר |
+  | `financialmodelingprep.com` | `TickerLogo.jsx:18` |
+  | `data:` + `blob:` | תצוגה מקדימה של OCR (`readAsDataURL`/`toDataURL`) והורדות CSV |
+
+  ⚠️ **אין `report-uri`** — הפרות נראות בקונסולת הדפדפן בלבד. הוספת endpoint
+  לדיווח היא משטח תקיפה חדש; ההליכה הידנית על המסכים היא מנגנון האיסוף
 - ⏭️ **CSP אוכף** — פרומפט נפרד, רק אחרי שדוח ה-Report-Only ריק
 - ⚠️ **`redeem_mentor_invite` ללא throttle על ניסיונות.** קוד בן 8 תווים
   מאלפבית של 30 (≈6.6·10¹¹), אך זהו **מסלול הקריאה החוצה-משתמש היחיד ל-`trades`**.
