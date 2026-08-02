@@ -19,6 +19,7 @@
 import fs from "fs";
 import path from "path";
 import nodemailer from "nodemailer";
+import { resolveOrigin } from "./_lib/cors.js";
 
 // Reuse the SPA's Supabase env — VITE_-prefixed vars are present at function
 // runtime on Vercel; prefer unprefixed names if ever defined.
@@ -37,21 +38,6 @@ const fetchWithTimeout = (url, opts = {}, ms = 8000) => {
   const t = setTimeout(() => c.abort(), ms);
   return fetch(url, { ...opts, signal: c.signal }).finally(() => clearTimeout(t));
 };
-
-// Allow only the app's own origins cross-origin (prod + previews + custom domain).
-// Same-origin SPA calls never hit CORS. Mirrors api/ocr.js.
-function resolveOrigin(origin) {
-  if (!origin) return null;
-  try {
-    const host = new URL(origin).hostname;
-    const ok =
-      host === "localhost" || host === "127.0.0.1" || host.endsWith(".vercel.app") ||
-      host === "swing-edge.com" || host === "www.swing-edge.com";
-    return ok ? origin : null;
-  } catch {
-    return null;
-  }
-}
 
 // Verify a Supabase access token via GoTrue. Returns the user on success, else
 // null. Also returns the raw token so it can be forwarded to the RPCs.

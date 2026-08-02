@@ -27,6 +27,7 @@
 // parse failure the endpoint degrades to a safe null result rather than a 500.
 
 import { rateLimit } from "./_lib/rateLimit.js";
+import { resolveOrigin } from "./_lib/cors.js";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
@@ -273,22 +274,6 @@ function buildPrompt() {
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const SUPABASE_ANON_KEY =
   process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
-
-// Allow only the app's own origins to consume the endpoint cross-origin. Prod +
-// previews are *.vercel.app; local dev is localhost. Same-origin calls (the SPA
-// hitting its own /api/ocr) never hit CORS. Custom domain swing-edge.com is adopted.
-function resolveOrigin(origin) {
-  if (!origin) return null;
-  try {
-    const host = new URL(origin).hostname;
-    const ok =
-      host === "localhost" || host === "127.0.0.1" || host.endsWith(".vercel.app") ||
-      host === "swing-edge.com" || host === "www.swing-edge.com";
-    return ok ? origin : null;
-  } catch {
-    return null;
-  }
-}
 
 // Verify a Supabase access token by asking GoTrue who it belongs to. Returns the
 // user object on success, null on any failure (missing / expired / invalid).

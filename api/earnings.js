@@ -12,6 +12,7 @@
 // as "no earnings signal" and the Coach runs normally (fail-open).
 
 import { rateLimit, clientIp } from "./_lib/rateLimit.js";
+import { applyCors } from "./_lib/cors.js";
 
 const FINNHUB_BASE = "https://finnhub.io/api/v1";
 
@@ -83,13 +84,8 @@ async function nextEarnings(symbol, key) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  if (req.method === "OPTIONS") {
-    res.status(204).end();
-    return;
-  }
+  // CORS — restricted to the app's own origins; this spends Finnhub quota.
+  if (applyCors(req, res, { methods: "GET, OPTIONS" })) return;
 
   const { allowed, retryAfter } = rateLimit(`${clientIp(req)}:earnings`, {
     windowMs: 60 * 1000,

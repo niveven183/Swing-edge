@@ -17,6 +17,8 @@
 //     → 200 { status: "ok", warnings: ["twelvedata"], checks }      only TwelveData down
 //     → 503 { status: "degraded", failing: [...], warnings, checks } a critical dep fails
 
+import { rateLimit, clientIp } from "./_lib/rateLimit.js";
+
 const FINNHUB_BASE = "https://finnhub.io/api/v1";
 const COINGECKO_BASE = "https://api.coingecko.com/api/v3";
 const TWELVEDATA_BASE = "https://api.twelvedata.com";
@@ -125,10 +127,33 @@ const CACHE_TTL_MS = 20000;
 let healthCache = null; // { at: number, body: object }
 
 export default async function handler(req, res) {
+  // CORS stays wide open here — unlike every other endpoint. This probe is
+  // consumed by EXTERNAL monitors (UptimeRobot, per docs/ARCHITECTURE.md) plus
+  // sentinel.yml and fleet-weekly.yml. Narrowing it to our own origins would
+  // break external uptime monitoring, which is the whole point of the endpoint.
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   if (req.method === "OPTIONS") {
     res.status(204).end();
+    return;
+  }
+
+  // Being open makes this the one endpoint an anonymous caller can use to spend
+  // our money: every cache miss costs one TwelveData credit plus a Finnhub call,
+  // and the cache below is per-instance, so parallel cold starts bypass it.
+  // Measured legitimate peak per IP is 0.2/min — UptimeRobot's floor is one probe
+  // per 5 min, and the only scheduled callers are sentinel.yml (twice an hour)
+  // and fleet-weekly.yml (weekly), each from a fresh runner IP. health.yml is
+  // deprecated (workflow_dispatch, no cron) and does not count. 30/min is ~150x
+  // that peak: a real monitor cannot reach the ceiling; a loop can.
+  const { allowed, retryAfter } = rateLimit(`health:${clientIp(req)}`, {
+    windowMs: 60 * 1000,
+    max: 30,
+  });
+  if (!allowed) {
+    console.warn(`[rate_limited] health ip=${clientIp(req)} retryAfter=${retryAfter}s`);
+    res.setHeader("Retry-After", String(retryAfter));
+    res.status(429).json({ error: "rate_limited", retryAfter });
     return;
   }
 

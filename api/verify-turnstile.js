@@ -12,6 +12,7 @@
 // OPEN — a real user is never permanently locked out of signup by an outage.
 
 import { rateLimit, clientIp } from "./_lib/rateLimit.js";
+import { applyCors } from "./_lib/cors.js";
 
 const SECRET = process.env.TURNSTILE_SECRET_KEY;
 const SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
@@ -23,13 +24,10 @@ const fetchWithTimeout = (url, opts = {}, ms = 8000) => {
 };
 
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  if (req.method === "OPTIONS") {
-    res.status(204).end();
-    return;
-  }
+  // CORS — restricted to the app's own origins. This runs BEFORE login, but the
+  // caller is always our own signup form, so the origin is always one of ours.
+  if (applyCors(req, res, { methods: "POST, OPTIONS" })) return;
+
   if (req.method !== "POST") {
     res.status(405).json({ error: "method_not_allowed" });
     return;

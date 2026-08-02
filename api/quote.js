@@ -18,6 +18,7 @@
 // a global 500.
 
 import { rateLimit, clientIp } from "./_lib/rateLimit.js";
+import { applyCors } from "./_lib/cors.js";
 
 const FINNHUB_BASE = "https://finnhub.io/api/v1";
 const COINGECKO_BASE = "https://api.coingecko.com/api/v3";
@@ -345,15 +346,16 @@ async function handleHistory(symbols, mdKey, days, res) {
 }
 
 export default async function handler(req, res) {
-  // CORS — permissive so the SPA can consume it from any origin.
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  if (req.method === "OPTIONS") {
-    res.status(204).end();
-    return;
-  }
+  // CORS — restricted to the app's own origins so a third-party site can't use
+  // this proxy as a free market-data backend. Sentinel hits it via curl (no
+  // Origin header), so scheduled monitoring is unaffected.
+  if (applyCors(req, res, { methods: "GET, OPTIONS" })) return;
 
+  // 60/min per IP is deliberately ~14x the legitimate peak — DO NOT "tighten"
+  // this without re-measuring. A user polls every 15s while the market is open
+  // (src/priceService.js getRefreshInterval) = 4.0 calls/min, plus ~0.2/min for
+  // the Overview panel → ~4.2/min. The headroom is what covers several open tabs
+  // (3 tabs ≈ 12.6/min) and multiple users sharing one NAT/CGNAT address.
   const { allowed, retryAfter } = rateLimit(`${clientIp(req)}:quote`, {
     windowMs: 60 * 1000,
     max: 60,

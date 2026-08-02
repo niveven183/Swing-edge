@@ -2,12 +2,13 @@
 // The TradingView symbol-search endpoint gates on `Referer: tradingview.com`,
 // so it can NEVER be called directly from the browser (Referer is a forbidden
 // fetch header). This server-side proxy spoofs the Referer and returns the raw
-// JSON array, with permissive CORS so the SPA can consume it.
+// JSON array to the SPA.
 //
 // The client (priceService.searchSymbolsTV) falls back to Yahoo automatically
 // if this endpoint errors, so a TV outage is transparent to the user.
 
 import { rateLimit, clientIp } from "./_lib/rateLimit.js";
+import { applyCors } from "./_lib/cors.js";
 
 const TV_BASE = "https://symbol-search.tradingview.com/symbol_search/";
 
@@ -20,15 +21,14 @@ const fetchWithTimeout = (url, opts = {}, ms = 8000) => {
 };
 
 export default async function handler(req, res) {
-  // CORS — allow the SPA (same origin in prod, but keep it permissive/robust).
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  if (req.method === "OPTIONS") {
-    res.status(204).end();
-    return;
-  }
+  // CORS — restricted to the app's own origins; this proxy is the only way to
+  // reach TV's search, so leaving it open hands third parties a free bypass.
+  // Sentinel hits it via curl (no Origin header) and is unaffected.
+  if (applyCors(req, res, { methods: "GET, OPTIONS" })) return;
 
+  // 30/min per IP sits far above the legitimate peak: the search box is
+  // debounced (TradingViewSearch.jsx) and results are cached 5 min client-side
+  // (SEARCH_TTL_MS), so real typing produces a handful of calls per minute.
   const { allowed, retryAfter } = rateLimit(`${clientIp(req)}:symbol-search`, {
     windowMs: 60 * 1000,
     max: 30,

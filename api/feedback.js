@@ -11,6 +11,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { rateLimit, clientIp } from "./_lib/rateLimit.js";
+import { applyCors } from "./_lib/cors.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY;
@@ -19,13 +20,10 @@ const VALID_TYPES = new Set(["bug", "idea", "love", "question"]);
 const MAX_MESSAGE_LEN = 5000;
 
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  if (req.method === "OPTIONS") {
-    res.status(204).end();
-    return;
-  }
+  // CORS — restricted to the app's own origins. Deliberately NO auth gate: a
+  // user who is stuck before login must still be able to report it.
+  if (applyCors(req, res, { methods: "POST, OPTIONS" })) return;
+
   if (req.method !== "POST") {
     res.status(405).json({ error: "method_not_allowed" });
     return;
@@ -82,7 +80,10 @@ export default async function handler(req, res) {
   ]);
 
   if (dbError) {
-    res.status(502).json({ error: "insert_failed", detail: dbError.message || String(dbError) });
+    // Log the real cause server-side; never echo Postgres text to the client —
+    // it names columns and constraints and helps nobody but an attacker.
+    console.error(`[feedback] insert failed: ${dbError.message || String(dbError)}`);
+    res.status(502).json({ error: "insert_failed" });
     return;
   }
 
