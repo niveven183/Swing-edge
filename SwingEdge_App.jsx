@@ -3213,7 +3213,7 @@ export default function SwingEdge() {
           </div>
           <div className="text-end hidden sm:block">
             <div className="text-xs text-slate-500">{t.account}</div>
-            <div className="text-sm font-bold font-mono text-cyan-400">${curEquity.toLocaleString("en-US", { minimumFractionDigits: 2 })}</div>
+            <div className="text-sm font-bold font-mono text-cyan-400">{accSym}{curEquity.toLocaleString("en-US", { minimumFractionDigits: 2 })}</div>
           </div>
         </div>
       </header>
@@ -3600,7 +3600,7 @@ export default function SwingEdge() {
                         )}
                         {priceAlerts[tr.ticker] && showAlertInput !== tr.id && (
                           <div className="mt-1 text-[9px] text-amber-500/70 font-mono flex items-center gap-1">
-                            <Bell size={8} /> Alert @ ${priceAlerts[tr.ticker]}
+                            <Bell size={8} /> Alert @ {CURRENCY_SYMBOL[currencyOf(tr)]}{priceAlerts[tr.ticker]}
                           </div>
                         )}
                         <div className="mt-1 grid grid-cols-2 gap-x-3 text-[10px] text-slate-500 font-mono">
@@ -3735,7 +3735,7 @@ export default function SwingEdge() {
                     <div className={`bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border rounded-xl p-4 ${meterColor.border}`}>
                       <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 block mb-1">{t.totalOpenRisk}</span>
                       <span className={`text-2xl font-bold font-mono ${meterColor.text}`}>{totalRiskPct.toFixed(2)}%</span>
-                      <span className="text-xs text-slate-500 block mt-0.5 font-mono">${totalRiskDollar.toFixed(2)}</span>
+                      <span className="text-xs text-slate-500 block mt-0.5 font-mono">{accSym}{totalRiskDollar.toFixed(2)}</span>
                       <span className="text-[10px] text-slate-600 mt-1 block">
                         {openTrades.length - unmeasuredRiskCount}/{openTrades.length} {t.openTradesCount}
                       </span>
@@ -3750,8 +3750,8 @@ export default function SwingEdge() {
                     <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
                       <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mb-1 flex items-center gap-1">{t.maxAllowedRisk}<TermTooltip term="riskLimits" lang={lang} /></span>
                       <span className="text-2xl font-bold font-mono text-violet-400">{MAX_RISK_PCT.toFixed(1)}%</span>
-                      <span className="text-xs text-slate-500 block mt-0.5 font-mono">${maxRiskDollar.toFixed(2)}</span>
-                      <span className="text-[10px] text-slate-600 mt-1 block">{t.fromCapital} ${capital.toLocaleString()}</span>
+                      <span className="text-xs text-slate-500 block mt-0.5 font-mono">{accSym}{maxRiskDollar.toFixed(2)}</span>
+                      <span className="text-[10px] text-slate-600 mt-1 block">{t.fromCapital} {accSym}{capital.toLocaleString()}</span>
                     </div>
 
                     {/* Visual risk meter */}
@@ -3822,7 +3822,7 @@ export default function SwingEdge() {
                                       {t.side}
                                     </span>
                                   </td>
-                                  <td className="py-2 pe-4 font-mono text-slate-300">${t.entry}</td>
+                                  <td className="py-2 pe-4 font-mono text-slate-300">{CURRENCY_SYMBOL[currencyOf(t)]}{t.entry}</td>
                                   <td className="py-2 pe-4 font-mono text-[var(--v3-loss)]">{t.hasStop ? `${CURRENCY_SYMBOL[currencyOf(t)]}${t.stop}` : "—"}</td>
                                   <td className="py-2 pe-4 font-mono text-slate-400">{t.shares}</td>
                                   <td className={`py-2 pe-4 font-bold font-mono ${rowColor}`}>{t.hasStop ? `${CURRENCY_SYMBOL[currencyOf(t)]}${t.riskDollar.toFixed(2)}` : "—"}</td>
@@ -4168,16 +4168,16 @@ export default function SwingEdge() {
                         <td className="p-3 font-bold text-white font-mono whitespace-nowrap"><div className="flex items-center gap-1.5"><TickerLogo ticker={t.ticker} size={16} />{t.ticker}{t.isDemo && <span className="text-xs bg-slate-700 text-slate-400 px-1 py-0.5 rounded ms-1 font-normal">DEMO</span>}</div></td>
                         <td className="p-3 text-slate-500 whitespace-nowrap">{t.date}</td>
                         <td className="p-3"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side==="LONG"?"bg-[#00C076]/10 text-[var(--v3-accent)] border border-[#00C076]/20":"bg-[#F43F5E]/10 text-[var(--v3-loss)] border border-[#F43F5E]/20"}`}>{t.side}</span></td>
-                        <td className="p-3 font-mono text-slate-300">${t.entry}</td>
-                        <td className="p-3 font-mono text-[var(--v3-loss)]">${t.stop}</td>
-                        <td className="p-3 font-mono text-[var(--v3-accent)]">${t.target}</td>
+                        <td className="p-3 font-mono text-slate-300">{CURRENCY_SYMBOL[currencyOf(t)]}{t.entry}</td>
+                        <td className="p-3 font-mono text-[var(--v3-loss)]">{t.stop != null ? `${CURRENCY_SYMBOL[currencyOf(t)]}${t.stop}` : "–"}</td>
+                        <td className="p-3 font-mono text-[var(--v3-accent)]">{t.target != null ? `${CURRENCY_SYMBOL[currencyOf(t)]}${t.target}` : "–"}</td>
                         <td className="p-3 font-mono text-slate-400">{t.shares}</td>
                         {/* Current Price */}
                         <td className="p-3 font-mono text-xs whitespace-nowrap">
                           {isOpen ? (() => {
                             const cp = getLivePrice(t.ticker)?.price;
                             return cp
-                              ? <span className="text-slate-200 font-bold">${cp.toFixed(2)}</span>
+                              ? <span className="text-slate-200 font-bold">{CURRENCY_SYMBOL[currencyOf(t)]}{cp.toFixed(2)}</span>
                               : pricesLoading
                                 ? <span className="text-slate-600 animate-pulse text-[10px]"><RefreshCw size={8} className="inline animate-spin" /></span>
                                 : <span className="text-slate-700">–</span>;
@@ -4780,7 +4780,7 @@ export default function SwingEdge() {
                       min="0"
                       className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono"
                     />
-                    <span className="text-[9px] text-slate-700 mt-0.5 block font-mono">Auto: ${capital.toLocaleString()}</span>
+                    <span className="text-[9px] text-slate-700 mt-0.5 block font-mono">Auto: {accSym}{capital.toLocaleString()}</span>
                   </div>
                   <div>
                     <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1 flex items-center gap-1">
@@ -4848,7 +4848,7 @@ export default function SwingEdge() {
                       <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase tracking-widest">
                         <AlertTriangle size={10} className="text-[var(--v3-loss)]" /> {t.riskInDollars}
                       </div>
-                      <div className="text-2xl font-bold font-mono text-[var(--v3-loss)]">${riskDollars.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                      <div className="text-2xl font-bold font-mono text-[var(--v3-loss)]">{accSym}{riskDollars.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                       <div className="text-xs text-slate-600">{riskN}% {t.ofCapital}</div>
                     </div>
 
@@ -4856,8 +4856,8 @@ export default function SwingEdge() {
                       <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase tracking-widest">
                         <DollarSign size={10} className="text-[var(--v3-accent)]" /> {t.positionSize}
                       </div>
-                      <div className="text-2xl font-bold font-mono text-[var(--v3-accent)]">${posValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                      <div className="text-xs text-slate-600">{shares} × ${entN.toFixed(2)}</div>
+                      <div className="text-2xl font-bold font-mono text-[var(--v3-accent)]">{accSym}{posValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                      <div className="text-xs text-slate-600">{shares} × {accSym}{entN.toFixed(2)}</div>
                     </div>
 
                     <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-violet-500/25 rounded-xl p-4 flex flex-col gap-1">
@@ -4865,7 +4865,7 @@ export default function SwingEdge() {
                         <Percent size={10} className="text-violet-400" /> {t.portfolioPct}
                       </div>
                       <div className="text-2xl font-bold font-mono text-violet-400">{portPct.toFixed(1)}%</div>
-                      <div className="text-xs text-slate-600">{t.ofPortfolio} ${capN.toLocaleString()}</div>
+                      <div className="text-xs text-slate-600">{t.ofPortfolio} {accSym}{capN.toLocaleString()}</div>
                     </div>
                   </div>
 
@@ -6876,9 +6876,9 @@ export default function SwingEdge() {
             <div className="p-5 space-y-4">
               {/* Trade summary */}
               <div className="bg-white/3 rounded-xl p-3 border border-[var(--border-subtle)] dark:border-white/[0.06] grid grid-cols-3 gap-2 text-center text-[10px]">
-                <div><div className="text-slate-600 uppercase tracking-wider">Entry</div><div className="font-mono font-bold text-slate-300">${closingTrade.entry}</div></div>
-                <div><div className="text-slate-600 uppercase tracking-wider">Stop</div><div className="font-mono font-bold text-[#ef4444]">${closingTrade.stop}</div></div>
-                <div><div className="text-slate-600 uppercase tracking-wider">Target</div><div className="font-mono font-bold text-[#10b981]">${closingTrade.target || "–"}</div></div>
+                <div><div className="text-slate-600 uppercase tracking-wider">Entry</div><div className="font-mono font-bold text-slate-300">{CURRENCY_SYMBOL[currencyOf(closingTrade)]}{closingTrade.entry}</div></div>
+                <div><div className="text-slate-600 uppercase tracking-wider">Stop</div><div className="font-mono font-bold text-[#ef4444]">{closingTrade.stop != null ? `${CURRENCY_SYMBOL[currencyOf(closingTrade)]}${closingTrade.stop}` : "–"}</div></div>
+                <div><div className="text-slate-600 uppercase tracking-wider">Target</div><div className="font-mono font-bold text-[#10b981]">{closingTrade.target != null ? `${CURRENCY_SYMBOL[currencyOf(closingTrade)]}${closingTrade.target}` : "–"}</div></div>
               </div>
 
               {/* Exit Price + Exit Reason */}
@@ -7054,7 +7054,7 @@ export default function SwingEdge() {
               </span>
             );
           })()}
-          <span>{t.accountEquity}: ${curEquity.toLocaleString("en-US", {minimumFractionDigits: 2})}</span>
+          <span>{t.accountEquity}: {accSym}{curEquity.toLocaleString("en-US", {minimumFractionDigits: 2})}</span>
           <span>{t.riskPerTradeFooter}</span>
         </div>
         <div className="flex items-center gap-4">
