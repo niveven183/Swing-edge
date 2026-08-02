@@ -38,7 +38,7 @@ function Stat({ icon: Icon, label, value, tone = "text-[var(--v3-text-hi)]" }) {
   );
 }
 
-export default function WeeklyReviewTab({ trades, capital, calcMetrics, authUser, t, lang, isRTL }) {
+export default function WeeklyReviewTab({ trades, capital, calcMetrics, authUser, t, lang, isRTL, currency = "USD" }) {
   const [reviewedAt, setReviewedAt] = useState(null);
   const [marking, setMarking] = useState(false);
 
@@ -152,7 +152,7 @@ export default function WeeklyReviewTab({ trades, capital, calcMetrics, authUser
               {t.wr_pnl}
             </div>
             <div className={`se-serif text-5xl md:text-6xl leading-none tracking-tight ${pnlTone}`}>
-              {fmt$0(pnl)}
+              {fmt$0(pnl, currency)}
             </div>
           </div>
 

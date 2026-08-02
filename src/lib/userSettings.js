@@ -26,6 +26,7 @@ const LS_KEYS = {
   swingEdgePlaybook: { field: "playbook", parse: JSON.parse },
   swingEdgePriceAlerts: { field: "priceAlerts", parse: JSON.parse },
   swingEdgeLang: { field: "lang", parse: (v) => v },
+  swingEdgeAccountCurrency: { field: "accountCurrency", parse: (v) => v },
 };
 
 // ── localStorage helpers (SSR/Node-safe; never throw) ──────────────────────

@@ -21,7 +21,7 @@ function dayKeyOf(t) {
 // trades: array of trade objects (closed trades preferred — open trades show 0 P&L).
 // calcMetrics: function(trade) -> { pnl, rMultiple }. P&L/R are NOT stored on the trade.
 // lang: "he" | "en"
-export function TradeCalendar({ trades = [], calcMetrics, lang = 'he' }) {
+export function TradeCalendar({ trades = [], calcMetrics, lang = 'he', currency = 'USD' }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
 
@@ -129,7 +129,7 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he' }) {
                 ${monthSummary.pnl >= 0
                   ? 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
                   : 'bg-rose-50 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400'}`}>
-                {fmt$0(monthSummary.pnl)}
+                {fmt$0(monthSummary.pnl, currency)}
               </span>
               <span className="px-3 py-1 bg-slate-100 dark:bg-white/[0.08] text-slate-600 dark:text-slate-300 rounded-full text-xs">
                 {monthSummary.winRate}{t.wrSuffix}
@@ -193,7 +193,7 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he' }) {
                   text-[10px] font-mono font-semibold block leading-tight
                   ${pnl >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}
                 `}>
-                  {fmt$0(pnl)}
+                  {fmt$0(pnl, currency)}
                 </span>
               )}
 

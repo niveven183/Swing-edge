@@ -1,4 +1,4 @@
-import { isFollowedPlan, isOffPlan, qstars, holdDays, realizedAt, realizedDayKey } from "../utils.js";
+import { isFollowedPlan, isOffPlan, qstars, holdDays, realizedAt, realizedDayKey, currencyOf } from "../utils.js";
 import {
   edgeScore, wilsonLowerBound,
   getClosed, outcomeRates, grossPnl, profitFactorFromPnls,
@@ -59,6 +59,18 @@ export function computeTradingStats(trades, capital, calcTradeMetrics) {
 
   const totalPnL = metrics.reduce((s, m) => s + (m.pnl || 0), 0);
   const { grossWin: totalWin, grossLoss: totalLoss } = grossPnl(metrics.map(pnlOfMetric));
+
+  // A shekel and a dollar do not add up, and `totalPnL` above adds them anyway
+  // because every figure downstream of it is one number. Rather than silently
+  // producing a sum that means nothing, the split is published beside it and the
+  // consumer is told when the set is mixed (§2 — no ratio without a denominator,
+  // and no total without a unit).
+  const pnlByCurrency = {};
+  metrics.forEach((m) => {
+    const c = currencyOf(m);
+    pnlByCurrency[c] = (pnlByCurrency[c] || 0) + (m.pnl || 0);
+  });
+  const currencies = Object.keys(pnlByCurrency).sort();
 
   // SCALE BOUNDARY — the one and only place this module leaves the 0..1
   // convention of statisticalModels and enters the 0..100 convention its UI
@@ -176,6 +188,9 @@ export function computeTradingStats(trades, capital, calcTradeMetrics) {
     // pnl
     totalPnL, totalWin, totalLoss,
 
+    // currency — `totalPnL` is only meaningful when `currencies` holds one entry.
+    pnlByCurrency, currencies, mixedCurrency: currencies.length > 1,
+
     // rates — all 0..100 (see SCALE BOUNDARY above).
     // winRate + lossRate + beRate === 100 exactly; `beRate` exists so that
     // identity holds instead of the BE slice silently going missing.
@@ -239,6 +254,7 @@ function EMPTY_STATS(capital) {
   return {
     totalTrades: 0, total: 0, openTrades: 0, wins: 0, losses: 0, be: 0,
     totalPnL: 0, totalWin: 0, totalLoss: 0,
+    pnlByCurrency: {}, currencies: [], mixedCurrency: false,
     winRate: 0, lossRate: 0, beRate: 0, profitFactor: 0,
     avgWin: 0, avgLoss: 0, avgR: null, rSampleSize: 0, bestWin: 0, worstLoss: 0,
     currentEquity: capital, capital, returnPct: 0,

@@ -7,7 +7,7 @@ import useModalA11y from '../hooks/useModalA11y.js';
 import TickerLogo from './TickerLogo.jsx';
 import InfoTooltip from './ui/InfoTooltip.jsx';
 import { EMOTION_OPTIONS } from '../data/tradeOptions.jsx';
-import { isFollowedPlan, isOffPlan, fmt$, fmtR, isNegativeValue } from '../utils.js';
+import { isFollowedPlan, isOffPlan, fmt$, fmtR, isNegativeValue, currencyOf } from '../utils.js';
 import { getSetupTooltip } from '../intelligence/knowledgeGlue.js';
 import { outcomeRates } from '../intelligence/utils/statisticalModels.js';
 
@@ -220,7 +220,7 @@ export default function DayTradesModal({ dateKey, trades = [], calcMetrics, lang
                   </div>
                   <div className="text-right shrink-0">
                     <div className={`font-mono font-semibold text-sm ${pnlClass(pnl)}`}>
-                      {fmt$(pnl)}
+                      {fmt$(pnl, currencyOf(tr))}
                     </div>
                     {rMultiple !== null && rMultiple !== undefined && (
                       <div className="text-xs text-slate-400 dark:text-slate-500 font-mono">

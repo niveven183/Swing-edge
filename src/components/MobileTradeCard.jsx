@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { MessageCircle } from "lucide-react";
 import TickerLogo from "./TickerLogo";
-import { calcTradeMetrics, fmt$, fmtR } from "../utils";
+import { calcTradeMetrics, fmt$, fmtR, currencyOf } from "../utils";
 import { getTranslations, labelFor } from "../i18n.js";
 
 function MobileTradeCardImpl({
@@ -72,7 +72,7 @@ function MobileTradeCardImpl({
           {trade.side}
         </span>
         <span className={`ms-auto font-bold text-sm ${pnlColorClass}`}>
-          {isOpen ? labelFor("status", "OPEN", lang) : fmt$(pnl)}
+          {isOpen ? labelFor("status", "OPEN", lang) : fmt$(pnl, currencyOf(trade))}
         </span>
         {!isOpen && rMultiple != null && (
           <span className={`text-[11px] ${rColorClass}`}>{fmtR(rMultiple)}</span>

@@ -9,6 +9,9 @@
     "totalPnL": 0,
     "totalWin": 0,
     "totalLoss": 0,
+    "pnlByCurrency": {},
+    "currencies": [],
+    "mixedCurrency": false,
     "winRate": 0,
     "lossRate": 0,
     "beRate": 0,
@@ -66,6 +69,13 @@
     "totalPnL": 230,
     "totalWin": 510,
     "totalLoss": 280,
+    "pnlByCurrency": {
+      "USD": 230
+    },
+    "currencies": [
+      "USD"
+    ],
+    "mixedCurrency": false,
     "winRate": 62.5,
     "lossRate": 37.5,
     "beRate": 0,
@@ -537,6 +547,13 @@
     "totalPnL": 50,
     "totalWin": 400,
     "totalLoss": 350,
+    "pnlByCurrency": {
+      "USD": 50
+    },
+    "currencies": [
+      "USD"
+    ],
+    "mixedCurrency": false,
     "winRate": 33.33333333333333,
     "lossRate": 33.33333333333333,
     "beRate": 33.33333333333333,
@@ -902,6 +919,13 @@
     "totalPnL": 300,
     "totalWin": 600,
     "totalLoss": 300,
+    "pnlByCurrency": {
+      "USD": 300
+    },
+    "currencies": [
+      "USD"
+    ],
+    "mixedCurrency": false,
     "winRate": 60,
     "lossRate": 40,
     "beRate": 0,
@@ -1232,6 +1256,13 @@
     "totalPnL": 100,
     "totalWin": 300,
     "totalLoss": 200,
+    "pnlByCurrency": {
+      "USD": 100
+    },
+    "currencies": [
+      "USD"
+    ],
+    "mixedCurrency": false,
     "winRate": 66.66666666666666,
     "lossRate": 33.33333333333333,
     "beRate": 0,
@@ -1481,6 +1512,13 @@
     "totalPnL": 0,
     "totalWin": 200,
     "totalLoss": 200,
+    "pnlByCurrency": {
+      "USD": 0
+    },
+    "currencies": [
+      "USD"
+    ],
+    "mixedCurrency": false,
     "winRate": 50,
     "lossRate": 50,
     "beRate": 0,

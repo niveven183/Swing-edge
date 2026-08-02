@@ -113,21 +113,34 @@ export const validateTradeInputs = (entry, stop, target, side) => {
 // the number's color and its printed sign can never disagree.
 export const isNegativeValue = (n) => n < 0 || Object.is(n, -0);
 
+// The symbol is derived here and nowhere else. A hard-coded "$" in JSX is how a
+// shekel trade came to be printed as dollars.
+export const CURRENCY_SYMBOL = { USD: "$", ILS: "₪" };
+
+// A trade without a currency predates the column and is a dollar trade — the
+// migration's `default 'USD'` says the same thing on the server side.
+export const currencyOf = (trade) =>
+  CURRENCY_SYMBOL[trade?.currency] ? trade.currency : "USD";
+
 // Signed money display. The second trap: `NaN >= 0` is false, so a blown-up
 // metric fell into the negative branch and rendered as "-$NaN".
-const money = (n, digits) => {
+const money = (n, digits, currency) => {
   if (!Number.isFinite(n)) return "—";
-  return `${isNegativeValue(n) ? "-" : "+"}$${Math.abs(n).toLocaleString("en-US", {
+  const sym = CURRENCY_SYMBOL[currency] || CURRENCY_SYMBOL.USD;
+  return `${isNegativeValue(n) ? "-" : "+"}${sym}${Math.abs(n).toLocaleString("en-US", {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   })}`;
 };
 
-export const fmt$ = (n) => money(n, 2);
+export const fmtMoney = (n, currency = "USD") => money(n, 2, currency);
 
-// Whole-dollar variant for tight surfaces (calendar cells, chart axes) where
+// Whole-unit variant for tight surfaces (calendar cells, chart axes) where
 // cents do not fit. The sign still lives in the text, never in the color alone.
-export const fmt$0 = (n) => money(n, 0);
+export const fmtMoney0 = (n, currency = "USD") => money(n, 0, currency);
+
+export const fmt$ = fmtMoney;
+export const fmt$0 = fmtMoney0;
 
 // Numeric field parsing at the input boundary. `0` is a value, not a blank:
 // `parseFloat(v) || null` silently turned a real MFE/MAE of 0 into "not filled
