@@ -167,10 +167,17 @@ export const findEdges = (trades, { topK = 3 } = {}) => {
 };
 
 // How well does a proposed trade idea match an existing edge?
-// Returns { matched: boolean, edge|null, score: 0..1 }.
+// Returns { edge: Edge|null, score: 0..1 } — the best overlap found.
+//
+// There is deliberately no `matched` boolean. The old one was `score >= 0.75`,
+// a threshold unreachable by construction: findEdges enumerates 2- and 3-part
+// keys only, a full match returns early with score 1, so the partial scores
+// that can physically occur are 0, 1/3, 1/2 and 2/3 — all below the bar. Any
+// consumer that needs a yes/no answer picks and documents its own threshold,
+// because the right cut-off depends on what the caller does with the answer.
 export const matchIdeaToEdge = (edgeReport, idea) => {
   if (!edgeReport || !edgeReport.edges || !edgeReport.edges.length || !idea) {
-    return { matched: false, edge: null, score: 0 };
+    return { edge: null, score: 0 };
   }
   const ideaKeyParts = new Set([
     idea.setup            && `setup:${idea.setup}`,
@@ -180,15 +187,15 @@ export const matchIdeaToEdge = (edgeReport, idea) => {
     idea.rr               && `rr:${idea.rr}`,
   ].filter(Boolean));
 
-  let best = { matched: false, edge: null, score: 0 };
+  let best = { edge: null, score: 0 };
   for (const edge of edgeReport.edges) {
     const parts = edge.key.split(" + ");
     const matches = parts.filter(p => ideaKeyParts.has(p)).length;
     if (matches === parts.length && parts.length > 0) {
-      return { matched: true, edge, score: 1 };
+      return { edge, score: 1 };
     }
     const score = parts.length ? matches / parts.length : 0;
-    if (score > best.score) best = { matched: score >= 0.75, edge, score };
+    if (score > best.score) best = { edge, score };
   }
   return best;
 };

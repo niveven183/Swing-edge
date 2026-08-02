@@ -95,41 +95,76 @@ export const rebuildFromHistory = (trades) => {
 };
 
 // ─── REPORTING ───────────────────────────────────────────────────────────────
-// Accuracy of GO / CAUTION / SKIP predictions.
+// Accuracy of the engine's GO / SKIP calls.
+//
+// CAUTION is deliberately outside the accuracy figure (FIN-037). GO and SKIP
+// are falsifiable predictions — a GO that lost was wrong. CAUTION is a hedge:
+// no outcome can contradict it, so it has no truth value to average. The old
+// code scored every CAUTION as correct, which pinned that bucket at 100% and
+// dragged the headline number up with it — a book of nothing but CAUTION
+// reported perfect accuracy.
+//
+// `accuracy` therefore reads over `scoredN`, not `n`, and `accuracyBasis`
+// names the population out loud so no caller can print the ratio without its
+// denominator (CLAUDE.md §2). CAUTION still reports `n`, `wins`/`losses` and
+// `avgR` — what happened is knowable; whether it was "right" is not.
+const SCORABLE = new Set(["GO", "SKIP"]);
+
 export const calibrationReport = () => {
   const state = readState();
   const cal = state.calibration;
-  if (!cal.length) return { n: 0, accuracy: 0, byVerdict: {} };
+  if (!cal.length) {
+    return { n: 0, scoredN: 0, accuracy: null, accuracyBasis: "GO/SKIP", byVerdict: {} };
+  }
 
   const byVerdict = {};
   for (const e of cal) {
     const v = e.verdict || "UNKNOWN";
-    if (!byVerdict[v]) byVerdict[v] = { n: 0, correct: 0, rSum: 0, rSampleSize: 0, avgR: null };
-    byVerdict[v].n += 1;
+    if (!byVerdict[v]) {
+      byVerdict[v] = {
+        n: 0, correct: 0, wins: 0, losses: 0,
+        rSum: 0, rSampleSize: 0, avgR: null, scorable: SCORABLE.has(v),
+      };
+    }
+    const b = byVerdict[v];
+    b.n += 1;
+    if (e.outcome ===  1) b.wins   += 1;
+    if (e.outcome === -1) b.losses += 1;
     // A GO is "correct" when the trade won; a SKIP is "correct" when it lost.
-    const correct =
-      (v === "GO"      && e.outcome ===  1) ||
-      (v === "SKIP"    && e.outcome === -1) ||
-      (v === "CAUTION" && true);
-    if (correct) byVerdict[v].correct += 1;
+    if (b.scorable && ((v === "GO" && e.outcome === 1) || (v === "SKIP" && e.outcome === -1))) {
+      b.correct += 1;
+    }
     // The log stores `r: null` for trades where R was never measurable. Those
     // entries still count toward accuracy — the verdict was still right or
     // wrong — but they cannot enter an R average in either position.
     if (Number.isFinite(e.r)) {
-      byVerdict[v].rSum += e.r;
-      byVerdict[v].rSampleSize += 1;
+      b.rSum += e.r;
+      b.rSampleSize += 1;
     }
   }
+
+  let scoredN = 0;
+  let totalCorrect = 0;
   for (const v of Object.keys(byVerdict)) {
     const b = byVerdict[v];
     b.avgR = b.rSampleSize ? b.rSum / b.rSampleSize : null;
-    b.accuracy = b.correct / b.n;
+    if (b.scorable) {
+      b.accuracy = b.correct / b.n;
+      scoredN      += b.n;
+      totalCorrect += b.correct;
+    } else {
+      // null, not 0: an unscorable verdict has no accuracy, and 0 would read
+      // as "always wrong" exactly the way the old 1 read as "always right".
+      b.accuracy = null;
+      b.correct  = null;
+    }
   }
 
-  const totalCorrect = Object.values(byVerdict).reduce((s, x) => s + x.correct, 0);
   return {
     n: cal.length,
-    accuracy: totalCorrect / cal.length,
+    scoredN,
+    accuracy: scoredN ? totalCorrect / scoredN : null,
+    accuracyBasis: "GO/SKIP",
     byVerdict,
   };
 };

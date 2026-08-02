@@ -20,6 +20,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import { DEFAULT_CAPITAL } from "../utils.js";
+import { getClosed } from "../intelligence/utils/statisticalModels.js";
 
 // ─── i18n strings ────────────────────────────────────────────────────────────
 const STR = {
@@ -200,10 +201,12 @@ export default function GrowthPredictor({ trades = [], stats = {}, capital = 0, 
   const S = { ...STR.en, ...(STR[lang] || {}) };
   const isRTL = lang === "he" || lang === "ar";
 
-  const closedTrades = useMemo(
-    () => (trades || []).filter((t) => t.status === "CLOSED"),
-    [trades]
-  );
+  // getClosed, not a local filter: this list gates the ≥5-trade unlock and
+  // feeds monthsOfData, both of which sit beside figures the dashboard derives
+  // from the same definition. A row marked CLOSED with no exit has no realized
+  // outcome to forecast from, and counting it here unlocked the projection on
+  // evidence that does not exist.
+  const closedTrades = useMemo(() => getClosed(trades), [trades]);
 
   // Diversity check — need 2+ setups and 2+ emotions to build meaningful questions
   const hasDiversity = useMemo(() => {
@@ -263,6 +266,11 @@ export default function GrowthPredictor({ trades = [], stats = {}, capital = 0, 
   const m3 = forecastData[3]?.balance ?? effectiveCapital;
   const m12 = forecastData[12]?.balance ?? effectiveCapital;
   const m24 = forecastData[24]?.balance ?? effectiveCapital;
+  // One growth-percentage formatter for this component (FIN-015). The summary
+  // cards rounded to whole percent and the chart tooltip to a tenth, so hovering
+  // a point could read 41.6% while the card above it read 42% — the same
+  // forecast disagreeing with itself. A projection carries no precision worth a
+  // decimal place, so whole percent wins and both surfaces use this.
   const pct = (val) =>
     effectiveCapital > 0 ? (((val - effectiveCapital) / effectiveCapital) * 100).toFixed(0) : "0";
 
@@ -572,11 +580,8 @@ export default function GrowthPredictor({ trades = [], stats = {}, capital = 0, 
                 fontSize: 11,
               }}
               formatter={(v) => {
-                const change =
-                  effectiveCapital > 0
-                    ? (((v - effectiveCapital) / effectiveCapital) * 100).toFixed(1)
-                    : "0";
-                return [`${fmtUsd(v)} (${change >= 0 ? "+" : ""}${change}%)`, S.balance];
+                const change = pct(v);
+                return [`${fmtUsd(v)} (${Number(change) >= 0 ? "+" : ""}${change}%)`, S.balance];
               }}
               labelFormatter={(l) => (l === 0 ? S.fromNow : `Month ${l}`)}
             />

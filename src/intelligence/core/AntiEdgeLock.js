@@ -9,8 +9,8 @@
 //     3. If all N weeks show negative expectancy → LOCKED.
 //     4. If N-1 weeks show negative expectancy → WARNING.
 //
-// A locked setup blocks new trade entry and must be manually unlocked
-// (or auto-unlocks after one winning week).
+// A locked setup blocks new trade entry. It is released either manually, or
+// automatically once its evidence goes stale — see LOCK_STALE_WEEKS below.
 
 import { getClosed, rStats, winRate, expectedValueR } from "../utils/statisticalModels.js";
 
@@ -19,8 +19,27 @@ const WARN_WEEKS     = 3;   // weeks before soft warning
 const MIN_WEEK_TRADES = 2;  // trades needed in a week for it to "count"
 const MIN_TOTAL_N    = 8;   // minimum total trades before we evaluate a setup
 
+// How long a lock's evidence still describes today (FIN-038).
+//
+// The lock is derived from the most recent weeks that CONTAIN TRADES, and it
+// blocks entry on that setup. So once it fires, no new trade can be recorded,
+// no new week can qualify, the evidence freezes, and the setup stays locked
+// forever: the release condition required the very action the lock forbids.
+// Past this window the losing streak is history, not a description of the
+// present, so the lock steps down to a warning — the setup is still flagged,
+// but the trader is allowed to gather the evidence that settles it either way.
+const LOCK_STALE_WEEKS = 6;
+const WEEK_MS = 7 * 86_400_000;
+
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 const setupOf  = (t) => t.setup || null;
+
+const stampOf = (trade) => {
+  const raw = trade.closedAt || trade.createdAt || trade.date;
+  if (!raw) return null;
+  const ms = new Date(raw).getTime();
+  return isNaN(ms) ? null : ms;
+};
 
 const isoWeekKey = (trade) => {
   const raw = trade.closedAt || trade.createdAt || trade.date;
@@ -162,10 +181,26 @@ export const checkAntiEdgeLocks = (trades = [], nowMs = Date.now()) => {
     const negativeWeeks = weeksData.filter((w) => w.negative).length;
     const manuallyUnlocked = lockState[setup]?.unlocked === true;
 
+    // The lock's evidence is only as current as its newest trade. From that
+    // point the clock runs, and the trader can see exactly when it stops.
+    const evidenceMs = Math.max(
+      ...recentWeeks
+        .flatMap((wk) => weekMap.get(wk) || [])
+        .map(stampOf)
+        .filter((ms) => ms != null)
+    );
+    const hasEvidenceDate = Number.isFinite(evidenceMs);
+    const unlocksAtMs = hasEvidenceDate ? evidenceMs + LOCK_STALE_WEEKS * WEEK_MS : null;
+    const unlocksAt   = unlocksAtMs == null ? null : new Date(unlocksAtMs).toISOString();
+    const unlockDay   = unlocksAt == null ? null : unlocksAt.slice(0, 10);
+    const stale       = unlocksAtMs != null && nowMs > unlocksAtMs;
+
     const status = {
       setup,
       negativeWeeks,
       weeksData,
+      unlocksAt,
+      stale,
       overallAvgR: overallR.avg == null ? null : Number(overallR.avg.toFixed(2)),
       overallRSampleSize: overallR.n,
       overallWR:   Math.round(winRate(allTrades) * 100),
@@ -173,10 +208,17 @@ export const checkAntiEdgeLocks = (trades = [], nowMs = Date.now()) => {
       manuallyUnlocked,
     };
 
-    if (negativeWeeks >= LOCK_WEEKS) {
+    if (negativeWeeks >= LOCK_WEEKS && stale) {
+      // The streak is real but it is history. Keep it visible, stop blocking.
       status.message = {
-        he: `"${setup}" חסום — ${negativeWeeks} שבועות רצופים עם expectancy שלילי. לא מומלץ לסחור עד לבדיקה.`,
-        en: `"${setup}" is locked — ${negativeWeeks} consecutive weeks of negative expectancy. Review before trading.`,
+        he: `"${setup}" — ${negativeWeeks} שבועות שליליים, אך הנתונים התיישנו (מאז ${unlockDay}). החסימה הוסרה; סחור בזהירות ובגודל מוקטן.`,
+        en: `"${setup}" — ${negativeWeeks} negative weeks, but the evidence is stale (since ${unlockDay}). Lock released; trade cautiously and small.`,
+      };
+      warnings.push(status);
+    } else if (negativeWeeks >= LOCK_WEEKS) {
+      status.message = {
+        he: `"${setup}" חסום — ${negativeWeeks} שבועות רצופים עם expectancy שלילי. לא מומלץ לסחור עד לבדיקה. החסימה תוסר אוטומטית ב-${unlockDay}.`,
+        en: `"${setup}" is locked — ${negativeWeeks} consecutive weeks of negative expectancy. Review before trading. Lock lifts automatically on ${unlockDay}.`,
       };
       if (!manuallyUnlocked) {
         locked.push(status);

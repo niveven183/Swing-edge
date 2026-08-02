@@ -57,13 +57,18 @@ const consistencyScore = (trades) => {
 const edgeUtilizationScore = (trades, edgeReport) => {
   const closed = getClosed(trades);
   if (!closed.length || !edgeReport || !edgeReport.edges?.length) return 50;
+  // Threshold owned by this consumer (FIN-036). "Edge utilisation" measures
+  // how often the trader actually took the pattern that works, so a trade only
+  // counts when it reproduces the edge in full — a partial overlap is a
+  // different trade. Same behaviour as the removed `matched` flag.
+  const EDGE_MATCH_MIN = 1;
   const matched = closed.filter(t => {
     const m = matchIdeaToEdge(edgeReport, {
       setup: t.setup,
       emotionAtEntry: t.emotionAtEntry,
       marketCondition: t.marketCondition,
     });
-    return m.matched;
+    return m.score >= EDGE_MATCH_MIN;
   }).length;
   return to100(matched / closed.length);
 };

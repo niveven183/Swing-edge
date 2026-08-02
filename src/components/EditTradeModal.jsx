@@ -5,7 +5,7 @@ import InfoTooltip from "./ui/InfoTooltip.jsx";
 import SmartSelect from "./ui/SmartSelect.jsx";
 import useModalA11y from "../hooks/useModalA11y.js";
 import { getTradeSelectProps, CATEGORY_TOOLTIP } from "../data/tradeOptions.jsx";
-import { qstars, localDayKey } from "../utils.js";
+import { qstars, localDayKey, validateTradeInputs } from "../utils.js";
 import { deriveCloseState } from "../lib/tradeCloseState.js";
 
 const EXIT_REASONS = ["Hit Target", "Hit Stop", "Manual Exit", "Trailing Stop", "Other"];
@@ -47,7 +47,7 @@ export default function EditTradeModal({ trade, lang, onClose, onSave }) {
   function validate() {
     const sharesN = Number(form.shares);
     const entryN = Number(form.entry);
-    const stopN = Number(form.stop);
+    const stopN = form.stop === "" || form.stop == null ? null : Number(form.stop);
     const targetN = form.target === "" ? null : Number(form.target);
     const exitN = form.exit === "" || form.exit == null ? null : Number(form.exit);
 
@@ -57,7 +57,11 @@ export default function EditTradeModal({ trade, lang, onClose, onSave }) {
     if (!Number.isFinite(entryN) || entryN <= 0) {
       return isHe ? "מחיר כניסה חייב להיות גדול מ-0" : "Entry price must be greater than 0";
     }
-    if (!Number.isFinite(stopN) || stopN <= 0) {
+    // A stop is optional — a trade without one is legal (import decision #1),
+    // and requiring it here meant a trade that never had a stop could not be
+    // edited at all: `Number("")` is 0, so the old `stopN <= 0` rejected the
+    // save before the user could so much as fix a typo in the notes.
+    if (stopN != null && (!Number.isFinite(stopN) || stopN <= 0)) {
       return isHe ? "Stop חייב להיות גדול מ-0" : "Stop must be greater than 0";
     }
     if (targetN != null && (!Number.isFinite(targetN) || targetN <= 0)) {
@@ -68,6 +72,15 @@ export default function EditTradeModal({ trade, lang, onClose, onSave }) {
     }
     if (!form.date) {
       return isHe ? "חובה לבחור תאריך כניסה" : "Entry date is required";
+    }
+    // Same geometry validator that guards Log New Trade and import, gated on
+    // the same condition as normalizeRow.js — a stop only has a side when it
+    // exists. Editing used to check positivity and nothing else, so a LONG
+    // could be saved with its stop above entry: a "risk" that is really a
+    // guaranteed loss, and an R multiple with its sign inverted.
+    if (stopN != null && stopN > 0) {
+      const v = validateTradeInputs(entryN, stopN, targetN, form.side);
+      if (!v.valid) return isHe ? v.reason.he : v.reason.en;
     }
     return null;
   }
@@ -83,7 +96,10 @@ export default function EditTradeModal({ trade, lang, onClose, onSave }) {
       side: form.side,
       date: form.date,
       entry: Number(form.entry),
-      stop: Number(form.stop),
+      // null, not 0: a blank stop means "no stop was set", and `Number("")`
+      // would store a 0 that reads downstream as a real price — an infinite
+      // risk distance and an R multiple computed against it.
+      stop: form.stop === "" || form.stop == null ? null : Number(form.stop),
       target: form.target === "" ? null : Number(form.target),
       shares: Number(form.shares),
       setup: form.setup,

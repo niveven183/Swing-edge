@@ -1956,6 +1956,15 @@ export default function SwingEdge() {
     [stats.currentEquity, openPnL]
   );
 
+  // The equity card's trend must be the return on the equity the card is
+  // showing (FIN-013). It used to read `totalPnL / capital`, which is the
+  // closed-only return, so with an open position the headline moved and the
+  // percentage beside it did not — two different portfolios in one card.
+  const curEquityReturnPct = useMemo(
+    () => (capital > 0 ? ((curEquity - capital) / capital) * 100 : 0),
+    [curEquity, capital]
+  );
+
   // Daily P&L calculation
   const dailyPnL = useMemo(() => {
     const today = localDayKey(new Date());
@@ -3381,7 +3390,7 @@ export default function SwingEdge() {
             )}
             {/* KPI Row */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              <StatCard anchor="equity" label={t.accountEquity}  value={`$${curEquity.toLocaleString("en-US", {minimumFractionDigits:0})}`} sub={`${t.startedAt} $${capital.toLocaleString()}`} trend={totalPnL/capital*100} icon={DollarSign} accent="cyan"
+              <StatCard anchor="equity" label={t.accountEquity}  value={`$${curEquity.toLocaleString("en-US", {minimumFractionDigits:0})}`} sub={`${t.startedAt} $${capital.toLocaleString()}`} trend={curEquityReturnPct} icon={DollarSign} accent="cyan"
                 info={lang === "he"
                   ? `הון = בסיס ההון שהגדרת ($${capital.toLocaleString()}) בתוספת P&L מצטבר מעסקאות סגורות ופתוחות. הסיכון לכל עסקה מחושב תמיד מבסיס ההון הקבוע — לא מההון הנוכחי.`
                   : `Equity = your capital base ($${capital.toLocaleString()}) plus cumulative P&L from closed & open trades. Per-trade risk is always sized from your fixed capital base — not current equity.`} />

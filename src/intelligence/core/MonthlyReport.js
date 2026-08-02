@@ -12,7 +12,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { isFollowedPlan, isOffPlan, localDayKey } from "../../utils.js";
-import { edgeScore } from "../utils/statisticalModels.js";
+import { edgeScore, getClosed, outcomeRates } from "../utils/statisticalModels.js";
 import { getSetupActionKnowledge } from "../knowledgeGlue.js";
 
 const DOW = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -66,21 +66,27 @@ function enrich(t, calcMetrics) {
 // Core numeric summary for a set of enriched trades.
 function summarize(list) {
   const n = list.length;
-  if (n === 0) return { totalTrades: 0, wins: 0, losses: 0, winRate: 0, netPnL: 0, avgR: null, rSampleSize: 0, rValues: [] };
-  let wins = 0, net = 0, rSum = 0;
+  if (n === 0) {
+    return { totalTrades: 0, wins: 0, losses: 0, breakEven: 0, winRate: 0, netPnL: 0, avgR: null, rSampleSize: 0, rValues: [] };
+  }
+  let net = 0, rSum = 0;
   // Only measurable R enters `rValues` — it feeds the consistency term of the
   // grade, and a synthetic 0 there reads as a perfectly repeatable outcome.
   const rValues = [];
   for (const e of list) {
-    if (e.win) wins++;
     net += e.pnl;
     if (e.r != null) { rSum += e.r; rValues.push(e.r); }
   }
+  // Three buckets, one rule (T3 · decision 2). `losses: n - wins` counted every
+  // scratch as a loss, so a flat month read worse here than on the dashboard
+  // that the same user was looking at.
+  const rates = outcomeRates(list, (e) => e.pnl);
   return {
     totalTrades: n,
-    wins,
-    losses: n - wins,
-    winRate: round((wins / n) * 100),
+    wins:      rates.wins.length,
+    losses:    rates.losses.length,
+    breakEven: rates.be.length,
+    winRate: round(rates.winRate * 100),   // scale boundary
     netPnL: round(net, 2),
     avgR: rValues.length ? round(rSum / rValues.length, 2) : null,
     rSampleSize: rValues.length,
@@ -156,8 +162,7 @@ function computeGrade(sum, disciplineRatio) {
 
 // ── MAIN ─────────────────────────────────────────────────────────────────────
 export function generateMonthlyReport(trades, month, year, calcMetrics) {
-  const all = (trades || []).filter(t => t && t.status === "CLOSED");
-  const enrichedAll = all.map(t => enrich(t, calcMetrics));
+  const enrichedAll = getClosed(trades).map(t => enrich(t, calcMetrics));
 
   const cur = enrichedAll.filter(e => e.date && e.date.getMonth() === month && e.date.getFullYear() === year);
 
@@ -181,7 +186,7 @@ export function generateMonthlyReport(trades, month, year, calcMetrics) {
       period,
       hasEnoughData: false,
       minTrades: MIN_TRADES,
-      summary: { totalTrades: cur.length, wins: sum.wins, losses: sum.losses, winRate: sum.winRate, netPnL: sum.netPnL, avgR: sum.avgR, rSampleSize: sum.rSampleSize },
+      summary: { totalTrades: cur.length, wins: sum.wins, losses: sum.losses, breakEven: sum.breakEven, winRate: sum.winRate, netPnL: sum.netPnL, avgR: sum.avgR, rSampleSize: sum.rSampleSize },
     };
   }
 
@@ -336,6 +341,7 @@ export function generateMonthlyReport(trades, month, year, calcMetrics) {
     totalTrades: sum.totalTrades,
     wins: sum.wins,
     losses: sum.losses,
+    breakEven: sum.breakEven,
     winRate: sum.winRate,
     netPnL: sum.netPnL,
     avgR: sum.avgR,
@@ -370,7 +376,7 @@ export function generateMonthlyReport(trades, month, year, calcMetrics) {
 // Returns { month, year } of the month with the most CLOSED trades — used by the
 // ?testReport=1 QA shortcut so the modal can be exercised regardless of today's date.
 export function findBestMonth(trades, calcMetrics) {
-  const all = (trades || []).filter(t => t && t.status === "CLOSED").map(t => enrich(t, calcMetrics));
+  const all = getClosed(trades).map(t => enrich(t, calcMetrics));
   const counts = new Map();
   for (const e of all) {
     if (!e.date) continue;

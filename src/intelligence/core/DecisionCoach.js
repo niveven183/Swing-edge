@@ -446,7 +446,13 @@ export const coachTrade = ({ form, trades = [], dna = null, edges = null, regime
   // Edge match + anti-edge match
   const edgeMatch     = edges ? matchIdeaToEdge(edges, idea)     : null;
   const antiEdgeMatch = edges ? matchIdeaToAntiEdge(edges, idea) : null;
-  if (edgeMatch && edgeMatch.matched) {
+  // Threshold owned by this consumer (FIN-036). A +10 "matches your top edge"
+  // bullet claims the idea IS the edge, so nothing short of every dimension
+  // lining up earns it — a 2-of-3 overlap is a different pattern wearing a
+  // similar name. This is also the exact behaviour the removed `matched` flag
+  // produced, since its 0.75 bar was only ever cleared by a full match.
+  const EDGE_MATCH_MIN = 1;
+  if (edgeMatch && edgeMatch.score >= EDGE_MATCH_MIN) {
     checks.push({
       id: "edge", icon: "🎯", kind: "go", weight: 10,
       text: {

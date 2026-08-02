@@ -11,6 +11,7 @@ import { CalendarCheck, TrendingUp, Target, Flame, AlertTriangle, Sparkles, Hash
 import { useTradingStats } from "../hooks/useTradingStats.js";
 import { realizedAt } from "../utils.js";
 import { SwingEdgeAI } from "../intelligence/SwingEdgeAI.js";
+import { edgeScore } from "../intelligence/utils/statisticalModels.js";
 import { supabase, isSupabaseConfigured } from "../supabaseClient.js";
 
 const PANEL =
@@ -59,12 +60,21 @@ export default function WeeklyReviewTab({ trades, capital, calcMetrics, authUser
   const wStats = useTradingStats(weekly, capital, calcMetrics);
   const edges = useMemo(() => SwingEdgeAI.getEdges(weekly), [weekly]);
 
-  // best/worst setup from the engine breakdown (min sample 2 to avoid noise).
+  // Best/worst setup from the engine breakdown (min sample 2 to avoid noise),
+  // ranked by the canonical edgeScore rather than raw win rate (FIN-017).
+  // Raw win rate let a 2-for-2 fluke outrank a proven setup and, worse, called
+  // a setup "best" here while the Dashboard and Monthly Report — which already
+  // rank on edgeScore — named a different one. Wilson discounts the small
+  // sample and expectancy breaks ties on size, not just frequency.
   const { bestSetup, worstSetup } = useMemo(() => {
     const setups = (wStats.bySetup || []).filter((s) => s.count >= 2 && s.name !== "Unknown");
     if (!setups.length) return { bestSetup: null, worstSetup: null };
-    const byWin = [...setups].sort((a, b) => b.winRate - a.winRate || b.totalPnL - a.totalPnL);
-    return { bestSetup: byWin[0], worstSetup: byWin[byWin.length - 1] };
+    const ranked = [...setups].sort(
+      (a, b) =>
+        edgeScore(b.wins, b.count, b.avgR ?? 0) - edgeScore(a.wins, a.count, a.avgR ?? 0) ||
+        b.totalPnL - a.totalPnL
+    );
+    return { bestSetup: ranked[0], worstSetup: ranked[ranked.length - 1] };
   }, [wStats.bySetup]);
 
   const topEdge = edges.topEdge;
