@@ -513,6 +513,7 @@ BE, ונעלמת **בהצהרה** ולא בשקט.
   | `api.emailjs.com` | `FeedbackTab.jsx:189` דרך הבאנדל — **פספוס ב-grep הסטטי** |
   | `challenges.cloudflare.com` | Turnstile — script + iframe |
   | `s3.tradingview.com` · `www.tradingview.com` | `TradingViewWidgets.jsx:3` + iframe שהוידג'ט מזריק |
+  | `s.tradingview.com` · `www.tradingview-widget.com` | **מדידת ריצה בלבד** — ראה ההפרה שנתפסה למטה |
   | `va.vercel-scripts.com` · `vitals.vercel-insights.com` | Vercel Analytics — script + beacon |
   | `www.googletagmanager.com` · `*.google-analytics.com` | GA4, `index.html` |
   | `fonts.googleapis.com`/`gstatic` · `api.fontshare.com`/`cdn.fontshare.com` | `index.html` + ה-CSS ש-fontshare מחזיר |
@@ -521,6 +522,18 @@ BE, ונעלמת **בהצהרה** ולא בשקט.
 
   ⚠️ **אין `report-uri`** — הפרות נראות בקונסולת הדפדפן בלבד. הוספת endpoint
   לדיווח היא משטח תקיפה חדש; ההליכה הידנית על המסכים היא מנגנון האיסוף
+- ✅ **הפרת `frame-src` שנתפסה ב-Report Mode ותוקנה (02.08).** ההליכה על המסכים
+  החזירה 3 הפרות (2 hosts), כולן `frame-src`, כולן בלוח הבקרה: `s.tradingview.com`
+  (×2) ו-`www.tradingview-widget.com`. הסיבה: `s3.tradingview.com` הוא ה-host של
+  ה**סקריפט**; ה-iframe שהוא מזריק מגיע מ-`s.tradingview.com` (בלי 3) ומקנן בתוכו
+  frame שני מ-`tradingview-widget.com`. **שני ה-hosts אינם קיימים בקוד המקור ולא
+  בבאנדל** — grep סטטי מחזיר רק `s3.` ו-`www.` — ורק מדידת ריצה תפסה אותם.
+  אלמלא Report Mode, אכיפה הייתה משתקת את סרט הטיקרים בשקט. תוקן ב-`vercel.json`
+- ⚠️ **כיסוי CSP ל-`api.emailjs.com` ולמסלול ה-OCR אומת ב-probe, לא בשליחה
+  אמיתית.** בהליכת שלב ב' לא נשלח פידבק אמיתי (מייל + שורת פרודקשן) ולא הורץ OCR
+  אמיתי (עלות קריאה); הכיסוי הוכח דרך ה-origin בבאנדל + `fetch(...,{mode:'no-cors'})`
+  ו-probes ל-`data:`/`blob:`. **לאמת בשליחה אחת בכוונה אחרי אכיפת ה-CSP** — probe
+  מוכיח שה-host מותר, לא שהזרימה המלאה עוברת
 - ⏭️ **CSP אוכף** — פרומפט נפרד, רק אחרי שדוח ה-Report-Only ריק
 - ⚠️ **`redeem_mentor_invite` ללא throttle על ניסיונות.** קוד בן 8 תווים
   מאלפבית של 30 (≈6.6·10¹¹), אך זהו **מסלול הקריאה החוצה-משתמש היחיד ל-`trades`**.
