@@ -1,11 +1,14 @@
 name: Email Campaign
 
-# Manual, opt-in marketing sender. Sends ONLY to approved waitlist rows
-# (waitlist.approved_at IS NOT NULL) and dedups against public.email_campaign_log
-# so nobody gets the same campaign twice. dry_run defaults to TRUE and limit
-# defaults to 10 — a real send is a deliberate, low-ceiling action. Read-only on
-# waitlist; the only writes are one row per send into email_campaign_log. No
-# email address is ever printed in full; SMTP secrets never echoed.
+# Manual, opt-in sender. `audience` picks the recipient set and defaults to
+# waitlist_approved (waitlist.approved_at IS NOT NULL) — the original behaviour.
+# registered_users targets account holders (auth.users) instead: the two barely
+# overlap, so a product-update note to users must NOT go to the waitlist. Either
+# way the send dedups against public.email_campaign_log so nobody gets the same
+# campaign twice. dry_run defaults to TRUE and limit defaults to 10 — a real send
+# is a deliberate, low-ceiling action. Read-only on both audience tables; the only
+# writes are one row per send into email_campaign_log. No email address is ever
+# printed in full; SMTP secrets never echoed.
 #
 # The email_campaign_log table is created by a migration the operator runs
 # manually. Until then, the fetch below degrades to a clear ::warning and a
@@ -18,6 +21,13 @@ on:
         description: "Campaign key (matches template + dedup ledger)"
         required: true
         default: waitlist_launch
+      audience:
+        description: "Who to send to"
+        type: choice
+        options:
+          - waitlist_approved
+          - registered_users
+        default: waitlist_approved
       subject:
         description: "Email subject line"
         required: true
@@ -75,20 +85,28 @@ jobs:
           [ "$fail" = "0" ] || exit 1
           echo "guard ok · limit=$LIMIT · template=$TEMPLATE"
 
-      - name: Fetch approved recipients (read-only, deduped)
+      - name: Fetch recipients (read-only, deduped)
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           CAMPAIGN: ${{ inputs.campaign }}
           LIMIT: ${{ inputs.limit }}
+          AUDIENCE: ${{ inputs.audience }}
         run: |
           set -uo pipefail
           set +e                     # runner injects `bash -e`; disable so a degradable failure doesn't abort
           # SQL fed via stdin (not -c): psql only interpolates :'var' for script
           # input, so campaign/lim bind safely instead of string-concat.
+          #
+          # `audience` selects between two FIXED heredocs — it is never spliced
+          # into SQL text. An unknown value exits 1 rather than falling through
+          # to some default audience: silently mailing the wrong list is the one
+          # failure this workflow must never have.
           : > recipients.txt
-          psql -v ON_ERROR_STOP=1 -tAq \
-            -v campaign="$CAMPAIGN" -v lim="$LIMIT" \
-            "$SUPABASE_DB_URL" > recipients.txt 2>/tmp/fetcherr <<'SQLEOF'
+          case "$AUDIENCE" in
+            waitlist_approved)
+              psql -v ON_ERROR_STOP=1 -tAq \
+                -v campaign="$CAMPAIGN" -v lim="$LIMIT" \
+                "$SUPABASE_DB_URL" > recipients.txt 2>/tmp/fetcherr <<'SQLEOF'
           SET default_transaction_read_only = on;
           SELECT email FROM public.waitlist w
           WHERE w.approved_at IS NOT NULL
@@ -99,6 +117,33 @@ jobs:
           ORDER BY w.approved_at ASC
           LIMIT :lim;
           SQLEOF
+              ;;
+            registered_users)
+              # Everyone holding an account. Deleted, banned and unconfirmed rows
+              # are excluded, and so are the reserved TLDs (RFC 6762 `.local` and
+              # friends) that seed/test accounts use — SMTP hard-fails on those,
+              # so including them would manufacture a guaranteed `failed` row.
+              psql -v ON_ERROR_STOP=1 -tAq \
+                -v campaign="$CAMPAIGN" -v lim="$LIMIT" \
+                "$SUPABASE_DB_URL" > recipients.txt 2>/tmp/fetcherr <<'SQLEOF'
+          SET default_transaction_read_only = on;
+          SELECT u.email FROM auth.users u
+          WHERE u.deleted_at IS NULL
+            AND u.banned_until IS NULL
+            AND u.email_confirmed_at IS NOT NULL
+            AND u.email ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'
+            AND u.email !~* '\.(local|localhost|test|invalid|example)$'
+            AND NOT EXISTS (SELECT 1 FROM public.email_campaign_log l
+              WHERE l.campaign = :'campaign'
+                AND lower(l.email) = lower(u.email)
+                AND l.status = 'sent')
+          ORDER BY u.created_at ASC
+          LIMIT :lim;
+          SQLEOF
+              ;;
+            *)
+              echo "::error::unknown audience '$AUDIENCE' — expected waitlist_approved or registered_users"; exit 1 ;;
+          esac
           rc=$?
           if [ "$rc" -ne 0 ]; then
             err="$(head -3 /tmp/fetcherr 2>/dev/null)"     # never contains the conn string
@@ -121,6 +166,7 @@ jobs:
           SUBJECT: ${{ inputs.subject }}
           TEMPLATE: ${{ inputs.template }}
           CAMPAIGN: ${{ inputs.campaign }}
+          AUDIENCE: ${{ inputs.audience }}
         run: |
           set -uo pipefail
           set +e
@@ -129,7 +175,7 @@ jobs:
             lp="${e%@*}"; dom="${e#*@}"
             printf '%s***@%s' "$(printf '%s' "$lp" | cut -c1-2)" "$dom"
           }
-          echo "📧 Email Campaign (DRY RUN) — campaign=$CAMPAIGN"
+          echo "📧 Email Campaign (DRY RUN) — campaign=$CAMPAIGN · audience=$AUDIENCE"
           echo "נמענים בתור: ${RCPT_COUNT:-0}"
           if [ "${RCPT_COUNT:-0}" -gt 0 ]; then
             echo "דוגמאות (ממוסך):"
@@ -238,23 +284,44 @@ jobs:
           DISCORD_WEBHOOK: ${{ secrets.SENTINEL_DISCORD_WEBHOOK }}
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           CAMPAIGN: ${{ inputs.campaign }}
+          AUDIENCE: ${{ inputs.audience }}
         run: |
           set -uo pipefail
           set +e
           stamp="$(date -u '+%Y-%m-%d %H:%M UTC')"
-          # remaining = approved rows not yet logged as sent (SQL via stdin so :'var' binds)
-          remaining="$(psql -v ON_ERROR_STOP=1 -tAq -v campaign="$CAMPAIGN" "$SUPABASE_DB_URL" 2>/dev/null <<'SQLEOF'
+          # remaining = rows in THIS run's audience not yet logged as sent. The
+          # predicate must mirror the fetch step exactly, or the report counts a
+          # different population than the one that was mailed.
+          case "$AUDIENCE" in
+            waitlist_approved)
+              cat > /tmp/remaining.sql <<'SQLEOF'
           SET default_transaction_read_only = on;
           SELECT count(*) FROM public.waitlist w
           WHERE w.approved_at IS NOT NULL
             AND NOT EXISTS (SELECT 1 FROM public.email_campaign_log l
               WHERE l.campaign = :'campaign' AND lower(l.email)=lower(w.email) AND l.status='sent');
           SQLEOF
-          )"
+              ;;
+            registered_users)
+              cat > /tmp/remaining.sql <<'SQLEOF'
+          SET default_transaction_read_only = on;
+          SELECT count(*) FROM auth.users u
+          WHERE u.deleted_at IS NULL
+            AND u.banned_until IS NULL
+            AND u.email_confirmed_at IS NOT NULL
+            AND u.email ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'
+            AND u.email !~* '\.(local|localhost|test|invalid|example)$'
+            AND NOT EXISTS (SELECT 1 FROM public.email_campaign_log l
+              WHERE l.campaign = :'campaign' AND lower(l.email)=lower(u.email) AND l.status='sent');
+          SQLEOF
+              ;;
+            *) : > /tmp/remaining.sql ;;
+          esac
+          remaining="$(psql -v ON_ERROR_STOP=1 -tAq -v campaign="$CAMPAIGN" "$SUPABASE_DB_URL" < /tmp/remaining.sql 2>/dev/null)"
           [ -n "$remaining" ] || remaining="?"
 
-          desc="$(printf '📧 Email Campaign — %s\n• נשלחו: %s\n• נכשלו: %s\n• נותרו בתור: %s\nנבדק: %s' \
-            "$CAMPAIGN" "${SENT:-0}" "${FAILED:-0}" "$remaining" "$stamp")"
+          desc="$(printf '📧 Email Campaign — %s (%s)\n• נשלחו: %s\n• נכשלו: %s\n• נותרו בתור: %s\nנבדק: %s' \
+            "$CAMPAIGN" "$AUDIENCE" "${SENT:-0}" "${FAILED:-0}" "$remaining" "$stamp")"
 
           if [ -z "${DISCORD_WEBHOOK:-}" ]; then
             echo "::warning::SENTINEL_DISCORD_WEBHOOK not set — skipping Discord."
