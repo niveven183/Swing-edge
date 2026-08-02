@@ -173,6 +173,42 @@ const ibiFifoWb = XLSX.utils.book_new();
 XLSX.utils.book_append_sheet(ibiFifoWb, XLSX.utils.aoa_to_sheet(ibiFifoAoa), "תנועות");
 w("ibi-fifo.xlsx", XLSX.write(ibiFifoWb, { type: "buffer", bookType: "xlsx" }));
 
+// 11c) IBI export built for T9: an agorot-quoted TASE security and a
+// dollar-quoted one in the SAME file, plus the three pseudo-securities IBI
+// books as ordinary buys/sells. Every value here is arithmetically consistent
+// with the two ratios the importer uses, so the fixture proves the derivation
+// rather than hard-coding its answer:
+//   currency = |שווי כולל בש"ח| / |שווי במטבע|          (1 = ILS, ~3.6 = USD)
+//   unit     = |שווי במטבע| / (|כמות| × |שער|)          (1 = major, 0.01 = agorot)
+// מזרחי: quoted 12000 agorot = 120 ₪ · 100 × 120 = 12,000 ₪, ratio 0.01
+// NFLX:  quoted 77.79 $      · 20 × 77.79 = 1,555.80 $ × 3.6 = 5,600.88 ₪
+const ibiRowFull = (name, id, action, qty, rate, valueFx, valueIls, date) =>
+  [name, id, action, qty, rate, valueFx, valueIls, date, date, 25, 0];
+
+const ibiCurrencyAoa = [
+  blank11(),
+  ["תנועות היסטוריות", "", "", "", "", "", "", "", "", "", ""],
+  blank11(),
+  IBI_HEADERS,
+  ibiRowFull("מזרחי טפחות", 695437, "קנייה", 100, 12000, 12000, 12000, "05/01/2026"),
+  ibiRowFull("NFLX US", 1100004, "קנייה", 20, 77.79, 1555.8, 5600.88, "06/01/2026"),
+  ibiRowFull("מזרחי טפחות", 695437, "מכירה", -100, 13000, 13000, 13000, "09/01/2026"),
+  ibiRowFull("NFLX US", 1100004, "מכירה", -20, 90, 1800, 6480, "10/01/2026"),
+  // Booked as a buy of a security called "מס ששולם" at a par rate of 100. The
+  // action verb is a genuine קנייה, so only the name tells it apart — and its
+  // unit ratio is 666.94 / (666.94 × 100) = 0.01, indistinguishable from a
+  // legitimate agorot quote. Two independent gates, one on the unit and one on
+  // the identity of the security.
+  ibiRowFull("מס ששולם", "", "קנייה", 666.94, 100, 666.94, 666.94, "31/01/2026"),
+  ibiRowFull("זיכוי מס", "", "מכירה", -193.3, 100, 193.3, 193.3, "31/03/2026"),
+  ibiRowFull("B USD/ILS 3.170", "", "קנייה", 1000, 317.02, 3170.2, 3170.2, "11/01/2026"),
+  // Already stopped by the action whitelist — kept so both gates run on one file.
+  ibiRowFull("מזרחי טפחות", 695437, "דיבידנד - תשלום", 100, 0.5, 50, 50, "12/01/2026"),
+];
+const ibiCurWb = XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(ibiCurWb, XLSX.utils.aoa_to_sheet(ibiCurrencyAoa), "תנועות");
+w("ibi-currency.xlsx", XLSX.write(ibiCurWb, { type: "buffer", bookType: "xlsx" }));
+
 // 12) Altshuler export. Header on row 1, quantity positive on sells too, and a
 // foreign security whose symbol hides in the *name* column while the symbol
 // column sits empty.
@@ -189,6 +225,18 @@ w("altshuler-full.csv",
 11/02/2026,דיבדנד,NFLX US,,0,0,$,0,0,12,43,7613,0
 12/02/2026,ריבית מזומן בשח,,,0,0,₪,0,0,3,3,7616,0
 13/02/2026,העברה מזומן בשח,,,0,0,₪,0,0,5,5,7621,0
+`);
+
+// 12b) Altshuler, T9: the same mixed-currency proof on the other profile, where
+// the currency is read from the `מטבע` column instead of being derived. The
+// Israeli security is quoted in agorot (4000 = 40 ₪), the foreign one in
+// dollars, and `תמורה במט"ח` is what makes each unit ratio checkable.
+w("altshuler-agorot.csv",
+`תאריך,סוג פעולה,שם נייר,מס' נייר / סימבול,כמות,שער ביצוע,מטבע,עמלת פעולה,עמלות נלוות,תמורה במט"ח,תמורה בשקלים,יתרה שקלית,אומדן מס רווחי הון
+03/02/2026,קניה רצף,בנק לאומי,604611,30,4000,₪,2,0,-1200,-1200,5000,0
+04/02/2026,קניה חול מטח,NFLX US,,12,25.5,$,1,0,-306,-1100,3900,0
+05/02/2026,מכירה רצף,בנק לאומי,604611,30,4500,₪,2,0,1350,1350,5250,20
+06/02/2026,מכירה חול מטח,NFLX US,,12,30,$,1,0,360,1300,6550,50
 `);
 
 // 13) Declared-generic file: must match no profile and travel the old road.
