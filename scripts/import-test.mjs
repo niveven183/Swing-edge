@@ -10,7 +10,9 @@ import { parseCSV, parseXLSX } from "../src/import/parseFile.js";
 import { detectColumns } from "../src/import/detectColumns.js";
 import { buildImport } from "../src/import/buildImport.js";
 import { normalizeRow } from "../src/import/normalizeRow.js";
-import { detectProfile, applyProfile } from "../src/import/brokerProfiles.js";
+import {
+  detectProfile, applyProfile, isTradeAction, nonSecurityKind, unitDivisor,
+} from "../src/import/brokerProfiles.js";
 import { normalizeSide } from "../src/import/synonyms.js";
 import { fifoMatch } from "../src/import/fifoMatch.js";
 
@@ -68,6 +70,7 @@ const runProfile = (file, opts = {}) => {
     capital: 2500,
     sideResolver: applied.sideResolver,
     tickerResolver: applied.tickerResolver,
+    unitResolver: applied.unitResolver,
     skipped: applied.skipped,
     skippedByKind: applied.skippedByKind,
     ...opts,
@@ -275,9 +278,16 @@ console.log("test:import — pipeline over 14 fixtures\n");
 //     the resolvers existed — same result keys, same trade shape.
 {
   console.log("15) normalizeRow shape frozen without resolvers");
-  const TRADE_KEYS = "id,ticker,date,createdAt,side,entry,stop,target,exit,shares,status,setup,notes," +
+  // The pre-T9 shape, kept verbatim. T9 adds exactly one key — `currency`, the
+  // additive column of migration 20260802140000 — and the expected shape below
+  // is *derived* from this string rather than retyped, so any second change to
+  // the trade shape still fails this gate.
+  const TRADE_KEYS_PRE_T9 = "id,ticker,date,createdAt,side,entry,stop,target,exit,shares,status,setup,notes," +
     "marketCondition,emotionAtEntry,entryQuality,tradeImage,exitReason,followedPlan,lessonLearned," +
     "maxFavorable,maxAdverse,closedAt,_capitalAtEntry,_prediction,isDemo";
+  const TRADE_KEYS = TRADE_KEYS_PRE_T9.replace("side,", "side,currency,");
+  check("T9 adds exactly one key",
+    TRADE_KEYS.split(",").length - TRADE_KEYS_PRE_T9.split(",").length, 1);
   for (const f of ["en-standard.csv", "he-semicolon.csv", "bad-rows.csv"]) {
     const { headers, rows } = parseCSV(readFileSync(join(FIX, f), "utf8"));
     const det = detectColumns(headers, rows);
@@ -639,9 +649,132 @@ const near = (name, actual, expected) => {
   near("widget total pnl", widget.reduce((s, t) => s + pnl(t), 0), 700);
 }
 
+// ── T9: currency and unit ───────────────────────────────────────────────────
+
+// 29) The second gate. `מס ששולם` is booked by IBI as a *buy* at a par rate of
+//     100, so it passes the action whitelist exactly as a real purchase does.
+//     Nine such rows reached a live account. The gate keys on the security name
+//     because that is where the distinction lives.
+{
+  console.log("29) second gate — pseudo-securities are not trades");
+  check("מס ששולם", nonSecurityKind("מס ששולם"), "תנועת מס");
+  check("זיכוי מס", nonSecurityKind("זיכוי מס"), "תנועת מס");
+  check("מס תקבולים   26", nonSecurityKind("מס תקבולים   26"), "תנועת מס");
+  check("B USD/ILS 3.170", nonSecurityKind("B USD/ILS 3.170"), 'המרת מט"ח');
+  check("S USD/ILS 3.100", nonSecurityKind("S USD/ILS 3.100"), 'המרת מט"ח');
+  // Substring, not token — a real security keeps its place.
+  check("מסילות is a security", nonSecurityKind("מסילות בע\"מ"), null);
+  check("מספנות is a security", nonSecurityKind("מספנות ישראל"), null);
+  check("מזרחי טפחות", nonSecurityKind("מזרחי טפחות"), null);
+  check("NFLX US", nonSecurityKind("NFLX US"), null);
+  check("empty", nonSecurityKind(""), null);
+  // And the action whitelist still stands on its own: the verb of a tax row is
+  // a genuine buy, which is precisely why one gate was not enough.
+  check("the tax row's verb passes the whitelist", isTradeAction("קנייה"), true);
+}
+
+// 30) Mixed file, both gates, end to end. 8 rows: 4 trades (2 ILS + 2 USD),
+//     3 pseudo-securities, 1 dividend.
+//     מזרחי quoted 12000 agorot -> 120 ₪ ; sold 13000 -> 130 ₪
+//       pnl = (130 - 120) * 100 = 1,000 ₪
+//     NFLX  quoted 77.79 $ (unchanged) ; sold 90 $
+//       pnl = (90 - 77.79) * 20 = 244.2 $
+{
+  console.log("30) IBI mixed currency — agorot and dollars in one file");
+  const { res, applied } = runProfile("ibi-currency.xlsx", { fifo: true });
+  check("trade rows kept", applied.rows.length, 4);
+  check("rows dropped", applied.skipped.length, 4);
+  check("tax rows named", applied.skippedByKind["תנועת מס"], 2);
+  check("fx row named", applied.skippedByKind['המרת מט"ח'], 1);
+  check("dividend still caught by the action gate",
+    applied.skippedByKind["דיבידנד - תשלום"], 1);
+  check("no pseudo-security became a trade",
+    res.valid.some((t) => nonSecurityKind(t.ticker) != null), false);
+  check("rows accounted for",
+    res.counts.rejected + res.counts.skipped + res.counts.accepted, res.counts.total);
+
+  const ils = res.valid.find((t) => t.ticker === "מזרחי טפחות");
+  check("ILS currency", ils.currency, "ILS");
+  near("agorot divided by 100 — entry", ils.entry, 120);
+  near("agorot divided by 100 — exit", ils.exit, 130);
+  check("ILS shares untouched", ils.shares, 100);
+  near("ILS pnl", pnl(ils), 1000);
+
+  const usd = res.valid.find((t) => t.ticker === "NFLX");
+  check("USD currency", usd.currency, "USD");
+  near("dollar price untouched — entry", usd.entry, 77.79);
+  near("dollar price untouched — exit", usd.exit, 90);
+  near("USD pnl", pnl(usd), 244.2);
+
+  // The point of the fixture: neither security's unit leaked into the other.
+  check("two currencies in one file",
+    [...new Set(res.valid.map((t) => t.currency))].sort().join(","), "ILS,USD");
+  check("both closed", res.counts.closed, 2);
+  check("nothing left open", res.counts.open, 0);
+}
+
+// 31) Altshuler — the currency is stated, the unit is still derived.
+//     בנק לאומי 4000 agorot -> 40 ₪, sold 4500 -> 45 ₪ : (45-40)*30 = 150 ₪
+//     NFLX 25.5 $ -> 30 $ : (30-25.5)*12 = 54 $
+{
+  console.log("31) Altshuler — currency from the column, unit from arithmetic");
+  const { res, applied } = runProfile("altshuler-agorot.csv", { fifo: true });
+  check("all four rows are trades", applied.rows.length, 4);
+  check("nothing skipped", applied.skipped.length, 0);
+
+  const ils = res.valid.find((t) => t.ticker === "בנק לאומי");
+  check("ILS from the מטבע column", ils.currency, "ILS");
+  near("agorot converted", ils.entry, 40);
+  near("agorot converted on exit", ils.exit, 45);
+  near("ILS pnl", pnl(ils), 150);
+
+  const usd = res.valid.find((t) => t.ticker === "NFLX");
+  check("USD from the מטבע column", usd.currency, "USD");
+  near("dollar untouched", usd.entry, 25.5);
+  near("USD pnl", pnl(usd), 54);
+
+  // The whole altshuler-full fixture keeps working, with a currency on each row.
+  const full = runProfile("altshuler-full.csv", { fifo: true }).res;
+  check("full file still 3 closed", full.counts.closed, 3);
+  check("full file currencies",
+    [...new Set(full.valid.map((t) => t.currency))].sort().join(","), "ILS,USD");
+}
+
+// 32) The unit ratio itself, and the refusal to guess. A row that resolves to
+//     neither 1.00 nor 0.01 is rejected and named — it is never rounded to the
+//     nearer of the two.
+{
+  console.log("32) unit ratio — resolves or refuses, never guesses");
+  check("major unit", unitDivisor(1555.8, 20, 77.79), 1);
+  check("agorot", unitDivisor(12000, 100, 12000), 100);
+  check("Yitzhak's דיסקונט row", unitDivisor(14990.4, 432, 3470), 100);
+  check("negative sell", unitDivisor(-13000, -100, 13000), 100);
+  check("neither -> null", unitDivisor(500, 100, 100), null);
+  check("zero gross -> null", unitDivisor(100, 0, 50), null);
+  check("missing value -> null", unitDivisor(null, 10, 10), null);
+
+  // A generic file has no resolver: factor 1 and the account currency, exactly
+  // as it behaved before T9.
+  const generic = runCSV("en-standard.csv");
+  check("generic entry untouched", generic.res.valid[0].entry, 150);
+  check("generic defaults to USD", generic.res.valid[0].currency, "USD");
+  const ils = runCSV("en-standard.csv", { defaultCurrency: "ILS" });
+  check("account currency honoured", ils.res.valid[0].currency, "ILS");
+  check("account currency does not scale", ils.res.valid[0].entry, 150);
+
+  // And a row whose arithmetic does not resolve is rejected with a reason, not
+  // imported at some plausible-looking price.
+  const bad = normalizeRow(["X", "10", "100"], { ticker: 0, shares: 1, entry: 2 }, {
+    unitResolver: () => ({ error: "bad_unit" }),
+  });
+  check("rejected", bad.ok, false);
+  check("named", bad.code, "bad_unit");
+  check("has a Hebrew reason", typeof bad.detail?.he, "string");
+}
+
 console.log("");
 if (failures > 0) {
   console.error(`❌ test:import — ${failures} assertion(s) failed`);
   process.exit(1);
 }
-console.log("✅ test:import — all fixtures passed (28 scenarios)");
+console.log("✅ test:import — all fixtures passed (32 scenarios)");

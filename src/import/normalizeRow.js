@@ -70,6 +70,14 @@ const REASONS = {
   no_entry:  { he: "מחיר כניסה חסר/לא תקין", en: "Missing/invalid entry price" },
   no_qty:    { he: "חסרה כמות", en: "Missing quantity" },
   bad_stop:  { he: "סטופ בצד הלא נכון של הכניסה", en: "Stop on the wrong side of entry" },
+  bad_currency: {
+    he: "לא ניתן לקבוע את מטבע השורה",
+    en: "Cannot determine the row's currency",
+  },
+  bad_unit: {
+    he: "לא ניתן לקבוע אם השער נקוב בשקלים או באגורות",
+    en: "Cannot tell whether the price is quoted in shekels or agorot",
+  },
 };
 
 // mapping: { field: columnIndex }. opts: { dateFormat, capital, todayISO,
@@ -91,16 +99,26 @@ export function normalizeRow(row, mapping, opts = {}) {
   const resolvedTicker =
     typeof opts.tickerResolver === "function" ? opts.tickerResolver(row) : null;
 
+  // A TASE security is quoted in agorot and the cell does not say so, so every
+  // price on the row is divided by the same factor the broker profile derived
+  // from the row's own arithmetic. No resolver — a generic file — means factor
+  // 1 and the account's currency, exactly as it behaved before.
+  const unit = typeof opts.unitResolver === "function" ? opts.unitResolver(row) : null;
+  if (unit?.error) return { ok: false, code: unit.error, detail: REASONS[unit.error] };
+  const divisor = unit?.divisor ?? 1;
+  const currency = unit?.currency || opts.defaultCurrency || "USD";
+  const price = (v) => (v == null ? null : v / divisor);
+
   const tickerRaw = resolvedTicker ? resolvedTicker.ticker : cell("ticker");
   const ticker = String(tickerRaw ?? "").trim().toUpperCase();
-  const entry = num(cell("entry"));
+  const entry = price(num(cell("entry")));
   // When the sign of the quantity was consumed as the direction it must not be
   // read a second time as the size — otherwise every sell fails on shares <= 0.
   let shares = num(cell("shares"));
   if (resolvedSide && shares != null) shares = Math.abs(shares);
-  const stop = num(cell("stop"));
-  const target = num(cell("target"));
-  const exit = num(cell("exit"));
+  const stop = price(num(cell("stop")));
+  const target = price(num(cell("target")));
+  const exit = price(num(cell("exit")));
 
   if (!ticker) return { ok: false, code: "no_ticker", detail: REASONS.no_ticker };
   if (entry == null || entry <= 0) return { ok: false, code: "no_entry", detail: REASONS.no_entry };
@@ -131,6 +149,7 @@ export function normalizeRow(row, mapping, opts = {}) {
     date,
     createdAt: new Date(`${date}T14:30:00`).toISOString(),
     side,
+    currency,
     entry,
     stop: stop != null && stop > 0 ? stop : null,
     target: target != null && target > 0 ? target : null,

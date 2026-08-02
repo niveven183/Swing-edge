@@ -12,8 +12,9 @@ import { detectProfile, applyProfile } from "../import/brokerProfiles.js";
 // hands the parent a ready-to-persist array of trade objects via onImport.
 //
 // props:
-//   open, lang, t (translations dict), capital, existingTrades, onClose, onImport(trades)
-export default function ImportJournalModal({ open, lang, t: tr = {}, capital = 0, existingTrades = [], onClose, onImport }) {
+//   open, lang, t (translations dict), capital, accountCurrency, existingTrades,
+//   onClose, onImport(trades)
+export default function ImportJournalModal({ open, lang, t: tr = {}, capital = 0, accountCurrency = "USD", existingTrades = [], onClose, onImport }) {
   const isHe = lang === "he";
   const titleId = useId();
   const fileInputRef = useRef(null);
@@ -61,6 +62,8 @@ export default function ImportJournalModal({ open, lang, t: tr = {}, capital = 0
       dateFormat, capital, existingTrades,
       sideResolver: applied?.sideResolver,
       tickerResolver: applied?.tickerResolver,
+      unitResolver: applied?.unitResolver,
+      defaultCurrency: accountCurrency,
       skipped: applied?.skipped,
       skippedByKind: applied?.skippedByKind,
       // A broker file is a transaction log — one row per buy, one per sell — so
