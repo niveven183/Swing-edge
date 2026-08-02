@@ -242,3 +242,49 @@ Every production incident gets one short entry: what broke, root cause, fix, pre
   means accepting a restore-capability outage of up to a week, with nothing on any dashboard saying so.
 - **Prevention:** `docs/RUNBOOK.md` now carries the three-step rotation procedure inline, so the
   backup and the drill cannot be read as optional follow-ups.
+
+## #11 — 2026-08-02 — A Tel Aviv stock entered 100× too large, and the trade object had no way to say otherwise
+
+- **Symptom:** a live user (`a0556783290`) reported a **$280,000 loss on a ~50,000₪ account** after
+  importing his IBI journal. 41 trades. Every price on every Israeli row was 100× its real value,
+  and every one of them was rendered with a hard-coded `$`.
+- **Root cause — two independent defects that compounded:**
+  1. **Unit.** A TASE security is quoted in **agorot** (1/100 ₪) and the cell does not say so.
+     `normalizeRow.js:58` strips `₪ $ € £ , %` before `Number()`, by design — so the magnitude
+     entered the pipeline with no unit attached and nothing downstream could recover it.
+  2. **Currency.** `public.trades` had **no currency column at all**, and every money formatter
+     hard-coded `"$"`. Even if the unit had been right, the app could not have told the user which
+     currency he was looking at. The system did not get the answer wrong; it had no place to store one.
+- **Why no gate caught it:** every existing import guard tests *geometry* (stop vs entry vs target)
+  or *presence* (ticker, entry, qty). All of them pass on a row that is internally consistent and
+  uniformly 100× too big — the geometry of a correct trade survives multiplication by a constant.
+  There was no guard on **scale**, because scale had never been representable.
+- **Fix (`4154198`, `3e7c3f1`, `5977ba5`, `0aff647`):** the unit is now **derived from the row's own
+  arithmetic** — the ratio between the booked trade value and (rate × quantity) resolves to 1 or
+  0.01; anything else is rejected as `bad_unit` with a reason code rather than guessed. Currency
+  became an attribute of both the trade and the account, and `fmtMoney(n, currency)` is the single
+  source of the symbol. A second, independent gate (`nonSecurityKind`) drops IBI's pseudo-securities
+  — tax debits and FX conversions, which the broker books as *purchases*.
+- **A 100%-certain measurement that refuted the convenient explanation:** the 9 tax rows were first
+  assumed to be residue from an old import. They are not. All 9 carry `entry = 100` exactly, and the
+  arithmetic gate provably **cannot** catch them: quantity 666.94 at rate 100 yields a ratio of
+  exactly 0.01 — bit-identical to a legitimate agorot quote. The two gates are genuinely independent,
+  and merging them into one test with two conditions would have produced a gate blind to one class.
+- **Zero-harm decision:** the 41 damaged trades are **not** repaired by `UPDATE`. Dividing by 100
+  after the fact assumes all 41 are agorot-quoted — unverifiable without the source file, which is
+  in the owner's Drive trash. The remedy is user-initiated (delete and re-import), communicated by
+  email. A silent write on a live user's trading data is exactly the failure class this log exists for.
+- **Found only in the browser, after the code was "done":** a DOM read of a shekel trade returned
+  `$120 / $74 / … / ₪130 / +₪1,000.00` — price and P&L in shekels, entry and stop still in dollars.
+  16 hard-coded `$` sites survived a full code review and a green `verify`. **A currency bug is a
+  rendering bug, and rendering is not provable from source.**
+- **Lesson:** **a number without a unit is not a number.** The import pipeline stripped the one piece
+  of information that made the magnitude meaningful, and no schema field existed to carry it — so
+  the loss of meaning was structural, not accidental. Any parser that normalizes away a symbol must
+  first record what the symbol meant.
+- **Prevention:** `test:import` now carries a fixture with an Israeli security **and** a dollar
+  security in the same file, asserting no cross-contamination; `bad_unit` and `bad_currency` are
+  first-class rejection codes with user-visible reasons; `tradingStats` exposes `pnlByCurrency` and
+  `mixedCurrency`, and a mixed-currency journal renders a banner stating that the total is not a
+  real sum. **⛔ Still open:** OCR is unaware of agorot (⏭️ in `STATE.md`), and the `currency`
+  column awaits Niv running the migration (⏸️).
