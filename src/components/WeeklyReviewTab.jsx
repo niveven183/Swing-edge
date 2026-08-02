@@ -9,7 +9,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { CalendarCheck, TrendingUp, Target, Flame, AlertTriangle, Sparkles, Hash } from "lucide-react";
 import { useTradingStats } from "../hooks/useTradingStats.js";
-import { realizedAt } from "../utils.js";
+import { realizedAt, fmt$0, formatPct, isNegativeValue } from "../utils.js";
 import { SwingEdgeAI } from "../intelligence/SwingEdgeAI.js";
 import { edgeScore } from "../intelligence/utils/statisticalModels.js";
 import { supabase, isSupabaseConfigured } from "../supabaseClient.js";
@@ -19,8 +19,7 @@ const PANEL =
 
 const WEEK_MS = 7 * 86400000;
 
-const money = (n) => `${n < 0 ? "-" : ""}$${Math.abs(Math.round(n)).toLocaleString()}`;
-const pct = (n) => `${Math.round(n)}%`;
+const pct = formatPct;
 
 function fmtDate(d, lang) {
   return d.toLocaleDateString(lang === "he" ? "he-IL" : "en-US", { day: "2-digit", month: "short" });
@@ -114,7 +113,9 @@ export default function WeeklyReviewTab({ trades, capital, calcMetrics, authUser
   };
 
   const pnl = wStats.totalPnL || 0;
-  const pnlTone = pnl >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]";
+  const pnlTone = !Number.isFinite(pnl)
+    ? "text-[var(--v3-text-lo)]"
+    : isNegativeValue(pnl) ? "text-[var(--v3-loss)]" : "text-[var(--v3-accent)]";
   const streak = wStats.currentStreak || 0;
   const streakLabel = streak > 0 ? `${streak}W` : streak < 0 ? `${Math.abs(streak)}L` : "—";
 
@@ -151,7 +152,7 @@ export default function WeeklyReviewTab({ trades, capital, calcMetrics, authUser
               {t.wr_pnl}
             </div>
             <div className={`se-serif text-5xl md:text-6xl leading-none tracking-tight ${pnlTone}`}>
-              {pnl >= 0 ? "+" : ""}{money(pnl)}
+              {fmt$0(pnl)}
             </div>
           </div>
 

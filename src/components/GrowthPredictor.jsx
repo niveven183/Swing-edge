@@ -271,8 +271,15 @@ export default function GrowthPredictor({ trades = [], stats = {}, capital = 0, 
   // a point could read 41.6% while the card above it read 42% — the same
   // forecast disagreeing with itself. A projection carries no precision worth a
   // decimal place, so whole percent wins and both surfaces use this.
-  const pct = (val) =>
-    effectiveCapital > 0 ? (((val - effectiveCapital) / effectiveCapital) * 100).toFixed(0) : "0";
+  // Split into number and string: the sign has to be decided on the number,
+  // before rounding. Comparing the formatted string meant `Number("-0") >= 0`
+  // was true, so a forecast that rounded to -0 rendered as a green "+-0%".
+  const pctNum = (val) =>
+    effectiveCapital > 0 ? ((val - effectiveCapital) / effectiveCapital) * 100 : 0;
+  const pct = (val) => {
+    const r = Math.round(pctNum(val));
+    return `${r > 0 ? "+" : r < 0 ? "-" : ""}${Math.abs(r)}%`;
+  };
 
   // ── Handlers ──
   const handleAnswer = useCallback(
@@ -579,10 +586,7 @@ export default function GrowthPredictor({ trades = [], stats = {}, capital = 0, 
                 borderRadius: 8,
                 fontSize: 11,
               }}
-              formatter={(v) => {
-                const change = pct(v);
-                return [`${fmtUsd(v)} (${Number(change) >= 0 ? "+" : ""}${change}%)`, S.balance];
-              }}
+              formatter={(v) => [`${fmtUsd(v)} (${pct(v)})`, S.balance]}
               labelFormatter={(l) => (l === 0 ? S.fromNow : `Month ${l}`)}
             />
             <Area
@@ -617,11 +621,12 @@ export default function GrowthPredictor({ trades = [], stats = {}, capital = 0, 
             </div>
             <div
               className={`text-[10px] mt-0.5 font-mono ${
-                Number(pct(c.val)) >= 0 ? "text-emerald-400" : "text-rose-400"
+                Math.round(pctNum(c.val)) > 0 ? "text-emerald-400"
+                  : Math.round(pctNum(c.val)) < 0 ? "text-rose-400"
+                  : "text-slate-500"
               }`}
             >
-              {Number(pct(c.val)) >= 0 ? "+" : ""}
-              {pct(c.val)}%
+              {pct(c.val)}
             </div>
           </div>
         ))}

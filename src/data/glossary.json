@@ -2,7 +2,7 @@
   "winRate": {
     "label": {
       "en": "Win Rate",
-      "he": "אחוז זכייה",
+      "he": "אחוז הצלחה",
       "es": "Tasa de Acierto",
       "pt": "Taxa de Acerto",
       "ar": "نسبة الربح"
@@ -40,11 +40,11 @@
       "ar": "متوسّط R"
     },
     "description": {
-      "en": "Average R-Multiple per closed trade.\n\nR = (Exit Price − Entry Price) ÷ Initial Risk Per Share.\n\n+1.0R means you made exactly what you risked. Aim for +0.3R or higher as a minimum average. Elite traders average +1.5R to +2.5R.",
-      "he": "ממוצע R-Multiple לעסקה סגורה.\n\nR = (מחיר יציאה − מחיר כניסה) ÷ סיכון ראשוני למניה.\n\n+1.0R אומר שהרווחת בדיוק כמה שסיכנת. שאף ל-+0.3R לפחות כממוצע. סוחרים עילית מגיעים ל-+1.5R עד +2.5R.",
-      "es": "R-Multiple promedio por operación cerrada.\n\nR = (Precio de Salida − Precio de Entrada) ÷ Riesgo Inicial por Acción.\n\n+1.0R significa que ganaste exactamente lo que arriesgaste. Apunta a +0.3R o más como promedio mínimo. Los traders de élite promedian +1.5R a +2.5R.",
-      "pt": "R-Multiple médio por operação fechada.\n\nR = (Preço de Saída − Preço de Entrada) ÷ Risco Inicial por Ação.\n\n+1.0R significa que ganhaste exatamente o que arriscaste. Aponta para +0.3R ou mais como média mínima. Traders de elite têm média de +1.5R a +2.5R.",
-      "ar": "متوسّط R-Multiple لكل صفقة مغلقة.\n\nR = (سعر الخروج − سعر الدخول) ÷ المخاطرة الأوّلية للسهم.\n\n+1.0R يعني أنك ربحت تماماً ما خاطرت به. استهدف +0.3R أو أعلى كحدّ أدنى للمتوسّط. متداولو النخبة يحقّقون متوسّط +1.5R إلى +2.5R."
+      "en": "Average R-Multiple per closed trade.\n\nR = trade profit ÷ initial risk per share. The profit follows the direction of the trade: on a LONG it is (Exit − Entry), on a SHORT it is (Entry − Exit) — so a winning SHORT is always a positive R.\n\n+1.0R means you made exactly what you risked. Aim for +0.3R or higher as a minimum average. Elite traders average +1.5R to +2.5R.\n\nOnly trades that had a stop can be measured in R — a trade without one is excluded from this average, not counted as 0R. The line under the number shows how many of your closed trades the average actually covers.",
+      "he": "ממוצע R-Multiple לעסקה סגורה.\n\nR = רווח העסקה ÷ הסיכון הראשוני למניה. הרווח נגזר מכיוון העסקה: ב-LONG הוא (יציאה − כניסה), וב-SHORT הוא (כניסה − יציאה) — כך ש-SHORT מנצחת היא תמיד R חיובי.\n\n+1.0R אומר שהרווחת בדיוק כמה שסיכנת. שאף ל-+0.3R לפחות כממוצע. סוחרים עילית מגיעים ל-+1.5R עד +2.5R.\n\nרק עסקה עם סטופ ניתנת למדידה ב-R — עסקה בלי סטופ מוחרגת מהממוצע, ואינה נספרת כ-0R. השורה מתחת למספר מראה כמה מהעסקאות הסגורות הממוצע באמת מכסה.",
+      "es": "R-Multiple promedio por operación cerrada.\n\nR = ganancia de la operación ÷ riesgo inicial por acción. La ganancia sigue la dirección de la operación: en un LONG es (Salida − Entrada), en un SHORT es (Entrada − Salida) — así que un SHORT ganador siempre da un R positivo.\n\n+1.0R significa que ganaste exactamente lo que arriesgaste. Apunta a +0.3R o más como promedio mínimo. Los traders de élite promedian +1.5R a +2.5R.\n\nSolo las operaciones con stop pueden medirse en R — una operación sin stop se excluye de este promedio, no cuenta como 0R. La línea bajo el número muestra cuántas de tus operaciones cerradas cubre realmente el promedio.",
+      "pt": "R-Multiple médio por operação fechada.\n\nR = lucro da operação ÷ risco inicial por ação. O lucro segue a direção da operação: num LONG é (Saída − Entrada), num SHORT é (Entrada − Saída) — por isso um SHORT vencedor dá sempre um R positivo.\n\n+1.0R significa que ganhaste exatamente o que arriscaste. Aponta para +0.3R ou mais como média mínima. Traders de elite têm média de +1.5R a +2.5R.\n\nSó as operações com stop podem ser medidas em R — uma operação sem stop é excluída desta média, não conta como 0R. A linha por baixo do número mostra quantas das tuas operações fechadas a média cobre realmente.",
+      "ar": "متوسّط R-Multiple لكل صفقة مغلقة.\n\nR = ربح الصفقة ÷ المخاطرة الأوّلية للسهم. الربح يتبع اتّجاه الصفقة: في LONG هو (الخروج − الدخول)، وفي SHORT هو (الدخول − الخروج) — لذلك فإن SHORT الرابحة تعطي دائماً R موجباً.\n\n+1.0R يعني أنك ربحت تماماً ما خاطرت به. استهدف +0.3R أو أعلى كحدّ أدنى للمتوسّط. متداولو النخبة يحقّقون متوسّط +1.5R إلى +2.5R.\n\nالصفقات التي لها وقف خسارة فقط يمكن قياسها بـ R — الصفقة بلا وقف تُستثنى من هذا المتوسّط ولا تُحتسب كـ 0R. السطر أسفل الرقم يوضّح كم صفقة مغلقة يغطّيها المتوسّط فعلياً."
     }
   },
   "expectancy": {
@@ -200,11 +200,11 @@
       "ar": "نظام السوق"
     },
     "description": {
-      "en": "Market Regime — current market environment that affects which setups work best.\n\n• Bull Trend: Momentum, breakouts, pullback entries work best\n• Bear Trend: Short setups, fade the rip, reduce size\n• Sideways/Range: Mean-reversion, avoid breakouts\n• Volatile: Reduce size by 50%, widen stops",
-      "he": "מצב שוק — סביבת השוק הנוכחית שמשפיעה על אילו סטאפים עובדים הכי טוב.\n\n• מגמה שורית: מומנטום, פריצות, כניסות בתיקון עובדות הכי טוב\n• מגמה דובית: סטאפי שורט, פייד של עליות, הקטן גודל\n• עצור/טווח: היפוך ממוצע, הימנע מפריצות\n• תנודתי: הקטן גודל ב-50%, הרחב סטופים",
-      "es": "Régimen de Mercado — el entorno de mercado actual que afecta qué setups funcionan mejor.\n\n• Tendencia Alcista: Momentum, breakouts, entradas en pullback funcionan mejor\n• Tendencia Bajista: Setups en corto, fade del rebote, reduce tamaño\n• Lateral/Rango: Reversión a la media, evita breakouts\n• Volátil: Reduce tamaño 50%, amplía stops",
-      "pt": "Regime de Mercado — o ambiente de mercado atual que afeta quais setups funcionam melhor.\n\n• Tendência de Alta: Momentum, breakouts, entradas em pullback funcionam melhor\n• Tendência de Baixa: Setups vendidos, fade do repique, reduz tamanho\n• Lateral/Range: Reversão à média, evita breakouts\n• Volátil: Reduz tamanho 50%, amplia stops",
-      "ar": "نظام السوق — بيئة السوق الحالية التي تؤثّر على أي النماذج تعمل بأفضل شكل.\n\n• اتجاه صاعد: الزخم والاختراقات والدخول عند التراجع تعمل بأفضل شكل\n• اتجاه هابط: نماذج البيع، fade الارتداد، قلّل الحجم\n• عرضي/نطاق: العودة للمتوسّط، تجنّب الاختراقات\n• متقلّب: قلّل الحجم 50%، وسّع أوامر الوقف"
+      "en": "Market Regime — the current market environment, read from real price action (not your trades). Computed from SPY/QQQ vs their 20-day average, trend %, how many sector ETFs are rising (breadth), and realized volatility.\n\n• Bull Trend: Uptrend — price above a rising 20-day average with broad participation. Favor breakouts and pullbacks.\n• Bear Trend: Downtrend — price below a falling 20-day average, broad weakness. Favor shorts or stand aside.\n• Choppy/Range: No net trend — price stuck between support and resistance. Fade the extremes, avoid breakouts.\n• High Volatility: Large daily swings dominate. Cut size ~50% and widen stops.\n• Low Volatility: Quiet, coiled tape — expect small moves.\n\nShows 'insufficient data' when there isn't enough price history to classify.",
+      "he": "מצב שוק — סביבת השוק הנוכחית, נקראת מפעולת מחיר אמיתית (לא מהעסקאות שלך). מחושב מ-SPY/QQQ מול הממוצע הנע ל-20 יום, אחוז מגמה, כמה סקטורים עולים (רוחב שוק), ותנודתיות ממומשת.\n\n• שוק עולה: מגמת עלייה — המחיר מעל ממוצע נע עולה ל-20 יום עם השתתפות רחבה. העדף פריצות ותיקונים.\n• שוק יורד: מגמת ירידה — המחיר מתחת לממוצע נע יורד ל-20 יום, חולשה רחבה. העדף שורטים או שב בצד.\n• שוק צדדי/טווח: אין מגמה נטו — המחיר תקוע בין תמיכה להתנגדות. סחור בקצוות, הימנע מפריצות.\n• תנודתיות גבוהה: תנודות יומיות חדות שולטות. הקטן גודל ב-50% והרחב סטופים.\n• תנודתיות נמוכה: שוק שקט ודחוס — צפה לתנועות קטנות.\n\nמציג 'נתונים לא מספיקים' כשאין מספיק היסטוריית מחירים לסיווג.",
+      "es": "Régimen de Mercado — el entorno de mercado actual, leído de la acción real del precio (no de tus operaciones). Se calcula con SPY/QQQ frente a su media de 20 días, el % de tendencia, cuántos ETF sectoriales suben (amplitud) y la volatilidad realizada.\n\n• Tendencia Alcista: Tendencia al alza — precio por encima de una media de 20 días creciente con participación amplia. Favorece breakouts y pullbacks.\n• Tendencia Bajista: Tendencia a la baja — precio por debajo de una media de 20 días decreciente, debilidad amplia. Favorece cortos o mantente al margen.\n• Lateral/Rango: Sin tendencia neta — precio atrapado entre soporte y resistencia. Opera los extremos, evita breakouts.\n• Alta Volatilidad: Dominan los fuertes vaivenes diarios. Reduce tamaño ~50% y amplía stops.\n• Baja Volatilidad: Mercado tranquilo y comprimido — espera movimientos pequeños.\n\nMuestra 'Datos insuficientes' cuando no hay suficiente historial de precios para clasificar.",
+      "pt": "Regime de Mercado — o ambiente de mercado atual, lido da ação real do preço (não das tuas operações). Calculado a partir de SPY/QQQ face à média de 20 dias, % de tendência, quantos ETF setoriais sobem (amplitude) e volatilidade realizada.\n\n• Tendência de Alta: Tendência de subida — preço acima de uma média de 20 dias ascendente com participação ampla. Favorece breakouts e pullbacks.\n• Tendência de Baixa: Tendência de descida — preço abaixo de uma média de 20 dias descendente, fraqueza ampla. Favorece vendas ou fica de fora.\n• Lateral/Range: Sem tendência líquida — preço preso entre suporte e resistência. Opera os extremos, evita breakouts.\n• Alta Volatilidade: Dominam as fortes oscilações diárias. Reduz tamanho ~50% e amplia stops.\n• Baixa Volatilidade: Mercado calmo e comprimido — espera movimentos pequenos.\n\nMostra 'Dados insuficientes' quando não há histórico de preços suficiente para classificar.",
+      "ar": "نظام السوق — بيئة السوق الحالية، تُقرأ من حركة السعر الحقيقية (وليس من صفقاتك). يُحسب من SPY/QQQ مقابل متوسّطها المتحرّك لـ20 يومًا، ونسبة الاتجاه، وكم قطاعًا يرتفع (اتساع السوق)، والتقلّب المحقَّق.\n\n• اتجاه صاعد: اتجاه صعودي — السعر فوق متوسّط 20 يومًا صاعد بمشاركة واسعة. فضّل الاختراقات والتراجعات.\n• اتجاه هابط: اتجاه هبوطي — السعر تحت متوسّط 20 يومًا هابط، ضعف واسع. فضّل البيع أو ابقَ جانبًا.\n• عرضي/نطاق: لا اتجاه صافٍ — السعر محصور بين الدعم والمقاومة. تاجر عند الأطراف وتجنّب الاختراقات.\n• تقلّب عالٍ: تسيطر التذبذبات اليومية الحادة. قلّل الحجم ~50% ووسّع أوامر الوقف.\n• تقلّب منخفض: سوق هادئ ومضغوط — توقّع حركات صغيرة.\n\nيعرض 'بيانات غير كافية' عند عدم توفّر تاريخ أسعار كافٍ للتصنيف."
     }
   },
   "riskPerTrade": {
@@ -296,11 +296,11 @@
       "ar": "R-Multiple"
     },
     "description": {
-      "en": "R-Multiple = (Exit − Entry) ÷ Initial Risk\n\nExamples:\n+2R = you made 2× what you risked ✓\n+1R = made exactly what you risked ✓\n-1R = lost your planned risk (normal)\n-2R = stop was not honored (problem)\n\nTracking R-Multiple eliminates dollar bias and lets you compare trades objectively.",
-      "he": "R-Multiple = (יציאה − כניסה) ÷ סיכון ראשוני\n\nדוגמאות:\n+2R = הרווחת פי 2 ממה שסיכנת ✓\n+1R = הרווחת בדיוק מה שסיכנת ✓\n-1R = הפסדת את הסיכון המתוכנן (נורמלי)\n-2R = הסטופ לא כובד (בעיה)\n\nמעקב אחר R-Multiple מסיר הטיית דולר ומאפשר השוואה אובייקטיבית בין עסקאות.",
-      "es": "R-Multiple = (Salida − Entrada) ÷ Riesgo Inicial\n\nEjemplos:\n+2R = ganaste 2× lo que arriesgaste ✓\n+1R = ganaste exactamente lo que arriesgaste ✓\n-1R = perdiste tu riesgo planificado (normal)\n-2R = el stop no se respetó (problema)\n\nSeguir el R-Multiple elimina el sesgo del dólar y te permite comparar operaciones objetivamente.",
-      "pt": "R-Multiple = (Saída − Entrada) ÷ Risco Inicial\n\nExemplos:\n+2R = ganhaste 2× o que arriscaste ✓\n+1R = ganhaste exatamente o que arriscaste ✓\n-1R = perdeste o teu risco planeado (normal)\n-2R = o stop não foi respeitado (problema)\n\nAcompanhar o R-Multiple elimina o viés do dólar e permite comparar operações objetivamente.",
-      "ar": "R-Multiple = (الخروج − الدخول) ÷ المخاطرة الأوّلية\n\nأمثلة:\n+2R = ربحت 2× ما خاطرت به ✓\n+1R = ربحت تماماً ما خاطرت به ✓\n-1R = خسرت مخاطرتك المخطّطة (طبيعي)\n-2R = لم يُحترم وقف الخسارة (مشكلة)\n\nتتبّع R-Multiple يزيل انحياز الدولار ويتيح لك مقارنة الصفقات موضوعياً."
+      "en": "R-Multiple = trade profit ÷ initial risk. The profit follows the direction of the trade: on a LONG it is (Exit − Entry), on a SHORT it is (Entry − Exit) — so a winning SHORT is always a positive R.\n\nExamples:\n+2R = you made 2× what you risked ✓\n+1R = made exactly what you risked ✓\n-1R = lost your planned risk (normal)\n-2R = stop was not honored (problem)\n\nTracking R-Multiple eliminates dollar bias and lets you compare trades objectively.",
+      "he": "R-Multiple = רווח העסקה ÷ הסיכון הראשוני. הרווח נגזר מכיוון העסקה: ב-LONG הוא (יציאה − כניסה), וב-SHORT הוא (כניסה − יציאה) — כך ש-SHORT מנצחת היא תמיד R חיובי.\n\nדוגמאות:\n+2R = הרווחת פי 2 ממה שסיכנת ✓\n+1R = הרווחת בדיוק מה שסיכנת ✓\n-1R = הפסדת את הסיכון המתוכנן (נורמלי)\n-2R = הסטופ לא כובד (בעיה)\n\nמעקב אחר R-Multiple מסיר הטיית דולר ומאפשר השוואה אובייקטיבית בין עסקאות.",
+      "es": "R-Multiple = ganancia de la operación ÷ riesgo inicial. La ganancia sigue la dirección de la operación: en un LONG es (Salida − Entrada), en un SHORT es (Entrada − Salida) — así que un SHORT ganador siempre da un R positivo.\n\nEjemplos:\n+2R = ganaste 2× lo que arriesgaste ✓\n+1R = ganaste exactamente lo que arriesgaste ✓\n-1R = perdiste tu riesgo planificado (normal)\n-2R = el stop no se respetó (problema)\n\nSeguir el R-Multiple elimina el sesgo del dólar y te permite comparar operaciones objetivamente.",
+      "pt": "R-Multiple = lucro da operação ÷ risco inicial. O lucro segue a direção da operação: num LONG é (Saída − Entrada), num SHORT é (Entrada − Saída) — por isso um SHORT vencedor dá sempre um R positivo.\n\nExemplos:\n+2R = ganhaste 2× o que arriscaste ✓\n+1R = ganhaste exatamente o que arriscaste ✓\n-1R = perdeste o teu risco planeado (normal)\n-2R = o stop não foi respeitado (problema)\n\nAcompanhar o R-Multiple elimina o viés do dólar e permite comparar operações objetivamente.",
+      "ar": "R-Multiple = ربح الصفقة ÷ المخاطرة الأوّلية. الربح يتبع اتّجاه الصفقة: في LONG هو (الخروج − الدخول)، وفي SHORT هو (الدخول − الخروج) — لذلك فإن SHORT الرابحة تعطي دائماً R موجباً.\n\nأمثلة:\n+2R = ربحت 2× ما خاطرت به ✓\n+1R = ربحت تماماً ما خاطرت به ✓\n-1R = خسرت مخاطرتك المخطّطة (طبيعي)\n-2R = لم يُحترم وقف الخسارة (مشكلة)\n\nتتبّع R-Multiple يزيل انحياز الدولار ويتيح لك مقارنة الصفقات موضوعياً."
     }
   },
   "chartCalcPosition": {
@@ -1117,6 +1117,38 @@
       "es": "Un grupo de operaciones con una relación riesgo/beneficio de 3 o más: la recompensa potencial es al menos 3× el riesgo. Son las operaciones de mayor calidad por ratio: incluso con una tasa de aciertos baja, ganar una fracción basta para ser rentable.",
       "pt": "Um grupo de operações com uma relação risco/retorno de 3 ou mais: o retorno potencial é pelo menos 3× o risco. São as operações de maior qualidade por rácio: mesmo com uma taxa de acertos baixa, ganhar uma fração já basta para ser lucrativo.",
       "ar": "مجموعة صفقات بنسبة مخاطرة/عائد تبلغ 3 أو أكثر: العائد المحتمل لا يقل عن 3 أضعاف المخاطرة. هذه أعلى الصفقات جودةً من حيث النسبة: حتى مع نسبة نجاح منخفضة، يكفي الربح في جزء منها لتحقيق الربحية."
+    }
+  },
+  "dayOfWeek": {
+    "label": {
+      "en": "P&L by Day of Week",
+      "he": "רווח/הפסד לפי יום בשבוע",
+      "es": "G/P por Día de la Semana",
+      "pt": "L/P por Dia da Semana",
+      "ar": "الربح/الخسارة حسب يوم الأسبوع"
+    },
+    "description": {
+      "en": "Your profit/loss broken down by day of the week. Reveals which days you consistently make or lose money — many traders have a hidden edge (or leak) tied to specific days like Mondays or Fridays.",
+      "he": "הרווח/הפסד שלך מחולק לפי ימי השבוע. חושף באילו ימים אתה עקבית מרוויח או מפסיד — לרבים יש Edge נסתר (או דליפה) שקשור לימים מסוימים כמו שני או שישי.",
+      "es": "Tu ganancia/pérdida desglosada por día de la semana. Revela en qué días ganas o pierdes dinero de forma consistente — muchos traders tienen un edge oculto (o una fuga) ligado a días concretos como lunes o viernes.",
+      "pt": "O teu lucro/perda discriminado por dia da semana. Revela em que dias ganhas ou perdes dinheiro de forma consistente — muitos traders têm um edge oculto (ou uma fuga) ligado a dias específicos como segundas ou sextas.",
+      "ar": "أرباحك/خسائرك موزّعة حسب أيام الأسبوع. تكشف في أي الأيام تربح أو تخسر باستمرار — كثير من المتداولين لديهم أفضلية خفية (أو تسريب) مرتبط بأيام محدّدة كالإثنين أو الجمعة."
+    }
+  },
+  "performanceBySetup": {
+    "label": {
+      "en": "Performance by Setup",
+      "he": "ביצועים לפי סטאפ",
+      "es": "Rendimiento por Setup",
+      "pt": "Desempenho por Setup",
+      "ar": "الأداء حسب السيناريو"
+    },
+    "description": {
+      "en": "A breakdown of every setup you trade — win rate, total R, and number of trades. Shows at a glance which setups carry your account and which drain it. Your edges and anti-edges, side by side.",
+      "he": "פירוט של כל setup שאתה סוחר — אחוז זכייה, R כולל, ומספר עסקאות. מראה במבט אחד אילו סטאפים נושאים את החשבון שלך ואילו מנקזים אותו. ה-Edges וה-Anti-Edges שלך, זה לצד זה.",
+      "es": "Un desglose de cada setup que operas — win rate, R total y número de operaciones. Muestra de un vistazo qué setups sostienen tu cuenta y cuáles la drenan. Tus edges y anti-edges, lado a lado.",
+      "pt": "Uma discriminação de cada setup que operas — win rate, R total e número de operações. Mostra num relance quais setups sustentam a tua conta e quais a drenam. Os teus edges e anti-edges, lado a lado.",
+      "ar": "تفصيل لكل setup تتداوله — نسبة الربح، إجمالي R، وعدد الصفقات. يُظهر بنظرة واحدة أي النماذج تحمل حسابك وأيّها يستنزفه. أفضلياتك وأنتي-أفضلياتك، جنباً إلى جنب."
     }
   }
 }

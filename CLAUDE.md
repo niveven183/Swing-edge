@@ -67,7 +67,8 @@ chmod +x .githooks/*
 
 ```bash
 npm run verify   # test:coach → test:import → test:settings → test:datachain
-                 # → test:rcontract → test:tradingstats → test:ocr → build
+                 # → test:rcontract → test:format → test:tradingstats → test:ocr
+                 # → test:engine → build
 ```
 
 **להדביק את הפלט המלא בדיווח**, לא סיכום ולא "עבר". `test:coach` (111 assertions) חובה לפני *וגם* אחרי כל נגיעה ב-`src/intelligence/`; `test:import` לפני כל נגיעה ב-`src/import/` או בסכימת העסקה; `test:ocr` לפני כל נגיעה ב-`api/ocr.js`.

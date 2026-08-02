@@ -7,7 +7,7 @@ import {
 import { he as heLocale } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { nTrades, getTranslations } from '../i18n.js';
-import { localDayKey } from '../utils.js';
+import { localDayKey, fmt$0 } from '../utils.js';
 import { outcomeRates } from '../intelligence/utils/statisticalModels.js';
 import DayTradesModal from './DayTradesModal.jsx';
 
@@ -129,7 +129,7 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he' }) {
                 ${monthSummary.pnl >= 0
                   ? 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
                   : 'bg-rose-50 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400'}`}>
-                {monthSummary.pnl >= 0 ? '+' : ''}${monthSummary.pnl.toFixed(0)}
+                {fmt$0(monthSummary.pnl)}
               </span>
               <span className="px-3 py-1 bg-slate-100 dark:bg-white/[0.08] text-slate-600 dark:text-slate-300 rounded-full text-xs">
                 {monthSummary.winRate}{t.wrSuffix}
@@ -193,7 +193,7 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he' }) {
                   text-[10px] font-mono font-semibold block leading-tight
                   ${pnl >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}
                 `}>
-                  {pnl >= 0 ? '+' : ''}${Math.abs(pnl).toFixed(0)}
+                  {fmt$0(pnl)}
                 </span>
               )}
 

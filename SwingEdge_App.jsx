@@ -45,7 +45,7 @@ import { useToast, useConfirm } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured, tradeForSupabase, tradeFromSupabase } from "./src/supabaseClient.js";
 import { cleanTrades, purgeInvalidTrades } from "./src/lib/cleanTrades.js";
 import { loadSettings, saveSettings, flushSettings, migrateFromLocalStorage } from "./src/lib/userSettings.js";
-import { calcTradeMetrics, fmt$, fmtR, fmtNum, numOrNull, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays, localDayKey, realizedAt, realizedDayKey } from "./src/utils.js";
+import { calcTradeMetrics, fmt$, fmt$0, fmtR, fmtNum, numOrNull, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays, localDayKey, realizedAt, realizedDayKey } from "./src/utils.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell,
@@ -3460,7 +3460,7 @@ export default function SwingEdge() {
                         </div>
                         <div className="text-end">
                           <div className="text-emerald-400 font-bold text-sm">{formatPct(edge.winRate)} WR</div>
-                          <div className="text-slate-300 text-xs">${edge.totalPnL.toFixed(0)}</div>
+                          <div className="text-slate-300 text-xs">{fmt$0(edge.totalPnL)}</div>
                         </div>
                       </div>
                     ))}
@@ -3477,7 +3477,7 @@ export default function SwingEdge() {
                         </div>
                         <div className="text-end">
                           <div className="text-rose-400 font-bold text-sm">{formatPct(edge.winRate)} WR</div>
-                          <div className="text-slate-300 text-xs">${edge.totalPnL.toFixed(0)}</div>
+                          <div className="text-slate-300 text-xs">{fmt$0(edge.totalPnL)}</div>
                         </div>
                       </div>
                     ))}
@@ -4903,7 +4903,7 @@ export default function SwingEdge() {
               <StatCard label={t.totalTrades}  value={realTrades.length} sub={t.allTime}      icon={Layers}    accent="cyan"   />
               <StatCard label={<span className="flex items-center gap-1">{t.winRate}<TermTooltip term="winRate" lang={lang} /></span>} value={formatPct(winRate)} sub={`${stats.wins} ${t.wins}`} icon={CheckCircle} accent="green" />
               <StatCard label={<span className="flex items-center gap-1">{t.avgRMultiple}<TermTooltip term="avgR" lang={lang} /></span>} value={fmtR(avgR)} sub={rSampleSub(t, stats)} icon={Activity}  accent="purple" />
-              <StatCard label={t.totalReturn}   value={formatReturnPct(stats.returnPct)} sub={`$${Math.round(Math.abs(totalPnL)).toLocaleString()} P&L`} icon={TrendingUp} accent={totalPnL>=0?"green":"red"} />
+              <StatCard label={t.totalReturn}   value={formatReturnPct(stats.returnPct)} sub={`${fmt$0(totalPnL)} P&L`} icon={TrendingUp} accent={totalPnL>=0?"green":"red"} />
             </div>
 
             {/* Per-trade P&L bars */}
@@ -4913,7 +4913,7 @@ export default function SwingEdge() {
                 <BarChart data={closedTrades.map(t => ({ name: t.ticker, pnl: Math.round(calcTradeMetrics(t).pnl || 0) }))}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v=>`$${v}`} />
+                  <YAxis tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={fmt$0} />
                   <Tooltip contentStyle={{ background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 10, fontSize: 11 }} formatter={v=>[fmt$(v),"P&L"]} />
                   <ReferenceLine y={0} stroke="var(--v3-text-lo)" />
                   <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
@@ -4965,7 +4965,7 @@ export default function SwingEdge() {
                     <BarChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
                       <XAxis dataKey="day" tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => dayLabel(v, lang)} />
-                      <YAxis tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
+                      <YAxis tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={fmt$0} />
                       <Tooltip
                         contentStyle={{ background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 10, fontSize: 11 }}
                         formatter={(v, n, p) => [`${fmt$(v)} · ${nTrades(p.payload.count, lang)}`, "P&L"]}
@@ -5108,7 +5108,7 @@ export default function SwingEdge() {
                         </div>
                         <div className="text-end">
                           <div className="text-emerald-400 font-bold text-sm">{formatPct(edge.winRate)} WR</div>
-                          <div className="text-slate-300 text-xs">${edge.totalPnL.toFixed(0)}</div>
+                          <div className="text-slate-300 text-xs">{fmt$0(edge.totalPnL)}</div>
                         </div>
                       </div>
                     ))}
@@ -5125,7 +5125,7 @@ export default function SwingEdge() {
                         </div>
                         <div className="text-end">
                           <div className="text-rose-400 font-bold text-sm">{formatPct(edge.winRate)} WR</div>
-                          <div className="text-slate-300 text-xs">${edge.totalPnL.toFixed(0)}</div>
+                          <div className="text-slate-300 text-xs">{fmt$0(edge.totalPnL)}</div>
                         </div>
                       </div>
                     ))}
@@ -5253,7 +5253,7 @@ export default function SwingEdge() {
                         <BarChart data={pnlByMonth} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
                           <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} />
-                          <YAxis tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
+                          <YAxis tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={fmt$0} />
                           <Tooltip contentStyle={darkTooltip} formatter={(v, n, p) => [`${fmt$(v)} · ${p.payload.count} trade${p.payload.count !== 1 ? "s" : ""}`, "P&L"]} />
                           <ReferenceLine y={0} stroke="var(--v3-text-lo)" />
                           <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
@@ -5280,7 +5280,7 @@ export default function SwingEdge() {
                         <BarChart data={emotionStatsArr} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
                           <XAxis dataKey="emotion" tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => labelFor("emotion", v, lang)} />
-                          <YAxis tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
+                          <YAxis tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={fmt$0} />
                           <Tooltip contentStyle={darkTooltip} formatter={(v, n, p) => [`${fmt$(v)} · ${formatPct(p.payload.winRate)} WR`, "P&L"]} />
                           <ReferenceLine y={0} stroke="var(--v3-text-lo)" />
                           <Bar dataKey="totalPnL" radius={[4, 4, 0, 0]}>
@@ -5429,7 +5429,7 @@ export default function SwingEdge() {
                             tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }}
                             tickLine={false}
                             axisLine={false}
-                            tickFormatter={v => `$${v}`}
+                            tickFormatter={fmt$0}
                           />
                           <ReferenceLine y={0} stroke="var(--v3-text-lo)" />
                           <Tooltip

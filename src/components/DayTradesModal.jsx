@@ -7,7 +7,7 @@ import useModalA11y from '../hooks/useModalA11y.js';
 import TickerLogo from './TickerLogo.jsx';
 import InfoTooltip from './ui/InfoTooltip.jsx';
 import { EMOTION_OPTIONS } from '../data/tradeOptions.jsx';
-import { isFollowedPlan, isOffPlan } from '../utils.js';
+import { isFollowedPlan, isOffPlan, fmt$, fmtR, isNegativeValue } from '../utils.js';
 import { getSetupTooltip } from '../intelligence/knowledgeGlue.js';
 import { outcomeRates } from '../intelligence/utils/statisticalModels.js';
 
@@ -21,9 +21,11 @@ function parseDayKey(key) {
   return (y && m && d) ? new Date(y, m - 1, d) : new Date();
 }
 
-const pnlClass = (n) => (n >= 0
-  ? 'text-emerald-600 dark:text-emerald-400'
-  : 'text-rose-600 dark:text-rose-400');
+const pnlClass = (n) => (!Number.isFinite(n)
+  ? 'text-slate-400 dark:text-slate-500'
+  : isNegativeValue(n)
+    ? 'text-rose-600 dark:text-rose-400'
+    : 'text-emerald-600 dark:text-emerald-400');
 
 // Day drill-down: every trade CLOSED on the selected day, one compact card each,
 // with a ticker jump-strip + prev/next + keyboard arrows for fast navigation.
@@ -217,12 +219,12 @@ export default function DayTradesModal({ dateKey, trades = [], calcMetrics, lang
                     </span>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className={`font-mono font-semibold text-sm ${pnlClass(pnl || 0)}`}>
-                      {(pnl || 0) >= 0 ? '+' : ''}${(pnl || 0).toFixed(2)}
+                    <div className={`font-mono font-semibold text-sm ${pnlClass(pnl)}`}>
+                      {fmt$(pnl)}
                     </div>
                     {rMultiple !== null && rMultiple !== undefined && (
                       <div className="text-xs text-slate-400 dark:text-slate-500 font-mono">
-                        {rMultiple >= 0 ? '+' : ''}{rMultiple.toFixed(2)}{t.cal_rMultiple}
+                        {fmtR(rMultiple)}
                       </div>
                     )}
                   </div>

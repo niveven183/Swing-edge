@@ -108,9 +108,26 @@ export const validateTradeInputs = (entry, stop, target, side) => {
   return { valid: true, reason: null };
 };
 
-export const fmt$ = (n) => n >= 0
-  ? `+$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
-  : `-$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+// `-0 >= 0` is true, so a loss small enough to round away tested as a gain and
+// rendered green. Every sign test on a money/R value must go through here so
+// the number's color and its printed sign can never disagree.
+export const isNegativeValue = (n) => n < 0 || Object.is(n, -0);
+
+// Signed money display. The second trap: `NaN >= 0` is false, so a blown-up
+// metric fell into the negative branch and rendered as "-$NaN".
+const money = (n, digits) => {
+  if (!Number.isFinite(n)) return "—";
+  return `${isNegativeValue(n) ? "-" : "+"}$${Math.abs(n).toLocaleString("en-US", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  })}`;
+};
+
+export const fmt$ = (n) => money(n, 2);
+
+// Whole-dollar variant for tight surfaces (calendar cells, chart axes) where
+// cents do not fit. The sign still lives in the text, never in the color alone.
+export const fmt$0 = (n) => money(n, 0);
 
 // Numeric field parsing at the input boundary. `0` is a value, not a blank:
 // `parseFloat(v) || null` silently turned a real MFE/MAE of 0 into "not filled
@@ -128,16 +145,23 @@ export const fmtNum = (v, digits = 2) =>
 
 export const fmtR = (r) =>
   (typeof r === "number" && !Number.isNaN(r))
-    ? (r >= 0 ? `+${r.toFixed(2)}R` : `${r.toFixed(2)}R`)
+    ? (isNegativeValue(r) ? `-${Math.abs(r).toFixed(2)}R` : `+${r.toFixed(2)}R`)
     : "—";
+
+// `Number(v) || 0` turned a missing value into a confident "0%". A real 0 and
+// "we never measured this" are different claims, and only one of them is a
+// number. Empty portfolios still read 0% — EMPTY_STATS carries a numeric 0.
+const asNum = (v) => (v === "" || v == null ? NaN : Number(v));
 
 // Win-rate (and any 0..100 percentage) display — single source of truth for
 // percentage rounding, so the same value renders identically everywhere.
-export const formatPct = (v) => `${Math.round(Number(v) || 0)}%`;
+export const formatPct = (v) =>
+  Number.isFinite(asNum(v)) ? `${Math.round(asNum(v))}%` : "—";
 
 // Return-on-capital display — single source of truth so the Dashboard KPI and
 // the Analytics figure round the same value to the same digit (#7).
-export const formatReturnPct = (v) => `${(Number(v) || 0).toFixed(2)}%`;
+export const formatReturnPct = (v) =>
+  Number.isFinite(asNum(v)) ? `${asNum(v).toFixed(2)}%` : "—";
 
 // ─── followedPlan NORMALIZATION ───────────────────────────────────────────────
 // `followedPlan` is true | false | "Partially" | null in the UI, but the DB

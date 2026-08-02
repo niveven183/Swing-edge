@@ -11,7 +11,7 @@ import {
 } from "recharts";
 import { TrendingUp, TrendingDown, CheckCircle, AlertTriangle, Award } from "lucide-react";
 import { generateMonthlyReport, MONTH_NAMES } from "../intelligence/core/MonthlyReport.js";
-import { formatPct, fmtR } from "../utils.js";
+import { formatPct, fmtR, fmt$0, isNegativeValue } from "../utils.js";
 import TermTooltip from "./ui/TermTooltip.jsx";
 
 // ── helpers ──
@@ -176,7 +176,7 @@ export default function MonthlyReportTab({ trades, calcMetrics, t, lang, isRTL }
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {sCard(t.mr_totalTrades, summary.totalTrades, summary.vsLastMonth.hasPrev ? <Delta value={summary.vsLastMonth.trades} t={t} /> : <span className="text-[10px] text-slate-400">{summary.wins}W / {summary.losses}L</span>)}
         {sCard(t.mr_winRate, formatPct(summary.winRate), summary.vsLastMonth.hasPrev ? <Delta value={summary.vsLastMonth.winRate} suffix="%" t={t} /> : null, "winRate")}
-        {sCard(t.mr_netPnL, <span className={summary.netPnL >= 0 ? "text-emerald-500 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"}>{summary.netPnL >= 0 ? "+" : ""}${summary.netPnL.toLocaleString()}</span>, summary.vsLastMonth.hasPrev ? <Delta value={summary.vsLastMonth.netPnL} money t={t} /> : null)}
+        {sCard(t.mr_netPnL, <span className={isNegativeValue(summary.netPnL) ? "text-rose-500 dark:text-rose-400" : "text-emerald-500 dark:text-emerald-400"}>{fmt$0(summary.netPnL)}</span>, summary.vsLastMonth.hasPrev ? <Delta value={summary.vsLastMonth.netPnL} money t={t} /> : null)}
         {sCard(t.mr_avgR, <span className={summary.avgR == null ? "text-slate-400 dark:text-slate-500" : summary.avgR >= 0 ? "text-emerald-500 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"}>{fmtR(summary.avgR)}</span>, <span className="text-[10px] text-slate-400 dark:text-slate-500">
           {summary.bestTrade && <>{t.mr_best}: {summary.bestTrade.ticker}<br /></>}
           {interp(t.avgRSample, { n: summary.rSampleSize, total: summary.totalTrades })}
@@ -224,8 +224,8 @@ export default function MonthlyReportTab({ trades, calcMetrics, t, lang, isRTL }
             <BarChart data={charts.dailyPnL}>
               <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
               <XAxis dataKey="date" tick={axisTick} axisLine={false} tickLine={false} />
-              <YAxis tick={axisTick} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v}`} />
-              <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(34,211,238,0.06)" }} formatter={(v) => [`$${v}`, t.mr_netPnL]} />
+              <YAxis tick={axisTick} axisLine={false} tickLine={false} tickFormatter={fmt$0} />
+              <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(34,211,238,0.06)" }} formatter={(v) => [fmt$0(v), t.mr_netPnL]} />
               <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
                 {charts.dailyPnL.map((d, i) => (
                   <Cell key={i} fill={d.pnl >= 0 ? "#10B981" : "#F43F5E"} />
