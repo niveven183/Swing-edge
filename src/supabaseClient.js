@@ -23,7 +23,8 @@ export const supabase = isSupabaseConfigured
 // rewrites the database on the next save.
 //
 // Only these columns exist in public.trades (verified against information_schema
-// on 2026-07-27 — 25 columns, exact match). The client carries extra fields
+// on 2026-08-03 — 26 columns, exact match; היו 25 עד שמיגרציית T9 הוסיפה
+// `currency`). The client carries extra fields
 // (tradeImage, _prediction) for local UX; those are stripped before any
 // INSERT / UPDATE / UPSERT so PostgREST does not reject the whole payload.
 const TRADE_COLUMNS = new Set([
@@ -52,6 +53,9 @@ const TRADE_COLUMNS = new Set([
   "createdAt",
   "closedAt",
   "is_demo",
+  // T9 — נוסף אחרי שמיגרציית 20260802140000 הורצה ואומת ב-information_schema
+  // (text, default 'USD'). לפני ההרצה מפתח כזה היה מפיל כל INSERT.
+  "currency",
 ]);
 
 // Client-side-only fields. They are dropped on write by design, so dropping
