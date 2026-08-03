@@ -43,6 +43,32 @@ export default defineConfig({
   },
   server: {
     proxy: {
+      // Mirror the Vercel `api/fx.js` function in local dev. Without this the
+      // currency work can only ever be verified in production, which means the
+      // one path you most want to see with your own eyes — a real rate applied
+      // to real numbers — is the one path you cannot test before shipping it.
+      //
+      // Frankfurter's range endpoint puts the dates in the PATH (`/a..b`) while
+      // our client puts them in the query, so the rewrite moves them. The
+      // response shape is identical either way, which is why `api/fx.js` passes
+      // `rates` straight through and this proxy can too.
+      "/api/fx": {
+        target: "https://api.frankfurter.dev",
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => {
+          const q = new URLSearchParams(path.split("?")[1] || "");
+          const base = q.get("base") || "USD";
+          const symbols = q.get("symbols") || "";
+          const start = q.get("start");
+          const end = q.get("end");
+          const date = q.get("date");
+          const tail = `?base=${base}${symbols ? `&symbols=${symbols}` : ""}`;
+          if (start && end) return `/v1/${start}..${end}${tail}`;
+          if (date) return `/v1/${date}${tail}`;
+          return `/v1/latest${tail}`;
+        },
+      },
       // Mirror the Vercel `api/symbol-search.js` function in local dev:
       // forward /api/symbol-search?text=... to TradingView with the Referer
       // header it requires (the browser can't set Referer itself → 403).

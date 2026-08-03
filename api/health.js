@@ -25,7 +25,10 @@ import { rateLimit, clientIp } from "./_lib/rateLimit.js";
 const FINNHUB_BASE = "https://finnhub.io/api/v1";
 const COINGECKO_BASE = "https://api.coingecko.com/api/v3";
 const TWELVEDATA_BASE = "https://api.twelvedata.com";
-const FRANKFURTER_BASE = "https://api.frankfurter.app";
+// The canonical host. `api.frankfurter.app` still answers but 301s here,
+// and a service that works only because a redirect is followed is a
+// dependency nobody wrote down — verified 03.08.2026.
+const FRANKFURTER_BASE = "https://api.frankfurter.dev/v1";
 const TIMEOUT_MS = 5000;
 
 async function timedFetch(url, opts = {}) {

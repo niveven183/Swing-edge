@@ -38,7 +38,10 @@
 import { rateLimit, clientIp } from "./_lib/rateLimit.js";
 import { applyCors } from "./_lib/cors.js";
 
-const FRANKFURTER_BASE = "https://api.frankfurter.app";
+// The canonical host. `api.frankfurter.app` still answers but 301s here,
+// and a service that works only because a redirect is followed is a
+// dependency nobody wrote down — verified 03.08.2026.
+const FRANKFURTER_BASE = "https://api.frankfurter.dev/v1";
 
 // Abort a hung upstream so a stalled provider can't pin a serverless invocation
 // open for its full timeout. Mirrors api/quote.js.

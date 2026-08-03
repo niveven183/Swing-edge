@@ -27,6 +27,9 @@ const LS_KEYS = {
   swingEdgePriceAlerts: { field: "priceAlerts", parse: JSON.parse },
   swingEdgeLang: { field: "lang", parse: (v) => v },
   swingEdgeAccountCurrency: { field: "accountCurrency", parse: (v) => v },
+  // T10: the currency the capital NUMBER is denominated in, distinct from the
+  // one it is displayed in. jsonb blob, so a new key costs no migration.
+  swingEdgeCapitalCurrency: { field: "capitalCurrency", parse: (v) => v },
 };
 
 // ── localStorage helpers (SSR/Node-safe; never throw) ──────────────────────

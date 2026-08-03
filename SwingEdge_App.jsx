@@ -45,7 +45,7 @@ import { useToast, useConfirm } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured, tradeForSupabase, tradeFromSupabase } from "./src/supabaseClient.js";
 import { cleanTrades, purgeInvalidTrades } from "./src/lib/cleanTrades.js";
 import { loadSettings, saveSettings, flushSettings, migrateFromLocalStorage } from "./src/lib/userSettings.js";
-import { calcTradeMetrics, fmt$, fmt$0, fmtR, fmtNum, fmtPrice, numOrNull, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays, localDayKey, realizedAt, realizedDayKey, currencyOf, CURRENCY_SYMBOL } from "./src/utils.js";
+import { calcTradeMetrics, fmt$, fmt$0, fmtR, fmtNum, fmtPrice, fmtBalance, numOrNull, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays, localDayKey, realizedAt, realizedDayKey, currencyOf, CURRENCY_SYMBOL } from "./src/utils.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell,
@@ -85,6 +85,8 @@ import {
   DNACard, EdgeCard, DecisionCoachPanel, TiltShield, GrowthChart, RegimeIndicator, PatternTags,
 } from "./src/intelligence/ui/IntelligenceUI.jsx";
 import { useTradingStats } from "./src/hooks/useTradingStats.js";
+import { useFxRates, realizedDayKeysOf, makeConvertingCalc } from "./src/hooks/useFxRates.js";
+import { convert } from "./src/lib/fx.js";
 import InfoTooltip from "./src/components/ui/InfoTooltip.jsx";
 import TermTooltip from "./src/components/ui/TermTooltip.jsx";
 import SmartSelect from "./src/components/ui/SmartSelect.jsx";
@@ -310,7 +312,17 @@ const SCANNER_DATA = [
 ];
 
 // ─── EQUITY CURVE GENERATION ─────────────────────────────────────────────────
-const generateEquityCurve = (cap, trades = []) => {
+// `calcFn` is injected rather than closed over so the curve is summed in ONE
+// currency. `balance += pnl` across a mixed-currency journal adds shekels to
+// dollars and yields a number that is not merely wrong by a rate — it is not a
+// quantity at all. The converting calc (makeConvertingCalc) prices each trade
+// at the fixing of the day it closed, so the series is stable forever: re-run
+// it tomorrow and every point is identical.
+//
+// It also keeps the last curve point and the "Account Equity" KPI on the same
+// rate, since both now derive through this one function. Those two disagreeing
+// is exactly the bug family of T10 finding 2, wearing a different hat.
+const generateEquityCurve = (cap, trades = [], calcFn = calcTradeMetrics) => {
   let balance = cap;
   const data = [];
   // getClosed returns a fresh array, so sorting in place does not mutate `trades`.
@@ -319,7 +331,7 @@ const generateEquityCurve = (cap, trades = []) => {
   const sortedTrades = getClosed(trades)
     .sort((a, b) => (realizedAt(a) ?? 0) - (realizedAt(b) ?? 0));
   sortedTrades.forEach(t => {
-    const pnl = calcTradeMetrics(t).pnl || 0;
+    const pnl = calcFn(t).pnl || 0;
     balance += pnl;
     data.push({ date: realizedDayKey(t), equity: Math.round(balance), ticker: t.ticker, pnl: Math.round(pnl) });
   });
@@ -398,7 +410,13 @@ const exportTradesCSV = (trades) => {
 // Aggregates come from useTradingStats (single source): `stats` = all-time,
 // `monthStats` = same hook scoped to the current month. Per-trade rows/equity
 // points stay local (per-trade calcTradeMetrics is the canonical source).
-const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity, currency = "USD") => {
+// T10 · `calcFn` is not optional plumbing. The report stamps ONE symbol on every
+// money figure in it, so every figure has to already be in that currency. Before
+// this parameter existed the KPI band came from `stats` (converted) while the
+// equity curve and the trade rows were rebuilt here from the raw
+// calcTradeMetrics (unconverted) — one page, one "₪", two currencies. `capital`
+// must likewise arrive already converted; the caller passes `capitalShown`.
+const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity, currency = "USD", calcFn = calcTradeMetrics) => {
   const sym = CURRENCY_SYMBOL[currency] || CURRENCY_SYMBOL.USD;
   const now = new Date();
   const monthName = now.toLocaleString("en-US", { month: "long" });
@@ -424,7 +442,7 @@ const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity, cur
   // Build equity curve points from all closed trades
   let runBalance = capital;
   const equityPoints = allClosed.map(t => {
-    const pnl = calcTradeMetrics(t).pnl || 0;
+    const pnl = calcFn(t).pnl || 0;
     runBalance += pnl;
     return { date: t.date, ticker: t.ticker, equity: Math.round(runBalance) };
   });
@@ -446,7 +464,7 @@ const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity, cur
   const areaD = `${pathD} L${chartW},${chartH} L0,${chartH} Z`;
 
   const tradeRows = [...monthClosed].reverse().map(t => {
-    const m = calcTradeMetrics(t);
+    const m = calcFn(t);
     const pnl = m.pnl != null ? m.pnl : 0;
     // `: 0` printed "+0.00R" for a trade that had no stop — an exported,
     // archived document asserting a measurement that was never taken.
@@ -762,6 +780,43 @@ const MixedCurrencyBanner = memo(({ stats, t }) => {
         </p>
       </div>
     </div>
+  );
+});
+
+// ─── FX NOTE ──────────────────────────────────────────────────────────────────
+// Principles 3 and 4 of T10, in one component.
+//
+// A converted number the user cannot check is a number the user has to trust,
+// and trust is the wrong thing to ask for about their own money. So whenever a
+// figure on screen has been through a rate, this line states the rate and the
+// DAY the rate is from — the ECB's actual fixing date, which on a Monday is
+// last Friday's, not today's.
+//
+// And when there is no rate, it says so instead of going quiet. A silent
+// absence looks identical to a successful conversion; that is the whole reason
+// the missing-rate path gets a visible marker rather than a console warning.
+const FxNote = memo(({ note, status, t, capital, capSym, dispSym, shown }) => {
+  if (status === "identity") return null;
+  if (status === "loading") {
+    return <p className="mt-2 text-[10px] text-[var(--v3-text-lo)] animate-pulse">···</p>;
+  }
+  if (status === "unavailable" || !note) {
+    return (
+      <p className="mt-2 flex items-start gap-1.5 text-[10px] leading-relaxed text-amber-400/90">
+        <AlertTriangle size={11} className="mt-0.5 shrink-0" />
+        <span>{t.fxUnavailable}</span>
+      </p>
+    );
+  }
+  return (
+    <p className="mt-2 text-[10px] leading-relaxed text-[var(--v3-text-lo)]">
+      <span className="font-mono text-[var(--v3-text-mid)]">
+        {capSym}{capital.toLocaleString()} = {dispSym}{Math.round(shown).toLocaleString()}
+      </span>
+      {"  ·  "}
+      {t.fxConvertedAt} <span className="font-mono">{note.rate.toFixed(4)}</span>
+      {note.date ? <> ({t.fxRateFrom} <span className="font-mono">{note.date}</span>)</> : null}
+    </p>
   );
 });
 
@@ -1108,9 +1163,30 @@ export default function SwingEdge() {
   });
   const [capitalInput, setCapitalInput] = useState("");
 
-  // The currency `capital` is denominated in. Money that belongs to a single trade
-  // prints in that trade's own currency; everything derived from capital (equity,
-  // position size, return %) prints in this one.
+  // ── TWO CURRENCIES, DELIBERATELY (T10) ────────────────────────────────────
+  //
+  // `capitalCurrency` is what the `capital` NUMBER means. `accountCurrency` is
+  // what the user wants to READ. One field carrying both meanings is a bug
+  // waiting to happen, and it already happened: switching the picker swapped
+  // the symbol and left the number alone, so $2,500 became "₪2,500" — a 3x
+  // wealth increase performed by a dropdown.
+  //
+  // The split is also what makes the round trip exact. `capital` is never
+  // rewritten when the display currency changes, so $200 → ₪611.48 → $200
+  // returns 200 exactly. There is no round trip on the stored value to lose
+  // precision in — the exactness is structural, not a rounding accident.
+  //
+  // Back-compat: before this split, `accountCurrency` WAS the denomination
+  // (it was only ever a label). Seeding `capitalCurrency` from it preserves
+  // every existing user's meaning exactly — a dollar journal stays a dollar
+  // journal, with zero migration and zero writes.
+  const [capitalCurrency, setCapitalCurrency] = useState(() => {
+    try {
+      const s = localStorage.getItem("swingEdgeCapitalCurrency")
+        || localStorage.getItem("swingEdgeAccountCurrency");
+      return CURRENCY_SYMBOL[s] ? s : "USD";
+    } catch { return "USD"; }
+  });
   const [accountCurrency, setAccountCurrency] = useState(() => {
     try {
       const s = localStorage.getItem("swingEdgeAccountCurrency");
@@ -1471,6 +1547,15 @@ export default function SwingEdge() {
         setAccountCurrency(s.accountCurrency);
         try { localStorage.setItem("swingEdgeAccountCurrency", s.accountCurrency); } catch {}
       }
+      // Back-compat: a row written before the split has no `capitalCurrency`.
+      // It falls back to `accountCurrency`, which back then WAS the denomination,
+      // so an existing account keeps meaning exactly what it meant yesterday.
+      const capCcy = CURRENCY_SYMBOL[s.capitalCurrency] ? s.capitalCurrency
+                   : CURRENCY_SYMBOL[s.accountCurrency] ? s.accountCurrency : null;
+      if (capCcy) {
+        setCapitalCurrency(capCcy);
+        try { localStorage.setItem("swingEdgeCapitalCurrency", capCcy); } catch {}
+      }
       if (typeof s.riskPct === "number" && s.riskPct >= 0.1 && s.riskPct <= 10) {
         setRiskPct(s.riskPct);
         try { localStorage.setItem("swingEdgeRiskPct", String(s.riskPct)); } catch {}
@@ -1526,7 +1611,7 @@ export default function SwingEdge() {
     try { betaWelcome = localStorage.getItem(`swingEdgeBetaWelcome:${authUser.id}`) === "1"; } catch {}
 
     const patch = {
-      capital, riskPct, lang, accountCurrency,
+      capital, riskPct, lang, accountCurrency, capitalCurrency,
       watchlist: watchlistItems,
       priceAlerts,
       playbook: playbookSetups,
@@ -1543,7 +1628,7 @@ export default function SwingEdge() {
       } catch {}
     }
     saveSettings(authUser.id, patch);
-  }, [capital, riskPct, lang, accountCurrency, watchlistItems, priceAlerts, playbookSetups, userProfile, showOnboarding]);
+  }, [capital, riskPct, lang, accountCurrency, capitalCurrency, watchlistItems, priceAlerts, playbookSetups, userProfile, showOnboarding]);
 
   // Flush the pending debounced settings write on logout / user-switch / tab-hide, so the
   // last change isn't lost. Gated on hydratedRef so a premature flush can't upsert an empty
@@ -1795,7 +1880,63 @@ export default function SwingEdge() {
   }, [marketState, moRange]);
 
   const realTrades = useMemo(() => trades.filter(t => !t.isDemo), [trades]);
-  const equityCurve = useMemo(() => generateEquityCurve(capital, realTrades), [realTrades, capital]);
+
+  // ─── FX ─────────────────────────────────────────────────────────────────────
+  // One rate table for the whole journal: spot, plus the fixing for every day
+  // that has a realized trade on it. Two requests, not one per trade.
+  const fxDayKeys = useMemo(() => realizedDayKeysOf(realTrades), [realTrades]);
+  const { table: fxTable, status: fxStatus } = useFxRates(capitalCurrency, accountCurrency, fxDayKeys);
+
+  // Present value: the capital base expressed in the display currency, at spot.
+  // `capital` itself is never touched — this is a view of it, which is why
+  // flipping the display currency and back is lossless.
+  const displayCapital = useMemo(() => {
+    const { value } = convert(capital, capitalCurrency, accountCurrency, fxTable);
+    return value;
+  }, [capital, capitalCurrency, accountCurrency, fxTable]);
+
+  // When no rate exists, converted figures must fall back to the currency the
+  // number is actually denominated in — never to the requested one with an
+  // unconverted number under it, which is precisely the $2,500 → "₪2,500" bug.
+  const fxOk = capitalCurrency === accountCurrency || displayCapital != null;
+  const dispCcy = fxOk ? accountCurrency : capitalCurrency;
+  const capitalShown = displayCapital != null ? displayCapital : capital;
+  // The one symbol every ACCOUNT-LEVEL figure prints. Deliberately distinct from
+  // `accSym` (what the user ASKED for) — when there is no rate the two differ,
+  // and printing the requested symbol over an unconverted number is exactly the
+  // "$2,500 → ₪2,500" bug this task exists to kill.
+  const dispSym = CURRENCY_SYMBOL[dispCcy] || CURRENCY_SYMBOL.USD;
+  // The capital's OWN symbol. Used by the tools whose inputs the user types in
+  // that currency — the position calculator and the trade form — because
+  // converting a number the user just typed is not a display, it is an edit.
+  const capSym = CURRENCY_SYMBOL[capitalCurrency] || CURRENCY_SYMBOL.USD;
+  // Present-value view of an amount denominated in the capital's currency.
+  // Spot, not a past fixing: risk and position size are claims about NOW.
+  // Falls back to the raw number only when `dispCcy` is already the capital's
+  // currency, so the symbol and the number can never disagree.
+  const toDisp = useCallback((n) => {
+    if (!fxOk || capitalCurrency === accountCurrency) return n;
+    const { value } = convert(n, capitalCurrency, accountCurrency, fxTable);
+    return value == null ? n : value;
+  }, [fxOk, capitalCurrency, accountCurrency, fxTable]);
+  // The rate actually applied, for the "converted at …" line. Null in identity
+  // mode (nothing was converted) and when no rate exists (nothing to claim).
+  const fxNote = useMemo(() => {
+    if (capitalCurrency === accountCurrency || !fxOk || !fxTable?.spot) return null;
+    return { rate: fxTable.spot.rate, date: fxTable.spot.rateDate, from: capitalCurrency, to: accountCurrency };
+  }, [capitalCurrency, accountCurrency, fxOk, fxTable]);
+
+  // Every aggregate flows through this one seam. Identity when there is nothing
+  // to convert, which keeps a pure-dollar journal byte-identical to before.
+  const stableCalcTradeMetrics = useMemo(
+    () => makeConvertingCalc(fxTable, accountCurrency, fxStatus),
+    [fxTable, accountCurrency, fxStatus]
+  );
+
+  const equityCurve = useMemo(
+    () => generateEquityCurve(capitalShown, realTrades, stableCalcTradeMetrics),
+    [realTrades, capitalShown, stableCalcTradeMetrics]
+  );
   const closedTrades = getClosed(realTrades);
   const openTrades   = realTrades.filter(t => t.status === "OPEN");
   // Journal header counter: counts over the SAME base the journal list renders
@@ -1803,19 +1944,17 @@ export default function SwingEdge() {
   const openCountAll   = useMemo(() => trades.filter(t => t.status === "OPEN").length, [trades]);
   const closedCountAll = useMemo(() => getClosed(trades).length, [trades]);
 
-  // Stable reference for the pure calcTradeMetrics function — prevents
-  // useTradingStats from re-running its useMemo on every render.
-  const stableCalcTradeMetrics = useCallback(calcTradeMetrics, []);
-
   // ─── MASTER STATS HUB — single source of truth ──────────────────────────────
-  const stats = useTradingStats(realTrades, capital, stableCalcTradeMetrics);
+  // Fed the DISPLAYED capital and the converting calc, so the return % and the
+  // equity KPI are a ratio of two numbers in the same currency.
+  const stats = useTradingStats(realTrades, capitalShown, stableCalcTradeMetrics);
   const { totalPnL, winRate, avgR } = stats;
 
   // Mentor Dashboard (B4.3) — derived analytics for the SELECTED mentee. Kept
   // separate from the mentor's own `stats`/`aiDNA` so the two never mix. Both
   // hooks run unconditionally with an empty default until a mentee is chosen.
   const menteeRealTrades = useMemo(() => menteeTrades.filter(t => !t.isDemo), [menteeTrades]);
-  const menteeStats = useTradingStats(menteeRealTrades, capital, stableCalcTradeMetrics);
+  const menteeStats = useTradingStats(menteeRealTrades, capitalShown, stableCalcTradeMetrics);
   const menteeDNA = useMemo(() => calculateTradeDNA(menteeRealTrades), [menteeRealTrades]);
 
   // Current-month subset fed through the same hub — powers the monthly PDF export.
@@ -1829,7 +1968,7 @@ export default function SwingEdge() {
       return d.getMonth() === m && d.getFullYear() === y;
     });
   }, [realTrades]);
-  const monthStats = useTradingStats(currentMonthRealTrades, capital, stableCalcTradeMetrics);
+  const monthStats = useTradingStats(currentMonthRealTrades, capitalShown, stableCalcTradeMetrics);
 
   // ─── MONTHLY REPORT — auto-popup modal (start of month, once) + QA shortcut ──
   const [showReportModal, setShowReportModal] = useState(false);
@@ -1909,7 +2048,7 @@ export default function SwingEdge() {
     () => filteredTrades.filter(t => !t.isDemo),
     [filteredTrades]
   );
-  const journalStats = useTradingStats(filteredRealTrades, capital, stableCalcTradeMetrics);
+  const journalStats = useTradingStats(filteredRealTrades, capitalShown, stableCalcTradeMetrics);
 
   const uniqueSetups = useMemo(() => {
     const s = new Set(trades.map(t => t.setup).filter(Boolean));
@@ -2011,9 +2150,14 @@ export default function SwingEdge() {
   // showing (FIN-013). It used to read `totalPnL / capital`, which is the
   // closed-only return, so with an open position the headline moved and the
   // percentage beside it did not — two different portfolios in one card.
+  //
+  // T10: the denominator is `capitalShown`, not `capital`. `curEquity` is in the
+  // DISPLAY currency; `capital` is in the capital's. Dividing one by the other
+  // is a ratio of two units, and it does not fail quietly — it read 286.7% on a
+  // journal that made 26%, because it was measuring the exchange rate.
   const curEquityReturnPct = useMemo(
-    () => (capital > 0 ? ((curEquity - capital) / capital) * 100 : 0),
-    [curEquity, capital]
+    () => (capitalShown > 0 ? ((curEquity - capitalShown) / capitalShown) * 100 : 0),
+    [curEquity, capitalShown]
   );
 
   // Daily P&L calculation
@@ -2230,9 +2374,13 @@ export default function SwingEdge() {
       date: new Date().toISOString().slice(0, 10),
       createdAt: new Date().toISOString(),
       side: form.side,
-      // A hand-typed trade is priced in the account's currency by construction —
-      // the form has no currency field and posSize/risk are derived from `capital`.
-      currency: accountCurrency,
+      // A hand-typed trade is priced in the CAPITAL's currency by construction —
+      // the form has no currency field and posSize/risk are derived from
+      // `capital`, which is denominated in `capitalCurrency`. Stamping the
+      // DISPLAY currency here would be the split's worst failure mode: a $150
+      // entry saved as "₪150" and then converted again on the way out, so
+      // merely looking at the journal in shekels would silently rewrite it.
+      currency: capitalCurrency,
       entry: entryN, stop: stopN, target: targetN,
       shares: effShares, status: "OPEN", exit: null,
       setup: form.setup, notes: form.notes,
@@ -3222,7 +3370,7 @@ export default function SwingEdge() {
           </div>
           <div className="text-end hidden sm:block">
             <div className="text-xs text-slate-500">{t.account}</div>
-            <div className="text-sm font-bold font-mono text-cyan-400">{accSym}{curEquity.toLocaleString("en-US", { minimumFractionDigits: 2 })}</div>
+            <div className="text-sm font-bold font-mono text-cyan-400">{fmtBalance(curEquity, dispCcy)}</div>
           </div>
         </div>
       </header>
@@ -3443,12 +3591,21 @@ export default function SwingEdge() {
               </div>
             )}
             <MixedCurrencyBanner stats={stats} t={t} />
+            {/* C7 — the missing-rate marker. Silence and success look the
+                same on screen, so an unavailable rate has to say so where
+                the numbers are, not only in Settings. */}
+            {fxStatus === "unavailable" && (
+              <p className="mb-4 flex items-start gap-1.5 text-[11px] leading-relaxed text-amber-400/90">
+                <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                <span>{t.fxUnavailable}</span>
+              </p>
+            )}
             {/* KPI Row */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              <StatCard anchor="equity" label={t.accountEquity}  value={`${accSym}${curEquity.toLocaleString("en-US", {minimumFractionDigits:0})}`} sub={`${t.startedAt} ${accSym}${capital.toLocaleString()}`} trend={curEquityReturnPct} icon={DollarSign} accent="cyan"
+              <StatCard anchor="equity" label={t.accountEquity}  value={fmtBalance(curEquity, dispCcy)} sub={`${t.startedAt} ${dispSym}${Math.round(capitalShown).toLocaleString()}`} trend={curEquityReturnPct} icon={DollarSign} accent="cyan"
                 info={lang === "he"
-                  ? `הון = בסיס ההון שהגדרת (${accSym}${capital.toLocaleString()}) בתוספת P&L מצטבר מעסקאות סגורות ופתוחות. הסיכון לכל עסקה מחושב תמיד מבסיס ההון הקבוע — לא מההון הנוכחי.`
-                  : `Equity = your capital base (${accSym}${capital.toLocaleString()}) plus cumulative P&L from closed & open trades. Per-trade risk is always sized from your fixed capital base — not current equity.`} />
+                  ? `הון = בסיס ההון שהגדרת (${dispSym}${Math.round(capitalShown).toLocaleString()}) בתוספת P&L מצטבר מעסקאות סגורות ופתוחות. הסיכון לכל עסקה מחושב תמיד מבסיס ההון הקבוע — לא מההון הנוכחי.`
+                  : `Equity = your capital base (${dispSym}${Math.round(capitalShown).toLocaleString()}) plus cumulative P&L from closed & open trades. Per-trade risk is always sized from your fixed capital base — not current equity.`} />
               <StatCard label={t.netPnlClosed} value={fmt$(Math.round(totalPnL * 100) / 100, statsCcy(stats))} sub={`${closedTrades.length} ${t.closedTrades}`} trend={stats.returnPct} trendText={formatReturnPct(stats.returnPct)} icon={TrendingUp} accent={totalPnL >= 0 ? "green" : "red"} />
               <StatCard label={<span className="flex items-center gap-1">{t.winRate}<TermTooltip term="winRate" lang={lang} /></span>} value={formatPct(winRate)} sub={winLossBeSub(stats)} icon={Target} accent="purple" />
               <StatCard label={<span className="flex items-center gap-1">{t.avgRMultiple}<TermTooltip term="avgR" lang={lang} /></span>} value={fmtR(avgR)} sub={rSampleSub(t, stats)} icon={Activity} accent="amber" />
@@ -3560,9 +3717,9 @@ export default function SwingEdge() {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
                     <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => typeof v === "string" && v.length === 10 && v[4] === "-" ? v.slice(5) : v} minTickGap={40} />
-                    <YAxis domain={equityYDomain(equityCurve)} tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={(v) => fmtAxisMoney(v, accountCurrency)} width={52} />
+                    <YAxis domain={equityYDomain(equityCurve)} tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={(v) => fmtAxisMoney(v, dispCcy)} width={52} />
                     <ReferenceLine y={capital} stroke="var(--v3-text-lo)" strokeDasharray="4 4" />
-                    <Tooltip contentStyle={{ background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 8, fontSize: 11 }} formatter={(v) => [`${accSym}${v.toLocaleString()}`, "Equity"]} />
+                    <Tooltip contentStyle={{ background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 8, fontSize: 11 }} formatter={(v) => [fmtBalance(v, dispCcy), "Equity"]} />
                     <Area type="monotone" dataKey="equity" stroke="var(--v3-info)" strokeWidth={2} fill="url(#eqGrad)" dot={{ fill: "var(--v3-info)", r: 3 }} />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -3698,7 +3855,10 @@ export default function SwingEdge() {
               // meter the full position value — the single largest source of a
               // wrong "you are over your risk limit" reading.
               const openRisks = openTrades.map(t => {
-                const hasStop = t.stop != null && t.shares > 0;
+                // Risk in another currency over `capital` is a ratio of two
+                // units — UNMEASURED, same contract as a missing stop below.
+                const sameCcy = currencyOf(t) === capitalCurrency;
+                const hasStop = sameCcy && t.stop != null && t.shares > 0;
                 const riskDollar = hasStop ? Math.abs(t.entry - t.stop) * t.shares : null;
                 const riskPct = hasStop && capital > 0 ? (riskDollar / capital) * 100 : null;
                 const rrRatio = hasStop && t.target ? priceBasedRR(t.entry, t.stop, t.target) : null;
@@ -3745,7 +3905,7 @@ export default function SwingEdge() {
                     <div className={`bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border rounded-xl p-4 ${meterColor.border}`}>
                       <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 block mb-1">{t.totalOpenRisk}</span>
                       <span className={`text-2xl font-bold font-mono ${meterColor.text}`}>{totalRiskPct.toFixed(2)}%</span>
-                      <span className="text-xs text-slate-500 block mt-0.5 font-mono">{accSym}{totalRiskDollar.toFixed(2)}</span>
+                      <span className="text-xs text-slate-500 block mt-0.5 font-mono">{dispSym}{toDisp(totalRiskDollar).toFixed(2)}</span>
                       <span className="text-[10px] text-slate-600 mt-1 block">
                         {openTrades.length - unmeasuredRiskCount}/{openTrades.length} {t.openTradesCount}
                       </span>
@@ -3760,8 +3920,8 @@ export default function SwingEdge() {
                     <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
                       <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mb-1 flex items-center gap-1">{t.maxAllowedRisk}<TermTooltip term="riskLimits" lang={lang} /></span>
                       <span className="text-2xl font-bold font-mono text-violet-400">{MAX_RISK_PCT.toFixed(1)}%</span>
-                      <span className="text-xs text-slate-500 block mt-0.5 font-mono">{accSym}{maxRiskDollar.toFixed(2)}</span>
-                      <span className="text-[10px] text-slate-600 mt-1 block">{t.fromCapital} {accSym}{capital.toLocaleString()}</span>
+                      <span className="text-xs text-slate-500 block mt-0.5 font-mono">{dispSym}{toDisp(maxRiskDollar).toFixed(2)}</span>
+                      <span className="text-[10px] text-slate-600 mt-1 block">{t.fromCapital} {dispSym}{Math.round(capitalShown).toLocaleString()}</span>
                     </div>
 
                     {/* Visual risk meter */}
@@ -3790,7 +3950,7 @@ export default function SwingEdge() {
                         <span className={`text-lg font-bold font-mono ${meterColor.text}`}>{usedPct.toFixed(0)}%</span>
                         <span className="text-[10px] text-slate-600">{t.ofLimit}</span>
                         <span className="ms-auto text-[10px] text-slate-500 font-mono">
-                          {t.remaining}: ${Math.max(maxRiskDollar - totalRiskDollar, 0).toFixed(2)}
+                          {t.remaining}: {dispSym}{toDisp(Math.max(maxRiskDollar - totalRiskDollar, 0)).toFixed(2)}
                         </span>
                       </div>
                     </div>
@@ -4436,7 +4596,7 @@ export default function SwingEdge() {
                   <div className="text-center">
                     <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">{t.riskInDollars}</div>
                     <div className="text-lg font-bold font-mono text-[var(--v3-loss)]">
-                      {azShares > 0 ? `${accSym}${azDollarRisk.toFixed(2)}` : "–"}
+                      {azShares > 0 ? `${dispSym}${toDisp(azDollarRisk).toFixed(2)}` : "–"}
                     </div>
                   </div>
                   <div className="text-center">
@@ -4790,7 +4950,7 @@ export default function SwingEdge() {
                       min="0"
                       className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition font-mono"
                     />
-                    <span className="text-[9px] text-slate-700 mt-0.5 block font-mono">Auto: {accSym}{capital.toLocaleString()}</span>
+                    <span className="text-[9px] text-slate-700 mt-0.5 block font-mono">Auto: {capSym}{capital.toLocaleString()}</span>
                   </div>
                   <div>
                     <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1 flex items-center gap-1">
@@ -4858,7 +5018,7 @@ export default function SwingEdge() {
                       <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase tracking-widest">
                         <AlertTriangle size={10} className="text-[var(--v3-loss)]" /> {t.riskInDollars}
                       </div>
-                      <div className="text-2xl font-bold font-mono text-[var(--v3-loss)]">{accSym}{riskDollars.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                      <div className="text-2xl font-bold font-mono text-[var(--v3-loss)]">{capSym}{riskDollars.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                       <div className="text-xs text-slate-600">{riskN}% {t.ofCapital}</div>
                     </div>
 
@@ -4866,8 +5026,8 @@ export default function SwingEdge() {
                       <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase tracking-widest">
                         <DollarSign size={10} className="text-[var(--v3-accent)]" /> {t.positionSize}
                       </div>
-                      <div className="text-2xl font-bold font-mono text-[var(--v3-accent)]">{accSym}{posValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                      <div className="text-xs text-slate-600">{shares} × {accSym}{entN.toFixed(2)}</div>
+                      <div className="text-2xl font-bold font-mono text-[var(--v3-accent)]">{capSym}{posValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                      <div className="text-xs text-slate-600">{shares} × {fmtPrice(entN, capitalCurrency)}</div>
                     </div>
 
                     <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-violet-500/25 rounded-xl p-4 flex flex-col gap-1">
@@ -4875,7 +5035,7 @@ export default function SwingEdge() {
                         <Percent size={10} className="text-violet-400" /> {t.portfolioPct}
                       </div>
                       <div className="text-2xl font-bold font-mono text-violet-400">{portPct.toFixed(1)}%</div>
-                      <div className="text-xs text-slate-600">{t.ofPortfolio} {accSym}{capN.toLocaleString()}</div>
+                      <div className="text-xs text-slate-600">{t.ofPortfolio} {capSym}{capN.toLocaleString()}</div>
                     </div>
                   </div>
 
@@ -4914,6 +5074,15 @@ export default function SwingEdge() {
         {tab === "analytics" && (
           <div className="space-y-8 animate-fade-in">
             <MixedCurrencyBanner stats={stats} t={t} />
+            {/* C7 — the missing-rate marker. Silence and success look the
+                same on screen, so an unavailable rate has to say so where
+                the numbers are, not only in Settings. */}
+            {fxStatus === "unavailable" && (
+              <p className="mb-4 flex items-start gap-1.5 text-[11px] leading-relaxed text-amber-400/90">
+                <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                <span>{t.fxUnavailable}</span>
+              </p>
+            )}
             {/* ═══════════ HERO — the story of your account ═══════════ */}
             <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-2xl p-6 md:p-8">
               <div className="flex items-start justify-between gap-4 mb-6">
@@ -4929,7 +5098,7 @@ export default function SwingEdge() {
                       {totalPnL>=0?"▲":"▼"} {formatReturnPct(stats.returnPct)}
                     </span>
                     <span className="text-slate-600">·</span>
-                    <span>{lang === "he" ? `הון התחלתי ${accSym}${capital.toLocaleString()}` : `starting capital ${accSym}${capital.toLocaleString()}`}</span>
+                    <span>{lang === "he" ? `הון התחלתי ${dispSym}${Math.round(capitalShown).toLocaleString()}` : `starting capital ${dispSym}${Math.round(capitalShown).toLocaleString()}`}</span>
                   </div>
                 </div>
                 <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 flex items-center gap-1 shrink-0">
@@ -4946,11 +5115,11 @@ export default function SwingEdge() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
                   <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => typeof v === "string" && v.length === 10 && v[4] === "-" ? v.slice(5) : v} minTickGap={40} />
-                  <YAxis domain={equityYDomain(equityCurve)} tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={(v) => fmtAxisMoney(v, accountCurrency)} width={52} />
+                  <YAxis domain={equityYDomain(equityCurve)} tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={(v) => fmtAxisMoney(v, dispCcy)} width={52} />
                   <ReferenceLine y={capital} stroke="var(--v3-text-lo)" strokeDasharray="5 5" label={{ value: lang === "he" ? "הון התחלתי" : "Starting Capital", position: "insideTopRight", fontSize: 9, fill: "var(--v3-text-lo)" }} />
                   <Tooltip
                     contentStyle={{ background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 10, fontSize: 11 }}
-                    formatter={(v, n, p) => [`${accSym}${v.toLocaleString()} (${p.payload.ticker})`, "Equity"]}
+                    formatter={(v, n, p) => [`${fmtBalance(v, dispCcy)} (${p.payload.ticker})`, "Equity"]}
                   />
                   <Area type="monotone" dataKey="equity" stroke="var(--v3-info)" strokeWidth={2.5} fill="url(#eqFull)" dot={{ fill: "var(--v3-info)", r: 4, strokeWidth: 0 }} activeDot={{ r: 6, fill: "var(--v3-info)" }} />
                 </AreaChart>
@@ -6083,8 +6252,33 @@ export default function SwingEdge() {
                   </button>
                 </div>
                 <p className="text-[10px] text-[var(--v3-text-lo)] mt-2">
-                  {t.currentCapital}: <span className="text-[var(--v3-accent)] font-mono font-bold">{CURRENCY_SYMBOL[accountCurrency]}{capital.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                  {t.currentCapital}: <span className="text-[var(--v3-accent)] font-mono font-bold">{fmtBalance(capital, capitalCurrency)}</span>
                 </p>
+
+                {/* What the capital NUMBER is denominated in. Separate from the
+                    display currency on purpose: one field carrying both meanings
+                    is what let "$2,500" become "₪2,500" by flipping a label. */}
+                <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] dark:border-white/[0.06]">
+                  <h4 className="text-xs font-bold text-white mb-1">{t.capitalCurrencyTitle}</h4>
+                  <p className="text-[11px] text-[var(--v3-text-lo)] mb-2">{t.capitalCurrencyDesc}</p>
+                  <div className="flex gap-2">
+                    {["USD", "ILS"].map(c => (
+                      <button
+                        key={c}
+                        onClick={() => {
+                          setCapitalCurrency(c);
+                          try { localStorage.setItem("swingEdgeCapitalCurrency", c); } catch {}
+                        }}
+                        className={`px-4 py-2 rounded-lg text-xs font-bold font-mono transition border ${
+                          capitalCurrency === c
+                            ? "bg-[var(--v3-accent-glow)] border-[#00C076]/30 text-[var(--v3-accent)]"
+                            : "bg-white/5 border-[var(--border-subtle)] dark:border-white/[0.10] text-[var(--v3-text-mid)] hover:text-white"
+                        }`}>
+                        {CURRENCY_SYMBOL[c]} {c}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
                 <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] dark:border-white/[0.06]">
                   <h4 className="text-xs font-bold text-white mb-1">{t.accountCurrencyTitle}</h4>
@@ -6106,6 +6300,9 @@ export default function SwingEdge() {
                       </button>
                     ))}
                   </div>
+                  {/* C6 — transparency. A converted number must say what it was
+                      converted at and on which day, or the user cannot check it. */}
+                  <FxNote note={fxNote} status={fxStatus} t={t} capital={capital} capSym={capSym} dispSym={dispSym} shown={capitalShown} />
                 </div>
               </div>
 
@@ -6394,7 +6591,7 @@ export default function SwingEdge() {
                       {t.pdfIncludes}
                     </p>
                     <button
-                      onClick={() => exportMonthlyPDF(realTrades, capital, stats, monthStats, curEquity, statsCcy(stats))}
+                      onClick={() => exportMonthlyPDF(realTrades, capitalShown, stats, monthStats, curEquity, statsCcy(stats), stableCalcTradeMetrics)}
                       className="w-full py-2 rounded-lg bg-[var(--v3-info-glow)] border border-[#06b6d4]/25 text-[var(--v3-info)] text-xs font-bold hover:bg-[#06b6d4]/20 transition flex items-center justify-center gap-1.5">
                       <FileText size={12} /> {t.createPdf}
                     </button>
@@ -6671,11 +6868,11 @@ export default function SwingEdge() {
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-[var(--v3-text-lo)] uppercase tracking-wider mb-0.5">Pos. Value</div>
-                    <div className={`text-sm font-bold font-mono truncate ${tradeValidity.valid?"text-white":"text-[var(--v3-text-lo)]"}`}>{tradeValidity.valid?`${accSym}${effPosValue.toLocaleString()}`:"—"}</div>
+                    <div className={`text-sm font-bold font-mono truncate ${tradeValidity.valid?"text-white":"text-[var(--v3-text-lo)]"}`}>{tradeValidity.valid?`${capSym}${effPosValue.toLocaleString()}`:"—"}</div>
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-[var(--v3-text-lo)] uppercase tracking-wider mb-0.5">Max Risk</div>
-                    <div className={`text-sm font-bold font-mono truncate ${tradeValidity.valid?"text-[var(--v3-loss)]":"text-[var(--v3-text-lo)]"}`}>{tradeValidity.valid?`${accSym}${Math.round(effPotLoss).toLocaleString()}`:"—"}</div>
+                    <div className={`text-sm font-bold font-mono truncate ${tradeValidity.valid?"text-[var(--v3-loss)]":"text-[var(--v3-text-lo)]"}`}>{tradeValidity.valid?`${capSym}${Math.round(effPotLoss).toLocaleString()}`:"—"}</div>
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-[var(--v3-text-lo)] uppercase tracking-wider mb-0.5 flex items-center justify-center gap-1">R/R Ratio<TermTooltip term="rr" lang={lang} /></div>
@@ -7064,7 +7261,7 @@ export default function SwingEdge() {
               </span>
             );
           })()}
-          <span>{t.accountEquity}: {accSym}{curEquity.toLocaleString("en-US", {minimumFractionDigits: 2})}</span>
+          <span>{t.accountEquity}: {fmtBalance(curEquity, dispCcy)}</span>
           <span>{t.riskPerTradeFooter}</span>
         </div>
         <div className="flex items-center gap-4">

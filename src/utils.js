@@ -165,6 +165,22 @@ export const fmtPrice = (n, currency = "USD") => {
   return `${sym}${v.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 };
 
+// Account balance display — unsigned, always exactly two decimals.
+//
+// Not a price and not a P&L, so neither `fmtPrice` (which keeps a price's
+// natural precision) nor `fmt$` (which forces a leading +/-) fits. It exists
+// because `toLocaleString("en-US", { minimumFractionDigits: 2 })` leaves the
+// MAXIMUM at 3, which nobody notices while every balance is a round dollar
+// figure — and then a converted balance lands on 9666.972 and the header
+// prints "₪9,666.972", three decimals of a currency whose smallest unit is
+// the agora. Conversion did not create that bug; it made it visible.
+export const fmtBalance = (n, currency = "USD") => {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return "—";
+  const sym = CURRENCY_SYMBOL[currency] || CURRENCY_SYMBOL.USD;
+  return `${sym}${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
 // Numeric field parsing at the input boundary. `0` is a value, not a blank:
 // `parseFloat(v) || null` silently turned a real MFE/MAE of 0 into "not filled
 // in". Garbage still becomes null rather than a stored NaN.
