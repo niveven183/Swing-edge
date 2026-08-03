@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { MessageCircle } from "lucide-react";
 import TickerLogo from "./TickerLogo";
-import { calcTradeMetrics, fmt$, fmtR, currencyOf, CURRENCY_SYMBOL } from "../utils";
+import { calcTradeMetrics, fmt$, fmtR, fmtPrice, currencyOf } from "../utils";
 import { getTranslations, labelFor } from "../i18n.js";
 
 function MobileTradeCardImpl({
@@ -81,9 +81,9 @@ function MobileTradeCardImpl({
 
       <div className="flex flex-wrap items-center gap-2 font-mono text-[11px]">
         <span className="text-[var(--v3-text-lo)]">{shortDate}</span>
-        <span className="text-slate-300">{CURRENCY_SYMBOL[currencyOf(trade)]}{trade.entry}</span>
+        <span className="text-slate-300">{fmtPrice(trade.entry, currencyOf(trade))}</span>
         <span className="text-[var(--v3-text-lo)]">→</span>
-        <span className="text-slate-300">{trade.exit != null ? `${CURRENCY_SYMBOL[currencyOf(trade)]}${trade.exit}` : "–"}</span>
+        <span className="text-slate-300">{trade.exit != null ? `${fmtPrice(trade.exit, currencyOf(trade))}` : "–"}</span>
         {trade.setup && (
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#A78BFA]/10 text-[var(--v3-purple)] border border-[#A78BFA]/20 whitespace-nowrap shrink-0">
             {labelFor("setup", trade.setup, lang)}

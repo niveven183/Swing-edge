@@ -1,6 +1,6 @@
 // api/health.js — dependency health probe (Vercel serverless function)
 //
-// Checks Supabase, Finnhub, Twelve Data, and CoinGecko in parallel so an
+// Checks Supabase, Finnhub, Twelve Data, CoinGecko and Frankfurter in parallel so an
 // outage in any one of them shows up here before a user hits it in the app.
 // Each check gets a 5s timeout and never throws past itself — one bad
 // dependency reports as "failing", it never crashes the whole probe.
@@ -10,6 +10,9 @@
 // Finnhub is also non-fatal for the same reason (transient 401/429/timeout
 // shouldn't page us either — see console.error in checkFinnhub for root cause).
 // CoinGecko is also non-fatal now — its rate-limits/timeouts shouldn't page us.
+// Frankfurter (FX rates, api/fx.js) is non-fatal too: conversion degrades to the
+// original currency with a marker, so an outage is a handled failure, not an
+// incident. It is watched here so the degradation is visible rather than silent.
 // Supabase stays the sole hard-fail (503) dependency since it's load-bearing.
 //
 //   GET /api/health
@@ -22,6 +25,7 @@ import { rateLimit, clientIp } from "./_lib/rateLimit.js";
 const FINNHUB_BASE = "https://finnhub.io/api/v1";
 const COINGECKO_BASE = "https://api.coingecko.com/api/v3";
 const TWELVEDATA_BASE = "https://api.twelvedata.com";
+const FRANKFURTER_BASE = "https://api.frankfurter.app";
 const TIMEOUT_MS = 5000;
 
 async function timedFetch(url, opts = {}) {
@@ -95,18 +99,37 @@ async function checkCoinGecko() {
   return r.ok;
 }
 
+// Frankfurter (ECB reference rates) — the FX source behind api/fx.js. Checked
+// here because a new external dependency that nothing watches is a silent
+// failure waiting to happen: when it is down, converted figures fall back to
+// their original currency, which is correct behaviour but is indistinguishable
+// from "the user has a dollar journal" unless something says otherwise.
+async function checkFrankfurter() {
+  const r = await timedFetch(`${FRANKFURTER_BASE}/latest?base=USD&symbols=ILS`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!r.ok) return false;
+  const d = await r.json();
+  // `ok` is not enough — a 200 with no rate is exactly the case that matters.
+  return Number.isFinite(d?.rates?.ILS) && d.rates.ILS > 0;
+}
+
 const SERVICES = {
   supabase: checkSupabaseWithRetry,
   finnhub: checkFinnhub,
   twelvedata: checkTwelveData,
   coingecko: checkCoinGecko,
+  frankfurter: checkFrankfurter,
 };
 
 // Non-fatal deps: reported under `warnings`, never trigger a 503. TwelveData's
 // credit rate-limits (429/timeout) shouldn't page us on a transient blip;
 // Finnhub gets the same treatment (see checkFinnhub's console.error for cause);
 // CoinGecko's public API is similarly prone to transient rate-limits/timeouts.
-const NON_FATAL = new Set(["twelvedata", "finnhub", "coingecko"]);
+// Frankfurter is non-fatal by design, not by tolerance: api/fx.js degrades to
+// "no rate → show the original currency with a marker", so an outage costs a
+// conversion, not the app. Paging on it would be paging on a handled failure.
+const NON_FATAL = new Set(["twelvedata", "finnhub", "coingecko", "frankfurter"]);
 
 async function run(fn) {
   const start = Date.now();

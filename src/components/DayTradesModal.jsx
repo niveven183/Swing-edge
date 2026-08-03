@@ -7,7 +7,7 @@ import useModalA11y from '../hooks/useModalA11y.js';
 import TickerLogo from './TickerLogo.jsx';
 import InfoTooltip from './ui/InfoTooltip.jsx';
 import { EMOTION_OPTIONS } from '../data/tradeOptions.jsx';
-import { isFollowedPlan, isOffPlan, fmt$, fmtR, isNegativeValue, currencyOf, CURRENCY_SYMBOL } from '../utils.js';
+import { isFollowedPlan, isOffPlan, fmt$, fmtR, fmtPrice, isNegativeValue, currencyOf } from '../utils.js';
 import { getSetupTooltip } from '../intelligence/knowledgeGlue.js';
 import { outcomeRates } from '../intelligence/utils/statisticalModels.js';
 
@@ -232,8 +232,8 @@ export default function DayTradesModal({ dateKey, trades = [], calcMetrics, lang
 
                 {/* Row 2: detail grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-xs">
-                  <Field label={t.cal_entry} value={tr.entry != null ? `${CURRENCY_SYMBOL[currencyOf(tr)]}${tr.entry}` : '–'} mono />
-                  <Field label={t.cal_exit} value={tr.exit != null ? `${CURRENCY_SYMBOL[currencyOf(tr)]}${tr.exit}` : '–'} mono />
+                  <Field label={t.cal_entry} value={tr.entry != null ? `${fmtPrice(tr.entry, currencyOf(tr))}` : '–'} mono />
+                  <Field label={t.cal_exit} value={tr.exit != null ? `${fmtPrice(tr.exit, currencyOf(tr))}` : '–'} mono />
                   <Field label={t.cal_setup} value={tr.setup || '–'} tip={<SetupTip setup={tr.setup} isRTL={isRTL} />} />
                   <Field
                     label={t.cal_emotion}

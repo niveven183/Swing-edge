@@ -6,7 +6,7 @@ import {
   Sparkles,
   CheckCircle2,
   XCircle,
-  DollarSign,
+  Wallet,
   Unlock,
 } from "lucide-react";
 import {
@@ -19,7 +19,7 @@ import {
   CartesianGrid,
   ReferenceLine,
 } from "recharts";
-import { DEFAULT_CAPITAL } from "../utils.js";
+import { DEFAULT_CAPITAL, CURRENCY_SYMBOL } from "../utils.js";
 import { getClosed } from "../intelligence/utils/statisticalModels.js";
 
 // ─── i18n strings ────────────────────────────────────────────────────────────
@@ -135,10 +135,16 @@ function projectGrowth(capital, monthlyReturn, months, deposit) {
   return data;
 }
 
-function fmtUsd(n) {
+// Projected account balance — account-level money, so it carries the account's
+// display currency. The name was `fmtUsd` and the symbol was a hard-coded "$",
+// which printed a shekel-denominated forecast under a dollar sign (T10).
+// Unsigned on purpose: a balance has no direction. The whole-unit rounding is
+// deliberate — a 24-month projection has no meaningful cents.
+const fmtBalance = (n, currency = "USD") => {
   const v = Math.round(n || 0);
-  return `$${v.toLocaleString("en-US")}`;
-}
+  const sym = CURRENCY_SYMBOL[currency] || CURRENCY_SYMBOL.USD;
+  return `${sym}${v.toLocaleString("en-US")}`;
+};
 
 // Generate the 3 questions from real data
 function generateQuestions(closedTrades, stats, lang) {
@@ -197,7 +203,7 @@ function generateQuestions(closedTrades, stats, lang) {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
-export default function GrowthPredictor({ trades = [], stats = {}, capital = 0, lang = "en" }) {
+export default function GrowthPredictor({ trades = [], stats = {}, capital = 0, lang = "en", currency = "USD" }) {
   const S = { ...STR.en, ...(STR[lang] || {}) };
   const isRTL = lang === "he" || lang === "ar";
 
@@ -539,7 +545,10 @@ export default function GrowthPredictor({ trades = [], stats = {}, capital = 0, 
         </div>
         <div className="md:col-span-2 bg-slate-900/50 border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl px-3 py-2.5">
           <label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider flex items-center gap-1">
-            <DollarSign className="w-3 h-3" />
+            {/* Currency-neutral on purpose: this deposit is denominated in the
+                account's currency, so a "$" glyph beside a shekel field is the
+                same class of bug as a hard-coded symbol in the formatter. */}
+            <Wallet className="w-3 h-3" />
             {S.monthlyDeposit}
           </label>
           <input
@@ -575,7 +584,7 @@ export default function GrowthPredictor({ trades = [], stats = {}, capital = 0, 
               tick={{ fontSize: 10, fill: "#475569" }}
               tickLine={false}
               axisLine={false}
-              tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+              tickFormatter={(v) => `${CURRENCY_SYMBOL[currency] || CURRENCY_SYMBOL.USD}${(v / 1000).toFixed(0)}k`}
               domain={["auto", "auto"]}
             />
             <ReferenceLine y={effectiveCapital} stroke="#475569" strokeDasharray="4 4" />
@@ -586,7 +595,7 @@ export default function GrowthPredictor({ trades = [], stats = {}, capital = 0, 
                 borderRadius: 8,
                 fontSize: 11,
               }}
-              formatter={(v) => [`${fmtUsd(v)} (${pct(v)})`, S.balance]}
+              formatter={(v) => [`${fmtBalance(v, currency)} (${pct(v)})`, S.balance]}
               labelFormatter={(l) => (l === 0 ? S.fromNow : `Month ${l}`)}
             />
             <Area
@@ -617,7 +626,7 @@ export default function GrowthPredictor({ trades = [], stats = {}, capital = 0, 
               {c.label}
             </div>
             <div className={`text-base font-bold mt-0.5 font-mono ${isNegative ? "text-rose-300" : "text-white"}`}>
-              {fmtUsd(c.val)}
+              {fmtBalance(c.val, currency)}
             </div>
             <div
               className={`text-[10px] mt-0.5 font-mono ${
@@ -634,7 +643,7 @@ export default function GrowthPredictor({ trades = [], stats = {}, capital = 0, 
 
       {isNegative && (
         <div className="mt-4 px-3 py-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-between gap-3 flex-wrap">
-          <p className="text-rose-300 text-xs">{S.negativeSubtitle(fmtUsd(m12))}</p>
+          <p className="text-rose-300 text-xs">{S.negativeSubtitle(fmtBalance(m12, currency))}</p>
           <span className="text-[11px] text-rose-400/80 font-semibold">{S.whatToImprove}</span>
         </div>
       )}

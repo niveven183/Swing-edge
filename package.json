@@ -15,10 +15,11 @@
     "test:datachain": "node scripts/dataChain-test.mjs",
     "test:rcontract": "node scripts/rContract-test.mjs",
     "test:format": "node scripts/format-test.mjs",
+    "test:fx": "node scripts/fx-test.mjs",
     "test:tradingstats": "node scripts/tradingstats-test.mjs",
     "test:ocr": "node scripts/ocr-contract-test.mjs",
     "test:engine": "node scripts/engine-test.mjs",
-    "verify": "npm run test:coach && npm run test:import && npm run test:settings && npm run test:datachain && npm run test:rcontract && npm run test:format && npm run test:tradingstats && npm run test:ocr && npm run test:engine && npm run build"
+    "verify": "npm run test:coach && npm run test:import && npm run test:settings && npm run test:datachain && npm run test:rcontract && npm run test:format && npm run test:fx && npm run test:tradingstats && npm run test:ocr && npm run test:engine && npm run build"
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",

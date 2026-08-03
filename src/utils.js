@@ -142,6 +142,29 @@ export const fmtMoney0 = (n, currency = "USD") => money(n, 0, currency);
 export const fmt$ = fmtMoney;
 export const fmt$0 = fmtMoney0;
 
+// Instrument price display — NOT money-in-your-account.
+//
+// T10 decision (docs/DECISIONS.md 2026-08-03): an instrument price is a claim
+// about the market, so it stays in the instrument's own currency and is never
+// FX-converted. A share trading at ₪73.61 rendered as "$24.14" is a number you
+// cannot place an order at. Account-level aggregates (equity, P&L, position
+// size, risk) DO convert — those are your money, not the market's quote.
+//
+// Unsigned on purpose: `money()` forces a leading +/- because a P&L without a
+// sign is ambiguous, but a price has no direction and "+$150.00" is wrong.
+// Built here rather than inline so the symbol keeps living in exactly one
+// place — eight hand-rolled `${CURRENCY_SYMBOL[...]}${value}` sites are how
+// one journal came to print a shekel price under a dollar sign.
+export const fmtPrice = (n, currency = "USD") => {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return "—";
+  const sym = CURRENCY_SYMBOL[currency] || CURRENCY_SYMBOL.USD;
+  // Prices keep their natural precision: 150 stays "150", 73.61 stays "73.61".
+  // Forcing 2 decimals everywhere would rewrite every whole-number price on
+  // screen, which is a visual change nobody asked for.
+  return `${sym}${v.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+};
+
 // Numeric field parsing at the input boundary. `0` is a value, not a blank:
 // `parseFloat(v) || null` silently turned a real MFE/MAE of 0 into "not filled
 // in". Garbage still becomes null rather than a stored NaN.

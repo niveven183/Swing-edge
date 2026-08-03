@@ -45,7 +45,7 @@ import { useToast, useConfirm } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured, tradeForSupabase, tradeFromSupabase } from "./src/supabaseClient.js";
 import { cleanTrades, purgeInvalidTrades } from "./src/lib/cleanTrades.js";
 import { loadSettings, saveSettings, flushSettings, migrateFromLocalStorage } from "./src/lib/userSettings.js";
-import { calcTradeMetrics, fmt$, fmt$0, fmtR, fmtNum, numOrNull, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays, localDayKey, realizedAt, realizedDayKey, currencyOf, CURRENCY_SYMBOL } from "./src/utils.js";
+import { calcTradeMetrics, fmt$, fmt$0, fmtR, fmtNum, fmtPrice, numOrNull, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays, localDayKey, realizedAt, realizedDayKey, currencyOf, CURRENCY_SYMBOL } from "./src/utils.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell,
@@ -330,15 +330,21 @@ const generateEquityCurve = (cap, trades = []) => {
   return [{ date: anchorDate, equity: cap, ticker: "START", pnl: 0 }, ...data];
 };
 
-// Axis-only money formatter: full dollars under $10k (keeps near-flat equity curves
-// legible so ticks don't all collapse to one "$Xk" string), k-notation above.
-const fmtAxisMoney = (v) => {
+// Axis-only money formatter: full units under 10k (keeps near-flat equity curves
+// legible so ticks don't all collapse to one "Xk" string), k-notation above.
+//
+// T10 · the currency parameter is not decoration. This function hard-coded "$"
+// while the tooltip on the SAME chart used the account symbol, so an ILS
+// account read "$2,550" on the Y axis and "₪2,500" in the tooltip — two
+// currencies, one graph. Callers must pass the currency they are plotting in.
+const fmtAxisMoney = (v, currency = "USD") => {
   const n = Number(v) || 0;
+  const sym = CURRENCY_SYMBOL[currency] || CURRENCY_SYMBOL.USD;
   if (Math.abs(n) >= 10000) {
     const k = n / 1000;
-    return `$${Number.isInteger(k) ? k : k.toFixed(1)}k`;
+    return `${sym}${Number.isInteger(k) ? k : k.toFixed(1)}k`;
   }
-  return `$${Math.round(n).toLocaleString("en-US")}`;
+  return `${sym}${Math.round(n).toLocaleString("en-US")}`;
 };
 
 // Display-only Y domain for the equity curve. Pads the real min/max; when the curve is
@@ -451,8 +457,8 @@ const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity, cur
         <td><strong>${t.ticker}</strong></td>
         <td>${t.side}</td>
         <td>${t.setup ?? "-"}</td>
-        <td>${CURRENCY_SYMBOL[currencyOf(t)]}${t.entry}</td>
-        <td>${t.exit != null ? CURRENCY_SYMBOL[currencyOf(t)] + t.exit : "-"}</td>
+        <td>${fmtPrice(t.entry, currencyOf(t))}</td>
+        <td>${t.exit != null ? fmtPrice(t.exit, currencyOf(t)) : "-"}</td>
         <td style="color:${pnlColor(pnl)};font-weight:600">${fmtDollar(pnl)}</td>
         <td style="color:${r == null ? "#94a3b8" : pnlColor(r)};font-weight:600">${fmtR(r)}</td>
         <td>${t.followedPlan === "Partially" ? "◐" : t.followedPlan != null ? (t.followedPlan ? "✓" : "✗") : "-"}</td>
@@ -630,7 +636,7 @@ const snakeToTitle = (s) =>
 // `stats` is the Master Stats Hub output (useTradingStats). Every rate, average
 // and grouping in this generator is READ from it — nothing is recomputed here,
 // so a lesson card can never contradict the dashboard tile above it.
-const generateSmartLessons = (closedTrades, stats, calcFn, lang = 'he') => {
+const generateSmartLessons = (closedTrades, stats, calcFn, lang = 'he', currency = 'USD') => {
   if (closedTrades.length < 2) return [];
   const he = lang === 'he';
   const lessons = [];
@@ -705,12 +711,12 @@ const generateSmartLessons = (closedTrades, stats, calcFn, lang = 'he') => {
       lessons.push(he ? {
         type: "insight",
         title: "ההפסדים שלך גדולים מהרווחים",
-        detail: `רווח ממוצע: $${Math.round(avgWin)} מול הפסד ממוצע: $${Math.round(avgLoss)}.`,
+        detail: `רווח ממוצע: ${fmtPrice(Math.round(avgWin), currency)} מול הפסד ממוצע: ${fmtPrice(Math.round(avgLoss), currency)}.`,
         action: "הדק את הסטופים או הרחב את היעדים. שאף ליחס סיכון-סיכוי של לפחות 2:1.",
       } : {
         type: "insight",
         title: "Your losses are bigger than your wins",
-        detail: `Average win: $${Math.round(avgWin)} vs average loss: $${Math.round(avgLoss)}.`,
+        detail: `Average win: ${fmtPrice(Math.round(avgWin), currency)} vs average loss: ${fmtPrice(Math.round(avgLoss), currency)}.`,
         action: "Tighten your stop losses or widen your targets. Aim for at least 2:1 R/R.",
       });
     }
@@ -749,7 +755,10 @@ const MixedCurrencyBanner = memo(({ stats, t }) => {
         <p className="text-xs font-bold text-amber-300">{t.mixedCurrencyTitle}</p>
         <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--v3-text-mid)]">{t.mixedCurrencyBody}</p>
         <p className="mt-1 font-mono text-[11px] text-amber-200/80">
-          {stats.currencies.map((c) => `${CURRENCY_SYMBOL[c]}${(stats.pnlByCurrency[c] ?? 0).toLocaleString("en-US", { maximumFractionDigits: 2 })}`).join("  ·  ")}
+          {/* Signed: these are P&L figures, and a per-currency breakdown whose
+              sign lives only in the color is the exact trap `money()` exists to
+              close. Routed through fmt$ so the symbol has one home (T10 A4). */}
+          {stats.currencies.map((c) => fmt$(stats.pnlByCurrency[c] ?? 0, c)).join("  ·  ")}
         </p>
       </div>
     </div>
@@ -2024,7 +2033,7 @@ export default function SwingEdge() {
 
   // Smart lessons
   const smartLessons = useMemo(() => {
-    const base = generateSmartLessons(closedTrades, stats, calcTradeMetrics, lang) || [];
+    const base = generateSmartLessons(closedTrades, stats, calcTradeMetrics, lang, accountCurrency) || [];
     const adaptive = AdaptiveLessons.generate(closedTrades, calcTradeMetrics, lang) || [];
     // Adaptive lessons that describe the SAME signal as a base lesson map onto a
     // shared semantic channel, so the strip never shows two "strongest setup" or
@@ -2042,7 +2051,7 @@ export default function SwingEdge() {
       if (ch) seenCh.add(ch);
     }
     return merged;
-  }, [closedTrades, stats, lang]);
+  }, [closedTrades, stats, lang, accountCurrency]);
 
   // Top ticker ribbon — fixed 8 tickers updated with live prices
   const TOP_RIBBON = ["NVDA", "AAPL", "TSLA", "MSFT", "META", "AMD", "BTC-USD", "SPY"];
@@ -3339,8 +3348,8 @@ export default function SwingEdge() {
                                 <td className="px-3 py-2 font-mono font-bold text-white">{tr.ticker}</td>
                                 <td className="px-3 py-2 text-[var(--v3-text-mid)]">{tr.side}</td>
                                 <td className="px-3 py-2 text-[var(--v3-text-lo)] font-mono">{tr.date}</td>
-                                <td className="px-3 py-2 text-end font-mono text-[var(--v3-text-mid)]">{tr.entry != null ? `${CURRENCY_SYMBOL[currencyOf(tr)]}${tr.entry}` : "—"}</td>
-                                <td className="px-3 py-2 text-end font-mono text-[var(--v3-text-mid)]">{closed && tr.exit != null ? `${CURRENCY_SYMBOL[currencyOf(tr)]}${tr.exit}` : "—"}</td>
+                                <td className="px-3 py-2 text-end font-mono text-[var(--v3-text-mid)]">{tr.entry != null ? `${fmtPrice(tr.entry, currencyOf(tr))}` : "—"}</td>
+                                <td className="px-3 py-2 text-end font-mono text-[var(--v3-text-mid)]">{closed && tr.exit != null ? `${fmtPrice(tr.exit, currencyOf(tr))}` : "—"}</td>
                                 <td className={`px-3 py-2 text-end font-mono font-semibold ${!closed ? "text-[var(--v3-text-lo)]" : (mm.pnl || 0) >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>
                                   {closed ? fmt$(Math.round((mm.pnl || 0) * 100) / 100, currencyOf(tr)) : "—"}
                                 </td>
@@ -3482,6 +3491,7 @@ export default function SwingEdge() {
               stats={stats}
               capital={capital}
               lang={lang}
+              currency={accountCurrency}
             />
 
             {/* Top Edge & Anti-Edge */}
@@ -3550,7 +3560,7 @@ export default function SwingEdge() {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
                     <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => typeof v === "string" && v.length === 10 && v[4] === "-" ? v.slice(5) : v} minTickGap={40} />
-                    <YAxis domain={equityYDomain(equityCurve)} tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={fmtAxisMoney} width={52} />
+                    <YAxis domain={equityYDomain(equityCurve)} tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={(v) => fmtAxisMoney(v, accountCurrency)} width={52} />
                     <ReferenceLine y={capital} stroke="var(--v3-text-lo)" strokeDasharray="4 4" />
                     <Tooltip contentStyle={{ background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 8, fontSize: 11 }} formatter={(v) => [`${accSym}${v.toLocaleString()}`, "Equity"]} />
                     <Area type="monotone" dataKey="equity" stroke="var(--v3-info)" strokeWidth={2} fill="url(#eqGrad)" dot={{ fill: "var(--v3-info)", r: 3 }} />
@@ -3600,13 +3610,13 @@ export default function SwingEdge() {
                         )}
                         {priceAlerts[tr.ticker] && showAlertInput !== tr.id && (
                           <div className="mt-1 text-[9px] text-amber-500/70 font-mono flex items-center gap-1">
-                            <Bell size={8} /> Alert @ {CURRENCY_SYMBOL[currencyOf(tr)]}{priceAlerts[tr.ticker]}
+                            <Bell size={8} /> Alert @ {fmtPrice(priceAlerts[tr.ticker], currencyOf(tr))}
                           </div>
                         )}
                         <div className="mt-1 grid grid-cols-2 gap-x-3 text-[10px] text-slate-500 font-mono">
-                          <span>Entry <span className="text-slate-300">{CURRENCY_SYMBOL[currencyOf(tr)]}{tr.entry}</span></span>
-                          <span>Now <span className={currentPrice ? "text-cyan-300 font-bold" : "text-slate-600"}>{currentPrice ? `${CURRENCY_SYMBOL[currencyOf(tr)]}${currentPrice.toFixed(2)}` : "..."}</span></span>
-                          <span>Stop <span className="text-[var(--v3-loss)]">{CURRENCY_SYMBOL[currencyOf(tr)]}{tr.stop}</span></span>
+                          <span>Entry <span className="text-slate-300">{fmtPrice(tr.entry, currencyOf(tr))}</span></span>
+                          <span>Now <span className={currentPrice ? "text-cyan-300 font-bold" : "text-slate-600"}>{currentPrice ? `${fmtPrice(currentPrice, currencyOf(tr))}` : "..."}</span></span>
+                          <span>Stop <span className="text-[var(--v3-loss)]">{fmtPrice(tr.stop, currencyOf(tr))}</span></span>
                           <span>P&L <span className={livePnl !== null ? (livePnl >= 0 ? "text-[var(--v3-accent)] font-bold" : "text-[var(--v3-loss)] font-bold") : "text-slate-600"}>{livePnl !== null ? fmt$(Math.round(livePnl), currencyOf(tr)) : "..."}</span></span>
                         </div>
                         {livePnlPct !== null && (
@@ -3657,8 +3667,8 @@ export default function SwingEdge() {
                           <td className="py-2 pe-4 font-bold text-white font-mono"><div className="flex items-center gap-1.5"><TickerLogo ticker={t.ticker} size={16} />{t.ticker}</div></td>
                           <td className="py-2 pe-4 text-slate-500">{t.date}</td>
                           <td className="py-2 pe-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side==="LONG"?"bg-[var(--v3-accent)]/10 text-[var(--v3-accent)] border border-[var(--v3-accent)]/20":"bg-[var(--v3-loss)]/10 text-[var(--v3-loss)] border border-[var(--v3-loss)]/20"}`}>{t.side}</span></td>
-                          <td className="py-2 pe-4 font-mono text-slate-300">{CURRENCY_SYMBOL[currencyOf(t)]}{t.entry}</td>
-                          <td className="py-2 pe-4 font-mono text-slate-300">{CURRENCY_SYMBOL[currencyOf(t)]}{t.exit}</td>
+                          <td className="py-2 pe-4 font-mono text-slate-300">{fmtPrice(t.entry, currencyOf(t))}</td>
+                          <td className="py-2 pe-4 font-mono text-slate-300">{fmtPrice(t.exit, currencyOf(t))}</td>
                           <td className="py-2 pe-4 font-mono text-slate-400">{t.shares}</td>
                           <td className={`py-2 pe-4 font-bold font-mono ${win ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>{fmt$(Math.round(pnl), currencyOf(t))}</td>
                           <td className={`py-2 pe-4 font-bold font-mono ${rMultiple == null ? "text-slate-600" : rMultiple >= 0 ? "text-cyan-400" : "text-[var(--v3-loss)]"}`}>{fmtR(rMultiple)}</td>
@@ -3822,10 +3832,10 @@ export default function SwingEdge() {
                                       {t.side}
                                     </span>
                                   </td>
-                                  <td className="py-2 pe-4 font-mono text-slate-300">{CURRENCY_SYMBOL[currencyOf(t)]}{t.entry}</td>
-                                  <td className="py-2 pe-4 font-mono text-[var(--v3-loss)]">{t.hasStop ? `${CURRENCY_SYMBOL[currencyOf(t)]}${t.stop}` : "—"}</td>
+                                  <td className="py-2 pe-4 font-mono text-slate-300">{fmtPrice(t.entry, currencyOf(t))}</td>
+                                  <td className="py-2 pe-4 font-mono text-[var(--v3-loss)]">{t.hasStop ? `${fmtPrice(t.stop, currencyOf(t))}` : "—"}</td>
                                   <td className="py-2 pe-4 font-mono text-slate-400">{t.shares}</td>
-                                  <td className={`py-2 pe-4 font-bold font-mono ${rowColor}`}>{t.hasStop ? `${CURRENCY_SYMBOL[currencyOf(t)]}${t.riskDollar.toFixed(2)}` : "—"}</td>
+                                  <td className={`py-2 pe-4 font-bold font-mono ${rowColor}`}>{t.hasStop ? `${fmtPrice(t.riskDollar, currencyOf(t))}` : "—"}</td>
                                   <td className={`py-2 pe-4 font-bold font-mono ${rowColor}`}>{t.hasStop ? `${t.riskPct.toFixed(2)}%` : "—"}</td>
                                   <td className="py-2 pe-4 font-mono text-slate-400">
                                     {t.rrRatio !== null ? `${t.rrRatio.toFixed(2)}:1` : "—"}
@@ -4168,16 +4178,16 @@ export default function SwingEdge() {
                         <td className="p-3 font-bold text-white font-mono whitespace-nowrap"><div className="flex items-center gap-1.5"><TickerLogo ticker={t.ticker} size={16} />{t.ticker}{t.isDemo && <span className="text-xs bg-slate-700 text-slate-400 px-1 py-0.5 rounded ms-1 font-normal">DEMO</span>}</div></td>
                         <td className="p-3 text-slate-500 whitespace-nowrap">{t.date}</td>
                         <td className="p-3"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side==="LONG"?"bg-[#00C076]/10 text-[var(--v3-accent)] border border-[#00C076]/20":"bg-[#F43F5E]/10 text-[var(--v3-loss)] border border-[#F43F5E]/20"}`}>{t.side}</span></td>
-                        <td className="p-3 font-mono text-slate-300">{CURRENCY_SYMBOL[currencyOf(t)]}{t.entry}</td>
-                        <td className="p-3 font-mono text-[var(--v3-loss)]">{t.stop != null ? `${CURRENCY_SYMBOL[currencyOf(t)]}${t.stop}` : "–"}</td>
-                        <td className="p-3 font-mono text-[var(--v3-accent)]">{t.target != null ? `${CURRENCY_SYMBOL[currencyOf(t)]}${t.target}` : "–"}</td>
+                        <td className="p-3 font-mono text-slate-300">{fmtPrice(t.entry, currencyOf(t))}</td>
+                        <td className="p-3 font-mono text-[var(--v3-loss)]">{t.stop != null ? `${fmtPrice(t.stop, currencyOf(t))}` : "–"}</td>
+                        <td className="p-3 font-mono text-[var(--v3-accent)]">{t.target != null ? `${fmtPrice(t.target, currencyOf(t))}` : "–"}</td>
                         <td className="p-3 font-mono text-slate-400">{t.shares}</td>
                         {/* Current Price */}
                         <td className="p-3 font-mono text-xs whitespace-nowrap">
                           {isOpen ? (() => {
                             const cp = getLivePrice(t.ticker)?.price;
                             return cp
-                              ? <span className="text-slate-200 font-bold">{CURRENCY_SYMBOL[currencyOf(t)]}{cp.toFixed(2)}</span>
+                              ? <span className="text-slate-200 font-bold">{fmtPrice(cp, currencyOf(t))}</span>
                               : pricesLoading
                                 ? <span className="text-slate-600 animate-pulse text-[10px]"><RefreshCw size={8} className="inline animate-spin" /></span>
                                 : <span className="text-slate-700">–</span>;
@@ -4194,7 +4204,7 @@ export default function SwingEdge() {
                             return <span className={lp >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}>{fmt$(Math.round(lp), currencyOf(t))}</span>;
                           })()}
                         </td>
-                        <td className="p-3 font-mono text-slate-300">{t.exit ? `${CURRENCY_SYMBOL[currencyOf(t)]}${t.exit}` : "–"}</td>
+                        <td className="p-3 font-mono text-slate-300">{t.exit ? `${fmtPrice(t.exit, currencyOf(t))}` : "–"}</td>
                         <td className={`p-3 font-bold font-mono text-sm ${isOpen ? "text-slate-500" : win ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>
                           {isOpen ? "–" : fmt$(pnl, currencyOf(t))}
                         </td>
@@ -4936,7 +4946,7 @@ export default function SwingEdge() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
                   <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => typeof v === "string" && v.length === 10 && v[4] === "-" ? v.slice(5) : v} minTickGap={40} />
-                  <YAxis domain={equityYDomain(equityCurve)} tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={fmtAxisMoney} width={52} />
+                  <YAxis domain={equityYDomain(equityCurve)} tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={(v) => fmtAxisMoney(v, accountCurrency)} width={52} />
                   <ReferenceLine y={capital} stroke="var(--v3-text-lo)" strokeDasharray="5 5" label={{ value: lang === "he" ? "הון התחלתי" : "Starting Capital", position: "insideTopRight", fontSize: 9, fill: "var(--v3-text-lo)" }} />
                   <Tooltip
                     contentStyle={{ background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 10, fontSize: 11 }}
@@ -6876,9 +6886,9 @@ export default function SwingEdge() {
             <div className="p-5 space-y-4">
               {/* Trade summary */}
               <div className="bg-white/3 rounded-xl p-3 border border-[var(--border-subtle)] dark:border-white/[0.06] grid grid-cols-3 gap-2 text-center text-[10px]">
-                <div><div className="text-slate-600 uppercase tracking-wider">Entry</div><div className="font-mono font-bold text-slate-300">{CURRENCY_SYMBOL[currencyOf(closingTrade)]}{closingTrade.entry}</div></div>
-                <div><div className="text-slate-600 uppercase tracking-wider">Stop</div><div className="font-mono font-bold text-[#ef4444]">{closingTrade.stop != null ? `${CURRENCY_SYMBOL[currencyOf(closingTrade)]}${closingTrade.stop}` : "–"}</div></div>
-                <div><div className="text-slate-600 uppercase tracking-wider">Target</div><div className="font-mono font-bold text-[#10b981]">{closingTrade.target != null ? `${CURRENCY_SYMBOL[currencyOf(closingTrade)]}${closingTrade.target}` : "–"}</div></div>
+                <div><div className="text-slate-600 uppercase tracking-wider">Entry</div><div className="font-mono font-bold text-slate-300">{fmtPrice(closingTrade.entry, currencyOf(closingTrade))}</div></div>
+                <div><div className="text-slate-600 uppercase tracking-wider">Stop</div><div className="font-mono font-bold text-[#ef4444]">{closingTrade.stop != null ? `${fmtPrice(closingTrade.stop, currencyOf(closingTrade))}` : "–"}</div></div>
+                <div><div className="text-slate-600 uppercase tracking-wider">Target</div><div className="font-mono font-bold text-[#10b981]">{closingTrade.target != null ? `${fmtPrice(closingTrade.target, currencyOf(closingTrade))}` : "–"}</div></div>
               </div>
 
               {/* Exit Price + Exit Reason */}
