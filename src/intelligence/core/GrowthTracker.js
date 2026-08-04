@@ -4,7 +4,7 @@
 
 import {
   getClosed, isWin, pnlOf, rValues, rStats, winRate, stddev, groupBy, to100,
-  MIN_SAMPLE_R,
+  toPctRound, MIN_SAMPLE_R,
 } from "../utils/statisticalModels.js";
 import { disciplineRate } from "../utils/psychologyPatterns.js";
 import { matchIdeaToEdge } from "./EdgeFinder.js";
@@ -139,7 +139,9 @@ export const generateGrowthReport = (trades = [], edgeReport = null, now = new D
   const { avg: monthAvgR, n: monthRSample } = rStats(thisTrades);
   const stats = {
     closedTrades: thisTrades.length,
-    winRate:      Math.round(winRate(thisTrades) * 100),
+    // null when the month is empty — a month you sat out has no win rate, and
+    // `closedTrades` above is its denominator (A5 · §2).
+    winRate:      toPctRound(winRate(thisTrades)),
     avgR:         monthAvgR == null ? null : Number(monthAvgR.toFixed(2)),
     rSampleSize:  monthRSample,
     netPnl:       Math.round(thisTrades.reduce((s, t) => s + pnlOf(t), 0)),

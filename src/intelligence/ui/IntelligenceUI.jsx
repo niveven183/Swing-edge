@@ -625,7 +625,7 @@ export const AntiEdgeLockCard = ({ antiEdgeLocks, onUnlock, onRelock, lang = "he
           {lang === "he" ? "כולל" : "Overall"}: <b className={s.overallAvgR < 0 ? "text-rose-400" : "text-emerald-400"}>{s.overallAvgR}R</b>
         </span>
         <span>·</span>
-        <span>WR <b className="text-slate-300">{s.overallWR}%</b></span>
+        <span>WR <b className="text-slate-300">{s.overallWR == null ? "—" : `${s.overallWR}%`}</b></span>
         <span>·</span>
         <span>{nTrades(s.totalTrades, lang)}</span>
       </div>

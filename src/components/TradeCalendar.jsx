@@ -8,7 +8,7 @@ import { he as heLocale } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { nTrades, getTranslations } from '../i18n.js';
 import { localDayKey, fmt$0 } from '../utils.js';
-import { outcomeRates } from '../intelligence/utils/statisticalModels.js';
+import { outcomeRates, toPctRound } from '../intelligence/utils/statisticalModels.js';
 import DayTradesModal from './DayTradesModal.jsx';
 
 // Day a CLOSED trade belongs to = the day it was closed (its realized P&L lands then).
@@ -79,7 +79,10 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he', currency 
     return {
       count: monthTrades.length,
       pnl,
-      winRate: Math.round(winRate * 100),
+      // null when the month is empty. The badge below is already gated on
+      // `count > 0`, so this never reaches the screen — but the value leaving
+      // this hook must still mean what it says (A5).
+      winRate: toPctRound(winRate),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMonth, trades]);

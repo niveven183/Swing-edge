@@ -12,7 +12,7 @@
 // A locked setup blocks new trade entry. It is released either manually, or
 // automatically once its evidence goes stale — see LOCK_STALE_WEEKS below.
 
-import { getClosed, rStats, winRate, expectedValueR } from "../utils/statisticalModels.js";
+import { getClosed, rStats, winRate, expectedValueR, toPctRound } from "../utils/statisticalModels.js";
 
 const LOCK_WEEKS     = 4;   // consecutive losing weeks before hard lock
 const WARN_WEEKS     = 3;   // weeks before soft warning
@@ -171,7 +171,10 @@ export const checkAntiEdgeLocks = (trades = [], nowMs = Date.now()) => {
         expectancy: ev == null ? null : Number(ev.toFixed(2)),
         avgR: wAvgR == null ? null : Number(wAvgR.toFixed(2)),
         rSampleSize: wRn,
-        winRate: Math.round(winRate(wTrades) * 100),
+        // `weekMap.get(wk) || []` above means a week with no trades reaches
+        // here as an empty array. `n` is right beside this — a week you did not
+        // trade has no win rate, it does not have a 0% one (A5 · §2).
+        winRate: toPctRound(winRate(wTrades)),
         // An unmeasurable week is not a negative week. Locking a setup blocks
         // real entries, so absence of evidence never counts as evidence.
         negative: ev != null && ev < 0,
@@ -203,7 +206,7 @@ export const checkAntiEdgeLocks = (trades = [], nowMs = Date.now()) => {
       stale,
       overallAvgR: overallR.avg == null ? null : Number(overallR.avg.toFixed(2)),
       overallRSampleSize: overallR.n,
-      overallWR:   Math.round(winRate(allTrades) * 100),
+      overallWR:   toPctRound(winRate(allTrades)),
       totalTrades: allTrades.length,
       manuallyUnlocked,
     };

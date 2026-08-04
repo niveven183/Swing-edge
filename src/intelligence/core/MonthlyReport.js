@@ -12,7 +12,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { isFollowedPlan, isOffPlan, localDayKey } from "../../utils.js";
-import { edgeScore, getClosed, outcomeRates } from "../utils/statisticalModels.js";
+import { edgeScore, getClosed, outcomeRates, toPctRound } from "../utils/statisticalModels.js";
 import { getSetupActionKnowledge } from "../knowledgeGlue.js";
 
 const DOW = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -67,7 +67,10 @@ function enrich(t, calcMetrics) {
 function summarize(list) {
   const n = list.length;
   if (n === 0) {
-    return { totalTrades: 0, wins: 0, losses: 0, breakEven: 0, winRate: 0, netPnL: 0, avgR: null, rSampleSize: 0, rValues: [] };
+    // winRate null, netPnL 0: an empty month really did realize zero P&L, but
+    // it has no win rate to report. Found by the A5 consumer map — same class
+    // as summarize() in lib/tradingStats.js, one layer up.
+    return { totalTrades: 0, wins: 0, losses: 0, breakEven: 0, winRate: null, netPnL: 0, avgR: null, rSampleSize: 0, rValues: [] };
   }
   let net = 0, rSum = 0;
   // Only measurable R enters `rValues` — it feeds the consistency term of the
@@ -86,7 +89,7 @@ function summarize(list) {
     wins:      rates.wins.length,
     losses:    rates.losses.length,
     breakEven: rates.be.length,
-    winRate: round(rates.winRate * 100),   // scale boundary
+    winRate: toPctRound(rates.winRate),   // scale boundary
     netPnL: round(net, 2),
     avgR: rValues.length ? round(rSum / rValues.length, 2) : null,
     rSampleSize: rValues.length,
@@ -350,7 +353,12 @@ export function generateMonthlyReport(trades, month, year, calcMetrics) {
     worstTrade,
     vsLastMonth: {
       hasPrev: prev.length > 0,
-      winRate: round(sum.winRate - prevSum.winRate),
+      // A delta against an unmeasured month is not a delta. Subtracting null
+      // yields -prevSum.winRate, which would read as a catastrophic decline in
+      // a month the trader simply sat out.
+      winRate: (sum.winRate == null || prevSum.winRate == null)
+        ? null
+        : round(sum.winRate - prevSum.winRate),
       netPnL: round(sum.netPnL - prevSum.netPnL, 2),
       trades: sum.totalTrades - prevSum.totalTrades,
     },

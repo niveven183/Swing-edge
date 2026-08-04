@@ -99,7 +99,16 @@ export const outcomeSplit = (items, pnlFn = pnlOf) => {
 // `rPopulations` uses, so a caller never has to re-split to get at the members.
 export const outcomeRates = (items, pnlFn = pnlOf) => {
   const { n, wins, losses, be } = outcomeSplit(items, pnlFn);
-  if (!n) return { winRate: 0, lossRate: 0, beRate: 0, wins, losses, be, n: 0 };
+  // A rate is a quotient, and a quotient with a zero denominator is not zero —
+  // it does not exist (§2). Returning 0 here published "0% win rate" for a
+  // population of 0W/0L: a measurement of a thing that was never measured, and
+  // one the trader reads as "everything I did failed" rather than "I did
+  // nothing". `avgR` has always returned null for exactly this reason (:118);
+  // the three rates now say the same thing in the same way.
+  //
+  // `n` travels in the return either way, so a consumer that wants to
+  // distinguish "0 of 0" from "0 of 40" already has everything it needs.
+  if (!n) return { winRate: null, lossRate: null, beRate: null, wins, losses, be, n: 0 };
   return {
     winRate:  wins.length / n,
     lossRate: losses.length / n,
@@ -108,7 +117,17 @@ export const outcomeRates = (items, pnlFn = pnlOf) => {
   };
 };
 
+// number | null — null propagates from outcomeRates on an empty population.
 export const winRate = (trades) => outcomeRates(trades).winRate;
+
+// ─── SCALE CROSSING ──────────────────────────────────────────────────────────
+// The ONLY sanctioned way to leave the 0..1 convention above for the 0..100 one
+// the UI reads. A bare `rate * 100` is what makes the null contract die
+// quietly: `null * 100 === 0` and `Math.round(null) === 0`, so an absent
+// measurement silently reappears downstream as a confident zero — the exact bug
+// this module just stopped producing, re-introduced one line later.
+export const toPct      = (rate) => (rate == null ? null : rate * 100);
+export const toPctRound = (rate) => (rate == null ? null : Math.round(rate * 100));
 
 // number | null — null means "not measurable", which is not the same as 0.
 export const avgR = (trades) => rStats(trades).avg;

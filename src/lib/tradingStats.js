@@ -1,7 +1,7 @@
 import { isFollowedPlan, isOffPlan, qstars, holdDays, realizedAt, realizedDayKey, currencyOf } from "../utils.js";
 import {
   edgeScore, wilsonLowerBound,
-  getClosed, outcomeRates, grossPnl, profitFactorFromPnls,
+  getClosed, outcomeRates, grossPnl, profitFactorFromPnls, toPct,
 } from "../intelligence/utils/statisticalModels.js";
 
 // P&L accessor for the already-enriched metric objects this module works with.
@@ -74,10 +74,16 @@ export function computeTradingStats(trades, capital, calcTradeMetrics) {
 
   // SCALE BOUNDARY — the one and only place this module leaves the 0..1
   // convention of statisticalModels and enters the 0..100 convention its UI
-  // consumers read (T3 · decision 3). Every rate below is multiplied here, once.
-  const winRate  = rates.winRate  * 100;
-  const lossRate = rates.lossRate * 100;
-  const beRate   = rates.beRate   * 100;
+  // consumers read (T3 · decision 3). Every rate below crosses via toPct, which
+  // carries a null through instead of collapsing it to 0 (A5).
+  //
+  // These three specifically can never BE null: `closed.length === 0` returned
+  // EMPTY_STATS above, so `rates.n >= 1` here. They go through the helper
+  // anyway, because a scale crossing that is safe today and unsafe after the
+  // next edit is the kind of thing nobody re-audits.
+  const winRate  = toPct(rates.winRate);
+  const lossRate = toPct(rates.lossRate);
+  const beRate   = toPct(rates.beRate);
 
   const profitFactor = profitFactorFromPnls(metrics.map(pnlOfMetric));
   const avgWin       = winners.length ? totalWin / winners.length : 0;
@@ -147,9 +153,12 @@ export function computeTradingStats(trades, capital, calcTradeMetrics) {
   const planYes = metrics.filter(m => isFollowedPlan(m.followedPlan));
   const planNo  = metrics.filter(m => isOffPlan(m.followedPlan));
   // Same win-rate rule as everywhere else (BE in the denominator, not the
-  // numerator); outcomeRates already returns 0 for an empty population.
-  const planFollowedWR = outcomeRates(planYes, pnlOfMetric).winRate * 100;  // scale boundary
-  const planIgnoredWR  = outcomeRates(planNo,  pnlOfMetric).winRate * 100;  // scale boundary
+  // numerator). Either bucket can be legitimately empty in an active journal:
+  // a trader who never deviated has no `planNo` population, and "0% win rate
+  // when you ignored the plan" is then a verdict on trades that do not exist.
+  // null | number — `planAdherence` below is the denominator's public form.
+  const planFollowedWR = toPct(outcomeRates(planYes, pnlOfMetric).winRate);  // scale boundary
+  const planIgnoredWR  = toPct(outcomeRates(planNo,  pnlOfMetric).winRate);  // scale boundary
 
   // ─── Time-based ────────────────────────────────────────────
   const now = Date.now();
@@ -291,9 +300,9 @@ function groupAndAnalyze(metrics, field, keyFn) {
       wins:   rates.wins.length,
       losses: rates.losses.length,
       be:     rates.be.length,
-      winRate:  rates.winRate  * 100,   // scale boundary (see computeTradingStats)
-      lossRate: rates.lossRate * 100,
-      beRate:   rates.beRate   * 100,
+      winRate:  toPct(rates.winRate),   // scale boundary (see computeTradingStats)
+      lossRate: toPct(rates.lossRate),
+      beRate:   toPct(rates.beRate),
       totalPnL,
       avgPnL: totalPnL / items.length,
       totalR: r.total,
@@ -324,21 +333,25 @@ function analyzeByDay(metrics) {
       return {
         name: d.name,
         count: d.items.length,
-        winRate: rates.winRate * 100,   // scale boundary
-        beRate:  rates.beRate  * 100,
+        winRate: toPct(rates.winRate),   // scale boundary
+        beRate:  toPct(rates.beRate),
         totalPnL: d.items.reduce((s, m) => s + (m.pnl || 0), 0),
       };
     });
 }
 
+// The rolling-window summary. `count` and `pnl` are always measured — an empty
+// window really did produce zero trades and zero P&L. The RATES are not: a week
+// in which you placed no trades has no win rate, and reporting 0 tells the
+// trader they lost every trade in a week they sat out (A5 · §2).
 function summarize(metrics) {
-  if (!metrics.length) return { count: 0, pnl: 0, winRate: 0, beRate: 0 };
+  if (!metrics.length) return { count: 0, pnl: 0, winRate: null, beRate: null };
   const rates = outcomeRates(metrics, pnlOfMetric);
   return {
     count: metrics.length,
     pnl: metrics.reduce((s, m) => s + (m.pnl || 0), 0),
-    winRate: rates.winRate * 100,   // scale boundary
-    beRate:  rates.beRate  * 100,
+    winRate: toPct(rates.winRate),   // scale boundary
+    beRate:  toPct(rates.beRate),
   };
 }
 
@@ -371,8 +384,8 @@ function findEdges(metrics, type) {
         setup: items[0].setup || "?",
         emotion: items[0].emotionAtEntry || "?",
         count: n,
-        winRate: rates.winRate * 100,   // scale boundary
-        beRate:  rates.beRate  * 100,
+        winRate: toPct(rates.winRate),   // scale boundary
+        beRate:  toPct(rates.beRate),
         totalPnL: items.reduce((s, m) => s + (m.pnl || 0), 0),
         avgR,
         rSampleSize,

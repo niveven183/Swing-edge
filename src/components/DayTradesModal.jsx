@@ -9,7 +9,7 @@ import InfoTooltip from './ui/InfoTooltip.jsx';
 import { EMOTION_OPTIONS } from '../data/tradeOptions.jsx';
 import { isFollowedPlan, isOffPlan, fmt$, fmtR, fmtPrice, isNegativeValue, currencyOf } from '../utils.js';
 import { getSetupTooltip } from '../intelligence/knowledgeGlue.js';
-import { outcomeRates } from '../intelligence/utils/statisticalModels.js';
+import { outcomeRates, toPctRound } from '../intelligence/utils/statisticalModels.js';
 
 const EMOTION_EMOJI = Object.fromEntries(EMOTION_OPTIONS.map(o => [o.value, o.emoji]));
 
@@ -64,7 +64,7 @@ export default function DayTradesModal({ dateKey, trades = [], calcMetrics, lang
     return {
       count: rows.length,
       pnl,
-      winRate: Math.round(winRate * 100),
+      winRate: toPctRound(winRate),   // null on an empty day (A5)
     };
   }, [rows]);
 
@@ -133,9 +133,14 @@ export default function DayTradesModal({ dateKey, trades = [], calcMetrics, lang
                 : 'bg-rose-50 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400'}`}>
               {totals.pnl >= 0 ? '+' : ''}${totals.pnl.toFixed(0)}
             </span>
-            <span className="px-3 py-1 bg-slate-100 dark:bg-white/[0.08] text-slate-600 dark:text-slate-300 rounded-full text-xs">
-              {totals.winRate}% {t.winRate}
-            </span>
+            {/* Unlike the P&L badge beside it, this one is conditional: a day
+                with no rows has no win rate, and "0%" would report a wipeout on
+                a day nothing happened. */}
+            {totals.winRate != null && (
+              <span className="px-3 py-1 bg-slate-100 dark:bg-white/[0.08] text-slate-600 dark:text-slate-300 rounded-full text-xs">
+                {totals.winRate}% {t.winRate}
+              </span>
+            )}
           </div>
         </div>
 

@@ -80,7 +80,7 @@ import { calculateTradeDNA } from "./src/intelligence/core/TradeDNA.js";
 // never disagree about which trades count.
 // outcomeRates is THE win/loss/break-even classifier (0..1 scale) — used here
 // only where a population cannot come from the stats hub (raw Supabase rows).
-import { dayLabel, getClosed, outcomeRates } from "./src/intelligence/utils/statisticalModels.js";
+import { dayLabel, getClosed, outcomeRates, toPct } from "./src/intelligence/utils/statisticalModels.js";
 import {
   DNACard, EdgeCard, DecisionCoachPanel, TiltShield, GrowthChart, RegimeIndicator, PatternTags,
 } from "./src/intelligence/ui/IntelligenceUI.jsx";
@@ -2658,7 +2658,10 @@ export default function SwingEdge() {
       }
       const teasers = {};
       for (const [u, s] of Object.entries(byUser)) {
-        teasers[u] = { count: s.count, winRate: outcomeRates(s.closed).winRate * 100 };
+        // `count` counts every row; `s.closed` only the settled ones. A mentee
+        // whose trades are all still open has an empty closed population, so the
+        // win rate is null and the card renders `—` via formatPct (A5 · §2).
+        teasers[u] = { count: s.count, winRate: toPct(outcomeRates(s.closed).winRate) };
       }
       if (!cancelled) setMenteeTeasers(teasers);
     })();
