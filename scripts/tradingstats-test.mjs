@@ -450,13 +450,87 @@ const mk = (over) => ({
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// 8 · FROZEN BASELINE — full-object regression gate for all 6 fixtures.
+// 8 · A5 — A RATE WITH A ZERO DENOMINATOR IS NOT 0%.
+//
+//     Every fixture above feeds computeTradingStats a journal whose every
+//     sub-population happens to be non-empty, so the zero-denominator branch
+//     of outcomeRates/summarize was never observed by this suite. That is the
+//     whole reason "0% win rate on 0W/0L" survived: the gate could not see it.
+//     A scenario that was never observed failing is not a gate.
+//
+//     Two populations can be empty inside a perfectly active journal:
+//       a. a TIME WINDOW  — you traded, just not in the last 7/30 days.
+//       b. a PLAN BUCKET  — you traded, and never once deviated from plan.
+//     In both cases the honest answer is "not measured", which is what avgR
+//     has always returned (null) and what these rates must now return too.
+// ─────────────────────────────────────────────────────────────────────────
+{
+  console.log("\n8 · A5 — zero-denominator rates are null, not 0");
+
+  // ── a. Dormant windows: a real journal, no activity in the last 30 days ──
+  const DORMANT = [
+    mk({ id: "d1", entry: 100, stop: 90, exit: 120, shares: 10, date: daysAgo(90) }),
+    mk({ id: "d2", entry: 100, stop: 90, exit: 85,  shares: 10, date: daysAgo(120) }),
+  ];
+  const d = computeTradingStats(DORMANT, CAPITAL, calcTradeMetrics);
+
+  eq("dormant — journal is NOT empty", d.isEmpty, false);
+  eq("dormant — totalTrades", d.totalTrades, 2);
+  eq("dormant — all-time winRate is a real 1/2", d.winRate, 50);
+  // The denominator of both windows is genuinely zero…
+  eq("dormant — lastWeekStats.count", d.lastWeekStats.count, 0);
+  eq("dormant — lastMonthStats.count", d.lastMonthStats.count, 0);
+  // …so neither window may report a rate. 0 here is a claim that the trader
+  // lost every trade last week; they placed none.
+  eq("dormant — lastWeekStats.winRate is null, not 0", d.lastWeekStats.winRate, null);
+  eq("dormant — lastWeekStats.beRate is null, not 0", d.lastWeekStats.beRate, null);
+  eq("dormant — lastMonthStats.winRate is null, not 0", d.lastMonthStats.winRate, null);
+  eq("dormant — lastMonthStats.beRate is null, not 0", d.lastMonthStats.beRate, null);
+  // pnl and count stay numeric — those ARE measured, and they are 0.
+  eq("dormant — lastWeekStats.pnl stays a real 0", d.lastWeekStats.pnl, 0);
+
+  // ── b. Plan buckets: every trade followed the plan → planNo is empty ─────
+  const ALL_ON_PLAN = [
+    mk({ id: "p1", entry: 100, stop: 90, exit: 120, shares: 10, date: daysAgo(3), followedPlan: true }),
+    mk({ id: "p2", entry: 100, stop: 90, exit: 80,  shares: 10, date: daysAgo(6), followedPlan: true }),
+  ];
+  const on = computeTradingStats(ALL_ON_PLAN, CAPITAL, calcTradeMetrics);
+  eq("allOnPlan — planAdherence proves the denominator is zero", on.planAdherence, 100);
+  eq("allOnPlan — planFollowedWR is a real 1/2", on.planFollowedWR, 50);
+  eq("allOnPlan — planIgnoredWR is null, not 0", on.planIgnoredWR, null);
+
+  // ── c. The mirror image, so the fix cannot be a one-sided special case ──
+  const ALL_OFF_PLAN = [
+    mk({ id: "q1", entry: 100, stop: 90, exit: 120, shares: 10, date: daysAgo(3), followedPlan: false }),
+    mk({ id: "q2", entry: 100, stop: 90, exit: 80,  shares: 10, date: daysAgo(6), followedPlan: false }),
+  ];
+  const off = computeTradingStats(ALL_OFF_PLAN, CAPITAL, calcTradeMetrics);
+  eq("allOffPlan — planAdherence proves the denominator is zero", off.planAdherence, 0);
+  eq("allOffPlan — planIgnoredWR is a real 1/2", off.planIgnoredWR, 50);
+  eq("allOffPlan — planFollowedWR is null, not 0", off.planFollowedWR, null);
+
+  // ── d. null must never be silently re-coerced back into a number ─────────
+  // `null * 100 === 0` and `Math.round(null) === 0`. The whole contract dies
+  // quietly if any of these read as 0 rather than as absent.
+  for (const [label, v] of [
+    ["lastWeekStats.winRate", d.lastWeekStats.winRate],
+    ["lastMonthStats.winRate", d.lastMonthStats.winRate],
+    ["planIgnoredWR", on.planIgnoredWR],
+    ["planFollowedWR", off.planFollowedWR],
+  ]) {
+    check(`${label} — Number.isFinite() is false (it is absent, not zero)`, Number.isFinite(v) === false);
+    check(`${label} — does not equal 0`, v !== 0);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 9 · FROZEN BASELINE — full-object regression gate for all 6 fixtures.
 //     First run on a clean checkout writes the baseline (and the assertion
 //     trivially passes); every run after that diffs against the committed
 //     file. This is the T3 tripwire referenced in the plan doc.
 // ─────────────────────────────────────────────────────────────────────────
 {
-  console.log("\n8 · frozen full-object baseline v2 (scripts/fixtures/tradingstats-baseline.json)");
+  console.log("\n9 · frozen full-object baseline v2 (scripts/fixtures/tradingstats-baseline.json)");
   const scenarios = {
     empty: computeTradingStats([], CAPITAL, calcTradeMetrics),
     normal: computeTradingStats([
