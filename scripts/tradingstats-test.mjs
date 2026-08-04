@@ -530,7 +530,7 @@ const mk = (over) => ({
 //     file. This is the T3 tripwire referenced in the plan doc.
 // ─────────────────────────────────────────────────────────────────────────
 {
-  console.log("\n9 · frozen full-object baseline v2 (scripts/fixtures/tradingstats-baseline.json)");
+  console.log("\n9 · frozen full-object baseline v3 (scripts/fixtures/tradingstats-baseline.json)");
   const scenarios = {
     empty: computeTradingStats([], CAPITAL, calcTradeMetrics),
     normal: computeTradingStats([
@@ -571,6 +571,18 @@ const mk = (over) => ({
       mk({ id: "x2", entry: 100, stop: 90, exit: 80,   shares: 10, date: daysAgo(10) }),
       mk({ id: "ghost", entry: 100, stop: 90, exit: null, shares: 10, date: daysAgo(6) }),
       mk({ id: "o1", entry: 100, stop: 90, exit: null, shares: 10, date: daysAgo(1), status: "OPEN" }),
+    ], CAPITAL, calcTradeMetrics),
+    // New in v3 — the A5 null-rate contract (scenario 8). Scenario 8 asserts
+    // the individual fields; freezing the whole object here is what stops a
+    // future refactor from re-coercing null back to 0 in a field nobody
+    // thought to assert on.
+    dormantWindows: computeTradingStats([
+      mk({ id: "d1", entry: 100, stop: 90, exit: 120, shares: 10, date: daysAgo(90) }),
+      mk({ id: "d2", entry: 100, stop: 90, exit: 85,  shares: 10, date: daysAgo(120) }),
+    ], CAPITAL, calcTradeMetrics),
+    allOnPlan: computeTradingStats([
+      mk({ id: "p1", entry: 100, stop: 90, exit: 120, shares: 10, date: daysAgo(3), followedPlan: true }),
+      mk({ id: "p2", entry: 100, stop: 90, exit: 80,  shares: 10, date: daysAgo(6), followedPlan: true }),
     ], CAPITAL, calcTradeMetrics),
   };
 

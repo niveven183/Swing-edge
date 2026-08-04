@@ -629,7 +629,7 @@
       }
     ],
     "planFollowedWR": 33.33333333333333,
-    "planIgnoredWR": 0,
+    "planIgnoredWR": null,
     "planAdherence": 100,
     "avgHoldHours": 0,
     "avgHold": 0,
@@ -1006,7 +1006,7 @@
       }
     ],
     "planFollowedWR": 60,
-    "planIgnoredWR": 0,
+    "planIgnoredWR": null,
     "planAdherence": 100,
     "avgHoldHours": 0,
     "avgHold": 0,
@@ -1321,7 +1321,7 @@
       }
     ],
     "planFollowedWR": 66.66666666666666,
-    "planIgnoredWR": 0,
+    "planIgnoredWR": null,
     "planAdherence": 100,
     "avgHoldHours": 0,
     "avgHold": 0,
@@ -1566,7 +1566,7 @@
       }
     ],
     "planFollowedWR": 50,
-    "planIgnoredWR": 0,
+    "planIgnoredWR": null,
     "planAdherence": 100,
     "avgHoldHours": 0,
     "avgHold": 0,
@@ -1701,6 +1701,430 @@
         "exit": 80,
         "shares": 10,
         "date": "2026-02-05",
+        "pnl": -200,
+        "rMultiple": -2
+      }
+    ],
+    "isEmpty": false
+  },
+  "dormantWindows": {
+    "totalTrades": 2,
+    "total": 2,
+    "openTrades": 0,
+    "wins": 1,
+    "losses": 1,
+    "be": 0,
+    "totalPnL": 50,
+    "totalWin": 200,
+    "totalLoss": 150,
+    "pnlByCurrency": {
+      "USD": 50
+    },
+    "currencies": [
+      "USD"
+    ],
+    "mixedCurrency": false,
+    "winRate": 50,
+    "lossRate": 50,
+    "beRate": 0,
+    "profitFactor": 1.3333333333333333,
+    "avgWin": 200,
+    "avgLoss": 150,
+    "avgR": 0.25,
+    "rSampleSize": 2,
+    "bestWin": 200,
+    "worstLoss": -150,
+    "currentEquity": 2550,
+    "capital": 2500,
+    "returnPct": 2,
+    "equityCurve": [
+      {
+        "index": 1,
+        "date": "2025-10-18",
+        "equity": 2350,
+        "pnl": -150,
+        "drawdown": 6
+      },
+      {
+        "index": 2,
+        "date": "2025-11-17",
+        "equity": 2550,
+        "pnl": 200,
+        "drawdown": 0
+      }
+    ],
+    "maxDrawdown": 6,
+    "maxDD": 150,
+    "currentDrawdown": 0,
+    "currentStreak": 1,
+    "maxWinStreak": 1,
+    "maxLossStreak": 1,
+    "bestStreak": 1,
+    "streakRuns": [
+      {
+        "type": "loss",
+        "length": 1
+      },
+      {
+        "type": "win",
+        "length": 1
+      }
+    ],
+    "planFollowedWR": 50,
+    "planIgnoredWR": null,
+    "planAdherence": 100,
+    "avgHoldHours": 0,
+    "avgHold": 0,
+    "lastWeekStats": {
+      "count": 0,
+      "pnl": 0,
+      "winRate": null,
+      "beRate": null
+    },
+    "lastMonthStats": {
+      "count": 0,
+      "pnl": 0,
+      "winRate": null,
+      "beRate": null
+    },
+    "bySetup": [
+      {
+        "name": "Breakout",
+        "count": 2,
+        "wins": 1,
+        "losses": 1,
+        "be": 0,
+        "winRate": 50,
+        "lossRate": 50,
+        "beRate": 0,
+        "totalPnL": 50,
+        "avgPnL": 25,
+        "totalR": 0.5,
+        "avgR": 0.25,
+        "rSampleSize": 2,
+        "profitFactor": 1.3333333333333333
+      }
+    ],
+    "byEmotion": [
+      {
+        "name": "Confident",
+        "count": 2,
+        "wins": 1,
+        "losses": 1,
+        "be": 0,
+        "winRate": 50,
+        "lossRate": 50,
+        "beRate": 0,
+        "totalPnL": 50,
+        "avgPnL": 25,
+        "totalR": 0.5,
+        "avgR": 0.25,
+        "rSampleSize": 2,
+        "profitFactor": 1.3333333333333333
+      }
+    ],
+    "byMarket": [
+      {
+        "name": "Trending Up",
+        "count": 2,
+        "wins": 1,
+        "losses": 1,
+        "be": 0,
+        "winRate": 50,
+        "lossRate": 50,
+        "beRate": 0,
+        "totalPnL": 50,
+        "avgPnL": 25,
+        "totalR": 0.5,
+        "avgR": 0.25,
+        "rSampleSize": 2,
+        "profitFactor": 1.3333333333333333
+      }
+    ],
+    "byEntryQuality": [
+      {
+        "name": "3★",
+        "count": 2,
+        "wins": 1,
+        "losses": 1,
+        "be": 0,
+        "winRate": 50,
+        "lossRate": 50,
+        "beRate": 0,
+        "totalPnL": 50,
+        "avgPnL": 25,
+        "totalR": 0.5,
+        "avgR": 0.25,
+        "rSampleSize": 2,
+        "profitFactor": 1.3333333333333333
+      }
+    ],
+    "byDayOfWeek": [
+      {
+        "name": "Monday",
+        "count": 1,
+        "winRate": 100,
+        "beRate": 0,
+        "totalPnL": 200
+      },
+      {
+        "name": "Saturday",
+        "count": 1,
+        "winRate": 0,
+        "beRate": 0,
+        "totalPnL": -150
+      }
+    ],
+    "topEdges": [],
+    "antiEdges": [],
+    "closedMetrics": [
+      {
+        "id": "d1",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Breakout",
+        "emotionAtEntry": "Confident",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": true,
+        "closedAt": "2025-11-17T20:00:00.000Z",
+        "entry": 100,
+        "stop": 90,
+        "exit": 120,
+        "shares": 10,
+        "date": "2025-11-17",
+        "pnl": 200,
+        "rMultiple": 2
+      },
+      {
+        "id": "d2",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Breakout",
+        "emotionAtEntry": "Confident",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": true,
+        "closedAt": "2025-10-18T20:00:00.000Z",
+        "entry": 100,
+        "stop": 90,
+        "exit": 85,
+        "shares": 10,
+        "date": "2025-10-18",
+        "pnl": -150,
+        "rMultiple": -1.5
+      }
+    ],
+    "isEmpty": false
+  },
+  "allOnPlan": {
+    "totalTrades": 2,
+    "total": 2,
+    "openTrades": 0,
+    "wins": 1,
+    "losses": 1,
+    "be": 0,
+    "totalPnL": 0,
+    "totalWin": 200,
+    "totalLoss": 200,
+    "pnlByCurrency": {
+      "USD": 0
+    },
+    "currencies": [
+      "USD"
+    ],
+    "mixedCurrency": false,
+    "winRate": 50,
+    "lossRate": 50,
+    "beRate": 0,
+    "profitFactor": 1,
+    "avgWin": 200,
+    "avgLoss": 200,
+    "avgR": 0,
+    "rSampleSize": 2,
+    "bestWin": 200,
+    "worstLoss": -200,
+    "currentEquity": 2500,
+    "capital": 2500,
+    "returnPct": 0,
+    "equityCurve": [
+      {
+        "index": 1,
+        "date": "2026-02-09",
+        "equity": 2300,
+        "pnl": -200,
+        "drawdown": 8
+      },
+      {
+        "index": 2,
+        "date": "2026-02-12",
+        "equity": 2500,
+        "pnl": 200,
+        "drawdown": 0
+      }
+    ],
+    "maxDrawdown": 8,
+    "maxDD": 200,
+    "currentDrawdown": 0,
+    "currentStreak": 1,
+    "maxWinStreak": 1,
+    "maxLossStreak": 1,
+    "bestStreak": 1,
+    "streakRuns": [
+      {
+        "type": "loss",
+        "length": 1
+      },
+      {
+        "type": "win",
+        "length": 1
+      }
+    ],
+    "planFollowedWR": 50,
+    "planIgnoredWR": null,
+    "planAdherence": 100,
+    "avgHoldHours": 0,
+    "avgHold": 0,
+    "lastWeekStats": {
+      "count": 2,
+      "pnl": 0,
+      "winRate": 50,
+      "beRate": 0
+    },
+    "lastMonthStats": {
+      "count": 2,
+      "pnl": 0,
+      "winRate": 50,
+      "beRate": 0
+    },
+    "bySetup": [
+      {
+        "name": "Breakout",
+        "count": 2,
+        "wins": 1,
+        "losses": 1,
+        "be": 0,
+        "winRate": 50,
+        "lossRate": 50,
+        "beRate": 0,
+        "totalPnL": 0,
+        "avgPnL": 0,
+        "totalR": 0,
+        "avgR": 0,
+        "rSampleSize": 2,
+        "profitFactor": 1
+      }
+    ],
+    "byEmotion": [
+      {
+        "name": "Confident",
+        "count": 2,
+        "wins": 1,
+        "losses": 1,
+        "be": 0,
+        "winRate": 50,
+        "lossRate": 50,
+        "beRate": 0,
+        "totalPnL": 0,
+        "avgPnL": 0,
+        "totalR": 0,
+        "avgR": 0,
+        "rSampleSize": 2,
+        "profitFactor": 1
+      }
+    ],
+    "byMarket": [
+      {
+        "name": "Trending Up",
+        "count": 2,
+        "wins": 1,
+        "losses": 1,
+        "be": 0,
+        "winRate": 50,
+        "lossRate": 50,
+        "beRate": 0,
+        "totalPnL": 0,
+        "avgPnL": 0,
+        "totalR": 0,
+        "avgR": 0,
+        "rSampleSize": 2,
+        "profitFactor": 1
+      }
+    ],
+    "byEntryQuality": [
+      {
+        "name": "3★",
+        "count": 2,
+        "wins": 1,
+        "losses": 1,
+        "be": 0,
+        "winRate": 50,
+        "lossRate": 50,
+        "beRate": 0,
+        "totalPnL": 0,
+        "avgPnL": 0,
+        "totalR": 0,
+        "avgR": 0,
+        "rSampleSize": 2,
+        "profitFactor": 1
+      }
+    ],
+    "byDayOfWeek": [
+      {
+        "name": "Monday",
+        "count": 1,
+        "winRate": 0,
+        "beRate": 0,
+        "totalPnL": -200
+      },
+      {
+        "name": "Thursday",
+        "count": 1,
+        "winRate": 100,
+        "beRate": 0,
+        "totalPnL": 200
+      }
+    ],
+    "topEdges": [],
+    "antiEdges": [],
+    "closedMetrics": [
+      {
+        "id": "p1",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Breakout",
+        "emotionAtEntry": "Confident",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": true,
+        "closedAt": "2026-02-12T20:00:00.000Z",
+        "entry": 100,
+        "stop": 90,
+        "exit": 120,
+        "shares": 10,
+        "date": "2026-02-12",
+        "pnl": 200,
+        "rMultiple": 2
+      },
+      {
+        "id": "p2",
+        "ticker": "AAPL",
+        "side": "LONG",
+        "status": "CLOSED",
+        "setup": "Breakout",
+        "emotionAtEntry": "Confident",
+        "marketCondition": "Trending Up",
+        "entryQuality": 3,
+        "followedPlan": true,
+        "closedAt": "2026-02-09T20:00:00.000Z",
+        "entry": 100,
+        "stop": 90,
+        "exit": 80,
+        "shares": 10,
+        "date": "2026-02-09",
         "pnl": -200,
         "rMultiple": -2
       }
