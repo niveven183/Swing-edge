@@ -26,7 +26,7 @@ description: |
 
 | audience | מי | מיון |
 |---|---|---|
-| `waitlist` | נרשמי רשימת המתנה עם `approved_at IS NOT NULL` | — |
+| `waitlist_approved` | נרשמי רשימת המתנה עם `approved_at IS NOT NULL` | — |
 | `registered_users` | כל מי שיש לו חשבון | `created_at ASC` |
 | `stuck_users` | חשבון ≥7 ימים · ≤1 עסקה · לא אדמין | `last_sign_in_at DESC` |
 
