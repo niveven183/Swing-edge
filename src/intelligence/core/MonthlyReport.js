@@ -12,7 +12,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { isFollowedPlan, isOffPlan, localDayKey } from "../../utils.js";
-import { edgeScore, getClosed, outcomeRates, toPctRound } from "../utils/statisticalModels.js";
+import { edgeScore, getClosed, outcomeRates, toPct } from "../utils/statisticalModels.js";
 import { getSetupActionKnowledge } from "../knowledgeGlue.js";
 
 const DOW = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -89,7 +89,13 @@ function summarize(list) {
     wins:      rates.wins.length,
     losses:    rates.losses.length,
     breakEven: rates.be.length,
-    winRate: toPctRound(rates.winRate),   // scale boundary
+    // Scale boundary. NOT toPctRound: this field carries one decimal
+    // (`round` defaults to d=1) and the engine test pins it at 33.3, because
+    // it must equal the dashboard's winRate exactly. toPctRound would round to
+    // 33 and break that equality — a precision loss with no visible exception.
+    // `round` cannot be used directly either: its `(v || 0)` turns null into 0,
+    // which is the very bug this change removes.
+    winRate: rates.winRate == null ? null : round(toPct(rates.winRate)),
     netPnL: round(net, 2),
     avgR: rValues.length ? round(rSum / rValues.length, 2) : null,
     rSampleSize: rValues.length,

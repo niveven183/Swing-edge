@@ -865,6 +865,18 @@ TradeDNA ×8, EdgeFinder ×3 **בלתי-ניתנים להגעה מבנית**: `e
 `statisticalModels.js:242` אוכפת `if (n < minSample) continue`. אוכלוסייה ריקה
 לא מגיעה לשם לעולם. §11 — אין churn על קוד שהוכח בטוח.
 
+**⚠️ הרגרסיה שהכנסתי בעצמי, ומה שתפס אותה.** `toPctRound` הוא
+`Math.round(rate * 100)` — **מספר שלם**. ב-`MonthlyReport.js:92` הוא החליף
+`round(rates.winRate * 100)`, וה-`round` המקומי של הקובץ (`:25`) הוא
+**`d = 1` כברירת מחדל**. כלומר 33.3 הפך ל-33 בשקט, בלי חריגה, בשדה שחייב
+להיות **שווה בדיוק** ל-winRate של הדשבורד. `npm run test:engine` נפל על
+`monthly winRate === dashboard winRate` ותפס אותו לפני ה-push. אודיט של כל 8
+ההחלפות הראה ש**זו היחידה** שהחליפה `round` ולא `Math.round` — כל השאר
+תחליף מדויק. התיקון: `rates.winRate == null ? null : round(toPct(...))`; אי-אפשר
+להשתמש ב-`round` לבדו כי ה-`(v || 0)` שלו הופך `null` ל-0, שהוא הבאג המקורי.
+**הלקח:** `toPctRound` נושא הנחת דיוק, ולכן החלפה שלו במקום שבו כבר היה עיגול
+אחר אינה החלפה — היא שינוי התנהגות.
+
 **התצוגה.** `src/utils.js:203` (`formatPct`) כבר היה null-safe ומחזיר `—`, ולכן
 ייצוא ה-PDF וה-teaser לא נגעו. שני מקומות **כן** נדרשו: `DayTradesModal.jsx`
 (רינדור לא-מגודר → עוטף ב-`totals.winRate != null`) ו-`IntelligenceUI.jsx:628`
