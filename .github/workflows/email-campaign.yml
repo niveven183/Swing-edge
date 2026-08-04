@@ -1,12 +1,19 @@
 name: Email Campaign
 
-# Manual, opt-in sender. `audience` picks the recipient set and defaults to
-# waitlist_approved (waitlist.approved_at IS NOT NULL) — the original behaviour.
-# registered_users targets account holders (auth.users) instead: the two barely
-# overlap, so a product-update note to users must NOT go to the waitlist. Either
-# way the send dedups against public.email_campaign_log so nobody gets the same
+# Manual, opt-in sender. `audience` picks the recipient set from three:
+#
+#   waitlist_approved — the default and the original behaviour: waitlist rows
+#     with approved_at IS NOT NULL. People who asked in, not yet account holders.
+#   registered_users  — account holders (auth.users). Barely overlaps the
+#     waitlist, so a product-update note to users must NOT go to the waitlist.
+#   stuck_users       — registered_users narrowed to those who never got going:
+#     confirmed, 7+ days old, <= 1 trade, admins excluded. Ordered by last
+#     sign-in DESC. This is the "what stopped you?" audience — the one where a
+#     mis-aimed send costs the most, since it tells someone we think they failed.
+#
+# Every audience dedups against public.email_campaign_log so nobody gets the same
 # campaign twice. dry_run defaults to TRUE and limit defaults to 10 — a real send
-# is a deliberate, low-ceiling action. Read-only on both audience tables; the only
+# is a deliberate, low-ceiling action. Read-only on all audience tables; the only
 # writes are one row per send into email_campaign_log. No email address is ever
 # printed in full; SMTP secrets never echoed.
 #
@@ -27,6 +34,7 @@ on:
         options:
           - waitlist_approved
           - registered_users
+          - stuck_users
         default: waitlist_approved
       subject:
         description: "Email subject line"
@@ -141,8 +149,36 @@ jobs:
           LIMIT :lim;
           SQLEOF
               ;;
+            stuck_users)
+              # registered_users narrowed to those who never got going: a week or
+              # more old, and at most one trade to their name (one trade is a
+              # look, not a habit). Admins are excluded — do not ask Niv why he
+              # isn't using his own app. Ordered by last sign-in DESC: someone
+              # who came back recently and still entered nothing carries the
+              # strongest signal, which the oldest-first ordering would bury.
+              psql -v ON_ERROR_STOP=1 -tAq \
+                -v campaign="$CAMPAIGN" -v lim="$LIMIT" \
+                "$SUPABASE_DB_URL" > recipients.txt 2>/tmp/fetcherr <<'SQLEOF'
+          SET default_transaction_read_only = on;
+          SELECT u.email FROM auth.users u
+          WHERE u.deleted_at IS NULL
+            AND u.banned_until IS NULL
+            AND u.email_confirmed_at IS NOT NULL
+            AND u.email ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'
+            AND u.email !~* '\.(local|localhost|test|invalid|example)$'
+            AND u.created_at < now() - interval '7 days'
+            AND (SELECT count(*) FROM public.trades t WHERE t.user_id = u.id) <= 1
+            AND NOT EXISTS (SELECT 1 FROM public.admins a WHERE a.user_id = u.id)
+            AND NOT EXISTS (SELECT 1 FROM public.email_campaign_log l
+              WHERE l.campaign = :'campaign'
+                AND lower(l.email) = lower(u.email)
+                AND l.status = 'sent')
+          ORDER BY u.last_sign_in_at DESC NULLS LAST
+          LIMIT :lim;
+          SQLEOF
+              ;;
             *)
-              echo "::error::unknown audience '$AUDIENCE' — expected waitlist_approved or registered_users"; exit 1 ;;
+              echo "::error::unknown audience '$AUDIENCE' — expected waitlist_approved, registered_users or stuck_users"; exit 1 ;;
           esac
           rc=$?
           if [ "$rc" -ne 0 ]; then
@@ -311,6 +347,22 @@ jobs:
             AND u.email_confirmed_at IS NOT NULL
             AND u.email ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'
             AND u.email !~* '\.(local|localhost|test|invalid|example)$'
+            AND NOT EXISTS (SELECT 1 FROM public.email_campaign_log l
+              WHERE l.campaign = :'campaign' AND lower(l.email)=lower(u.email) AND l.status='sent');
+          SQLEOF
+              ;;
+            stuck_users)
+              cat > /tmp/remaining.sql <<'SQLEOF'
+          SET default_transaction_read_only = on;
+          SELECT count(*) FROM auth.users u
+          WHERE u.deleted_at IS NULL
+            AND u.banned_until IS NULL
+            AND u.email_confirmed_at IS NOT NULL
+            AND u.email ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'
+            AND u.email !~* '\.(local|localhost|test|invalid|example)$'
+            AND u.created_at < now() - interval '7 days'
+            AND (SELECT count(*) FROM public.trades t WHERE t.user_id = u.id) <= 1
+            AND NOT EXISTS (SELECT 1 FROM public.admins a WHERE a.user_id = u.id)
             AND NOT EXISTS (SELECT 1 FROM public.email_campaign_log l
               WHERE l.campaign = :'campaign' AND lower(l.email)=lower(u.email) AND l.status='sent');
           SQLEOF
