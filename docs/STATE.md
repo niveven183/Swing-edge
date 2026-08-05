@@ -69,8 +69,8 @@
 ## ✅ נסגר השבוע
 
 - **M** פערי מטבע §1-§6 · **S1** RLS · **R** ניקוי · **#12** טוקני GA4 (`08ca710`) · `why_stopped_r2` מוכן ⛔ לא נשלח — הפירוט נגזם ל-`docs/audits/STATE-ARCHIVE-2026-08.md`
-- **W · `blockAnalytics` תוקן בשלושת הקבצים (05.08)** — גלוב→רג'קס. הוכחה: ישן חסם 0/דלף 2, חדש חסם 2/דלף 0, פרודקשן חסם 1/דלף 0. ממצאי sentinel 2→0. `INCIDENTS.md#13`
-- **W · 33 pins מ-node20** — checkout v7 · setup-node v7 · cache v6 · github-script v9 (13 קבצים, 33/33, אפס שורה שאינה `uses:`). ארבעת התגים אומתו קיימים ב-API לפני ההצמדה; 17/17 workflows עוברים YAML parse · **`node-version` 20→22** (9/9). ⚠️ `backup.yml` לא נגע בשניהם — אין בו setup-node ואין הצמדת node20
+- **W · `blockAnalytics` תוקן בשלושת הקבצים (05.08)** — גלוב→רג'קס. הוכחה: ישן חסם 0/דלף 2, חדש חסם 2/דלף 0, פרודקשן חסם 1/דלף 0. ממצאי sentinel 2→0, **אומת בפרודקשן** (`31049305536`: `findings: 0`). `INCIDENTS.md#13`
+- **W · 33 pins מ-node20** — checkout v7 · setup-node v7 · cache v6 · github-script v9 (13 קבצים, 33/33, אפס שורה שאינה `uses:`). ארבעת התגים אומתו קיימים ב-API לפני ההצמדה; 17/17 workflows עוברים YAML parse · **`node-version` 20→22** (9/9). ⚠️ `backup.yml` לא נגע בשניהם — אין בו setup-node ואין הצמדת node20. ⚠️ **parse אינו הרצה: הופעלו על runner 9/33 מופעים, 3/4 סוגים** — checkout·setup-node·`cache*` (smoke+build `deb3c34`, sentinel `31049305536`). **`github-script@v9` 0/3, טרם הורץ** — ראשון ב-`data-guardian` (cron כל 3 ימים) ⏭️
 - **W · project `mobile-android` (Pixel 5)** — 2 בדיקות ב-`grep`, 8/8 עוברות. ⏭️ `download-artifact@v7→v8` (1 שורה) לא בוצע — לא היה ב-4 שאושרו
 
 ---
