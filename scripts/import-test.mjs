@@ -816,6 +816,27 @@ const near = (name, actual, expected) => {
     "2020-01-01");
 }
 
+// ── §6 · the importer is fed the CAPITAL currency, never the DISPLAY one ─────
+// SwingEdge_App.jsx is a React monolith and cannot be imported here, so the wire
+// is locked as source text — the same technique rContract-test.mjs uses. This is
+// the only currency bug of the six that corrupted data on WRITE: every row of a
+// generic CSV would have been stamped with whatever the journal happened to be
+// displaying, then converted a second time on the way out.
+{
+  console.log("\n§6 · import default currency");
+  const app = readFileSync(new URL("../SwingEdge_App.jsx", import.meta.url), "utf8");
+  const i = app.indexOf("<ImportJournalModal");
+  const el = i < 0 ? "" : app.slice(i, app.indexOf("/>", i));
+  check("the import modal is mounted", i > -1, true);
+  check("importer receives capitalCurrency", /capitalCurrency=\{capitalCurrency\}/.test(el), true);
+  check("importer never receives accountCurrency", /accountCurrency=/.test(el), false);
+
+  // ...and the modal spends that prop on defaultCurrency and nothing else.
+  const modal = readFileSync(new URL("../src/components/ImportJournalModal.jsx", import.meta.url), "utf8");
+  check("modal maps it to defaultCurrency", /defaultCurrency:\s*capitalCurrency/.test(modal), true);
+  check("modal has no accountCurrency binding", /accountCurrency\s*[=:]/.test(modal), false);
+}
+
 console.log("");
 if (failures > 0) {
   console.error(`❌ test:import — ${failures} assertion(s) failed`);

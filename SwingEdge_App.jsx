@@ -7194,13 +7194,19 @@ export default function SwingEdge() {
       {/* ── HELP MODAL ── */}
       {showHelpModal && <HelpModal onClose={() => setShowHelpModal(false)} onStartTour={() => { setShowHelpModal(false); startTour(); }} t={t} />}
 
-      {/* ── IMPORT JOURNAL MODAL ── */}
+      {/* ── IMPORT JOURNAL MODAL ──
+          capitalCurrency, NOT accountCurrency. The DISPLAY currency must never
+          reach the importer: a generic CSV of dollar prices, imported while the
+          journal happens to be shown in ₪, would have been WRITTEN as
+          currency:"ILS" and then converted a second time on the way out. This is
+          the same failure mode the manual-entry form guards against — see the
+          comment above `currency: capitalCurrency` in the newTrade builder. */}
       <ImportJournalModal
         open={showImportModal}
         lang={lang}
         t={t}
         capital={capital}
-        accountCurrency={accountCurrency}
+        capitalCurrency={capitalCurrency}
         existingTrades={trades}
         onClose={() => setShowImportModal(false)}
         onImport={handleImportTrades}

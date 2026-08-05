@@ -12,9 +12,14 @@ import { detectProfile, applyProfile } from "../import/brokerProfiles.js";
 // hands the parent a ready-to-persist array of trade objects via onImport.
 //
 // props:
-//   open, lang, t (translations dict), capital, accountCurrency, existingTrades,
+//   open, lang, t (translations dict), capital, capitalCurrency, existingTrades,
 //   onClose, onImport(trades)
-export default function ImportJournalModal({ open, lang, t: tr = {}, capital = 0, accountCurrency = "USD", existingTrades = [], onClose, onImport }) {
+//
+// capitalCurrency is the currency the imported NUMBERS are denominated in — NOT
+// accountCurrency, which is only what the app happens to be displaying. It is
+// used for exactly one thing: defaultCurrency for rows the file itself cannot
+// answer. Passing the display currency here writes the wrong currency to the DB.
+export default function ImportJournalModal({ open, lang, t: tr = {}, capital = 0, capitalCurrency = "USD", existingTrades = [], onClose, onImport }) {
   const isHe = lang === "he";
   const titleId = useId();
   const fileInputRef = useRef(null);
@@ -63,7 +68,7 @@ export default function ImportJournalModal({ open, lang, t: tr = {}, capital = 0
       sideResolver: applied?.sideResolver,
       tickerResolver: applied?.tickerResolver,
       unitResolver: applied?.unitResolver,
-      defaultCurrency: accountCurrency,
+      defaultCurrency: capitalCurrency,
       skipped: applied?.skipped,
       skippedByKind: applied?.skippedByKind,
       // A broker file is a transaction log — one row per buy, one per sell — so
@@ -71,7 +76,7 @@ export default function ImportJournalModal({ open, lang, t: tr = {}, capital = 0
       // already carries entry and exit on one row and must never be matched.
       fifo: !!applied,
     });
-  }, [step, parsed, applied, mapping, dateFormat, capital, existingTrades]);
+  }, [step, parsed, applied, mapping, dateFormat, capital, existingTrades, capitalCurrency]);
 
   if (!open) return null;
 
