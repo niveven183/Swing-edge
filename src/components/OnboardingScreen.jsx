@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { TrendingUp, Target, DollarSign, BarChart2, Zap, CheckCircle, ChevronRight, ChevronLeft, Cpu, Star, Shield, BookOpen } from "lucide-react";
+import { TrendingUp, Target, Wallet, BarChart2, Zap, CheckCircle, ChevronRight, ChevronLeft, Cpu, Star, Shield, BookOpen } from "lucide-react";
 
 const QUESTIONS = [
   {
@@ -27,7 +27,10 @@ const QUESTIONS = [
   },
   {
     id: "portfolioSize",
-    icon: DollarSign,
+    // Wallet, not DollarSign: this step is where the currency is CHOSEN, so its
+    // icon cannot presume one. lucide has no shekel glyph, so the currency-
+    // specific mark is the ₪/$ text adornment inside the input instead.
+    icon: Wallet,
     type: "amount",
     title: "מה גודל התיק שלך?",
     subtitle: "נגדיר אחוזי סיכון ועמלה לפי סכום ההון",
@@ -73,12 +76,25 @@ const strategyRec = (strategy) => {
   return null;
 };
 
+const CURRENCY_SYMBOL = { USD: "$", ILS: "₪" };
+
 const generateProfile = (answers) => {
   const { experience, strategy, portfolioSize, goal, frequency } = answers;
+  const ccy = answers.capitalCurrency === "ILS" ? "ILS" : "USD";
 
-  // portfolioSize is now the capital amount in $ (number). Derive the risk/commission bucket.
+  // portfolioSize is the capital amount, denominated in `ccy`. Derive the
+  // risk/commission bucket.
   const capitalAmount = Number(portfolioSize) || 0;
-  const fmtCapital = capitalAmount > 0 ? `$${capitalAmount.toLocaleString()}` : null;
+  const fmtCapital = capitalAmount > 0 ? `${CURRENCY_SYMBOL[ccy]}${capitalAmount.toLocaleString()}` : null;
+
+  // ⚠️ These thresholds are calibrated to DOLLARS, and the currency is now chosen
+  // on this very screen — so ₪10,000 (≈ $2,700) falls into "medium" while it is
+  // in truth a small account, and walks away with a large account's riskPct.
+  // Converting to USD first is the correct fix, but it needs an FX read on the
+  // FIRST screen, before sign-in — a network dependency on the most fragile
+  // surface in the product. The approximation is accepted deliberately.
+  // Whoever adds a THIRD currency here has to settle this first.
+  // STATE ⚠️ · PLAN 2026-08-05 §3.
   let bucket = "medium";
   if (capitalAmount < 5000) bucket = "small";
   else if (capitalAmount < 25000) bucket = "medium";
@@ -196,7 +212,7 @@ const generateProfile = (answers) => {
     commission,
     summary: `${strategyMap[strategy]} עם ניסיון ${expMap[experience]}, מתמקד ב${goalMap[goal]}`,
     recommendations: recs,
-    defaults: { riskPct, commission, capital: capitalAmount },
+    defaults: { riskPct, commission, capital: capitalAmount, capitalCurrency: ccy },
   };
 };
 
@@ -210,6 +226,10 @@ const colorMap = {
 export default function OnboardingScreen({ onComplete }) {
   const [step, setStep] = useState(0); // 0 = welcome, 1-5 = questions, 6 = analysis
   const [answers, setAnswers] = useState({});
+  // What the capital NUMBER the user is about to type is denominated in. USD is
+  // the default because it was already the hardcoded assumption — this makes the
+  // status quo visible and changeable, it does not invent a new default.
+  const [capitalCurrency, setCapitalCurrency] = useState("USD");
   const [selected, setSelected] = useState(null);
   const [profile, setProfile] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -241,6 +261,9 @@ export default function OnboardingScreen({ onComplete }) {
     const q = QUESTIONS[step - 1];
     const value = q.type === "amount" ? Number(selected) : selected;
     const newAnswers = { ...answers, [q.id]: value };
+    // The amount and the unit it is measured in travel together — an amount
+    // recorded without its currency is the bug this whole wave is about.
+    if (q.type === "amount") newAnswers.capitalCurrency = capitalCurrency;
     setAnswers(newAnswers);
     setSelected(null);
 
@@ -358,8 +381,28 @@ export default function OnboardingScreen({ onComplete }) {
               {/* Options / amount input */}
               {isAmountStep ? (
                 <div>
+                  {/* The currency is picked BEFORE the amount, because the amount
+                      is meaningless without it. Mirrors the Settings picker. */}
+                  <div className="flex gap-2 mb-3">
+                    {["USD", "ILS"].map(c => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setCapitalCurrency(c)}
+                        aria-pressed={capitalCurrency === c}
+                        className={`px-4 py-2 rounded-lg text-xs font-bold font-mono transition border ${
+                          capitalCurrency === c
+                            ? "border-cyan-500/50 bg-cyan-500/10 text-cyan-300"
+                            : "border-white/[0.10] bg-white/[0.02] text-slate-400 hover:text-white hover:border-white/20"
+                        }`}>
+                        {CURRENCY_SYMBOL[c]} {c}
+                      </button>
+                    ))}
+                  </div>
                   <div className="relative">
-                    <DollarSign size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none text-lg font-mono leading-none">
+                      {CURRENCY_SYMBOL[capitalCurrency]}
+                    </span>
                     <input
                       type="number"
                       inputMode="numeric"
@@ -371,7 +414,9 @@ export default function OnboardingScreen({ onComplete }) {
                       className="w-full bg-white/[0.03] border border-white/[0.10] rounded-xl pr-10 pl-4 py-3.5 text-lg font-mono text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition text-right"
                     />
                   </div>
-                  <p className="text-[11px] text-slate-600 mt-2">הזן את סכום ההון בדולרים ($). נגזור ממנו את אחוזי הסיכון והעמלה.</p>
+                  <p className="text-[11px] text-slate-600 mt-2">
+                    הזן את סכום ההון ב־{CURRENCY_SYMBOL[capitalCurrency]}. נגזור ממנו את אחוזי הסיכון והעמלה.
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-2.5">

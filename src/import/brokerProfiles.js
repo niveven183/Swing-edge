@@ -4,7 +4,7 @@
 // row it drops is reported with its action type — nothing is discarded quietly.
 // A file that matches no profile takes the generic route, untouched.
 
-import { matchHeader, normalizeSide } from "./synonyms.js";
+import { matchHeader, normalizeSide, CURRENCY_SIGNS } from "./synonyms.js";
 import { looksLikeSymbol } from "./detectColumns.js";
 import { matrixToTable } from "./parseFile.js";
 import { num } from "./normalizeRow.js";
@@ -132,10 +132,8 @@ const closeTo = (v, target, tol = 0.02) =>
 const FX_MIN = 2;
 const FX_MAX = 6;
 
-const CURRENCY_SIGNS = {
-  $: "USD", USD: "USD", "US$": "USD",
-  "₪": "ILS", ILS: "ILS", 'ש"ח': "ILS", NIS: "ILS",
-};
+// CURRENCY_SIGNS now lives in synonyms.js — the generic import route needs the
+// same vocabulary for a mapped "מטבע"/"Currency" column, and one table beats two.
 
 // |value| / (|qty| × |rate|) — 1 means the rate is already in the major unit,
 // 0.01 means it is in agorot. Verified against the live file that caused this:

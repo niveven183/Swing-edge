@@ -14,7 +14,9 @@ import { normalizeRow } from "../src/import/normalizeRow.js";
 import {
   detectProfile, applyProfile, isTradeAction, nonSecurityKind, unitDivisor,
 } from "../src/import/brokerProfiles.js";
-import { normalizeSide } from "../src/import/synonyms.js";
+import {
+  normalizeSide, normalizeCurrency, fieldForHeader, MAPPABLE_FIELDS, REQUIRED_FIELDS,
+} from "../src/import/synonyms.js";
 import { fifoMatch } from "../src/import/fifoMatch.js";
 
 const FIX = join(dirname(fileURLToPath(import.meta.url)), "import-fixtures");
@@ -835,6 +837,83 @@ const near = (name, actual, expected) => {
   const modal = readFileSync(new URL("../src/components/ImportJournalModal.jsx", import.meta.url), "utf8");
   check("modal maps it to defaultCurrency", /defaultCurrency:\s*capitalCurrency/.test(modal), true);
   check("modal has no accountCurrency binding", /accountCurrency\s*[=:]/.test(modal), false);
+}
+
+// ── §1 · currency survives the export → import round-trip ────────────────────
+{
+  console.log("\n§1 · currency round-trip");
+  const M = { ticker: 0, shares: 1, entry: 2, currency: 3 };
+  const ccy = (cell, opts = {}) => normalizeRow(["X", "10", "100", cell], M, opts);
+
+  check("a mapped ₪ cell is read", ccy("₪").trade.currency, "ILS");
+  check("a mapped $ cell is read", ccy("$").trade.currency, "USD");
+  check("ILS code", ccy("ILS").trade.currency, "ILS");
+  check("lowercase usd", ccy("usd").trade.currency, "USD");
+  check('ש"ח with a curly gershayim', ccy("ש”ח").trade.currency, "ILS");
+
+  // The cell outranks the account default — the file states it outright.
+  check("cell beats defaultCurrency", ccy("₪", { defaultCurrency: "USD" }).trade.currency, "ILS");
+  // ...and an empty cell falls THROUGH to the default rather than rejecting.
+  check("empty cell falls through", ccy("  ", { defaultCurrency: "ILS" }).trade.currency, "ILS");
+
+  // A cell that says something we cannot parse is not silence. Rejecting is the
+  // whole point: defaulting it to USD would print a shekel trade in dollars.
+  const junk = ccy("ILSX");
+  check("unreadable currency is rejected", junk.ok, false);
+  check("...with a named reason", junk.code, "bad_currency");
+  check("...that is human-readable", typeof junk.detail?.he, "string");
+  check("...and never silently USD", junk.trade, undefined);
+
+  // The broker resolver still outranks everything, including a currency column.
+  check("resolver beats the cell",
+    normalizeRow(["X", "10", "100", "$"], M, { unitResolver: () => ({ currency: "ILS", divisor: 1 }) }).trade.currency,
+    "ILS");
+
+  // Niv's ask: pin the bare default as a DECISION, not an accident. A generic
+  // file with no currency column and no defaultCurrency lands on USD, which is
+  // what migration 20260802140000 declares for the column. Whoever changes this
+  // meets a red test instead of a shekel trade printed in dollars.
+  const t = normalizeRow(["X", "10", "100"], { ticker: 0, shares: 1, entry: 2 }, {});
+  check("no currency column and no default → USD, deliberately", t.trade.currency, "USD");
+
+  // Header detection: the column has to be findable, and must NOT swallow the
+  // value columns that merely contain the word (the IBI `שווי במטבע` trap).
+  check("Hebrew header maps", fieldForHeader("מטבע"), "currency");
+  check("English header maps", fieldForHeader("Currency"), "currency");
+  check("multi-word Hebrew header maps", fieldForHeader("מטבע עסקה"), "currency");
+  check("IBI value column is NOT currency", fieldForHeader("שווי במטבע"), null);
+  check('IBI shekel-value column is NOT currency', fieldForHeader('שווי כולל בש"ח'), null);
+  check("currency is user-mappable", MAPPABLE_FIELDS.includes("currency"), true);
+  check("currency is NOT required", REQUIRED_FIELDS.includes("currency"), false);
+
+  // The export side of the round-trip: the journal CSV has to emit the column,
+  // and it has to emit it LAST so no existing column shifts under a consumer.
+  const app = readFileSync(new URL("../SwingEdge_App.jsx", import.meta.url), "utf8");
+  const ex = app.slice(app.indexOf("const exportTradesCSV"), app.indexOf("const exportTradesCSV") + 1800);
+  check("journal CSV exports a Currency column", /"Currency"\]/.test(ex), true);
+  check("...and writes the value", /currencyOf\(t\)/.test(ex), true);
+
+  // Both halves must land together: an export the importer cannot read is not a
+  // round-trip. This asserts the header the exporter writes is the header the
+  // importer resolves — the actual seam.
+  check("the exported header is the one the importer resolves",
+    fieldForHeader("Currency"), "currency");
+}
+
+// ── §2 · the manual form inherits the CAPITAL currency, forever ──────────────
+// No code changed here — the form is already right. This locks the contract so a
+// future refactor cannot quietly undo it. Same source-text technique as §6.
+{
+  console.log("\n§2 · manual trade currency contract");
+  const app = readFileSync(new URL("../SwingEdge_App.jsx", import.meta.url), "utf8");
+  const i = app.indexOf("const newTrade = {");
+  const block = app.slice(i, i + 1400);
+  check("the manual trade builder exists", i > -1, true);
+  check("manual trade inherits capitalCurrency", /currency:\s*capitalCurrency/.test(block), true);
+  // Catches `currency: "USD"` and `currency: 'ILS'` — a hardcoded literal.
+  check("manual trade never hardcodes a currency literal", /currency:\s*["']/.test(block), false);
+  // Catches the §6 failure class reappearing on the manual path.
+  check("manual trade never uses the DISPLAY currency", /currency:\s*accountCurrency/.test(block), false);
 }
 
 console.log("");

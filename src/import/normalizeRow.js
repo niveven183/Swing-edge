@@ -4,7 +4,7 @@
 // source of truth for geometry, no duplicated validation.
 
 import { validateTradeInputs, inferSide, todayKey } from "../utils.js";
-import { normalizeSide } from "./synonyms.js";
+import { normalizeSide, normalizeCurrency } from "./synonyms.js";
 import { isExcelSerial } from "./detectColumns.js";
 
 const two = (n) => String(n).padStart(2, "0");
@@ -110,7 +110,32 @@ export function normalizeRow(row, mapping, opts = {}) {
   const unit = typeof opts.unitResolver === "function" ? opts.unitResolver(row) : null;
   if (unit?.error) return { ok: false, code: unit.error, detail: REASONS[unit.error] };
   const divisor = unit?.divisor ?? 1;
-  const currency = unit?.currency || opts.defaultCurrency || "USD";
+
+  // Currency, in strict order of authority:
+  //   1. the broker profile's resolver — it derived the currency from the row's
+  //      own arithmetic, which beats anything a header claims;
+  //   2. a mapped currency cell — the file states it outright;
+  //   3. opts.defaultCurrency — the account's CAPITAL currency (never the
+  //      display currency; see ImportJournalModal);
+  //   4. "USD" — the pre-existing contract, matching the column's `default 'USD'`
+  //      in migration 20260802140000. Pinned by a test so it stays a decision.
+  //
+  // A cell that is present but unreadable is the one case with no safe fallback:
+  // "ILSX" is not silence, it is a statement we failed to parse, and defaulting
+  // it to USD would print a shekel trade in dollars. That row is rejected.
+  let currency = unit?.currency || null;
+  if (!currency) {
+    // Only consulted when the resolver had nothing to say. A broker profile that
+    // already answered is never second-guessed by a header — otherwise IBI's
+    // `שווי במטבע` (a VALUE column) could veto a currency the row's own
+    // arithmetic proved.
+    const cellCurrency = String(cell("currency") ?? "").trim();
+    currency = cellCurrency ? normalizeCurrency(cellCurrency) : null;
+    if (cellCurrency && !currency) {
+      return { ok: false, code: "bad_currency", detail: REASONS.bad_currency };
+    }
+    currency = currency || opts.defaultCurrency || "USD";
+  }
   const price = (v) => (v == null ? null : v / divisor);
 
   const tickerRaw = resolvedTicker ? resolvedTicker.ticker : cell("ticker");

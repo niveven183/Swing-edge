@@ -381,7 +381,10 @@ const equityYDomain = (curve) => {
 
 // ─── EXPORT HELPERS ───────────────────────────────────────────────────────────
 const exportTradesCSV = (trades) => {
-  const headers = ["ID","Ticker","Date","Side","Entry","Stop","Target","Shares","Status","Exit","Setup","Notes","Market Condition","Emotion at Entry","Entry Quality","Exit Reason","Followed Plan","Lesson Learned","Max Favorable","Max Adverse","P&L","R-Multiple"];
+  // "Currency" is APPENDED, never inserted. The importer matches on header NAME,
+  // not position, so adding at the end closes the export→import round-trip
+  // without moving a single existing column under any consumer's feet.
+  const headers = ["ID","Ticker","Date","Side","Entry","Stop","Target","Shares","Status","Exit","Setup","Notes","Market Condition","Emotion at Entry","Entry Quality","Exit Reason","Followed Plan","Lesson Learned","Max Favorable","Max Adverse","P&L","R-Multiple","Currency"];
   const rows = trades.map(t => {
     const m = calcTradeMetrics(t);
     return [
@@ -395,6 +398,7 @@ const exportTradesCSV = (trades) => {
       t.maxFavorable ?? "", t.maxAdverse ?? "",
       m.pnl != null ? m.pnl.toFixed(2) : "",
       m.rMultiple != null ? m.rMultiple.toFixed(2) : "",
+      currencyOf(t),
     ].join(",");
   });
   const csv = [headers.join(","), ...rows].join("\n");
@@ -1055,6 +1059,16 @@ export default function SwingEdge() {
     if (rp >= 0.1 && rp <= 10) {
       setRiskPct(rp);
       try { localStorage.setItem("swingEdgeRiskPct", String(rp)); } catch {}
+    }
+    // The unit the capital above is measured in. Onboarding used to leave this
+    // untouched, so a user who typed shekels silently got a USD-labelled account.
+    // Whitelisted, not trusted: an unknown value keeps the existing setting
+    // rather than writing something meaningless. The settings sync already
+    // carries capitalCurrency, so this reaches user_settings with no new code.
+    const cc = profile?.defaults?.capitalCurrency;
+    if (cc === "USD" || cc === "ILS") {
+      setCapitalCurrency(cc);
+      try { localStorage.setItem("swingEdgeCapitalCurrency", cc); } catch {}
     }
     setShowOnboarding(false);
   };

@@ -14,11 +14,12 @@ export const FIELD_SYNONYMS = {
   stop:     ["stop", "stop loss", "stoploss", "sl", "stop price", "סטופ", "סטופ לוס", "מחיר סטופ"],
   target:   ["target", "take profit", "takeprofit", "tp", "target price", "יעד", "מטרה", "מחיר יעד"],
   fees:     ["fees", "fee", "commission", "commissions", "comm", "עמלה", "עמלות"],
+  currency: ["currency", "ccy", "curr", "מטבע", "סוג מטבע", "מטבע עסקה", "מטבע העסקה"],
 };
 
 // Fields the user can map a column to (fees included so it can be explicitly
 // parked/ignored; it never becomes a trade field).
-export const MAPPABLE_FIELDS = ["ticker", "side", "entry", "exit", "shares", "date", "exitDate", "stop", "target", "fees"];
+export const MAPPABLE_FIELDS = ["ticker", "side", "entry", "exit", "shares", "date", "exitDate", "stop", "target", "fees", "currency"];
 
 // Required for a valid imported row (decision #2: qty missing → reject).
 export const REQUIRED_FIELDS = ["ticker", "entry", "shares"];
@@ -48,9 +49,20 @@ const SYNONYM_TO_FIELD = (() => {
 // `includes("s")` claims "stop loss price" and "total shares sold" for `side`.
 // Hence the length floors — a 2-char token is only trustworthy when it has to
 // co-occur with others, and a lone token needs 3.
+//
+// The length floors are not enough for one word. "מטבע" clears them, but it is a
+// SUBSTRING of headers that mean something else entirely: IBI writes `שווי במטבע`
+// ("value in currency") for a value column, and matching that as the currency
+// column made the importer reject every IBI row. Hebrew builds such compounds
+// with a bare prefix and no separator, so substring matching cannot tell the two
+// apart. A synonym listed here therefore has to match a header EXACTLY; the
+// multi-word forms ("סוג מטבע", "מטבע עסקה") are unaffected and still exact-match.
+const EXACT_ONLY = new Set(["מטבע"]);
+
 const FALLBACK_CANDIDATES = (() => {
   const out = [];
   for (const [syn, field] of SYNONYM_TO_FIELD) {
+    if (EXACT_ONLY.has(syn)) continue;
     const tokens = syn.split(" ");
     const floor = tokens.length > 1 ? 2 : 3;
     if (tokens.some((tok) => tok.length < floor)) continue;
@@ -94,4 +106,28 @@ export const normalizeSide = (raw) => {
   if (/^(short|sell|s)$/.test(k) || k.includes("short") || k.includes("sell") || k.includes("מכיר") || k.includes("מכר")) return "SHORT";
   if (k.includes("קני")) return "LONG";
   return null;
+};
+
+// The symbols and codes a broker or a hand-kept sheet actually writes into a
+// currency cell. Lives here rather than in brokerProfiles.js because both the
+// broker route (Altshuler states the currency outright) and the generic route
+// (a mapped "מטבע"/"Currency" column) have to read the same vocabulary — two
+// copies would drift, and the drift would be silent.
+export const CURRENCY_SIGNS = {
+  $: "USD", USD: "USD", "US$": "USD",
+  "₪": "ILS", ILS: "ILS", 'ש"ח': "ILS", NIS: "ILS",
+};
+
+// Currency value normalization: text → "USD" | "ILS" | null. The exact sibling
+// of normalizeSide, and null carries the same meaning it does there — UNMEASURED.
+// A caller that gets null must reject the row; it must NOT substitute a default,
+// because "the cell said something we don't understand" and "the file never said"
+// are different facts and only the second one has a safe fallback.
+export const normalizeCurrency = (raw) => {
+  const s = String(raw ?? "")
+    .replace(/[“”״]/g, '"')   // fold the gershayim variants so ש”ח === ש"ח
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!s) return null;
+  return CURRENCY_SIGNS[s] || CURRENCY_SIGNS[s.toUpperCase()] || null;
 };
