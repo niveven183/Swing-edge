@@ -13,6 +13,7 @@ concurrency:
 
 permissions:
   contents: read
+  deployments: read   # the wait step below reads Vercel's deployment statuses
 
 jobs:
   smoke:
@@ -25,6 +26,94 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      # ⚠️ Until this step existed, NOTHING connected the `push: [main]` trigger to the
+      # deploy the tests actually hit. The job started, installed, and requested
+      # https://swing-edge.com — whatever was live at that moment.
+      #
+      # Measured across four pushes the margin between "Vercel deployment success" and
+      # "npx playwright test started" was +21s / +9s / +5s / +16s. All positive, none
+      # enforced: the margin is a side effect of `npm ci` + `playwright install` taking
+      # ~40s, which happened to exceed the Vercel build. Nothing keeps it that way.
+      #
+      # 🔴 The danger is NOT a red run. If the race flips, smoke does not fail — it
+      # passes against the PREVIOUS deploy and reports ✅ for code that was never
+      # executed. A false green is worse than a red, because a red gets investigated
+      # and a green stops the search.
+      #
+      # What this proves / what it does NOT:
+      #   proves    — Vercel reported a Production deployment for THIS commit as ready.
+      #   does not  — that the swing-edge.com alias finished propagating to every edge
+      #               node. The app serves no build-SHA marker, so this is the closest
+      #               honest signal reachable from the workflow alone. If alias
+      #               propagation ever proves to be the real gap, the fix is a SHA
+      #               marker served by the app — not a longer `sleep`.
+      #
+      # Timeout ⇒ FAIL. "Could not prove which deploy is live" must be red. Continuing
+      # would reintroduce exactly the false ✅ this step exists to remove.
+      #
+      # `push` only: on `schedule` / `workflow_dispatch` there is no new deploy to wait
+      # for, and an old commit whose deployment record has aged out would fail for a
+      # reason that has nothing to do with the product.
+      - name: Wait for this commit's deploy to be live
+        if: ${{ github.event_name == 'push' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -uo pipefail
+          TIMEOUT_S=${TIMEOUT_S:-180}
+          deadline=$(( SECONDS + TIMEOUT_S ))
+          # ⚠️ `gh api` prints the ERROR BODY to stdout on a non-2xx, so a bare
+          # `ids=$(gh api ... || true)` puts `{"message":"Not Found",...}` into $ids and
+          # the loop then treats JSON fragments as deployment IDs. Measured, not
+          # theorised — it happened while testing this step. Hence: branch on the exit
+          # code, emit nothing on failure, and keep only digits.
+          #
+          # ⚠️ The error leaves through a FILE, not a variable: every call below runs
+          # inside $( ), i.e. a subshell, so an assignment here would be discarded and
+          # an unreachable API would look identical to a deploy that never finished.
+          query() {   # $1 = path, $2 = jq filter -> stdout on success; error -> /tmp/api_err
+            local out
+            if out=$(gh api "$1" --jq "$2" 2>/tmp/gh.err); then
+              printf '%s' "$out"
+            else
+              { printf '%s -> ' "$1"; tr -d '\n' < /tmp/gh.err | cut -c1-200; echo; } >> /tmp/api_err
+            fi
+          }
+
+          while :; do
+            : > /tmp/api_err
+            ids=$(query "repos/${GITHUB_REPOSITORY}/deployments?sha=${SHA}&environment=Production" '.[].id' \
+                  | grep -E '^[0-9]+$' || true)
+            states=""
+            for id in $ids; do
+              states="$states $(query "repos/${GITHUB_REPOSITORY}/deployments/${id}/statuses" '.[].state' | tr '\n' ' ')"
+            done
+            api_err=$(tr '\n' ';' < /tmp/api_err)
+            echo "t=${SECONDS}s sha=${SHA:0:7} deployments=[$(echo $ids)] states=[${states} ]${api_err:+ api_error=<${api_err}>}"
+
+            case " $states " in
+              *" success "*)
+                echo "✅ Vercel reported ${SHA:0:7} ready after ${SECONDS}s — the deploy under test is this commit."
+                exit 0 ;;
+              *" failure "*|*" error "*)
+                echo "::error::Vercel deployment for ${SHA:0:7} reported [${states} ]. Not running smoke against a failed deploy."
+                exit 1 ;;
+            esac
+
+            if (( SECONDS >= deadline )); then
+              # Two different causes, and they must not read the same. An API error is
+              # "we could not look", a clean empty result is "Vercel never got there".
+              if [ -n "$api_err" ]; then
+                echo "::error::Could not read deployment status for ${SHA:0:7} within ${TIMEOUT_S}s — last API error: ${api_err}. Failing rather than guessing which deploy is live."
+              else
+                echo "::error::No successful Production deployment for ${SHA:0:7} within ${TIMEOUT_S}s. Failing on purpose: testing whatever is live would be a false ✅ against the previous deploy."
+              fi
+              exit 1
+            fi
+            sleep 10
+          done
+
       - name: Run smoke tests
         env:
           TEST_URL: ${{ vars.TEST_URL || 'https://swing-edge.com' }}
