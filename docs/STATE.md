@@ -51,7 +51,9 @@ Chrome`, ו-`verify` כולו Node בלי DOM. **בלעדיו שש הסתעפו�
 
 ## ⏸️ חסום / ממתין לניב
 
-- **שליחת 2 המענים** — `fix_mobile_upload` + `files_received` בריפו ו-`/api/notify` בנוי. ⛔ לא נשלח: הפרומפט הבא
+- **שליחת 2 המענים** — `fix_mobile_upload` + `files_received` בריפו ו-`/api/notify` בנוי. ⛔ לא נשלח: הפרומפט הבא.
+  ⚠️ הנושא שאושר **"מצאנו — ותוקן"** רחב מהגוף: ה-OCR **לא** תוקן. הכרעה לפני שליחה
+- **הרצת `why_stopped_r2`** — `campaign=why_stopped_r2` · `prior_campaigns=why_stopped` · `audience=stuck_users`. ⛔ לא הורץ
 - אימות ידני: אונבורדינג ב-₪ בחלון אנונימי · יתר §1-§4 של M (מטבע בייבוא · זבל→דחייה · round-trip · AdminPanel)
 - 2 קבצי Sheets של `a0556783290` (IBI + אלטשולר) — חומר הגלם לתיקון הייבוא, טרם נוצל
 - **הגנת סיסמאות דלופות** — **פיצ'ר Supabase Pro בלבד**, לא הגדרת קונסולה. עם השדרוג
@@ -59,8 +61,7 @@ Chrome`, ו-`verify` כולו Node בלי DOM. **בלעדיו שש הסתעפו�
 - Stripe Test Mode · Google Search Console · Google Workspace · ריפו פרטי מול Actions
 - QA מובייל 7 סעיפים · ערכת OCR (30 גרפים) · 390 תמונות · עו"ד על `/privacy` · רשם הדומיין (Auto-Renew)
 - שדה טווח עסקה (בקשת 31.07, נוגע בסכימה+מסננים) · הודעה על 3 המספרים שזזו ב-T7 · מייל ל-`saridel` (22/22 ללא stop)
-- **מחיקת `~/Desktop/Swing-edge`** (worktree שבור מ-30.05, הכשיל סשן ב-04.08). ⚠️ יושב שם
-  `Backup-codes-niveven183.txt` — 2FA בטקסט גלוי, **לא בריפו (אומת)**. ניב השאיר; הסיכון: `git add -A` משם
+- **מחיקת `~/Desktop/Swing-edge`** (worktree שבור מ-30.05, הכשיל סשן 04.08). ⚠️ יושב שם `Backup-codes-niveven183.txt` — 2FA גלוי, **לא בריפו (אומת)**. הסיכון: `git add -A` משם
 
 ---
 
@@ -68,8 +69,7 @@ Chrome`, ו-`verify` כולו Node בלי DOM. **בלעדיו שש הסתעפו�
 
 - **M · פערי המטבע** §1-§6 (05.08) `2491c86` `b5d99dd` `e9de006` `e09833e` · **S1 · RLS** (`ee72492`) · **גל הסטופים בוטל** (artifact ייבוא)
 - **מובייל · `capture` הוסר** (05.08) — הבורר מציע גלריה **וגם** מצלמה, אסרציה ב-`test:ocr` נועלת
-- **קמפיין `why_stopped`** נשלח 04.08 ל-5 מתוך 26 סגורות. ⚠️ **מנה הבאה חייבת
-  שם campaign חדש** — ה-dedup יחסום את אותו שם בשקט
+- **`why_stopped_r2` מוכן, ⛔ לא נשלח** (06.08) — `prior_campaigns` מרחיב את ה-dedup → קהל 21 ב**אפס** כתיבות בליגר
 - 🔴 **טוקני Supabase ל-GA4 — נסגר (06.08)** `08ca710`. `page_location` ננעל ל-`origin+pathname`. ≤8/41 בחלון של 10 ימים; האמיתי לא ניתן למדידה. `INCIDENTS.md#12`
 
 ---

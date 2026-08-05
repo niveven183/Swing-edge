@@ -17,6 +17,16 @@ name: Email Campaign
 # writes are one row per send into email_campaign_log. No email address is ever
 # printed in full; SMTP secrets never echoed.
 #
+# `prior_campaigns` widens that dedup to earlier campaigns as well, which is what
+# makes a FOLLOW-UP possible: round two needs a new campaign key (the ledger's
+# unique index would otherwise swallow it in silence), but the people already
+# mailed in round one must still be excluded. Empty by default, and an empty value
+# reproduces the old single-campaign behaviour exactly.
+#
+# The alternative — pre-writing `sent` rows for the earlier batch — was rejected:
+# the ledger is the only record of what actually left the building, and inventing
+# rows in it to steer an audience corrupts the one source of truth we have.
+#
 # The email_campaign_log table is created by a migration the operator runs
 # manually. Until then, the fetch below degrades to a clear ::warning and a
 # green finish (dry-run), never a hard failure.
@@ -28,6 +38,10 @@ on:
         description: "Campaign key (matches template + dedup ledger)"
         required: true
         default: waitlist_launch
+      prior_campaigns:
+        description: "Comma-separated earlier campaigns to ALSO exclude (follow-up sends)"
+        required: false
+        default: ""
       audience:
         description: "Who to send to"
         type: choice
@@ -74,6 +88,8 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           LIMIT: ${{ inputs.limit }}
           TEMPLATE: ${{ inputs.template }}
+          CAMPAIGN: ${{ inputs.campaign }}
+          PRIOR_CAMPAIGNS: ${{ inputs.prior_campaigns }}
         run: |
           set -uo pipefail
           set +e
@@ -90,20 +106,39 @@ jobs:
           if [ ! -f "$TEMPLATE" ]; then
             echo "::error::template not found: $TEMPLATE"; fail=1
           fi
+          # A typo here silently WIDENS the exclusion and shrinks the audience, so
+          # it fails loudly rather than quietly mailing fewer people than intended.
+          case "$CAMPAIGN" in
+            ''|*[!a-zA-Z0-9_-]*) echo "::error::campaign must be [a-zA-Z0-9_-]+ (got '$CAMPAIGN')."; fail=1 ;;
+          esac
+          if [ -n "${PRIOR_CAMPAIGNS:-}" ]; then
+            case "$PRIOR_CAMPAIGNS" in
+              *[!a-zA-Z0-9_,-]*|,*|*,|*,,*)
+                echo "::error::prior_campaigns must be comma-separated [a-zA-Z0-9_-] keys (got '$PRIOR_CAMPAIGNS')."; fail=1 ;;
+            esac
+          fi
           [ "$fail" = "0" ] || exit 1
-          echo "guard ok · limit=$LIMIT · template=$TEMPLATE"
+          echo "guard ok · limit=$LIMIT · template=$TEMPLATE · prior='${PRIOR_CAMPAIGNS:-}'"
 
       - name: Fetch recipients (read-only, deduped)
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           CAMPAIGN: ${{ inputs.campaign }}
+          PRIOR_CAMPAIGNS: ${{ inputs.prior_campaigns }}
           LIMIT: ${{ inputs.limit }}
           AUDIENCE: ${{ inputs.audience }}
         run: |
           set -uo pipefail
           set +e                     # runner injects `bash -e`; disable so a degradable failure doesn't abort
+          # The exclusion set always contains the current campaign — a re-run must
+          # still skip whoever this campaign already reached — plus any earlier
+          # campaigns the operator named. Passed as ONE bound literal and split
+          # server-side by string_to_array, so it is never spliced into SQL text.
+          CAMPAIGNS="$CAMPAIGN"
+          [ -n "${PRIOR_CAMPAIGNS:-}" ] && CAMPAIGNS="$CAMPAIGN,$PRIOR_CAMPAIGNS"
+          echo "dedup against: $CAMPAIGNS"
           # SQL fed via stdin (not -c): psql only interpolates :'var' for script
-          # input, so campaign/lim bind safely instead of string-concat.
+          # input, so campaigns/lim bind safely instead of string-concat.
           #
           # `audience` selects between two FIXED heredocs — it is never spliced
           # into SQL text. An unknown value exits 1 rather than falling through
@@ -113,13 +148,13 @@ jobs:
           case "$AUDIENCE" in
             waitlist_approved)
               psql -v ON_ERROR_STOP=1 -tAq \
-                -v campaign="$CAMPAIGN" -v lim="$LIMIT" \
+                -v campaigns="$CAMPAIGNS" -v lim="$LIMIT" \
                 "$SUPABASE_DB_URL" > recipients.txt 2>/tmp/fetcherr <<'SQLEOF'
           SET default_transaction_read_only = on;
           SELECT email FROM public.waitlist w
           WHERE w.approved_at IS NOT NULL
             AND NOT EXISTS (SELECT 1 FROM public.email_campaign_log l
-              WHERE l.campaign = :'campaign'
+              WHERE l.campaign = ANY(string_to_array(:'campaigns', ','))
                 AND lower(l.email) = lower(w.email)
                 AND l.status = 'sent')
           ORDER BY w.approved_at ASC
@@ -132,7 +167,7 @@ jobs:
               # friends) that seed/test accounts use — SMTP hard-fails on those,
               # so including them would manufacture a guaranteed `failed` row.
               psql -v ON_ERROR_STOP=1 -tAq \
-                -v campaign="$CAMPAIGN" -v lim="$LIMIT" \
+                -v campaigns="$CAMPAIGNS" -v lim="$LIMIT" \
                 "$SUPABASE_DB_URL" > recipients.txt 2>/tmp/fetcherr <<'SQLEOF'
           SET default_transaction_read_only = on;
           SELECT u.email FROM auth.users u
@@ -142,7 +177,7 @@ jobs:
             AND u.email ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'
             AND u.email !~* '\.(local|localhost|test|invalid|example)$'
             AND NOT EXISTS (SELECT 1 FROM public.email_campaign_log l
-              WHERE l.campaign = :'campaign'
+              WHERE l.campaign = ANY(string_to_array(:'campaigns', ','))
                 AND lower(l.email) = lower(u.email)
                 AND l.status = 'sent')
           ORDER BY u.created_at ASC
@@ -157,7 +192,7 @@ jobs:
               # who came back recently and still entered nothing carries the
               # strongest signal, which the oldest-first ordering would bury.
               psql -v ON_ERROR_STOP=1 -tAq \
-                -v campaign="$CAMPAIGN" -v lim="$LIMIT" \
+                -v campaigns="$CAMPAIGNS" -v lim="$LIMIT" \
                 "$SUPABASE_DB_URL" > recipients.txt 2>/tmp/fetcherr <<'SQLEOF'
           SET default_transaction_read_only = on;
           SELECT u.email FROM auth.users u
@@ -170,7 +205,7 @@ jobs:
             AND (SELECT count(*) FROM public.trades t WHERE t.user_id = u.id) <= 1
             AND NOT EXISTS (SELECT 1 FROM public.admins a WHERE a.user_id = u.id)
             AND NOT EXISTS (SELECT 1 FROM public.email_campaign_log l
-              WHERE l.campaign = :'campaign'
+              WHERE l.campaign = ANY(string_to_array(:'campaigns', ','))
                 AND lower(l.email) = lower(u.email)
                 AND l.status = 'sent')
           ORDER BY u.last_sign_in_at DESC NULLS LAST
@@ -320,11 +355,14 @@ jobs:
           DISCORD_WEBHOOK: ${{ secrets.SENTINEL_DISCORD_WEBHOOK }}
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           CAMPAIGN: ${{ inputs.campaign }}
+          PRIOR_CAMPAIGNS: ${{ inputs.prior_campaigns }}
           AUDIENCE: ${{ inputs.audience }}
         run: |
           set -uo pipefail
           set +e
           stamp="$(date -u '+%Y-%m-%d %H:%M UTC')"
+          CAMPAIGNS="$CAMPAIGN"
+          [ -n "${PRIOR_CAMPAIGNS:-}" ] && CAMPAIGNS="$CAMPAIGN,$PRIOR_CAMPAIGNS"
           # remaining = rows in THIS run's audience not yet logged as sent. The
           # predicate must mirror the fetch step exactly, or the report counts a
           # different population than the one that was mailed.
@@ -335,7 +373,7 @@ jobs:
           SELECT count(*) FROM public.waitlist w
           WHERE w.approved_at IS NOT NULL
             AND NOT EXISTS (SELECT 1 FROM public.email_campaign_log l
-              WHERE l.campaign = :'campaign' AND lower(l.email)=lower(w.email) AND l.status='sent');
+              WHERE l.campaign = ANY(string_to_array(:'campaigns', ',')) AND lower(l.email)=lower(w.email) AND l.status='sent');
           SQLEOF
               ;;
             registered_users)
@@ -348,7 +386,7 @@ jobs:
             AND u.email ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'
             AND u.email !~* '\.(local|localhost|test|invalid|example)$'
             AND NOT EXISTS (SELECT 1 FROM public.email_campaign_log l
-              WHERE l.campaign = :'campaign' AND lower(l.email)=lower(u.email) AND l.status='sent');
+              WHERE l.campaign = ANY(string_to_array(:'campaigns', ',')) AND lower(l.email)=lower(u.email) AND l.status='sent');
           SQLEOF
               ;;
             stuck_users)
@@ -364,12 +402,12 @@ jobs:
             AND (SELECT count(*) FROM public.trades t WHERE t.user_id = u.id) <= 1
             AND NOT EXISTS (SELECT 1 FROM public.admins a WHERE a.user_id = u.id)
             AND NOT EXISTS (SELECT 1 FROM public.email_campaign_log l
-              WHERE l.campaign = :'campaign' AND lower(l.email)=lower(u.email) AND l.status='sent');
+              WHERE l.campaign = ANY(string_to_array(:'campaigns', ',')) AND lower(l.email)=lower(u.email) AND l.status='sent');
           SQLEOF
               ;;
             *) : > /tmp/remaining.sql ;;
           esac
-          remaining="$(psql -v ON_ERROR_STOP=1 -tAq -v campaign="$CAMPAIGN" "$SUPABASE_DB_URL" < /tmp/remaining.sql 2>/dev/null)"
+          remaining="$(psql -v ON_ERROR_STOP=1 -tAq -v campaigns="$CAMPAIGNS" "$SUPABASE_DB_URL" < /tmp/remaining.sql 2>/dev/null)"
           [ -n "$remaining" ] || remaining="?"
 
           desc="$(printf '📧 Email Campaign — %s (%s)\n• נשלחו: %s\n• נכשלו: %s\n• נותרו בתור: %s\nנבדק: %s' \
