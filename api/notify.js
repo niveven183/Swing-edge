@@ -36,7 +36,9 @@ const SUPABASE_ANON_KEY =
 // The only templates this endpoint can ever send. Adding a key is a code change
 // and a code review; that is the point.
 const TEMPLATES = {
-  fix_mobile_upload: { file: "emails/fix_mobile_upload.html", subject: "מצאנו — ותוקן" },
+  // The subject must not promise more than the body delivers: the picker was
+  // fixed, the OCR reading was not, and the body says so explicitly.
+  fix_mobile_upload: { file: "emails/fix_mobile_upload.html", subject: "מצאנו את מה שחסם אותך" },
   files_received: { file: "emails/files_received.html", subject: "הקבצים שלך התקבלו" },
 };
 
