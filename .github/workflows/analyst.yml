@@ -31,7 +31,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
 
       # The analyst imports canonical trade math from src/ (date-fns), so deps
       # must be installed — unlike the self-contained guardian/digest scripts.
