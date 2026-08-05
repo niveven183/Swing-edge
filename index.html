@@ -132,7 +132,16 @@
       } catch (e) {}
 
       gtag('js', new Date());
-      gtag('config', 'G-VC8PKL4NL1', { anonymize_ip: true, send_page_view: true });
+      // page_location is pinned to origin+pathname. gtag defaults it to location.href,
+      // and supabase detectSessionInUrl puts #access_token=…&refresh_token=… in the URL
+      // on every OAuth / password-recovery return — the default would ship those to GA.
+      // Every manually sent page_view must pass page_location too: params set here become
+      // the defaults for later events, so an omitted one silently reuses the load-time path.
+      gtag('config', 'G-VC8PKL4NL1', {
+        anonymize_ip: true,
+        send_page_view: true,
+        page_location: location.origin + location.pathname
+      });
     </script>
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-VC8PKL4NL1"></script>
 

@@ -288,3 +288,39 @@ Every production incident gets one short entry: what broke, root cause, fix, pre
   `mixedCurrency`, and a mixed-currency journal renders a banner stating that the total is not a
   real sum. **⛔ Still open:** OCR is unaware of agorot (⏭️ in `STATE.md`), and the `currency`
   column awaits Niv running the migration (⏸️).
+
+## #12 — 2026-08-06 — Supabase access tokens may have been sent to Google Analytics in `page_location`
+- **Symptom:** none. **No monitor fired, no user reported anything, and nothing was broken.**
+  Found by reading `index.html:135` while planning an unrelated SPA-pageview change. Had the
+  wave not touched that exact line, the leak would still be live.
+- **Root cause — two safe defaults that are unsafe together:**
+  1. `src/supabaseClient.js:13` sets `detectSessionInUrl: true` and no `flowType`, so
+     supabase-js v2 uses the **implicit** flow: every OAuth / password-recovery return lands on
+     `https://swing-edge.com/#access_token=…&refresh_token=…` before the client strips the hash.
+  2. `gtag('config', …, { send_page_view: true })` defaults `page_location` to
+     `document.location.href` — **fragment included** — and the GA block in `index.html` runs
+     at document parse time, i.e. **before** supabase-js has cleared the hash.
+  Neither default is wrong on its own. The bug lives in the seam, which is why a review of
+  either file alone reads as correct.
+- **Scope (bounded, upper bound — the true number is not knowable from the server):**
+  window `e8c2d3b` (2026-07-27, GA4 added) → this fix, 10 days. `detectSessionInUrl` predates it
+  by three months (`bb8cc06`) but was harmless until GA4 arrived. Eligible population: **20/41
+  users are Google OAuth, of whom 8/41 signed in during the window; 0/41 password recoveries.**
+  So **at most 8/41 users** could have been affected, and only the subset that granted analytics
+  consent — **consent lives in `localStorage`, so that subset cannot be counted server-side.**
+  ⛔ Do not read "8" as the number of affected users; it is the ceiling of a number we cannot measure.
+- **Fix (this commit):** `page_location` is pinned to `location.origin + location.pathname` in
+  the `config` call. This also covers the PKCE `?code=` variant, since neither query nor fragment
+  survives. Manually sent `page_view` events must pass `page_location` explicitly — config params
+  become defaults for later events, so an omitted one silently reuses the load-time path.
+- **Why it shipped:** the GA4 review asked "does this send PII?" and correctly answered no —
+  **no line of our code passes a token to gtag.** The token was contributed by a *default* in a
+  library, through the URL, which no reviewer of either file was looking at.
+- **Lesson:** **a default that reads the ambient environment is an input you did not declare.**
+  `page_location` was never written down anywhere in the repo, and that is exactly why it was
+  never reviewed. Any analytics call that defaults to "the current URL" must be pinned the day
+  it is added, not the day someone notices what else is in the URL.
+- **Prevention:** the `config` block now carries the reason inline so the next editor cannot
+  remove the pin without reading why. **⛔ Still open:** no automated check asserts that nothing
+  resembling a token reaches an outbound analytics call — this class is currently caught by
+  reading only. The CSP work (⏭️ S2) is the nearest structural guard.
