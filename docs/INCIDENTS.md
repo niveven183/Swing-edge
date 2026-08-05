@@ -324,3 +324,64 @@ Every production incident gets one short entry: what broke, root cause, fix, pre
   remove the pin without reading why. **⛔ Still open:** no automated check asserts that nothing
   resembling a token reaches an outbound analytics call — this class is currently caught by
   reading only. The CSP work (⏭️ S2) is the nearest structural guard.
+
+## #13 — 2026-08-05 — `blockAnalytics()` never blocked anything: three files, one glob, ten days of CI traffic in GA4
+> ⚠️ **Dating note — this entry is not out of order.** #12 is labelled 2026-08-06, but its commit
+> `08ca710`, like every commit around it (`f74428e` 22:39, `57c2832` 22:42, `91177b1` 23:11), is
+> stamped **2026-08-05 +0300**. The docs have been running one calendar day ahead of the commits.
+> This entry uses the **git-verifiable** date. ⏭️ Niv decides which convention wins; until then
+> `git log` is the authority (per this file's own header: a date not verifiable against a commit
+> must be marked as such).
+- **Symptom:** none. No monitor fired, no test failed, nothing was broken. Found while auditing
+  workflow versions (task W) by reading the route pattern, not by any signal. **The function had
+  a comment stating exactly what it prevented, and it prevented nothing.**
+- **Root cause — a Playwright glob that matches on path segments:**
+  `page.route('**/googletagmanager.com/**', …)`. In Playwright, `**/` requires a literal `/`
+  immediately before the next token. In `https://www.googletagmanager.com/gtag/js` the character
+  before `googletagmanager.com` is a **`.`**, not a `/`. The pattern therefore matched **no URL
+  that could ever exist**, the route never fired, and every CI page load sent a real `page_view`
+  to `G-VC8PKL4NL1`. Introduced in `e8c2d3b` (2026-07-27) — **the same commit as #12** — which
+  added GA4 and the three block helpers together.
+- **Scope (measured, not estimated), window `e8c2d3b` 2026-07-27 → this fix 2026-08-05:**
+  - smoke: **108 runs × 5 page loads = 540**
+  - sentinel: **122 runs × 3 page loads = 366**
+  - **≈906 synthetic `page_view` events** against a product with **41 registered / 12 activated
+    users**. Only `index.html` carries the GA snippet, and it is the SPA shell, so every route
+    load counts.
+  - ⚠️ **Every GA4 metric dated before 2026-08-05 is unusable.** The synthetic traffic is not
+    separable after the fact: it carries no marker distinguishing it from a real session. **The
+    fix date is the baseline; do not compare across it.**
+- **Two wrong numbers were sitting in the comments the whole time**, and both are corrected in
+  this commit: sentinel's cron `'20,50 * * * *'` **schedules** 48 runs/day, but GitHub actually
+  delivered **~12/day** (122 runs / 10 days) — the comment quoted the schedule as if it were a
+  measurement. And **"~29 real users" was the activation *rate*** (12/41 = 29%) misread as a
+  headcount (§2: no ratio without its denominator). A number nobody re-measured for ten days.
+- **The fix exposed a second, independent defect — the console channel discards the URL.**
+  Making the block actually work turned smoke **red, 4/6 failed**: `route.abort()` emits
+  `Failed to load resource: net::ERR_FAILED`, and `msg.text()` for a resource-load failure
+  contains **no URL at all** — the host lives only in `msg.location().url`. All three files
+  filtered console errors on `text` alone, so their GA allowlists could not match. Consequences:
+  - `tests/smoke.spec.js` — the same blind spot made smoke red on **2026-08-04 and 2026-08-05**:
+    a 500 from `api.fontshare.com` was correctly ignored by the response channel (host check) and
+    walked straight back in through the console channel, which had no host check. The comment
+    promised "third-party 5xx must not fail our smoke" while the code enforced it on **one of two
+    paths**. Diagnosing it required downloading the trace artifact by hand.
+  - `tests-sentinel/*` — 2 false amber findings per run, which the watch job would have merged,
+    classified and reported **forever**. Verified: 2 findings → **0** after the fix.
+  **This makes the console-URL fix a hard prerequisite for the glob fix, not a companion to it.**
+- **Proof (required before commit, per §2 — a count, not a declaration):**
+  old glob → blocked **0**, leaked **2**. New regex → blocked **2**, leaked **0**. Against real
+  production → blocked **1** (`gtag/js?id=G-VC8PKL4NL1`), leaked **0**.
+  ⚠️ The first version of this proof was **confounded** and discarded: it registered a catch-all
+  `**/*` route second, and Playwright evaluates routes in **reverse registration order**, so the
+  catch-all would have won regardless. The rerun uses no catch-all.
+- **Lesson:** **a comment describing a mechanism is not evidence the mechanism runs.** Three
+  files carried the same broken line under three confident comments explaining what it prevented.
+  A guard whose failure mode is silence must be tested by **observing it fire** — a blocked-request
+  count — because there is no other way to tell a working filter from a dead one.
+- **Prevention:** all three now use a regex (`/googletagmanager\.com|google-analytics\.com/`) with
+  an inline note stating why it must never become a glob again; `google-analytics.com` is blocked
+  too, since `/g/collect` records the hit even if the loader is blocked. Console filters now match
+  the location URL as well as the text — as a **provider list, never a host rule**.
+  **⛔ Still open:** nothing asserts that a CI run sends zero analytics requests. Until an
+  assertion like that exists, this class of failure is caught by reading only.

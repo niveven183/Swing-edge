@@ -26,10 +26,24 @@ const IGNORE_SUBSTR = [
   'google-analytics', 'googletagmanager', 'doubleclick', 'gtag',
 ];
 
-// Sentinel runs 48×/day. Letting it reach GA4 would bury ~29 real users under
-// synthetic pageviews, silently — block the tag before it ever loads.
+// Letting sentinel reach GA4 buries real users under synthetic pageviews, silently.
+// Measured 2026-07-27..08-05: 122 sentinel runs × 3 page loads = 366 page_views, against
+// a product with 41 registered / 12 activated users. Block the tag before it ever loads.
+// ⚠️ The cron schedules 48 runs/day ('20,50 * * * *'); GitHub actually delivers ~12/day
+// (122 / 10 days). The old "48×/day" here was the schedule, never the measurement — and
+// "~29 real users" was the activation RATE (12/41 = 29%) misread as a headcount.
+//
+// REGEX, NOT GLOB. '**/googletagmanager.com/**' matched NOTHING: Playwright globs
+// align on path segments, so '**/' demands a '/' before the host, but in
+// 'https://www.googletagmanager.com/...' that character is '.'. This file is the
+// worst offender of the three that carried the broken line — 48 runs/day × 2 page
+// loads went to GA4 as real page_views. See docs/INCIDENTS.md #13.
+// google-analytics.com is blocked too: /g/collect is what records the hit.
+// Never replace this with a glob.
+const ANALYTICS_HOSTS = /googletagmanager\.com|google-analytics\.com/;
+
 async function blockAnalytics(page) {
-  await page.route('**/googletagmanager.com/**', (route) => route.abort());
+  await page.route(ANALYTICS_HOSTS, (route) => route.abort());
 }
 
 const findings = [];
@@ -59,13 +73,24 @@ function watch(page) {
   page.on('console', (msg) => {
     if (msg.type() !== 'error') return;
     const text = msg.text();
-    if (ignored(text)) return;
     // The message text is whatever the app chose to print and often names no
     // resource; the location is the only thing that always identifies where it
-    // came from. Appended, never used to filter — filtering here would be a new
-    // silence, and this exists to remove one.
+    // came from. It is matched against IGNORE_SUBSTR — the third-party-noise
+    // list — and appended to the finding.
+    //
+    // Matching src against IGNORE_SUBSTR is required, not optional: a blocked
+    // request reports exactly "Failed to load resource: net::ERR_FAILED" with
+    // the host ONLY in the location. Filtering on text alone meant every
+    // route-aborted GA request became an amber finding — 2 per run × 48 runs/day.
+    // That is the same defect as the broken glob above: a filter that cannot
+    // see the field it is filtering on. See docs/INCIDENTS.md #13.
+    //
+    // This is a provider list, NOT a host rule. Never filter here on
+    // "own-origin", "404", or "Failed to load resource": that would silence a
+    // real failure, and removing silences is why this collector exists.
     let src = '';
     try { src = msg.location()?.url || ''; } catch { src = ''; }
+    if (ignored(text) || ignored(src)) return;
     consoleErrors.push(src ? `${text} @ ${cleanUrl(src)}` : text);
   });
   page.on('pageerror', (err) => {

@@ -13,31 +13,66 @@ const BASE_HOST = new URL(BASE_URL).host;
 // should ever fire — these four are the safety net if another load path slips through.
 const CONSOLE_ERROR_ALLOWLIST = ['google-analytics', 'googletagmanager', 'doubleclick', 'gtag'];
 
-// Never let CI traffic reach GA4. sentinel.yml alone is 48 runs/day against ~29 real
-// users; synthetic pageviews would drown the signal with no error surfacing anywhere.
+// Never let CI traffic reach GA4. Measured over 2026-07-27..08-05: smoke ran 108 times
+// (5 page loads each = 540) and sentinel 122 times (3 each = 366) — ~906 synthetic
+// page_views against a product with 41 registered / 12 activated users, with no error
+// surfacing anywhere.
+// ⚠️ Two numbers that used to sit here were wrong and are corrected above: sentinel's
+// cron schedules 48/day but GitHub actually delivers ~12/day (122 runs / 10 days), and
+// "~29 real users" was the activation RATE (12/41 = 29%) misread as a user count.
+//
+// REGEX, NOT GLOB — and that is the entire point. The previous pattern,
+// '**/googletagmanager.com/**', matched NOTHING: Playwright globs align on path
+// segments, so '**/' demands a '/' immediately before the host, but in
+// 'https://www.googletagmanager.com/...' the character there is '.'. The route never
+// fired and every CI run shipped a real page_view to G-VC8PKL4NL1 — for months,
+// silently, behind a comment promising the opposite. See docs/INCIDENTS.md #13.
+// google-analytics.com is blocked too: /g/collect is the endpoint that actually
+// records the hit, so blocking only the loader leaves a second path open.
+// Never replace this with a glob.
+const ANALYTICS_HOSTS = /googletagmanager\.com|google-analytics\.com/;
+
 async function blockAnalytics(page) {
-  await page.route('**/googletagmanager.com/**', (route) => route.abort());
+  await page.route(ANALYTICS_HOSTS, (route) => route.abort());
+}
+
+function hostOf(url) {
+  try { return new URL(url).host; } catch { return ''; }
 }
 
 // Attach diagnostics to a page: uncaught console errors, page errors, and any
 // 5xx from the deployment's own origin (third-party 5xx must not fail our smoke).
+//
+// The console channel enforces the SAME host rule as the response channel. It did
+// not, and that gap is what made smoke red on 2026-08-04 and 2026-08-05: a 500 from
+// api.fontshare.com was correctly ignored by the response channel (host !== BASE_HOST)
+// and then walked straight back in through the console channel, which filtered on
+// nothing but four GA substrings. The comment promised "third-party 5xx must not fail
+// our smoke" while the code enforced it on one of two paths. See docs/INCIDENTS.md #13.
+//
+// The URL lives in msg.location(), NOT in msg.text(). A failed resource load reports
+// exactly "Failed to load resource: the server responded with a status of 500 ()" —
+// no URL at all. That is why diagnosing the 2026-08-05 failure required downloading
+// the trace artifact by hand, and why the URL is now appended to every recorded error.
 function watchErrors(page) {
   const consoleErrors = [];
   const serverErrors = [];
   page.on('console', (msg) => {
     if (msg.type() !== 'error') return;
     const text = msg.text();
-    if (CONSOLE_ERROR_ALLOWLIST.some((p) => text.includes(p))) return;
-    consoleErrors.push(text);
+    const url = msg.location()?.url || '';
+    if (CONSOLE_ERROR_ALLOWLIST.some((p) => text.includes(p) || url.includes(p))) return;
+    // Attributable to a third party -> not our deployment failing. Unattributable
+    // (no URL: inline script, page-level error) -> keep it and fail loud.
+    if (url && hostOf(url) !== BASE_HOST) return;
+    consoleErrors.push(url ? `${text}  [${url}]` : text);
   });
   page.on('pageerror', (err) => {
     consoleErrors.push(`pageerror: ${err.message}`);
   });
   page.on('response', (res) => {
     if (res.status() < 500) return;
-    let host = '';
-    try { host = new URL(res.url()).host; } catch { /* ignore */ }
-    if (host === BASE_HOST) serverErrors.push(`${res.status()} ${res.url()}`);
+    if (hostOf(res.url()) === BASE_HOST) serverErrors.push(`${res.status()} ${res.url()}`);
   });
   return { consoleErrors, serverErrors };
 }

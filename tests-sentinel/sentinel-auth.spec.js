@@ -111,7 +111,14 @@ function watch(page) {
     try { src = msg.location()?.url || ''; } catch { src = ''; }
     if (IGNORE_SOURCE.some((p) => src.includes(p))) return;
     const text = msg.text();
-    if (ignored(text)) return;
+    // src is matched against IGNORE_SUBSTR too, not just IGNORE_SOURCE. A
+    // route-blocked request reports exactly "Failed to load resource:
+    // net::ERR_FAILED" and carries the host ONLY in the location — so the GA
+    // entries in IGNORE_SUBSTR could never match, and every aborted GA request
+    // became an amber finding. Same defect as the broken glob: a filter that
+    // cannot see the field it filters on. See docs/INCIDENTS.md #13.
+    // Still a provider list, never a host rule (see IGNORE_SOURCE above).
+    if (ignored(text) || ignored(src)) return;
     // src already decided whether to keep this message; it must also reach the
     // report. The text is whatever the app chose to print and often names no
     // resource — the location is the only part that always identifies one.
@@ -297,8 +304,15 @@ test('authenticated journey: login → journal → create/delete SNTNL', async (
     return;
   }
 
-  // Sentinel runs 48×/day against ~29 real users. Its traffic must never reach GA4.
-  await page.route('**/googletagmanager.com/**', (route) => route.abort());
+  // Sentinel traffic must never reach GA4. Measured 2026-07-27..08-05: 122 runs, each
+  // loading /app once, against a product with 41 registered / 12 activated users.
+  // ⚠️ The old note said "48×/day against ~29 real users" — both wrong: 48 is the cron
+  // schedule (actual delivery ~12/day), and 29 was the activation RATE (12/41), not a
+  // headcount.
+  // REGEX, NOT GLOB: '**/googletagmanager.com/**' matched NOTHING (Playwright globs
+  // align on path segments; '**/' demands a '/' before the host, but the character
+  // before 'googletagmanager.com' is '.'). See docs/INCIDENTS.md #13.
+  await page.route(/googletagmanager\.com|google-analytics\.com/, (route) => route.abort());
 
   const diag = watch(page);
 
