@@ -72,7 +72,7 @@ Every production incident gets one short entry: what broke, root cause, fix, pre
   the domain**, which propagated through DNS and pulled the domains offline. Not a Vercel, build,
   or DNS-config problem — a registrant-verification lapse.
 - **Misread precursor:** UptimeRobot began **flapping on the evening of 19/07**
-  (see `docs/HEALTH-FLAPPING-DIAGNOSIS.md`). It was attributed to transient blips; in reality it
+  (see `docs/audits/HEALTH-FLAPPING-DIAGNOSIS.md`). It was attributed to transient blips; in reality it
   was the suspension propagating through DNS. The `/api/health` hardening done in response
   (`b98135e`) was chasing the wrong root cause but remains a legitimate improvement and stays.
 - **Process failure:** The Dispatcher agent classified the registrar email as "account noise,"

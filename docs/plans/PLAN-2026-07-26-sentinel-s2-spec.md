@@ -3,7 +3,7 @@
 - **תאריך**: 2026-07-26
 - **סטטוס**: אושר 2026-07-26 עם שלושה תיקונים (חלון gate 45→09, `concurrency` ברמת ה-job, עדכון סעיף הסודות) — משולבים למטה
 - **קבצים שייגעו**: `tests-sentinel/sentinel-auth.spec.js` (חדש) · `.github/workflows/sentinel.yml`
-- **מקור אמת**: [docs/SENTINEL-S2-DIAGNOSIS-2026-07-25.md](../SENTINEL-S2-DIAGNOSIS-2026-07-25.md) (S2 שלב 1/2)
+- **מקור אמת**: [docs/audits/SENTINEL-S2-DIAGNOSIS-2026-07-25.md](../audits/SENTINEL-S2-DIAGNOSIS-2026-07-25.md) (S2 שלב 1/2)
 
 ## Context
 

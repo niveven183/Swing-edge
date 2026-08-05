@@ -18,7 +18,7 @@ Desktop/Cowork, לא GitHub Actions). לצי הסוכנים המבוסס GitHub 
 | **Architecture Auditor** | סקירת קוד/ארכיטקטורה שבועית | שבועי | קוד הריפו (origin/source) | הפיק false positives מחוסר אימות מול המקור בפועל (AGENTS-AUDIT #4-5) |
 | **Performance Auditor** | ניתוח ביצועי מסחר (win rate, R:R) | שבועי | טבלת `trades` ב-Supabase | תוקן ב-19.07 — איסור טאוטולוגיות, חיתוך תאים לפי planned R:R בלבד (לא realized) |
 
-**כפוף לפרוטוקול צי הסוכנים (docs/AGENTS-AUDIT-2026-07-19.md).**
+**כפוף לפרוטוקול צי הסוכנים (docs/audits/AGENTS-AUDIT-2026-07-19.md).**
 
 כל סוכן חדש שנוסף לצי ה-Cowork חייב להתווסף לטבלה הזו באותה ריצה שבה הוא
 מוגדר — כדי שהמסמך לא יתיישן שוב (ראו AGENTS-AUDIT #7).

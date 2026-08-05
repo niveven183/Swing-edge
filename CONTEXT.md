@@ -585,14 +585,14 @@ Run **outside this repo** (no code here references them) — ops/maintenance age
 
 A pre-distribution sprint: wire the onboarding→coach pipeline, fix data-viz honesty, complete bilingual coverage, and make the app usable on a real phone. Each wave is one reviewable commit.
 
-- **Wave 1 — onboarding wired** (`c74c512`): onboarding now feeds the app for real. `profileName` is captured and used; capital is entered **manually in `$`** (no more hardcoded default) and drives **bucket derivation** downstream. Closes the "onboarding is decorative" gap from the pipeline audit (`ee359fd`, `docs/ONBOARDING-COACH-AUDIT-2026-07-13.md`).
+- **Wave 1 — onboarding wired** (`c74c512`): onboarding now feeds the app for real. `profileName` is captured and used; capital is entered **manually in `$`** (no more hardcoded default) and drives **bucket derivation** downstream. Closes the "onboarding is decorative" gap from the pipeline audit (`ee359fd`, `docs/audits/ONBOARDING-COACH-AUDIT-2026-07-13.md`).
 - **Wave 2 — R-01 hold-time scatter** (`e9bad7d`): the Hold-vs-P&L scatter had a hard floor that flattened the axis. Fix removes the floor, uses an **auto domain**, and spreads the demo holds so the distribution is legible instead of collapsed onto one value.
 - **Wave 3 — i18n sweep (he+en full)** (`9efa423`): localized remaining hardcoded UI strings + enum **display labels** via a central `labelFor(kind, value, lang)` helper in **`src/i18n.js`** (single source for enum→label). `regimes.json` made **bilingual** (regime knowledge in he+en). **L-01 reclassified** as a user-facing-text issue.
 - **Wave 4 — mobile layout** (`4e70fd7`): **FAB hide-on-scroll** wired to both `window` and the `main` scroll container (closes M-02/R-05 from the earlier QA); **footer wraps** instead of overflowing (M-01); **StatCard** value/label made responsive with proper padding (M-03/M-05); setup **badge unclipped**.
 - **Wave 4.1 — mobile hotfix** (`834870d`): Setup Matrix table switched to **`table-fixed sm:table-auto`** with explicit column widths (**46/49/44/78px**) so it fits the viewport without RTL clipping; mobile trade card reflowed to **3 rows** so the meta row no longer overlaps. Root cause + prevention logged in `docs/INCIDENTS.md` (`table-layout: auto` let a variable-width column blow past the viewport in RTL).
 
 ### Mobile UX Audit (2026-07-15) — verdict: ready to distribute
-`docs/MOBILE-UX-AUDIT-2026-07-15.md` (`bd6c388`). Full mobile pass, HE/EN, emulated at 390px against production.
+`docs/audits/MOBILE-UX-AUDIT-2026-07-15.md` (`bd6c388`). Full mobile pass, HE/EN, emulated at 390px against production.
 - **Score: 0 🔴 blockers · 3 🟠 fix-soon · 7 🟡 polish.** No finding blocks distribution — verdict is "good enough for a first friends round."
 - **The 3 🟠 (fix before *wider* distribution):**
   - **M-01** — dark-theme muted text fails WCAG AA (`#334155` on `#0d1424` = 1.84:1); raise `--text-muted`/`--text-tertiary` to ≥`#8A97A8` (~4.6:1).
@@ -619,14 +619,14 @@ A pre-distribution sprint: wire the onboarding→coach pipeline, fix data-viz ho
 
 ## Waves 8–10 — Deep audit → audit fixes → tour → universal import (2026-07, CLOSED)
 
-- **Deep audit** (`950774a`, `docs/DEEP-AUDIT-2026-07-17.md`): full functional + UX audit across **all tabs**, flows, and data consistency. Verdict **1🔴 / 3🟠 / 4🟡**, backed by a **ground-truth script** (independent recomputation of the displayed metrics).
+- **Deep audit** (`950774a`, `docs/audits/DEEP-AUDIT-2026-07-17.md`): full functional + UX audit across **all tabs**, flows, and data consistency. Verdict **1🔴 / 3🟠 / 4🟡**, backed by a **ground-truth script** (independent recomputation of the displayed metrics).
 - **Wave 8 — audit fixes** (`819d169`): applied the audit findings —
   - **DNA cache invalidation** — cache key now sensitive to `status`/`exit` (so closing/editing a trade busts the cache) **+ mentee separation** (a mentor viewing a mentee no longer reads the mentor's own cached DNA).
   - **Coach insight dedup** — collapses duplicate/mirrored insights before display.
   - **Guest notebook state** — notebook state handled correctly for guest (non-persisted) sessions.
   - **Dialog semantics** + **formatting consistency** across screens.
 - **Wave 9 — guided tour** (`6989c42`): 15-step **tab-navigating** product tour — `onNavigate` + **retry** + **centered fallback** when an anchor is missing; **19 `data-tour` anchors**; **`en` fallback** for untranslated steps; **restart from Settings**. Satisfies source-of-truth requirement **#4 ✅**.
-- **Import spec** (`d0d42e1`, `docs/IMPORT-SPEC-2026-07-18.md` — **the source-of-truth for the import format**), gated pre-implementation, then **Wave 10 — universal import** (`0c8f2f3`):
+- **Import spec** (`d0d42e1`, `docs/audits/IMPORT-SPEC-2026-07-18.md` — **the source-of-truth for the import format**), gated pre-implementation, then **Wave 10 — universal import** (`0c8f2f3`):
   - **CSV/XLSX** import under **`src/import/`** — `parseFile` / `detectColumns` / `normalizeRow` / `buildImport` / `synonyms`.
   - **Smart bilingual column mapping** (he+en synonyms) **+ content sniffing** to disambiguate ambiguous headers.
   - **Excel serial dates** handled, **DD/MM** as the default interpretation.
