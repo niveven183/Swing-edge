@@ -45,7 +45,7 @@ import { useToast, useConfirm } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured, tradeForSupabase, tradeFromSupabase } from "./src/supabaseClient.js";
 import { cleanTrades, purgeInvalidTrades } from "./src/lib/cleanTrades.js";
 import { loadSettings, saveSettings, flushSettings, migrateFromLocalStorage } from "./src/lib/userSettings.js";
-import { calcTradeMetrics, fmt$, fmt$0, fmtR, fmtNum, fmtPrice, fmtBalance, numOrNull, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays, localDayKey, realizedAt, realizedDayKey, currencyOf, CURRENCY_SYMBOL } from "./src/utils.js";
+import { calcTradeMetrics, fmt$, fmt$0, fmtR, fmtNum, fmtPrice, fmtBalance, numOrNull, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays, localDayKey, todayKey, realizedAt, realizedDayKey, currencyOf, CURRENCY_SYMBOL } from "./src/utils.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell,
@@ -402,7 +402,7 @@ const exportTradesCSV = (trades) => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `SwingEdge_Journal_${new Date().toISOString().slice(0,10)}.csv`;
+  a.download = `SwingEdge_Journal_${todayKey()}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 };
@@ -2371,7 +2371,9 @@ export default function SwingEdge() {
     const newTrade = {
       id: (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       ticker: form.ticker.toUpperCase(),
-      date: new Date().toISOString().slice(0, 10),
+      // CALENDAR DAY -> local. toISOString() here stamped YESTERDAY on any trade
+      // typed between local midnight and 02:59 (IDT). See todayKey in utils.js.
+      date: todayKey(),
       createdAt: new Date().toISOString(),
       side: form.side,
       // A hand-typed trade is priced in the CAPITAL's currency by construction —

@@ -3,7 +3,7 @@
 // reason code. Reuses validateTradeInputs / inferSide from utils.js — single
 // source of truth for geometry, no duplicated validation.
 
-import { validateTradeInputs, inferSide } from "../utils.js";
+import { validateTradeInputs, inferSide, todayKey } from "../utils.js";
 import { normalizeSide } from "./synonyms.js";
 import { isExcelSerial } from "./detectColumns.js";
 
@@ -88,7 +88,11 @@ const REASONS = {
 export function normalizeRow(row, mapping, opts = {}) {
   const dateFormat = opts.dateFormat || "DD/MM";
   const capital = opts.capital ?? 0;
-  const today = opts.todayISO || new Date().toISOString().slice(0, 10);
+  // Fallback for a row with no date cell. Local day, not UTC — the same bug the
+  // manual form carried: a file imported just after local midnight would have
+  // stamped every dateless row with YESTERDAY. `opts.todayISO` still wins so the
+  // tests can freeze the day.
+  const today = opts.todayISO || todayKey();
   const cell = (field) => {
     const idx = mapping[field];
     return idx == null || idx < 0 ? "" : row[idx];

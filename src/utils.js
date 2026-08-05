@@ -13,6 +13,19 @@ export const localDayKey = (raw) => {
   return isNaN(d.getTime()) ? null : format(d, "yyyy-MM-dd");
 };
 
+// TODAY as a LOCAL 'YYYY-MM-DD' key — the zero-argument sibling of localDayKey,
+// and it exists for the same reason. `new Date().toISOString().slice(0,10)`
+// reports the UTC day, which east of Greenwich is still YESTERDAY during the
+// first hours after local midnight. Measured, not theorized:
+//   local 2026-08-04 00:30 → toISOString key "2026-08-03"   ← the bug
+//   local 2026-08-04 03:30 → toISOString key "2026-08-04"
+// Window: 00:00–02:59 local in IDT (UTC+3), 00:00–01:59 in IST (UTC+2).
+//
+// ⚠️ CALENDAR DAY only. An INSTANT (`createdAt`, `closedAt`) keeps
+// `toISOString()` — UTC is correct for a timestamp, and "fixing" those would
+// be the mirror-image bug.
+export const todayKey = () => format(new Date(), "yyyy-MM-dd");
+
 // When a trade's P&L was realized, as a sortable instant. Open trades have no
 // close stamp, so they fall back to entry and sort as if realized on entry day.
 export const realizedAt = (trade) => {

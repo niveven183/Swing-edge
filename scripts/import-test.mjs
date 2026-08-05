@@ -2,6 +2,7 @@
 // 6 fixtures and asserts exact counts. Regenerates fixtures first so the run is
 // deterministic (esp. the XLSX serial-date fixture).
 import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import "./import-fixtures/generate.mjs";
@@ -770,6 +771,49 @@ const near = (name, actual, expected) => {
   check("rejected", bad.ok, false);
   check("named", bad.code, "bad_unit");
   check("has a Hebrew reason", typeof bad.detail?.he, "string");
+}
+
+// ── §5 · the day a trade is stamped with is the LOCAL day ────────────────────
+// Runs in a CHILD process with TZ=Asia/Jerusalem so the parent's timezone — and
+// every other date assertion in this file — is untouched. "Now" is frozen at
+// 2026-08-03T21:30:00Z, which is 2026-08-04 00:30 in Israel: inside the window
+// where the UTC day and the local day disagree.
+{
+  console.log("\n§5 · local calendar day");
+  const utilsURL = new URL("../src/utils.js", import.meta.url).href;
+  const normURL = new URL("../src/import/normalizeRow.js", import.meta.url).href;
+  const run = (code) => execFileSync(
+    process.execPath, ["--input-type=module", "-e", code],
+    { env: { ...process.env, TZ: "Asia/Jerusalem" }, encoding: "utf8" },
+  ).trim();
+
+  const FROZEN = `
+    const R = Date, FIXED = new R("2026-08-03T21:30:00Z").getTime();
+    globalThis.Date = class extends R {
+      constructor(...a) { super(...(a.length ? a : [FIXED])); }
+      static now() { return FIXED; }
+    };`;
+
+  check("todayKey() returns the LOCAL day",
+    run(`${FROZEN} const {todayKey} = await import("${utilsURL}"); console.log(todayKey());`),
+    "2026-08-04");
+
+  // The regression witness: this pins the OLD expression as wrong and records
+  // the exact size of the gap, so a future "simplification" back to
+  // toISOString() fails here instead of in a user's journal.
+  check("the old expression is what produced yesterday's date",
+    run(`${FROZEN} console.log(new Date().toISOString().slice(0,10));`),
+    "2026-08-03");
+
+  // The import path's dateless-row fallback inherits the same fix, and an
+  // explicit todayISO still wins so fixtures stay deterministic.
+  check("normalizeRow's dateless fallback is the local day",
+    run(`${FROZEN} const {normalizeRow} = await import("${normURL}");`
+      + ` console.log(normalizeRow(["X","10","100"], {ticker:0,shares:1,entry:2}).trade.date);`),
+    "2026-08-04");
+  check("explicit todayISO still overrides",
+    normalizeRow(["X", "10", "100"], { ticker: 0, shares: 1, entry: 2 }, { todayISO: "2020-01-01" }).trade.date,
+    "2020-01-01");
 }
 
 console.log("");
