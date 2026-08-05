@@ -916,6 +916,32 @@ const near = (name, actual, expected) => {
   check("manual trade never uses the DISPLAY currency", /currency:\s*accountCurrency/.test(block), false);
 }
 
+// ── §4 · a cross-user aggregate is not shown as a number without a unit ──────
+{
+  console.log("\n§4 · admin mixed-currency aggregate");
+  const admin = readFileSync(new URL("../src/components/AdminPanel.jsx", import.meta.url), "utf8");
+
+  // avg(pnl) in admin_trades_agg has no `group by currency`, so the scalar mixes
+  // ₪ and $. A hardcoded "$" in front of it asserted a unit it does not have.
+  check("no hardcoded $ on the mixed aggregate", /\$\$\{agg\.avg_pnl\}/.test(admin), false);
+  check("Avg P&L renders as —", /label="Avg P&L" value="—"/.test(admin), true);
+  check("...and says why", /Mixed USD\+ILS/.test(admin), true);
+
+  // The replacement card must not reproduce the A5 failure: the RPC returns 0 on
+  // an empty denominator, so an unguarded render says "0% with stop" when the
+  // truth is "no trades exist".
+  check("% with stop card exists", /label="% with stop"/.test(admin), true);
+  check("...guards the empty denominator", /!agg\?\.total \? "—"/.test(admin), true);
+  check("...and names its denominator", /of \$\{agg\.total/.test(admin), true);
+  check("grid widened to fit the 5th card", /md:grid-cols-5/.test(admin), true);
+
+  // The finding this guard exists for, pinned against the SQL itself. If the RPC
+  // is ever fixed to return null, this flips and the client guard can be revisited.
+  const sql = readFileSync(new URL("../supabase/migrations/20260719120000_admin_rpcs.sql", import.meta.url), "utf8");
+  check("RPC still returns 0 on an empty denominator (known, unfixed)",
+    /pct_with_stop'[\s\S]{0,120}else 0 end/.test(sql), true);
+}
+
 console.log("");
 if (failures > 0) {
   console.error(`❌ test:import — ${failures} assertion(s) failed`);

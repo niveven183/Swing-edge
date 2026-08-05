@@ -926,8 +926,23 @@ function TradesTab({ tradesList, agg, toast, onMutate }) {
   const stats = {
     total: agg?.total ?? 0,
     winRate: agg?.win_rate == null ? "—" : `${agg.win_rate}%`,
-    avgPnl: agg?.avg_pnl == null ? "—" : `$${agg.avg_pnl}`,
+    // ⛔ Avg P&L is deliberately NOT rendered as a number. admin_trades_agg()
+    // computes avg(pnl) over every closed trade with no `group by currency`
+    // (admin_rpcs.sql:241-251), so it averages shekels and dollars into one
+    // scalar, and admin_trades_list returns no currency for the client to split
+    // by. A "$" in front of it was a lie about a number that has no unit.
+    // ⏭️ STATE: an avg_pnl_by_ccy RPC. Until then the honest render is "—".
     topTicker: agg?.top_ticker || "—",
+    // ⚠️ The RPC returns 0, not null, on an empty denominator
+    // (admin_rpcs.sql:267 `else 0`). Without this guard an empty table renders
+    // "0% with stop" — which reads as "nobody sets stops" when the truth is
+    // "there are no trades". Same failure class as the A5 win-rate denominator.
+    // ⏭️ STATE: make the RPC return null on an empty denominator, and raw counts.
+    pctWithStop: !agg?.total ? "—" : `${agg.pct_with_stop}%`,
+    // The RPC gives back the percentage only, never the raw numerator, and
+    // reconstructing it from a rounded percent would be fake precision. So the
+    // sub-label carries the DENOMINATOR and says which population it is.
+    stopSub: !agg?.total ? "No trades yet" : `of ${agg.total.toLocaleString()} trades`,
   };
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
@@ -964,11 +979,14 @@ function TradesTab({ tradesList, agg, toast, onMutate }) {
         <p className="text-[11px] text-slate-500">Moderation metadata only — no ticker, price, P&amp;L, or notes. {filtered.length} rows after filters.</p>
       </header>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <KpiCard label="Total (platform)" value={stats.total.toLocaleString()} accent="cyan" />
         <KpiCard label="Win rate" value={stats.winRate} accent="emerald" />
-        <KpiCard label="Avg P&L" value={stats.avgPnl} accent="violet" />
+        <KpiCard label="Avg P&L" value="—" sub="Mixed USD+ILS — no unit" accent="violet" />
         <KpiCard label="Top ticker" value={stats.topTicker} accent="amber" />
+        {/* Replaces the dead Avg P&L slot with a metric that is currency-free by
+            nature and already returned by the RPC — it was never rendered. */}
+        <KpiCard label="% with stop" value={stats.pctWithStop} sub={stats.stopSub} accent="slate" />
       </div>
 
       <div className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-3 flex flex-wrap items-center gap-2">
