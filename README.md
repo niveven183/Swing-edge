@@ -31,8 +31,10 @@ running.
   before scaling.
 - [CONTEXT.md](CONTEXT.md) — deep product/engine reference (unified analysis
   engine, R/R conventions, etc.) — more detail than ARCHITECTURE.md covers.
-- [HIVE_ARCHITECTURE.md](HIVE_ARCHITECTURE.md) — the separate Python demo-data
-  agent system (`agents/`, `core/`) that seeds Supabase via MCP.
+- [docs/archive/HIVE_ARCHITECTURE.md](docs/archive/HIVE_ARCHITECTURE.md) —
+  **retired.** Design of a Python demo-data agent system that no longer exists
+  here; its `agents/` and `core/` were removed on 2026-08-06. Kept as a record,
+  not a description of this repo.
 
 ## CI
 Build gate on every push/PR · Health Monitor every 30 min · Smoke tests

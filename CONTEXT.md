@@ -526,17 +526,16 @@ After the engine unification (Stage 2) and the Analyzer rich-context wiring (Sta
 - **Stage 3d** — image that actually analyzes (gated on the OCR decision in Stage 5).
 - **Stage 5 — OCR architecture decision.** `src/vision/ChartVisionEngine.js` uses Tesseract.js, which is architecturally too weak for a dark TradingView chart. `handleAnalyzerImageUpload` currently only calls `setPreview` — the upload is decorative until OCR is resolved.
 
-## Hive Agents Context
-`agents/_base.py` + `core/supervisor.py` — Python orchestrator.
-- **S1** Pre-market (15:00) — Gap and Go
-- **S2** Open (16:45) — ORB Breakout
-- **S3** Mid-day (19:00) — Bull Flag
-- **S4** Close (22:55) — Power Hour Break
-- **S5** Post-market (23:30) — Earnings Gap Play
-- **Supervisor** (23:55) — preflight + daily flush + weekly cleanup + Tech Team v2 audit → `PROPOSALS.md` + `TASKS.md`
+## Hive Agents Context — retired 2026-08-06
+The Python orchestrator (`agents/_base.py`, `core/supervisor.py`, `core/constants.py`) was
+**deleted**: 5 files, zero importers, never wired into the React app. Design record kept at
+`docs/archive/HIVE_ARCHITECTURE.md`. Recover code with `git show 1063f69:core/supervisor.py`.
 
-Agents write **prompts** for Claude Code, not code directly.
-Constants: `VALID_SETUPS` (30) · `VALID_EMOTIONS` (15) · `VALID_MARKETS` (14) + aliases.
+Its `VALID_SETUPS` / `VALID_EMOTIONS` / `VALID_MARKETS` were **Python-side constants and are
+gone with it** — they never matched the app. The live, canonical enums are
+`SETUP_VALUES` · `EMOTION_VALUES` · `MARKET_VALUES` in `src/data/tradeEnums.js`
+(single source of truth; `tradeOptions.jsx` re-exports them). Those `value` strings are
+**load-bearing** — see `CLAUDE.md` §13 before touching one.
 
 ## Cowork Autonomous Agents
 Run **outside this repo** (no code here references them) — ops/maintenance agents, distinct from the trading-idea Hive agents above:
