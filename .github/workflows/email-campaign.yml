@@ -79,7 +79,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout (for the template)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Guard secrets & validate inputs
         env:

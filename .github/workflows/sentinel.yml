@@ -46,14 +46,14 @@ jobs:
     outputs:
       auth: ${{ steps.gate.outputs.auth }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
       - run: npm ci
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -105,7 +105,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Restore incident state
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: .sentinel-state
           key: sentinel-state-${{ github.run_id }}
@@ -624,7 +624,7 @@ jobs:
 
       - name: Save incident state
         if: always()
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: .sentinel-state
           key: sentinel-state-${{ github.run_id }}

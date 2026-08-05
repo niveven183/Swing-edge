@@ -27,7 +27,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Restore day-over-day state
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: .fleet-state
           key: fleet-daily-state-${{ github.run_id }}
@@ -297,7 +297,7 @@ jobs:
 
       - name: Save day-over-day state
         if: always()
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: .fleet-state
           key: fleet-daily-state-${{ github.run_id }}
