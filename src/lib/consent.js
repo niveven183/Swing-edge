@@ -113,6 +113,50 @@ export function trackEvent(name, params) {
   window.gtag("event", name, params);
 }
 
+// GA4 counts one pageview at load, so client-side navigation was invisible and
+// /app read as dead traffic. Only these four paths exist (src/main.jsx); anything
+// else collapses to "/other" so a future route can never widen what we send.
+// In-app tabs are useState, not routes — they do not navigate and are not counted.
+const ROUTES = new Set(["/", "/app", "/terms", "/privacy"]);
+
+// page_location is built from origin + an allowlisted path, never from href.
+// search and hash are dropped on purpose: the OAuth return carries the session
+// tokens in the fragment, and gtag's default would have shipped them (INCIDENTS #12).
+export function trackPageView(pathname) {
+  if (readConsent() !== "granted") return;
+  if (typeof window === "undefined" || typeof window.gtag !== "function") return;
+  const path = ROUTES.has(pathname) ? pathname : "/other";
+  window.gtag("event", "page_view", {
+    page_location: window.location.origin + path,
+  });
+}
+
+const FIRST_TRADE_KEY = "swingEdgeFirstTrade";
+
+// Activation: the user saved their first trade in this browser. Zero parameters —
+// nothing about WHICH trade may leave the device.
+//
+// Two deliberate asymmetries:
+//  1. The sentinel is written even when consent is denied. Otherwise a user who
+//     records trades, then grants consent, would report "first trade" on what is
+//     really their fifth. Under-count is a gap; over-count is a false number.
+//  2. It is a localStorage key, so this measures "first trade in this browser",
+//     not globally. Measuring globally needs a user id, which is exactly what
+//     must never reach analytics. Two devices count twice, and that is the price.
+export function trackFirstTradeSaved() {
+  const store = ls();
+  if (!store) return;
+  try {
+    if (store.getItem(FIRST_TRADE_KEY)) return;
+    store.setItem(FIRST_TRADE_KEY, new Date().toISOString());
+  } catch (e) {
+    // A full quota must not silently turn every trade into a "first" one.
+    console.error("consent: first-trade sentinel failed", e);
+    return;
+  }
+  trackEvent("first_trade_saved");
+}
+
 // Fires on every decision change. Returns an unsubscribe function.
 export function subscribeConsent(fn) {
   listeners.add(fn);

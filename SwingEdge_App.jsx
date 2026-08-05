@@ -65,7 +65,7 @@ import {
   Users, GraduationCap, UserPlus, NotebookPen, CalendarCheck, Upload, Undo2
 } from "lucide-react";
 import { getTranslations, LANGUAGES, isRTLLang, nTrades, labelFor, plural } from "./src/i18n.js";
-import { trackEvent } from "./src/lib/consent.js";
+import { trackEvent, trackFirstTradeSaved } from "./src/lib/consent.js";
 import {
   fetchPrices, fmtVolume, fmtMarketCap, searchTickers,
   fetchQuote, fetchEarnings, getMarketState, getMarketStateBadge, getRefreshInterval, MARKET_STATE,
@@ -2409,6 +2409,7 @@ export default function SwingEdge() {
       _prediction: predictionSnapshot,
     };
     setTrades(prev => [...prev, newTrade]);
+    trackFirstTradeSaved();
     setLastImportIds([]);
     // Sync new trade to Supabase (primary source of truth)
     if (isSupabaseConfigured && supabase && authUser?.id) {
@@ -2548,6 +2549,7 @@ export default function SwingEdge() {
     if (!imported || imported.length === 0) return;
     const ids = imported.map(t => t.id);
     setTrades(prev => [...prev, ...imported]);
+    trackFirstTradeSaved();
     setLastImportIds(ids);
     setShowImportModal(false);
 

@@ -1,6 +1,6 @@
-import { StrictMode } from "react";
+import { StrictMode, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import * as Sentry from "@sentry/react";
 import "./index.css";
 import SwingEdge from "../SwingEdge_App.jsx";
@@ -9,6 +9,7 @@ import { TermsPage, PrivacyPage } from "./components/LegalPages.jsx";
 import { ToastProvider, ConfirmProvider } from "./components/ToastProvider.jsx";
 import { ThemeProvider } from "./contexts/ThemeContext.jsx";
 import ConsentBanner from "./components/ConsentBanner.jsx";
+import { trackPageView } from "./lib/consent.js";
 import { inject } from "@vercel/analytics";
 
 inject();
@@ -55,6 +56,21 @@ Sentry.init({
 
 console.info('[SwingEdge] Build v1.0.1 — ' + new Date().toISOString());
 
+// gtag('config') already emits the load pageview, so the seed is the path the
+// document loaded with — comparing against it is what keeps the first render from
+// counting twice (a doubled load pageview moves bounce rate with no behavior change).
+// Comparing rather than a "first run" flag also survives StrictMode's double effect.
+function RouteTracker() {
+  const { pathname } = useLocation();
+  const last = useRef(typeof window !== "undefined" ? window.location.pathname : null);
+  useEffect(() => {
+    if (pathname === last.current) return;
+    last.current = pathname;
+    trackPageView(pathname);
+  }, [pathname]);
+  return null;
+}
+
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <Sentry.ErrorBoundary fallback={<p>משהו השתבש. רענן את הדף.</p>}>
@@ -62,6 +78,7 @@ createRoot(document.getElementById("root")).render(
         <ToastProvider>
           <ConfirmProvider>
             <BrowserRouter>
+              <RouteTracker />
               <Routes>
                 <Route path="/" element={<LandingGate />} />
                 <Route path="/app" element={<SwingEdge />} />
