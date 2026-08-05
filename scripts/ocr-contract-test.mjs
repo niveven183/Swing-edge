@@ -243,9 +243,35 @@ if (PRINT) {
   process.exit(0);
 }
 
+// ── The chart fallback input must never carry `capture` ──────────────────────
+// The frozen scenarios above drive api/ocr.js. They cannot see the one thing that
+// decides whether a mobile user can hand it an image at all: the fallback input in
+// SwingEdge_App.jsx. It is fired programmatically by openChartFallback, reached only
+// from the `!getDisplayMedia` branch — so only mobile ever opens it. `capture` there
+// forces the camera and hides the gallery, making a screenshot unselectable on the
+// only platform that takes the path. No browser test can catch this either:
+// playwright.config.js declares a single Desktop Chrome project, which has
+// getDisplayMedia and therefore never reaches the branch. Matched on `chartFileRef`,
+// not a line number, so moving the JSX does not silently disarm this.
+const { readFileSync } = await import("node:fs");
+const appSrc = readFileSync(new URL("../SwingEdge_App.jsx", import.meta.url), "utf8");
+const fallbackInput = appSrc.match(/<input[^>]*ref=\{chartFileRef\}[^>]*>/);
+let uiFailed = 0;
+if (!fallbackInput) {
+  uiFailed++;
+  console.error("❌ chart fallback input (ref={chartFileRef}) not found in SwingEdge_App.jsx");
+} else if (/\bcapture\s*=/.test(fallbackInput[0])) {
+  uiFailed++;
+  console.error("❌ chart fallback input carries `capture` — Android opens the camera and the gallery is unreachable, so a screenshot cannot be uploaded.");
+  console.error(`   ${fallbackInput[0].trim()}`);
+} else {
+  console.log("✅ chart fallback input carries no `capture` — OS picker offers gallery and camera.");
+}
+
 const checked = Object.keys(FROZEN).length;
-if (failed > 0) {
-  console.error(`❌ ocr-contract: ${failed}/${checked} frozen scenarios moved.`);
+if (failed > 0 || uiFailed > 0) {
+  if (failed > 0) console.error(`❌ ocr-contract: ${failed}/${checked} frozen scenarios moved.`);
+  if (uiFailed > 0) console.error(`❌ ocr-contract: ${uiFailed}/1 chart fallback input assertions failed.`);
   process.exit(1);
 }
-console.log(`✅ ocr-contract: ${checked}/${checked} frozen scenarios unchanged, ${SCENARIOS.length}/${SCENARIOS.length} scenarios executed.`);
+console.log(`✅ ocr-contract: ${checked}/${checked} frozen scenarios unchanged, ${SCENARIOS.length}/${SCENARIOS.length} scenarios executed, 1/1 chart fallback input assertions passed.`);

@@ -5780,8 +5780,14 @@ export default function SwingEdge() {
                       )}
                     </button>
                   </div>
-                  {/* Graceful fallback: file / camera picker when screen capture is unavailable or cancelled */}
-                  <input ref={chartFileRef} type="file" accept="image/*" capture="environment" onChange={handleChartFileFallback} className="hidden" aria-hidden="true" tabIndex={-1} />
+                  {/* Graceful fallback: file / camera picker when screen capture is unavailable or cancelled.
+                      NEVER add `capture` here. This input is not clicked by the user — it is fired
+                      programmatically by openChartFallback, which is reached only from the
+                      `!getDisplayMedia` branch, i.e. only on mobile. `capture` forces the camera and
+                      removes the gallery, so the screenshot the user came to upload becomes unreachable
+                      on the one platform that takes this path. Without it the OS picker still offers
+                      the camera — nothing is lost. Guarded by test:ocr. */}
+                  <input ref={chartFileRef} type="file" accept="image/*" onChange={handleChartFileFallback} className="hidden" aria-hidden="true" tabIndex={-1} />
                 </div>
               </div>
 
