@@ -58,8 +58,7 @@
 - **שליחת 2 המענים** — `fix_mobile_upload` + `files_received` בריפו ו-`/api/notify` בנוי. ⛔ לא נשלח: הפרומפט הבא
 - **הרצת `why_stopped_r2`** — `campaign=why_stopped_r2` · `prior_campaigns=why_stopped` · `audience=stuck_users`. ⛔ לא הורץ
 - אימות ידני: אונבורדינג ב-₪ בחלון אנונימי · יתר §1-§4 של M (מטבע בייבוא · זבל→דחייה · round-trip · AdminPanel)
-- 2 קבצי Sheets של `a0556783290` (IBI + אלטשולר) — חומר הגלם לתיקון הייבוא, טרם נוצל
-- **הגנת סיסמאות דלופות** — **פיצ'ר Supabase Pro בלבד**, לא הגדרת קונסולה. עם השדרוג
+- 2 קבצי Sheets של `a0556783290` (IBI + אלטשולר) — חומר הגלם לתיקון הייבוא, טרם נוצל · **הגנת סיסמאות דלופות** — **פיצ'ר Supabase Pro בלבד**, לא הגדרת קונסולה. עם השדרוג
 - PR #44 Dependabot · דוח Architecture Auditor (14 ממצאים, טרם מוינו) · מלאי סודות · **`docs/TASKS-REGISTRY.md` טרם הורד לעץ** (הפיל את שלב 5 של R; ⛔ Claude לא יוצר אותו)
 - Stripe Test Mode · Google Search Console · Google Workspace · ריפו פרטי מול Actions · QA מובייל 7 סעיפים · ערכת OCR (30 גרפים) · 390 תמונות · עו"ד על `/privacy` · רשם הדומיין (Auto-Renew)
 - שדה טווח עסקה (בקשת 31.07, נוגע בסכימה+מסננים) · הודעה על 3 המספרים שזזו ב-T7 · מייל ל-`saridel` (22/22 ללא stop)
@@ -71,7 +70,8 @@
 
 - **M** פערי מטבע §1-§6 · **S1** RLS · **R** ניקוי · **#12** טוקני GA4 (`08ca710`) · `why_stopped_r2` מוכן ⛔ לא נשלח — הפירוט נגזם ל-`docs/audits/STATE-ARCHIVE-2026-08.md`
 - **W · `blockAnalytics` תוקן בשלושת הקבצים (05.08)** — גלוב→רג'קס. הוכחה: ישן חסם 0/דלף 2, חדש חסם 2/דלף 0, פרודקשן חסם 1/דלף 0. ממצאי sentinel 2→0. `INCIDENTS.md#13`
-- **W · 33 pins מ-node20** — checkout v7 · setup-node v7 · cache v6 · github-script v9 (13 קבצים, 33/33, אפס שורה שאינה `uses:`). ארבעת התגים אומתו קיימים ב-API לפני ההצמדה; 17/17 workflows עוברים YAML parse
+- **W · 33 pins מ-node20** — checkout v7 · setup-node v7 · cache v6 · github-script v9 (13 קבצים, 33/33, אפס שורה שאינה `uses:`). ארבעת התגים אומתו קיימים ב-API לפני ההצמדה; 17/17 workflows עוברים YAML parse · **`node-version` 20→22** (9/9). ⚠️ `backup.yml` לא נגע בשניהם — אין בו setup-node ואין הצמדת node20
+- **W · project `mobile-android` (Pixel 5)** — 2 בדיקות ב-`grep`, 8/8 עוברות. ⏭️ `download-artifact@v7→v8` (1 שורה) לא בוצע — לא היה ב-4 שאושרו
 
 ---
 
