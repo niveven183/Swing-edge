@@ -11,6 +11,7 @@ import {
 import { supabase, isSupabaseConfigured } from "../supabaseClient.js";
 import { useToast, useConfirm } from "./ToastProvider.jsx";
 import { pluralize } from "../i18n.js";
+import { initialState, reduce, canCheck, canSend, templatesFrom } from "../lib/replyGate.js";
 
 const ADMIN_EMAIL = "niveven183@gmail.com";
 
@@ -1095,7 +1096,112 @@ function FeedbackTab({ feedback, setFeedback, toast }) {
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
 
+  // The reply handle. One row is open at a time, so one gate is enough — and it
+  // is reset on every open, so a verification can never survive a row change.
+  const [templates, setTemplates] = useState([]);
+  const [tplError, setTplError] = useState("");
+  const [ledger, setLedger] = useState({});
+  const [ledgerError, setLedgerError] = useState("");
+  const [openFor, setOpenFor] = useState(null);
+  const [gate, setGate] = useState(initialState);
+  const [busy, setBusy] = useState(false);
+
   const getStatus = (f) => f.status || "new";
+
+  const authedFetch = async (path, init) => {
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess?.session?.access_token;
+    if (!token) throw new Error("אין סשן פעיל");
+    const res = await fetch(path, {
+      ...init,
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...(init?.headers || {}) },
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.error ? `${json.error} (HTTP ${res.status})` : `HTTP ${res.status}`);
+    return json;
+  };
+
+  // Whether a reply went out is a fact about the ledger, not about this browser:
+  // the panel reads it back rather than remembering what it just did, so a send
+  // from another device — or a send whose ledger write failed — shows the truth.
+  // ⛔ campaign/sent_at/status only. The email column is never selected.
+  const loadLedger = useCallback(async () => {
+    if (!supabase) return;
+    const { data, error } = await supabase
+      .from("email_campaign_log")
+      .select("campaign,sent_at,status")
+      .like("campaign", "reply:%");
+    if (error) { setLedgerError(error.message || "קריאת הליגר נכשלה"); return; }
+    setLedgerError("");
+    const map = {};
+    for (const r of data || []) map[String(r.campaign).slice("reply:".length)] = r;
+    setLedger(map);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const json = await authedFetch("/api/notify", { method: "GET" });
+        if (!cancelled) { setTemplates(templatesFrom(json)); setTplError(""); }
+      } catch (e) {
+        if (!cancelled) setTplError(e?.message || "טעינת התבניות נכשלה");
+      }
+    })();
+    loadLedger();
+    return () => { cancelled = true; };
+  }, [loadLedger]);
+
+  const openReply = (id) => {
+    if (openFor === id) { setOpenFor(null); return; }
+    setOpenFor(id);
+    setGate(initialState());
+  };
+
+  const post = (id, dry) =>
+    authedFetch("/api/notify", {
+      method: "POST",
+      body: JSON.stringify({ feedback_id: id, template: gate.template, dry_run: dry }),
+    });
+
+  const runDry = async (id) => {
+    setBusy(true);
+    setGate((s) => reduce(s, { type: "checking" }));
+    try {
+      const json = await post(id, true);
+      setGate((s) => reduce(s, { type: "checked", ok: true, payload: json }));
+    } catch (e) {
+      setGate((s) => reduce(s, { type: "checked", ok: false, error: e?.message || "unknown" }));
+    }
+    setBusy(false);
+  };
+
+  const runSend = async (id) => {
+    // Re-checked here and not only on the button: an async gap between the click
+    // and this line is exactly where a revoked verification would slip through.
+    if (!canSend(gate)) return;
+    const ok = await confirm({
+      title: "שליחת תשובה",
+      message: `לשלוח את "${gate.dry?.subject || ""}" אל ${gate.dry?.recipient_masked || ""}? המייל יוצא מיידית ואי-אפשר לבטל.`,
+      confirmText: "שלח",
+      cancelText: "ביטול",
+    });
+    if (!ok) return;
+    setBusy(true);
+    setGate((s) => reduce(s, { type: "sending" }));
+    try {
+      const json = await post(id, false);
+      setGate((s) => reduce(s, { type: "sent", ok: true, payload: json }));
+      if (json.failed) toast.error(`השליחה נכשלה: ${json.error || "unknown"}`);
+      else toast.success("נשלח ✅");
+      if (json.log_failed) toast.error("נשלח אך הרישום בליגר נכשל — בדוק לפני שליחה חוזרת");
+      await loadLedger();
+    } catch (e) {
+      setGate((s) => reduce(s, { type: "sent", ok: false, error: e?.message || "unknown" }));
+      toast.error(e?.message || "שליחה נכשלה");
+    }
+    setBusy(false);
+  };
 
   const filtered = useMemo(() => {
     let list = feedback;
@@ -1179,9 +1285,22 @@ function FeedbackTab({ feedback, setFeedback, toast }) {
         </div>
       </header>
 
+      {tplError && (
+        <div className="text-[11px] text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-lg px-3 py-2">
+          טעינת התבניות נכשלה: {tplError}
+        </div>
+      )}
+      {ledgerError && (
+        <div className="text-[11px] text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-lg px-3 py-2">
+          קריאת הליגר נכשלה: {ledgerError} — "נשלח" ליד שורה אינו אמין עד שזה נפתר.
+        </div>
+      )}
+
       <div className="space-y-2">
         {filtered.map((f) => {
           const status = getStatus(f);
+          const logged = ledger[f.id];
+          const open = openFor === f.id;
           return (
             <div key={f.id} className="bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-3">
               <div className="flex items-start gap-3 flex-wrap">
@@ -1191,10 +1310,21 @@ function FeedbackTab({ feedback, setFeedback, toast }) {
                     <span className="text-[11px] font-mono text-cyan-300">{f.user_email || "anonymous"}</span>
                     <span className="text-[10px] text-slate-500">{formatDateTime(f.created_at)}</span>
                     <Badge tone={statusTone[status]}>{status}</Badge>
+                    {logged && (
+                      <span className="text-[10px] text-emerald-300" title="מתוך email_campaign_log">
+                        ✉ נשלחה תשובה · {formatDateTime(logged.sent_at)}
+                        {logged.status !== "sent" ? ` (${logged.status})` : ""}
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-slate-200 leading-relaxed whitespace-pre-wrap">{f.message}</p>
                 </div>
                 <div className="flex flex-col gap-1 shrink-0">
+                  <button
+                    onClick={() => openReply(f.id)}
+                    title="השב במייל ממותג"
+                    className={`text-[10px] px-2 py-1 rounded border flex items-center justify-center gap-1 ${open ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-200" : "bg-white/5 border-white/10 text-slate-400 hover:text-white"}`}
+                  ><Mail size={10} /> השב</button>
                   <button
                     onClick={() => markReviewed(f)}
                     title="Mark as reviewed"
@@ -1211,6 +1341,61 @@ function FeedbackTab({ feedback, setFeedback, toast }) {
                   ><Trash2 size={10} /> Delete</button>
                 </div>
               </div>
+
+              {open && (
+                <div dir="rtl" className="mt-3 pt-3 border-t border-white/10 space-y-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <select
+                      value={gate.template}
+                      onChange={(e) => setGate((s) => reduce(s, { type: "template", key: e.target.value }))}
+                      className="bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-[11px] text-white focus:border-cyan-500/50 focus:outline-none"
+                    >
+                      <option value="">— בחר תבנית —</option>
+                      {templates.map((t) => (
+                        <option key={t.key} value={t.key}>{t.subject}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => runDry(f.id)}
+                      disabled={busy || !canCheck(gate)}
+                      className="text-[11px] px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-slate-200 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                    >{gate.step === "checking" ? "בודק…" : "הרצה יבשה"}</button>
+                    <button
+                      onClick={() => runSend(f.id)}
+                      disabled={busy || !canSend(gate)}
+                      title={canSend(gate) ? "" : "נדרשת הרצה יבשה תקינה לתבנית הזו"}
+                      className="text-[11px] px-3 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-30 disabled:cursor-not-allowed"
+                    >{gate.step === "sending" ? "שולח…" : "שלח"}</button>
+                  </div>
+
+                  {gate.step === "verified" && (
+                    <div className="text-[11px] text-slate-200 bg-white/5 border border-white/10 rounded-lg px-3 py-2 space-y-0.5">
+                      <div>נושא: <span className="text-white">{gate.dry?.subject}</span></div>
+                      <div>נמען: <span className="font-mono text-cyan-300">{gate.dry?.recipient_masked}</span></div>
+                      <div className="text-slate-400">{gate.dry?.html_bytes} bytes · {gate.dry?.text_chars} תווי טקסט · טרם נשלח</div>
+                    </div>
+                  )}
+                  {gate.step === "already_sent" && (
+                    <div className="text-[11px] text-amber-200 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
+                      כבר נשלחה תשובה לפידבק הזה. הליגר מאפשר תשובה אחת בלבד, ולכן השליחה חסומה.
+                    </div>
+                  )}
+                  {gate.step === "failed" && (
+                    <div className="text-[11px] text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-lg px-3 py-2 font-mono break-all">
+                      {gate.error}
+                    </div>
+                  )}
+                  {gate.step === "sent" && (
+                    <div className="text-[11px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-2">
+                      נשלחו {gate.result?.sent ?? 0} · נכשלו {gate.result?.failed ?? 0}
+                      {gate.result?.error ? ` · ${gate.result.error}` : ""}
+                    </div>
+                  )}
+                  <p className="text-[10px] text-slate-500">
+                    שליחת תשובה אינה מסמנת את הפידבק כטופל — "טופל" אומר שהבקשה מומשה.
+                  </p>
+                </div>
+              )}
             </div>
           );
         })}
