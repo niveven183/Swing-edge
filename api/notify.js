@@ -8,6 +8,14 @@
 //   200  : { sent, failed, campaign, recipient_masked }   (+ log_failed:true)
 //   200  : { sent: 0, reason: "already_sent" }            — ledger dedup
 //
+//   GET  /api/notify
+//   200  : { templates: [ { key, subject } ] }            — admin only
+//
+// GET exists so the admin panel can populate its template picker WITHOUT holding
+// a second copy of the allowlist. Two copies disagree silently: a template
+// present in one and absent from the other simply never appears. It returns the
+// key and the subject and nothing else — never the file path, never the HTML.
+//
 // THE RECIPIENT IS NEVER TAKEN FROM THE REQUEST. It is resolved server-side from
 // feedback_id. THE TEMPLATE IS NEVER TAKEN FROM THE REQUEST either — the body
 // carries a key into a hard-coded allowlist, never HTML and never a path. Those
@@ -34,8 +42,10 @@ const SUPABASE_ANON_KEY =
   process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
 
 // The only templates this endpoint can ever send. Adding a key is a code change
-// and a code review; that is the point.
-const TEMPLATES = {
+// and a code review; that is the point. Exported so the handle's test can derive
+// the expected list instead of copying it — a test that copies the allowlist is
+// itself the second copy it exists to forbid.
+export const TEMPLATES = {
   // The subject must not promise more than the body delivers: the picker was
   // fixed, the OCR reading was not, and the body says so explicitly.
   fix_mobile_upload: { file: "emails/fix_mobile_upload.html", subject: "מצאנו את מה שחסם אותך" },
@@ -172,13 +182,13 @@ export default async function handler(req, res) {
   const allowedOrigin = resolveOrigin(req.headers.origin);
   if (allowedOrigin) res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Vary", "Origin");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   if (req.method === "OPTIONS") {
     res.status(204).end();
     return;
   }
-  if (req.method !== "POST") {
+  if (req.method !== "POST" && req.method !== "GET") {
     res.status(405).json({ error: "method_not_allowed" });
     return;
   }
@@ -190,6 +200,34 @@ export default async function handler(req, res) {
   const { user, token } = await verifyUser(req);
   if (!user || !token) {
     res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+
+  if (req.method === "GET") {
+    // A SEPARATE limiter key, deliberately. The send budget below is 3/10min:
+    // sharing it would let three panel loads spend the whole allowance and jam
+    // the handle shut for ten minutes, with no error a user could see — a 429 on
+    // a list request looks like an empty picker. Listing is a read behind the
+    // same admin gate, so it only needs a ceiling on runaway loops.
+    const { allowed, retryAfter } = rateLimit(`${user.id}:notify_list:10m`, {
+      windowMs: 10 * 60 * 1000,
+      max: 60,
+    });
+    if (!allowed) {
+      res.setHeader("Retry-After", String(retryAfter));
+      res.status(429).json({ error: "rate_limited", retryAfter });
+      return;
+    }
+
+    const listAdmin = await callRpc("is_admin", token, {});
+    if (!listAdmin.ok || listAdmin.data !== true) {
+      res.status(403).json({ error: "forbidden" });
+      return;
+    }
+
+    res.status(200).json({
+      templates: Object.entries(TEMPLATES).map(([key, t]) => ({ key, subject: t.subject })),
+    });
     return;
   }
 
