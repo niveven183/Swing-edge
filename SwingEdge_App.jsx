@@ -1662,12 +1662,12 @@ export default function SwingEdge() {
 
   // Persist trades to localStorage
   useEffect(() => {
-    try { localStorage.setItem("swingEdgeTrades", JSON.stringify(trades)); } catch {}
+    try { localStorage.setItem("swingEdgeTrades", JSON.stringify(trades)); } catch (err) { console.error("[persist] trades → localStorage failed. ALL local persistence is now dead, including the fallback that holds trades when Supabase is unreachable: this session survives in memory only and is lost on reload.", err); }
   }, [trades]);
 
   // Persist watchlist to localStorage
   useEffect(() => {
-    try { localStorage.setItem("swingEdgeWatchlist", JSON.stringify(watchlistItems)); } catch {}
+    try { localStorage.setItem("swingEdgeWatchlist", JSON.stringify(watchlistItems)); } catch (err) { console.error("[persist] watchlist → localStorage failed. ALL local persistence is now dead, including the fallback that holds trades when Supabase is unreachable: this session survives in memory only and is lost on reload.", err); }
   }, [watchlistItems]);
 
   // TradingView Advanced Chart — modern embed. The legacy tv.js widget mounted
