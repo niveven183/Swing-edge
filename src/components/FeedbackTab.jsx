@@ -13,6 +13,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { getTranslations, isRTLLang, LANGUAGES } from "../i18n.js";
+import { supabase } from "../supabaseClient.js";
 
 const EMAILJS_SERVICE_ID = "service_jxkivjs";
 const EMAILJS_TEMPLATE_ID = "template_q0u4f7c";
@@ -156,9 +157,11 @@ export default function FeedbackTab({ user, lang = "he", originTab = "dashboard"
       ? `\n\n— context —\napp v${ctx.app_version} · screen: ${ctx.screen} · ${ctx.browser} · lang: ${ctx.locale} · ${ctx.viewport}`
       : "";
 
+    // No user_id / user_email here on purpose. /api/feedback derives both from the
+    // access token and ignores anything the body claims, so sending them would be
+    // dead weight that reads like a guarantee. A signed-out reporter stays
+    // anonymous server-side, which is the supported path — not a degraded one.
     const payload = {
-      user_id: user?.id || null,
-      user_email: user?.email || "anonymous",
       type: selectedType,
       message: message + footer,
     };
@@ -167,10 +170,23 @@ export default function FeedbackTab({ user, lang = "he", originTab = "dashboard"
     let emailOk = false;
     let detail = "";
 
+    // Best-effort: a signed-out user has no session and must still be able to
+    // submit. Only a token that is present AND unverifiable is rejected.
+    let accessToken = null;
+    try {
+      const { data } = (await supabase?.auth.getSession()) || {};
+      accessToken = data?.session?.access_token || null;
+    } catch (err) {
+      console.warn("[feedback] session lookup failed, submitting anonymously:", err?.message || err);
+    }
+
     try {
       const resp = await fetch("/api/feedback", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
         body: JSON.stringify(payload),
       });
       if (resp.ok) {
@@ -190,7 +206,10 @@ export default function FeedbackTab({ user, lang = "he", originTab = "dashboard"
         EMAILJS_SERVICE_ID,
         EMAILJS_TEMPLATE_ID,
         {
-          user_email: payload.user_email,
+          // Client-asserted by nature and always was: this is a heads-up to Niv's
+          // inbox, not the row api/notify.js replies to. The DB row's address is
+          // the one that had to become trustworthy.
+          user_email: user?.email || "anonymous",
           type: selectedType,
           message,
           date: new Date().toLocaleString(),

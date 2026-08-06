@@ -19,10 +19,47 @@ const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY;
 const VALID_TYPES = new Set(["bug", "idea", "love", "question"]);
 const MAX_MESSAGE_LEN = 5000;
 
+const fetchWithTimeout = (url, opts = {}, ms = 8000) => {
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(), ms);
+  return fetch(url, { ...opts, signal: c.signal }).finally(() => clearTimeout(t));
+};
+
+// Three-state on purpose, unlike the verifyUser in api/ocr.js and api/notify.js
+// which collapse "no header" and "bad token" into one null. Here the difference
+// is the whole point: no header is a legitimate anonymous reporter and must be
+// served, while a token that does not verify is an attack signal and must not be
+// quietly downgraded to one.
+//   { state: "anonymous" }        no Authorization header at all
+//   { state: "verified", user }   GoTrue vouched for the token
+//   { state: "invalid" }          a token was presented and did not verify
+async function identify(req) {
+  const header = req.headers.authorization || req.headers.Authorization || "";
+  const m = /^Bearer\s+(.+)$/i.exec(String(header));
+  if (!m) return { state: "anonymous" };
+  const token = m[1].trim();
+  if (!token) return { state: "anonymous" };
+  try {
+    const r = await fetchWithTimeout(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { Authorization: `Bearer ${token}`, apikey: SUPABASE_ANON_KEY },
+    });
+    if (!r.ok) return { state: "invalid" };
+    const u = await r.json();
+    return u && u.id ? { state: "verified", user: u } : { state: "invalid" };
+  } catch {
+    // GoTrue unreachable. Fail closed: the caller asked to be someone, and we
+    // cannot confirm it. Serving them as anonymous would silently grant exactly
+    // the substitution this endpoint now refuses to make.
+    return { state: "invalid" };
+  }
+}
+
 export default async function handler(req, res) {
-  // CORS — restricted to the app's own origins. Deliberately NO auth gate: a
-  // user who is stuck before login must still be able to report it.
-  if (applyCors(req, res, { methods: "POST, OPTIONS" })) return;
+  // CORS — restricted to the app's own origins. Still NO auth gate: a user who is
+  // stuck before login must be able to report it. What changed is that identity is
+  // no longer taken on the caller's word — see identify() and the insert below.
+  if (applyCors(req, res, { methods: "POST, OPTIONS", headers: "Content-Type, Authorization" }))
+    return;
 
   if (req.method !== "POST") {
     res.status(405).json({ error: "method_not_allowed" });
@@ -69,11 +106,25 @@ export default async function handler(req, res) {
     return;
   }
 
+  // Identity is derived here and NEVER read from the body. A caller-asserted
+  // user_email does not stop at this table: api/notify.js resolves a reply
+  // recipient from the row and mails it, so a forged address turned an admin's
+  // "reply" click into a branded SwingEdge email to a stranger.
+  const id = await identify(req);
+  if (id.state === "invalid") {
+    console.warn(`[feedback] rejected unverifiable token ip=${clientIp(req)}`);
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const identity =
+    id.state === "verified"
+      ? { user_id: id.user.id, user_email: id.user.email || "anonymous" }
+      : { user_id: null, user_email: "anonymous" };
+
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   const { error: dbError } = await supabase.from("feedback").insert([
     {
-      user_id: body.user_id ?? null,
-      user_email: typeof body.user_email === "string" ? body.user_email : "anonymous",
+      ...identity,
       type: body.type,
       message,
     },
