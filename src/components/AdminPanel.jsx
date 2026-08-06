@@ -15,7 +15,6 @@ import { pluralize } from "../i18n.js";
 const ADMIN_EMAIL = "niveven183@gmail.com";
 
 const BANNED_USERS_KEY = "swingEdgeBannedUsers";
-const REVIEWED_FEEDBACK_KEY = "swingEdgeReviewedFeedback";
 const FEATURE_FLAGS_KEY = "swingEdgeFeatureFlags";
 
 const DEFAULT_FLAGS = {
@@ -359,12 +358,10 @@ export default function AdminPanel() {
   const isAdmin = email === ADMIN_EMAIL || authUser?.app_metadata?.role === "admin";
   if (authUser && !isAdmin) return null;
 
-  const reviewedSet = useMemo(() => new Set(readJSON(REVIEWED_FEEDBACK_KEY, [])), [feedback]);
-  const unreadFeedbackCount = feedback.reduce((n, f) => {
-    if (f.status === "resolved") return n;
-    if (reviewedSet.has(f.id)) return n;
-    return n + 1;
-  }, 0);
+  // Drives whether the Feedback tab looks worth opening, so it has to come from
+  // the same place every device reads. It used to count a localStorage set that
+  // only ever existed in one browser.
+  const unreadFeedbackCount = feedback.filter((f) => (f.status || "new") === "new").length;
 
   return (
     <div className="space-y-5 animate-fade-in" dir="ltr">
@@ -1095,46 +1092,41 @@ function TradesTab({ tradesList, agg, toast, onMutate }) {
 
 function FeedbackTab({ feedback, setFeedback, toast }) {
   const confirm = useConfirm();
-  const [reviewed, setReviewed] = useState(() => new Set(readJSON(REVIEWED_FEEDBACK_KEY, [])));
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
 
-  const persistReviewed = (set) => {
-    setReviewed(new Set(set));
-    writeJSON(REVIEWED_FEEDBACK_KEY, Array.from(set));
-  };
-
-  const getStatus = (f) => {
-    if (f.status === "resolved") return "resolved";
-    if (reviewed.has(f.id)) return "reviewed";
-    return "new";
-  };
+  const getStatus = (f) => f.status || "new";
 
   const filtered = useMemo(() => {
     let list = feedback;
     if (filterType !== "all") list = list.filter((f) => f.type === filterType);
     if (filterStatus !== "all") list = list.filter((f) => getStatus(f) === filterStatus);
     return list;
-  }, [feedback, filterType, filterStatus, reviewed]);
+  }, [feedback, filterType, filterStatus]);
 
-  const markReviewed = (id) => {
-    const next = new Set(reviewed);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    persistReviewed(next);
-  };
-
-  const markResolved = async (id, resolved) => {
+  // admin_set_feedback_status accepts exactly ('new','reviewed','resolved') and
+  // re-checks is_admin itself, so all three transitions share one path.
+  const setStatus = async (id, nextStatus, okMsg) => {
     try {
-      const nextStatus = resolved ? "resolved" : "new";
       const { data, error } = await supabase.rpc("admin_set_feedback_status", { _id: id, _status: nextStatus });
       if (error) throw error;
       if (!data) throw new Error("No rows updated (check permissions)");
       setFeedback((rs) => rs.map((r) => (r.id === id ? { ...r, status: nextStatus } : r)));
-      toast.success(resolved ? "Resolved ✓" : "Reopened");
+      toast.success(okMsg);
     } catch (e) {
       toast.error("Update failed: " + (e?.message || ""));
     }
   };
+
+  const markReviewed = (f) =>
+    f.status === "reviewed"
+      ? setStatus(f.id, "new", "Reopened")
+      : setStatus(f.id, "reviewed", "Reviewed ✓");
+
+  const markResolved = (f) =>
+    f.status === "resolved"
+      ? setStatus(f.id, "new", "Reopened")
+      : setStatus(f.id, "resolved", "Resolved ✓");
 
   const remove = async (id) => {
     const ok = await confirm({
@@ -1156,7 +1148,7 @@ function FeedbackTab({ feedback, setFeedback, toast }) {
     new: feedback.filter((f) => getStatus(f) === "new").length,
     reviewed: feedback.filter((f) => getStatus(f) === "reviewed").length,
     resolved: feedback.filter((f) => getStatus(f) === "resolved").length,
-  }), [feedback, reviewed]);
+  }), [feedback]);
 
   const typeEmoji = { bug: "🐛", idea: "💡", love: "⭐", question: "❓" };
   const statusTone = { new: "rose", reviewed: "amber", resolved: "emerald" };
@@ -1204,12 +1196,12 @@ function FeedbackTab({ feedback, setFeedback, toast }) {
                 </div>
                 <div className="flex flex-col gap-1 shrink-0">
                   <button
-                    onClick={() => markReviewed(f.id)}
-                    title="Mark as reviewed (local)"
-                    className={`text-[10px] px-2 py-1 rounded border ${reviewed.has(f.id) ? "bg-amber-500/20 border-amber-500/40 text-amber-200" : "bg-white/5 border-white/10 text-slate-400 hover:text-white"}`}
+                    onClick={() => markReviewed(f)}
+                    title="Mark as reviewed"
+                    className={`text-[10px] px-2 py-1 rounded border ${f.status === "reviewed" ? "bg-amber-500/20 border-amber-500/40 text-amber-200" : "bg-white/5 border-white/10 text-slate-400 hover:text-white"}`}
                   >Reviewed</button>
                   <button
-                    onClick={() => markResolved(f.id, f.status !== "resolved")}
+                    onClick={() => markResolved(f)}
                     className={`text-[10px] px-2 py-1 rounded border ${f.status === "resolved" ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-200" : "bg-white/5 border-white/10 text-slate-400 hover:text-white"}`}
                   >{f.status === "resolved" ? "✓ Resolved" : "Resolve"}</button>
                   <button
