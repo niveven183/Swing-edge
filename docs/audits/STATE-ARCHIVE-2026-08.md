@@ -1687,3 +1687,11 @@ TradeDNA ×8, EdgeFinder ×3 **בלתי-ניתנים להגעה מבנית**: `e
 - **`why_stopped_r2` מוכן, ⛔ לא נשלח** (06.08) — `prior_campaigns` מרחיב את ה-dedup → קהל 21 ב**אפס** כתיבות בליגר
 - **R · ניקוי וארגון (06.08)** `2a29121` `f74428e` — 5 קבצי Python נמחקו · 10 דוחות → `docs/audits/` · 7 מפנים עודכנו, אפס קישורים מתים · `npm audit` 4→2. **שלב 5 (TASKS-REGISTRY) ירד** — הקובץ אינו בעץ
 - 🔴 **טוקני Supabase ל-GA4 — נסגר (06.08)** `08ca710`. `page_location` ננעל ל-`origin+pathname`. ≤8/41 בחלון של 10 ימים. `INCIDENTS.md#12`
+
+## נגזם מ-STATE.md ב-06.08 (גל ידית /api/notify) — "נסגר השבוע" של W
+- **W · `blockAnalytics` (05.08)** גלוב→רג'קס: ישן חסם 0/דלף 2, חדש 2/0, פרודקשן 1/0; sentinel 2→0 אומת בפרודקשן (`31049305536`). `INCIDENTS.md#13` · **project `mobile-android`** 8/8 · ⏭️ `download-artifact@v7→v8`
+- **W · 33/33 pins מ-node20** (13 קבצים, 4 תגים אומתו ב-API, 17/17 YAML parse) · `node-version` 20→22 **9/9**. ⚠️ `backup.yml` לא נגע בשניהם. ⚠️ **parse אינו הרצה — 9/33 מופעים, 3/4 סוגים הופעלו על runner**; `github-script@v9` **0/3** נשאר חי ב-STATE
+
+- **M** פערי מטבע §1-§6 · **S1** RLS · **R** ניקוי · **#12** טוקני GA4 (`08ca710`) · `why_stopped_r2` מוכן ⛔ לא נשלח — הפירוט נגזם ל-`docs/audits/STATE-ARCHIVE-2026-08.md`
+- **W** (`blockAnalytics` · 33/33 pins · node 20→22 · project מובייל) — הפירוט נגזם לארכיון. נותר חי: `github-script@v9` **0/3** → 🔴 למעלה · ⏭️ `download-artifact@v7→v8` · ⚠️ **parse אינו הרצה**
+- **S2 · התחזות ב-`api/feedback.js` נסגרה.** הזהות נגזרת מהטוקן ו**לעולם** לא מהגוף; אין header → `anonymous` כפוי; טוקן פסול → 401. **הפרצה:** `user_email` מזויף לא נעצר בטבלה — `api/notify.js:253` שולף ממנו נמען ושולח מייל ממותג, כלומר לחיצת "השב" של אדמין הפכה לספאם לזר. **הוכחה:** `scripts/feedback-identity-test.mjs` נכתב **לפני** התיקון ונצפה נכשל **3/5** (A·B·C), אחריו **5/5**. בשרשרת `verify` כ-`test:feedback`. ⚠️ שורות **קיימות** נשארו caller-asserted — המיסוך ואישור האדמין בעין הם ההגנה עליהן
