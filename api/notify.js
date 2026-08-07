@@ -231,22 +231,9 @@ export default async function handler(req, res) {
     return;
   }
 
-  // Keyed on the verified user id, so it cannot be shed by rotating IPs.
-  // 3/10min covers a triage pass over the whole feedback queue; 20/24h stays far
-  // below the ~300/day Gmail ceiling shared with send-invites and the campaign
-  // workflow, leaving room for a bulk campaign on the same day.
-  for (const [suffix, opts] of [
-    ["10m", { windowMs: 10 * 60 * 1000, max: 3 }],
-    ["24h", { windowMs: 24 * 60 * 60 * 1000, max: 20 }],
-  ]) {
-    const { allowed, retryAfter } = rateLimit(`${user.id}:notify:${suffix}`, opts);
-    if (!allowed) {
-      res.setHeader("Retry-After", String(retryAfter));
-      res.status(429).json({ error: "rate_limited", retryAfter });
-      return;
-    }
-  }
-
+  // Parsed BEFORE the limiter runs, because the limiter has to know which of the
+  // two budgets this request belongs to. Pure work, no I/O, and the caller was
+  // already authenticated above — moving it up opens no new surface.
   let body = req.body;
   if (typeof body === "string") {
     try {
@@ -256,6 +243,45 @@ export default async function handler(req, res) {
     }
   }
   body = body || {};
+
+  // Strict === true, and the fallback direction is the safe one: "true" as a
+  // string, 1, or a missing field all count as a SEND and pay the strict budget.
+  // A dry run charged as a send is an inconvenience; a send charged as a dry run
+  // is a hole in the quota that protects a real person's inbox.
+  const dryRun = body.dry_run === true;
+
+  // Keyed on the verified user id, so it cannot be shed by rotating IPs.
+  //
+  // ⚠️ THE DRY RUN HAS ITS OWN KEY, AND THAT IS THE POINT. It is the mandatory
+  // gate before a send (src/lib/replyGate.js), so while it shared the send's
+  // 3/10min allowance three previews shut the send out with a 429 — a gate that
+  // closes itself is not a gate. It happened in production on 2026-08-07.
+  //
+  //   send — 3/10min + 20/24h, UNCHANGED. The daily cap exists because sends
+  //   share the ~300/day Gmail ceiling with send-invites and the campaign
+  //   workflow. This is the protection against a bulk send by accident.
+  //
+  //   dry  — 30/10min and NO daily cap. It sends no mail, so the Gmail ceiling
+  //   that justifies 20/24h simply does not apply, and a daily number with no
+  //   cost behind it is one nobody can justify the day it blocks someone. 30
+  //   covers a full triage pass (a queue of 5 previewed against ~6 templates;
+  //   replyGate revokes approval on every template switch, so previews multiply).
+  //   The ceiling is here to stop a render loop, not an attacker — rateLimit is
+  //   in-memory per Lambda and was never a hard global cap.
+  const limits = dryRun
+    ? [["dry:10m", { windowMs: 10 * 60 * 1000, max: 30 }]]
+    : [
+        ["10m", { windowMs: 10 * 60 * 1000, max: 3 }],
+        ["24h", { windowMs: 24 * 60 * 60 * 1000, max: 20 }],
+      ];
+  for (const [suffix, opts] of limits) {
+    const { allowed, retryAfter } = rateLimit(`${user.id}:notify:${suffix}`, opts);
+    if (!allowed) {
+      res.setHeader("Retry-After", String(retryAfter));
+      res.status(429).json({ error: "rate_limited", retryAfter });
+      return;
+    }
+  }
 
   const feedbackId = String(body.feedback_id || "");
   if (!UUID_RE.test(feedbackId)) {
@@ -267,7 +293,6 @@ export default async function handler(req, res) {
     res.status(400).json({ error: "invalid_template" });
     return;
   }
-  const dryRun = body.dry_run === true;
 
   // Admin gate — resolved in the database against the caller's own JWT.
   const adminRes = await callRpc("is_admin", token, {});
