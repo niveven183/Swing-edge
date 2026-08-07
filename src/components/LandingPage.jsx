@@ -66,11 +66,11 @@ const STR = {
     quoteName: "סוחר סווינג", quoteRole: "Beta · 3 חודשים",
     pricingKicker: "מחירים",
     pricingTitle: "התחל חינם. שדרג כשמוכנים.",
-    freeName: "Free", freePrice: "0₪", freePer: "לתמיד",
+    freeName: "Free", freePer: "לתמיד",
     freeSub: "כל מה שצריך כדי להתחיל לראות את עצמך באמת.",
     freeCta: "התחל עכשיו",
     freeFeatures: ["יומן עסקאות מלא", "Decision Coach בסיסי", "Trade DNA — תמונת מצב"],
-    proBadge: "הכי פופולרי", proName: "Pro", proPrice: "$5", proPer: "לחודש",
+    proBadge: "הכי פופולרי", proName: "Pro", proPer: "לחודש",
     proSub: "למי שרציני. כל המנועים, בלי תקרה.",
     proCta: "שדרג ל-Pro",
     proFeatures: ["כל מה שב-Free", "דוח חודשי מלא", "Vision OCR — קליטה מצילום מסך", "Edge Finder מתקדם", "Tilt Protection", "דוחות מעמיקים + ייצוא", "תמיכה מועדפת"],
@@ -158,11 +158,11 @@ const STR = {
     quoteName: "Swing trader", quoteRole: "Beta · 3 months",
     pricingKicker: "Pricing",
     pricingTitle: "Start free. Upgrade when you're ready.",
-    freeName: "Free", freePrice: "$0", freePer: "forever",
+    freeName: "Free", freePer: "forever",
     freeSub: "Everything you need to start really seeing yourself.",
     freeCta: "Start now",
     freeFeatures: ["Full trade journal", "Basic Decision Coach", "Trade DNA — snapshot"],
-    proBadge: "Most popular", proName: "Pro", proPrice: "$5", proPer: "per month",
+    proBadge: "Most popular", proName: "Pro", proPer: "per month",
     proSub: "For those who are serious. All the engines, no ceiling.",
     proCta: "Upgrade to Pro",
     proFeatures: ["Everything in Free", "Full monthly report", "Vision OCR — read from screenshots", "Advanced Edge Finder", "Tilt Protection", "Deep reports + export", "Priority support"],
@@ -193,6 +193,16 @@ const STR = {
     waitlistPrivacyNote: "By signing up you agree we'll store your email to notify you about launch. Details in the ",
     waitlistPrivacyLink: "Privacy Policy",
   },
+};
+
+// Price is NOT language copy — it is a commercial fact, so it lives on its own
+// axis and both cards read the same key. While price was a field of STR.he/STR.en
+// the section could show a shekel price beside a dollar one — and until 08.08 it did.
+// Each currency carries its own convention: shekel suffixed, dollar prefixed.
+// Fixed by decision — 25₪ is not pegged to the rate and is never converted.
+const PRICES = {
+  ils: { free: "0₪", pro: "25₪" },
+  usd: { free: "$0", pro: "$8" },
 };
 
 const SIGNALS = {
@@ -613,6 +623,13 @@ export default function LandingPage() {
   const goApp = () => navigate("/app");
 
   const [lang, setLang] = useState("he");
+  // Language is the only proxy for currency — no geo, no IP, no rate lookup.
+  // Switching language re-seeds the default; the toggle then overrides it.
+  const [ccy, setCcy] = useState(lang === "he" ? "ils" : "usd");
+  const chooseLang = (next) => {
+    setLang(next);
+    setCcy(next === "he" ? "ils" : "usd");
+  };
   const L = STR[lang];
   const dir = L.dir;
   const signals = SIGNALS[lang];
@@ -649,6 +666,9 @@ export default function LandingPage() {
     background: "transparent", color: "#5b6b62", fontWeight: 700, fontSize: 13,
     fontFamily: "'Heebo',sans-serif",
   };
+  // #5b6b62 is tuned for the light nav; on the near-black pricing section it
+  // reads as disabled rather than unselected.
+  const darkIdleBtn = { ...idleBtn, color: "#8F9D94" };
 
   const pill = {
     cursor: "pointer", border: "none", textDecoration: "none",
@@ -697,8 +717,8 @@ export default function LandingPage() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ display: "inline-flex", padding: 3, background: "rgba(21,32,26,0.05)", border: "1px solid rgba(21,32,26,0.07)", borderRadius: 999 }}>
-            <button onClick={() => setLang("he")} style={lang === "he" ? activeBtn : idleBtn} aria-pressed={lang === "he"}>עב</button>
-            <button onClick={() => setLang("en")} style={lang === "en" ? activeBtn : idleBtn} aria-pressed={lang === "en"}>EN</button>
+            <button onClick={() => chooseLang("he")} style={lang === "he" ? activeBtn : idleBtn} aria-pressed={lang === "he"}>עב</button>
+            <button onClick={() => chooseLang("en")} style={lang === "en" ? activeBtn : idleBtn} aria-pressed={lang === "en"}>EN</button>
           </div>
           <button
             onClick={goApp}
@@ -1022,13 +1042,21 @@ export default function LandingPage() {
           <div data-reveal="" style={{ textAlign: "center", maxWidth: 680, margin: "0 auto 48px" }}>
             <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#16D687", marginBottom: 14 }}>{L.pricingKicker}</div>
             <h2 style={{ fontSize: "clamp(28px,4.4vw,48px)", lineHeight: 1.08, letterSpacing: "-0.03em", fontWeight: 800, margin: 0 }}>{L.pricingTitle}</h2>
+            <div
+              role="group"
+              aria-label={lang === "he" ? "מטבע תצוגה" : "Display currency"}
+              style={{ display: "inline-flex", padding: 3, marginTop: 18, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)", borderRadius: 999 }}
+            >
+              <button onClick={() => setCcy("ils")} style={ccy === "ils" ? activeBtn : darkIdleBtn} aria-pressed={ccy === "ils"}>₪</button>
+              <button onClick={() => setCcy("usd")} style={ccy === "usd" ? activeBtn : darkIdleBtn} aria-pressed={ccy === "usd"}>$</button>
+            </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 22, alignItems: "stretch" }}>
             {/* Free */}
             <div data-reveal="" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", borderRadius: 24, padding: 32, display: "flex", flexDirection: "column" }}>
               <div style={{ fontWeight: 800, fontSize: 18, color: "#fff", marginBottom: 6 }}>{L.freeName}</div>
               <div style={{ color: "#8F9D94", fontSize: 13.5, fontWeight: 600, lineHeight: 1.45, marginBottom: 16 }}>{L.freeSub}</div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 7, marginBottom: 22 }}><span style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, fontSize: 42 }}>{L.freePrice}</span><span style={{ color: "#8F9D94", fontSize: 14, fontWeight: 600 }}>{L.freePer}</span></div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 7, marginBottom: 22 }}><span style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, fontSize: 42 }}>{PRICES[ccy].free}</span><span style={{ color: "#8F9D94", fontSize: 14, fontWeight: 600 }}>{L.freePer}</span></div>
               <button onClick={goApp} style={{ cursor: "pointer", display: "block", width: "100%", textAlign: "center", padding: 13, borderRadius: 12, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.16)", color: "#fff", fontWeight: 800, fontSize: 15, marginBottom: 24, fontFamily: "'Heebo',sans-serif" }}>{L.freeCta}</button>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {L.freeFeatures.map((f) => (
@@ -1042,7 +1070,7 @@ export default function LandingPage() {
               <span style={{ position: "absolute", top: -13, insetInlineStart: 32, padding: "5px 13px", borderRadius: 999, background: "#00C076", color: "#06281C", fontSize: 12, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace" }}>{L.proBadge}</span>
               <div style={{ fontWeight: 800, fontSize: 18, color: "#fff", marginBottom: 6 }}>{L.proName}</div>
               <div style={{ color: "#8F9D94", fontSize: 13.5, fontWeight: 600, lineHeight: 1.45, marginBottom: 16 }}>{L.proSub}</div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 7, marginBottom: 22 }}><span style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, fontSize: 42, color: "#16D687" }}>{L.proPrice}</span><span style={{ color: "#8F9D94", fontSize: 14, fontWeight: 600 }}>{L.proPer}</span></div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 7, marginBottom: 22 }}><span style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, fontSize: 42, color: "#16D687" }}>{PRICES[ccy].pro}</span><span style={{ color: "#8F9D94", fontSize: 14, fontWeight: 600 }}>{L.proPer}</span></div>
               <button onClick={goApp} style={{ cursor: "pointer", display: "block", width: "100%", textAlign: "center", padding: 13, borderRadius: 12, background: "#00C076", color: "#06281C", fontWeight: 800, fontSize: 15, marginBottom: 24, boxShadow: "0 10px 26px rgba(0,192,118,0.35)", border: "none", fontFamily: "'Heebo',sans-serif" }}>{L.proCta}</button>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {L.proFeatures.map((f) => (
