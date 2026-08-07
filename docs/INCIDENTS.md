@@ -385,3 +385,46 @@ Every production incident gets one short entry: what broke, root cause, fix, pre
   the location URL as well as the text — as a **provider list, never a host rule**.
   **⛔ Still open:** nothing asserts that a CI run sends zero analytics requests. Until an
   assertion like that exists, this class of failure is caught by reading only.
+
+## #14 — 2026-08-07 — A deleted trade said "deleted" and stayed in the database
+- **Symptom:** Sentinel's authenticated layer raised `browser-auth|ui-delete-incomplete`
+  (06.08 15:01): the UI delete reported success, the row was gone from the journal, and the
+  REST cleanup then found SNTNL rows still in `public.trades`. Intermittent — roughly 3 of the
+  12 runs in a 6-hour window, not 12 of 12.
+- **Root cause — two defects that only fail together:**
+  1. `handleSubmit` fired the INSERT **without `await`** and without keeping the promise
+     (`SwingEdge_App.jsx:2416`). A delete issued before that INSERT landed sent a DELETE for an
+     id the table did not have yet; the DELETE matched zero rows, and the INSERT landed *after*
+     it. The row was in the DB and gone from state.
+  2. **PostgREST returns `error: null` for a DELETE that matches zero rows.** Correct behaviour,
+     not a bug — but it means `if (error)` can never detect this, and `toast.success` at
+     `:2485` was unconditional. The failure had no error to report.
+- **What it was NOT — each ruled out by evidence, not by judgement:**
+  - **RLS:** `restCleanup()` (`tests-sentinel/sentinel-auth.spec.js:225-286`) deletes the same
+    rows as the *same* QA user, with the *same* anon key, under the *same* `users own trades`
+    policy — and succeeds. **The finding could only fire when that cleanup removed `n > 0`
+    rows, so the finding's own existence proves RLS was working.** RLS failure would also be
+    deterministic: 12/12 runs, not 3.
+  - **Network:** a transport failure rejects the promise and would have reached the `catch` at
+    `:2483` and logged. It also would not correlate with create→delete timing.
+  - **Hydration race:** the load effect (`:1495`) is keyed on `[authUser?.id]` and only
+    REPLACES client state. It cannot put a row back into the DB. Hydration is how the ghost
+    *reappears* to the user, not why it survived.
+- **Fix:** `src/lib/tradeDelete.js` (pure, so it is assertable in `verify` — same reason as
+  `replyGate.js`). `.select("id")` on the DELETE and `ok` **only for exactly one row**; a
+  `pendingWrites` registry makes a delete wait for its own row's in-flight INSERT; a failed
+  delete restores the trade **at its original index** and shows the error verbatim.
+  ⚠️ The registry releases on **settle, not resolve** — releasing only on success would turn a
+  silent failure into a silent hang, which is worse because it has no end state.
+- **Proof:** `scripts/deleteTrade-test.mjs`, written first and **observed failing 0/7**, then
+  7/7. The old inline logic was separately replayed against `{data:null,error:null}`: the
+  `if (error)` branch was not entered, nothing was logged, and the user saw "העסקה נמחקה".
+- **Lesson:** **an error check is not a success check.** Where the API can report "nothing
+  happened" without reporting an error, only counting the affected rows distinguishes a
+  completed write from a no-op. The admin path already knew this — `admin_delete_trade` does
+  `get diagnostics _n = row_count` (`admin_rpcs.sql:402`) — and the user path did not.
+- **Prevention:** `test:delete` is in the blocking `verify` chain.
+  **⛔ Still open:** the same shape survives at 6 more sites — bulk delete, edit, close, the
+  two imports, and undo-import — all of them optimistic with an unconditional success toast.
+  The fire-and-forget INSERT in `handleSubmit` is the **root of the race** and is first in that
+  queue: fixing delete without fixing save leaves the class alive. Tracked in `docs/STATE.md`.

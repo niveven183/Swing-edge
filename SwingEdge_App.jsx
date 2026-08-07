@@ -44,6 +44,7 @@ import { TVTickerTape } from "./src/components/TradingViewWidgets.jsx";
 import { useToast, useConfirm } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured, tradeForSupabase, tradeFromSupabase } from "./src/supabaseClient.js";
 import { cleanTrades, purgeInvalidTrades } from "./src/lib/cleanTrades.js";
+import { deleteTradeVerified, restoreAt, createPendingWrites } from "./src/lib/tradeDelete.js";
 import { loadSettings, saveSettings, flushSettings, migrateFromLocalStorage } from "./src/lib/userSettings.js";
 import { calcTradeMetrics, fmt$, fmt$0, fmtR, fmtNum, fmtPrice, fmtBalance, numOrNull, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays, localDayKey, todayKey, realizedAt, realizedDayKey, currencyOf, CURRENCY_SYMBOL } from "./src/utils.js";
 import {
@@ -1491,6 +1492,16 @@ export default function SwingEdge() {
   const [showJournalFilters, setShowJournalFilters] = useState(false);
   const [journalView, setJournalView] = useState('table');
 
+  // In-flight Supabase writes, keyed by trade id. A delete waits for its own
+  // row's pending INSERT before going out — without this, deleting a
+  // just-created trade sends a DELETE for an id that is not in the table yet,
+  // matches zero rows, and the INSERT lands afterwards (Sentinel, 06.08).
+  // Lazy init: useRef(createPendingWrites()) would allocate a fresh Map on every
+  // render of this component and throw it away — garbage on every keystroke.
+  const pendingWritesRef = useRef(null);
+  if (!pendingWritesRef.current) pendingWritesRef.current = createPendingWrites();
+  const pendingWrites = pendingWritesRef.current;
+
   // ── Load trades: Supabase is source of truth; localStorage is fallback ──
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase || !authUser?.id) return;
@@ -2411,10 +2422,15 @@ export default function SwingEdge() {
     setTrades(prev => [...prev, newTrade]);
     trackFirstTradeSaved();
     setLastImportIds([]);
-    // Sync new trade to Supabase (primary source of truth)
+    // Sync new trade to Supabase (primary source of truth). Registered in
+    // pendingWrites so a delete issued before this lands waits for it instead
+    // of deleting an id the table does not have yet.
     if (isSupabaseConfigured && supabase && authUser?.id) {
-      supabase.from("trades").insert(tradeForSupabase({ ...newTrade, user_id: authUser.id, is_demo: false }))
-        .then(({ error }) => { if (error) console.error("Supabase insert failed:", error); });
+      pendingWrites.track(
+        newTrade.id,
+        supabase.from("trades").insert(tradeForSupabase({ ...newTrade, user_id: authUser.id, is_demo: false }))
+          .then(({ error }) => { if (error) console.error("Supabase insert failed:", error); })
+      );
     }
     setForm({ ticker: "", side: "LONG", entry: "", stop: "", target: "", shares: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
     setOcrStatus(null);
@@ -2469,21 +2485,37 @@ export default function SwingEdge() {
       cancelText: lang === "he" ? "ביטול" : "Cancel",
       danger: true,
     });
-    if (ok) {
-      setTrades(prev => prev.filter(t => t.id !== tradeId));
-      setLastImportIds([]);
-      // Sync delete to Supabase
-      if (isSupabaseConfigured && supabase && authUser?.id && tradeId) {
-        try {
-          const { error } = await supabase.from("trades")
-            .delete()
-            .eq("id", tradeId)
-            .eq("user_id", authUser.id);
-          if (error) console.error("Supabase delete failed:", error);
-        } catch (e) { console.error("Supabase delete threw:", e); }
-      }
+    if (!ok) return;
+
+    // Remember WHERE the row was, not just what it was: a rollback that appends
+    // would move the trade in the journal and read as a second bug.
+    const idx = trades.findIndex(t => t.id === tradeId);
+    const removed = idx >= 0 ? trades[idx] : null;
+
+    setTrades(prev => prev.filter(t => t.id !== tradeId));
+    setLastImportIds([]);
+
+    // Local-only mode (logged out / Supabase unconfigured): nothing to verify.
+    if (!(isSupabaseConfigured && supabase && authUser?.id && tradeId)) {
       toast.success(lang === "he" ? "העסקה נמחקה" : "Trade deleted");
+      return;
     }
+
+    // ⚠️ PostgREST returns error:null for a DELETE that matches zero rows, so
+    // the row count — not the error — is what says whether this worked.
+    const res = await deleteTradeVerified(supabase, { id: tradeId, userId: authUser.id }, pendingWrites);
+
+    if (!res.ok) {
+      if (removed) setTrades(prev => restoreAt(prev, removed, idx));
+      console.error("Supabase delete failed:", res.reason, res.message);
+      toast.error(
+        (lang === "he" ? "המחיקה נכשלה — העסקה הוחזרה: " : "Delete failed — the trade was restored: ") +
+        res.message
+      );
+      return;
+    }
+
+    toast.success(lang === "he" ? "העסקה נמחקה" : "Trade deleted");
   };
 
   const handleBulkDelete = async () => {
