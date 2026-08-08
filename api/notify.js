@@ -4,12 +4,13 @@
 // and outside every guard (CLAUDE.md §3).
 //
 //   POST /api/notify
-//   body : { feedback_id: uuid, template: <allowlist key>, dry_run?: boolean }
+//   body : { feedback_id: uuid, template: <allowlist key>, dry_run?: boolean,
+//            body_text?: string }                         — the admin-written core
 //   200  : { sent, failed, campaign, recipient_masked }   (+ log_failed:true)
 //   200  : { sent: 0, reason: "already_sent" }            — ledger dedup
 //
 //   GET  /api/notify
-//   200  : { templates: [ { key, subject } ] }            — admin only
+//   200  : { templates: [ { key, subject, body } ] }      — admin only
 //
 // GET exists so the admin panel can populate its template picker WITHOUT holding
 // a second copy of the allowlist. Two copies disagree silently: a template
@@ -26,16 +27,22 @@
 // caller's own JWT, and admin_log_campaign_send re-checks it independently.
 // No service-role key anywhere.
 //
-// ⚠️ Ceiling note: the real cap is the LEDGER, not the rate limit. campaign =
-// "reply:<feedback_id>" is unique per feedback row, so a given feedback can be
-// answered exactly once, forever, even across cold starts. The rate limiter
-// below is in-memory per Lambda instance and is a speed bump, not a cap.
+// ⚠️ Ceiling note: the real cap is the LEDGER, not the rate limit. Until
+// 2026-08-08 that cap was "one reply per feedback, forever" — campaign was
+// "reply:<feedback_id>" and nothing else could ever be filed under it. The seven
+// templates make that wrong on purpose: "we reproduced your bug" today and "it
+// is fixed" next week are two letters about one report. The key now carries a
+// server-derived counter AND a content fingerprint, and it is the fingerprint
+// that still caps anything — see api/_lib/replyLedger.js. The rate limiter below
+// is in-memory per Lambda instance and is a speed bump, not a cap.
 
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import nodemailer from "nodemailer";
 import { resolveOrigin } from "./_lib/cors.js";
 import { rateLimit } from "./_lib/rateLimit.js";
+import { campaignKey, hasFingerprint, nextN } from "./_lib/replyLedger.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const SUPABASE_ANON_KEY =
@@ -45,14 +52,86 @@ const SUPABASE_ANON_KEY =
 // and a code review; that is the point. Exported so the handle's test can derive
 // the expected list instead of copying it — a test that copies the allowlist is
 // itself the second copy it exists to forbid.
+//
+// `body: true` marks a SKELETON — a letter whose middle is written by the admin
+// in the panel and injected at {{BODY}}. It is the single source of truth for
+// "does this template need core text": the panel shows its textarea from this
+// flag (served over GET), the validation below requires the field from it, and
+// nothing else may hold an opinion about it.
 export const TEMPLATES = {
+  // ⛔ THE TWO FROZEN ONES. Both already went to real people, and
+  // fix_mobile_upload is still the only written answer to the open OCR bug.
   // The subject must not promise more than the body delivers: the picker was
   // fixed, the OCR reading was not, and the body says so explicitly.
   fix_mobile_upload: { file: "emails/fix_mobile_upload.html", subject: "מצאנו את מה שחסם אותך" },
   files_received: { file: "emails/files_received.html", subject: "הקבצים שלך התקבלו" },
+
+  // The seven skeletons. Two frozen templates were serving seven kinds of event,
+  // which is why every letter had to stay vague enough to cover all of them.
+  reply_bug_fixed: { file: "emails/reply_bug_fixed.html", subject: "הבאג שדיווחת — תוקן", body: true },
+  reply_bug_ack: { file: "emails/reply_bug_ack.html", subject: "שחזרנו את הבאג שדיווחת", body: true },
+  reply_feature_accepted: { file: "emails/reply_feature_accepted.html", subject: "הרעיון שלך נכנס לתוכנית", body: true },
+  reply_feature_declined: { file: "emails/reply_feature_declined.html", subject: "הרעיון שלך — ההחלטה, והנימוק", body: true },
+  reply_need_info: { file: "emails/reply_need_info.html", subject: "שאלה אחת, כדי לא לנחש", body: true },
+  reply_material_received: { file: "emails/reply_material_received.html", subject: "החומר שלך התקבל", body: true },
+  reply_thanks: { file: "emails/reply_thanks.html", subject: "תודה", body: true },
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// 2000 characters of core. The measured reply of 07.08 — the most detailed one
+// ever written, covering four separate reports — was ~900, so a tighter cap
+// would have blocked the very letter this feature exists to make repeatable.
+// Upward: escaping can expand a character sixfold (& → &amp;), so 2000 is at
+// most ~12KB against a ~5KB skeleton, and Gmail clips a message around 102KB.
+// The cap is not there to save bytes; it is there so a stray paste cannot
+// produce a letter nobody can read.
+const BODY_MAX = 2000;
+
+const escapeHtml = (s) =>
+  String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+// Admin text → paragraphs. Blank line splits, single newline breaks, and NOTHING
+// else is honoured: ⛔ no markdown, no link syntax, no tag allowlist. Every
+// character the admin typed reaches the recipient as a character, which is the
+// only version of this that can be reasoned about.
+function renderBody(text) {
+  return String(text)
+    .replace(/\r\n/g, "\n")
+    .trim()
+    .split(/\n\s*\n+/)
+    .map(
+      (p) =>
+        `<div style="font-size:15px;color:#3d4a44;line-height:1.75;margin:0 0 16px;">${escapeHtml(p).replace(
+          /\n/g,
+          "<br>"
+        )}</div>`
+    )
+    .join("\n");
+}
+
+// ⚠️ THE REPLACEMENT MUST BE A FUNCTION. String.prototype.replace interprets
+// $&, $` and $' inside a string replacement, so a core containing "$&" would
+// re-insert the literal "{{BODY}}" into the letter and "$`" would inline the
+// entire document prefix. A function replacer is passed through verbatim.
+function injectBody(html, text) {
+  return html.replace("{{BODY}}", () => renderBody(text));
+}
+
+// sha256(template + "\n" + trimmed core), first 8 hex. See replyLedger.js for
+// why identity (`n`) and deduplication (this) had to be separated.
+function fingerprint(templateKey, bodyText) {
+  return crypto
+    .createHash("sha256")
+    .update(`${templateKey}\n${String(bodyText).trim()}`)
+    .digest("hex")
+    .slice(0, 8);
+}
 
 const fetchWithTimeout = (url, opts = {}, ms = 8000) => {
   const c = new AbortController();
@@ -101,12 +180,19 @@ async function callRpc(fn, token, body) {
   return { ok: r.ok, status: r.status, data };
 }
 
-// Has this exact feedback already been answered? Reads the ledger with the
-// caller's JWT (email_campaign_log_admin_select covers admins).
-async function alreadySent(campaign, token) {
+// Every reply already filed against this feedback. One read serves both
+// questions — what is the next `n`, and has this exact letter already gone out —
+// because two reads could disagree with each other between them.
+//
+// Reads with the caller's JWT (email_campaign_log_admin_select covers admins).
+// ⛔ campaign + status only. The email column is never selected, here or in the
+// panel. `limit=200` is a runaway guard, not a real ceiling: 200 replies to one
+// feedback row is not a scenario, it is a bug that should be visible.
+async function readReplyLedger(feedbackId, token) {
   const url =
     `${SUPABASE_URL}/rest/v1/email_campaign_log` +
-    `?campaign=eq.${encodeURIComponent(campaign)}&status=eq.sent&select=id&limit=1`;
+    `?campaign=like.${encodeURIComponent(`reply:${feedbackId}*`)}` +
+    `&select=campaign,status&limit=200`;
   const r = await fetchWithTimeout(url, {
     headers: { Authorization: `Bearer ${token}`, apikey: SUPABASE_ANON_KEY },
   });
@@ -117,7 +203,7 @@ async function alreadySent(campaign, token) {
     return "unknown";
   }
   const rows = await r.json().catch(() => null);
-  return Array.isArray(rows) && rows.length > 0;
+  return Array.isArray(rows) ? rows : "unknown";
 }
 
 // "omrikapara1@example.com" → "om***@example.com". The admin confirms the right
@@ -225,8 +311,16 @@ export default async function handler(req, res) {
       return;
     }
 
+    // `body` travels with the list for the same reason the list travels at all:
+    // the panel must not decide for itself which templates take core text. That
+    // decision held in two places fails in the worst direction — a textarea that
+    // never appears for a template that cannot be sent without one.
     res.status(200).json({
-      templates: Object.entries(TEMPLATES).map(([key, t]) => ({ key, subject: t.subject })),
+      templates: Object.entries(TEMPLATES).map(([key, t]) => ({
+        key,
+        subject: t.subject,
+        body: !!t.body,
+      })),
     });
     return;
   }
@@ -288,9 +382,33 @@ export default async function handler(req, res) {
     res.status(400).json({ error: "invalid_feedback_id" });
     return;
   }
-  const tpl = TEMPLATES[String(body.template || "")];
+  const templateKey = String(body.template || "");
+  const tpl = TEMPLATES[templateKey];
   if (!tpl) {
     res.status(400).json({ error: "invalid_template" });
+    return;
+  }
+
+  // ── the admin-written core ────────────────────────────────────────────────
+  // Validated here, next to the other pure request checks and before any I/O.
+  const hasBodyField = body.body_text !== undefined && body.body_text !== null;
+  const bodyText = hasBodyField ? String(body.body_text) : "";
+  if (tpl.body) {
+    if (!bodyText.trim()) {
+      // A skeleton with a hole in it still renders and still sends. The person
+      // on the other end gets a branded email that says nothing at all.
+      res.status(400).json({ error: "body_text_required" });
+      return;
+    }
+    if (bodyText.length > BODY_MAX) {
+      res.status(400).json({ error: "body_text_too_long", max: BODY_MAX, got: bodyText.length });
+      return;
+    }
+  } else if (hasBodyField && bodyText.trim()) {
+    // ⚠️ 400, NOT a silent drop. An admin who typed a core and then picked a
+    // frozen template would otherwise send a letter missing everything they
+    // wrote, with nothing anywhere to say so — §2, אפס כשל שקט.
+    res.status(400).json({ error: "body_text_not_supported", template: templateKey });
     return;
   }
 
@@ -319,13 +437,20 @@ export default async function handler(req, res) {
     return;
   }
 
-  const campaign = `reply:${feedbackId}`;
-  const dup = await alreadySent(campaign, token);
-  if (dup === "unknown") {
+  const ledger = await readReplyLedger(feedbackId, token);
+  if (ledger === "unknown") {
     res.status(503).json({ error: "ledger_unavailable" });
     return;
   }
-  if (dup) {
+  const hash = fingerprint(templateKey, bodyText);
+  const n = nextN(ledger, feedbackId);
+  const campaign = campaignKey(feedbackId, n, hash);
+
+  // Not "has this feedback been answered" any more — that question now has a
+  // legitimate yes. The question is whether THIS letter has already gone out.
+  // Kept as 200 + reason rather than a 4xx so src/lib/replyGate.js keeps its
+  // dedicated already_sent branch instead of surfacing a raw error string.
+  if (hasFingerprint(ledger, feedbackId, hash)) {
     res.status(200).json({ sent: 0, reason: "already_sent", campaign });
     return;
   }
@@ -338,6 +463,17 @@ export default async function handler(req, res) {
     res.status(500).json({ error: "template_unavailable" });
     return;
   }
+  if (tpl.body) {
+    // A skeleton whose slot was renamed or deleted still reads, still renders
+    // and still sends — the admin's text just never appears. Refusing is the
+    // only way that stays visible.
+    if (!html.includes("{{BODY}}")) {
+      console.error(`[notify] ${tpl.file} declares body:true but has no {{BODY}} slot`);
+      res.status(500).json({ error: "template_missing_body_slot" });
+      return;
+    }
+    html = injectBody(html, bodyText);
+  }
   const text = htmlToText(html);
 
   if (dryRun) {
@@ -345,8 +481,16 @@ export default async function handler(req, res) {
       dry_run: true,
       sent: 0,
       campaign,
+      n,
       subject: tpl.subject,
       template: tpl.file,
+      // ⚠️ THE RENDERED LETTER, not a byte count. With frozen templates the
+      // size was a fingerprint of a file the admin could read in the repo. With
+      // free text it fingerprints nothing a human can check: the same byte count
+      // covers the intended core and a paragraph pasted into the wrong reply.
+      // The panel renders this in a fully sandboxed iframe. Dry run ONLY —
+      // never on GET, never in a send response.
+      html,
       html_bytes: Buffer.byteLength(html, "utf8"),
       text_chars: text.length,
       recipient_masked: maskEmail(recipient),
