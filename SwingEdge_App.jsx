@@ -2663,34 +2663,92 @@ export default function SwingEdge() {
   // (client-generated ids, isDemo:false). We append them, persist to Supabase
   // for logged-in users, and remember the batch's ids so the import can be
   // undone until the next add/close/edit/delete.
-  const handleImportTrades = (imported) => {
+  const handleImportTrades = async (imported) => {
     if (!imported || imported.length === 0) return;
     const ids = imported.map(t => t.id);
     setTrades(prev => [...prev, ...imported]);
     trackFirstTradeSaved();
     setLastImportIds(ids);
     setShowImportModal(false);
+    setTab("journal");
 
-    if (isSupabaseConfigured && supabase && authUser?.id) {
-      supabase.from("trades")
-        .insert(imported.map(t => tradeForSupabase({ ...t, user_id: authUser.id, is_demo: false })))
-        .then(({ error }) => { if (error) console.warn("[import] supabase insert:", error.message); });
+    // Local-only mode: nothing to verify.
+    if (!(isSupabaseConfigured && supabase && authUser?.id)) {
+      toast.success(t.imp_success.replace("{n}", imported.length));
+      return;
     }
 
-    toast.success(t.imp_success.replace("{n}", imported.length));
-    setTab("journal");
+    // ⚠️ A single INSERT for the whole batch — there is no chunking in this
+    // path, verified 08.08. That is fine, but it means a payload the server
+    // refuses used to fail SILENTLY: `.then(({error}))` only warned to the
+    // console and the user was told every row was imported.
+    const rows = imported.map(t => tradeForSupabase({ ...t, user_id: authUser.id, is_demo: false }));
+    const writing = insertTradeRows(supabase, { rows });
+    // Each id is registered so an undo (or a delete) issued right after the
+    // import waits for its own row instead of racing it.
+    ids.forEach(id => pendingWrites.track(id, writing));
+    const res = await writing;
+
+    if (!res.ok) {
+      // Only the rows that did NOT land leave the journal; the ones that did
+      // are real and stay. §2: the report carries numerator and denominator.
+      const missing = new Set(res.missingIds || ids);
+      setTrades(prev => prev.filter(tr => !missing.has(tr.id)));
+      setLastImportIds(ids.filter(id => !missing.has(id)));
+      console.error("[import] supabase insert failed:", res.reason, res.message);
+      toast.error(
+        (lang === "he"
+          ? `יובאו ${res.rows} מתוך ${ids.length} — ${missing.size} נכשלו: `
+          : `Imported ${res.rows} of ${ids.length} — ${missing.size} failed: `) + res.message
+      );
+      return;
+    }
+
+    toast.success(t.imp_success.replace("{n}", res.rows));
   };
 
   // Session-only undo: drop the last imported batch from state (+ Supabase).
-  const handleUndoImport = () => {
+  const handleUndoImport = async () => {
     if (lastImportIds.length === 0) return;
-    const idSet = new Set(lastImportIds);
-    setTrades(prev => prev.filter(t => !idSet.has(t.id)));
+    const ids = lastImportIds;
+    const idSet = new Set(ids);
+    // Positions, so a partial undo puts the survivors back where they were.
+    const removed = trades.map((tr, i) => ({ t: tr, i })).filter(x => idSet.has(x.t.id));
+
+    setTrades(prev => prev.filter(tr => !idSet.has(tr.id)));
     setLastImportIds([]);
-    if (isSupabaseConfigured && supabase && authUser?.id) {
-      supabase.from("trades").delete().in("id", lastImportIds).eq("user_id", authUser.id)
-        .then(({ error }) => { if (error) console.warn("[import] supabase undo:", error.message); });
+
+    if (!(isSupabaseConfigured && supabase && authUser?.id)) {
+      toast.info(t.imp_undo_done);
+      return;
     }
+
+    // This is the create→delete race at its sharpest: undo deletes rows the
+    // import may still be writing.
+    await Promise.all(ids.map(id => pendingWrites.wait(id)));
+
+    const res = await deleteTradeRows(supabase, { ids, userId: authUser.id });
+
+    if (!res.ok) {
+      const missing = new Set(res.missingIds || ids);
+      const back = removed.filter(x => missing.has(x.t.id)).sort((a, b) => a.i - b.i);
+      if (back.length) {
+        setTrades(prev => {
+          let next = prev;
+          for (const { t: tr, i } of back) next = restoreAt(next, tr, i);
+          return next;
+        });
+        setLastImportIds(back.map(x => x.t.id));
+      }
+      console.error("[import] supabase undo failed:", res.reason, res.message);
+      toast.error(
+        (lang === "he"
+          ? `בוטלו ${res.rows} מתוך ${ids.length} — ${back.length} הוחזרו: `
+          : `Undone ${res.rows} of ${ids.length} — ${back.length} restored: `) + res.message
+      );
+      return;
+    }
+
     toast.info(t.imp_undo_done);
   };
 
