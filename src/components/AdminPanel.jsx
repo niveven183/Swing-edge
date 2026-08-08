@@ -12,6 +12,10 @@ import { supabase, isSupabaseConfigured } from "../supabaseClient.js";
 import { useToast, useConfirm } from "./ToastProvider.jsx";
 import { pluralize } from "../i18n.js";
 import { initialState, reduce, canCheck, canSend, templatesFrom } from "../lib/replyGate.js";
+// ⛔ The campaign string is NEVER parsed here. api/_lib/replyLedger.js is the one
+// parser both sides share; a second copy is the drift that makes a sent reply
+// silently vanish from this screen. See that file's header.
+import { summarize } from "../../api/_lib/replyLedger.js";
 
 const ADMIN_EMAIL = "niveven183@gmail.com";
 
@@ -1099,6 +1103,7 @@ function FeedbackTab({ feedback, setFeedback, toast }) {
   // The reply handle. One row is open at a time, so one gate is enough — and it
   // is reset on every open, so a verification can never survive a row change.
   const [templates, setTemplates] = useState([]);
+  const [bodyMax, setBodyMax] = useState(0);
   const [tplError, setTplError] = useState("");
   const [ledger, setLedger] = useState({});
   const [ledgerError, setLedgerError] = useState("");
@@ -1133,9 +1138,7 @@ function FeedbackTab({ feedback, setFeedback, toast }) {
       .like("campaign", "reply:%");
     if (error) { setLedgerError(error.message || "קריאת הליגר נכשלה"); return; }
     setLedgerError("");
-    const map = {};
-    for (const r of data || []) map[String(r.campaign).slice("reply:".length)] = r;
-    setLedger(map);
+    setLedger(summarize(data));
   }, []);
 
   useEffect(() => {
@@ -1143,7 +1146,13 @@ function FeedbackTab({ feedback, setFeedback, toast }) {
     (async () => {
       try {
         const json = await authedFetch("/api/notify", { method: "GET" });
-        if (!cancelled) { setTemplates(templatesFrom(json)); setTplError(""); }
+        if (!cancelled) {
+          setTemplates(templatesFrom(json));
+          // 0 means "the server did not say", and the counter renders nothing
+          // rather than inventing a limit it cannot know.
+          setBodyMax(Number(json?.body_max) > 0 ? Number(json.body_max) : 0);
+          setTplError("");
+        }
       } catch (e) {
         if (!cancelled) setTplError(e?.message || "טעינת התבניות נכשלה");
       }
@@ -1158,10 +1167,18 @@ function FeedbackTab({ feedback, setFeedback, toast }) {
     setGate(initialState());
   };
 
+  // body_text is sent only when the chosen template has a slot for it — the
+  // server rejects a core on a frozen template (body_text_not_supported), and
+  // that rejection is a guard, not a thing to trip on every frozen send.
   const post = (id, dry) =>
     authedFetch("/api/notify", {
       method: "POST",
-      body: JSON.stringify({ feedback_id: id, template: gate.template, dry_run: dry }),
+      body: JSON.stringify({
+        feedback_id: id,
+        template: gate.template,
+        dry_run: dry,
+        ...(gate.bodyRequired ? { body_text: gate.body } : {}),
+      }),
     });
 
   const runDry = async (id) => {
@@ -1312,8 +1329,9 @@ function FeedbackTab({ feedback, setFeedback, toast }) {
                     <Badge tone={statusTone[status]}>{status}</Badge>
                     {logged && (
                       <span className="text-[10px] text-emerald-300" title="מתוך email_campaign_log">
-                        ✉ נשלחה תשובה · {formatDateTime(logged.sent_at)}
-                        {logged.status !== "sent" ? ` (${logged.status})` : ""}
+                        ✉ {logged.count === 1 ? "נשלחה תשובה אחת" : `נשלחו ${logged.count} תשובות`}
+                        {logged.lastSentAt ? ` · אחרונה ${formatDateTime(logged.lastSentAt)}` : ""}
+                        {logged.lastStatus && logged.lastStatus !== "sent" ? ` (${logged.lastStatus})` : ""}
                       </span>
                     )}
                   </div>
@@ -1347,7 +1365,12 @@ function FeedbackTab({ feedback, setFeedback, toast }) {
                   <div className="flex items-center gap-2 flex-wrap">
                     <select
                       value={gate.template}
-                      onChange={(e) => setGate((s) => reduce(s, { type: "template", key: e.target.value }))}
+                      onChange={(e) => {
+                        const key = e.target.value;
+                        // ⛔ The flag comes off the served list, never off the key.
+                        const picked = templates.find((t) => t.key === key);
+                        setGate((s) => reduce(s, { type: "template", key, bodyRequired: !!picked?.body }));
+                      }}
                       className="bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-[11px] text-white focus:border-cyan-500/50 focus:outline-none"
                     >
                       <option value="">— בחר תבנית —</option>
@@ -1363,21 +1386,63 @@ function FeedbackTab({ feedback, setFeedback, toast }) {
                     <button
                       onClick={() => runSend(f.id)}
                       disabled={busy || !canSend(gate)}
-                      title={canSend(gate) ? "" : "נדרשת הרצה יבשה תקינה לתבנית הזו"}
+                      title={canSend(gate) ? "" : "נדרשת הרצה יבשה תקינה לתבנית ולליבה שעל המסך"}
                       className="text-[11px] px-3 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-30 disabled:cursor-not-allowed"
                     >{gate.step === "sending" ? "שולח…" : "שלח"}</button>
                   </div>
 
+                  {/* The core. Shown only for templates that carry a {{BODY}} slot,
+                      and that fact arrives from GET — see the picker's onChange. */}
+                  {gate.bodyRequired && (
+                    <div className="space-y-1">
+                      <textarea
+                        value={gate.body}
+                        onChange={(e) => setGate((s) => reduce(s, { type: "body", text: e.target.value }))}
+                        rows={6}
+                        dir="rtl"
+                        placeholder="הליבה — מה בדיוק קרה, מה נעשה, ומה הצעד הבא. טקסט בלבד; שורה ריקה פותחת פסקה."
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[12px] text-white leading-relaxed placeholder:text-slate-600 focus:border-cyan-500/50 focus:outline-none resize-y"
+                      />
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="text-slate-500">
+                          ללא HTML וללא קישורים — כל תו נמלט בשרת לפני ההזרקה לתבנית.
+                        </span>
+                        {bodyMax > 0 && (
+                          <span className={gate.body.length > bodyMax ? "text-rose-300 font-mono" : "text-slate-500 font-mono"}>
+                            {gate.body.length} / {bodyMax}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {gate.step === "verified" && (
-                    <div className="text-[11px] text-slate-200 bg-white/5 border border-white/10 rounded-lg px-3 py-2 space-y-0.5">
+                    <div className="text-[11px] text-slate-200 bg-white/5 border border-white/10 rounded-lg px-3 py-2 space-y-1.5">
                       <div>נושא: <span className="text-white">{gate.dry?.subject}</span></div>
                       <div>נמען: <span className="font-mono text-cyan-300">{gate.dry?.recipient_masked}</span></div>
-                      <div className="text-slate-400">{gate.dry?.html_bytes} bytes · {gate.dry?.text_chars} תווי טקסט · טרם נשלח</div>
+                      <div className="text-slate-400">
+                        תשובה מס׳ {gate.dry?.n ?? "?"} · {gate.dry?.html_bytes} bytes · טרם נשלח
+                      </div>
+                      {/* ⚠️ THE VERIFICATION POINT. With free text in the middle of the
+                          letter, a byte count proves nothing — the admin has to read
+                          the thing that will land in the inbox. sandbox="" with no
+                          allow-scripts and no allow-same-origin: the frame can render
+                          and nothing else, which is what a preview should be able to do. */}
+                      {gate.dry?.html && (
+                        <iframe
+                          title="תצוגה מקדימה של המייל"
+                          srcDoc={gate.dry.html}
+                          sandbox=""
+                          referrerPolicy="no-referrer"
+                          className="w-full h-[420px] rounded-lg border border-white/10 bg-white"
+                        />
+                      )}
                     </div>
                   )}
                   {gate.step === "already_sent" && (
                     <div className="text-[11px] text-amber-200 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
-                      כבר נשלחה תשובה לפידבק הזה. הליגר מאפשר תשובה אחת בלבד, ולכן השליחה חסומה.
+                      המכתב הזה — אותה תבנית ואותה ליבה — כבר נשלח לפידבק הזה, ולכן השליחה חסומה.
+                      תשובה נוספת עם תוכן אחר מותרת: שנה את הליבה והרץ יבש שוב.
                     </div>
                   )}
                   {gate.step === "failed" && (

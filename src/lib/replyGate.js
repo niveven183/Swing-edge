@@ -13,28 +13,71 @@
 // canSend keys on verifiedFor, not on a boolean flag: dry-running one template
 // and sending another is the failure this shape makes unrepresentable rather
 // than merely unlikely.
+//
+// ⚠️ 2026-08-08 — THE SAME ARGUMENT NOW APPLIES TO THE TEXT. Until the seven
+// skeletons landed, a dry run verified a FILE: the template key was the whole
+// identity of the letter, and the admin could read the file in the repo. Now the
+// middle of the letter is a string the admin typed, so the key no longer
+// identifies what will be delivered. verifiedBody carries the rest of it, and
+// canSend requires BOTH to still match — otherwise the preview shows one letter
+// and the send delivers another, which is the one failure this module exists for.
 
 export function initialState() {
-  return { step: "idle", template: "", verifiedFor: "", dry: null, error: "", result: null };
+  return {
+    step: "idle",
+    template: "",
+    verifiedFor: "",
+    body: "",
+    bodyRequired: false,
+    verifiedBody: "",
+    dry: null,
+    error: "",
+    result: null,
+  };
 }
 
 export function reduce(state, event) {
   switch (event.type) {
     case "template":
       // Any change of template revokes the verification, including re-picking
-      // the same key — a fresh pick means a fresh look.
-      return { ...initialState(), step: event.key ? "picked" : "idle", template: event.key || "" };
+      // the same key — a fresh pick means a fresh look. The core is cleared with
+      // it: text written for "the bug is fixed" is not text for "we declined".
+      return {
+        ...initialState(),
+        step: event.key ? "picked" : "idle",
+        template: event.key || "",
+        // Served by GET /api/notify. ⛔ The panel never decides this itself.
+        bodyRequired: !!event.bodyRequired,
+      };
+
+    case "body": {
+      const body = event.text || "";
+      if (body === state.body) return state;
+      // Mid-flight edits do not rewind the step — the request already left. The
+      // verification is revoked either way, so the response cannot license it.
+      const inFlight = state.step === "checking" || state.step === "sending";
+      return {
+        ...state,
+        body,
+        verifiedFor: "",
+        verifiedBody: "",
+        dry: inFlight ? state.dry : null,
+        error: inFlight ? state.error : "",
+        result: inFlight ? state.result : null,
+        step: inFlight ? state.step : state.template ? "picked" : "idle",
+      };
+    }
 
     case "checking":
       return { ...state, step: "checking", dry: null, error: "", result: null };
 
     case "checked": {
       if (!event.ok) {
-        return { ...state, step: "failed", error: event.error || "unknown", verifiedFor: "" };
+        return { ...state, step: "failed", error: event.error || "unknown", verifiedFor: "", verifiedBody: "" };
       }
       const payload = event.payload || {};
       if (payload.reason === "already_sent") {
-        return { ...state, step: "already_sent", dry: payload, error: "", verifiedFor: "" };
+        return { ...state, step: "already_sent", dry: payload, error: "", verifiedFor: "", verifiedBody: "" };
       }
       // Fail closed: only an explicit dry_run acknowledgement licenses a send.
       if (payload.dry_run !== true) {
@@ -43,9 +86,19 @@ export function reduce(state, event) {
           step: "failed",
           error: "התשובה אינה הרצה יבשה מאושרת",
           verifiedFor: "",
+          verifiedBody: "",
         };
       }
-      return { ...state, step: "verified", dry: payload, error: "", verifiedFor: state.template };
+      return {
+        ...state,
+        step: "verified",
+        dry: payload,
+        error: "",
+        verifiedFor: state.template,
+        // The letter the admin just read, pinned. Not payload.body_text: the
+        // verification is of what THIS panel will send next, and that is state.body.
+        verifiedBody: state.body,
+      };
     }
 
     case "sending":
@@ -53,20 +106,30 @@ export function reduce(state, event) {
 
     case "sent":
       return event.ok
-        ? { ...state, step: "sent", result: event.payload || {}, error: "", verifiedFor: "" }
-        : { ...state, step: "failed", error: event.error || "unknown", verifiedFor: "" };
+        ? { ...state, step: "sent", result: event.payload || {}, error: "", verifiedFor: "", verifiedBody: "" }
+        : { ...state, step: "failed", error: event.error || "unknown", verifiedFor: "", verifiedBody: "" };
 
     default:
       return state;
   }
 }
 
+// A dry run on an empty core is not a dry run of anything: the server rejects it
+// with body_text_required, and the admin gets a red box instead of a preview.
+// Blocking here turns a 400 into a disabled button.
 export function canCheck(state) {
-  return !!state.template && state.step !== "checking" && state.step !== "sending";
+  if (!state.template) return false;
+  if (state.bodyRequired && !state.body.trim()) return false;
+  return state.step !== "checking" && state.step !== "sending";
 }
 
 export function canSend(state) {
-  return state.step === "verified" && !!state.template && state.verifiedFor === state.template;
+  return (
+    state.step === "verified" &&
+    !!state.template &&
+    state.verifiedFor === state.template &&
+    state.verifiedBody === state.body
+  );
 }
 
 // Pass-through by design. A template added to api/notify.js must reach the

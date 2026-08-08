@@ -10,7 +10,7 @@
 //   200  : { sent: 0, reason: "already_sent" }            — ledger dedup
 //
 //   GET  /api/notify
-//   200  : { templates: [ { key, subject, body } ] }      — admin only
+//   200  : { body_max, templates: [ { key, subject, body } ] }   — admin only
 //
 // GET exists so the admin panel can populate its template picker WITHOUT holding
 // a second copy of the allowlist. Two copies disagree silently: a template
@@ -316,6 +316,11 @@ export default async function handler(req, res) {
     // decision held in two places fails in the worst direction — a textarea that
     // never appears for a template that cannot be sent without one.
     res.status(200).json({
+      // ⛔ Served, not duplicated. The panel's character counter and this 400 are
+      // the same rule; a hardcoded 2000 in the JSX is a second source of truth
+      // that drifts the moment BODY_MAX moves, and drifts toward a counter that
+      // says "fine" about a request the server rejects.
+      body_max: BODY_MAX,
       templates: Object.entries(TEMPLATES).map(([key, t]) => ({
         key,
         subject: t.subject,
