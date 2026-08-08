@@ -477,3 +477,33 @@ Every production incident gets one short entry: what broke, root cause, fix, pre
   to be added server-side, only read. `:1234` (`admin_set_feedback_status`) already does this
   correctly (`if (!data) throw`) — from #3, which is where the rule entered this codebase.
   Tracked in `docs/STATE.md`.
+
+### #14 — 2026-08-08 — ✅ THE ADMIN RPC SITES, 3/3 — the class is closed in both files
+
+- **What changed:** all three sites now go through `rpcCountVerified` over the **same**
+  `classifyRows` — no second module, no duplicated verdict. `AdminPanel.jsx:960` and `:1261`
+  expect exactly 1 and surface the error verbatim; the feedback row leaves local state only
+  **after** the count confirms it left the DB.
+- **⚠️ The classifier had to be widened, and this is the load-bearing detail:** the count arrives
+  in two shapes. `.select("id")` on a table write answers with the rows; an RPC declared
+  `returns int` answers with the **number alone**. `classifyRows` read `data.length` only, so
+  pointing the panel at it unchanged would have scored **every** RPC as zero — a fix that turns
+  every admin delete into a false failure. `countOf` normalises both, inside the one classifier.
+- **⚠️ `:1525` is deliberately not asserted for equality.** `admin_delete_demo_trades` deletes by
+  predicate (`where is_demo = true`), so no expected count exists; `expected: null` reports the
+  number instead of judging it. Asserting against the `demoCount` on screen would manufacture
+  failures out of a stale read. "cleared 0" is truthful and visible — the old unconditional
+  "Demo trades cleared" was not.
+- **Prevention:** `test:write` 20 → **25** assertions, in the blocking `verify` chain. Red baseline
+  **9/25** against `scripts/fixtures/tradeWrite-legacy.mjs` (21, 22, 24 failing), reproducible at
+  any time, not a number in a log. ⚠️ 23 and 25 pass **vacuously** on the old shape — the panel
+  did handle errors; what it never did was count.
+- **⚠️ A prediction of mine was disproved, again by measurement:** I marked 22 ("1 row = success")
+  as vacuous. It **separates**, because it demands `rows === 1` and the old shape returns no
+  counter at all. Same correction as 9 and 11 in the previous wave — the third time a vacuity
+  call was wrong, which is why the marking is measured and not reasoned.
+- **Lesson:** the rule was invented on the server side of this repo in #3 and had been sitting
+  correct and unread ever since. A silent failure can survive not because the mechanism is
+  missing but because **nobody read the value it already returns** — so when a class is closed,
+  the sweep must cover every file that calls the same kind of write, not every file that shares
+  the same code.

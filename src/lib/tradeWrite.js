@@ -42,7 +42,19 @@ export function classifyRows(res, opts = {}) {
     return { ok: false, reason: "error", message: error.message || String(error), rows: 0 };
   }
 
-  const rows = Array.isArray(data) ? data.length : 0;
+  const rows = countOf(data);
+
+  // ⚠️ expected === null — the count cannot be known in advance because the rows
+  // are chosen by predicate, not by id (admin_delete_demo_trades deletes every
+  // demo row there is). Any count is a true answer, so it is REPORTED, never
+  // judged. Asserting equality against the number on screen would invent a
+  // failure out of a stale read. The error branch above is still the guard —
+  // this branch is deliberately below it, and assertion 25 locks that order.
+  //
+  // ⚠️ Note `expected = 1` above is a destructuring default: it fills in for
+  // `undefined` only, so an explicit `null` survives to here. That is the point.
+  if (expected === null) return { ok: true, reason: okReason, message: "", rows };
+
   if (rows === expected) return { ok: true, reason: okReason, message: "", rows };
 
   if (rows > expected) {
@@ -71,6 +83,19 @@ export function classifyRows(res, opts = {}) {
     message: `only ${rows} of ${expected} rows were written`,
     rows,
   };
+}
+
+// The count arrives in two shapes that mean the same thing, so it is normalised
+// HERE — inside the one classifier — and not at each call site.
+//   · `.select("id")` on a table write answers with the rows themselves.
+//   · An RPC declared `returns int` over `get diagnostics _n = row_count`
+//     (admin_rpcs.sql:403) answers with the number alone.
+// Reading only `data.length` would score every RPC as zero, which is why the
+// admin panel could not have been fixed by pointing it at classifyRows as-is.
+function countOf(data) {
+  if (Array.isArray(data)) return data.length;
+  if (typeof data === "number" && Number.isFinite(data)) return data;
+  return 0;
 }
 
 // Runs the built query and never throws: a transport failure comes back as a
@@ -197,6 +222,41 @@ export async function deleteTradeRows(client, { ids, userId } = {}) {
     noun: "delete",
   });
   return withIds(verdict, res && res.data, asked);
+}
+
+/**
+ * A `security definer` RPC that returns its own row_count, verified.
+ *
+ * WHY THIS LIVES HERE. The admin panel deletes through RPCs, not through the
+ * `trades` table, so it never passes through deleteTradeRow — but "did this
+ * write happen" must still be decided in exactly ONE place. Routing it through
+ * classifyRows is what stops a second module with duplicated logic being born.
+ *
+ * ⚠️ THE COUNTER WAS ALREADY ON THE WIRE. All three admin deletes are
+ * `returns int` over `get diagnostics _n = row_count` (admin_rpcs.sql:391-446).
+ * The panel destructured `{ error }` alone and dropped the number, so a delete
+ * that matched nothing read as success — #14's silent failure in another file,
+ * over infrastructure that was already counting correctly.
+ *
+ * ⛔ admin_set_feedback_status is NOT in this class: it already does
+ * `if (!data) throw` and reads the returned value. It is left untouched.
+ *
+ * Pass `expected: null` when the row count is not knowable in advance.
+ */
+export async function rpcCountVerified(client, fnName, args = undefined, opts = {}) {
+  if (!client || typeof client.rpc !== "function" || !fnName) {
+    return { ok: false, reason: "unconfigured", message: "missing client or rpc name", rows: 0 };
+  }
+  const {
+    expected = 1, okReason = "deleted", noneReason = "not-found", noneMessage = "", noun = "delete",
+  } = opts;
+  return settle(() => (args === undefined ? client.rpc(fnName) : client.rpc(fnName, args)), {
+    expected,
+    okReason,
+    noneReason,
+    noun,
+    noneMessage: noneMessage || `${fnName} affected no rows — nothing was deleted`,
+  });
 }
 
 /**

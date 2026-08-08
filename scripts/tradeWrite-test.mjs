@@ -18,17 +18,22 @@
 // (admin_rpcs.sql:402). מסלול האדמין מאמת מונה; מסלול המשתמש לא אימת.
 //
 // 1–7   — גל המחיקה (07.08). 8–20 — גל הכתיבה (08.08), 6 האתרים הנותרים.
+// 21–25 — אתרי ה-RPC בפאנל האדמין (08.08), אותה מחלקה בקובץ אחר.
 //
-// **קו הבסיס האדום, נמדד מול `fixtures/tradeWrite-legacy.mjs`: 7/20.**
-// נכשלו: 1, 2, 6, 8, 9, 10, 12, 13, 14, 15, 16, 18, 20.
+// **קו הבסיס האדום, נמדד מול `fixtures/tradeWrite-legacy.mjs`: 9/25.**
+// נכשלו: 1, 2, 6, 8, 9, 10, 12, 13, 14, 15, 16, 18, 20, 21, 22, 24.
 //
 // ⚠️ אסרציות שעוברות **ריקנית** על הישן — מגן נסיגה, לא ראיה: **3, 4, 5, 7,
-// 11, 17, 19.** "המספר המלא = הצלחה" אינו יכול להיכשל בקוד שתמיד מדווח הצלחה,
-// ו-11 עוברת כי ל-shim אין רישום כתיבות כלל ולכן `wait` חוזר מיד.
+// 11, 17, 19, 23, 25.** "המספר המלא = הצלחה" אינו יכול להיכשל בקוד שתמיד מדווח
+// הצלחה; 11 עוברת כי ל-shim אין רישום כתיבות כלל ולכן `wait` חוזר מיד; ו-23
+// עוברת כי הפאנל הישן **כן** טיפל בשגיאות — הוא זרק ל-catch והציג toast.
+// זה בדיוק העניין: מה שנשבר שם אינו טיפול בשגיאה אלא ספירה.
 //
-// ⚠️ **שתי תחזיות שלי הופרכו במדידה, ומתועדות כאן כדי שלא יחזרו כהנחה:**
+// ⚠️ **שלוש תחזיות שלי הופרכו במדידה, ומתועדות כאן כדי שלא יחזרו כהנחה:**
 // (א) חזיתי ש-9 ריקנית — היא **מפרידה**, כי היא תובעת גם `.select()`, שהישן
 // לא קרא לו כלל. (ב) חזיתי ש-11 מפרידה — היא **ריקנית**, מהסיבה שלמעלה.
+// (ג) חזיתי ש-22 ריקנית ("1 שורה = הצלחה") — היא **מפרידה**, כי היא תובעת
+// `rows === 1`, והצורה הישנה אינה מחזירה מונה **כלל**.
 //
 // ⚠️ ה-shim הוא **שחזור** של הלוגיקה הישנה, לא הקוד ההיסטורי עצמו: הוא מעתיק
 // את `restoreAt` כלשונו ויש לו ענף שגיאה תקין, ולכן 1–7 נותנות בו 4/7 ולא את
@@ -70,6 +75,9 @@ function stubClient(result, calls = {}) {
   calls.inserts = 0;
   calls.updates = 0;
   calls.payload = null;
+  calls.rpcs = 0;
+  calls.rpcName = null;
+  calls.rpcArgs = undefined;
   const chain = {
     delete() { calls.deletes++; return chain; },
     insert(rows) { calls.inserts++; calls.payload = rows; return chain; },
@@ -79,7 +87,14 @@ function stubClient(result, calls = {}) {
     select(cols) { calls.selected = cols; return chain; },
     then(res, rej) { return Promise.resolve(result()).then(res, rej); },
   };
-  return { from(table) { calls.table = table; return chain; }, __calls: calls };
+  return {
+    from(table) { calls.table = table; return chain; },
+    // ⚠️ ה-RPC מחזיר סקלר, לא מערך שורות: `returns int` מעל
+    // `get diagnostics _n = row_count`. ה-stub מחזיר את אותה שרשרת thenable,
+    // ותרחישי ה-RPC מצהירים `data` כמספר.
+    rpc(name, args) { calls.rpcs++; calls.rpcName = name; calls.rpcArgs = args; return chain; },
+    __calls: calls,
+  };
 }
 
 const IMPL = process.env.TRADEWRITE_IMPL || "../src/lib/tradeWrite.js";
@@ -90,13 +105,14 @@ try {
 } catch (e) {
   console.error(`\n❌ ${IMPL} לא ניתן לייבוא: ${e.message}`);
   console.error("   כל האסרציות נכשלות — אין מודול לאמת מולו.\n");
-  console.log("0/20 passed");
+  console.log("0/25 passed");
   process.exit(1);
 }
 
 const {
   deleteTradeRow, restoreAt, createPendingWrites, deleteTradeVerified,
   insertTradeRow, updateTradeRow, insertTradeRows, deleteTradeRows,
+  rpcCountVerified,
 } = mod;
 
 const rowsOf = (n) => Array.from({ length: n }, (_, i) => ({ id: `id-${i}` }));
@@ -394,6 +410,83 @@ const rowsOf = (n) => Array.from({ length: n }, (_, i) => ({ id: `id-${i}` }));
       r.missingIds.includes("y") && r.missingIds.includes("z"),
     `החזיר ${JSON.stringify(r)} — undo שמדווח הצלחה ומשאיר שורות ב-DB הוא ` +
       `אותו כשל שקט, רק בכיוון ההפוך`
+  );
+}
+
+// ═══ אתרי ה-RPC בפאנל האדמין — AdminPanel :960 :1261 :1525. ══════════════
+//
+// ⚠️ אותה מחלקה בדיוק, בקובץ אחר, ועם הבדל אחד מחמיר: כאן המונה **כבר היה על
+// החוט**. שלוש הפונקציות הן `returns int` מעל `get diagnostics _n = row_count`
+// (admin_rpcs.sql:404, :424, :444) — הפאנל פירק `{ error }` בלבד וזרק אותו.
+// ⛔ `admin_set_feedback_status` (AdminPanel:1236) *אינו* במחלקה: הוא כבר עושה
+// `if (!data) throw` וקורא את הערך המוחזר. לא נגענו בו.
+
+// ─── 21. RPC שהחזיר 0 = כשל. המפרידה. ───────────────────────────────────
+{
+  const calls = {};
+  const client = stubClient(() => ({ data: 0, error: null }), calls);
+  const r = await rpcCountVerified(client, "admin_delete_trade", { _id: ID });
+  check(
+    "21",
+    "RPC שהחזיר מונה 0 מדווח כשל — לא 'Trade deleted'",
+    r && r.ok === false && r.rows === 0,
+    `החזיר ${JSON.stringify(r)} — ה-RPC מחזיר את row_count שלו, אבל הפאנל פירק ` +
+      `{ error } בלבד. אפס שורות מגיע עם error:null, ולכן האדמין רואה "נמחק" ` +
+      `על שורה שנשארה ב-DB. ⚠️ data כאן הוא **מספר**, לא מערך`
+  );
+}
+
+// ─── 22. RPC שהחזיר 1 = הצלחה. ⚠️ עוברת ריקנית על הישן. ─────────────────
+{
+  const calls = {};
+  const client = stubClient(() => ({ data: 1, error: null }), calls);
+  const r = await rpcCountVerified(client, "admin_delete_feedback", { _id: ID });
+  check(
+    "22",
+    "RPC שהחזיר מונה 1 = הצלחה, והשם והארגומנטים הועברו כלשונם",
+    r && r.ok === true && r.rows === 1 &&
+      calls.rpcs === 1 && calls.rpcName === "admin_delete_feedback" &&
+      calls.rpcArgs && calls.rpcArgs._id === ID,
+    `החזיר ${JSON.stringify(r)} rpcs=${calls.rpcs} name=${calls.rpcName} args=${JSON.stringify(calls.rpcArgs)}`
+  );
+}
+
+// ─── 23. שגיאת RPC כלשונה. ⚠️ עוברת ריקנית — הישן כבר זרק וטוסט. ────────
+{
+  const client = stubClient(() => ({ data: null, error: { message: "not authorized" } }));
+  const r = await rpcCountVerified(client, "admin_delete_trade", { _id: ID });
+  check(
+    "23",
+    "שגיאת RPC מוחזרת כלשונה",
+    r && r.ok === false && r.reason === "error" && /not authorized/.test(r.message || ""),
+    `החזיר ${JSON.stringify(r)}`
+  );
+}
+
+// ─── 24. מונה לא-ידוע-מראש: מדווחים את המספר, לא כופים שוויון. מפרידה. ──
+{
+  const client = stubClient(() => ({ data: 12, error: null }));
+  const r = await rpcCountVerified(client, "admin_delete_demo_trades", undefined, { expected: null });
+  check(
+    "24",
+    "admin_delete_demo_trades מחזיר את המספר בפועל (12) ואינו נשפט מול צפי",
+    r && r.ok === true && r.rows === 12,
+    `החזיר ${JSON.stringify(r)} — מוחק לפי פרדיקט ("כל שורות הדמו"), ולכן אין ` +
+      `מספר ידוע מראש. ⚠️ אסרציית שוויון מול demoCount שעל המסך הייתה ממציאה ` +
+      `כשל מקריאה ישנה. בלי rows אי אפשר לדווח "נמחקו N" בכלל`
+  );
+}
+
+// ─── 25. מונה לא-ידוע-מראש עדיין נכשל על שגיאה. ──────────────────────────
+{
+  const client = stubClient(() => ({ data: null, error: { message: "not authorized" } }));
+  const r = await rpcCountVerified(client, "admin_delete_demo_trades", undefined, { expected: null });
+  check(
+    "25",
+    "expected:null אינו בולע שגיאות — 'כל מונה תקף' חל רק על ספירה שהצליחה",
+    r && r.ok === false && r.reason === "error",
+    `החזיר ${JSON.stringify(r)} — מצב "כל מספר מתקבל" הוא בדיוק המצב שבו קל ` +
+      `להחזיר ok:true לפני בדיקת השגיאה. זו האסרציה ששומרת על הסדר הזה`
   );
 }
 

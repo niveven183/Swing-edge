@@ -66,12 +66,15 @@ chmod +x .githooks/*
 ## 7. verify לפני כל push
 
 ```bash
-npm run verify   # test:coach → test:import → test:settings → test:datachain
-                 # → test:rcontract → test:format → test:fx → test:tradingstats
-                 # → test:ocr → test:engine → build
+npm run verify   # test:coach → test:import → test:write → test:settings
+                 # → test:datachain → test:rcontract → test:format → test:fx
+                 # → test:tradingstats → test:ocr → test:engine → test:feedback
+                 # → test:notify → test:landing → build
 ```
 
-**להדביק את הפלט המלא בדיווח**, לא סיכום ולא "עבר". `test:coach` (111 assertions) חובה לפני *וגם* אחרי כל נגיעה ב-`src/intelligence/`; `test:import` לפני כל נגיעה ב-`src/import/` או בסכימת העסקה; `test:ocr` לפני כל נגיעה ב-`api/ocr.js`; `test:fx` לפני כל נגיעה ב-`src/lib/fx.js` או ב-`api/fx.js`.
+14 חוליות ואז `build`. **הרשימה נגזרת מ-`package.json` ומתעדכנת באותו קומיט שמשנה את השרשרת** — ראה `docs/DECISIONS.md` 2026-08-08.
+
+**להדביק את הפלט המלא בדיווח**, לא סיכום ולא "עבר". `test:coach` (111 assertions) חובה לפני *וגם* אחרי כל נגיעה ב-`src/intelligence/`; `test:import` לפני כל נגיעה ב-`src/import/` או בסכימת העסקה; `test:write` (25 assertions) לפני כל נגיעה ב-`src/lib/tradeWrite.js` או בכל מסלול שכותב ל-`trades` — כולל מסלולי ה-RPC ב-`AdminPanel.jsx`; `test:ocr` לפני כל נגיעה ב-`api/ocr.js`; `test:fx` לפני כל נגיעה ב-`src/lib/fx.js` או ב-`api/fx.js`.
 
 `test:smoke` (Playwright) **אינו** בשרשרת — הוא נפרד ואינו חוסם push.
 

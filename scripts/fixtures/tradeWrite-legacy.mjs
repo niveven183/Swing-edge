@@ -67,6 +67,21 @@ export async function deleteTradeRows(client, { ids, userId } = {}) {
   return { ok: true, reason: "deleted", message: "", rows: asked.length, returnedIds: asked, missingIds: [] };
 }
 
+// ⚠️ הצורה הישנה בפאנל האדמין (AdminPanel :960 :1261 :1525): המונה שה-RPC
+// מחזיר (`returns int` מעל `get diagnostics _n = row_count`) **נזרק בשורת
+// הפירוק**, כי היא מפרקת `{ error }` בלבד. מחיקה שהתאימה אפס שורות מחזירה
+// `error: null`, עוברת את `if (error)` בשלום, ומדווחת "Trade deleted".
+// זהו בדיוק הכשל של #14 — בקובץ אחר, ומעל תשתית שכבר ספרה נכון.
+export async function rpcCountVerified(client, fnName, args) {
+  try {
+    const { error } = await (args === undefined ? client.rpc(fnName) : client.rpc(fnName, args));
+    if (error) return { ok: false, reason: "error", message: error.message };
+  } catch (e) {
+    return { ok: false, reason: "threw", message: e?.message || String(e) };
+  }
+  return { ok: true, reason: "deleted", message: "" };
+}
+
 // אלה כבר היו נכונים בגל המחיקה — מועתקים כדי ש-5,6,7 ימדדו את מה שהן מודדות.
 export function restoreAt(list, trade, index) {
   const next = Array.isArray(list) ? list.slice() : [];

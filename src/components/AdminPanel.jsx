@@ -12,6 +12,7 @@ import { supabase, isSupabaseConfigured } from "../supabaseClient.js";
 import { useToast, useConfirm } from "./ToastProvider.jsx";
 import { pluralize } from "../i18n.js";
 import { initialState, reduce, canCheck, canSend, templatesFrom } from "../lib/replyGate.js";
+import { rpcCountVerified } from "../lib/tradeWrite.js";
 // ⛔ The campaign string is NEVER parsed here. api/_lib/replyLedger.js is the one
 // parser both sides share; a second copy is the drift that makes a sent reply
 // silently vanish from this screen. See that file's header.
@@ -956,14 +957,17 @@ function TradesTab({ tradesList, agg, toast, onMutate }) {
       confirmText: "Delete", cancelText: "Cancel", danger: true,
     });
     if (!ok) return;
-    try {
-      const { error } = await supabase.rpc("admin_delete_trade", { _id: t.id });
-      if (error) throw error;
-      toast.success("Trade deleted");
-      onMutate?.();
-    } catch (e) {
-      toast.error("Delete failed: " + (e?.message || ""));
+    // admin_delete_trade returns its own row_count (admin_rpcs.sql:404). Reading
+    // `{ error }` alone threw that number away, and a delete matching zero rows
+    // comes back with error:null — so "Trade deleted" was printed over a row
+    // that never moved. Same silent failure as #14, one file over.
+    const res = await rpcCountVerified(supabase, "admin_delete_trade", { _id: t.id });
+    if (!res.ok) {
+      toast.error("Delete failed: " + res.message);
+      return;
     }
+    toast.success("Trade deleted");
+    onMutate?.();
   };
 
   // CSV is metadata-only — mirrors the privacy contract of admin_trades_list.
@@ -1257,14 +1261,16 @@ function FeedbackTab({ feedback, setFeedback, toast }) {
       confirmText: "Delete", cancelText: "Cancel", danger: true,
     });
     if (!ok) return;
-    try {
-      const { error } = await supabase.rpc("admin_delete_feedback", { _id: id });
-      if (error) throw error;
-      setFeedback((rs) => rs.filter((r) => r.id !== id));
-      toast.success("Deleted");
-    } catch (e) {
-      toast.error("Delete failed: " + (e?.message || ""));
+    // Same counter, same discard (admin_rpcs.sql:424). ⚠️ The row is dropped
+    // from local state only AFTER the count confirms it left the DB — removing
+    // it first would hide the failure behind a list that already looks right.
+    const res = await rpcCountVerified(supabase, "admin_delete_feedback", { _id: id });
+    if (!res.ok) {
+      toast.error("Delete failed: " + res.message);
+      return;
     }
+    setFeedback((rs) => rs.filter((r) => r.id !== id));
+    toast.success("Deleted");
   };
 
   const counts = useMemo(() => ({
@@ -1521,16 +1527,20 @@ function SystemTab({ agg, totalTrades, feedbackCount, supaUp, toast, onMutate })
   };
 
   const executeClearDemos = async () => {
-    try {
-      const { error } = await supabase.rpc("admin_delete_demo_trades");
-      if (error) throw error;
-      toast.success("Demo trades cleared");
-      setPwGate(null);
-      onMutate?.();
-    } catch (e) {
-      toast.error("Clear failed: " + (e?.message || ""));
-      setPwGate(null);
+    // ⚠️ expected:null — unlike the two above, this one deletes by PREDICATE
+    // (`where is_demo = true`), so there is no number to check against. Asserting
+    // equality with `demoCount` on screen would manufacture a failure out of a
+    // stale read. The count is therefore reported, not judged: "cleared 0" is a
+    // truthful, visible answer, where the old unconditional "Demo trades
+    // cleared" was not.
+    const res = await rpcCountVerified(supabase, "admin_delete_demo_trades", undefined, { expected: null });
+    setPwGate(null);
+    if (!res.ok) {
+      toast.error("Clear failed: " + res.message);
+      return;
     }
+    toast.success(`Demo trades cleared — ${res.rows} ${pluralize(res.rows, "row", "rows")} deleted`);
+    onMutate?.();
   };
 
   return (
