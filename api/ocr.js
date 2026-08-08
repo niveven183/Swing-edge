@@ -61,6 +61,16 @@ const RR_TOL = 0.1;
 // the entry. Same tolerance guards the computed levels against the read ones.
 const GEO_TOL = 0.005;
 
+// Outcome trace. Without it there is no way to tell which of the null paths a failed
+// read took: the 2026-08-01 audit could not place omrikapara1's 31.07 report on any
+// branch, because the only console statement in this file was the rate limiter and the
+// log window is ~24h. FLAGS ONLY — no user id, no ticker, no prices. This repo is
+// public and its function logs are readable.
+const logOutcome = (path, o = {}) =>
+  console.log(
+    `[ocr] path=${path} tool=${o.tool ?? "?"} entry=${o.entryChannel ?? "none"} side=${o.sideSource ?? "-"} conf=${o.confidence ?? 0}`
+  );
+
 const ALLOWED_MEDIA = new Set([
   "image/png",
   "image/jpeg",
@@ -157,6 +167,34 @@ function computeEntry(stopDelta, stopPercent, targetDelta, targetPercent) {
   if (eFromStop   !== null) return { value: eFromStop,   source: "stop",   converged: null };
   if (eFromTarget !== null) return { value: eFromTarget, source: "target", converged: null };
   return { value: null, source: "none", converged: null };
+}
+
+// Third and LAST entry channel, used only when the percentages are missing AND Vision
+// read no entry — the state that returned a completely empty read on a correctly marked
+// chart (omrikapara1, 31.07). The absolute stop/target line prices are already read for
+// the direction check, and they pin the entry exactly:
+//   LONG  entry = stopPrice + stopDelta = targetPrice - targetDelta
+//   SHORT entry = stopPrice - stopDelta = targetPrice + targetDelta
+// Direction is unknown at this point, so BOTH hypotheses are tried and exactly one may
+// converge. That convergence is the veto, and it is the only thing that makes this a
+// measurement rather than a coin flip: on real levels the losing hypothesis misses by
+// the full width of the position, never by rounding. Zero or two survivors is not
+// evidence, it is noise → null.
+function entryFromLines(stopPrice, stopDelta, targetPrice, targetDelta) {
+  if (!(stopPrice > 0) || !(stopDelta > 0) || !(targetPrice > 0) || !(targetDelta > 0))
+    return null;
+  const hits = [];
+  for (const sign of [1, -1]) {
+    const eFromStop = stopPrice + sign * stopDelta;
+    const eFromTarget = targetPrice - sign * targetDelta;
+    if (!(eFromStop > 0) || !(eFromTarget > 0)) continue;
+    if (
+      Math.abs(eFromStop - eFromTarget) / Math.max(eFromStop, eFromTarget) <=
+      GEO_TOL
+    )
+      hits.push(tidy((eFromStop + eFromTarget) / 2));
+  }
+  return hits.length === 1 ? hits[0] : null;
 }
 
 // Direction from ONE read absolute price. The magnitude is verified against the delta
@@ -435,6 +473,7 @@ export default async function handler(req, res) {
     const parsed = extractJson(text);
     if (!parsed || typeof parsed !== "object") {
       // Model returned something unparseable — degrade gracefully, don't 500.
+      logOutcome("unparsed");
       res.status(200).json(nullResult);
       return;
     }
@@ -454,6 +493,7 @@ export default async function handler(req, res) {
     // every badge reads it as failure, but keep it non-zero: the low end still
     // separates "sure there's no tool" from "could not read the image at all".
     if (parsed.hasPositionTool !== true) {
+      logOutcome("no_tool", { tool: false, confidence: Math.min(modelConf, 25) });
       res.status(200).json({ ...nullResult, ticker, confidence: Math.min(modelConf, 25) });
       return;
     }
@@ -468,9 +508,24 @@ export default async function handler(req, res) {
     const rrRatioRead = num(parsed.rrRatio);
 
     // Compute entry deterministically from delta/percent pairs (direction-agnostic).
-    // Falls back to visionEntry when no percents are available (source="none").
+    // Three ranked channels — the geometric one is the FALLBACK, never the road:
+    //   1 percentages — entry = delta/(percent/100). Unchanged, still first.
+    //   2 visionEntry — the model's own read of the entry line. Unchanged.
+    //   3 lines       — the geometry of the read stop/target prices. Fires only when
+    //                   1 and 2 both produced nothing, which is exactly the starved
+    //                   label case; it never overrides a read the model did make.
     const computed = computeEntry(stopDelta, stopPercent, targetDelta, targetPercent);
-    const entry = computed.value !== null ? computed.value : visionEntry;
+    const lineEntry =
+      computed.value === null && visionEntry === null
+        ? entryFromLines(stopPriceRead, stopDelta, targetPriceRead, targetDelta)
+        : null;
+    const entry =
+      computed.value !== null ? computed.value : visionEntry !== null ? visionEntry : lineEntry;
+    // Which channel actually produced the entry — for the outcome log only. The
+    // validate() call below keeps using computed.source, because its tautology check
+    // is specifically about which percentage leg the entry was derived from.
+    const entryChannel =
+      computed.value !== null ? computed.source : visionEntry !== null ? "vision" : lineEntry !== null ? "lines" : "none";
 
     // ─── Direction — one explicit, ranked hierarchy ────────────────────────
     // The deltas are unsigned magnitudes, so this single decision determines
@@ -538,6 +593,12 @@ export default async function handler(req, res) {
 
     // Floor / suspect-entry gate → surface no prices, keeping badge<40 honest.
     if (modelConf < MIN_CONFIDENCE || bothLegsFail) {
+      logOutcome(bothLegsFail ? "both_legs_fail" : "below_floor", {
+        tool: true,
+        entryChannel,
+        sideSource,
+        confidence: bothLegsFail ? Math.min(modelConf, 30) : modelConf,
+      });
       res.status(200).json({
         ticker,
         entry: null,
@@ -588,6 +649,12 @@ export default async function handler(req, res) {
         ? tidy(targetDelta / stopDelta)
         : rrRatioRead;
 
+    logOutcome(entry === null ? "no_entry" : "ok", {
+      tool: true,
+      entryChannel,
+      sideSource,
+      confidence,
+    });
     res
       .status(200)
       .json({ ticker, entry, stop, target, side: resolvedSide, sideSource, sideConflict, confidence, rrRatio });
