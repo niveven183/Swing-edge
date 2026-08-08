@@ -111,6 +111,35 @@ const SCENARIOS = [
       rrRatio: 2.43, hasPositionTool: true, confidence: 90,
     }),
   },
+  // ─── Third entry channel · omrikapara1 31.07 ──────────────────────────────
+  // The tool label can show the deltas WITHOUT their percentages, and the entry
+  // line's own label can be unreadable. That combination starves both existing
+  // entry channels at once and used to return a completely empty read — the
+  // reported bug. I proves the geometry of the read lines recovers the entry;
+  // J proves that same channel abstains rather than guessing when the lines do
+  // not agree. J is the reason I is safe to ship.
+  {
+    id: "I",
+    title: "no percentages, unreadable entry label — entry recovered from the stop/target lines",
+    side: "LONG",
+    modelText: JSON.stringify({
+      ticker: "MRVL", entry: null, direction: null,
+      stopDelta: 26.54, stopPercent: null, stopPrice: 160.9,
+      targetDelta: 64.41, targetPercent: null, targetPrice: 251.85,
+      rrRatio: null, hasPositionTool: true, confidence: 82,
+    }),
+  },
+  {
+    id: "J",
+    title: "no percentages and the lines disagree — the geometric channel abstains",
+    side: "LONG",
+    modelText: JSON.stringify({
+      ticker: "MRVL", entry: null, direction: null,
+      stopDelta: 26.54, stopPercent: null, stopPrice: 160.9,
+      targetDelta: 40.0, targetPercent: null, targetPrice: 251.85,
+      rrRatio: null, hasPositionTool: true, confidence: 80,
+    }),
+  },
 ];
 
 // ─── Frozen contract ────────────────────────────────────────────────────────
@@ -157,6 +186,16 @@ const FROZEN = {
     status: 200,
     note: "F4: Niv's MRVL read of 01.08 replayed. Levels were already correct that day; the failure was that the form stayed on SHORT and validation blocked a perfect extraction. sideConflict true is precisely that state, now reported instead of left for the trader to deduce from a red banner.",
     body: { ticker: "MRVL", entry: 187.441297526, stop: 160.901297526, target: 251.851297526, side: "LONG", sideSource: "geometry", sideConflict: true, confidence: 100, rrRatio: 2.42690278824 },
+  },
+  I: {
+    status: 200,
+    note: "omrikapara1 31.07, replayed as logic. The tool label carries the deltas but no percentages, and the entry line's own label is unreadable — so computeEntry has no percent to divide by AND Vision has no entry to report. Captured against 27434f3 BEFORE the fix, this returned entry/stop/target all null with confidence 82: a completely empty read on a correctly marked chart, which is the bug as reported. The third channel recovers the entry from the two line prices that were already being read for the direction check (160.9 + 26.54 = 251.85 - 64.41 = 187.44) and the levels follow. sideSource 'geometry' falls out of the EXISTING hierarchy once the entry exists — no new source was added. confidence stays the model's 82: no percentage legs existed to agree or disagree, so nothing adjusts it.",
+    body: { ticker: "MRVL", entry: 187.44, stop: 160.9, target: 251.85, side: "LONG", sideSource: "geometry", sideConflict: false, confidence: 82, rrRatio: 2.42690278824 },
+  },
+  J: {
+    status: 200,
+    note: "The safety gate on I, and the reason I is safe to ship. Same starved input, but targetDelta was misread as 40.0: neither direction hypothesis converges (LONG 187.44 vs 211.85, SHORT 134.36 vs 291.85), so the channel returns null instead of picking one. entry/stop/target stay null — IDENTICAL to the pre-fix capture, which is the point: the new channel adds a reading, never a guess. If this row ever starts returning a price, the convergence veto has been broken.",
+    body: { ticker: "MRVL", entry: null, stop: null, target: null, side: "LONG", sideSource: "user", sideConflict: false, confidence: 80, rrRatio: 1.50715900528 },
   },
 };
 
