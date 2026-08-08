@@ -2487,18 +2487,10 @@ export default function SwingEdge() {
     };
     // Close the loop: grade the prediction we made at entry.
     try { SwingEdgeAI.reinforceFromTrade(closedTrade); } catch { /* learning is best-effort */ }
+    // Remember the OPEN trade so a failed close can put it back exactly.
+    const beforeClose = closingTrade;
     setTrades(prev => prev.map(t => t.id === closingTrade.id ? closedTrade : t));
     setLastImportIds([]);
-    // Sync close to Supabase
-    if (isSupabaseConfigured && supabase && authUser?.id && closedTrade.id) {
-      try {
-        const { error } = await supabase.from("trades")
-          .update(tradeForSupabase(closedTrade))
-          .eq("id", closedTrade.id)
-          .eq("user_id", authUser.id);
-        if (error) console.error("Supabase close-update failed:", error);
-      } catch (e) { console.error("Supabase close-update threw:", e); }
-    }
     setShowCloseForm(false);
     setClosingTrade(null);
     setCloseForm({ exit: "", exitReason: "Target Hit", followedPlan: true, lessonLearned: "", maxFavorable: "", maxAdverse: "" });
@@ -2506,6 +2498,26 @@ export default function SwingEdge() {
     if (pnl > 0) toast.success(lang === "he" ? `רווח ${fmt$(Math.round(pnl), currencyOf(closedTrade))} נסגר בהצלחה` : `Closed with profit ${fmt$(Math.round(pnl), currencyOf(closedTrade))}`);
     else if (pnl < 0) toast.error(lang === "he" ? `הפסד ${fmt$(Math.round(pnl), currencyOf(closedTrade))} — נסגר` : `Closed with loss ${fmt$(Math.round(pnl), currencyOf(closedTrade))}`);
     else toast.info(lang === "he" ? "העסקה נסגרה" : "Trade closed");
+
+    // ⚠️ A close that did not reach the DB reports a P&L that does not exist
+    // there. `if (error)` cannot see it — an UPDATE matching zero rows returns
+    // error:null, exactly like the DELETE in #14.
+    if (isSupabaseConfigured && supabase && authUser?.id && closedTrade.id) {
+      const res = await updateTradeRow(supabase, {
+        id: closedTrade.id,
+        userId: authUser.id,
+        patch: tradeForSupabase(closedTrade),
+      });
+      if (!res.ok) {
+        setTrades(prev => prev.map(t => t.id === beforeClose.id ? beforeClose : t));
+        console.error("Supabase close-update failed:", res.reason, res.message);
+        toast.error(
+          (lang === "he"
+            ? "הסגירה לא נשמרה — העסקה חזרה להיות פתוחה: "
+            : "The close was not saved — the trade is open again: ") + res.message
+        );
+      }
+    }
   };
 
   const handleDeleteTrade = async (tradeId) => {
@@ -2565,20 +2577,49 @@ export default function SwingEdge() {
     });
     if (!ok) return;
     const idSet = new Set(ids);
+    // Positions, not just rows: a partial failure restores only the trades that
+    // survived, and each one has to go back where it was.
+    const removed = trades.map((t, i) => ({ t, i })).filter(x => idSet.has(x.t.id));
+
     setTrades(prev => prev.filter(t => !idSet.has(t.id)));
     setLastImportIds([]);
-    if (isSupabaseConfigured && supabase && authUser?.id) {
-      try {
-        const { error } = await supabase.from("trades")
-          .delete()
-          .in("id", ids)
-          .eq("user_id", authUser.id);
-        if (error) console.error("Supabase bulk delete failed:", error);
-      } catch (e) { console.error("Supabase bulk delete threw:", e); }
-    }
     setSelectedTrades(new Set());
+
+    // Local-only mode (logged out / Supabase unconfigured): nothing to verify.
+    if (!(isSupabaseConfigured && supabase && authUser?.id)) {
+      toast.success(lang === "he" ? `${ids.length} עסקאות נמחקו` : `${ids.length} trades deleted`);
+      return;
+    }
+
+    // Same race as the single delete: any of these ids may still have an
+    // INSERT in flight.
+    await Promise.all(ids.map(id => pendingWrites.wait(id)));
+
+    const res = await deleteTradeRows(supabase, { ids, userId: authUser.id });
+
+    if (!res.ok) {
+      // ⚠️ Partial is the case the old code could not even represent: it
+      // reported `ids.length` deleted no matter how many rows actually went.
+      const missing = new Set(res.missingIds || ids);
+      const back = removed.filter(x => missing.has(x.t.id)).sort((a, b) => a.i - b.i);
+      if (back.length) {
+        setTrades(prev => {
+          let next = prev;
+          for (const { t, i } of back) next = restoreAt(next, t, i);
+          return next;
+        });
+      }
+      console.error("Supabase bulk delete failed:", res.reason, res.message);
+      toast.error(
+        (lang === "he"
+          ? `נמחקו ${res.rows} מתוך ${ids.length} — ${back.length} הוחזרו: `
+          : `Deleted ${res.rows} of ${ids.length} — ${back.length} restored: `) + res.message
+      );
+      return;
+    }
+
     toast.success(
-      lang === "he" ? `${ids.length} עסקאות נמחקו` : `${ids.length} trades deleted`
+      lang === "he" ? `${res.rows} עסקאות נמחקו` : `${res.rows} trades deleted`
     );
   };
 
@@ -2589,20 +2630,32 @@ export default function SwingEdge() {
   // Receives the fully built `updated` trade from <EditTradeModal />
   const handleEditSubmit = async (updated) => {
     if (!updated || !updated.id) return;
+    // Keep the pre-edit values: a failed update must not leave the journal
+    // showing numbers the database never accepted.
+    const beforeEdit = trades.find(t => t.id === updated.id) || null;
     setTrades(prev => prev.map(t => t.id === updated.id ? updated : t));
     setLastImportIds([]);
-    // Sync edit to Supabase
-    if (isSupabaseConfigured && supabase && authUser?.id && updated.id) {
-      try {
-        const { error } = await supabase.from("trades")
-          .update(tradeForSupabase(updated))
-          .eq("id", updated.id)
-          .eq("user_id", authUser.id);
-        if (error) console.error("Supabase update failed:", error);
-      } catch (e) { console.error("Supabase update threw:", e); }
-    }
     setEditingTrade(null);
     toast.success(lang === "he" ? "העסקה עודכנה" : "Trade updated");
+
+    // ⚠️ Same shape as #14: an UPDATE that matched zero rows returns
+    // error:null, so only the row count says whether the edit landed.
+    if (isSupabaseConfigured && supabase && authUser?.id && updated.id) {
+      const res = await updateTradeRow(supabase, {
+        id: updated.id,
+        userId: authUser.id,
+        patch: tradeForSupabase(updated),
+      });
+      if (!res.ok) {
+        if (beforeEdit) setTrades(prev => prev.map(t => t.id === beforeEdit.id ? beforeEdit : t));
+        console.error("Supabase update failed:", res.reason, res.message);
+        toast.error(
+          (lang === "he"
+            ? "העדכון לא נשמר — הערכים הקודמים הוחזרו: "
+            : "The edit was not saved — the previous values were restored: ") + res.message
+        );
+      }
+    }
   };
 
   // ─── JOURNAL IMPORT (Wave 10) ───────────────────────────────────────────
