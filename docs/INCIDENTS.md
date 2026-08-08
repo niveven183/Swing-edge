@@ -424,7 +424,56 @@ Every production incident gets one short entry: what broke, root cause, fix, pre
   completed write from a no-op. The admin path already knew this — `admin_delete_trade` does
   `get diagnostics _n = row_count` (`admin_rpcs.sql:402`) — and the user path did not.
 - **Prevention:** `test:delete` is in the blocking `verify` chain.
-  **⛔ Still open:** the same shape survives at 6 more sites — bulk delete, edit, close, the
-  two imports, and undo-import — all of them optimistic with an unconditional success toast.
-  The fire-and-forget INSERT in `handleSubmit` is the **root of the race** and is first in that
-  queue: fixing delete without fixing save leaves the class alive. Tracked in `docs/STATE.md`.
+  **⛔ Still open (as recorded 07.08):** the same shape survives at 6 more sites — bulk delete,
+  edit, close, the two imports, and undo-import — all of them optimistic with an unconditional
+  success toast. The fire-and-forget INSERT in `handleSubmit` is the **root of the race** and is
+  first in that queue: fixing delete without fixing save leaves the class alive.
+
+### #14 — 2026-08-08 — ✅ CLASS CLOSED 7/7 (the 6 sites above)
+
+- **What changed:** `src/lib/tradeDelete.js` → `src/lib/tradeWrite.js` (`git mv`, both referrers in
+  the same commit). Of the 7 call sites it governs only 2 are deletes; a file named `tradeDelete`
+  that verifies INSERTs is exactly how a second module with duplicated logic gets born. One pure
+  `classifyRows(res, {expected, …})` is now the **only** place where "did this write happen" is
+  decided — `deleteTradeRow` · `insertTradeRow` · `updateTradeRow` · `insertTradeRows` ·
+  `deleteTradeRows` are all calls to it.
+- **The 6 sites, at their measured line numbers** (the numbers carried in the 07.08 prompt were
+  stale — `:2416`/`:2485` above are as-recorded and left as-is):
+  | # | site | line | fix |
+  |---|------|------|-----|
+  | 5 | `handleSubmit` INSERT — **the root** | `:2431` | `await` + `.select("id")`; on failure the trade **leaves** state, the form reopens with every value, error verbatim |
+  | 3 | `handleCloseSubmit` | `:2564` | verified UPDATE; rollback maps the trade back to OPEN |
+  | 4 | `handleEditSubmit` | `:2589` | verified UPDATE; rollback restores the previous values |
+  | 2 | `handleBulkDelete` | `:2462` | counter returned vs counter asked; partial restores only the survivors, at their original indexes |
+  | 6 | `handleImportTrades` | `:2539` | verified bulk INSERT; only `missingIds` are removed |
+  | 7 | `handleUndoImport` | `:2605` | verified bulk DELETE; partial restore + `lastImportIds` re-narrowed to what came back |
+- **⚠️ The save rollback is the INVERSE of the delete rollback.** A failed delete puts a row
+  **back**; a failed save takes it **out** — the trade was never saved, so leaving it on screen is
+  the same lie in the other direction. Both are `restoreAt`/filter on the same state, and reading
+  one as a template for the other is the mistake this line exists to prevent.
+- **Partial is a third state the old code could not represent.** `error:null` + fewer rows than
+  asked was indistinguishable from success, so a bulk write reported the number **requested**.
+  `missingIds` makes the difference actionable: the rows that landed stay, only the rest roll back,
+  and the toast says `נמחקו 3 מתוך 5` instead of `5`.
+- **Proof — `scripts/tradeWrite-test.mjs`: red baseline 7/20, now 20/20.** The baseline is
+  **reproducible, not a number someone wrote in a log**: `scripts/fixtures/tradeWrite-legacy.mjs`
+  is the pre-wave logic, committed, and
+  `TRADEWRITE_IMPL=../scripts/fixtures/tradeWrite-legacy.mjs node scripts/tradeWrite-test.mjs`
+  reprints it on demand → `FAILED: 1, 2, 6, 8, 9, 10, 12, 13, 14, 15, 16, 18, 20`.
+- **7 of the 20 assertions pass vacuously on the old code** (3, 4, 5, 7, 11, 17, 19) — they are
+  regression guards, not evidence. **Two predictions in the approved plan were falsified by the
+  measurement and are recorded so they are not re-assumed:** #9 was predicted vacuous and is not
+  (it also asserts `.select()` was called, which the old path never did); #11 was not predicted
+  vacuous and is (the legacy `createPendingWrites` is a no-op, so `wait()` returns immediately).
+- **Lesson (beyond #14's own):** a fix that closes 1 of 7 instances of a class leaves the class
+  open, and the queue only stays visible if the remaining instances are enumerated **by line** at
+  the time of the first fix. That enumeration is what made this wave mechanical.
+- **⚠️ Found while closing this class, NOT fixed (AdminPanel is out of this wave's scope):** the
+  admin path invented the row-count rule — every delete RPC is `returns int` over
+  `get diagnostics _n = row_count` (`20260719120000_admin_rpcs.sql:383,403,423,443`) — and then
+  **the client throws the count away.** `AdminPanel.jsx:960` (`admin_delete_trade`), `:1261`
+  (`admin_delete_feedback`) and `:1525` (`admin_delete_demo_trades`) all destructure `{ error }`
+  only, so a 0-row admin delete toasts "Deleted". The count is already on the wire; nothing needs
+  to be added server-side, only read. `:1234` (`admin_set_feedback_status`) already does this
+  correctly (`if (!data) throw`) — from #3, which is where the rule entered this codebase.
+  Tracked in `docs/STATE.md`.
