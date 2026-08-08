@@ -44,7 +44,7 @@ import { TVTickerTape } from "./src/components/TradingViewWidgets.jsx";
 import { useToast, useConfirm } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured, tradeForSupabase, tradeFromSupabase } from "./src/supabaseClient.js";
 import { cleanTrades, purgeInvalidTrades } from "./src/lib/cleanTrades.js";
-import { deleteTradeVerified, restoreAt, createPendingWrites } from "./src/lib/tradeDelete.js";
+import { deleteTradeVerified, restoreAt, createPendingWrites, insertTradeRow, updateTradeRow, insertTradeRows, deleteTradeRows } from "./src/lib/tradeWrite.js";
 import { loadSettings, saveSettings, flushSettings, migrateFromLocalStorage } from "./src/lib/userSettings.js";
 import { calcTradeMetrics, fmt$, fmt$0, fmtR, fmtNum, fmtPrice, fmtBalance, numOrNull, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays, localDayKey, todayKey, realizedAt, realizedDayKey, currencyOf, CURRENCY_SYMBOL } from "./src/utils.js";
 import {
@@ -2368,7 +2368,7 @@ export default function SwingEdge() {
     return () => { if (analyzerQuoteTimer.current) clearTimeout(analyzerQuoteTimer.current); };
   }, [analyzerForm.ticker, tab, toolsTab, fetchAnalyzerQuote]);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!form.ticker || !entryN || !stopN) return;
     // Block geometrically invalid trades from being saved (reversed stop/target).
     const validity = validateTradeInputs(entryN, stopN, targetN, form.side);
@@ -2422,21 +2422,54 @@ export default function SwingEdge() {
     setTrades(prev => [...prev, newTrade]);
     trackFirstTradeSaved();
     setLastImportIds([]);
-    // Sync new trade to Supabase (primary source of truth). Registered in
-    // pendingWrites so a delete issued before this lands waits for it instead
-    // of deleting an id the table does not have yet.
-    if (isSupabaseConfigured && supabase && authUser?.id) {
-      pendingWrites.track(
-        newTrade.id,
-        supabase.from("trades").insert(tradeForSupabase({ ...newTrade, user_id: authUser.id, is_demo: false }))
-          .then(({ error }) => { if (error) console.error("Supabase insert failed:", error); })
-      );
-    }
+
+    // Snapshot what the user typed BEFORE the form is cleared. If the write
+    // fails we put it back, so a failed save costs one click instead of
+    // re-typing ten fields and re-attaching the chart.
+    // ⚠️ `tradeImagePreview` is a data-URL STRING (readAsDataURL, `:2868`/`:3128`),
+    // not an object URL — there is nothing to revoke and nothing to rebuild,
+    // so it survives the round trip as plain state.
+    const submittedForm = form;
+
+    // The optimistic UI is deliberate and UNCHANGED: the journal updates, the
+    // form closes, and nothing blocks while the write is in flight.
     setForm({ ticker: "", side: "LONG", entry: "", stop: "", target: "", shares: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
     setOcrStatus(null);
     setShowForm(false);
     setTab("journal");
     toast.success(lang === "he" ? `${newTrade.ticker} נוספה ליומן` : `${newTrade.ticker} added to journal`);
+
+    // ── The truth, arriving late ──────────────────────────────────────────
+    // ⚠️ THE ROOT OF #14. This INSERT used to be fire-and-forget: a delete
+    // could go out for an id the table did not have yet, match zero rows, and
+    // let the insert land after it. And because PostgREST returns error:null
+    // for a write that stored nothing, `if (error)` could never see it. Only
+    // the returned ROW COUNT can.
+    if (isSupabaseConfigured && supabase && authUser?.id) {
+      const writing = insertTradeRow(supabase, {
+        row: tradeForSupabase({ ...newTrade, user_id: authUser.id, is_demo: false }),
+      });
+      // Registered BEFORE the await: a delete issued while this is in flight
+      // must wait for it. Registering after would leave the race open.
+      pendingWrites.track(newTrade.id, writing);
+      const res = await writing;
+
+      if (!res.ok) {
+        // ⚠️ THE OPPOSITE OF THE DELETE ROLLBACK. There, a failure puts the row
+        // back; here it takes the row OUT — the trade was never saved, and
+        // leaving it in the journal would show a row that disappears on the
+        // next load, which is the silent failure wearing a different hat.
+        setTrades(prev => prev.filter(t => t.id !== newTrade.id));
+        setForm(submittedForm);
+        setShowForm(true);
+        console.error("Supabase insert failed:", res.reason, res.message);
+        toast.error(
+          (lang === "he"
+            ? "העסקה לא נשמרה — הטופס הוחזר, נסה שוב: "
+            : "The trade was not saved — the form was restored, try again: ") + res.message
+        );
+      }
+    }
   };
 
   const handleCloseSubmit = async () => {

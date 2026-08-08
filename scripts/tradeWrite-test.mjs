@@ -1,0 +1,404 @@
+// scripts/tradeWrite-test.mjs — כתיבה שמדווחת הצלחה ולא כותבת.
+//
+// WHY THIS EXISTS. Sentinel תפס ב-06.08 (`browser-auth|ui-delete-incomplete`)
+// שהמחיקה ב-UI דיווחה הצלחה בעוד שורות SNTNL נשארו ב-DB. שלוש ההשערות
+// המתבקשות — כשל RLS, שגיאת רשת, מרוץ עם hydration — נשללו כולן:
+// `restCleanup` בספק של Sentinel מוחק את אותן שורות עם *אותו* משתמש, *אותו*
+// anon key ו*אותה* מדיניות `users own trades` ומצליח, ולכן RLS תקין; שגיאת
+// רשת הייתה מגיעה ל-`catch`; ו-hydration מחליפה state בלבד ואינה יכולה
+// להחזיר שורה ל-DB.
+//
+// השורש הוא רביעי, והוא מרוץ: `handleSubmit` ירה את ה-INSERT בלי `await`,
+// ולכן ה-DELETE יכול היה לצאת על `id` שטרם נכתב.
+//
+// ⚠️ ומה שהופך אותו לשקט: **DELETE שמתאים אפס שורות מחזיר `error: null`.**
+// זו התנהגות PostgREST, לא באג. המסקנה המעשית — ואת זה הקובץ הזה נועל —
+// היא ש*שום* בדיקת שגיאה לא יכולה לתפוס את המקרה. רק בדיקת מונה שורות.
+// התקדים כבר בריפו: `admin_delete_trade` עושה `get diagnostics row_count`
+// (admin_rpcs.sql:402). מסלול האדמין מאמת מונה; מסלול המשתמש לא אימת.
+//
+// 1–7   — גל המחיקה (07.08). 8–20 — גל הכתיבה (08.08), 6 האתרים הנותרים.
+//
+// **קו הבסיס האדום, נמדד מול `fixtures/tradeWrite-legacy.mjs`: 7/20.**
+// נכשלו: 1, 2, 6, 8, 9, 10, 12, 13, 14, 15, 16, 18, 20.
+//
+// ⚠️ אסרציות שעוברות **ריקנית** על הישן — מגן נסיגה, לא ראיה: **3, 4, 5, 7,
+// 11, 17, 19.** "המספר המלא = הצלחה" אינו יכול להיכשל בקוד שתמיד מדווח הצלחה,
+// ו-11 עוברת כי ל-shim אין רישום כתיבות כלל ולכן `wait` חוזר מיד.
+//
+// ⚠️ **שתי תחזיות שלי הופרכו במדידה, ומתועדות כאן כדי שלא יחזרו כהנחה:**
+// (א) חזיתי ש-9 ריקנית — היא **מפרידה**, כי היא תובעת גם `.select()`, שהישן
+// לא קרא לו כלל. (ב) חזיתי ש-11 מפרידה — היא **ריקנית**, מהסיבה שלמעלה.
+//
+// ⚠️ ה-shim הוא **שחזור** של הלוגיקה הישנה, לא הקוד ההיסטורי עצמו: הוא מעתיק
+// את `restoreAt` כלשונו ויש לו ענף שגיאה תקין, ולכן 1–7 נותנות בו 4/7 ולא את
+// ה-**2/7 הקפוא** שנמדד בגל המחיקה מול הקוד החי. אלה שני מדדים שונים; הקפוא
+// נשאר כפי שנרשם, וההפרש אינו "אסרציה שהתרככה" — 1–7 חייבות 7/7 על המודול.
+//
+// המודול טהור בכוונה: SwingEdge_App.jsx בן 7,340 שורות ואינו ניתן לייבוא
+// ב-node (recharts, lucide). אותו נימוק בדיוק כמו src/lib/replyGate.js.
+//
+//   node scripts/tradeWrite-test.mjs
+//
+// קו הבסיס האדום הוא בר-שחזור, לא מדידה חד-פעמית:
+//   TRADEWRITE_IMPL=../scripts/fixtures/tradeWrite-legacy.mjs node scripts/tradeWrite-test.mjs
+
+let ran = 0;
+const failures = [];
+
+function check(id, desc, cond, detail) {
+  ran++;
+  if (cond) {
+    console.log(`  ✅ ${id}. ${desc}`);
+  } else {
+    failures.push(id);
+    console.error(`  ❌ ${id}. ${desc}\n     → ${detail}`);
+  }
+}
+
+const ID = "11111111-1111-4111-8111-111111111111";
+const USER = "22222222-2222-4222-8222-222222222222";
+
+// A minimal stand-in for the supabase query builder: every filter returns
+// `this`, and awaiting the chain yields whatever the scenario declared.
+// `calls` records that the filters were actually applied — a DELETE that
+// forgets `.eq("user_id", …)` would delete another user's row.
+function stubClient(result, calls = {}) {
+  calls.filters = [];
+  calls.selected = false;
+  calls.deletes = 0;
+  calls.inserts = 0;
+  calls.updates = 0;
+  calls.payload = null;
+  const chain = {
+    delete() { calls.deletes++; return chain; },
+    insert(rows) { calls.inserts++; calls.payload = rows; return chain; },
+    update(patch) { calls.updates++; calls.payload = patch; return chain; },
+    eq(col, val) { calls.filters.push([col, val]); return chain; },
+    in(col, vals) { calls.filters.push([col, vals]); return chain; },
+    select(cols) { calls.selected = cols; return chain; },
+    then(res, rej) { return Promise.resolve(result()).then(res, rej); },
+  };
+  return { from(table) { calls.table = table; return chain; }, __calls: calls };
+}
+
+const IMPL = process.env.TRADEWRITE_IMPL || "../src/lib/tradeWrite.js";
+
+let mod;
+try {
+  mod = await import(IMPL);
+} catch (e) {
+  console.error(`\n❌ ${IMPL} לא ניתן לייבוא: ${e.message}`);
+  console.error("   כל האסרציות נכשלות — אין מודול לאמת מולו.\n");
+  console.log("0/20 passed");
+  process.exit(1);
+}
+
+const {
+  deleteTradeRow, restoreAt, createPendingWrites, deleteTradeVerified,
+  insertTradeRow, updateTradeRow, insertTradeRows, deleteTradeRows,
+} = mod;
+
+const rowsOf = (n) => Array.from({ length: n }, (_, i) => ({ id: `id-${i}` }));
+
+// ─── 1. אפס שורות = כשל. זה הבאג עצמו. ───────────────────────────────────
+{
+  const calls = {};
+  const client = stubClient(() => ({ data: [], error: null }), calls);
+  const r = await deleteTradeRow(client, { id: ID, userId: USER });
+  check(
+    "1",
+    "DELETE שהתאים אפס שורות מדווח כשל — לא הצלחה",
+    r && r.ok === false && r.reason === "not-found",
+    `החזיר ${JSON.stringify(r)} — PostgREST מחזיר error:null על אפס שורות, ולכן ` +
+      `"ok" כאן פירושו שהמשתמש מקבל "העסקה נמחקה" על שורה שעדיין ב-DB`
+  );
+  check(
+    "2",
+    "המחיקה מסוננת גם על user_id וגם על id, ומבקשת select כדי לספור",
+    calls.deletes === 1 &&
+      calls.filters.some(([c, v]) => c === "id" && v === ID) &&
+      calls.filters.some(([c, v]) => c === "user_id" && v === USER) &&
+      calls.selected !== false,
+    `deletes=${calls.deletes} filters=${JSON.stringify(calls.filters)} select=${calls.selected} — ` +
+      `בלי select אין גוף תשובה, ובלי גוף תשובה אי אפשר לספור שורות`
+  );
+}
+
+// ─── 3. שגיאה עוברת כלשונה. ───────────────────────────────────────────────
+{
+  const client = stubClient(() => ({ data: null, error: { message: "permission denied for table trades" } }));
+  const r = await deleteTradeRow(client, { id: ID, userId: USER });
+  check(
+    "3",
+    "שגיאת Supabase מוחזרת כלשונה, לא נבלעת",
+    r && r.ok === false && r.reason === "error" && /permission denied/.test(r.message || ""),
+    `החזיר ${JSON.stringify(r)} — §2: כל כשל צועק, וההודעה מוצגת כלשונה`
+  );
+}
+
+// ─── 4. שורה אחת בדיוק = הצלחה. ⚠️ עוברת ריקנית על הישן. ─────────────────
+{
+  const client = stubClient(() => ({ data: [{ id: ID }], error: null }));
+  const r = await deleteTradeRow(client, { id: ID, userId: USER });
+  check(
+    "4",
+    "שורה אחת שחזרה = הצלחה",
+    r && r.ok === true,
+    `החזיר ${JSON.stringify(r)}`
+  );
+}
+
+// ─── 5. rollback לאינדקס המקורי. ─────────────────────────────────────────
+{
+  const gone = { id: "b" };
+  const after = [{ id: "a" }, { id: "c" }];
+  const back = restoreAt(after, gone, 1);
+  check(
+    "5",
+    "rollback מחזיר את העסקה לאינדקס המקורי, לא לסוף המערך",
+    Array.isArray(back) && back.length === 3 && back[1] && back[1].id === "b",
+    `החזיר ${JSON.stringify(back && back.map((t) => t.id))} — צפוי ["a","b","c"]; ` +
+      `החזרה לסוף מקפיצה את השורה בטבלה ונראית למשתמש כבאג שני`
+  );
+}
+
+// ─── 6. המרוץ: ה-INSERT התלוי נגמר לפני שה-DELETE יוצא. ─────────────────
+{
+  const pending = createPendingWrites();
+  const order = [];
+  let releaseInsert;
+  const insert = new Promise((res) => { releaseInsert = () => { order.push("insert"); res(); }; });
+  pending.track(ID, insert);
+
+  const client = stubClient(() => { order.push("delete"); return { data: [{ id: ID }], error: null }; });
+  const running = deleteTradeVerified(client, { id: ID, userId: USER }, pending);
+
+  // נותנים ל-microtasks להתנקז. אם ה-DELETE לא ממתין — הוא כבר רץ כאן.
+  await new Promise((r) => setTimeout(r, 10));
+  const firedEarly = order.includes("delete");
+  releaseInsert();
+  await running;
+
+  check(
+    "6",
+    "DELETE ממתין ל-INSERT התלוי של אותה עסקה",
+    !firedEarly && order[0] === "insert" && order[1] === "delete",
+    `סדר בפועל ${JSON.stringify(order)} — DELETE שיוצא לפני שה-INSERT נחת מתאים ` +
+      `אפס שורות, וה-INSERT נוחת אחריו: השורה נשארת ב-DB בדיוק כפי ש-Sentinel תפס`
+  );
+}
+
+// ─── 7. שחרור על settle, לא על resolve. ⚠️ עוברת ריקנית על הישן. ────────
+{
+  const pending = createPendingWrites();
+  const failed = Promise.reject(new Error("insert failed"));
+  pending.track(ID, failed);
+
+  const client = stubClient(() => ({ data: [{ id: ID }], error: null }));
+  const timeout = new Promise((r) => setTimeout(() => r("TIMED-OUT"), 300));
+  const r = await Promise.race([deleteTradeVerified(client, { id: ID, userId: USER }, pending), timeout]);
+
+  check(
+    "7",
+    "INSERT שנכשל משחרר את הממתין — מחיקה אחריו אינה נתלית",
+    r !== "TIMED-OUT",
+    `הקריאה לא חזרה תוך 300ms — שחרור על resolve בלבד הופך כשל שקט לתלייה שקטה`
+  );
+}
+
+// ═══ אתר 5 — handleSubmit. השורש. ════════════════════════════════════════
+
+// ─── 8. INSERT שהחזיר אפס שורות (RLS דוחה) = כשל. תרחיש השורש. ──────────
+{
+  const client = stubClient(() => ({ data: [], error: null }));
+  const r = await insertTradeRow(client, { row: { id: ID, user_id: USER } });
+  check(
+    "8",
+    "INSERT שהחזיר אפס שורות מדווח כשל — העסקה לא נשמרה",
+    r && r.ok === false && r.rows === 0,
+    `החזיר ${JSON.stringify(r)} — זה המסלול שבו RLS דוחה בשקט: המשתמש רואה ` +
+      `"נוספה ליומן", סוגר את הדפדפן, והעסקה איננה. ⚠️ כאן ה-rollback *מסיר* מה-state`
+  );
+}
+
+// ─── 9. INSERT שהחזיר שורה = הצלחה. ⚠️ עוברת ריקנית על הישן. ────────────
+{
+  const calls = {};
+  const client = stubClient(() => ({ data: [{ id: ID }], error: null }), calls);
+  const r = await insertTradeRow(client, { row: { id: ID, user_id: USER } });
+  check(
+    "9",
+    "INSERT שהחזיר שורה אחת = הצלחה, ו-select נתבע כדי לספור",
+    r && r.ok === true && calls.inserts === 1 && calls.selected !== false,
+    `החזיר ${JSON.stringify(r)} inserts=${calls.inserts} select=${calls.selected}`
+  );
+}
+
+// ─── 10. INSERT שזרק (רשת) חוזר כערך, לא כחריגה. ────────────────────────
+{
+  const client = { from() { throw new Error("Failed to fetch"); } };
+  const r = await insertTradeRow(client, { row: { id: ID } });
+  check(
+    "10",
+    "INSERT שזרק מוחזר כ-threw עם ההודעה כלשונה, ואינו מפיל את הקורא",
+    r && r.ok === false && r.reason === "threw" && /Failed to fetch/.test(r.message || ""),
+    `החזיר ${JSON.stringify(r)} — קורא ש"נופל" באמצע משאיר את ה-state אופטימי לנצח`
+  );
+}
+
+// ─── 11. INSERT שנכשל משחרר את pendingWrites — אין תלייה. ───────────────
+{
+  const pending = createPendingWrites();
+  const client = stubClient(() => ({ data: [], error: null }));
+  const p = insertTradeRow(client, { row: { id: ID, user_id: USER } });
+  pending.track(ID, p);
+  await p;
+
+  const timeout = new Promise((r) => setTimeout(() => r("TIMED-OUT"), 300));
+  const waited = await Promise.race([pending.wait(ID).then(() => "RELEASED"), timeout]);
+  check(
+    "11",
+    "INSERT שנכשל משחרר את הרישום — מחיקה אחריו אינה נתלית",
+    waited === "RELEASED",
+    `pending.wait לא חזר תוך 300ms — כשל שמירה שהופך לתלייה הוא החמרה, לא תיקון`
+  );
+}
+
+// ═══ אתרים 2·3 — סגירה ועריכה (UPDATE). ══════════════════════════════════
+
+// ─── 12. UPDATE על אפס שורות עם error:null = כשל. ───────────────────────
+{
+  const client = stubClient(() => ({ data: [], error: null }));
+  const r = await updateTradeRow(client, { id: ID, userId: USER, patch: { status: "CLOSED" } });
+  check(
+    "12",
+    "UPDATE שהתאים אפס שורות מדווח כשל — לא 'העסקה עודכנה'",
+    r && r.ok === false && r.reason === "not-found",
+    `החזיר ${JSON.stringify(r)} — אותה התנהגות PostgREST של #14, באתר אחר: ` +
+      `סגירת עסקה שלא נשמרה מדווחת רווח שאינו קיים ב-DB`
+  );
+}
+
+// ─── 13. UPDATE מסונן על id וגם על user_id. ─────────────────────────────
+{
+  const calls = {};
+  const client = stubClient(() => ({ data: [{ id: ID }], error: null }), calls);
+  await updateTradeRow(client, { id: ID, userId: USER, patch: { exit: 10 } });
+  check(
+    "13",
+    "UPDATE מסונן על id וגם על user_id, ומבקש select",
+    calls.updates === 1 &&
+      calls.filters.some(([c, v]) => c === "id" && v === ID) &&
+      calls.filters.some(([c, v]) => c === "user_id" && v === USER) &&
+      calls.selected !== false,
+    `updates=${calls.updates} filters=${JSON.stringify(calls.filters)} select=${calls.selected}`
+  );
+}
+
+// ─── 14. UPDATE שהחזיר 2 שורות = כשל, לא הצלחה. ─────────────────────────
+{
+  const client = stubClient(() => ({ data: [{ id: "a" }, { id: "b" }], error: null }));
+  const r = await updateTradeRow(client, { id: ID, userId: USER, patch: { exit: 10 } });
+  check(
+    "14",
+    "UPDATE שנגע ביותר משורה אחת מדווח too-many",
+    r && r.ok === false && r.reason === "too-many",
+    `החזיר ${JSON.stringify(r)} — id הוא מפתח ראשי, ולכן 2 שורות = הסינון שבור ` +
+      `ועסקה של משתמש אחר בדיוק נדרסה. זה חייב לצעוק`
+  );
+}
+
+// ═══ אתר 4 — מחיקה מרובה. ════════════════════════════════════════════════
+
+// ─── 15. bulk: 3 מתוך 5 = partial, עם ה-ids שלא נמחקו. ──────────────────
+{
+  const ids = ["a", "b", "c", "d", "e"];
+  const client = stubClient(() => ({ data: [{ id: "a" }, { id: "b" }, { id: "c" }], error: null }));
+  const r = await deleteTradeRows(client, { ids, userId: USER });
+  check(
+    "15",
+    "מחיקה מרובה חלקית מדווחת 3/5 ומחזירה את שני ה-ids שנשארו",
+    r && r.ok === false && r.reason === "partial" && r.rows === 3 &&
+      Array.isArray(r.missingIds) && r.missingIds.length === 2 &&
+      r.missingIds.includes("d") && r.missingIds.includes("e"),
+    `החזיר ${JSON.stringify(r)} — היום ה-toast אומר "5 עסקאות נמחקו" ללא תנאי. ` +
+      `בלי missingIds אי אפשר להחזיר ל-state רק את השתיים ששרדו`
+  );
+}
+
+// ─── 16. bulk: אפס מתוך 5 = כשל מלא, כל ה-ids חוזרים. ───────────────────
+{
+  const ids = ["a", "b", "c", "d", "e"];
+  const client = stubClient(() => ({ data: [], error: null }));
+  const r = await deleteTradeRows(client, { ids, userId: USER });
+  check(
+    "16",
+    "מחיקה מרובה שלא מחקה דבר מדווחת כשל, וכל 5 חוזרים",
+    r && r.ok === false && r.rows === 0 && r.missingIds && r.missingIds.length === 5,
+    `החזיר ${JSON.stringify(r)}`
+  );
+}
+
+// ─── 17. bulk: 5 מתוך 5 = הצלחה. ⚠️ עוברת ריקנית על הישן. ───────────────
+{
+  const ids = ["a", "b", "c", "d", "e"];
+  const client = stubClient(() => ({ data: ids.map((id) => ({ id })), error: null }));
+  const r = await deleteTradeRows(client, { ids, userId: USER });
+  check(
+    "17",
+    "מחיקה מרובה מלאה = הצלחה, בלי ids חסרים",
+    r && r.ok === true && r.rows === 5 && r.missingIds.length === 0,
+    `החזיר ${JSON.stringify(r)}`
+  );
+}
+
+// ═══ אתרים 6·7 — ייבוא ו-undo. ═══════════════════════════════════════════
+
+// ─── 18. ייבוא 44 מתוך 47 = partial עם המונים. ──────────────────────────
+{
+  const rows = rowsOf(47);
+  const client = stubClient(() => ({ data: rowsOf(44), error: null }));
+  const r = await insertTradeRows(client, { rows });
+  check(
+    "18",
+    "ייבוא חלקי מדווח 44 מתוך 47 — לא 'יובאו 47'",
+    r && r.ok === false && r.reason === "partial" && r.rows === 44 && r.missingIds.length === 3,
+    `החזיר rows=${r && r.rows} missing=${r && r.missingIds && r.missingIds.length} — ` +
+      `§2 (אפס מנה בלי מכנה): הדיווח חייב לשאת את המונה ואת המכנה`
+  );
+}
+
+// ─── 19. ייבוא 47/47 = הצלחה. ⚠️ עוברת ריקנית על הישן. ──────────────────
+{
+  const rows = rowsOf(47);
+  const client = stubClient(() => ({ data: rowsOf(47), error: null }));
+  const r = await insertTradeRows(client, { rows });
+  check(
+    "19",
+    "ייבוא מלא = הצלחה על 47/47",
+    r && r.ok === true && r.rows === 47,
+    `החזיר ${JSON.stringify(r && { ok: r.ok, rows: r.rows })}`
+  );
+}
+
+// ─── 20. undo חלקי מדווח מה שרד. ────────────────────────────────────────
+{
+  const ids = ["x", "y", "z"];
+  const client = stubClient(() => ({ data: [{ id: "x" }], error: null }));
+  const r = await deleteTradeRows(client, { ids, userId: USER });
+  check(
+    "20",
+    "undo-import חלקי מדווח 1/3 ומחזיר את y ו-z",
+    r && r.ok === false && r.rows === 1 &&
+      r.missingIds.includes("y") && r.missingIds.includes("z"),
+    `החזיר ${JSON.stringify(r)} — undo שמדווח הצלחה ומשאיר שורות ב-DB הוא ` +
+      `אותו כשל שקט, רק בכיוון ההפוך`
+  );
+}
+
+console.log(`\n${ran - failures.length}/${ran} passed`);
+if (failures.length) {
+  console.error(`FAILED: ${failures.join(", ")}`);
+  process.exit(1);
+}
