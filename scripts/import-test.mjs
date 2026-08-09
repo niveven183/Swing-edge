@@ -927,19 +927,41 @@ const near = (name, actual, expected) => {
   check("Avg P&L renders as —", /label="Avg P&L" value="—"/.test(admin), true);
   check("...and says why", /Mixed USD\+ILS/.test(admin), true);
 
-  // The replacement card must not reproduce the A5 failure: the RPC returns 0 on
-  // an empty denominator, so an unguarded render says "0% with stop" when the
-  // truth is "no trades exist".
+  // The replacement card must not reproduce the A5 failure: an unguarded render
+  // says "0% with stop" when the truth is "no trades exist".
+  //
+  // ⚠️ MOVED BASELINE (09.08). The two assertions below used to pin the literal
+  // stopgap `!agg?.total ? "—"` / `of ${agg.total`. That stopgap carried its own
+  // TODO — "make the RPC return null on an empty denominator, and raw counts" —
+  // and this wave executed it, so pinning the source text would now forbid the
+  // very fix it asked for. What is pinned instead is the INVARIANT, and it is
+  // strictly stronger: the guard sits on the RATE, not on `total`. A table
+  // holding only demo rows has total > 0 and no rate, which the old guard let
+  // through as the string "null%".
   check("% with stop card exists", /label="% with stop"/.test(admin), true);
-  check("...guards the empty denominator", /!agg\?\.total \? "—"/.test(admin), true);
-  check("...and names its denominator", /of \$\{agg\.total/.test(admin), true);
+  check("...guards the RATE, not the row count",
+    /pct_with_stop == null \? "—"/.test(admin), true);
+  check("...and never guards on `total` alone again",
+    /!agg\?\.total \? "—"/.test(admin), false);
+  check("...names its denominator AND its population",
+    /real_count \?\? agg\.total\)\.toLocaleString\(\)\} real trades/.test(admin), true);
+  check("...and ships the numerator so the rate can be un-rounded",
+    /agg\.with_stop\.toLocaleString\(\)\}\//.test(admin), true);
   check("grid widened to fit the 5th card", /md:grid-cols-5/.test(admin), true);
 
-  // The finding this guard exists for, pinned against the SQL itself. If the RPC
-  // is ever fixed to return null, this flips and the client guard can be revisited.
-  const sql = readFileSync(new URL("../supabase/migrations/20260719120000_admin_rpcs.sql", import.meta.url), "utf8");
-  check("RPC still returns 0 on an empty denominator (known, unfixed)",
-    /pct_with_stop'[\s\S]{0,120}else 0 end/.test(sql), true);
+  // Both halves of the SQL finding, pinned against the files themselves: the
+  // original still carries `else 0` (history, never edited), and the migration
+  // that replaces it is present in the repo. ⛔ Present ≠ run — Niv runs it
+  // (CLAUDE.md §12), which is why the client guard above must survive BOTH
+  // shapes and the `?? total` fallback stays until it has run.
+  const sqlOld = readFileSync(new URL("../supabase/migrations/20260719120000_admin_rpcs.sql", import.meta.url), "utf8");
+  check("the original RPC returned 0 on an empty denominator",
+    /pct_with_stop'[\s\S]{0,120}else 0 end/.test(sqlOld), true);
+  const sqlNew = readFileSync(new URL("../supabase/migrations/20260809120000_admin_rpcs_denominators.sql", import.meta.url), "utf8");
+  check("...and the replacement divides by nullif, not `else 0`",
+    /pct_with_stop',\s*round\(100\.0 \* _with_stop \/ nullif\(_real, 0\), 1\)/.test(sqlNew), true);
+  check("...over a denominator that excludes demo rows",
+    /count\(\*\) filter \(where not is_demo and stop is not null\)/.test(sqlNew), true);
 }
 
 console.log("");
