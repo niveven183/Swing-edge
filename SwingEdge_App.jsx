@@ -88,6 +88,7 @@ import {
 import { useTradingStats } from "./src/hooks/useTradingStats.js";
 import { useFxRates, realizedDayKeysOf, makeConvertingCalc } from "./src/hooks/useFxRates.js";
 import { convert } from "./src/lib/fx.js";
+import { resolveEquityBase } from "./src/lib/equityBase.js";
 import InfoTooltip from "./src/components/ui/InfoTooltip.jsx";
 import TermTooltip from "./src/components/ui/TermTooltip.jsx";
 import SmartSelect from "./src/components/ui/SmartSelect.jsx";
@@ -420,7 +421,8 @@ const exportTradesCSV = (trades) => {
 // this parameter existed the KPI band came from `stats` (converted) while the
 // equity curve and the trade rows were rebuilt here from the raw
 // calcTradeMetrics (unconverted) — one page, one "₪", two currencies. `capital`
-// must likewise arrive already converted; the caller passes `capitalShown`.
+// must likewise arrive already converted; the caller passes `equityBase`, the
+// same base `stats` was computed from, so the page's curve and its KPIs agree.
 const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity, currency = "USD", calcFn = calcTradeMetrics) => {
   const sym = CURRENCY_SYMBOL[currency] || CURRENCY_SYMBOL.USD;
   const now = new Date();
@@ -1935,6 +1937,15 @@ export default function SwingEdge() {
   // that currency — the position calculator and the trade form — because
   // converting a number the user just typed is not a display, it is an edit.
   const capSym = CURRENCY_SYMBOL[capitalCurrency] || CURRENCY_SYMBOL.USD;
+  // PAST value: the point the equity curve hangs from. `capitalShown` above is
+  // the present-tense "הון עכשיו" the header prints and must stay at spot; a
+  // curve base priced at spot slides the whole curve — and the return % with
+  // it — every morning the shekel moves, with nobody having touched a trade.
+  // See src/lib/equityBase.js for which day anchors it and why.
+  const equityBase = useMemo(
+    () => resolveEquityBase({ capital, capitalCurrency, accountCurrency, fxTable, trades: realTrades }),
+    [capital, capitalCurrency, accountCurrency, fxTable, realTrades]
+  );
   // Present-value view of an amount denominated in the capital's currency.
   // Spot, not a past fixing: risk and position size are claims about NOW.
   // Falls back to the raw number only when `dispCcy` is already the capital's
@@ -1959,8 +1970,8 @@ export default function SwingEdge() {
   );
 
   const equityCurve = useMemo(
-    () => generateEquityCurve(capitalShown, realTrades, stableCalcTradeMetrics),
-    [realTrades, capitalShown, stableCalcTradeMetrics]
+    () => generateEquityCurve(equityBase, realTrades, stableCalcTradeMetrics),
+    [realTrades, equityBase, stableCalcTradeMetrics]
   );
   const closedTrades = getClosed(realTrades);
   const openTrades   = realTrades.filter(t => t.status === "OPEN");
@@ -1970,16 +1981,17 @@ export default function SwingEdge() {
   const closedCountAll = useMemo(() => getClosed(trades).length, [trades]);
 
   // ─── MASTER STATS HUB — single source of truth ──────────────────────────────
-  // Fed the DISPLAYED capital and the converting calc, so the return % and the
-  // equity KPI are a ratio of two numbers in the same currency.
-  const stats = useTradingStats(realTrades, capitalShown, stableCalcTradeMetrics);
+  // Fed the equity BASE and the converting calc, so the return % is a ratio of
+  // two frozen numbers in the same currency: a P&L priced at each trade's own
+  // day over a base priced at the base day's. Neither moves after the fact.
+  const stats = useTradingStats(realTrades, equityBase, stableCalcTradeMetrics);
   const { totalPnL, winRate, avgR } = stats;
 
   // Mentor Dashboard (B4.3) — derived analytics for the SELECTED mentee. Kept
   // separate from the mentor's own `stats`/`aiDNA` so the two never mix. Both
   // hooks run unconditionally with an empty default until a mentee is chosen.
   const menteeRealTrades = useMemo(() => menteeTrades.filter(t => !t.isDemo), [menteeTrades]);
-  const menteeStats = useTradingStats(menteeRealTrades, capitalShown, stableCalcTradeMetrics);
+  const menteeStats = useTradingStats(menteeRealTrades, equityBase, stableCalcTradeMetrics);
   const menteeDNA = useMemo(() => calculateTradeDNA(menteeRealTrades), [menteeRealTrades]);
 
   // Current-month subset fed through the same hub — powers the monthly PDF export.
@@ -1993,7 +2005,7 @@ export default function SwingEdge() {
       return d.getMonth() === m && d.getFullYear() === y;
     });
   }, [realTrades]);
-  const monthStats = useTradingStats(currentMonthRealTrades, capitalShown, stableCalcTradeMetrics);
+  const monthStats = useTradingStats(currentMonthRealTrades, equityBase, stableCalcTradeMetrics);
 
   // ─── MONTHLY REPORT — auto-popup modal (start of month, once) + QA shortcut ──
   const [showReportModal, setShowReportModal] = useState(false);
@@ -2073,7 +2085,7 @@ export default function SwingEdge() {
     () => filteredTrades.filter(t => !t.isDemo),
     [filteredTrades]
   );
-  const journalStats = useTradingStats(filteredRealTrades, capitalShown, stableCalcTradeMetrics);
+  const journalStats = useTradingStats(filteredRealTrades, equityBase, stableCalcTradeMetrics);
 
   const uniqueSetups = useMemo(() => {
     const s = new Set(trades.map(t => t.setup).filter(Boolean));
@@ -2176,13 +2188,16 @@ export default function SwingEdge() {
   // closed-only return, so with an open position the headline moved and the
   // percentage beside it did not — two different portfolios in one card.
   //
-  // T10: the denominator is `capitalShown`, not `capital`. `curEquity` is in the
-  // DISPLAY currency; `capital` is in the capital's. Dividing one by the other
-  // is a ratio of two units, and it does not fail quietly — it read 286.7% on a
-  // journal that made 26%, because it was measuring the exchange rate.
+  // T10: the denominator is the converted base, not raw `capital`. `curEquity`
+  // is in the DISPLAY currency; `capital` is in the capital's. Dividing one by
+  // the other is a ratio of two units, and it does not fail quietly — it read
+  // 286.7% on a journal that made 26%, because it was measuring the rate.
+  //
+  // And the base is `equityBase`, not `capitalShown`: at spot, this percentage
+  // changed every morning on a journal nobody had touched.
   const curEquityReturnPct = useMemo(
-    () => (capitalShown > 0 ? ((curEquity - capitalShown) / capitalShown) * 100 : 0),
-    [curEquity, capitalShown]
+    () => (equityBase > 0 ? ((curEquity - equityBase) / equityBase) * 100 : 0),
+    [curEquity, equityBase]
   );
 
   // Daily P&L calculation
@@ -3799,10 +3814,10 @@ export default function SwingEdge() {
             )}
             {/* KPI Row */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              <StatCard anchor="equity" label={t.accountEquity}  value={fmtBalance(curEquity, dispCcy)} sub={`${t.startedAt} ${dispSym}${Math.round(capitalShown).toLocaleString()}`} trend={curEquityReturnPct} icon={DollarSign} accent="cyan"
+              <StatCard anchor="equity" label={t.accountEquity}  value={fmtBalance(curEquity, dispCcy)} sub={`${t.startedAt} ${dispSym}${Math.round(equityBase).toLocaleString()}`} trend={curEquityReturnPct} icon={DollarSign} accent="cyan"
                 info={lang === "he"
-                  ? `הון = בסיס ההון שהגדרת (${dispSym}${Math.round(capitalShown).toLocaleString()}) בתוספת P&L מצטבר מעסקאות סגורות ופתוחות. הסיכון לכל עסקה מחושב תמיד מבסיס ההון הקבוע — לא מההון הנוכחי.`
-                  : `Equity = your capital base (${dispSym}${Math.round(capitalShown).toLocaleString()}) plus cumulative P&L from closed & open trades. Per-trade risk is always sized from your fixed capital base — not current equity.`} />
+                  ? `הון = בסיס ההון שהגדרת (${dispSym}${Math.round(equityBase).toLocaleString()}) בתוספת P&L מצטבר מעסקאות סגורות ופתוחות. הסיכון לכל עסקה מחושב תמיד מבסיס ההון הקבוע — לא מההון הנוכחי.`
+                  : `Equity = your capital base (${dispSym}${Math.round(equityBase).toLocaleString()}) plus cumulative P&L from closed & open trades. Per-trade risk is always sized from your fixed capital base — not current equity.`} />
               <StatCard label={t.netPnlClosed} value={fmt$(Math.round(totalPnL * 100) / 100, statsCcy(stats))} sub={`${closedTrades.length} ${t.closedTrades}`} trend={stats.returnPct} trendText={formatReturnPct(stats.returnPct)} icon={TrendingUp} accent={totalPnL >= 0 ? "green" : "red"} />
               <StatCard label={<span className="flex items-center gap-1">{t.winRate}<TermTooltip term="winRate" lang={lang} /></span>} value={formatPct(winRate)} sub={winLossBeSub(stats)} icon={Target} accent="purple" />
               <StatCard label={<span className="flex items-center gap-1">{t.avgRMultiple}<TermTooltip term="avgR" lang={lang} /></span>} value={fmtR(avgR)} sub={rSampleSub(t, stats)} icon={Activity} accent="amber" />
@@ -5295,7 +5310,7 @@ export default function SwingEdge() {
                       {totalPnL>=0?"▲":"▼"} {formatReturnPct(stats.returnPct)}
                     </span>
                     <span className="text-slate-600">·</span>
-                    <span>{lang === "he" ? `הון התחלתי ${dispSym}${Math.round(capitalShown).toLocaleString()}` : `starting capital ${dispSym}${Math.round(capitalShown).toLocaleString()}`}</span>
+                    <span>{lang === "he" ? `הון התחלתי ${dispSym}${Math.round(equityBase).toLocaleString()}` : `starting capital ${dispSym}${Math.round(equityBase).toLocaleString()}`}</span>
                   </div>
                 </div>
                 <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 flex items-center gap-1 shrink-0">
@@ -6794,7 +6809,7 @@ export default function SwingEdge() {
                       {t.pdfIncludes}
                     </p>
                     <button
-                      onClick={() => exportMonthlyPDF(realTrades, capitalShown, stats, monthStats, curEquity, statsCcy(stats), stableCalcTradeMetrics)}
+                      onClick={() => exportMonthlyPDF(realTrades, equityBase, stats, monthStats, curEquity, statsCcy(stats), stableCalcTradeMetrics)}
                       className="w-full py-2 rounded-lg bg-[var(--v3-info-glow)] border border-[#06b6d4]/25 text-[var(--v3-info)] text-xs font-bold hover:bg-[#06b6d4]/20 transition flex items-center justify-center gap-1.5">
                       <FileText size={12} /> {t.createPdf}
                     </button>

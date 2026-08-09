@@ -31,6 +31,9 @@
 import { readFileSync } from "node:fs";
 import { convert, resolveDayRate, buildRateTable } from "../src/lib/fx.js";
 import { BUCKET_THRESHOLDS, bucketFor, riskPctFor } from "../src/lib/riskProfile.js";
+import { equityBaseDayKey, resolveEquityBase } from "../src/lib/equityBase.js";
+import { computeTradingStats } from "../src/lib/tradingStats.js";
+import { calcTradeMetrics } from "../src/utils.js";
 
 let failures = 0;
 const check = (name, cond) => {
@@ -206,6 +209,68 @@ console.log("\n6 · risk buckets · an amount is classified in its own currency"
     check(`${c} has a threshold row — a picker option cannot outrun its policy`,
       Object.prototype.hasOwnProperty.call(BUCKET_THRESHOLDS, c));
   }
+}
+
+// ── 7 · THE EQUITY CURVE'S BASE IS A PAST VALUE ─────────────────────────────
+// fx.js:16-17 names "a point on the equity curve" as a PAST value. The deltas
+// obeyed that; the base did not — it was converted at spot, so the whole curve
+// slid vertically whenever the shekel moved and the return % slid with it.
+console.log("\n7 · equity base · the curve does not move when spot does");
+{
+  // A shekel-denominated account, displayed in dollars — the live 3/32 case.
+  const ilsUsd = (spotRate) => buildRateTable("ILS", "USD", {
+    "2026-07-28": { USD: 0.3270 },
+    "2026-07-31": { USD: 0.3271 },
+  }, { rate: spotRate, rateDate: "2026-08-09" }, ["2026-07-28", "2026-07-31"]);
+
+  const trades = [
+    { id: 1, status: "CLOSED", side: "LONG", entry: 100, exit: 110, shares: 10,
+      stop: 95, date: "2026-07-28", closedAt: "2026-07-28T14:00:00Z", currency: "ILS" },
+    // Deliberately NOT 20 shares: a -100 here would cancel trade 1's +100, and
+    // returnPct would be 0 for EVERY base — an assertion that cannot fail.
+    { id: 2, status: "CLOSED", side: "LONG", entry: 50, exit: 45, shares: 6,
+      stop: 48, date: "2026-07-31", closedAt: "2026-07-31T14:00:00Z", currency: "ILS" },
+  ];
+  const args = { capital: 59_999, capitalCurrency: "ILS", accountCurrency: "USD", trades };
+
+  eq("the base day is the FIRST realized trade's day",
+    equityBaseDayKey(trades), "2026-07-28");
+
+  // Two tables identical in every historical fixing, differing ONLY in spot.
+  const calm  = resolveEquityBase({ ...args, fxTable: ilsUsd(0.3271) });
+  const moved = resolveEquityBase({ ...args, fxTable: ilsUsd(0.4000) });
+
+  eq("the base is priced at the base day's fixing, not spot",
+    Math.round(calm * 100) / 100, Math.round(59_999 * 0.3270 * 100) / 100);
+  check("a 22% move in spot does not shift the base by one cent", calm === moved);
+
+  // …and therefore not the return % either, which is what the user reads.
+  const statsCalm  = computeTradingStats(trades, calm,  calcTradeMetrics);
+  const statsMoved = computeTradingStats(trades, moved, calcTradeMetrics);
+  check("…so the return % is identical too", statsCalm.returnPct === statsMoved.returnPct);
+  check("…and every equity point with it",
+    statsCalm.currentEquity === statsMoved.currentEquity);
+
+  // Proof the two assertions above discriminate: run the OLD path (spot, no day
+  // key) through the SAME comparison and watch both of them move. Without this,
+  // a fixture whose P&L happens to sum to zero would pass the return-% check
+  // forever, on broken code and fixed code alike.
+  const oldCalm  = convert(59_999, "ILS", "USD", ilsUsd(0.3271)).value;
+  const oldMoved = convert(59_999, "ILS", "USD", ilsUsd(0.4000)).value;
+  check("the discarded spot base genuinely moved — the assertion has teeth",
+    oldCalm !== oldMoved);
+  check("…and moved the return % with it — the return-% check has teeth too",
+    computeTradingStats(trades, oldCalm, calcTradeMetrics).returnPct !==
+    computeTradingStats(trades, oldMoved, calcTradeMetrics).returnPct);
+
+  // No history yet → a single point, which IS a claim about now. Spot is right.
+  const noTrades = resolveEquityBase({ ...args, trades: [], fxTable: ilsUsd(0.4) });
+  eq("with no closed trades the single point uses spot", noTrades, 59_999 * 0.4);
+
+  // No fixing for the base day → keep the capital, never borrow spot.
+  const noFixing = resolveEquityBase({ ...args, fxTable: buildRateTable(
+    "ILS", "USD", {}, { rate: 0.4, rateDate: "2026-08-09" }, []) });
+  eq("a missing base-day fixing falls back to the capital, NOT to spot", noFixing, 59_999);
 }
 
 // ── 8 · THE ONBOARDING SUMMARY PRINTS THE USER'S CURRENCY ───────────────────
