@@ -39,11 +39,20 @@ export function ThemeProvider({ children }) {
   const [resolved, setResolved] = useState(() => resolveMode(readInitialMode()));
 
   useEffect(() => {
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    // Guarded to match resolveMode() above, which has always been wrapped in a
+    // try. The asymmetry WAS the bug: the same media query was safe on the first
+    // read and unguarded on the second, so an old WebView survived initial state
+    // and then threw inside this effect, taking the tree down.
+    let mq = null;
+    try {
+      mq = typeof window !== 'undefined' && window.matchMedia
+        ? window.matchMedia('(prefers-color-scheme: dark)')
+        : null;
+    } catch { mq = null; }
 
     const apply = () => {
       const actual =
-        mode === 'auto' ? (mq.matches ? 'dark' : 'light') : mode;
+        mode === 'auto' ? (mq?.matches ? 'dark' : 'light') : mode;
       setResolved(actual);
       const root = document.documentElement;
       root.classList.toggle('dark', actual === 'dark');
@@ -57,7 +66,8 @@ export function ThemeProvider({ children }) {
     apply();
     try { localStorage.setItem(STORAGE_KEY, mode); } catch {}
 
-    if (mode === 'auto') {
+    // No mq means no OS signal to follow — the resolved value from apply() stands.
+    if (mode === 'auto' && mq) {
       const handler = () => apply();
       mq.addEventListener('change', handler);
       return () => mq.removeEventListener('change', handler);

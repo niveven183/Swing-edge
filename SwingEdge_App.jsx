@@ -89,6 +89,7 @@ import { useTradingStats } from "./src/hooks/useTradingStats.js";
 import { useFxRates, realizedDayKeysOf, makeConvertingCalc } from "./src/hooks/useFxRates.js";
 import { convert } from "./src/lib/fx.js";
 import { resolveEquityBase } from "./src/lib/equityBase.js";
+import { fileToResizedDataURL, exceedsCap, MAX_EDGE_PX, Q_PRIMARY, Q_FALLBACK } from "./src/lib/imageResize.js";
 import InfoTooltip from "./src/components/ui/InfoTooltip.jsx";
 import TermTooltip from "./src/components/ui/TermTooltip.jsx";
 import SmartSelect from "./src/components/ui/SmartSelect.jsx";
@@ -1304,7 +1305,11 @@ export default function SwingEdge() {
   const [fabVisible, setFabVisible] = useState(true);
   const mainScrollRef = useRef(null);
   useEffect(() => {
-    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Guarded: an old WebView without matchMedia would throw here and take the
+    // whole tree down. Defaulting to false keeps today's behaviour on every
+    // browser that HAS the capability.
+    let prefersReducedMotion = false;
+    try { prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false; } catch {}
     if (prefersReducedMotion) return;
     let lastWinY = window.scrollY;
     let lastMainY = mainScrollRef.current ? mainScrollRef.current.scrollTop : 0;
@@ -2799,12 +2804,25 @@ export default function SwingEdge() {
 
   const handleCopyInvite = useCallback(async () => {
     if (!mentorInviteCode) return;
+    // The code is already on screen with select-all, so the fallback is NOT to
+    // reveal it — it is to tell the trader the copy did not happen. Without this
+    // the button gives zero feedback in a non-secure context or a WebView, and a
+    // dead button is indistinguishable from a broken feature.
+    const canCopy =
+      typeof navigator !== "undefined" &&
+      navigator.clipboard &&
+      typeof navigator.clipboard.writeText === "function";
+    if (!canCopy) { toast.info(t.mentoringCopyManual); return; }
     try {
       await navigator.clipboard.writeText(mentorInviteCode);
       setMentorCodeCopied(true);
       setTimeout(() => setMentorCodeCopied(false), 2000);
-    } catch { /* clipboard blocked — code stays visible for manual copy */ }
-  }, [mentorInviteCode]);
+    } catch {
+      // Permission denied, document not focused, WebView stub that throws — all
+      // reach the user. setMentorCodeCopied is NOT set: "Copied" must not lie.
+      toast.error(t.mentoringCopyManual);
+    }
+  }, [mentorInviteCode, toast, t]);
 
   const handleRedeemInvite = useCallback(async () => {
     if (!isSupabaseConfigured || !supabase) return;
@@ -3020,12 +3038,23 @@ export default function SwingEdge() {
     });
   };
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const dataURL = ev.target.result;
+    // Resize BEFORE anything else: an un-resized Android screenshot exceeds the
+    // /api/ocr 6MB cap and comes back 400. A failure here is surfaced as the same
+    // status:"error" the trader already knows — never a silent raw send.
+    let dataURL;
+    try {
+      dataURL = await fileToResizedDataURL(file);
+    } catch {
+      setOcrStatus({ status: "error", confidence: 0 });
+      return;
+    }
+    // Bare block, deliberately: it preserves the original scoping of the old
+    // reader.onload callback so this change stays a readable diff rather than a
+    // 60-line re-indent. Not a leftover.
+    {
       const sideAtUpload = form.side; // capture before async — avoids a stale form.side from an older closure
       // Reset prior read before analyzing a new image.
       setForm(f => ({ ...f, ticker: "", entry: "", stop: "", target: "", tradeImage: file, tradeImagePreview: dataURL }));
@@ -3083,16 +3112,21 @@ export default function SwingEdge() {
         clearTimeout(timer);
         setOcrStatus({ status: "error", confidence: 0 });
       }
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
-  const handleAnalyzerImageUpload = (e) => {
+  const handleAnalyzerImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const dataURL = ev.target.result;
+    // See handleImageUpload — resize first, surface failure, never send raw.
+    let dataURL;
+    try {
+      dataURL = await fileToResizedDataURL(file);
+    } catch {
+      setAnalyzerOcrResult({ status: "error", confidence: 0 });
+      return;
+    }
+    { // bare block — see handleImageUpload
       const sideAtUpload = analyzerOcrSide; // capture before async — avoids a stale side from an older closure
       setAnalyzerImage(file);
       setAnalyzerImagePreview(dataURL);
@@ -3134,8 +3168,7 @@ export default function SwingEdge() {
         clearTimeout(timer);
         setAnalyzerOcrResult({ status: "error", confidence: 0 });
       }
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   // The trader confirmed the reading — only now do values enter the form.
@@ -3239,15 +3272,25 @@ export default function SwingEdge() {
               let w = video.videoWidth;
               let h = video.videoHeight;
               if (!w || !h) { fail(new Error("empty_frame")); return; }
-              if (w > 2000) { h = Math.round((h * 2000) / w); w = 2000; }
+              // Caps and qualities come from src/lib/imageResize.js — the same values
+              // this path has always used, now shared with the three file-upload
+              // paths instead of duplicated here (CLAUDE.md §13, מקור-אמת-אחד).
+              //
+              // ⚠️ The WIDTH-ONLY pin below is deliberate and is NOT fitDimensions.
+              // fitDimensions caps the LONGEST edge, which would newly shrink a
+              // portrait capture (h > 2000, w ≤ 2000) that this path has always sent
+              // at full height. That is a behaviour change, and this path is the
+              // working reference — it was explicitly out of scope for the 09.08
+              // wave. The gap is recorded in docs/STATE.md, not fixed in passing.
+              if (w > MAX_EDGE_PX) { h = Math.round((h * MAX_EDGE_PX) / w); w = MAX_EDGE_PX; }
               const canvas = document.createElement("canvas");
               canvas.width = w;
               canvas.height = h;
               canvas.getContext("2d").drawImage(video, 0, 0, w, h);
-              let dataURL = canvas.toDataURL("image/jpeg", 0.92);
-              // Safety net vs the /api/ocr 6MB cap (base64 ≈ 4/3 of raw bytes).
-              if (dataURL.length * 0.75 > 6 * 1024 * 1024) {
-                dataURL = canvas.toDataURL("image/jpeg", 0.8);
+              let dataURL = canvas.toDataURL("image/jpeg", Q_PRIMARY);
+              // Safety net vs the /api/ocr cap (base64 ≈ 4/3 of raw bytes).
+              if (exceedsCap(dataURL.length)) {
+                dataURL = canvas.toDataURL("image/jpeg", Q_FALLBACK);
               }
               resolve(dataURL);
             } catch (e) { fail(e); }
@@ -3341,18 +3384,25 @@ export default function SwingEdge() {
 
   // onChange for the hidden fallback input — runs the same OCR → route pipeline.
   // Reads target/side from refs because this fires long after the original click.
-  const handleChartFileFallback = (e) => {
+  const handleChartFileFallback = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = ""; // allow re-picking the same file later
     if (!file) return;
     const target = chartTargetRef.current || "journal";
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setChartAiTarget(target);
-      setChartAiLoading(true);
-      runChartOcr(ev.target.result, target, chartSideRef.current);
-    };
-    reader.readAsDataURL(file);
+    setChartAiTarget(target);
+    setChartAiLoading(true);
+    // This is the MOBILE path — the one an Android screenshot actually travels.
+    // Resize before the round trip; a failure clears the spinner and reports.
+    let dataURL;
+    try {
+      dataURL = await fileToResizedDataURL(file);
+    } catch {
+      setChartOcrStatus({ status: "error", confidence: 0 });
+      setChartAiLoading(false);
+      setChartAiTarget(null);
+      return;
+    }
+    runChartOcr(dataURL, target, chartSideRef.current);
   };
 
   // Click handler for the two floating chart buttons.
