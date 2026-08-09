@@ -131,6 +131,43 @@ export function trackPageView(pathname) {
   });
 }
 
+// The closed set of in-app screens, measured from the `tab === "…"` render
+// branches in SwingEdge_App.jsx plus `onboarding`, which is a blocking screen
+// rather than a tab. Anything else collapses to "other" — the same shape as
+// ROUTES above, and for the same reason: a tab added next month must not widen
+// what we send without someone editing this line.
+//
+// `analyzer` and `position` are absent on purpose. They are real values of `tab`
+// for exactly one tick before an effect rewrites them to "tools", so sending
+// them would report a screen the trader never saw.
+export const SCREEN_NAMES = new Set([
+  "admin", "analytics", "dashboard", "feedback", "intel", "journal",
+  "mentoring", "notebook", "onboarding", "settings", "tools", "weeklyReview",
+]);
+
+export function trackScreenView(screen) {
+  trackEvent("screen_view", { screen_name: SCREEN_NAMES.has(screen) ? screen : "other" });
+}
+
+export function trackOnboardingCompleted() {
+  trackEvent("onboarding_completed");
+}
+
+// Which door the form was opened through, nothing about what went into it.
+export function trackTradeFormOpened(source) {
+  trackEvent("trade_form_opened", { source: source === "ocr" ? "ocr" : "manual" });
+}
+
+// Fires on EVERY OCR exit, success and failure alike. `ocr_result` only ever
+// fired on the success path, which left us counting successes against no
+// denominator at all. `ok` is coerced rather than passed through: callers reach
+// this from catch blocks where the value at hand is an error, not a boolean.
+// The failure REASON stays out by design — it is the one field that could carry
+// text the model or the user produced.
+export function trackOcrAttempted(ok) {
+  trackEvent("ocr_attempted", { ok: ok === true });
+}
+
 const FIRST_TRADE_KEY = "swingEdgeFirstTrade";
 
 // Activation: the user saved their first trade in this browser. Zero parameters —

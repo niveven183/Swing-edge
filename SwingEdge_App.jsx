@@ -66,7 +66,14 @@ import {
   Users, GraduationCap, UserPlus, NotebookPen, CalendarCheck, Upload, Undo2
 } from "lucide-react";
 import { getTranslations, LANGUAGES, isRTLLang, nTrades, labelFor, plural } from "./src/i18n.js";
-import { trackEvent, trackFirstTradeSaved } from "./src/lib/consent.js";
+import {
+  trackEvent,
+  trackFirstTradeSaved,
+  trackScreenView,
+  trackOnboardingCompleted,
+  trackTradeFormOpened,
+  trackOcrAttempted,
+} from "./src/lib/consent.js";
 import {
   fetchPrices, fmtVolume, fmtMarketCap, searchTickers,
   fetchQuote, fetchEarnings, getMarketState, getMarketStateBadge, getRefreshInterval, MARKET_STATE,
@@ -1075,6 +1082,7 @@ export default function SwingEdge() {
       try { localStorage.setItem("swingEdgeCapitalCurrency", cc); } catch {}
     }
     setShowOnboarding(false);
+    trackOnboardingCompleted();
   };
 
   // ── SUPABASE AUTH ──
@@ -1277,6 +1285,20 @@ export default function SwingEdge() {
   useEffect(() => {
     if (tab !== "feedback") feedbackOriginRef.current = tab;
   }, [tab]);
+
+  // The ONE place a screen change is reported. Every navigation in the app goes
+  // through setTab, so this effect sees all of them; seven scattered calls would
+  // drift the moment an eighth tab lands. In-app tabs are useState and not
+  // routes, so GA4 saw a single page_view per session and nothing after it —
+  // this is what closes that. trackScreenView clamps to SCREEN_NAMES, which is
+  // what keeps the transient "analyzer"/"position" aliases out.
+  // `onboarding` is not a tab — it is a blocking screen rendered over whatever
+  // `tab` happens to hold. Without this branch the session that stalled in
+  // onboarding would report "dashboard", which is precisely the confusion the
+  // wave exists to end.
+  useEffect(() => {
+    trackScreenView(showOnboarding ? "onboarding" : tab);
+  }, [tab, showOnboarding]);
 
   useEffect(() => {
     try { localStorage.removeItem("swingEdgeDashboardVariant"); } catch {}
@@ -1760,7 +1782,7 @@ export default function SwingEdge() {
       if (isTyping) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const k = e.key.toLowerCase();
-      if (k === "n") { e.preventDefault(); setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null }); setOcrStatus(null); setShowForm(true); }
+      if (k === "n") { e.preventDefault(); setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null }); setOcrStatus(null); setShowForm(true); trackTradeFormOpened("manual"); }
       else if (k === "j") { e.preventDefault(); setTab("journal"); }
       else if (k === "d") { e.preventDefault(); setTab("dashboard"); }
       else if (k === "a") { e.preventDefault(); setTab("analyzer"); }
@@ -2444,7 +2466,6 @@ export default function SwingEdge() {
       _prediction: predictionSnapshot,
     };
     setTrades(prev => [...prev, newTrade]);
-    trackFirstTradeSaved();
     setLastImportIds([]);
 
     // Snapshot what the user typed BEFORE the form is cleared. If the write
@@ -2469,6 +2490,12 @@ export default function SwingEdge() {
     // let the insert land after it. And because PostgREST returns error:null
     // for a write that stored nothing, `if (error)` could never see it. Only
     // the returned ROW COUNT can.
+    // The activation event must describe a trade the table actually holds. It
+    // used to fire next to the optimistic setTrades above, so a write that was
+    // rejected and rolled back still counted as "first trade saved" — and
+    // because the sentinel behind it is a localStorage key, that count could
+    // never be corrected. There is no second first trade.
+    let saved = true;
     if (isSupabaseConfigured && supabase && authUser?.id) {
       const writing = insertTradeRow(supabase, {
         row: tradeForSupabase({ ...newTrade, user_id: authUser.id, is_demo: false }),
@@ -2479,12 +2506,15 @@ export default function SwingEdge() {
       const res = await writing;
 
       if (!res.ok) {
+        saved = false;
         // ⚠️ THE OPPOSITE OF THE DELETE ROLLBACK. There, a failure puts the row
         // back; here it takes the row OUT — the trade was never saved, and
         // leaving it in the journal would show a row that disappears on the
         // next load, which is the silent failure wearing a different hat.
         setTrades(prev => prev.filter(t => t.id !== newTrade.id));
         setForm(submittedForm);
+        // Deliberately NOT a trade_form_opened: this is the form being handed
+        // back after a failed write, not the trader reaching for it.
         setShowForm(true);
         console.error("Supabase insert failed:", res.reason, res.message);
         toast.error(
@@ -2494,6 +2524,7 @@ export default function SwingEdge() {
         );
       }
     }
+    if (saved) trackFirstTradeSaved();
   };
 
   const handleCloseSubmit = async () => {
@@ -2691,13 +2722,13 @@ export default function SwingEdge() {
     if (!imported || imported.length === 0) return;
     const ids = imported.map(t => t.id);
     setTrades(prev => [...prev, ...imported]);
-    trackFirstTradeSaved();
     setLastImportIds(ids);
     setShowImportModal(false);
     setTab("journal");
 
     // Local-only mode: nothing to verify.
     if (!(isSupabaseConfigured && supabase && authUser?.id)) {
+      trackFirstTradeSaved();
       toast.success(t.imp_success.replace("{n}", imported.length));
       return;
     }
@@ -2725,9 +2756,13 @@ export default function SwingEdge() {
           ? `יובאו ${res.rows} מתוך ${ids.length} — ${missing.size} נכשלו: `
           : `Imported ${res.rows} of ${ids.length} — ${missing.size} failed: `) + res.message
       );
+      // A partial import still put real rows in the table — those are saved
+      // trades, and the activation is real even though the batch was not.
+      if (res.rows > 0) trackFirstTradeSaved();
       return;
     }
 
+    trackFirstTradeSaved();
     toast.success(t.imp_success.replace("{n}", res.rows));
   };
 
@@ -3049,6 +3084,7 @@ export default function SwingEdge() {
       dataURL = await fileToResizedDataURL(file);
     } catch {
       setOcrStatus({ status: "error", confidence: 0 });
+      trackOcrAttempted(false);
       return;
     }
     // Bare block, deliberately: it preserves the original scoping of the old
@@ -3063,6 +3099,9 @@ export default function SwingEdge() {
       // Vision can take 3–8s; bail out at 15s so the UI never hangs.
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 15000);
+      // Reported in `finally` so every way out of this block — the early return
+      // on a non-2xx, the throw, the success — is counted exactly once.
+      let ocrOk = false;
       try {
         const res = await postOcr(dataURL, sideAtUpload, controller.signal);
         clearTimeout(timer);
@@ -3108,9 +3147,12 @@ export default function SwingEdge() {
           detected: detection,
           confidence_bucket: confidenceBucket(result.confidence ?? 0),
         });
+        ocrOk = true;
       } catch {
         clearTimeout(timer);
         setOcrStatus({ status: "error", confidence: 0 });
+      } finally {
+        trackOcrAttempted(ocrOk);
       }
     }
   };
@@ -3124,6 +3166,7 @@ export default function SwingEdge() {
       dataURL = await fileToResizedDataURL(file);
     } catch {
       setAnalyzerOcrResult({ status: "error", confidence: 0 });
+      trackOcrAttempted(false);
       return;
     }
     { // bare block — see handleImageUpload
@@ -3135,6 +3178,8 @@ export default function SwingEdge() {
       // Vision can take 3–8s; bail out at 15s so the UI never hangs.
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 15000);
+      // See handleImageUpload — counted once in `finally`, whichever way we exit.
+      let ocrOk = false;
       try {
         const res = await postOcr(dataURL, sideAtUpload, controller.signal);
         clearTimeout(timer);
@@ -3164,9 +3209,12 @@ export default function SwingEdge() {
           detected: detection,
           confidence_bucket: confidenceBucket(result.confidence ?? 0),
         });
+        ocrOk = true;
       } catch {
         clearTimeout(timer);
         setAnalyzerOcrResult({ status: "error", confidence: 0 });
+      } finally {
+        trackOcrAttempted(ocrOk);
       }
     }
   };
@@ -3342,6 +3390,7 @@ export default function SwingEdge() {
         sideSource: result.sideSource ?? null,
       });
       setShowForm(true);
+      trackTradeFormOpened("ocr");
     }
     setChartOcrStatus({ status: "ok", confidence, detection });
     trackEvent("ocr_result", { detected: detection, confidence_bucket: confidenceBucket(confidence) });
@@ -3353,6 +3402,7 @@ export default function SwingEdge() {
     setChartOcrStatus({ status: "processing", confidence: 0 });
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15000);
+    let ocrOk = false;
     try {
       const res = await postOcr(dataURL, sideHint, controller.signal);
       clearTimeout(timer);
@@ -3363,12 +3413,14 @@ export default function SwingEdge() {
       }
       const result = await res.json();
       routeChartOcr(result, target, dataURL);
+      ocrOk = true;
     } catch {
       clearTimeout(timer);
       setChartOcrStatus({ status: "error", confidence: 0 });
     } finally {
       setChartAiLoading(false);
       setChartAiTarget(null);
+      trackOcrAttempted(ocrOk);
     }
   };
 
@@ -3400,6 +3452,7 @@ export default function SwingEdge() {
       setChartOcrStatus({ status: "error", confidence: 0 });
       setChartAiLoading(false);
       setChartAiTarget(null);
+      trackOcrAttempted(false);
       return;
     }
     runChartOcr(dataURL, target, chartSideRef.current);
@@ -3445,6 +3498,10 @@ export default function SwingEdge() {
       setChartOcrStatus({ status: "error", confidence: 0 });
       setChartAiLoading(false);
       setChartAiTarget(null);
+      // The frame grab failed after the trader granted capture — an attempt that
+      // produced no image. The cancelled-picker paths above are NOT counted:
+      // there was never an image, and they fall through to the file input.
+      trackOcrAttempted(false);
       return;
     } finally {
       // Stop the capture the instant we have the frame — BEFORE the OCR round trip
@@ -4506,7 +4563,7 @@ export default function SwingEdge() {
                 <h3 className="se-serif text-2xl md:text-3xl text-white mb-2 tracking-tight">{t.emptyTitle}</h3>
                 <p className="text-xs text-slate-500 mb-5 max-w-sm mx-auto leading-relaxed">{t.emptyBody}</p>
                 <div className="flex flex-wrap items-center justify-center gap-2">
-                  <button data-tour="add-trade" onClick={() => { setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null }); setOcrStatus(null); setShowForm(true); }}
+                  <button data-tour="add-trade" onClick={() => { setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null }); setOcrStatus(null); setShowForm(true); trackTradeFormOpened("manual"); }}
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--v3-accent)] text-black font-bold text-xs hover:opacity-90 transition">
                     <Plus size={13} /> {lang === "he" ? "עסקה ראשונה" : "Add First Trade"}
                   </button>
@@ -5141,6 +5198,7 @@ export default function SwingEdge() {
             }));
             setOcrStatus(null);
             setShowForm(true);
+            trackTradeFormOpened("manual");
             setPosCopied(true);
             setTimeout(() => setPosCopied(false), 2000);
           };
@@ -7507,7 +7565,7 @@ export default function SwingEdge() {
       {/* ── FLOATING NEW TRADE BUTTON ── */}
       <button
         data-tour="add-trade"
-        onClick={() => { setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null }); setOcrStatus(null); setShowForm(true); }}
+        onClick={() => { setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null }); setOcrStatus(null); setShowForm(true); trackTradeFormOpened("manual"); }}
         className={`fixed bottom-6 right-6 rtl:right-auto rtl:left-6 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-violet-500 text-white shadow-2xl shadow-cyan-500/25 flex items-center justify-center hover:scale-110 active:scale-95 transition-transform motion-reduce:transition-none ${fabVisible ? "translate-y-0 opacity-100" : "translate-y-24 opacity-0 pointer-events-none"}`}
         style={{ bottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
         aria-label={t.newTrade}

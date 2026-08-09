@@ -70,12 +70,12 @@ npm run verify   # test:coach → test:import → test:write → test:settings
                  # → test:datachain → test:rcontract → test:format → test:fx
                  # → test:tradingstats → test:ocr → test:engine → test:feedback
                  # → test:notify → test:landing → test:digest → test:capability
-                 # → test:arch → build
+                 # → test:analytics → test:arch → build
 ```
 
-17 חוליות ואז `build`. **הרשימה נגזרת מ-`package.json` ומתעדכנת באותו קומיט שמשנה את השרשרת** — ראה `docs/DECISIONS.md` 2026-08-08.
+18 חוליות ואז `build`. **הרשימה נגזרת מ-`package.json` ומתעדכנת באותו קומיט שמשנה את השרשרת** — ראה `docs/DECISIONS.md` 2026-08-08.
 
-**להדביק את הפלט המלא בדיווח**, לא סיכום ולא "עבר". `test:coach` (111 assertions) חובה לפני *וגם* אחרי כל נגיעה ב-`src/intelligence/`; `test:import` לפני כל נגיעה ב-`src/import/` או בסכימת העסקה; `test:write` (25 assertions) לפני כל נגיעה ב-`src/lib/tradeWrite.js` או בכל מסלול שכותב ל-`trades` — כולל מסלולי ה-RPC ב-`AdminPanel.jsx`; `test:ocr` לפני כל נגיעה ב-`api/ocr.js`; `test:fx` לפני כל נגיעה ב-`src/lib/fx.js` או ב-`api/fx.js`; `test:digest` (9 assertions) לפני כל נגיעה ב-`scripts/daily-digest.mjs` או ב-`api/_lib/replyLedger.js`; `test:arch` (8 assertions) לפני כל נגיעה ב-`scripts/arch-auditor.mjs` — כולל הוספה לרשימת ה-`ACKNOWLEDGED`; `test:capability` (11 assertions) לפני כל נגיעה ב-`src/lib/imageResize.js`, בכל מסלול שמעלה תמונה ל-`/api/ocr`, או בכל צריכה של `navigator.clipboard` / `matchMedia`.
+**להדביק את הפלט המלא בדיווח**, לא סיכום ולא "עבר". `test:coach` (111 assertions) חובה לפני *וגם* אחרי כל נגיעה ב-`src/intelligence/`; `test:import` לפני כל נגיעה ב-`src/import/` או בסכימת העסקה; `test:write` (25 assertions) לפני כל נגיעה ב-`src/lib/tradeWrite.js` או בכל מסלול שכותב ל-`trades` — כולל מסלולי ה-RPC ב-`AdminPanel.jsx`; `test:ocr` לפני כל נגיעה ב-`api/ocr.js`; `test:fx` לפני כל נגיעה ב-`src/lib/fx.js` או ב-`api/fx.js`; `test:digest` (9 assertions) לפני כל נגיעה ב-`scripts/daily-digest.mjs` או ב-`api/_lib/replyLedger.js`; `test:arch` (8 assertions) לפני כל נגיעה ב-`scripts/arch-auditor.mjs` — כולל הוספה לרשימת ה-`ACKNOWLEDGED`; `test:capability` (11 assertions) לפני כל נגיעה ב-`src/lib/imageResize.js`, בכל מסלול שמעלה תמונה ל-`/api/ocr`, או בכל צריכה של `navigator.clipboard` / `matchMedia`; `test:analytics` (14 assertions) לפני כל נגיעה ב-`src/lib/consent.js` או בכל אתר קריאה של `track*` ב-`SwingEdge_App.jsx` — כולל הוספת פרמטר לאירוע, שמוחזק ברשימה סגורה.
 
 `test:smoke` (Playwright) **אינו** בשרשרת — הוא נפרד ואינו חוסם push.
 
