@@ -162,7 +162,7 @@ reply:f95b837e-94c7-49cb-893b-4f8242b6f6e9 | sent | 42   ← 07.08 19:09
 | # | שאילתה | למה |
 |---|---|---|
 | 1 | `SELECT id, status, created_at FROM feedback` | ⛔ **בלי `message`** — ראה §1.4 |
-| 2 | `SELECT campaign FROM email_campaign_log WHERE campaign LIKE 'reply:%'` | הליגר. הסינון ב-SQL — קמפייני בulk (`why_stopped`, `waitlist_launch`) לא נמשכים |
+| 2 | `SELECT campaign FROM email_campaign_log WHERE campaign LIKE 'reply:%'` | הליגר. הסינון ב-SQL — קמפייני bulk (`why_stopped`, `waitlist_launch`) לא נמשכים |
 | 3 | `SELECT message FROM feedback WHERE id = '<id>'` | הסניפט של **הממתין-ללא-מענה העדכני בלבד** |
 
 **⚠️ הזרקת SQL:** ה-`id` בשאילתה 3 מגיע מתוצאת שאילתה 1 שלנו, ו**יאומת מול

@@ -8,6 +8,13 @@
 
 import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+import { parseCampaign } from "../api/_lib/replyLedger.js";
+
+// Validates the id before it is interpolated into the snippet query. This is a
+// shape check on a feedback id, not a second copy of the campaign parse — that
+// one lives in replyLedger.js and is imported above.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const PROD_URL = process.env.PROD_URL || "https://swing-edge.vercel.app";
 const REPO = process.env.GITHUB_REPOSITORY || "";
@@ -162,30 +169,98 @@ async function gatherOpen() {
   return open;
 }
 
-// ── (d) Feedback: unresolved count (Sunday: + theme breakdown) ───────────────
+// ── (d) Feedback: awaiting a reply vs already answered ───────────────────────
+
+// Splits the not-resolved population in two. `awaitingReply` is the only one
+// that lights the morning alert: a feedback that was already answered is not
+// something Niv has to act on today, and counting it kept the alert permanently
+// on — which is how an alert stops being read.
+//
+// `resolved` sits in neither bucket, answered or not. Two ledger shapes reach
+// here (`reply:<id>` from before 2026-08-08 and `reply:<id>:<n>:<h8>` after);
+// both collapse through the imported parseCampaign, which is the point of it.
+export function classifyFeedback(rows, ledgerRows) {
+  const answered = new Set();
+  for (const r of ledgerRows || []) {
+    const p = parseCampaign(r?.campaign);
+    if (p) answered.add(p.id);
+  }
+
+  let awaitingReply = 0;
+  let repliedPending = 0;
+  const awaitingIds = [];
+  const themes = { awaiting: {}, replied: {} };
+  let snippetId = null;
+  let snippetAt = "";
+
+  for (const f of rows || []) {
+    if (f?.status === "resolved") continue;
+    const bucket = answered.has(f?.id) ? "replied" : "awaiting";
+    if (bucket === "replied") {
+      repliedPending++;
+    } else {
+      awaitingReply++;
+      awaitingIds.push(f?.id);
+      const at = String(f?.created_at || "");
+      if (!snippetId || at > snippetAt) {
+        snippetId = f?.id;
+        snippetAt = at;
+      }
+    }
+    const t = f?.type || "לא צוין";
+    themes[bucket][t] = (themes[bucket][t] || 0) + 1;
+  }
+
+  const rank = (o) =>
+    Object.entries(o)
+      .map(([type, count]) => ({ type, count }))
+      .sort((a, b) => b.count - a.count);
+
+  return {
+    awaitingReply,
+    repliedPending,
+    awaitingIds,
+    snippetId,
+    themes: { awaiting: rank(themes.awaiting), replied: rank(themes.replied) },
+  };
+}
 
 function gatherFeedback() {
-  const fb = { unresolved: null, themes: null, snippet: null, error: null };
+  const fb = {
+    awaitingReply: null,
+    repliedPending: null,
+    notResolved: null,
+    themes: null,
+    snippet: null,
+    error: null,
+  };
   if (!SUPABASE_DB_URL) {
     fb.error = "no-db-url";
     return fb;
   }
   try {
-    const n = parseInt(psqlScalar("SELECT count(*) FROM feedback WHERE status IS DISTINCT FROM 'resolved'"), 10);
-    fb.unresolved = Number.isFinite(n) ? n : null;
-    if (fb.unresolved && fb.unresolved > 0) {
-      const msg = psqlScalar(
-        "SELECT message FROM feedback WHERE status IS DISTINCT FROM 'resolved' ORDER BY created_at DESC LIMIT 1"
-      );
+    // ⛔ No `message` here. facts is sent whole to the Anthropic API (:322);
+    // pulling every message to classify would be exactly the drift
+    // docs/DECISIONS.md 2026-08-06 names as the agent risk. The snippet below
+    // is one targeted read, same exposure as before, field for field.
+    const rows = psqlRows("SELECT id, status, type, created_at FROM feedback").map(
+      ([id, status, type, created_at]) => ({ id, status, type, created_at })
+    );
+    const ledger = psqlRows(
+      "SELECT campaign FROM email_campaign_log WHERE campaign LIKE 'reply:%'"
+    ).map(([campaign]) => ({ campaign }));
+
+    const c = classifyFeedback(rows, ledger);
+    fb.awaitingReply = c.awaitingReply;
+    fb.repliedPending = c.repliedPending;
+    fb.notResolved = c.awaitingReply + c.repliedPending;
+
+    if (c.snippetId && UUID_RE.test(c.snippetId)) {
+      const msg = psqlScalar(`SELECT message FROM feedback WHERE id = '${c.snippetId}'`);
       // Sanitized here in JS (not in bash) before it ever reaches a workflow env/run block.
       fb.snippet = msg ? msg.replace(/\r?\n/g, " ").slice(0, 100) : null;
     }
-    if (IS_SUNDAY) {
-      const rows = psqlRows(
-        "SELECT type, count(*) FROM feedback WHERE status IS DISTINCT FROM 'resolved' GROUP BY type ORDER BY 2 DESC"
-      );
-      fb.themes = rows.map(([type, count]) => ({ type, count: parseInt(count, 10) }));
-    }
+    if (IS_SUNDAY) fb.themes = c.themes;
   } catch {
     fb.error = "psql";
   }
@@ -225,7 +300,7 @@ function countAttention(facts) {
   if (facts.live.pipelineOk === false) n++;
   if (facts.live.health && facts.live.health.status === "degraded") n++;
   n += facts.open.issueCount + facts.open.prCount;
-  if (facts.feedback.unresolved && facts.feedback.unresolved > 0) n++;
+  if (facts.feedback.awaitingReply && facts.feedback.awaitingReply > 0) n++;
   return n;
 }
 
@@ -265,9 +340,13 @@ function fallbackDigest(facts) {
     }
   }
 
-  if (facts.feedback.unresolved && facts.feedback.unresolved > 0) {
+  if (facts.feedback.awaitingReply > 0 || facts.feedback.repliedPending > 0) {
     lines.push("");
-    lines.push(`📝 ${facts.feedback.unresolved} פידבקים ממתינים לטיפול`);
+    lines.push(
+      `📝 ${facts.feedback.awaitingReply} פידבקים ממתינים למענה · ` +
+        `${facts.feedback.repliedPending} נענו וטרם יושמו ` +
+        `(מתוך ${facts.feedback.notResolved} לא-סגורים)`
+    );
   }
 
   if (facts.weekly) {
@@ -279,8 +358,12 @@ function fallbackDigest(facts) {
     } else {
       lines.push("• אין כשלים חוזרים");
     }
-    if (facts.feedback.themes?.length) {
-      lines.push(`• פידבק פתוח לפי סוג: ${facts.feedback.themes.map((t) => `${t.type}: ${t.count}`).join(", ")}`);
+    const byType = (list) => list.map((t) => `${t.type}: ${t.count}`).join(", ");
+    if (facts.feedback.themes?.awaiting?.length) {
+      lines.push(`• ממתינים למענה לפי סוג: ${byType(facts.feedback.themes.awaiting)}`);
+    }
+    if (facts.feedback.themes?.replied?.length) {
+      lines.push(`• נענו וטרם יושמו לפי סוג: ${byType(facts.feedback.themes.replied)}`);
     }
   }
 
@@ -299,6 +382,8 @@ async function composeWithClaude(facts) {
     "אחרי הכותרת פרט אך ורק את הפריטים שבאמת דורשים תשומת לב — בלי מילוי, בלי לחזור על מה שתקין.",
     "אם הכל ירוק — סה\"כ 2-3 שורות ותו לא.",
     "כלול קישורים ישירים לכל PR/Issue שדורש פעולה.",
+    "ב-feedback יש שני דליים נפרדים מאותה אוכלוסייה (לא-סגורים): awaitingReply = ממתינים למענה, repliedPending = נענו וטרם יושמו. רק awaitingReply דורש פעולה.",
+    "בכל אזכור של פידבק כתוב את שני המספרים ואת המכנה, למשל '3 ממתינים למענה · 2 נענו וטרם יושמו (מתוך 5 לא-סגורים)'. אל תכתוב 'N פידבקים ממתינים' בלי הפירוק.",
     "אם קיים בעובדות שדה weekly — הוסף בסוף סעיף שכותרתו 'סיכום שבועי' עם מספר הדיפלויים, כשלים חוזרים, ותמות פידבק אם יש.",
     "אל תכלול סודות, טוקנים או מפתחות. היה תמציתי.",
   ].join(" ");
@@ -344,7 +429,9 @@ function emitOutputs(digest, attention, feedback) {
   if (gho) {
     const digestDelim = `DIGEST_${Date.now()}`;
     const fbDelim = `FBSNIP_${Date.now()}`;
-    const fbUnresolved = feedback && Number.isFinite(feedback.unresolved) ? feedback.unresolved : 0;
+    // ⚠️ The output name is consumed by daily-digest.yml:67 and stays as it is,
+    // but it now carries the awaiting-reply count — the one that needs action.
+    const fbUnresolved = feedback && Number.isFinite(feedback.awaitingReply) ? feedback.awaitingReply : 0;
     const fbSnippet = feedback && feedback.snippet ? feedback.snippet : "";
     appendFileSync(gho, `date=${DATE}\n`);
     appendFileSync(gho, `attention=${attention}\n`);
@@ -375,9 +462,13 @@ async function main() {
   emitOutputs(digest, facts.attentionCount, feedback);
 }
 
-main().catch((e) => {
-  // Absolute last resort: never fail the workflow over the digest itself.
-  console.error("::warning::daily-digest failed unexpectedly — emitting minimal notice");
-  const notice = "🟡 סוכן הסיכום היומי נתקל בשגיאה בהרכבת הדיווח. בדוק את לוג ה-Action.";
-  emitOutputs(notice, 1, null);
-});
+// Only when run as a script. Importing this file (scripts/digest-feedback-test.mjs)
+// must not spawn psql or call the Anthropic API.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch(() => {
+    // Absolute last resort: never fail the workflow over the digest itself.
+    console.error("::warning::daily-digest failed unexpectedly — emitting minimal notice");
+    const notice = "🟡 סוכן הסיכום היומי נתקל בשגיאה בהרכבת הדיווח. בדוק את לוג ה-Action.";
+    emitOutputs(notice, 1, null);
+  });
+}

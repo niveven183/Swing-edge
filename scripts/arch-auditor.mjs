@@ -18,7 +18,7 @@
 
 import { execFileSync } from "node:child_process";
 import { appendFileSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join, relative, extname } from "node:path";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || "";
@@ -64,7 +64,7 @@ function readSafe(p) {
 }
 
 // Collect the source corpus once: [{ path, rel, lines: [..], text }].
-function loadCorpus() {
+export function loadCorpus() {
   const files = walk(ROOT);
   return files.map((p) => {
     const text = readSafe(p);
@@ -82,10 +82,95 @@ function grepFile(file, re) {
   return hits;
 }
 
+// ── api endpoints ────────────────────────────────────────────────────────────
+
+// Everything directly under api/ IS a serverless endpoint; everything under
+// api/_lib/ is a helper module that is never invoked with (req, res). Calling
+// replyLedger.js "an endpoint without error handling" was one of the 16 weekly
+// findings and it was simply not true.
+export function apiEndpoints(corpus) {
+  return corpus.filter((f) => f.rel.startsWith("api/") && !f.rel.startsWith("api/_lib/"));
+}
+
+// The real mechanism, read from api/fx.js:38 rather than guessed:
+//   import { rateLimit, clientIp } from "./_lib/rateLimit.js";
+//   const { allowed, retryAfter } = rateLimit(`${clientIp(req)}:fx`, {…});
+// Matching a bare `429` instead would count any comment that mentions the number.
+const RATE_LIMIT_RE = /\brateLimit\s*\(|@upstash\/ratelimit/;
+
+// ⚠️ Per file, never aggregated. The predecessor asked whether EVERY api file
+// lacked a limiter — 12 of 13 had one, so it could never fire, and the single
+// endpoint with no IP limiter was never named. An all-or-nothing condition over
+// a corpus silences itself, and a silent check is indistinguishable from a pass.
+export function endpointsMissingRateLimit(corpus) {
+  return apiEndpoints(corpus)
+    .filter((f) => !RATE_LIMIT_RE.test(f.text))
+    .map((f) => f.rel);
+}
+
+// An endpoint is "exposed" only if it has NEITHER an auth signal NOR a limiter.
+// The title always promised auth-or-rate-limit; the code tested auth alone, and
+// named two rate-limited endpoints as unprotected.
+export function endpointsMissingAuth(corpus) {
+  const authRe = /authorization|api[_-]?key|bearer|\btoken\b|x-api-key/i;
+  return apiEndpoints(corpus)
+    .filter((f) => (f.text.match(/fetch\s*\(|https?:\/\//g) || []).length > 0)
+    .filter((f) => !authRe.test(f.text) && !RATE_LIMIT_RE.test(f.text))
+    .map((f) => f.rel);
+}
+
+// ── acknowledged findings ────────────────────────────────────────────────────
+//
+// A scanner that keeps reporting a decision already taken becomes noise, and
+// noise is what teaches Niv to skim the list. Suppression is therefore allowed —
+// but every entry carries a date and a reference to where the decision is
+// written, the count is printed out loud, and ⛔ the check itself is never
+// deleted: if the underlying fact changes, the finding must be able to return.
+const ACKNOWLEDGED = [
+  {
+    category: "ARCHITECTURE",
+    titleRe: /^קובץ ענק \(\d+ שורות\): SwingEdge_App\.jsx$/,
+    date: "2026-08-09",
+    ref: "docs/STATE.md:98",
+    reason: "גדול בכוונה — ייפוצל בעילה, לא כחוב כללי",
+  },
+  {
+    category: "ARCHITECTURE",
+    titleRe: /^קובץ ענק \(\d+ שורות\): src\/i18n\.js$/,
+    date: "2026-08-09",
+    ref: "docs/STATE.md:98",
+    reason: "גדול בכוונה — טבלת תרגום שטוחה",
+  },
+  {
+    category: "SECURITY",
+    titleRe: /^endpoint ללא הגבלת קצב: api\/send-invites\.js$/,
+    date: "2026-08-09",
+    ref: "api/send-invites.js:11-15",
+    reason: "JWT + is_admin() ב-RPC, נתיב אדמין-בלבד. rate-limit על דלת נעולה אינו ההגנה החסרה",
+  },
+];
+
+// ⚠️ src/components/AdminPanel.jsx (1,805) is deliberately absent. STATE.md:98
+// names exactly two files; a third suppression would widen a decision that was
+// never taken, so it stays a live finding.
+export function isAcknowledged(finding) {
+  return (
+    ACKNOWLEDGED.find(
+      (a) => a.category === finding?.category && a.titleRe.test(finding?.title || "")
+    ) || null
+  );
+}
+
 // ── finding factory ──────────────────────────────────────────────────────────
 // impact & effort are 1..5. ratio = impact / effort (higher = do first).
 const findings = [];
+const silenced = [];
 function add(category, title, impact, effort, evidence, recommendation) {
+  const ack = isAcknowledged({ category, title });
+  if (ack) {
+    silenced.push({ category, title, evidence, date: ack.date, ref: ack.ref, reason: ack.reason });
+    return;
+  }
   findings.push({
     category, title,
     impact: Math.max(1, Math.min(5, impact)),
@@ -234,14 +319,11 @@ function auditSecurity(corpus) {
       "ודא סניטציה (DOMPurify) לכל קלט שאינו סטטי כדי למנוע XSS.");
   }
 
-  // Rate-limiting on api/* endpoints (grep heuristic across the api directory).
-  const apiFiles = corpus.filter((f) => f.rel.startsWith("api/"));
-  const rlRe = /rate[-_ ]?limit|ratelimit|@upstash\/ratelimit|too many requests|429/i;
-  const noRL = apiFiles.filter((f) => !rlRe.test(f.text));
-  if (apiFiles.length && noRL.length === apiFiles.length) {
-    add("SECURITY", `אין הגבלת קצב (rate-limit) באף endpoint (api/* — ${apiFiles.length} קבצים)`,
-      4, 3, `${apiFiles[0].rel}:1`,
-      "הוסף rate-limiting (למשל לפי IP) על נקודות הקצה הציבוריות למניעת ניצול/עלות.");
+  // Rate-limiting, one answer per endpoint. See endpointsMissingRateLimit.
+  for (const relPath of endpointsMissingRateLimit(corpus)) {
+    add("SECURITY", `endpoint ללא הגבלת קצב: ${relPath}`,
+      4, 3, `${relPath}:1`,
+      "הוסף rateLimit() לפי IP על נקודת הקצה למניעת ניצול/עלות.");
   }
 
   // npm audit — summarise counts by severity (degrade gracefully if unavailable).
@@ -291,7 +373,9 @@ function auditData(corpus) {
   // RLS-mention heuristic: Supabase is used but no "RLS"/"policy" mention anywhere
   // in source → surface it as a review item (low confidence, review-only).
   const usesSupabase = src.some((f) => /supabase/i.test(f.text));
-  const mentionsRls = corpus.some((f) => /\bRLS\b|row level security|createPolicy|\bpolicy\b/i.test(f.text));
+  // ⚠️ `\bpolicy\b` was dropped: it matched `// ── Failure policy ──` in
+  // api/fx.js:30, which silenced a real security check on an unrelated comment.
+  const mentionsRls = corpus.some((f) => /\bRLS\b|row level security|createPolicy/i.test(f.text));
   if (usesSupabase && !mentionsRls) {
     const anchor = src.find((f) => /supabase/i.test(f.text));
     add("DATA", "אין אזכור ל-RLS/policies בקוד (Supabase בשימוש)",
@@ -308,8 +392,11 @@ function auditData(corpus) {
     }
     limits += grepFile(f, /\.limit\s*\(/).length;
   }
-  if (selects >= 5 && limits === 0) {
-    add("DATA", `שאילתות ללא .limit() — ${selects} קריאות select ללא תקרה`,
+  // ⚠️ On the difference, not on `limits === 0`: a single .limit(1) health probe
+  // (AdminPanel.jsx:1507) cancelled all 21 selects. Per-call would be 21 lines of
+  // noise; the gap is the signal.
+  if (selects - limits >= 5) {
+    add("DATA", `שאילתות ללא .limit() — ${selects} קריאות select מול ${limits} תקרות`,
       3, 2, firstSelect || "—",
       "הוסף .limit()/pagination לשאילתות שעלולות לגדול כדי למנוע קריאות בלתי חסומות (מועמדים).");
   }
@@ -388,11 +475,10 @@ function auditAccessibility(corpus) {
 
 // ── f. CONNECTIONS ───────────────────────────────────────────────────────────
 function auditConnections(corpus) {
-  const apiFiles = corpus.filter((f) => f.rel.startsWith("api/"));
-  for (const f of apiFiles) {
+  const exposed = new Set(endpointsMissingAuth(corpus));
+  for (const f of apiEndpoints(corpus)) {
     const hasTry = /\btry\s*\{/.test(f.text) && /\bcatch\b/.test(f.text);
     const hasTimeout = /AbortController|AbortSignal\.timeout|setTimeout\s*\(|timeout\s*:/.test(f.text);
-    const hasAuth = /authorization|api[_-]?key|bearer|\btoken\b|x-api-key/i.test(f.text);
     const extCalls = (f.text.match(/fetch\s*\(|https?:\/\//g) || []).length;
 
     if (!hasTry) {
@@ -405,7 +491,7 @@ function auditConnections(corpus) {
         4, 2, `${f.rel}:1`,
         "הוסף AbortController/timeout לכל fetch חיצוני כדי למנוע תקיעת בקשות ועלות.");
     }
-    if (!hasAuth && extCalls > 0) {
+    if (exposed.has(f.rel)) {
       add("CONNECTIONS", `endpoint ציבורי ללא אימות/הגבלה נראית: ${f.rel}`,
         3, 3, `${f.rel}:1`,
         "שקול אימות/הגבלת-קצב לחשיפת עלות מבוקרת בקריאות חיצוניות (בדיקה ידנית).");
@@ -432,6 +518,7 @@ async function composeWithClaude(facts) {
     "מבנה: (1) שורת כותרת: כמה ממצאים נמצאו וה-3 המובילים לפי יחס impact/effort.",
     "(2) פירוט מקובץ לפי קטגוריה — לכל ממצא: הכותרת, impact, effort, המיקום (evidence), ושורת תיקון אחת.",
     "ה-evidence הוא מיקום קובץ:שורה בלבד — לעולם אל תצטט ערך, סוד, מפתח או תוכן קוד.",
+    "אם acknowledged > 0 — הוסף בסוף שורה אחת בדיוק: 'N ממצאים מאושרים הושתקו' (N=acknowledged). אל תפרט אותם ואל תמנה אותם בין הממצאים.",
     "אם אין ממצאים — אמור זאת בכנות. היה תמציתי ומקצועי, ללא סיסמאות.",
   ].join(" ");
   try {
@@ -468,8 +555,12 @@ function fallbackHe(facts) {
   const L = [];
   L.push(`🏗️ SwingEdge — ביקורת ארכיטקטורה (${DATE})`);
   L.push("");
+  // A suppression that is not counted out loud is a deletion. Printed on the
+  // clean path too — that is exactly the path where a silent one would hide.
+  const ackLine = facts.acknowledged > 0 ? `${facts.acknowledged} ממצאים מאושרים הושתקו` : null;
   if (facts.total === 0) {
     L.push("לא נמצאו ממצאי ארכיטקטורה החודש. הבנייה נראית תקינה מבחינת המדדים שנבדקו.");
+    if (ackLine) L.push(ackLine);
     return L.join("\n");
   }
   L.push(`נמצאו ${facts.total} ממצאים. 3 המובילים לפי יחס impact/effort:`);
@@ -489,6 +580,7 @@ function fallbackHe(facts) {
     }
     L.push("");
   }
+  if (ackLine) L.push(ackLine);
   return L.join("\n").trimEnd();
 }
 
@@ -537,8 +629,10 @@ async function main() {
   const facts = {
     date: DATE,
     total: findings.length,
+    acknowledged: silenced.length,
     top3: rankTop(findings, 3),
     findings,
+    silenced,
   };
 
   const email_he = (await composeWithClaude(facts)) || fallbackHe(facts);
@@ -548,16 +642,25 @@ async function main() {
 
   const gss = process.env.GITHUB_STEP_SUMMARY;
   if (gss) {
+    const ackNote = silenced.length
+      ? `\n${silenced.length} ממצאים מאושרים הושתקו:\n\n` +
+        silenced.map((s) => `- \`${s.evidence}\` — ${s.reason} (${s.date}, ${s.ref})`).join("\n") +
+        "\n"
+      : "";
     const report = findings.length
-      ? `### 🏗️ Architecture Auditor — ${findings.length} findings (${DATE})\n\n${table}\n`
-      : `### 🏗️ Architecture Auditor — ✅ clean (${DATE})\n\nNo architecture findings.\n`;
+      ? `### 🏗️ Architecture Auditor — ${findings.length} findings (${DATE})\n\n${table}\n${ackNote}`
+      : `### 🏗️ Architecture Auditor — ✅ clean (${DATE})\n\nNo architecture findings.\n${ackNote}`;
     appendFileSync(gss, report);
   }
   console.log(JSON.stringify(facts, null, 2));
 }
 
-main().catch((e) => {
-  // Never fail the workflow over the auditor itself.
-  console.error("::warning::Architecture Auditor failed unexpectedly.", e?.message || e);
-  emit({ date: DATE, findings: 0, email_he: "", issue_table: "" });
-});
+// Only when run as a script. Importing this file (scripts/arch-auditor-test.mjs)
+// must not run `npm audit` or write to the CI output files.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((e) => {
+    // Never fail the workflow over the auditor itself.
+    console.error("::warning::Architecture Auditor failed unexpectedly.", e?.message || e);
+    emit({ date: DATE, findings: 0, email_he: "", issue_table: "" });
+  });
+}
