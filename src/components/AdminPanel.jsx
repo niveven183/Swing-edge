@@ -445,7 +445,10 @@ function OverviewTab({ overview, series, users, waitlist = [], loading, toast, o
   const totalUsers = overview?.total_users ?? 0;
   const activeUsers = overview?.active_30d ?? 0;
   const totalTrades = overview?.total_trades ?? 0;
-  const avgTradesPerUser = overview?.avg_trades_user != null ? Number(overview.avg_trades_user).toFixed(1) : "0";
+  // "—", not "0". With no users there is no average; a 0 here would say the
+  // users we have enter no trades. The RPC returns null on an empty denominator
+  // (admin_rpcs_denominators.sql).
+  const avgTradesPerUser = overview?.avg_trades_user != null ? Number(overview.avg_trades_user).toFixed(1) : "—";
   const newUsersThisWeek = overview?.new_users_week ?? 0;
   const tradesThisWeek = overview?.trades_week ?? 0;
   const waitlistCount = overview?.waitlist_count ?? null;
@@ -936,16 +939,19 @@ function TradesTab({ tradesList, agg, toast, onMutate }) {
     // by. A "$" in front of it was a lie about a number that has no unit.
     // ⏭️ STATE: an avg_pnl_by_ccy RPC. Until then the honest render is "—".
     topTicker: agg?.top_ticker || "—",
-    // ⚠️ The RPC returns 0, not null, on an empty denominator
-    // (admin_rpcs.sql:267 `else 0`). Without this guard an empty table renders
-    // "0% with stop" — which reads as "nobody sets stops" when the truth is
-    // "there are no trades". Same failure class as the A5 win-rate denominator.
-    // ⏭️ STATE: make the RPC return null on an empty denominator, and raw counts.
-    pctWithStop: !agg?.total ? "—" : `${agg.pct_with_stop}%`,
-    // The RPC gives back the percentage only, never the raw numerator, and
-    // reconstructing it from a rounded percent would be fake precision. So the
-    // sub-label carries the DENOMINATOR and says which population it is.
-    stopSub: !agg?.total ? "No trades yet" : `of ${agg.total.toLocaleString()} trades`,
+    // The RPC now returns null on an empty denominator and counts demo trades
+    // out of both numerator and denominator (admin_rpcs_denominators.sql). The
+    // guard is on the RATE, not on `total`: a table holding only demo rows has
+    // total > 0 and no rate, and `${null}%` renders the string "null%".
+    // `?? total` keeps this readable against the pre-migration RPC too.
+    pctWithStop: agg?.pct_with_stop == null ? "—" : `${agg.pct_with_stop}%`,
+    // A rounded percent cannot be un-rounded, so the numerator travels with it
+    // rather than being reconstructed. Both counts name their population.
+    stopSub: !(agg?.real_count ?? agg?.total)
+      ? "No real trades yet"
+      : agg?.with_stop != null
+        ? `${agg.with_stop.toLocaleString()}/${(agg.real_count ?? agg.total).toLocaleString()} real trades`
+        : `of ${(agg.real_count ?? agg.total).toLocaleString()} real trades`,
   };
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
