@@ -8,7 +8,7 @@ import {
 } from "../utils/statisticalModels.js";
 import { disciplineRate } from "../utils/psychologyPatterns.js";
 import { matchIdeaToEdge } from "./EdgeFinder.js";
-import { DEFAULT_CAPITAL } from "../../utils.js";
+import { currencyOf } from "../../utils.js";
 
 // Weights as specified: 30/25/20/15/10.
 const WEIGHTS = {
@@ -25,17 +25,30 @@ const disciplineScore = (trades) => {
   return dRate == null ? 50 : to100(dRate);
 };
 
-const riskMgmtScore = (trades, capitalAtEntryDefault = DEFAULT_CAPITAL) => {
+// `capitalCurrency` is optional. Passing it drops trades denominated in some
+// OTHER currency: risk% is riskDollars/capital, and a shekel numerator over a
+// dollar denominator is not a percentage, it is an exchange rate wearing a %
+// sign. Omitting it reproduces the currency-blind behaviour exactly, so a
+// single-currency journal is byte-identical. Never a conversion here — this
+// engine has no rate table and inventing one is the bug it is guarding against.
+const riskMgmtScore = (trades, capitalCurrency = null) => {
   const closed = getClosed(trades);
   if (!closed.length) return 50;
   // A trade without a stop has no measurable risk. `Math.abs(entry - null)` is
   // `entry`, so including it charged the score the FULL POSITION VALUE as risk —
   // a positive number, which the `> 0` filter below happily let through.
-  const pcts = closed.filter(t => t.stop != null && t.shares > 0).map(t => {
-    const capital = t._capitalAtEntry || capitalAtEntryDefault;
+  const measurable = closed.filter(t =>
+    t.stop != null && t.shares > 0 &&
+    (capitalCurrency == null || currencyOf(t) === capitalCurrency));
+  const pcts = measurable.map(t => {
+    // No capital recorded at entry → the risk % is UNMEASURED. It used to read
+    // DEFAULT_CAPITAL, which turned "we don't know" into a confident 2,500 and
+    // scored the trader against a number nobody ever entered.
+    const capital = Number(t._capitalAtEntry);
+    if (!Number.isFinite(capital) || capital <= 0) return null;
     const rd = Math.abs(t.entry - t.stop) * t.shares;
-    return capital > 0 ? rd / capital : 0;
-  }).filter(p => p > 0);
+    return rd / capital;
+  }).filter(p => p != null && p > 0);
   if (!pcts.length) return 50;
   const avg = pcts.reduce((s, x) => s + x, 0) / pcts.length;
   // 1% target = 100; each extra % off-target burns score linearly.
@@ -92,10 +105,10 @@ const tradesInMonth = (trades, year, month) =>
   getClosed(trades).filter(t => inMonth(t.date, year, month));
 
 // ─── PUBLIC API ──────────────────────────────────────────────────────────────
-export const calculateGrowthScore = (trades = [], edgeReport = null) => {
+export const calculateGrowthScore = (trades = [], edgeReport = null, capitalCurrency = null) => {
   const sub = {
     discipline:       disciplineScore(trades),
-    riskManagement:   riskMgmtScore(trades),
+    riskManagement:   riskMgmtScore(trades, capitalCurrency),
     consistency:      consistencyScore(trades),
     edgeUtilization:  edgeUtilizationScore(trades, edgeReport),
     emotionalControl: emotionalControlScore(trades),
@@ -111,7 +124,7 @@ export const calculateGrowthScore = (trades = [], edgeReport = null) => {
 };
 
 // Compare this month vs. the previous full month. Produces the monthly report.
-export const generateGrowthReport = (trades = [], edgeReport = null, now = new Date()) => {
+export const generateGrowthReport = (trades = [], edgeReport = null, now = new Date(), capitalCurrency = null) => {
   const year      = now.getFullYear();
   const month     = now.getMonth();
   const prevMonth = month === 0 ? 11 : month - 1;
@@ -120,10 +133,10 @@ export const generateGrowthReport = (trades = [], edgeReport = null, now = new D
   const thisTrades = tradesInMonth(trades, year, month);
   const prevTrades = tradesInMonth(trades, prevYear, prevMonth);
 
-  const current  = calculateGrowthScore(trades, edgeReport);
+  const current  = calculateGrowthScore(trades, edgeReport, capitalCurrency);
   const previous = calculateGrowthScore(
     getClosed(trades).filter(t => !inMonth(t.date, year, month)),
-    edgeReport
+    edgeReport, capitalCurrency
   );
   const delta = current.total - previous.total;
 
@@ -166,7 +179,7 @@ export const generateGrowthReport = (trades = [], edgeReport = null, now = new D
 };
 
 // Evolution chart: monthly growth score for the last N months.
-export const dnaEvolutionSeries = (trades = [], edgeReport = null, months = 6) => {
+export const dnaEvolutionSeries = (trades = [], edgeReport = null, months = 6, capitalCurrency = null) => {
   const out = [];
   const now = new Date();
   for (let i = months - 1; i >= 0; i--) {
@@ -176,7 +189,7 @@ export const dnaEvolutionSeries = (trades = [], edgeReport = null, months = 6) =
       const ts = new Date((t.date || "") + "T12:00:00").getTime();
       return !isNaN(ts) && ts <= upTo;
     });
-    const s = calculateGrowthScore(histSlice, edgeReport);
+    const s = calculateGrowthScore(histSlice, edgeReport, capitalCurrency);
     out.push({
       label: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
       score: s.total,

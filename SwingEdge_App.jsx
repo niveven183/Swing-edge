@@ -1992,7 +1992,7 @@ export default function SwingEdge() {
   // hooks run unconditionally with an empty default until a mentee is chosen.
   const menteeRealTrades = useMemo(() => menteeTrades.filter(t => !t.isDemo), [menteeTrades]);
   const menteeStats = useTradingStats(menteeRealTrades, equityBase, stableCalcTradeMetrics);
-  const menteeDNA = useMemo(() => calculateTradeDNA(menteeRealTrades), [menteeRealTrades]);
+  const menteeDNA = useMemo(() => calculateTradeDNA(menteeRealTrades, capitalCurrency), [menteeRealTrades, capitalCurrency]);
 
   // Current-month subset fed through the same hub — powers the monthly PDF export.
   const currentMonthRealTrades = useMemo(() => {
@@ -2095,12 +2095,16 @@ export default function SwingEdge() {
   // ─── SWINGEDGE AI REPORTS ──────────────────────────────────────────────────
   // Memoised against the trades reference — the orchestrator also has an
   // internal WeakMap cache so repeated reads are effectively free.
-  const aiDNA          = useMemo(() => SwingEdgeAI.getDNA(realTrades),          [realTrades]);
+  // `capitalCurrency` is passed so the risk sub-scores measure only the trades
+  // whose P&L shares the capital's unit. Trades in another currency are left
+  // UNMEASURED rather than converted: these engines hold no rate table, and an
+  // invented rate here would be a wrong score wearing a confident number.
+  const aiDNA          = useMemo(() => SwingEdgeAI.getDNA(realTrades, capitalCurrency),          [realTrades, capitalCurrency]);
   const aiEdges        = useMemo(() => SwingEdgeAI.getEdges(realTrades),        [realTrades]);
   const aiRegime       = useMemo(() => SwingEdgeAI.getRegime(realTrades, { marketData: regimeOverview }), [realTrades, regimeOverview]);
-  const aiGrowth       = useMemo(() => SwingEdgeAI.getGrowth(realTrades),       [realTrades]);
-  const aiEvolution    = useMemo(() => SwingEdgeAI.getEvolution(realTrades, 6), [realTrades]);
-  const aiGrowthReport = useMemo(() => SwingEdgeAI.getGrowthReport(realTrades), [realTrades]);
+  const aiGrowth       = useMemo(() => SwingEdgeAI.getGrowth(realTrades, capitalCurrency),       [realTrades, capitalCurrency]);
+  const aiEvolution    = useMemo(() => SwingEdgeAI.getEvolution(realTrades, 6, capitalCurrency), [realTrades, capitalCurrency]);
+  const aiGrowthReport = useMemo(() => SwingEdgeAI.getGrowthReport(realTrades, capitalCurrency), [realTrades, capitalCurrency]);
 
   // Tilt re-evaluates on a 60s tick so cooldown expiry and new conditions update.
   const [tiltTick, setTiltTick] = useState(0);

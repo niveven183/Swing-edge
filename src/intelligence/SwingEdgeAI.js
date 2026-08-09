@@ -33,7 +33,11 @@ const memoize = (trades, key, factory) => {
 // ─── PUBLIC API ──────────────────────────────────────────────────────────────
 export const SwingEdgeAI = {
   // Core reports. All are pure functions of `trades` (+ optional snapshot).
-  getDNA: (trades)                     => memoize(trades, "dna",    () => calculateTradeDNA(trades)),
+  // `capitalCurrency` is optional throughout. It gates the risk population in
+  // the engines below so a shekel trade is not divided by a dollar capital;
+  // omitting it reproduces the previous behaviour exactly. It is part of every
+  // memo key, because the same trades array yields different scores under it.
+  getDNA: (trades, capitalCurrency = null) => memoize(trades, `dna:${capitalCurrency || ""}`, () => calculateTradeDNA(trades, capitalCurrency)),
   getEdges: (trades)                   => memoize(trades, "edges",  () => findEdges(trades)),
   // opts: { marketData, snapshot }. A bare snapshot object is tolerated. When
   // live marketData is present we compute fresh — the trades-identity memo can't
@@ -45,9 +49,9 @@ export const SwingEdgeAI = {
     if (marketData) return detectMarketRegime(trades, { marketData, snapshot });
     return memoize(trades, snapshot ? "regime:snap" : "regime", () => detectMarketRegime(trades, { snapshot }));
   },
-  getGrowth: (trades)                  => memoize(trades, "growth", () => calculateGrowthScore(trades, SwingEdgeAI.getEdges(trades))),
-  getGrowthReport: (trades)            => memoize(trades, "growthReport", () => generateGrowthReport(trades, SwingEdgeAI.getEdges(trades))),
-  getEvolution:  (trades, months = 6)  => memoize(trades, `evo:${months}`, () => dnaEvolutionSeries(trades, SwingEdgeAI.getEdges(trades), months)),
+  getGrowth: (trades, capitalCurrency = null) => memoize(trades, `growth:${capitalCurrency || ""}`, () => calculateGrowthScore(trades, SwingEdgeAI.getEdges(trades), capitalCurrency)),
+  getGrowthReport: (trades, capitalCurrency = null) => memoize(trades, `growthReport:${capitalCurrency || ""}`, () => generateGrowthReport(trades, SwingEdgeAI.getEdges(trades), new Date(), capitalCurrency)),
+  getEvolution:  (trades, months = 6, capitalCurrency = null) => memoize(trades, `evo:${months}:${capitalCurrency || ""}`, () => dnaEvolutionSeries(trades, SwingEdgeAI.getEdges(trades), months, capitalCurrency)),
 
   // Real-time coaching on a candidate trade. Not memoised — the form state
   // changes on every keystroke.

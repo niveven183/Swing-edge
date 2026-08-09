@@ -19,7 +19,7 @@ import {
   MIN_SAMPLE_DNA, MIN_SAMPLE_PATTERNS, MIN_SAMPLE_FORECAST, MIN_SAMPLE_ML,
 } from "../utils/statisticalModels.js";
 import { disciplineRate, emotionPerformance } from "../utils/psychologyPatterns.js";
-import { qstars, DEFAULT_CAPITAL } from "../../utils.js";
+import { qstars, currencyOf } from "../../utils.js";
 import { isFollowedPlan } from "../../utils.js";
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -71,24 +71,42 @@ const rankGroups = (trades, keyFn, { minN = 3, topK = 3 } = {}) => {
   return { strengths, weaknesses };
 };
 
+// A risk % is riskDollars / capital. When the two are denominated in different
+// currencies the quotient is not a percentage, it is an exchange rate wearing a
+// % sign — the same unit mismatch the risk board already gates with `sameCcy`.
+// `capitalCurrency` is optional and omitting it reproduces the currency-blind
+// behaviour EXACTLY, so a single-currency journal is byte-identical. There is
+// deliberately no conversion here: this engine holds no rate table, and a
+// number marked unmeasured is worth more than a number quietly guessed.
+const measurableRisk = (closed, capitalCurrency) =>
+  capitalCurrency == null
+    ? closed
+    : closed.filter(t => currencyOf(t) === capitalCurrency);
+
 // ─── STYLE INFERENCE ─────────────────────────────────────────────────────────
 // Pragmatic heuristics — translates behaviour into a 0..100 "style" band.
-const inferStyle = (trades) => {
+const inferStyle = (trades, capitalCurrency = null) => {
   const closed = getClosed(trades);
   if (!closed.length) {
     return { aggression: 50, patience: 50, discipline: 50, tilt: 0 };
   }
 
   // Aggression: average portfolio risk taken per trade, relative to 1% baseline.
-  const risks = closed
+  // Only the risk population is currency-gated — patience, discipline and tilt
+  // below count behaviour, not money, and a shekel trade is behaviour too.
+  const risks = measurableRisk(closed, capitalCurrency)
     .map(t => {
       const entry = Number(t.entry);
       const stop = Number(t.stop);
       const shares = Number(t.shares);
       if (!Number.isFinite(entry) || !Number.isFinite(stop) || !Number.isFinite(shares)) return 0;
       const riskPerShare = Math.abs(entry - stop);
-      const capital = Number(t._capitalAtEntry) || DEFAULT_CAPITAL;
-      return capital > 0 ? (riskPerShare * shares) / capital : 0;
+      // No capital recorded at entry → UNMEASURED, not DEFAULT_CAPITAL. The
+      // default turned "we don't know" into a confident 2,500 and scored the
+      // trader's aggression against a number nobody ever entered.
+      const capital = Number(t._capitalAtEntry);
+      if (!Number.isFinite(capital) || capital <= 0) return 0;
+      return (riskPerShare * shares) / capital;
     })
     .filter(r => r > 0 && Number.isFinite(r));
   const avgRisk = risks.length ? risks.reduce((s, x) => s + x, 0) / risks.length : 0.01;
@@ -112,22 +130,22 @@ const inferStyle = (trades) => {
 };
 
 // ─── CORE SCORES ─────────────────────────────────────────────────────────────
-const computeScores = (trades) => {
+const computeScores = (trades, capitalCurrency = null) => {
   const closed = getClosed(trades);
   if (!closed.length) {
     return { risk: 50, discipline: 50, consistency: 50, growth: 50 };
   }
 
   // Risk score — 100 means always within the 1% rule, falls as risk drifts up.
-  const risks = closed
+  const risks = measurableRisk(closed, capitalCurrency)
     .map(t => {
       const entry = Number(t.entry);
       const stop = Number(t.stop);
       const shares = Number(t.shares);
       if (!Number.isFinite(entry) || !Number.isFinite(stop) || !Number.isFinite(shares)) return 0;
-      const capital = Number(t._capitalAtEntry) || DEFAULT_CAPITAL;
-      const rd = Math.abs(entry - stop) * shares;
-      return capital > 0 ? rd / capital : 0;
+      const capital = Number(t._capitalAtEntry);
+      if (!Number.isFinite(capital) || capital <= 0) return 0;
+      return (Math.abs(entry - stop) * shares) / capital;
     })
     .filter(r => r > 0 && Number.isFinite(r));
   const avgRiskPct = risks.length ? risks.reduce((s, x) => s + x, 0) / risks.length : 0.01;
@@ -166,7 +184,7 @@ const computeScores = (trades) => {
 // Single-entry cache: avoids recomputing for the same trade set.
 let _dnaCache = { key: null, result: null };
 
-export const calculateTradeDNA = (allTrades = []) => {
+export const calculateTradeDNA = (allTrades = [], capitalCurrency = null) => {
   // The key must satisfy TWO properties at once, because this single-entry slot
   // is shared across callers:
   //   (a) Mutation-sensitivity — closing or editing a trade (status / exit /
@@ -186,7 +204,10 @@ export const calculateTradeDNA = (allTrades = []) => {
     const s = `${t.id}|${t.status}|${t.exitPrice ?? t.exit ?? ''}|${t.entry}|${t.stop}|${t.shares}`;
     for (let i = 0; i < s.length; i++) _sig = (_sig * 31 + s.charCodeAt(i)) | 0;
   }
-  const _cacheKey = `${allTrades.length}_${_closed}_${allTrades[0]?.date || ''}_${_last?.date || ''}_${_last?.id || ''}_${_sig}`;
+  //   (c) Currency-sensitivity — the risk population is gated by
+  //       `capitalCurrency`, so flipping it changes the scores while every term
+  //       above stays identical. It has to be in the key.
+  const _cacheKey = `${allTrades.length}_${_closed}_${allTrades[0]?.date || ''}_${_last?.date || ''}_${_last?.id || ''}_${_sig}_${capitalCurrency || ''}`;
   if (_dnaCache.key === _cacheKey && _dnaCache.result !== null) return _dnaCache.result;
 
   const closed = getClosed(allTrades);
@@ -202,8 +223,8 @@ export const calculateTradeDNA = (allTrades = []) => {
     sampleSize: n,
     totalTrades: (allTrades || []).length,
     maturity: maturityFor(n),
-    scores: computeScores(closed),
-    style: inferStyle(closed),
+    scores: computeScores(closed, capitalCurrency),
+    style: inferStyle(closed, capitalCurrency),
     strengths: {
       setups:        setupsRank.strengths,
       emotions:      emotionsRank.strengths,
