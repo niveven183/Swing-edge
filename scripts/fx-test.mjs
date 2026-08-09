@@ -28,7 +28,9 @@
 //
 // Pure Node, no network. Run: `node scripts/fx-test.mjs`.
 
+import { readFileSync } from "node:fs";
 import { convert, resolveDayRate, buildRateTable } from "../src/lib/fx.js";
+import { BUCKET_THRESHOLDS, bucketFor, riskPctFor } from "../src/lib/riskProfile.js";
 
 let failures = 0;
 const check = (name, cond) => {
@@ -167,9 +169,60 @@ console.log("\n5 · buildRateTable · only real rates get in");
   eq("…and quote", t.quote, "ILS");
 }
 
+// ── 6 · A CLASSIFICATION THRESHOLD IS DENOMINATED TOO ───────────────────────
+// The bug: ₪10,000 was compared against a threshold written in dollars, so a
+// small account was classified as a medium one and walked away with double the
+// per-trade risk. Measured in production, not theorised: 1/2 of the shekel
+// onboardings (AUDIT 2026-08-09 §4א).
+console.log("\n6 · risk buckets · an amount is classified in its own currency");
+{
+  // ₪10,000 at ~3.0 ₪/$ is about $3,330. It must be classified like that
+  // account, and NOT like a $10,000 one. These two are the whole assertion.
+  eq("₪10,000 is a small account", bucketFor(10_000, "ILS"), "small");
+  eq("…exactly as $3,330 is", bucketFor(3_330, "USD"), "small");
+  check("₪10,000 is NOT classified as $10,000 would be",
+    bucketFor(10_000, "ILS") !== bucketFor(10_000, "USD"));
+  eq("…because $10,000 is a medium account", bucketFor(10_000, "USD"), "medium");
+
+  // The two real production onboardings, both of which must keep the riskPct
+  // they already have — this is the zero-harm claim, machine-checked.
+  eq("₪20,000 beginner keeps riskPct 1.0",
+    riskPctFor(bucketFor(20_000, "ILS"), "beginner"), 1);
+  eq("₪59,999 beginner keeps riskPct 1.0",
+    riskPctFor(bucketFor(59_999, "ILS"), "beginner"), 1);
+  // And the one that was actually harmed, had it been classified correctly.
+  eq("₪10,000 beginner should have been 0.5",
+    riskPctFor(bucketFor(10_000, "ILS"), "beginner"), 0.5);
+
+  // Every currency the picker offers needs a policy row. Without this, adding
+  // a third currency to the picker silently classifies it as dollars — which
+  // is the bug this whole section exists to close, one currency later.
+  const onboardingSrc = readFileSync(
+    new URL("../src/components/OnboardingScreen.jsx", import.meta.url), "utf8");
+  const picker = onboardingSrc.match(/\[([^\]]*)\]\.map\(c =>/);
+  const offered = picker ? [...picker[1].matchAll(/"([A-Z]{3})"/g)].map(m => m[1]) : [];
+  check(`the picker offers ${offered.length} currencies and the test found them`, offered.length >= 2);
+  for (const c of offered) {
+    check(`${c} has a threshold row — a picker option cannot outrun its policy`,
+      Object.prototype.hasOwnProperty.call(BUCKET_THRESHOLDS, c));
+  }
+}
+
+// ── 8 · THE ONBOARDING SUMMARY PRINTS THE USER'S CURRENCY ───────────────────
+// A lint-class assertion: JSX cannot be imported in bare Node, and a literal
+// "$" glued to a value is a source-level defect, so the source is what we read.
+console.log("\n8 · onboarding summary · no hardcoded currency glyph");
+{
+  const src = readFileSync(
+    new URL("../src/components/OnboardingScreen.jsx", import.meta.url), "utf8");
+  const literalDollar = src.match(/\$\{?\{profile\.[A-Za-z.]+\}/g) || [];
+  check("no profile value is printed behind a literal $ — an ILS user saw \"$0\"",
+    literalDollar.length === 0);
+}
+
 console.log(
   failures === 0
-    ? "\n✅ fx: all assertions passed — identity is exact, past values are frozen to their own day, and a missing rate is never invented.\n"
+    ? "\n✅ fx: all assertions passed — identity is exact, past values are frozen to their own day, a threshold is denominated, and a missing rate is never invented.\n"
     : `\n❌ fx: ${failures} assertion(s) failed.\n`
 );
 process.exit(failures === 0 ? 0 : 1);

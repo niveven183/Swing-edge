@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { TrendingUp, Target, Wallet, BarChart2, Zap, CheckCircle, ChevronRight, ChevronLeft, Cpu, Star, Shield, BookOpen } from "lucide-react";
+import { bucketFor, riskPctFor, commissionFor } from "../lib/riskProfile.js";
 
 const QUESTIONS = [
   {
@@ -87,32 +88,12 @@ const generateProfile = (answers) => {
   const capitalAmount = Number(portfolioSize) || 0;
   const fmtCapital = capitalAmount > 0 ? `${CURRENCY_SYMBOL[ccy]}${capitalAmount.toLocaleString()}` : null;
 
-  // ⚠️ These thresholds are calibrated to DOLLARS, and the currency is now chosen
-  // on this very screen — so ₪10,000 (≈ $2,700) falls into "medium" while it is
-  // in truth a small account, and walks away with a large account's riskPct.
-  // Converting to USD first is the correct fix, but it needs an FX read on the
-  // FIRST screen, before sign-in — a network dependency on the most fragile
-  // surface in the product. The approximation is accepted deliberately.
-  // Whoever adds a THIRD currency here has to settle this first.
-  // STATE ⚠️ · PLAN 2026-08-05 §3.
-  let bucket = "medium";
-  if (capitalAmount < 5000) bucket = "small";
-  else if (capitalAmount < 25000) bucket = "medium";
-  else if (capitalAmount <= 100000) bucket = "large";
-  else bucket = "xlarge";
-
-  // Risk percentage based on portfolio size and experience
-  let riskPct = 1;
-  if (bucket === "small") riskPct = experience === "beginner" ? 0.5 : 1;
-  else if (bucket === "medium") riskPct = experience === "advanced" ? 1.5 : 1;
-  else if (bucket === "large") riskPct = experience === "advanced" ? 2 : 1.5;
-  else riskPct = experience === "advanced" ? 2.5 : 2;
-
-  // Commission based on portfolio size
-  let commission = 0;
-  if (bucket === "small") commission = 0.65;
-  else if (bucket === "medium") commission = 0;
-  else commission = 0;
+  // The amount is classified against its OWN currency's policy row. Adding a
+  // currency to the picker below without a row in BUCKET_THRESHOLDS fails
+  // test:fx rather than silently classifying it as dollars.
+  const bucket = bucketFor(capitalAmount, ccy);
+  const riskPct = riskPctFor(bucket, experience);
+  const commission = commissionFor(bucket);
 
   // Profile summary
   const strategyMap = {
@@ -526,7 +507,7 @@ export default function OnboardingScreen({ onComplete }) {
                     </div>
                     <div className="bg-white/3 rounded-lg p-2.5 text-center border border-white/5">
                       <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-1">עמלה</div>
-                      <div className="text-sm font-bold font-mono text-violet-400">${profile.commission}</div>
+                      <div className="text-sm font-bold font-mono text-violet-400">{CURRENCY_SYMBOL[profile.defaults.capitalCurrency]}{profile.commission}</div>
                     </div>
                     <div className="bg-white/3 rounded-lg p-2.5 text-center border border-white/5">
                       <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-1">Max R:R</div>
