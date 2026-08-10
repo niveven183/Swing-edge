@@ -56,6 +56,12 @@ const TRADE_COLUMNS = new Set([
   // T9 — נוסף אחרי שמיגרציית 20260802140000 הורצה ואומת ב-information_schema
   // (text, default 'USD'). לפני ההרצה מפתח כזה היה מפיל כל INSERT.
   "currency",
+  // גל אופק העסקה — נוסף יחד עם מיגרציית 20260810143000 (text nullable,
+  // check: short|medium|long). ⚠️ הסדר כפוי: עד שהמיגרציה רצה, המפתח נזרק כאן
+  // בשקט והאפליקציה מתנהגת כמו היום; אחריה הוא נשמר. ⛔ העמודה מחזיקה את
+  // ההצהרה בלבד — הסימן עצמו נגזר ברינדור ולעולם אינו נשמר
+  // (src/lib/tradeHorizon.js).
+  "horizon",
 ]);
 
 // Client-side-only fields. They are dropped on write by design, so dropping

@@ -96,6 +96,7 @@ import { useTradingStats } from "./src/hooks/useTradingStats.js";
 import { useFxRates, realizedDayKeysOf, makeConvertingCalc } from "./src/hooks/useFxRates.js";
 import { convert } from "./src/lib/fx.js";
 import { resolveEquityBase } from "./src/lib/equityBase.js";
+import { horizonState, horizonLabel } from "./src/lib/tradeHorizon.js";
 import { fileToResizedDataURL, exceedsCap, MAX_EDGE_PX, Q_PRIMARY, Q_FALLBACK } from "./src/lib/imageResize.js";
 import InfoTooltip from "./src/components/ui/InfoTooltip.jsx";
 import TermTooltip from "./src/components/ui/TermTooltip.jsx";
@@ -2460,6 +2461,10 @@ export default function SwingEdge() {
       marketCondition: form.marketCondition,
       emotionAtEntry: form.emotionAtEntry,
       entryQuality: form.entryQuality,
+      // אופק מוצהר פר-עסקה. `|| null` ולא `?? null`: מחרוזת ריקה (הבחירה
+      // "לפי הסגנון המוצהר שלי") חייבת להישמר כ-null ולא כ-"", אחרת
+      // horizonThresholdDays היה מקבל ערך שאינו במפה ומשתיק את הסימן לצמיתות.
+      horizon: form.horizon || null,
       tradeImage: form.tradeImagePreview,
       exitReason: null, followedPlan: null, lessonLearned: null, maxFavorable: null, maxAdverse: null,
       _capitalAtEntry: capital,
@@ -4643,6 +4648,8 @@ export default function SwingEdge() {
                     const isOpen = t.status === "OPEN";
                     const win = !isOpen && pnl > 0;
                     const isSelected = selectedTrades.has(t.id);
+                    // נגזר ברינדור, ⛔ לעולם לא נשמר. `strategy` נעדר → stale=false.
+                    const hz = horizonState(t, { strategy: userProfile?.strategy });
                     return (
                       <tr key={t.id} className={`border-b border-white/[0.04] transition-colors ${isSelected ? "bg-[#06b6d4]/[0.06]" : ""} ${!isOpen && win ? "hover:bg-[#00C076]/[0.04]" : !isOpen ? "hover:bg-[#F43F5E]/[0.04]" : "hover:bg-white/[0.03]"}`}>
                         <td className={`p-3 w-8 border-s-[3px] ${isOpen ? "border-[#06b6d4]/40" : win ? "border-[var(--v3-accent)]" : "border-[var(--v3-loss)]"}`}>
@@ -4661,7 +4668,19 @@ export default function SwingEdge() {
                             className="w-3.5 h-3.5 rounded border border-white/20 bg-white/5 cursor-pointer accent-[var(--v3-info)]"
                           />
                         </td>
-                        <td className="p-3 font-bold text-white font-mono whitespace-nowrap"><div className="flex items-center gap-1.5"><TickerLogo ticker={t.ticker} size={16} />{t.ticker}{t.isDemo && <span className="text-xs bg-slate-700 text-slate-400 px-1 py-0.5 rounded ms-1 font-normal">DEMO</span>}</div></td>
+                        <td className="p-3 font-bold text-white font-mono whitespace-nowrap"><div className="flex items-center gap-1.5"><TickerLogo ticker={t.ticker} size={16} />{t.ticker}{t.isDemo && <span className="text-xs bg-slate-700 text-slate-400 px-1 py-0.5 rounded ms-1 font-normal">DEMO</span>}{hz.stale && (
+                            /* ⚠️ var(--warning) → --accent-amber, מודע-תמה:
+                               #D97706 על לבן = 3.19:1 ✓ · #F59E0B על #0d1424 = 8.56:1 ✓.
+                               ⛔ לא --v3-warn — הוא מוגדר ב-:root בלבד ואינו נדרס
+                               בכהה, ולכן 2.15:1 בבהיר (נכשל WCAG 1.4.11). */
+                            <span
+                              role="img"
+                              aria-label={horizonLabel(hz, lang)}
+                              title={horizonLabel(hz, lang)}
+                              className="inline-block w-1.5 h-1.5 rounded-full shrink-0 ms-0.5"
+                              style={{ backgroundColor: "var(--warning)" }}
+                            />
+                          )}</div></td>
                         <td className="p-3 text-slate-500 whitespace-nowrap">{t.date}</td>
                         <td className="p-3"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side==="LONG"?"bg-[#00C076]/10 text-[var(--v3-accent)] border border-[#00C076]/20":"bg-[#F43F5E]/10 text-[var(--v3-loss)] border border-[#F43F5E]/20"}`}>{t.side}</span></td>
                         <td className="p-3 font-mono text-slate-300">{fmtPrice(t.entry, currencyOf(t))}</td>
@@ -4767,6 +4786,7 @@ export default function SwingEdge() {
                   key={t.id}
                   trade={t}
                   lang={lang}
+                  strategy={userProfile?.strategy}
                   onClick={handleEditOpen}
                   onClose={(tr) => { setClosingTrade(tr); setShowCloseForm(true); }}
                   onDelete={handleDeleteTrade}
@@ -7372,6 +7392,26 @@ export default function SwingEdge() {
                   ))}
                   <span className="text-[10px] text-[var(--v3-text-lo)] ms-1">{form.entryQuality}/5</span>
                 </div>
+              </div>
+
+              {/* Horizon — אופציונלי. ⚠️ בכוונה אינו באובייקט ברירת המחדל של
+                  הטופס: האובייקט משוכפל ליטרלית ב-6 אתרים (:1363 · :1785 ·
+                  :2481 · :4569 · :7387 · :7576), ושדה שיישכח באחד מהם היה נעלם
+                  בשקט במסלול הזה בלבד. `form.horizon ?? ""` מתנהג נכון בכל
+                  ששת המסלולים בלי לגעת באף אחד — הנדסה במקום משמעת. */}
+              <div>
+                <label className="text-[10px] text-[var(--v3-text-lo)] tracking-widest uppercase block mb-1">
+                  {lang === "he" ? "אופק מתוכנן (אופציונלי)" : "Planned horizon (optional)"}
+                </label>
+                <select
+                  value={form.horizon ?? ""}
+                  onChange={(e) => setForm(f => ({ ...f, horizon: e.target.value || undefined }))}
+                  className="w-full bg-white/5 border border-[var(--border-subtle)] dark:border-[var(--v3-line)] rounded-[var(--v3-radius-chip)] px-3 py-2 text-sm text-[var(--v3-text-mid)] focus:outline-none focus:border-[var(--v3-accent)] transition">
+                  <option value="">{lang === "he" ? "לפי הסגנון המוצהר שלי" : "Use my declared style"}</option>
+                  <option value="short">{lang === "he" ? "קצר — עד 3 ימים" : "Short — up to 3 days"}</option>
+                  <option value="medium">{lang === "he" ? "בינוני — עד 21 ימים" : "Medium — up to 21 days"}</option>
+                  <option value="long">{lang === "he" ? "ארוך — ללא תזכורת" : "Long — no reminder"}</option>
+                </select>
               </div>
                 </div>
               )}

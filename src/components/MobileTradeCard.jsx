@@ -3,6 +3,7 @@ import { MessageCircle } from "lucide-react";
 import TickerLogo from "./TickerLogo";
 import { calcTradeMetrics, fmt$, fmtR, fmtPrice, currencyOf } from "../utils";
 import { getTranslations, labelFor } from "../i18n.js";
+import { horizonState, horizonLabel } from "../lib/tradeHorizon.js";
 
 function MobileTradeCardImpl({
   trade,
@@ -14,11 +15,15 @@ function MobileTradeCardImpl({
   mentorNotes,
   isRTL,
   lang = "en",
+  strategy,
 }) {
   const t = getTranslations(lang);
   const { pnl, rMultiple } = calcTradeMetrics(trade);
   const isOpen = trade.status === "OPEN";
   const win = !isOpen && pnl > 0;
+  // ⚠️ אותה גזירה בדיוק כמו בדסקטופ, מאותו מודול — ⛔ מסלול אחד בלי השני
+  // היה באג מובייל שקט. `strategy` נעדר → stale=false → אין נקודה.
+  const hz = horizonState(trade, { strategy });
 
   const sideClasses = trade.side === "LONG"
     ? "bg-[#00C076]/10 text-[#00C076] border border-[#00C076]/20"
@@ -67,6 +72,18 @@ function MobileTradeCardImpl({
         <span className="font-bold font-mono text-[var(--v3-text-hi)]">{trade.ticker}</span>
         {trade.isDemo && (
           <span className="text-[10px] bg-slate-700 text-slate-400 px-1 py-0.5 rounded font-normal">DEMO</span>
+        )}
+        {hz.stale && (
+          /* ⚠️ var(--warning) → --accent-amber, מודע-תמה: #D97706 על לבן =
+             3.19:1 ✓ · #F59E0B על #0d1424 = 8.56:1 ✓. ⛔ לא --v3-warn —
+             מוגדר ב-:root בלבד, 2.15:1 בבהיר, נכשל WCAG 1.4.11. */
+          <span
+            role="img"
+            aria-label={horizonLabel(hz, lang)}
+            title={horizonLabel(hz, lang)}
+            className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
+            style={{ backgroundColor: "var(--warning)" }}
+          />
         )}
         <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${sideClasses}`}>
           {trade.side}
