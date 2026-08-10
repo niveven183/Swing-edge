@@ -198,10 +198,10 @@ const generateProfile = (answers) => {
 };
 
 const colorMap = {
-  cyan: { border: "border-cyan-500/25", icon: "text-cyan-400", bg: "bg-cyan-500/10" },
-  violet: { border: "border-violet-500/25", icon: "text-violet-400", bg: "bg-violet-500/10" },
-  amber: { border: "border-amber-500/25", icon: "text-amber-400", bg: "bg-amber-500/10" },
-  green: { border: "border-emerald-500/25", icon: "text-emerald-400", bg: "bg-emerald-500/10" },
+  cyan: { border: "border-cyan-500/25", icon: "text-cyan-700 dark:text-cyan-400", bg: "bg-cyan-500/10" },
+  violet: { border: "border-violet-500/25", icon: "text-violet-700 dark:text-violet-400", bg: "bg-violet-500/10" },
+  amber: { border: "border-amber-500/25", icon: "text-amber-700 dark:text-amber-400", bg: "bg-amber-500/10" },
+  green: { border: "border-emerald-500/25", icon: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-500/10" },
 };
 
 export default function OnboardingScreen({ onComplete }) {

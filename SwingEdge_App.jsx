@@ -4245,6 +4245,9 @@ export default function SwingEdge() {
                       <span className="text-2xl font-bold font-mono text-violet-400">{MAX_RISK_PCT.toFixed(1)}%</span>
                       <span className="text-xs text-slate-500 block mt-0.5 font-mono">{dispSym}{toDisp(maxRiskDollar).toFixed(2)}</span>
                       <span className="text-[10px] text-slate-600 mt-1 block">{t.fromCapital} {dispSym}{Math.round(capitalShown).toLocaleString()}</span>
+                      {riskPct * 2 < 3 && (
+                        <span className="text-[10px] text-slate-600 mt-1 block">{t.systemMinRisk}: {MAX_RISK_PCT}%</span>
+                      )}
                     </div>
 
                     {/* Visual risk meter */}
@@ -6675,6 +6678,11 @@ export default function SwingEdge() {
                   {t.portfolioCapDerived}: <span className="text-violet-400 font-mono font-bold">{maxRiskPct}%</span>
                   <TermTooltip term="riskLimits" lang={lang} />
                 </p>
+                {riskPct * 2 < 3 && (
+                  <p className="text-[10px] text-[var(--v3-text-lo)] mt-1">
+                    {t.systemMinRisk}: {maxRiskPct}%
+                  </p>
+                )}
               </div>
 
               {/* ── IMPORT JOURNAL ── */}

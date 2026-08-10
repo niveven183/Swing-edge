@@ -632,6 +632,14 @@ export default function LandingPage() {
   };
   const L = STR[lang];
   const dir = L.dir;
+  // AuthScreen and ToastProvider read their language off the document, not off
+  // this component — without this write a visitor who picks EN gets a Hebrew login.
+  useEffect(() => {
+    try {
+      document.documentElement.lang = lang;
+      document.documentElement.dir  = dir;
+    } catch {}
+  }, [lang, dir]);
   const signals = SIGNALS[lang];
   const signalChips = SIGNAL_CHIPS[lang];
   const dnaBars = DNA_BARS[lang];
