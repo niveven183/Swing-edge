@@ -4,6 +4,7 @@ import TickerLogo from "./TickerLogo";
 import { calcTradeMetrics, fmt$, fmtR, fmtPrice, currencyOf } from "../utils";
 import { getTranslations, labelFor } from "../i18n.js";
 import { horizonState, horizonLabel } from "../lib/tradeHorizon.js";
+import { deriveInstrumentCurrency, isUnverified } from "../lib/instrumentCurrency.js";
 
 function MobileTradeCardImpl({
   trade,
@@ -72,6 +73,14 @@ function MobileTradeCardImpl({
         <span className="font-bold font-mono text-[var(--v3-text-hi)]">{trade.ticker}</span>
         {trade.isDemo && (
           <span className="text-[10px] bg-slate-700 text-slate-400 px-1 py-0.5 rounded font-normal">DEMO</span>
+        )}
+        {isUnverified(deriveInstrumentCurrency(trade)) && (
+          <span
+            title={t.ccyUnverifiedTip}
+            className="text-[10px] bg-amber-400/10 text-amber-400 border border-amber-400/20 px-1.5 py-0.5 rounded font-normal whitespace-nowrap"
+          >
+            {t.ccyUnverifiedChip}
+          </span>
         )}
         {hz.stale && (
           /* ⚠️ var(--warning) → --accent-amber, מודע-תמה: #D97706 על לבן =

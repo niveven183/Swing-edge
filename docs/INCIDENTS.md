@@ -589,3 +589,47 @@ Every production incident gets one short entry: what broke, root cause, fix, pre
   parse?" had never been asked of anything outside `src/`**, and a chain can be twenty links long
   and still have a denominator of zero for an entire class of artifact. When adding coverage for a
   file, the first assertion is the cheapest one: can the runtime load it.
+
+## #16 — 2026-08-11 — 61 trades carry a currency nobody measured, and three independent guards could not fire
+- **Symptom:** `BE` (NASDAQ, dollar-quoted) was saved 11.08 11:52:45 UTC with `currency="ILS"`.
+  Prices were stored correctly — only the label lied — so the lie surfaces nowhere in the price
+  and everywhere in a ratio against capital: the risk board read **0.596%** against the user's
+  1% ceiling where the truth is **1.787%** (ECB fixing 10.08; ×3.0005, ⛔ not ×3.3 — 3.3 was the
+  reciprocal 0.333 read backwards). **The reverse direction was worse and was not known:** 13 Tel
+  Aviv rows (`1081843`·`440016`·`587014`·`691212`, user `e403e391`, all OPEN) are quoted in
+  agorot and labelled USD — 4,061,818 as stored = **101.55× the 40,000 capital**, against
+  40,618.18 = **1.0155×** in agorot.
+- **Root cause — one line:** `SwingEdge_App.jsx:2457` stamps `currency: capitalCurrency` on every
+  manual trade. ⚠️ The comment at `:2443` correctly rejected the **display** currency and chose
+  the **capital** currency; the failure is that a third currency — the one the instrument
+  actually trades in — was never weighed. **The write path never asked the market.**
+  📌 The source of truth already existed and was thrown away: `priceService.js:385` returns
+  `currency_code` from TradingView and passes it through `onPick`; `handleSymbolPick` read
+  `type`+`symbol` only.
+- **⚠️ Why nothing caught it — the structural half, and the larger one:** three independent
+  guards (`SwingEdge_App.jsx:4188` risk board · `TradeDNA.js:81` · `GrowthTracker.riskMgmtScore`)
+  each tested `currencyOf(t) === capitalCurrency`. The write path **guarantees** that equality.
+  **Three layers of defence, none of which could ever fire** — not a bug in any one of them, a
+  tautology shared by all three. And the mixed-currency banner (`tradingStats.js:200`) keyed off
+  the same stored label: 13 TASE rows + 2 US rows, all labelled USD, `mixedCurrency=false`.
+  ⛔ The banner was silent precisely because every row was wrong in the same direction.
+- **⛔ What this was NOT:** not a display bug. The label is **written to the database**, and
+  45/61 rows are right **by accident** — their owner happens to hold dollars. Correcting 14 rows
+  would have left the mechanism intact and the next row wrong again.
+- **Fix (wave א', read-side only):** `src/lib/instrumentCurrency.js` — a pure module deriving the
+  **instrument's** currency at read time on a four-rung evidence ladder
+  (`MEASURED`→`CONTRADICTED`→`ASSUMED`→`AMBIGUOUS`). All three guards and `pnlByCurrency` now
+  compare against the derivation, so they **can** fail; 18 assertions were observed failing
+  before the wiring and 10 more against `HEAD` for the display layer.
+  📌 **The derivation is never saved.** A stored flag would go stale in silence the moment the
+  provider starts returning `currency_code`; block 9 of the gate forbids a derived DB column.
+  ⚠️ **The aggregate gate is "is this group proven single-currency", ⛔ not "is every row
+  verified"** — the strict reading would exclude 47/61 rows and replace one silent failure with
+  another. `ASSUMED` counts and **says so in the UI**; `CONTRADICTED`/`AMBIGUOUS` leave the
+  aggregate, are **shown marked** in both render paths, and a group containing one is not proven
+  single-currency ⇒ the banner lights.
+- **Gate:** `scripts/instrument-currency-test.mjs`, chain link 22 (`test:instrument`), **105
+  assertions**. Blocks 5–7 run three journals where the guard **must** block and where it did not.
+- **⚠️ Still open, deliberately:** the 61 stored labels are **unchanged** — they are simply no
+  longer trusted. ⛔ The `BE` row was not corrected; it is the evidence. Wave ב' (the 13 TASE
+  rows) waits on advance notice to `e403e391`; the migration is ⏸️ blocked on Niv (§12).

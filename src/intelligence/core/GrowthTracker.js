@@ -8,7 +8,7 @@ import {
 } from "../utils/statisticalModels.js";
 import { disciplineRate } from "../utils/psychologyPatterns.js";
 import { matchIdeaToEdge } from "./EdgeFinder.js";
-import { currencyOf } from "../../utils.js";
+import { deriveInstrumentCurrency, matchesCapital } from "../../lib/instrumentCurrency.js";
 
 // Weights as specified: 30/25/20/15/10.
 const WEIGHTS = {
@@ -37,9 +37,10 @@ const riskMgmtScore = (trades, capitalCurrency = null) => {
   // A trade without a stop has no measurable risk. `Math.abs(entry - null)` is
   // `entry`, so including it charged the score the FULL POSITION VALUE as risk —
   // a positive number, which the `> 0` filter below happily let through.
+  // ⚠️ מטבע הנייר הנגזר, ⛔ לא התווית השמורה — ראה `measurableRisk` ב-TradeDNA.
   const measurable = closed.filter(t =>
     t.stop != null && t.shares > 0 &&
-    (capitalCurrency == null || currencyOf(t) === capitalCurrency));
+    (capitalCurrency == null || matchesCapital(deriveInstrumentCurrency(t), capitalCurrency)));
   const pcts = measurable.map(t => {
     // No capital recorded at entry → the risk % is UNMEASURED. It used to read
     // DEFAULT_CAPITAL, which turned "we don't know" into a confident 2,500 and

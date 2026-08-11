@@ -19,7 +19,8 @@ import {
   MIN_SAMPLE_DNA, MIN_SAMPLE_PATTERNS, MIN_SAMPLE_FORECAST, MIN_SAMPLE_ML,
 } from "../utils/statisticalModels.js";
 import { disciplineRate, emotionPerformance } from "../utils/psychologyPatterns.js";
-import { qstars, currencyOf } from "../../utils.js";
+import { qstars } from "../../utils.js";
+import { deriveInstrumentCurrency, matchesCapital } from "../../lib/instrumentCurrency.js";
 import { isFollowedPlan } from "../../utils.js";
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -78,10 +79,14 @@ const rankGroups = (trades, keyFn, { minN = 3, topK = 3 } = {}) => {
 // behaviour EXACTLY, so a single-currency journal is byte-identical. There is
 // deliberately no conversion here: this engine holds no rate table, and a
 // number marked unmeasured is worth more than a number quietly guessed.
+//
+// ⚠️ הצד השמאלי הוא מטבע ה**נייר** הנגזר, ⛔ לא `currencyOf(t)`. הביטוי הישן
+// קרא את התווית ש-`SwingEdge_App.jsx:2457` חתם מהעדפת החשבון, ולכן החזיר
+// `true` בהגדרה — שער שאינו יכול להיכשל אינו שער.
 const measurableRisk = (closed, capitalCurrency) =>
   capitalCurrency == null
     ? closed
-    : closed.filter(t => currencyOf(t) === capitalCurrency);
+    : closed.filter(t => matchesCapital(deriveInstrumentCurrency(t), capitalCurrency));
 
 // ─── STYLE INFERENCE ─────────────────────────────────────────────────────────
 // Pragmatic heuristics — translates behaviour into a 0..100 "style" band.
@@ -201,7 +206,10 @@ export const calculateTradeDNA = (allTrades = [], capitalCurrency = null) => {
   let _sig = 0, _closed = 0;
   for (const t of allTrades) {
     if (t.status === "CLOSED" || t.exit != null || t.exitPrice != null) _closed++;
-    const s = `${t.id}|${t.status}|${t.exitPrice ?? t.exit ?? ''}|${t.entry}|${t.stop}|${t.shares}`;
+    // ⚠️ `ticker` נכנס לחתימה כי אוכלוסיית הסיכון נגזרת ממנו מאז גל מטבע
+    // הנייר. בלעדיו שני יומנים שנבדלים **רק** בטיקר מקבלים מפתח זהה, והמשבצת
+    // המשותפת מחזירה את ה-DNA של האחר — בשקט.
+    const s = `${t.id}|${t.ticker ?? ''}|${t.status}|${t.exitPrice ?? t.exit ?? ''}|${t.entry}|${t.stop}|${t.shares}`;
     for (let i = 0; i < s.length; i++) _sig = (_sig * 31 + s.charCodeAt(i)) | 0;
   }
   //   (c) Currency-sensitivity — the risk population is gated by

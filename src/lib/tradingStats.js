@@ -1,4 +1,5 @@
-import { isFollowedPlan, isOffPlan, qstars, holdDays, realizedAt, realizedDayKey, currencyOf } from "../utils.js";
+import { isFollowedPlan, isOffPlan, qstars, holdDays, realizedAt, realizedDayKey } from "../utils.js";
+import { deriveInstrumentCurrency, isAggregatable, isMixedCurrency } from "./instrumentCurrency.js";
 import {
   edgeScore, wilsonLowerBound,
   getClosed, outcomeRates, grossPnl, profitFactorFromPnls, toPct,
@@ -65,12 +66,20 @@ export function computeTradingStats(trades, capital, calcTradeMetrics) {
   // producing a sum that means nothing, the split is published beside it and the
   // consumer is told when the set is mixed (§2 — no ratio without a denominator,
   // and no total without a unit).
+  //
+  // ⚠️ המפתח הוא מטבע ה**נייר** הנגזר, ⛔ לא `currencyOf` — זו הייתה קריאה של
+  // התווית שמסלול הכתיבה חתם מהעדפת החשבון. יומן של 13 ניירות ת"א ועוד 2
+  // אמריקאיים נשא 15 תוויות `USD`, ולכן `currencies.length === 1` והבאנר
+  // דמם. שורה שמטבעה לא נמדד אינה תורמת לפילוח — היא נספרת כערבוב.
+  const derivations = metrics.map((m) => deriveInstrumentCurrency(m));
   const pnlByCurrency = {};
-  metrics.forEach((m) => {
-    const c = currencyOf(m);
+  metrics.forEach((m, i) => {
+    if (!isAggregatable(derivations[i])) return;
+    const c = derivations[i].code;
     pnlByCurrency[c] = (pnlByCurrency[c] || 0) + (m.pnl || 0);
   });
   const currencies = Object.keys(pnlByCurrency).sort();
+  const mixedCurrency = isMixedCurrency(derivations);
 
   // SCALE BOUNDARY — the one and only place this module leaves the 0..1
   // convention of statisticalModels and enters the 0..100 convention its UI
@@ -198,7 +207,7 @@ export function computeTradingStats(trades, capital, calcTradeMetrics) {
     totalPnL, totalWin, totalLoss,
 
     // currency — `totalPnL` is only meaningful when `currencies` holds one entry.
-    pnlByCurrency, currencies, mixedCurrency: currencies.length > 1,
+    pnlByCurrency, currencies, mixedCurrency,
 
     // rates — all 0..100 (see SCALE BOUNDARY above).
     // winRate + lossRate + beRate === 100 exactly; `beRate` exists so that

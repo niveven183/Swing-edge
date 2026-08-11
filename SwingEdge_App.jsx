@@ -97,6 +97,7 @@ import { useFxRates, realizedDayKeysOf, makeConvertingCalc } from "./src/hooks/u
 import { convert } from "./src/lib/fx.js";
 import { resolveEquityBase } from "./src/lib/equityBase.js";
 import { horizonState, horizonLabel } from "./src/lib/tradeHorizon.js";
+import { deriveInstrumentCurrency, matchesCapital, isUnverified, INSTRUMENT_STATE } from "./src/lib/instrumentCurrency.js";
 import { fileToResizedDataURL, exceedsCap, MAX_EDGE_PX, Q_PRIMARY, Q_FALLBACK } from "./src/lib/imageResize.js";
 import InfoTooltip from "./src/components/ui/InfoTooltip.jsx";
 import TermTooltip from "./src/components/ui/TermTooltip.jsx";
@@ -775,6 +776,37 @@ const generateSmartLessons = (closedTrades, stats, calcFn, lang = 'he', currency
 
   return lessons.slice(0, 3);
 };
+
+// ─── QUOTE PRICE ──────────────────────────────────────────────────────────────
+// מחיר ציטוט מוצג בסמל המטבע ה**נגזר** של הנייר. ⛔ לא `$` קשיח — ההערה
+// ב-`utils.js:129` מתעדת בדיוק את מחלקת הכשל הזו. נייר שמטבעו לא נגזר מוצג
+// כמספר בלי סמל: ⛔ מספר בלי מטבע עדיף על מספר במטבע שגוי.
+const QuotePrice = memo(({ ticker, price }) => {
+  const derived = deriveInstrumentCurrency({ ticker });
+  return (
+    <span className="text-sm font-mono font-bold text-white">
+      {isUnverified(derived) ? "" : CURRENCY_SYMBOL[derived.code]}{price.toFixed(2)}
+    </span>
+  );
+});
+
+// ─── UNVERIFIED-CURRENCY CHIP ─────────────────────────────────────────────────
+// שורה שמטבעה לא נגזר מוצגת — ⛔ לא נמחקת ולא מוסתרת — עם סימון שאומר בדיוק
+// מה לא ידוע. השורה עצמה נשארת קריאה; רק המצרפי חוצה-המטבע נמנע.
+// ⚠️ `lang` ולא אובייקט התרגום: בתוך `.map(t => …)` של היומן `t` הוא ה**עסקה**
+// ומצל על התרגומים, ולכן אין ממה לקרוא מפתח בתוך השורה.
+const UnverifiedCcyChip = memo(({ ticker, lang }) => {
+  if (!isUnverified(deriveInstrumentCurrency({ ticker }))) return null;
+  const tr = getTranslations(lang);
+  return (
+    <span
+      title={tr.ccyUnverifiedTip}
+      className="text-[10px] bg-amber-400/10 text-amber-400 border border-amber-400/20 px-1.5 py-0.5 rounded ms-1 font-normal whitespace-nowrap"
+    >
+      {tr.ccyUnverifiedChip}
+    </span>
+  );
+});
 
 // ─── MIXED-CURRENCY BANNER ────────────────────────────────────────────────────
 // Every aggregate figure (totals, charts, calendar) sums P&L across trades. When
@@ -2442,7 +2474,11 @@ export default function SwingEdge() {
 
     const newTrade = {
       id: (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      ticker: form.ticker.toUpperCase(),
+      // `.trim()` ⚠️ ולא רק `.toUpperCase()`: השומר ב-:2419 עושה trim, הכתיבה
+      // לא עשתה — וכך `"ASTS  "` יושב ב-DB כשורה נפרדת מ-`"ASTS"`
+      // (נמדד 2026-08-11: 36 טיקרים גולמיים מול 35 אחרי trim). ⛔ קדימה בלבד;
+      // השורה הקיימת לא נגעה, והגזירה מנרמלת בקריאה כדי שלא תישאר יתומה.
+      ticker: form.ticker.trim().toUpperCase(),
       // CALENDAR DAY -> local. toISOString() here stamped YESTERDAY on any trade
       // typed between local midnight and 02:59 (IDT). See todayKey in utils.js.
       date: todayKey(),
@@ -4185,15 +4221,27 @@ export default function SwingEdge() {
               const openRisks = openTrades.map(t => {
                 // Risk in another currency over `capital` is a ratio of two
                 // units — UNMEASURED, same contract as a missing stop below.
-                const sameCcy = currencyOf(t) === capitalCurrency;
+                //
+                // ⚠️ מטבע ה**נייר** הנגזר, ⛔ לא `currencyOf(t)`. התווית השמורה
+                // נכתבה מהעדפת החשבון ולכן השוואתה להון החזירה `true` בהגדרה.
+                const derived = deriveInstrumentCurrency(t);
+                const sameCcy = matchesCapital(derived, capitalCurrency);
                 const hasStop = sameCcy && t.stop != null && t.shares > 0;
                 const riskDollar = hasStop ? Math.abs(t.entry - t.stop) * t.shares : null;
                 const riskPct = hasStop && capital > 0 ? (riskDollar / capital) * 100 : null;
                 const rrRatio = hasStop && t.target ? priceBasedRR(t.entry, t.stop, t.target) : null;
-                return { ...t, hasStop, riskDollar, riskPct, rrRatio };
+                return { ...t, derived, sameCcy, hasStop, riskDollar, riskPct, rrRatio };
               });
 
-              const unmeasuredRiskCount = openRisks.filter(t => !t.hasStop).length;
+              // Two different reasons for the same exclusion. Reporting them under
+              // one label would tell a trader "no stop" about a trade that has one.
+              const unverifiedCcyCount = openRisks.filter(t => !t.sameCcy).length;
+              const noStopCount = openRisks.filter(t => t.sameCcy && !t.hasStop).length;
+              const unmeasuredRiskCount = unverifiedCcyCount + noStopCount;
+              // Of the rows that DO count, how many rest on an assumption rather
+              // than a measurement. Declared, not warned about.
+              const assumedCount = openRisks.filter(
+                t => t.hasStop && t.derived.state === INSTRUMENT_STATE.ASSUMED).length;
               const totalRiskDollar = openRisks.reduce((s, t) => s + (t.riskDollar ?? 0), 0);
               const totalRiskPct = capital > 0 ? (totalRiskDollar / capital) * 100 : 0;
               const usedPct = Math.min((totalRiskPct / MAX_RISK_PCT) * 100, 100);
@@ -4237,9 +4285,19 @@ export default function SwingEdge() {
                       <span className="text-[10px] text-slate-600 mt-1 block">
                         {openTrades.length - unmeasuredRiskCount}/{openTrades.length} {t.openTradesCount}
                       </span>
-                      {unmeasuredRiskCount > 0 && (
+                      {noStopCount > 0 && (
                         <span className="text-[10px] text-amber-400/90 mt-1 block">
-                          {plural(t, "riskUnmeasured", unmeasuredRiskCount)}
+                          {plural(t, "riskUnmeasured", noStopCount)}
+                        </span>
+                      )}
+                      {unverifiedCcyCount > 0 && (
+                        <span className="text-[10px] text-amber-400/90 mt-1 block">
+                          {plural(t, "riskUnverifiedCcy", unverifiedCcyCount)}
+                        </span>
+                      )}
+                      {assumedCount > 0 && (
+                        <span className="text-[10px] text-slate-500 mt-1 block">
+                          {plural(t, "ccyAssumedNote", assumedCount)}
                         </span>
                       )}
                     </div>
@@ -4668,7 +4726,7 @@ export default function SwingEdge() {
                             className="w-3.5 h-3.5 rounded border border-white/20 bg-white/5 cursor-pointer accent-[var(--v3-info)]"
                           />
                         </td>
-                        <td className="p-3 font-bold text-white font-mono whitespace-nowrap"><div className="flex items-center gap-1.5"><TickerLogo ticker={t.ticker} size={16} />{t.ticker}{t.isDemo && <span className="text-xs bg-slate-700 text-slate-400 px-1 py-0.5 rounded ms-1 font-normal">DEMO</span>}{hz.stale && (
+                        <td className="p-3 font-bold text-white font-mono whitespace-nowrap"><div className="flex items-center gap-1.5"><TickerLogo ticker={t.ticker} size={16} />{t.ticker}{t.isDemo && <span className="text-xs bg-slate-700 text-slate-400 px-1 py-0.5 rounded ms-1 font-normal">DEMO</span>}<UnverifiedCcyChip ticker={t.ticker} lang={lang} />{hz.stale && (
                             /* ⚠️ var(--warning) → --accent-amber, מודע-תמה:
                                #D97706 על לבן = 3.19:1 ✓ · #F59E0B על #0d1424 = 8.56:1 ✓.
                                ⛔ לא --v3-warn — הוא מוגדר ב-:root בלבד ואינו נדרס
@@ -4863,6 +4921,7 @@ export default function SwingEdge() {
               {analyzerForm.ticker && (() => {
                 const badge = getMarketStateBadge(analyzerQuote?.marketState || marketState);
                 const q = analyzerQuote;
+                const quoteTicker = analyzerForm.ticker;
                 const marketOpen = (analyzerQuote?.marketState || marketState) === MARKET_STATE.OPEN;
                 return (
                   <div className="bg-white/3 border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-3">
@@ -4875,7 +4934,7 @@ export default function SwingEdge() {
                           {badge.emoji} {marketOpen ? "LIVE" : q ? "LAST CLOSE" : badge.label}
                         </span>
                         {q?.price != null && (
-                          <span className="text-sm font-mono font-bold text-white">${q.price.toFixed(2)}</span>
+                          <QuotePrice ticker={quoteTicker} price={q.price} />
                         )}
                         {q?.changePct != null && (
                           <span className={`text-[11px] font-mono ${q.changePct >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>
@@ -7118,6 +7177,7 @@ export default function SwingEdge() {
               {form.ticker && (() => {
                 const badge = getMarketStateBadge(formQuote?.marketState || marketState);
                 const q = formQuote;
+                const quoteTicker = form.ticker;
                 const marketOpen = (formQuote?.marketState || marketState) === MARKET_STATE.OPEN;
                 return (
                   <div className="bg-white/3 border border-[var(--border-subtle)] dark:border-[var(--v3-line)] rounded-[var(--v3-radius-chip)] p-3">
@@ -7130,7 +7190,7 @@ export default function SwingEdge() {
                           {badge.emoji} {marketOpen ? "LIVE" : q ? "LAST CLOSE" : badge.label}
                         </span>
                         {q?.price != null && (
-                          <span className="text-sm font-mono font-bold text-white">${q.price.toFixed(2)}</span>
+                          <QuotePrice ticker={quoteTicker} price={q.price} />
                         )}
                         {q?.changePct != null && (
                           <span className={`text-[11px] font-mono ${q.changePct >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>
