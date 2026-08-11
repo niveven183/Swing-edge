@@ -72,15 +72,25 @@ function mergeSettings(base, patch) {
   return out;
 }
 
+// ⚠️ supabase-js RETURNS errors, it does not throw them. An RLS denial or a
+// constraint violation arrives as `{ error }` with the promise resolved, so a
+// bare `await` inside try/catch sees only network-level exceptions — and the
+// write failing is exactly the case that matters. Destructuring `{ error }` is
+// what :94 and :145 in this file already do, and tradeWrite.js:39 too; this
+// function was the one path that did not. INCIDENTS#15 registry item.
+//
+// ⛔ The contract is unchanged: a settings write NEVER throws. The only change
+// is that a failure is now visible in the console instead of vanishing.
 async function upsertBlob(userId, blob, client) {
   if (!client) return;
   try {
-    await client
+    const { error } = await client
       .from(TABLE)
       .upsert({ user_id: userId, settings: blob, updated_at: new Date().toISOString() });
+    if (error) console.error("userSettings: upsert rejected", error.message || error);
   } catch (e) {
-    // Surface the failure but never throw from a settings write.
-    console.error("userSettings: upsert failed", e);
+    // Network-level failure only — everything else arrives via `error` above.
+    console.error("userSettings: upsert threw", e);
   }
 }
 

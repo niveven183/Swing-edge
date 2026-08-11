@@ -327,12 +327,15 @@ function gatherStuck() {
          (SELECT count(*) FROM (
             SELECT user_id FROM clean GROUP BY user_id
             HAVING count(*) BETWEEN 1 AND 2 AND max("createdAt") < now() - interval '7 days') x),
-         -- ⚠️ הגיל של עסקה פתוחה נמדד מ-`date` (תאריך הכניסה) ולא מ-`createdAt`.
-         -- scripts/retention.sql:10 כבר קובע ש-`createdAt` אינו חותמת יצירת-שורה:
-         -- הייבוא גוזר אותו מ-`date` (import/normalizeRow.js:179), ו-40/59 השורות
+         -- ⚠️ הגיל של עסקה פתוחה נמדד מעמודת date (תאריך הכניסה) ולא מ-createdAt.
+         -- scripts/retention.sql:10 כבר קובע ש-createdAt אינו חותמת יצירת-שורה:
+         -- הייבוא גוזר אותו מ-date (import/normalizeRow.js:179), ו-40/59 השורות
          -- נושאות את החתימה הזו. נמדד 2026-08-10: 59/59 מקיימות
-         -- `"createdAt"::date = date`, ולכן המספר אינו זז היום — התיקון הוא נגד
+         -- "createdAt"::date = date, ולכן המספר אינו זז היום — התיקון הוא נגד
          -- סחיפה עתידית, ברגע שתיווצר שורה שבה השתיים נבדלות.
+         -- ⛔ אפס גרש-הפוך בהערה הזו. ההערה חיה בתוך template literal, ושם אין
+         -- תחביר הערות כלל: גרש בודד סוגר את המחרוזת. זה הפיל את הסוכן ב-11.08
+         -- (INCIDENTS#15). שמות עמודות נכתבים חשופים או במרכאות כפולות.
          (SELECT count(DISTINCT user_id) FROM clean
             WHERE status = 'OPEN' AND date < (current_date - 30)),
          (SELECT count(*) FROM clean

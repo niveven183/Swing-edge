@@ -507,3 +507,85 @@ Every production incident gets one short entry: what broke, root cause, fix, pre
   missing but because **nobody read the value it already returns** — so when a class is closed,
   the sweep must cover every file that calls the same kind of write, not every file that shares
   the same code.
+
+## #15 — 2026-08-11 — A production CI agent stopped parsing, and 20 green verify links said nothing
+- **Symptom:** the `User Analytics` workflow, run `31470184666` (11.08 07:44 UTC, HEAD `d7e4a4d`),
+  failed after **6 seconds** in step *Compose analytics report* with
+  `SyntaxError: missing ) after argument list` at `scripts/user-analytics.mjs:320`, raised inside
+  `compileSourceTextModule`. **1/1 runs since the commit** — the last green was `c4810f17`
+  (10.08 08:12 UTC) with 10 more green behind it; `d7e4a4d` landed 17:39 the same day. The
+  denominator is 1 because the agent runs daily and this was its first run after the commit.
+- **Root cause — a SQL comment convention carried into a place with no comments:** the previous
+  wave added explanatory comments to the `gatherStuck()` query at `:330-334`, and those comments
+  quoted column names in markdown style, with backticks. The query is a **template literal**
+  opened at `:320`. `--` is a comment in SQL and **is not** a comment in JavaScript, and inside a
+  template literal there is no comment syntax **at all** — the first backtick simply closes the
+  string. From there the parser reads bare identifiers inside an unclosed `q(` argument list.
+- **What it was NOT — each ruled out by a controlled experiment, not by judgement:**
+  - **The Hebrew, and the multi-line-ness.** This was the stated hypothesis. The same comment
+    block, Hebrew and multi-line, with the backticks removed and nothing else changed, parses.
+    Backticks alone, in an otherwise ASCII single-line comment, do not.
+  - **The SQL.** A parse error means **no line of the file ever ran**, so the new `date <
+    (current_date - 30)` predicate was never sent to Supabase. Independently corroborated: the
+    same query run by hand against production returned a row count, so the SQL is valid.
+- **⚠️ The rule this incident was first written with was wrong, and the measurement is the
+  finding:** the audit — and the prompt that approved it — both said "an **even** number of
+  backticks compiles and produces wrong SQL silently." **Parity is not the criterion.** Measured
+  over 19 realistic phrasings:
+  1. **11/11** where the quoted text opens with an identifier character (`` `date` ``,
+     `` `createdAt` ``) fail `node --check`, even and odd alike. Once the string closes, a bare
+     identifier sits against an expression, and that is never valid.
+  2. **8/8** where it opens with a **punctuator that continues an expression** (`` `.length` ``,
+     `` `,x,` ``, `` `+1` ``, `` `[0]` ``) **compile cleanly.**
+  3. And the comma case is the silent one: `` q(`${CTE}\n -- note `,label,` mid\n SELECT count(*)
+     FROM clean`) `` compiles, runs, and hands `q()` **three arguments instead of one** — the
+     first being the truncated string ending at `-- note `. The `SELECT` is gone and **nothing is
+     raised**. `q(sql, label)` takes exactly two arguments in this agent, so this is the shape of
+     the existing code, not a hypothetical.
+     **⚠️ The boundary of the silence was measured, not assumed:** it requires the token between
+     the commas to **resolve**. With a name that is in scope (`label`) it is fully silent —
+     `args=3`, `sql="WITH clean AS (…)\n -- note "`, `SELECT` absent, exit 0. With one that is not
+     (`x`) it throws `x is not defined` at runtime, loudly. Part of even this class announces
+     itself; the part that does not is the part that matters, and no amount of `--check` or smoke
+     running separates them in advance — only refusing the character does.
+- **⚠️ Why `npm run verify` was green — and this is the larger half of the incident:**
+  **0/5 CI agents were covered by the chain** (`user-analytics` · `analyst` · `data-guardian` ·
+  `daily-digest` · `arch-auditor`). `build` touches the frontend only. The single link that
+  touches the broken file — `horizon-test.mjs:213`, block 10 — was added **in the same commit that
+  broke it**, and it does `readFileSync` + regex: it reads the file as **text** and never imports
+  or parses it. 140/140 passed on a file that does not compile. No assertion lied; none was asked.
+- **Fix:** the comment is kept — it is the justification for the column change — and rewritten
+  with bare column names, plus a standing note saying why backticks may never return here.
+  The gate is `scripts/script-syntax-test.mjs`, chain link 21 (`test:syntax`): `node --check` over
+  every `.mjs`/`.cjs`/`.js` in `scripts/` + `api/`, an explicit corpus floor and a 5/5 agent-roster
+  assertion so a shrunken corpus cannot pass in silence, and a third check forbidding a backtick on
+  any line whose trimmed content opens with `--`.
+- **⚠️ `node --check` and not dynamic `import()`, decided by measurement:** `import()` would also
+  catch module-level errors, but **2/5 agents call `main()` with no entrypoint guard**
+  (`user-analytics.mjs:853`, `data-guardian.mjs:305`; the other three guard on
+  `process.argv[1] === import.meta.url`). Importing them would open a Supabase connection, write
+  files, and in one case `process.exit(1)` — killing the test process. Adding the guards is a
+  separate decision, filed in STATE. `node --check` parses without executing a line, and is
+  therefore correct **for as long as** 2/5 are unguarded.
+- **⛔ Coverage stated, not implied:** check 3 catches the comment class, which is 19/19 of what
+  was measured. It does **not** catch a backtick on a non-comment SQL line; there, only `node
+  --check` protects, and only for the identifier-leading class. Closing that gap needs a real
+  parser and there is no `acorn` in the tree. Registered, not closed. `.sql` files are excluded on
+  purpose — `scripts/retention.sql` carries 6 backticks in `--` comments and they are entirely
+  correct, because that file is run by hand in the SQL Editor and is not JavaScript.
+- **Proof:** observed failing twice, once per class. Restoring `` `date` `` failed check 2
+  (`43/44 compile`) and check 3, `exit=1`. Restoring `` `,label,` `` **passed** `node --check` and
+  check 2 (`44/44`) and was caught by check 3 alone, `exit=1` — which is the whole reason check 3
+  exists. File restored byte-for-byte after each, and `scripts/user-analytics.mjs` was then run
+  locally end-to-end, not merely `--check`ed.
+- **Registry item closed alongside:** `upsertBlob` (`src/lib/userSettings.js`) awaited the upsert
+  without destructuring `{ error }`. `supabase-js` **returns** errors rather than throwing them, so
+  an RLS denial or a constraint violation resolved the promise and vanished; the `try/catch` only
+  ever saw network faults. The same module already destructures at `:104` and `:145`, and so does
+  `tradeWrite.js:39`. ⛔ The contract is unchanged — a settings write still never throws; the
+  failure is now visible in the console instead of disappearing.
+- **Lesson:** a test that reads a file as text proves the bytes are there, not that the program
+  runs. The gap was not that a check was weak — it was that **the question "does this file
+  parse?" had never been asked of anything outside `src/`**, and a chain can be twenty links long
+  and still have a denominator of zero for an entire class of artifact. When adding coverage for a
+  file, the first assertion is the cheapest one: can the runtime load it.
