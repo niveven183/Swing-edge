@@ -36,13 +36,13 @@
   "//react-router-dom": "PINNED ABOVE 7.11.0 ON PURPOSE. npm audit reports GHSA-qwww-vcr4-c8h2 (high) against react-router and offers `npm audit fix --force`, which DOWNGRADES react-router-dom 7 minor versions to 7.11.0. Do not run it. The advisory is a CSRF bypass in RSC Mode; this app is a pure client-side SPA (BrowserRouter in src/main.jsx, plus Navigate/Link/useNavigate only) and has no RSC, no server actions, and no data-router actions — the vulnerable path does not exist here. REVOKE THIS the moment the app adopts RSC or server actions: then the advisory becomes reachable and the pin must be re-evaluated. See docs/DECISIONS.md 2026-07-27 and 2026-08-06. (This note is a top-level key because JSON has no comments and npm fails with EINVALIDPACKAGENAME on a '//' key inside dependencies.)",
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
-    "@sentry/react": "^10.67.0",
-    "@supabase/supabase-js": "^2.110.8",
+    "@sentry/react": "^10.69.0",
+    "@supabase/supabase-js": "^2.112.2",
     "@vercel/analytics": "^2.0.1",
     "date-fns": "^4.4.0",
     "html2canvas": "^1.4.1",
     "lucide-react": "^0.577.0",
-    "nodemailer": "^9.0.3",
+    "nodemailer": "^9.0.5",
     "papaparse": "^5.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -51,13 +51,13 @@
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
-    "@playwright/test": "^1.61.1",
+    "@playwright/test": "^1.62.1",
     "@sentry/vite-plugin": "^5.4.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.5.4",
-    "postcss": "^8.5.21",
+    "postcss": "^8.5.26",
     "tailwindcss": "^3.4.17",
     "vite": "^6.0.5"
   }
