@@ -154,6 +154,16 @@ export const deriveInstrumentCurrency = (trade, opts = {}) => {
   return unmeasured(AMBIGUOUS, "unrecognized_ticker");
 };
 
+// המטבע ש**כל** נייר מאומת נקוב בו היום. ⚠️ אינו הנחה נוחה — הוא מדידה:
+// הקבוצה הנגזרת סגורה על {USD, ILS}, ו-`MEASURED ILS` נמדד **0 מתוך 61**
+// (`ils_never_measured` ב-:148 הוא הסיבה). ⇒ טבלת שער אחת, USD→X, מכסה כל
+// נייר שאפשר בכלל לצרף.
+//
+// ⚠️ ביום שבו נייר ILS **יימדד** (שורות ת"א עם קוד ספק), הקבוע הזה מפסיק
+// להספיק ונדרשת טבלה פר-מטבע-נייר. `test:instrument` בלוק 5–7 הוא מה שיתפוס
+// את היום הזה — ⛔ לא ההערה הזו.
+export const PAPER_BASE = "USD";
+
 // המצרפי שגוי כשהקבוצה מעורבת, ⛔ לא כשמקור השורה לא נרשם. `ASSUMED` נכנס
 // לכן פנימה — הוצאתו הייתה מרוקנת את המוצר בלי להרוויח דיוק אחד.
 export const isAggregatable = (derived) =>

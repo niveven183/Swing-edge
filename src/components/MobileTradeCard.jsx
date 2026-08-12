@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { MessageCircle } from "lucide-react";
 import TickerLogo from "./TickerLogo";
-import { calcTradeMetrics, fmt$, fmtR, fmtPrice, currencyOf } from "../utils";
+import { calcTradeMetrics, fmt$, fmtR, fmtPaperPrice, currencyOf } from "../utils";
 import { getTranslations, labelFor } from "../i18n.js";
 import { horizonState, horizonLabel } from "../lib/tradeHorizon.js";
 import { deriveInstrumentCurrency, isUnverified } from "../lib/instrumentCurrency.js";
@@ -98,6 +98,9 @@ function MobileTradeCardImpl({
           {trade.side}
         </span>
         <span className={`ms-auto font-bold text-sm ${pnlColorClass}`}>
+          {/* ⚑ סכום-בחשבון — 🔴 לא מומר. `calcTradeMetrics` הגולמי (מטבע ה**נייר**)
+            מוצג תחת סמל ה**חשבון**. ⛔ התיקון הוא **המרה**, ⛔ לא `fmtPaperPrice`.
+            גל ג׳ · docs/STATE.md */}
           {isOpen ? labelFor("status", "OPEN", lang) : fmt$(pnl, currencyOf(trade))}
         </span>
         {!isOpen && rMultiple != null && (
@@ -107,9 +110,9 @@ function MobileTradeCardImpl({
 
       <div className="flex flex-wrap items-center gap-2 font-mono text-[11px]">
         <span className="text-[var(--v3-text-lo)]">{shortDate}</span>
-        <span className="text-slate-300">{fmtPrice(trade.entry, currencyOf(trade))}</span>
+        <span className="text-slate-300">{fmtPaperPrice(trade.entry, trade)}</span>
         <span className="text-[var(--v3-text-lo)]">→</span>
-        <span className="text-slate-300">{trade.exit != null ? `${fmtPrice(trade.exit, currencyOf(trade))}` : "–"}</span>
+        <span className="text-slate-300">{trade.exit != null ? `${fmtPaperPrice(trade.exit, trade)}` : "–"}</span>
         {trade.setup && (
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#A78BFA]/10 text-[var(--v3-purple)] border border-[#A78BFA]/20 whitespace-nowrap shrink-0">
             {labelFor("setup", trade.setup, lang)}

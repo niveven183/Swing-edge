@@ -1,6 +1,43 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { loadRateTable, convert } from "../lib/fx.js";
-import { realizedDayKey, currencyOf, calcTradeMetrics } from "../utils.js";
+import { realizedDayKey, calcTradeMetrics } from "../utils.js";
+// ⚠️ `instrumentCurrency.js` אינו מייבא דבר — אין מעגל ייבוא דרך `utils.js`.
+import { deriveInstrumentCurrency, isAggregatable } from "../lib/instrumentCurrency.js";
+
+/**
+ * fxPairPlan — כמה **קריאות רשת** עולה ליומן אחד, ולמה.
+ *
+ * ⚠️ הכלל הזה ישב inline ב-JSX, ולכן ⛔ לא היה ניתן לאסרציית **ערך** — בדיוק
+ * הכשל שהגל הקודם נפל בו (105 אסרציות מקור ירוקות מעל פיצ'ר מת). פונקציה
+ * טהורה שאפשר לקרוא לה מטסט היא מה שהופך "המשתמש הדולרי משלם 0" מהבטחה
+ * ל**מדידה**.
+ *
+ * שני צמדים נדרשים לוגית:
+ *   נייר→חשבון  — להצגת כסף שהומר (טווח תאריכים, קיבוע יומי)
+ *   נייר→הון     — לתמחור פוזיציה (spot בלבד)
+ *
+ * ⇒ שלוש תוצאות, וכל אחת נמדדת:
+ *   • `base === quote` בצמד ⇒ **זהות**, ⛔ אפס רשת (`fx.js:67` מחזיר את הקלט).
+ *   • `capitalCurrency === accountCurrency` ⇒ שני הצמדים **זהים** ⇒ הטבלה
+ *     השנייה ממוחזרת מהראשונה, ⛔ לא נטענת פעמיים.
+ *   • אחרת — שתי טבלאות. זה המחיר האמיתי, והוא מוצהר כאן.
+ *
+ * @returns {{ pairs: string[], network: number, reusesAccountTable: boolean }}
+ */
+export const fxPairPlan = (paperBase, capitalCurrency, accountCurrency) => {
+  const needed = [
+    [paperBase, accountCurrency],
+    [paperBase, capitalCurrency],
+  ];
+  // ⛔ `base === quote` ⛔ אינו קריאה שנכשלת — הוא **אינו קריאה**.
+  const real = needed.filter(([b, q]) => b !== q).map(([b, q]) => `${b}/${q}`);
+  const pairs = [...new Set(real)];
+  return {
+    pairs,
+    network: pairs.length,
+    reusesAccountTable: capitalCurrency === accountCurrency,
+  };
+};
 
 /**
  * useFxRates — fetches everything needed to express a journal in one currency.
@@ -106,7 +143,24 @@ export const realizedDayKeysOf = (trades) => {
 export const makeConvertingCalc = (table, displayCurrency, status) =>
   (trade) => {
     const m = calcTradeMetrics(trade);
-    const from = currencyOf(trade);
+    // 🔴 מטבע ה**נייר** הנגזר, ⛔ לא `currencyOf(trade)`.
+    //
+    // ⚠️ קטגוריה: זהו אתר **אריתמטי**, ⛔ לא אתר תצוגה. `currencyOf` מחזיר את
+    // התווית ש-`SwingEdge_App.jsx:2493` כתב מ**העדפת החשבון**, ולכן ביומן
+    // שקלי הוא שווה ל-`displayCurrency` בהגדרה ⇒ השורה הבאה מדלגת על ההמרה
+    // **תמיד**. זה בדיוק המנגנון שדרכו רווח דולרי נספר כשקלים.
+    //
+    // ⛔ אל תאחד את זה עם אתרי `currencyOf` האחרים — **אבל ⛔ אל תסיק מכך
+    // שהם תקינים.** התפר הזה מוזן ל-**מצרפים בלבד** (7/7: `generateEquityCurve`
+    // · `useTradingStats` ×4 · `exportMonthlyPDF`). כל אתר **שורה** קורא
+    // `calcTradeMetrics` הגולמי ומדביק עליו את סמל החשבון ⇒ 9/10 אתרי
+    // סכום-בחשבון מציגים מספר **לא מומר**. חוב מדוד ומתועד — `docs/STATE.md`
+    // (גל ג׳), ⛔ לא "כבר הומרו". ראה הבלוק מעל `currencyOf` ב-`src/utils.js`.
+    const derived = deriveInstrumentCurrency(trade);
+    // נייר שמטבעו לא אומת ⛔ אינו מומר ואינו מנוחש — הוא נשאר בתווית שלו,
+    // נספר ב-`pnlByCurrency` ומדליק את באנר הערבוב. ⛔ לא נשמט מהאוכלוסייה.
+    if (!isAggregatable(derived)) return m;
+    const from = derived.code;
     if (from === displayCurrency || m.pnl == null) return m;
     if (status !== "ready" || !table) return m;
 

@@ -1,4 +1,7 @@
 import { format } from "date-fns";
+// גזירת מטבע ה**נייר**. `instrumentCurrency.js` אינו מייבא דבר, ולכן אין כאן
+// מעגל ייבוא — וזו הסיבה שהגזירה יושבת שם ולא כאן.
+import { deriveInstrumentCurrency, isUnverified } from "./lib/instrumentCurrency.js";
 
 export const DEFAULT_CAPITAL = 2500;
 export const RISK_PCT = 0.01;
@@ -130,10 +133,43 @@ export const isNegativeValue = (n) => n < 0 || Object.is(n, -0);
 // shekel trade came to be printed as dollars.
 export const CURRENCY_SYMBOL = { USD: "$", ILS: "₪" };
 
+// ─── שלוש קטגוריות, ⛔ לא אחת ────────────────────────────────────────────────
+//
+// `currencyOf` נמדד ב-36 אתרי קריאה, והם ⛔ אינם קבוצה אחת. איחודם — הפיכת
+// `currencyOf` עצמו לנגזר — נשקל ונדחה על סמך מדידה (`docs/plans/
+// PLAN-2026-08-11-calc-point-conversion.md` §1), מפני שהוא היה משנה שלוש
+// קטגוריות שרוצות שלושה דברים שונים:
+//
+//   1. **מחיר-נייר** (24 אתרים) — `fmtPaperPrice` למטה. מטבע ה**נייר** הנגזר.
+//      הערך ⛔ לעולם אינו מומר; רק הסמל משתנה.
+//   2. **סכום-בחשבון** (10 אתרים) — `fmt$` עם מטבע ה**חשבון**, אחרי המרה.
+//      ⛔ אינם עוברים דרך `currencyOf` הנגזר: להטביע סמל **נייר** על סכום
+//      שהומר ל-`accountCurrency` הוא בדיוק הבאג ההפוך.
+//      🔴 **אזהרה — החוזה הזה ⛔ אינו מקוים היום.** נמדד: `makeConvertingCalc`
+//      מוזן ל-**מצרפים בלבד** (7/7 אתרים), וכל אתר **שורה** קורא
+//      `calcTradeMetrics` הגולמי ⇒ **9 מתוך 10** מציגים מספר שלא הומר תחת סמל
+//      החשבון ($500 → "₪500"). האתר התקין היחיד הוא `riskDollar`, וגם הוא רק
+//      מפני ש-`matchesCapital` **מסרב** ומציג `—`. חוב פתוח: `docs/STATE.md`
+//      (גל ג׳). ⛔ אל תקרא את הקטגוריה הזו כ"מטופל".
+//   3. **נתון מסודר** (אתר אחד — עמודת ה-CSV ב-`SwingEdge_App.jsx:413`) —
+//      ה**תווית השמורה** כפי שהיא. העמודה חוזרת דרך המייבא, ולכן כתיבת ערך
+//      **נגזר** לתוכה מאחסנת הסק שמתחזה לנתון. `scripts/import-test.mjs:894`
+//      נועל את זה.
+//
+// ⇒ `currencyOf` נשאר קורא-תווית, ו-`fmtPaperPrice` הוא הקורא הנפרד. השמות
+// מפורשים כדי שהעורך הבא ⛔ לא יאחד אותם בחזרה.
+//
 // A trade without a currency predates the column and is a dollar trade — the
 // migration's `default 'USD'` says the same thing on the server side.
 export const currencyOf = (trade) =>
   CURRENCY_SYMBOL[trade?.currency] ? trade.currency : "USD";
+
+// מטבע ה**נייר** הנגזר, או `null` כשאינו מאומת.
+// ⚠️ נגזר בזמן קריאה ו-⛔ לעולם אינו נשמר (`instrumentCurrency.js:12-17`).
+export const paperCurrencyOf = (trade) => {
+  const d = deriveInstrumentCurrency(trade);
+  return isUnverified(d) ? null : d.code;
+};
 
 // Signed money display. The second trap: `NaN >= 0` is false, so a blown-up
 // metric fell into the negative branch and rendered as "-$NaN".
@@ -175,6 +211,27 @@ export const fmtPrice = (n, currency = "USD") => {
   // Prices keep their natural precision: 150 stays "150", 73.61 stays "73.61".
   // Forcing 2 decimals everywhere would rewrite every whole-number price on
   // screen, which is a visual change nobody asked for.
+  return `${sym}${v.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+};
+
+// מחיר-נייר לפי מטבע ה**נייר** הנגזר — הקורא הנפרד של קטגוריה 1 (ראה הבלוק
+// מעל `currencyOf`). ⛔ אינו `fmtPrice(n, currencyOf(t))`: `currencyOf` מחזיר
+// את תווית ה**חשבון** השמורה, ולכן AAPL ביומן שקלי הודפס "₪304.51" — מחיר
+// שאי-אפשר לשלוח בו פקודה.
+//
+// מקבל את ה-`trade` ולא קוד מטבע, כדי שהגזירה תקרה במקום אחד ולא ב-24 אתרי
+// הקריאה — ובמחיר הזה גם שלושת האתרים שאינם שדה-עסקה (התראת מחיר, מחיר חי)
+// עובדים ללא שינוי, כי `deriveInstrumentCurrency` דורש רק `ticker`.
+//
+// ⚠️ נייר לא-מאומת מודפס **ללא סמל**, לא בסמל ברירת-מחדל. זו התקדימה של
+// `QuotePrice` (`SwingEdge_App.jsx:788`): מספר בלי מטבע מעורר שאלה, מספר
+// במטבע הלא-נכון לא. ⛔ אין כאן `|| CURRENCY_SYMBOL.USD` — הנפילה-לדולר היא
+// בדיוק הניחוש שהמודול הזה קיים כדי למנוע.
+export const fmtPaperPrice = (n, trade) => {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return "—";
+  const code = paperCurrencyOf(trade);
+  const sym = code ? CURRENCY_SYMBOL[code] || "" : "";
   return `${sym}${v.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 };
 

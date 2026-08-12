@@ -46,7 +46,7 @@ import { supabase, isSupabaseConfigured, tradeForSupabase, tradeFromSupabase } f
 import { cleanTrades, purgeInvalidTrades } from "./src/lib/cleanTrades.js";
 import { deleteTradeVerified, restoreAt, createPendingWrites, insertTradeRow, updateTradeRow, insertTradeRows, deleteTradeRows } from "./src/lib/tradeWrite.js";
 import { loadSettings, saveSettings, flushSettings, migrateFromLocalStorage } from "./src/lib/userSettings.js";
-import { calcTradeMetrics, fmt$, fmt$0, fmtR, fmtNum, fmtPrice, fmtBalance, numOrNull, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays, localDayKey, todayKey, realizedAt, realizedDayKey, currencyOf, CURRENCY_SYMBOL } from "./src/utils.js";
+import { calcTradeMetrics, fmt$, fmt$0, fmtR, fmtNum, fmtPrice, fmtBalance, numOrNull, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays, localDayKey, todayKey, realizedAt, realizedDayKey, currencyOf, fmtPaperPrice, paperCurrencyOf, CURRENCY_SYMBOL } from "./src/utils.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell,
@@ -93,11 +93,16 @@ import {
   DNACard, EdgeCard, DecisionCoachPanel, TiltShield, GrowthChart, RegimeIndicator, PatternTags,
 } from "./src/intelligence/ui/IntelligenceUI.jsx";
 import { useTradingStats } from "./src/hooks/useTradingStats.js";
-import { useFxRates, realizedDayKeysOf, makeConvertingCalc } from "./src/hooks/useFxRates.js";
+import { useFxRates, realizedDayKeysOf, makeConvertingCalc, fxPairPlan } from "./src/hooks/useFxRates.js";
 import { convert } from "./src/lib/fx.js";
 import { resolveEquityBase } from "./src/lib/equityBase.js";
 import { horizonState, horizonLabel } from "./src/lib/tradeHorizon.js";
-import { deriveInstrumentCurrency, matchesCapital, isUnverified, INSTRUMENT_STATE } from "./src/lib/instrumentCurrency.js";
+import { deriveInstrumentCurrency, matchesCapital, isUnverified, INSTRUMENT_STATE, PAPER_BASE } from "./src/lib/instrumentCurrency.js";
+import { sizePosition } from "./src/lib/positionSizing.js";
+
+// ⚠️ קבוע מודול, ⛔ לא `[]` inline: מערך טרי בכל רינדור הוא תלות טרייה ב-
+// `useFxRates`, וזה לולאת fetch אינסופית.
+const EMPTY_DAYS = [];
 import { fileToResizedDataURL, exceedsCap, MAX_EDGE_PX, Q_PRIMARY, Q_FALLBACK } from "./src/lib/imageResize.js";
 import InfoTooltip from "./src/components/ui/InfoTooltip.jsx";
 import TermTooltip from "./src/components/ui/TermTooltip.jsx";
@@ -410,6 +415,10 @@ const exportTradesCSV = (trades) => {
       t.maxFavorable ?? "", t.maxAdverse ?? "",
       m.pnl != null ? m.pnl.toFixed(2) : "",
       m.rMultiple != null ? m.rMultiple.toFixed(2) : "",
+      // ⚑ קטגוריה 3 — **נתון מסודר**, ⛔ לא תצוגה ולא חשבון.
+      // כותב את התווית ה**שמורה** כלשונה. ⛔ אל תחליף בגזירה: העמודה חוזרת
+      // דרך המייבא (`scripts/import-test.mjs` §1 round-trip), ולכן ערך נגזר
+      // כאן מאחסן **הסק שמתחזה לנתון**. הבדיקה נעולה על `currencyOf(t)`.
       currencyOf(t),
     ].join(",");
   });
@@ -492,8 +501,8 @@ const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity, cur
         <td><strong>${t.ticker}</strong></td>
         <td>${t.side}</td>
         <td>${t.setup ?? "-"}</td>
-        <td>${fmtPrice(t.entry, currencyOf(t))}</td>
-        <td>${t.exit != null ? fmtPrice(t.exit, currencyOf(t)) : "-"}</td>
+        <td>${fmtPaperPrice(t.entry, t)}</td>
+        <td>${t.exit != null ? fmtPaperPrice(t.exit, t) : "-"}</td>
         <td style="color:${pnlColor(pnl)};font-weight:600">${fmtDollar(pnl)}</td>
         <td style="color:${r == null ? "#94a3b8" : pnlColor(r)};font-weight:600">${fmtR(r)}</td>
         <td>${t.followedPlan === "Partially" ? "◐" : t.followedPlan != null ? (t.followedPlan ? "✓" : "✗") : "-"}</td>
@@ -795,8 +804,13 @@ const QuotePrice = memo(({ ticker, price }) => {
 // מה לא ידוע. השורה עצמה נשארת קריאה; רק המצרפי חוצה-המטבע נמנע.
 // ⚠️ `lang` ולא אובייקט התרגום: בתוך `.map(t => …)` של היומן `t` הוא ה**עסקה**
 // ומצל על התרגומים, ולכן אין ממה לקרוא מפתח בתוך השורה.
-const UnverifiedCcyChip = memo(({ ticker, lang }) => {
-  if (!isUnverified(deriveInstrumentCurrency({ ticker }))) return null;
+// 🔴 `trade` ולא `ticker`: `deriveInstrumentCurrency({ ticker })` בונה עסקה
+// חלקית שאין בה `currency`, ולכן שלב 4 (`stored === "ILS"` ⇒ `CONTRADICTED`)
+// ⛔ **בלתי-נגיש מבנית** — השבב לא יכול היה להידלק על שורה שקלית לעולם.
+// נמדד: עסקה שלמה ⇒ `contradicted/ils_never_measured`; `{ticker}` ⇒ `assumed`.
+// `MobileTradeCard` העביר עסקה שלמה ולכן **עבד** — זה ההבדל בין שני המסלולים.
+const UnverifiedCcyChip = memo(({ trade, lang }) => {
+  if (!isUnverified(deriveInstrumentCurrency(trade))) return null;
   const tr = getTranslations(lang);
   return (
     <span
@@ -1974,6 +1988,36 @@ export default function SwingEdge() {
   const fxDayKeys = useMemo(() => realizedDayKeysOf(realTrades), [realTrades]);
   const { table: fxTable, status: fxStatus } = useFxRates(capitalCurrency, accountCurrency, fxDayKeys);
 
+  // ─── טבלת מטבע ה**נייר** ────────────────────────────────────────────────────
+  // ⚠️ הטבלה למעלה היא הון→חשבון, ו-`fx.js:69` דורש התאמת זוג **מדויקת**.
+  // ⇒ ליומן שקלי (הון ₪ = חשבון ₪) היא `identity` ו**אף שער USD→ILS לא נטען
+  // בשום מקום**. זו הסיבה שהגל הקודם לא יכול היה להמיר גם אילו ניסה: לא היה
+  // במה. הטבלאות כאן הן מה שהופך את ההמרה לאפשרית בכלל.
+  //
+  // ⛔ אינן מבטלות את הראשונה — הון→חשבון ממשיך בדיוק כשהיה.
+  //
+  // עלות רשת: ⛔ **אינה נאמרת כאן** — היא נגזרת מ-`fxPairPlan`, פונקציה טהורה
+  // שהטסט קורא לה. הכלל הזה ישב כאן inline ⇒ ⛔ לא היה ניתן לאסרציית **ערך**;
+  // עכשיו `plan.network` הוא המספר שהטסט מודד, ⛔ לא הערה שמישהו יסתמך עליה.
+  const paperAcctFx = useFxRates(PAPER_BASE, accountCurrency, fxDayKeys);
+  // 🔴 מקור-אמת-אחד. `paperCapSamePair` היה כאן העתקה מקבילה של אותו תנאי —
+  // בדיוק המבנה שבו התיקון נוחת באחת מהשתיים. הון = חשבון (המקרה הרווח) ⇒
+  // אותו זוג בדיוק ⇒ קוראים ל-Hook עם `PAPER_BASE→PAPER_BASE` (`identity`,
+  // עלות אפס) ומשתמשים מחדש בטבלה שכבר נטענה, ⛔ במקום לשלם פעמיים.
+  const paperCapSamePair = fxPairPlan(PAPER_BASE, capitalCurrency, accountCurrency).reusesAccountTable;
+  const paperCapOwnFx = useFxRates(PAPER_BASE, paperCapSamePair ? PAPER_BASE : capitalCurrency, EMPTY_DAYS);
+  const paperCapTable  = paperCapSamePair ? paperAcctFx.table  : paperCapOwnFx.table;
+  const paperCapStatus = paperCapSamePair ? paperAcctFx.status : paperCapOwnFx.status;
+
+  // השער נייר→הון ל**ערכי הווה** (תמחור פוזיציה, סיכון). `null` = סירוב.
+  // ⛔ אין כאן `|| 1`: ברירת מחדל כאן היא פקודת קנייה בגודל שגוי.
+  const paperToCapitalRate = useMemo(() => {
+    if (PAPER_BASE === capitalCurrency) return 1; // זהות מדויקת, ⛔ לא שער
+    if (paperCapStatus !== "ready") return null;
+    const { rate } = convert(1, PAPER_BASE, capitalCurrency, paperCapTable);
+    return rate;
+  }, [capitalCurrency, paperCapTable, paperCapStatus]);
+
   // Present value: the capital base expressed in the display currency, at spot.
   // `capital` itself is never touched — this is a view of it, which is why
   // flipping the display currency and back is lossless.
@@ -2334,16 +2378,40 @@ export default function SwingEdge() {
   const entryN  = parseFloat(form.entry)  || 0;
   const stopN   = parseFloat(form.stop)   || 0;
   const targetN = parseFloat(form.target) || 0;
-  const riskPerShare   = Math.abs(entryN - stopN);
   const rewardPerShare = Math.abs(targetN - entryN);
-  const posSize        = riskPerShare > 0 ? Math.floor((capital * (riskPct / 100)) / riskPerShare) : 0;
-  const posValue       = posSize * entryN;
-  const potLoss        = posSize * riskPerShare;
+
+  // ─── תמחור הפוזיציה — ההמרה קורית **לפני** החלוקה ──────────────────────────
+  // `entryN`/`stopN` נקובים במטבע ה**נייר**; `capital` במטבע ה**הון**. חלוקה
+  // ישירה ביניהם היא הבאג: נמדד הון ₪25,000 · AAPL 304.51/250 · כלל 1% ⇒
+  // המסך אמר **4 מניות**, האמת **1**. הטעות תמיד לכיוון של יותר חשיפה.
+  //
+  // ⚠️ טיקר ריק ⇒ אין נייר ⇒ אין מה לסתור, ולכן משתמשים בשער ההון (זהות
+  // למשתמש דולרי). ⛔ סירוב כאן היה מציג "—" לכל מי שמקליד מחיר לפני טיקר.
+  const formPaperCcy = form.ticker.trim() ? paperCurrencyOf({ ticker: form.ticker }) : capitalCurrency;
+  const formRate = formPaperCcy == null
+    ? null                                    // נייר לא-מאומת ⇒ סירוב מוצהר
+    : formPaperCcy === capitalCurrency ? 1     // זהות מדויקת, ⛔ לא שער
+    : paperToCapitalRate;                      // שער spot, או null כשאין
+  const formRefusal = formPaperCcy == null ? "unverified_currency" : "no_rate";
+
+  const sizing = sizePosition({
+    entry: form.entry, stop: form.stop, capital, riskPct,
+    sharesOverride: form.shares ?? "",
+    rate: formRate, refusalReason: formRefusal,
+  });
+  // ⚠️ `sizingOk` שקר ⇒ המסך מציג `—` + סיבה. ⛔ אין נפילה למספר.
+  const sizingOk = sizing.ok;
+
+  const riskPerShare   = sizing.riskPerShare ?? 0;
+  const posSize        = sizing.posSize ?? 0;
+  const posValue       = sizing.posValue ?? 0;
+  const potLoss        = sizing.potLoss ?? 0;
   // R/R is a price-only ratio — independent of position size — so the card always
   // agrees with the Decision Coach even when posSize floors to 0 on a small account.
+  // ⚠️ נשאר על המחירים הגולמיים: יחס בין שני גדלים באותו מטבע ⇒ חסין-מטבע.
   const rrRatio        = priceBasedRR(entryN, stopN, targetN);
   // True when the risk-%-sized position rounds below a single share (high price / wide stop / small capital).
-  const posSizeTooSmall = riskPerShare > 0 && posSize === 0;
+  const posSizeTooSmall = sizing.posSizeTooSmall;
   // Geometry validity against the explicitly chosen side — drives the invalid-input
   // state (cards show "—", a red banner explains why, and save is blocked).
   const tradeValidity = validateTradeInputs(entryN, stopN, targetN, form.side);
@@ -2351,18 +2419,19 @@ export default function SwingEdge() {
   // suggestedShares mirrors the risk-%-sized value the card shows (1 when posSizeTooSmall).
   // effShares drives Pos.Value / Max Risk so an override recomputes them live; R/R stays price-only.
   // Sticky by design — changing entry/stop recomputes the suggestion but leaves the override in place.
-  const suggestedShares   = posSizeTooSmall ? 1 : posSize;
+  const suggestedShares   = sizing.suggestedShares ?? 0;
   const sharesOverrideStr = (form.shares ?? "").toString();
-  const sharesOverrideN   = parseInt(sharesOverrideStr, 10);
-  const hasSharesOverride = sharesOverrideStr !== "" && sharesOverrideN > 0 && sharesOverrideN !== suggestedShares;
-  const effShares   = sharesOverrideStr !== "" && sharesOverrideN > 0 ? sharesOverrideN : suggestedShares;
-  const effPosValue = effShares * entryN;
-  const effPotLoss  = effShares * riskPerShare;
+  const hasSharesOverride = sizing.hasSharesOverride;
+  const effShares   = sizing.effShares ?? 0;
+  const effPosValue = sizing.effPosValue ?? 0;
+  const effPotLoss  = sizing.effPotLoss ?? 0;
   // Actual portfolio risk of the sized position. When the 1-share floor (or a
   // manual override) pushes this above the configured %, the "based on X% risk"
   // claim is false — surface an honest over-risk warning without blocking. (#9)
-  const effRiskPct  = capital > 0 ? (effPotLoss / capital) * 100 : 0;
-  const isOverRisk  = tradeValidity.valid && effShares > 0 && effRiskPct > riskPct + 0.05;
+  const effRiskPct  = sizing.effRiskPct ?? 0;
+  // ⚠️ `sizingOk` בשער: בלי שער אין אחוז סיכון אמיתי, ולכן ⛔ אין גם אזהרת
+  // חריגה — אזהרה שמחושבת מ-0 היא שקט, ⛔ לא בטיחות.
+  const isOverRisk  = sizingOk && tradeValidity.valid && effShares > 0 && effRiskPct > riskPct + 0.05;
 
   // Analyzer computed values
   const azEntry  = parseFloat(analyzerForm.entry)  || 0;
@@ -2370,8 +2439,22 @@ export default function SwingEdge() {
   const azTarget = parseFloat(analyzerForm.target) || 0;
   const azShares = parseFloat(analyzerForm.shares) || 0;
   const azRiskPerShare = azEntry > 0 && azStop > 0 ? Math.abs(azEntry - azStop) : 0;
-  const azDollarRisk   = azRiskPerShare * azShares;
-  const azPortfolioRisk = capital > 0 ? (azDollarRisk / capital) * 100 : 0;
+  // ⚠️ אותה אריתמטיקה בדיוק כמו בטופס, ולכן **אותו באג**: `azRiskPerShare`
+  // נקוב במטבע ה**נייר** ואילו `capital` במטבע ה**הון**. `azDollarRisk/capital`
+  // בלי המרה מחלק דולרים בשקלים ⇒ אחוז הסיכון יוצא קטן פי-שער, כלומר לכיוון
+  // של **פחות** סיכון נראה — בדיוק הכיוון שלא גורם למשתמש לעצור.
+  //
+  // ⛔ אין כאן `|| 1`: המנתח הוא **שלב ההחלטה** לפני פתיחת פוזיציה, ומספר
+  // מנוחש כאן הוא בדיוק אותה הוראת-פעולה שגויה. אין שער ⇒ `null` ⇒ `—`.
+  const azPaperCcy = analyzerForm.ticker.trim()
+    ? paperCurrencyOf({ ticker: analyzerForm.ticker })
+    : capitalCurrency;
+  const azRate = azPaperCcy == null ? null
+    : azPaperCcy === capitalCurrency ? 1
+    : paperToCapitalRate;
+  const azOk = Number.isFinite(azRate) && azRate > 0;
+  const azDollarRisk    = azOk ? azRiskPerShare * azShares * azRate : null;
+  const azPortfolioRisk = azOk && capital > 0 ? (azDollarRisk / capital) * 100 : null;
   const azRRRatio  = priceBasedRR(azEntry, azStop, azTarget);
 
   // ─── LIVE QUOTE FOR ADD-TRADE FORM ──────────────────────────────────────────
@@ -2590,6 +2673,11 @@ export default function SwingEdge() {
     setShowCloseForm(false);
     setClosingTrade(null);
     setCloseForm({ exit: "", exitReason: "Target Hit", followedPlan: true, lessonLearned: "", maxFavorable: "", maxAdverse: "" });
+    // ⚑ קטגוריה 2 — **סכום-בחשבון**, ו-🔴 **החוב מופיע כאן**.
+    // `calcTradeMetrics` הוא הגולמי: `pnl` נקוב במטבע ה**נייר**, ואילו
+    // `currencyOf` הוא תווית ה**חשבון** ⇒ רווח של $500 מוכרז "₪500".
+    // ⛔ אל תתקן ל-`fmtPaperPrice` — זה סכום-בחשבון, והתיקון הוא **המרה**
+    // (דרך `stableCalcTradeMetrics`, שנמצא ב-scope כאן). גל ג׳ · docs/STATE.md.
     const { pnl } = calcTradeMetrics(closedTrade);
     if (pnl > 0) toast.success(lang === "he" ? `רווח ${fmt$(Math.round(pnl), currencyOf(closedTrade))} נסגר בהצלחה` : `Closed with profit ${fmt$(Math.round(pnl), currencyOf(closedTrade))}`);
     else if (pnl < 0) toast.error(lang === "he" ? `הפסד ${fmt$(Math.round(pnl), currencyOf(closedTrade))} — נסגר` : `Closed with loss ${fmt$(Math.round(pnl), currencyOf(closedTrade))}`);
@@ -3321,7 +3409,20 @@ export default function SwingEdge() {
       stop: azStop,
       target: azTarget,
       side: inferSide(azEntry, azStop, azTarget),
-      capital,
+      // 🔴 המרה ב**אתר הקריאה**, ⛔ לא בתוך המנוע. `DecisionCoach` הוא מודול
+      // **טהור** ואינו יודע שקיים שער; הכנסת fx לתוכו הייתה הופכת אותו
+      // לבלתי-ניתן-לבדיקה בלי רשת (`test:instrument` 13.11 נועל את זה).
+      //
+      // ⚠️ **כיוון ההמרה נבחר בכוונה — ההון מומר למטבע הנייר, ⛔ לא הפוך.**
+      // `rr` ו-`stopPct` הם יחסים בין מחירים. המרת `entry`/`stop`/`target`
+      // הייתה מזיזה אותם ב-ULP האחרון ((a·r − b·r)/(c·r) ≠ (a−b)/c ב-IEEE-754).
+      // כשה**הון** הוא שמומר, המחירים נכנסים ללא נגיעה ⇒ `rr` ו-`stopPct`
+      // זהים **מבנית**, ⛔ לא בקירוב. היחס `dollarRisk/capital` נכון בשני
+      // הכיוונים כי שניהם נמדדים אז באותה יחידה.
+      //
+      // ⛔ אין שער ⇒ `0` ⇒ `portfolioRiskNote` מחזיר `""` (`pct <= 0`) והמשפט
+      // **נשמט**. ⛔ לא "סיכון תיק 0%" — זו טענה שקרית, לא היעדר טענה.
+      capital: azOk ? capital / azRate : 0,
       shares: azShares,
       setup: analyzerForm.setup,
       notes: analyzerForm.notes,
@@ -3860,9 +3961,12 @@ export default function SwingEdge() {
                                 <td className="px-3 py-2 font-mono font-bold text-white">{tr.ticker}</td>
                                 <td className="px-3 py-2 text-[var(--v3-text-mid)]">{tr.side}</td>
                                 <td className="px-3 py-2 text-[var(--v3-text-lo)] font-mono">{tr.date}</td>
-                                <td className="px-3 py-2 text-end font-mono text-[var(--v3-text-mid)]">{tr.entry != null ? `${fmtPrice(tr.entry, currencyOf(tr))}` : "—"}</td>
-                                <td className="px-3 py-2 text-end font-mono text-[var(--v3-text-mid)]">{closed && tr.exit != null ? `${fmtPrice(tr.exit, currencyOf(tr))}` : "—"}</td>
+                                <td className="px-3 py-2 text-end font-mono text-[var(--v3-text-mid)]">{tr.entry != null ? `${fmtPaperPrice(tr.entry, tr)}` : "—"}</td>
+                                <td className="px-3 py-2 text-end font-mono text-[var(--v3-text-mid)]">{closed && tr.exit != null ? `${fmtPaperPrice(tr.exit, tr)}` : "—"}</td>
                                 <td className={`px-3 py-2 text-end font-mono font-semibold ${!closed ? "text-[var(--v3-text-lo)]" : (mm.pnl || 0) >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>
+                                  {/* ⚑ סכום-בחשבון — 🔴 לא מומר. `calcTradeMetrics` הגולמי (מטבע ה**נייר**)
+    מוצג תחת סמל ה**חשבון**. ⛔ התיקון הוא **המרה**, ⛔ לא `fmtPaperPrice`.
+    גל ג׳ · docs/STATE.md */}
                                   {closed ? fmt$(Math.round((mm.pnl || 0) * 100) / 100, currencyOf(tr)) : "—"}
                                 </td>
                                 <td className={`px-3 py-2 text-end font-mono ${!closed ? "text-[var(--v3-text-lo)]" : (mm.rMultiple || 0) >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>
@@ -4131,13 +4235,17 @@ export default function SwingEdge() {
                         )}
                         {priceAlerts[tr.ticker] && showAlertInput !== tr.id && (
                           <div className="mt-1 text-[9px] text-amber-500/70 font-mono flex items-center gap-1">
-                            <Bell size={8} /> Alert @ {fmtPrice(priceAlerts[tr.ticker], currencyOf(tr))}
+                            <Bell size={8} /> Alert @ {fmtPaperPrice(priceAlerts[tr.ticker], tr)}
                           </div>
                         )}
                         <div className="mt-1 grid grid-cols-2 gap-x-3 text-[10px] text-slate-500 font-mono">
-                          <span>Entry <span className="text-slate-300">{fmtPrice(tr.entry, currencyOf(tr))}</span></span>
-                          <span>Now <span className={currentPrice ? "text-cyan-300 font-bold" : "text-slate-600"}>{currentPrice ? `${fmtPrice(currentPrice, currencyOf(tr))}` : "..."}</span></span>
-                          <span>Stop <span className="text-[var(--v3-loss)]">{fmtPrice(tr.stop, currencyOf(tr))}</span></span>
+                          <span>Entry <span className="text-slate-300">{fmtPaperPrice(tr.entry, tr)}</span></span>
+                          <span>Now <span className={currentPrice ? "text-cyan-300 font-bold" : "text-slate-600"}>{currentPrice ? `${fmtPaperPrice(currentPrice, tr)}` : "..."}</span></span>
+                          <span>Stop <span className="text-[var(--v3-loss)]">{fmtPaperPrice(tr.stop, tr)}</span></span>
+                          {/* ⚑ סכום-בחשבון **לא ממומש** — 🔴 לא מומר, ו⚠️ ⛔ **אינו ניתן**
+    לתיקון דרך התפר הקיים: `calcTradeMetrics(עסקה פתוחה).pnl === null`
+    ⇒ `makeConvertingCalc` מדלג עליו. רווח לא-ממומש דורש **spot**
+    (`convert(…, dateKey=null)`), ⛔ לא קיבוע יום. הכרעה פתוחה — גל ג׳. */}
                           <span>P&L <span className={livePnl !== null ? (livePnl >= 0 ? "text-[var(--v3-accent)] font-bold" : "text-[var(--v3-loss)] font-bold") : "text-slate-600"}>{livePnl !== null ? fmt$(Math.round(livePnl), currencyOf(tr)) : "..."}</span></span>
                         </div>
                         {livePnlPct !== null && (
@@ -4188,9 +4296,12 @@ export default function SwingEdge() {
                           <td className="py-2 pe-4 font-bold text-white font-mono"><div className="flex items-center gap-1.5"><TickerLogo ticker={t.ticker} size={16} />{t.ticker}</div></td>
                           <td className="py-2 pe-4 text-slate-500">{t.date}</td>
                           <td className="py-2 pe-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side==="LONG"?"bg-[var(--v3-accent)]/10 text-[var(--v3-accent)] border border-[var(--v3-accent)]/20":"bg-[var(--v3-loss)]/10 text-[var(--v3-loss)] border border-[var(--v3-loss)]/20"}`}>{t.side}</span></td>
-                          <td className="py-2 pe-4 font-mono text-slate-300">{fmtPrice(t.entry, currencyOf(t))}</td>
-                          <td className="py-2 pe-4 font-mono text-slate-300">{fmtPrice(t.exit, currencyOf(t))}</td>
+                          <td className="py-2 pe-4 font-mono text-slate-300">{fmtPaperPrice(t.entry, t)}</td>
+                          <td className="py-2 pe-4 font-mono text-slate-300">{fmtPaperPrice(t.exit, t)}</td>
                           <td className="py-2 pe-4 font-mono text-slate-400">{t.shares}</td>
+                          {/* ⚑ סכום-בחשבון — 🔴 לא מומר. `calcTradeMetrics` הגולמי (מטבע ה**נייר**)
+    מוצג תחת סמל ה**חשבון**. ⛔ התיקון הוא **המרה**, ⛔ לא `fmtPaperPrice`.
+    גל ג׳ · docs/STATE.md */}
                           <td className={`py-2 pe-4 font-bold font-mono ${win ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>{fmt$(Math.round(pnl), currencyOf(t))}</td>
                           <td className={`py-2 pe-4 font-bold font-mono ${rMultiple == null ? "text-slate-600" : rMultiple >= 0 ? "text-cyan-400" : "text-[var(--v3-loss)]"}`}>{fmtR(rMultiple)}</td>
                           <td className="py-2 pe-4"><span className="inline-flex items-center gap-1"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">{labelFor("setup", t.setup, lang)}</span><SetupTagTip setup={t.setup} isRTL={isRTL} /></span></td>
@@ -4381,9 +4492,13 @@ export default function SwingEdge() {
                                       {t.side}
                                     </span>
                                   </td>
-                                  <td className="py-2 pe-4 font-mono text-slate-300">{fmtPrice(t.entry, currencyOf(t))}</td>
-                                  <td className="py-2 pe-4 font-mono text-[var(--v3-loss)]">{t.hasStop ? `${fmtPrice(t.stop, currencyOf(t))}` : "—"}</td>
+                                  <td className="py-2 pe-4 font-mono text-slate-300">{fmtPaperPrice(t.entry, t)}</td>
+                                  <td className="py-2 pe-4 font-mono text-[var(--v3-loss)]">{t.hasStop ? `${fmtPaperPrice(t.stop, t)}` : "—"}</td>
                                   <td className="py-2 pe-4 font-mono text-slate-400">{t.shares}</td>
+                                  {/* ⚑ סכום-בחשבון — ✅ **האתר התקין היחיד מה-10**, ולא במקרה:
+    `riskDollar` מחושב רק כש-`hasStop`, ו-`hasStop` חסום ב-`matchesCapital`
+    (מעל) ⇒ כשמטבע הנייר ≠ ההון הערך הוא `null` ומוצג `—`.
+    ⚠️ הסרת השער מפילה את האתר הזה לתוך אותו חוב של 9 האחרים. */}
                                   <td className={`py-2 pe-4 font-bold font-mono ${rowColor}`}>{t.hasStop ? `${fmtPrice(t.riskDollar, currencyOf(t))}` : "—"}</td>
                                   <td className={`py-2 pe-4 font-bold font-mono ${rowColor}`}>{t.hasStop ? `${t.riskPct.toFixed(2)}%` : "—"}</td>
                                   <td className="py-2 pe-4 font-mono text-slate-400">
@@ -4726,7 +4841,7 @@ export default function SwingEdge() {
                             className="w-3.5 h-3.5 rounded border border-white/20 bg-white/5 cursor-pointer accent-[var(--v3-info)]"
                           />
                         </td>
-                        <td className="p-3 font-bold text-white font-mono whitespace-nowrap"><div className="flex items-center gap-1.5"><TickerLogo ticker={t.ticker} size={16} />{t.ticker}{t.isDemo && <span className="text-xs bg-slate-700 text-slate-400 px-1 py-0.5 rounded ms-1 font-normal">DEMO</span>}<UnverifiedCcyChip ticker={t.ticker} lang={lang} />{hz.stale && (
+                        <td className="p-3 font-bold text-white font-mono whitespace-nowrap"><div className="flex items-center gap-1.5"><TickerLogo ticker={t.ticker} size={16} />{t.ticker}{t.isDemo && <span className="text-xs bg-slate-700 text-slate-400 px-1 py-0.5 rounded ms-1 font-normal">DEMO</span>}<UnverifiedCcyChip trade={t} lang={lang} />{hz.stale && (
                             /* ⚠️ var(--warning) → --accent-amber, מודע-תמה:
                                #D97706 על לבן = 3.19:1 ✓ · #F59E0B על #0d1424 = 8.56:1 ✓.
                                ⛔ לא --v3-warn — הוא מוגדר ב-:root בלבד ואינו נדרס
@@ -4741,16 +4856,16 @@ export default function SwingEdge() {
                           )}</div></td>
                         <td className="p-3 text-slate-500 whitespace-nowrap">{t.date}</td>
                         <td className="p-3"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.side==="LONG"?"bg-[#00C076]/10 text-[var(--v3-accent)] border border-[#00C076]/20":"bg-[#F43F5E]/10 text-[var(--v3-loss)] border border-[#F43F5E]/20"}`}>{t.side}</span></td>
-                        <td className="p-3 font-mono text-slate-300">{fmtPrice(t.entry, currencyOf(t))}</td>
-                        <td className="p-3 font-mono text-[var(--v3-loss)]">{t.stop != null ? `${fmtPrice(t.stop, currencyOf(t))}` : "–"}</td>
-                        <td className="p-3 font-mono text-[var(--v3-accent)]">{t.target != null ? `${fmtPrice(t.target, currencyOf(t))}` : "–"}</td>
+                        <td className="p-3 font-mono text-slate-300">{fmtPaperPrice(t.entry, t)}</td>
+                        <td className="p-3 font-mono text-[var(--v3-loss)]">{t.stop != null ? `${fmtPaperPrice(t.stop, t)}` : "–"}</td>
+                        <td className="p-3 font-mono text-[var(--v3-accent)]">{t.target != null ? `${fmtPaperPrice(t.target, t)}` : "–"}</td>
                         <td className="p-3 font-mono text-slate-400">{t.shares}</td>
                         {/* Current Price */}
                         <td className="p-3 font-mono text-xs whitespace-nowrap">
                           {isOpen ? (() => {
                             const cp = getLivePrice(t.ticker)?.price;
                             return cp
-                              ? <span className="text-slate-200 font-bold">{fmtPrice(cp, currencyOf(t))}</span>
+                              ? <span className="text-slate-200 font-bold">{fmtPaperPrice(cp, t)}</span>
                               : pricesLoading
                                 ? <span className="text-slate-600 animate-pulse text-[10px]"><RefreshCw size={8} className="inline animate-spin" /></span>
                                 : <span className="text-slate-700">–</span>;
@@ -4764,11 +4879,16 @@ export default function SwingEdge() {
                             const lp = t.side === "LONG"
                               ? (cp - t.entry) * t.shares
                               : (t.entry - cp) * t.shares;
+                            // ⚑ סכום-בחשבון **לא ממומש** — 🔴 לא מומר. `lp` מחושב inline
+                            // ממחיר חי ולכן ⛔ אינו עובר בתפר כלל. דורש **spot**. גל ג׳.
                             return <span className={lp >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}>{fmt$(Math.round(lp), currencyOf(t))}</span>;
                           })()}
                         </td>
-                        <td className="p-3 font-mono text-slate-300">{t.exit ? `${fmtPrice(t.exit, currencyOf(t))}` : "–"}</td>
+                        <td className="p-3 font-mono text-slate-300">{t.exit ? `${fmtPaperPrice(t.exit, t)}` : "–"}</td>
                         <td className={`p-3 font-bold font-mono text-sm ${isOpen ? "text-slate-500" : win ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>
+                          {/* ⚑ סכום-בחשבון — 🔴 לא מומר. `calcTradeMetrics` הגולמי (מטבע ה**נייר**)
+    מוצג תחת סמל ה**חשבון**. ⛔ התיקון הוא **המרה**, ⛔ לא `fmtPaperPrice`.
+    גל ג׳ · docs/STATE.md */}
                           {isOpen ? "–" : fmt$(pnl, currencyOf(t))}
                         </td>
                         <td className={`p-3 font-bold font-mono text-xs ${isOpen || rMultiple == null ? "text-slate-500" : rMultiple >= 0 ? "text-[var(--v3-info)]" : "text-[var(--v3-loss)]"}`}>
@@ -5001,13 +5121,13 @@ export default function SwingEdge() {
                   <div className="text-center">
                     <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">{t.riskInDollars}</div>
                     <div className="text-lg font-bold font-mono text-[var(--v3-loss)]">
-                      {azShares > 0 ? `${dispSym}${toDisp(azDollarRisk).toFixed(2)}` : "–"}
+                      {azShares > 0 && azDollarRisk != null ? `${dispSym}${toDisp(azDollarRisk).toFixed(2)}` : "–"}
                     </div>
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">{t.riskOfPortfolio}</div>
-                    <div className={`text-lg font-bold font-mono ${azPortfolioRisk > 2 ? "text-[var(--v3-loss)]" : azPortfolioRisk > 1 ? "text-[var(--v3-warn)]" : "text-[var(--v3-accent)]"}`}>
-                      {azShares > 0 ? `${azPortfolioRisk.toFixed(2)}%` : "–"}
+                    <div className={`text-lg font-bold font-mono ${azPortfolioRisk == null ? "text-slate-500" : azPortfolioRisk > 2 ? "text-[var(--v3-loss)]" : azPortfolioRisk > 1 ? "text-[var(--v3-warn)]" : "text-[var(--v3-accent)]"}`}>
+                      {azShares > 0 && azPortfolioRisk != null ? `${azPortfolioRisk.toFixed(2)}%` : "–"}
                     </div>
                   </div>
                 </div>
@@ -5259,14 +5379,29 @@ export default function SwingEdge() {
           const entN   = parseFloat(posCalc.entry)   || 0;
           const stopN  = parseFloat(posCalc.stop)    || 0;
 
-          const riskDollars   = capN * (riskN / 100);
-          const riskPerShare  = entN > 0 && stopN > 0 ? Math.abs(entN - stopN) : 0;
-          const shares        = riskPerShare > 0 ? Math.floor(riskDollars / riskPerShare) : 0;
-          const posValue      = shares * entN;
-          const portPct       = capN > 0 ? (posValue / capN) * 100 : 0;
+          // ⚠️ אותה המרה כמו בטופס, ומאותה סיבה: `entN`/`stopN` במטבע ה**נייר**
+          // ו-`capN` במטבע ה**הון**. ⛔ אין `|| 1` — פלט המחשבון הוא הוראת קנייה.
+          const calcPaperCcy = posCalc.ticker?.trim()
+            ? paperCurrencyOf({ ticker: posCalc.ticker })
+            : capitalCurrency;
+          const calcRate = calcPaperCcy == null ? null
+            : calcPaperCcy === capitalCurrency ? 1
+            : paperToCapitalRate;
 
-          const hasResult = capN > 0 && entN > 0 && stopN > 0 && riskPerShare > 0;
-          const calcPosSizeTooSmall = riskPerShare > 0 && shares === 0;
+          const calcSizing = sizePosition({
+            entry: posCalc.entry, stop: posCalc.stop, capital: capN, riskPct: riskN,
+            rate: calcRate,
+            refusalReason: calcPaperCcy == null ? "unverified_currency" : "no_rate",
+          });
+
+          const riskDollars   = capN * (riskN / 100);
+          const riskPerShare  = entN > 0 && stopN > 0 ? (calcSizing.riskPerShare ?? 0) : 0;
+          const shares        = calcSizing.posSize ?? 0;
+          const posValue      = calcSizing.posValue ?? 0;
+          const portPct       = capN > 0 && calcSizing.ok ? (posValue / capN) * 100 : 0;
+
+          const hasResult = calcSizing.ok && capN > 0 && entN > 0 && stopN > 0 && riskPerShare > 0;
+          const calcPosSizeTooSmall = calcSizing.posSizeTooSmall;
 
           const handleCopyToForm = () => {
             setForm(f => ({
@@ -5433,7 +5568,7 @@ export default function SwingEdge() {
                         <DollarSign size={10} className="text-[var(--v3-accent)]" /> {t.positionSize}
                       </div>
                       <div className="text-2xl font-bold font-mono text-[var(--v3-accent)]">{capSym}{posValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                      <div className="text-xs text-slate-600">{shares} × {fmtPrice(entN, capitalCurrency)}</div>
+                      <div className="text-xs text-slate-600">{shares} × {fmtPaperPrice(entN, { ticker: posCalc.ticker })}</div>
                     </div>
 
                     <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-violet-500/25 rounded-xl p-4 flex flex-col gap-1">
@@ -7265,7 +7400,7 @@ export default function SwingEdge() {
                   <div className="grid grid-cols-4 gap-2 bg-white/3 rounded-[var(--v3-radius-chip)] p-3 border border-[var(--border-subtle)] dark:border-[var(--v3-line)]">
                   <div className="text-center group">
                     <div className="text-[10px] text-[var(--v3-text-lo)] uppercase tracking-wider mb-0.5">Shares</div>
-                    {tradeValidity.valid ? (
+                    {tradeValidity.valid && sizingOk ? (
                       <div className="flex items-center justify-center gap-1">
                         <Pencil size={10} aria-hidden className="shrink-0 text-[var(--v3-text-lo)] group-hover:text-[var(--v3-text-mid)] transition-colors pointer-events-none" />
                         <input
@@ -7286,11 +7421,11 @@ export default function SwingEdge() {
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-[var(--v3-text-lo)] uppercase tracking-wider mb-0.5">Pos. Value</div>
-                    <div className={`text-sm font-bold font-mono truncate ${tradeValidity.valid?"text-white":"text-[var(--v3-text-lo)]"}`}>{tradeValidity.valid?`${capSym}${effPosValue.toLocaleString()}`:"—"}</div>
+                    <div className={`text-sm font-bold font-mono truncate ${tradeValidity.valid && sizingOk?"text-white":"text-[var(--v3-text-lo)]"}`}>{tradeValidity.valid && sizingOk?`${capSym}${effPosValue.toLocaleString()}`:"—"}</div>
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-[var(--v3-text-lo)] uppercase tracking-wider mb-0.5">Max Risk</div>
-                    <div className={`text-sm font-bold font-mono truncate ${tradeValidity.valid?"text-[var(--v3-loss)]":"text-[var(--v3-text-lo)]"}`}>{tradeValidity.valid?`${capSym}${Math.round(effPotLoss).toLocaleString()}`:"—"}</div>
+                    <div className={`text-sm font-bold font-mono truncate ${tradeValidity.valid && sizingOk?"text-[var(--v3-loss)]":"text-[var(--v3-text-lo)]"}`}>{tradeValidity.valid && sizingOk?`${capSym}${Math.round(effPotLoss).toLocaleString()}`:"—"}</div>
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-[var(--v3-text-lo)] uppercase tracking-wider mb-0.5 flex items-center justify-center gap-1">R/R Ratio<TermTooltip term="rr" lang={lang} /></div>
@@ -7316,7 +7451,23 @@ export default function SwingEdge() {
 
               {/* Position-too-small hint — explains why Shares/Value/Risk are 0 (R/R stays valid).
                   Suppressed when the over-risk warning below already covers this trade. */}
-              {tradeValidity.valid && posSizeTooSmall && !isOverRisk && (
+              {/* ⚠️ סירוב מוצהר — למה אין גודל פוזיציה. ⛔ "—" בלי סיבה הוא
+                  כשל שקט: המשתמש רואה מקף ולא יודע אם זו תקלה או קלט חסר.
+                  שתי הסיבות נבדלות, כי הפעולה הנדרשת שונה. */}
+              {tradeValidity.valid && !sizingOk && (
+                <div className="flex items-center gap-2 p-2.5 rounded-[var(--v3-radius-chip)] border text-xs bg-[var(--v3-warn)]/5 border-[var(--v3-warn)]/20 text-[var(--v3-warn)]">
+                  <AlertTriangle size={13} />
+                  <span>{sizing.reason === "unverified_currency"
+                    ? (lang === "he"
+                        ? `מטבע המסחר של ${form.ticker.trim().toUpperCase()} לא אומת, ולכן אי-אפשר לתמחר פוזיציה מול הון ${capSym}. מספר כאן היה יוצא שגוי, ולכן איננו מציגים אותו. ה-R/R תקף.`
+                        : `The trading currency of ${form.ticker.trim().toUpperCase()} is unverified, so the position cannot be priced against ${capSym} capital. A number here would be wrong, so we show none. R/R is still valid.`)
+                    : (lang === "he"
+                        ? `אין כרגע שער ${PAPER_BASE}→${capitalCurrency}, ולכן אי-אפשר לתמחר את הפוזיציה. ⛔ איננו מנחשים שער. ה-R/R תקף.`
+                        : `No ${PAPER_BASE}→${capitalCurrency} rate right now, so the position cannot be priced. We never guess a rate. R/R is still valid.`)}</span>
+                </div>
+              )}
+
+              {tradeValidity.valid && sizingOk && posSizeTooSmall && !isOverRisk && (
                 <div className="flex items-center gap-2 p-2.5 rounded-[var(--v3-radius-chip)] border text-xs bg-[var(--v3-warn)]/5 border-[var(--v3-warn)]/20 text-[var(--v3-warn)]">
                   <AlertTriangle size={13} />
                   <span>{lang === "he"
@@ -7521,9 +7672,9 @@ export default function SwingEdge() {
             <div className="p-5 space-y-4">
               {/* Trade summary */}
               <div className="bg-white/3 rounded-xl p-3 border border-[var(--border-subtle)] dark:border-white/[0.06] grid grid-cols-3 gap-2 text-center text-[10px]">
-                <div><div className="text-slate-600 uppercase tracking-wider">Entry</div><div className="font-mono font-bold text-slate-300">{fmtPrice(closingTrade.entry, currencyOf(closingTrade))}</div></div>
-                <div><div className="text-slate-600 uppercase tracking-wider">Stop</div><div className="font-mono font-bold text-[#ef4444]">{closingTrade.stop != null ? `${fmtPrice(closingTrade.stop, currencyOf(closingTrade))}` : "–"}</div></div>
-                <div><div className="text-slate-600 uppercase tracking-wider">Target</div><div className="font-mono font-bold text-[#10b981]">{closingTrade.target != null ? `${fmtPrice(closingTrade.target, currencyOf(closingTrade))}` : "–"}</div></div>
+                <div><div className="text-slate-600 uppercase tracking-wider">Entry</div><div className="font-mono font-bold text-slate-300">{fmtPaperPrice(closingTrade.entry, closingTrade)}</div></div>
+                <div><div className="text-slate-600 uppercase tracking-wider">Stop</div><div className="font-mono font-bold text-[#ef4444]">{closingTrade.stop != null ? `${fmtPaperPrice(closingTrade.stop, closingTrade)}` : "–"}</div></div>
+                <div><div className="text-slate-600 uppercase tracking-wider">Target</div><div className="font-mono font-bold text-[#10b981]">{closingTrade.target != null ? `${fmtPaperPrice(closingTrade.target, closingTrade)}` : "–"}</div></div>
               </div>
 
               {/* Exit Price + Exit Reason */}

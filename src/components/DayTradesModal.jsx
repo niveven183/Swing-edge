@@ -7,7 +7,7 @@ import useModalA11y from '../hooks/useModalA11y.js';
 import TickerLogo from './TickerLogo.jsx';
 import InfoTooltip from './ui/InfoTooltip.jsx';
 import { EMOTION_OPTIONS } from '../data/tradeOptions.jsx';
-import { isFollowedPlan, isOffPlan, fmt$, fmtR, fmtPrice, isNegativeValue, currencyOf } from '../utils.js';
+import { isFollowedPlan, isOffPlan, fmt$, fmtR, fmtPaperPrice, isNegativeValue, currencyOf } from '../utils.js';
 import { getSetupTooltip } from '../intelligence/knowledgeGlue.js';
 import { outcomeRates, toPctRound } from '../intelligence/utils/statisticalModels.js';
 
@@ -225,6 +225,10 @@ export default function DayTradesModal({ dateKey, trades = [], calcMetrics, lang
                   </div>
                   <div className="text-right shrink-0">
                     <div className={`font-mono font-semibold text-sm ${pnlClass(pnl)}`}>
+                      {/* ⚑ סכום-בחשבון — 🔴 לא מומר: `calcMetrics` מוזרם מ-
+                          `SwingEdge_App.jsx` כ-`calcTradeMetrics` הגולמי
+                          (`:4685` דרך TradeCalendar), ⛔ לא `stableCalcTradeMetrics`.
+                          גל ג׳ · docs/STATE.md */}
                       {fmt$(pnl, currencyOf(tr))}
                     </div>
                     {rMultiple !== null && rMultiple !== undefined && (
@@ -237,8 +241,8 @@ export default function DayTradesModal({ dateKey, trades = [], calcMetrics, lang
 
                 {/* Row 2: detail grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-xs">
-                  <Field label={t.cal_entry} value={tr.entry != null ? `${fmtPrice(tr.entry, currencyOf(tr))}` : '–'} mono />
-                  <Field label={t.cal_exit} value={tr.exit != null ? `${fmtPrice(tr.exit, currencyOf(tr))}` : '–'} mono />
+                  <Field label={t.cal_entry} value={tr.entry != null ? `${fmtPaperPrice(tr.entry, tr)}` : '–'} mono />
+                  <Field label={t.cal_exit} value={tr.exit != null ? `${fmtPaperPrice(tr.exit, tr)}` : '–'} mono />
                   <Field label={t.cal_setup} value={tr.setup || '–'} tip={<SetupTip setup={tr.setup} isRTL={isRTL} />} />
                   <Field
                     label={t.cal_emotion}
