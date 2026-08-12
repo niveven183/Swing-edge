@@ -21,7 +21,7 @@ function dayKeyOf(t) {
 // trades: array of trade objects (closed trades preferred — open trades show 0 P&L).
 // calcMetrics: function(trade) -> { pnl, rMultiple }. P&L/R are NOT stored on the trade.
 // lang: "he" | "en"
-export function TradeCalendar({ trades = [], calcMetrics, lang = 'he', currency = 'USD' }) {
+export function TradeCalendar({ trades = [], calcMetrics, lang = 'he', currency = 'USD', fmtAcct, acctRefusalText }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
 
@@ -227,6 +227,8 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he', currency 
           dateKey={selectedKey}
           trades={selectedTrades}
           calcMetrics={calcMetrics}
+          fmtAcct={fmtAcct}
+          acctRefusalText={acctRefusalText}
           lang={lang}
           onClose={() => setSelectedDate(null)}
         />

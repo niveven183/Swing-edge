@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { MessageCircle } from "lucide-react";
 import TickerLogo from "./TickerLogo";
-import { calcTradeMetrics, fmt$, fmtR, fmtPaperPrice, currencyOf } from "../utils";
+import { calcTradeMetrics, fmtR, fmtPaperPrice } from "../utils";
 import { getTranslations, labelFor } from "../i18n.js";
 import { horizonState, horizonLabel } from "../lib/tradeHorizon.js";
 import { deriveInstrumentCurrency, isUnverified } from "../lib/instrumentCurrency.js";
@@ -17,6 +17,14 @@ function MobileTradeCardImpl({
   isRTL,
   lang = "en",
   strategy,
+  // ⚠️ ההכרעה מגיעה כ-prop ו-⛔ אינה מיובאת כאן: מצב ה-FX (טבלה + סטטוס) חי
+  // ב-`SwingEdge_App`, ועותק שני של ההמרה בקומפוננטה הוא בדיוק איך ששני
+  // המסלולים נסחפים.
+  //
+  // ⛔ **אין ברירת מחדל.** prop חסר ⇒ חריגה שה-boundary תופס, ⛔ לא נפילה
+  // שקטה חזרה ל-`fmt$(pnl, currencyOf(trade))` — כלומר בדיוק לבאג שהוסר.
+  fmtAcct,
+  acctRefusalText,
 }) {
   const t = getTranslations(lang);
   const { pnl, rMultiple } = calcTradeMetrics(trade);
@@ -97,11 +105,11 @@ function MobileTradeCardImpl({
         <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${sideClasses}`}>
           {trade.side}
         </span>
-        <span className={`ms-auto font-bold text-sm ${pnlColorClass}`}>
-          {/* ⚑ סכום-בחשבון — 🔴 לא מומר. `calcTradeMetrics` הגולמי (מטבע ה**נייר**)
-            מוצג תחת סמל ה**חשבון**. ⛔ התיקון הוא **המרה**, ⛔ לא `fmtPaperPrice`.
-            גל ג׳ · docs/STATE.md */}
-          {isOpen ? labelFor("status", "OPEN", lang) : fmt$(pnl, currencyOf(trade))}
+        <span title={isOpen ? undefined : acctRefusalText(trade, pnl)}
+              className={`ms-auto font-bold text-sm ${pnlColorClass}`}>
+          {/* ✅ סכום-בחשבון **מומר** (גל ג׳, 2026-08-12) — דרך `fmtAcct`, אותה
+            הכרעה בדיוק שהדסקטופ והמצרפים רצים עליה. אין שער ⇒ `—` + נימוק. */}
+          {isOpen ? labelFor("status", "OPEN", lang) : fmtAcct(trade, pnl)}
         </span>
         {!isOpen && rMultiple != null && (
           <span className={`text-[11px] ${rColorClass}`}>{fmtR(rMultiple)}</span>

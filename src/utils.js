@@ -191,6 +191,34 @@ export const fmtMoney0 = (n, currency = "USD") => money(n, 0, currency);
 export const fmt$ = fmtMoney;
 export const fmt$0 = fmtMoney0;
 
+// קיפול **ההכרעה** של `accountAmount` לטקסט — המקום היחיד שבו סירוב הופך ל-"—".
+//
+// ⚠️ פונקציה ולא ביטוי inline, מפני שהיא נצרכת בארבעה קבצים (`SwingEdge_App`
+// · `MobileTradeCard` · `DayTradesModal` · הטסט). `d.ok ? … : "—"` שכתוב ידנית
+// בכל אתר הוא בדיוק איך ש-9/10 האתרים נסחפו מהחוזה בפעם הקודמת.
+//
+// ⛔ אין כאן ברירת מחדל: `ok:false` ⇒ `"—"`. הנימוק (`d.reason`) מוצג ע"י הקורא
+// כ-`title`, ⛔ לא נבלע — ראה `acctRefusalText` ב-`SwingEdge_App.jsx`.
+export const fmtAccountAmount = (decision) =>
+  decision?.ok ? fmtMoney(decision.value, decision.currency) : "—";
+
+// סכום **הון** ללא סימן — גודל פוזיציה, סיכון מרבי, שווי תיק.
+//
+// ⚠️ נפרד מ-`fmtMoney` מפני ש-`money()` כופה `+`/`-`: גודל פוזיציה אין לו כיוון,
+// ו-"+₪667.35" שגוי בדיוק כמו "$" על מחיר שקלי.
+//
+// 🔴 העיגול כאן הוא **תצוגה בלבד**. נמדד 2026-08-12: `POS. VALUE` הציג
+// ₪667.346 — ‏`toLocaleString()` חשוף נוקב ב-`maximumFractionDigits: 3`, ומכפלת
+// שער FX כמעט לעולם אינה נופלת על שתי ספרות. ⛔ אסור לעגל את `effPosValue`
+// עצמו: הוא מוזן ל-`sizePosition` ולחישוב אחוז-מהתיק, ועיגול שם מזיז הוראת
+// קנייה. הפורמט מעגל את ה**מחרוזת**, הערך נשאר שלם.
+export const fmtCapitalAmount = (n, currency = "USD") => {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return "—";
+  const sym = CURRENCY_SYMBOL[currency] || CURRENCY_SYMBOL.USD;
+  return `${sym}${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
 // Instrument price display — NOT money-in-your-account.
 //
 // T10 decision (docs/DECISIONS.md 2026-08-03): an instrument price is a claim

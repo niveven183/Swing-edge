@@ -140,6 +140,43 @@ export const realizedDayKeysOf = (trades) => {
  *    is the visible-degradation path — never a guessed rate, never a drop from
  *    the population (which would silently shrink a denominator).
  */
+/**
+ * accountAmount — **הכרעת ההמרה היחידה** מסכום במטבע נייר לסכום במטבע חשבון.
+ *
+ * ⚠️ קיים מפני שהחוזה של קטגוריה 2 (`src/utils.js`, הבלוק מעל `currencyOf`)
+ * ⛔ לא היה מקוים: `makeConvertingCalc` הוזן ל-**מצרפים בלבד** (7/7), וכל אתר
+ * **שורה** קרא `calcTradeMetrics` הגולמי והדביק עליו את סמל החשבון ⇒ 9/10
+ * אתרי סכום-בחשבון הציגו $500 בתור "₪500". הפער לא היה בלוגיקה — הוא היה
+ * בכך שללוגיקה לא הייתה **צורה שאתר-שורה יכול לקרוא**. זו הצורה.
+ *
+ * ⛔ אין העתקה מקבילה: `makeConvertingCalc` למטה קורא לפונקציה הזו, ולכן
+ * מצרף ושורה ⛔ אינם יכולים להיפרד.
+ *
+ * מחזיר **הכרעה מובחנת**, ⛔ לא מספר:
+ *   `{ ok:true,  reason:"identity"|"converted", value, currency }`
+ *   `{ ok:false, reason:"no_amount"|"unverified_instrument"|"no_table"|<סיבת fx>,
+ *      value:null, currency:null }`
+ *
+ * ⛔ אין `|| 1` ואין ברירת מחדל: `ok:false` הוא תשובה שהמסך **מציג** (`—`
+ * עם נימוק), ⛔ לא שגיאה שנבלעת ולא שער מנוחש.
+ */
+export const accountAmount = (trade, amount, displayCurrency, table, status) => {
+  const refuse = (reason) => ({ ok: false, reason, value: null, currency: null });
+  // `== null` ⛔ ולא `Number.isFinite`: התפר המצרפי בדק בדיוק את זה, ו-NaN
+  // שנכנס לכאן חייב לצאת NaN כדי ש-`money()` יציג "—" כמו קודם. שינוי לבדיקת
+  // סופיות היה משנה התנהגות מצרפית שאיננו מתקנים בגל הזה.
+  if (amount == null) return refuse("no_amount");
+  const derived = deriveInstrumentCurrency(trade);
+  // נייר שמטבעו לא אומת ⛔ אינו מומר ואינו מנוחש.
+  if (!isAggregatable(derived)) return refuse("unverified_instrument");
+  const from = derived.code;
+  if (from === displayCurrency) return { ok: true, reason: "identity", value: amount, currency: displayCurrency };
+  if (status !== "ready" || !table) return refuse("no_table");
+  const { value, reason } = convert(amount, from, displayCurrency, table, realizedDayKey(trade));
+  if (value == null) return refuse(reason || "no_rate");
+  return { ok: true, reason: "converted", value, currency: displayCurrency };
+};
+
 export const makeConvertingCalc = (table, displayCurrency, status) =>
   (trade) => {
     const m = calcTradeMetrics(trade);
@@ -150,21 +187,18 @@ export const makeConvertingCalc = (table, displayCurrency, status) =>
     // שקלי הוא שווה ל-`displayCurrency` בהגדרה ⇒ השורה הבאה מדלגת על ההמרה
     // **תמיד**. זה בדיוק המנגנון שדרכו רווח דולרי נספר כשקלים.
     //
-    // ⛔ אל תאחד את זה עם אתרי `currencyOf` האחרים — **אבל ⛔ אל תסיק מכך
-    // שהם תקינים.** התפר הזה מוזן ל-**מצרפים בלבד** (7/7: `generateEquityCurve`
-    // · `useTradingStats` ×4 · `exportMonthlyPDF`). כל אתר **שורה** קורא
-    // `calcTradeMetrics` הגולמי ומדביק עליו את סמל החשבון ⇒ 9/10 אתרי
-    // סכום-בחשבון מציגים מספר **לא מומר**. חוב מדוד ומתועד — `docs/STATE.md`
-    // (גל ג׳), ⛔ לא "כבר הומרו". ראה הבלוק מעל `currencyOf` ב-`src/utils.js`.
-    const derived = deriveInstrumentCurrency(trade);
-    // נייר שמטבעו לא אומת ⛔ אינו מומר ואינו מנוחש — הוא נשאר בתווית שלו,
-    // נספר ב-`pnlByCurrency` ומדליק את באנר הערבוב. ⛔ לא נשמט מהאוכלוסייה.
-    if (!isAggregatable(derived)) return m;
-    const from = derived.code;
-    if (from === displayCurrency || m.pnl == null) return m;
-    if (status !== "ready" || !table) return m;
-
-    const { value } = convert(m.pnl, from, displayCurrency, table, realizedDayKey(trade));
-    if (value == null) return m; // no rate for that day → leave it alone, loudly visible
-    return { ...m, pnl: value, currency: displayCurrency };
+    // ⛔ אל תאחד את זה עם אתרי `currencyOf` האחרים.
+    //
+    // ✅ נסגר 2026-08-12 (גל ג׳): התפר הזה חדל להיות המקום ה**יחיד** שבו ההמרה
+    // חיה. `accountAmount` למעלה היא ההכרעה, והיא נצרכת גם באתרי **שורה** —
+    // ולכן ⛔ אין יותר "מצרף מומר / שורה לא מומרת". השורות למטה הן קריאה אחת
+    // לאותה הכרעה, ⛔ לא עותק שלה.
+    const d = accountAmount(trade, m.pnl, displayCurrency, table, status);
+    // ⚠️ **רק** `converted` מתייג מחדש. `identity` מחזיר `m` כפי שהוא — לתייג
+    // אותו היה משנה את `pnlByCurrency` ביומן חד-מטבעי, וזה ⛔ אינו הגל הזה.
+    // כל `ok:false` (נייר לא מאומת · אין טבלה · אין שער ליום) מחזיר את העסקה
+    // **לא מומרת** בתווית שלה: היא נספרת ב-`pnlByCurrency` ומדליקה את באנר
+    // הערבוב. ⛔ לא נשמטת מהאוכלוסייה ו-⛔ לא מנוחשת.
+    if (d.reason !== "converted") return m;
+    return { ...m, pnl: d.value, currency: d.currency };
   };

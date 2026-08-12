@@ -7,7 +7,7 @@ import useModalA11y from '../hooks/useModalA11y.js';
 import TickerLogo from './TickerLogo.jsx';
 import InfoTooltip from './ui/InfoTooltip.jsx';
 import { EMOTION_OPTIONS } from '../data/tradeOptions.jsx';
-import { isFollowedPlan, isOffPlan, fmt$, fmtR, fmtPaperPrice, isNegativeValue, currencyOf } from '../utils.js';
+import { isFollowedPlan, isOffPlan, fmtR, fmtPaperPrice, isNegativeValue } from '../utils.js';
 import { getSetupTooltip } from '../intelligence/knowledgeGlue.js';
 import { outcomeRates, toPctRound } from '../intelligence/utils/statisticalModels.js';
 
@@ -30,7 +30,10 @@ const pnlClass = (n) => (!Number.isFinite(n)
 // Day drill-down: every trade CLOSED on the selected day, one compact card each,
 // with a ticker jump-strip + prev/next + keyboard arrows for fast navigation.
 // No data fetching — reads the already-loaded day array passed by the calendar.
-export default function DayTradesModal({ dateKey, trades = [], calcMetrics, lang = 'he', onClose }) {
+// ⚠️ `fmtAcct` / `acctRefusalText` מגיעים כ-props מ-`SwingEdge_App` דרך
+// `TradeCalendar`. ⛔ אין להם ברירת מחדל ו-⛔ אין כאן ייבוא של `accountAmount`:
+// prop חסר ⇒ חריגה, ⛔ לא נפילה שקטה למספר לא-מומר תחת סמל החשבון.
+export default function DayTradesModal({ dateKey, trades = [], calcMetrics, lang = 'he', onClose, fmtAcct, acctRefusalText }) {
   const t = getTranslations(lang);
   const isRTL = isRTLLang(lang);
   const locale = lang === 'he' ? heLocale : undefined;
@@ -224,12 +227,12 @@ export default function DayTradesModal({ dateKey, trades = [], calcMetrics, lang
                     </span>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className={`font-mono font-semibold text-sm ${pnlClass(pnl)}`}>
-                      {/* ⚑ סכום-בחשבון — 🔴 לא מומר: `calcMetrics` מוזרם מ-
-                          `SwingEdge_App.jsx` כ-`calcTradeMetrics` הגולמי
-                          (`:4685` דרך TradeCalendar), ⛔ לא `stableCalcTradeMetrics`.
-                          גל ג׳ · docs/STATE.md */}
-                      {fmt$(pnl, currencyOf(tr))}
+                    <div title={acctRefusalText(tr, pnl)}
+                         className={`font-mono font-semibold text-sm ${pnlClass(pnl)}`}>
+                      {/* ✅ סכום-בחשבון **מומר** (גל ג׳, 2026-08-12) — `fmtAcct` מוזרם
+                          מ-`SwingEdge_App` דרך `TradeCalendar`, ⛔ ולא מיובא כאן.
+                          אין שער ⇒ `—` + נימוק ב-`title`. */}
+                      {fmtAcct(tr, pnl)}
                     </div>
                     {rMultiple !== null && rMultiple !== undefined && (
                       <div className="text-xs text-slate-400 dark:text-slate-500 font-mono">

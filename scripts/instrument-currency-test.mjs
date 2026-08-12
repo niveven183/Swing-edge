@@ -30,10 +30,13 @@ import {
   isMixedCurrency, matchesCapital, PAPER_BASE,
 } from "../src/lib/instrumentCurrency.js";
 import { computeTradingStats } from "../src/lib/tradingStats.js";
-import { calcTradeMetrics, fmtPaperPrice, paperCurrencyOf, fmt$, currencyOf } from "../src/utils.js";
+import { calcTradeMetrics, fmtPaperPrice, paperCurrencyOf, fmt$, currencyOf, realizedDayKey,
+         fmtCapitalAmount, fmtAccountAmount, CURRENCY_SYMBOL } from "../src/utils.js";
 import { sizePosition } from "../src/lib/positionSizing.js";
 // ⚠️ הכלל הזה נצרך כאן **ובקומפוננטה** מאותו מקום — ⛔ אין העתקה מקבילה.
-import { fxPairPlan } from "../src/hooks/useFxRates.js";
+// `accountAmount` הוא **אותה** הכרעת המרה שהתפר המצרפי רץ עליה — ⛔ לא העתקה,
+// ולכן `makeConvertingCalc` נבדק כאן דרך אותו ייבוא כדי להוכיח שהם לא נפרדו.
+import { fxPairPlan, accountAmount, makeConvertingCalc } from "../src/hooks/useFxRates.js";
 import { calculateTradeDNA } from "../src/intelligence/core/TradeDNA.js";
 import { calculateGrowthScore } from "../src/intelligence/core/GrowthTracker.js";
 
@@ -446,31 +449,189 @@ const aggressionOf = (trades, capitalCurrency) =>
       if (/^\s*currencyOf\(t\),\s*$/.test(L)) return n;  // קטגוריה 3 — עמודת ה-CSV
       return n + hits;
     }, 0);
-    eq("10 מופעי סכום-בחשבון ב-app", acctCount(app), 10);
-    eq("מופע אחד ב-MobileTradeCard", acctCount(card), 1);
-    eq("מופע אחד ב-DayTradesModal", acctCount(src("../src/components/DayTradesModal.jsx")), 1);
+    // ⚠️ המספר ירד מ-10 ל-3 בגל ג׳ (2026-08-12). מה **שנשאר** הוא הרשימה
+    //    המלאה של מה שלא הומר, ⛔ לא שארית אקראית:
+    //      `:4249` · `:4884` — P&L **חי**. דורש spot ולא שער-יום-המימוש, ולכן
+    //                          ⛔ אינו עובר ב-`accountAmount` (שנועל על היום
+    //                          שבו העסקה מומשה). פריט BACKLOG נפרד.
+    //      `:4502`          — `riskDollar`, ה-1/10 שהיה תקין מלכתחילה: הוא
+    //                          מסורב ע"י `matchesCapital` ומציג `—`.
+    eq("3 מופעי סכום-בחשבון נותרו ב-app (2 P&L חי + riskDollar)", acctCount(app), 3);
+    eq("⛔ אפס ב-MobileTradeCard", acctCount(card), 0);
+    eq("⛔ אפס ב-DayTradesModal", acctCount(src("../src/components/DayTradesModal.jsx")), 0);
   }
 
-  // ── 13.9b קו קפוא על **חוב מדוד** ────────────────────────────────────────
+  // ── 13.9b הקו הקפוא **זז** — 2026-08-12, גל ג׳ ───────────────────────────
   //
-  // 🔴 האסרציה הזו מתעדת התנהגות **שגויה** בכוונה תחילה, ולכן היא אסרציית
-  //    **ערך** ולא אסרציית מקור: היא מריצה בדיוק את הביטוי שאתרי-השורה
-  //    מריצים, ומקבעת את הפלט שנמדד היום.
+  // 🔴 **הצהרת הסרה.** עד היום ישבה כאן אסרציה שקיבעה התנהגות **שגויה**
+  //    בכוונה תחילה:
   //
-  // ⚠️ נמדד: `makeConvertingCalc` מוזן ל-**מצרפים בלבד** (7/7 אתרים), ואילו
-  //    9/10 אתרי סכום-בחשבון קוראים `calcTradeMetrics` הגולמי. ⇒ רווח דולרי
-  //    מוצג תחת ₪. `:4450` הוא ה-1/10 התקין, ורק מפני ש-`matchesCapital` מסרב.
+  //      eq("🔴 חוב: אתר-שורה מציג $500 כ-₪500",
+  //         fmt$(calcTradeMetrics(t).pnl, currencyOf(t)), "+₪500.00");
   //
-  // ⛔ הקו הזה ⛔ אינו "ציפייה נכונה" — הוא **מלכודת**. ביום שגל ג׳ ימיר את
-  //    אתרי-השורה הוא ייפול, וזו המטרה: תיקון החוב חייב להיות **מוצהר**,
-  //    ⛔ לא להיבלע בשקט. קו שזז מדווח, ⛔ לא נעלם.
-  console.log("  13.9b · קו קפוא על החוב שנדחה לגל ג׳");
+  //    היא הייתה מלכודת מוצהרת: "ביום שגל ג׳ ימיר את אתרי-השורה הוא ייפול,
+  //    וזו המטרה". גל ג׳ הגיע, היא נצפתה **אדומה**, והיא מוסרת כאן במפורש
+  //    ⛔ ולא רוככה כדי לעבור. הערך הישן (`"+₪500.00"`) והחדש (`"—"`) שניהם
+  //    כתובים כאן, כדי שהקורא הבא יראה **מה** זז ולא רק שמשהו זז.
+  //
+  // ⚠️ הערך החדש הוא `"—"` ⛔ ולא "+₪1,499.60". מטבע הנייר של העסקה הזו
+  //    ⛔ **אינו מאומת** (תווית ILS על AAPL ⇒ CONTRADICTED), ולכן ⛔ אין שער
+  //    להמיר בו. סירוב מוצהר, ⛔ לא המרה בשער מנוחש. זו בדיוק ההבחנה שהגל
+  //    הזה קיים כדי לשמור.
+  console.log("  13.9b · הקו הקפוא זז — סירוב מוצהר במקום ₪500 שקריים");
   {
     const t = { ticker: "AAPL", side: "LONG", entry: 100, exit: 150, shares: 10,
                 status: "closed", currency: "ILS", date: "2026-03-01", closedAt: "2026-03-31" };
     eq("מטבע הנייר ⛔ אינו מאומת (תווית ILS על נייר דולרי)", paperCurrencyOf(t), null);
-    eq("`calcTradeMetrics` הגולמי מחזיר מטבע **נייר**", calcTradeMetrics(t).pnl, 500);
-    eq("🔴 חוב: אתר-שורה מציג $500 כ-₪500", fmt$(calcTradeMetrics(t).pnl, currencyOf(t)), "+₪500.00");
+    eq("`calcTradeMetrics` הגולמי עדיין מחזיר מטבע **נייר** — ⛔ המנוע לא זז",
+       calcTradeMetrics(t).pnl, 500);
+
+    const d = accountAmount(t, calcTradeMetrics(t).pnl, "ILS", null, "identity");
+    eq("✅ ההכרעה מסרבת ⛔ ולא מחזירה מספר", d.ok, false);
+    eq("✅ ובנימוק שאפשר להציג", d.reason, "unverified_instrument");
+    eq("✅ ⛔ ואין ערך — ⛔ לא 0, ⛔ לא הסכום הלא-מומר", d.value, null);
+    eq("✅ **הערך שזז**: היה \"+₪500.00\" ⇒ עכשיו \"—\"", fmtAccountAmount(d), "—");
+  }
+
+  // ── 13.9b′ ההמרה עצמה — נייר מאומת ⇒ מספר, בשער של יום המימוש ────────────
+  //
+  // ⚠️ 13.9b מוכיחה את ה**סירוב**. בלעדי הבלוק הזה אפשר היה "לעבור" ע"י
+  //    פונקציה שמסרבת תמיד — סירוב גורף הוא ⛔ לא תיקון, הוא מחיקת הפיצ'ר.
+  console.log("  13.9b′ · ההמרה עצמה — הצד החיובי של אותה הכרעה");
+  {
+    // AAPL בלי תווית סותרת ⇒ ASSUMED ⇒ aggregatable. נייר דולרי, חשבון שקלי.
+    const t = { ticker: "AAPL", side: "LONG", entry: 100, exit: 150, shares: 10,
+                status: "closed", date: "2026-03-01", closedAt: "2026-03-31" };
+    const table = {
+      base: "USD", quote: "ILS",
+      spot:  { rate: 2.9992, rateDate: "2026-08-12" },
+      byDay: { "2026-03-31": { rate: 3.5000, rateDate: "2026-03-31" } },
+    };
+    eq("הנייר מאומת-בהנחה ⇒ נכנס לחשבון", paperCurrencyOf(t), "USD");
+    const d = accountAmount(t, calcTradeMetrics(t).pnl, "ILS", table, "ready");
+    eq("✅ ההכרעה ממירה", d.reason, "converted");
+    eq("✅ בשער **יום המימוש** (3.5) ⛔ לא spot (2.9992)", d.value, 1750);
+    eq("✅ והתווית היא מטבע ה**חשבון**", d.currency, "ILS");
+    eq("✅ אתר-שורה מציג ₪1,750.00", fmtAccountAmount(d), "+₪1,750.00");
+    // 🔴 המספר שהמסך הראה עד היום, על אותה עסקה בדיוק.
+    eq("🔴 מה שהמסך הראה קודם — הסכום הדולרי תחת ₪",
+       fmt$(calcTradeMetrics(t).pnl, "ILS"), "+₪500.00");
+  }
+
+  // ── 13.9b″ ההכרעה — ארבע דחיות מובחנות, ⛔ אפס נפילה שקטה ────────────────
+  console.log("  13.9b″ · accountAmount — הכרעה מובחנת");
+  {
+    const usd = { ticker: "AAPL", status: "closed", date: "2026-03-01", closedAt: "2026-03-31" };
+    const table = { base: "USD", quote: "ILS", spot: { rate: 3, rateDate: "2026-08-12" },
+                    byDay: { "2026-03-31": { rate: 3, rateDate: "2026-03-31" } } };
+
+    // א. זהות — 43/46 המשתמשים. ⛔ אפס רשת, והערך עובר **כמו שהוא**.
+    const id = accountAmount(usd, 500, "USD", null, "identity");
+    eq("זהות ⇒ ok", id.ok, true);
+    eq("זהות ⇒ הערך byte-identical", Object.is(id.value, 500), true);
+    eq("זהות ⇒ ⛔ אין קריאת טבלה (טבלה null ואין סירוב)", id.reason, "identity");
+
+    // ב. אין טבלה (טוען / נכשל) ⇒ סירוב, ⛔ לא הסכום הלא-מומר.
+    const loading = accountAmount(usd, 500, "ILS", null, "loading");
+    eq("אין טבלה ⇒ ok שקר", loading.ok, false);
+    eq("אין טבלה ⇒ נימוק מובחן", loading.reason, "no_table");
+    eq("⛔ אין נפילה שקטה לשער 1 — הערך ⛔ אינו 500", loading.value, null);
+
+    // ג. יש טבלה אבל ⛔ אין שער ליום הזה ⇒ נימוק **שונה** מ"אין טבלה".
+    const gap = accountAmount({ ...usd, closedAt: "2026-04-15" }, 500, "ILS", table, "ready");
+    eq("אין שער ליום ⇒ ok שקר", gap.ok, false);
+    check("אין-שער-ליום ⛔ אינו מדווח כ'אין טבלה'", gap.reason !== "no_table");
+
+    // ד. אין סכום ⇒ ⛔ לא ממציאים 0.
+    const none = accountAmount(usd, null, "ILS", table, "ready");
+    eq("אין סכום ⇒ נימוק מובחן", none.reason, "no_amount");
+    eq("⛔ ולא 0", none.value, null);
+
+    // ⛔ אפס `|| 1` / `?? 1` בקובץ ההכרעה — הסירוב הוא התשובה.
+    // ⚠️ שורות הערה מנוכות: הכלל **מצוטט** בהערה מעל הפונקציה, וסריקה נאיבית
+    //    הייתה נופלת על התיעוד של עצמה (נמדד — נפלה).
+    const hookCode = src("../src/hooks/useFxRates.js").split("\n")
+      .filter((L) => !/^\s*(\/\/|\*|\/\*)/.test(L)).join("\n");
+    check("⛔ אין `|| 1` או `?? 1` בקוד של useFxRates.js", !/(\|\||\?\?)\s*1\b/.test(hookCode));
+  }
+
+  // ── 13.9b‴ התפר המצרפי ⛔ לא זז — byte-identical על 4 מצבים ──────────────
+  //
+  // ⚠️ `makeConvertingCalc` עבר לקרוא ל-`accountAmount`. אם ההתנהגות המצרפית
+  //    זזה ולו בביט אחד, כל עקומת ההון וכל סטטיסטיקה זזות איתה. ⇒ נמדד.
+  console.log("  13.9b‴ · המצרף byte-identical אחרי הריפקטור");
+  {
+    const table = { base: "USD", quote: "ILS", spot: { rate: 3, rateDate: "2026-08-12" },
+                    byDay: { "2026-03-31": { rate: 3, rateDate: "2026-03-31" } } };
+    const mk = (extra) => ({ ticker: "AAPL", side: "LONG", entry: 100, exit: 150, shares: 10,
+                             status: "closed", date: "2026-03-01", closedAt: "2026-03-31", ...extra });
+    const cases = [
+      ["נייר מאומת + טבלה", mk({}), table, "ready", "ILS"],
+      ["נייר לא מאומת",     mk({ currency: "ILS" }), table, "ready", "ILS"],
+      ["אין טבלה",          mk({}), null, "loading", "ILS"],
+      ["זהות",              mk({}), null, "identity", "USD"],
+      ["עסקה פתוחה (pnl null)", mk({ status: "OPEN", exit: null }), table, "ready", "ILS"],
+    ];
+    for (const [nm, tr, tbl, st, disp] of cases) {
+      const via = makeConvertingCalc(tbl, disp, st)(tr);
+      const raw = calcTradeMetrics(tr);
+      // R הוא יחס חסר-ממד ⇒ ⛔ לעולם אינו מומר, בכל אחד מהמצבים.
+      eq(`[${nm}] rMultiple ⛔ לא זז`, Object.is(via.rMultiple, raw.rMultiple), true);
+    }
+    eq("מצרף: נייר מאומת ⇒ 500 → 1500", makeConvertingCalc(table, "ILS", "ready")(mk({})).pnl, 1500);
+    eq("מצרף: נייר לא מאומת ⇒ ⛔ לא מומר",
+       makeConvertingCalc(table, "ILS", "ready")(mk({ currency: "ILS" })).pnl, 500);
+    eq("מצרף: זהות ⇒ התווית ⛔ לא נדרסת",
+       makeConvertingCalc(null, "USD", "identity")(mk({})).currency,
+       calcTradeMetrics(mk({})).currency);
+  }
+
+  // ── 13.9e §2ב — שלוש ספרות אחרי הנקודה (צולם 2026-08-12, 19:51) ─────────
+  //
+  // 🔴 `POS. VALUE` הציג **₪667.346**. הסיבה ⛔ אינה FX: `toLocaleString()`
+  //    חשוף נוקב ב-`maximumFractionDigits: 3`, ומכפלת שער כמעט לעולם אינה
+  //    נופלת על שתי ספרות. ⇒ הבאג נולד מהמרה, אבל הוא באג **תצוגה**.
+  //
+  // ⚠️ העיגול חייב להיות בתצוגה **בלבד**: `effPosValue` מוזן לאחוז-מהתיק
+  //    ולהוראת הקנייה. עיגול הערך עצמו מזיז פקודה.
+  console.log("  13.9e · §2ב — עיגול בתצוגה בלבד");
+  {
+    eq("🔴 הבאג שצולם: `toLocaleString()` חשוף ⇒ 3 ספרות", (667.346).toLocaleString(), "667.346");
+    eq("✅ הפורמט ⇒ שתי ספרות", fmtCapitalAmount(667.346, "ILS"), "₪667.35");
+    eq("✅ ללא סימן — גודל פוזיציה אין לו כיוון", fmtCapitalAmount(667.346, "USD"), "$667.35");
+    eq("✅ מספר שלם עדיין נוקב בשתיים", fmtCapitalAmount(1000, "ILS"), "₪1,000.00");
+    eq("✅ לא-סופי ⇒ — ⛔ לא ₪NaN", fmtCapitalAmount(NaN, "ILS"), "—");
+
+    // 🔴 הערך עצמו ⛔ **לא** עוגל — זו ההוכחה שהעיגול לא זלג פנימה.
+    const p = sizePosition({ entry: "304.51", stop: "250", capital: 2500, riskPct: 1, rate: 2.9992 });
+    check("⛔ `effPosValue` שומר על הדיוק המלא — העיגול ⛔ לא זלג לערך",
+      !Object.is(p.effPosValue, Math.round(p.effPosValue * 100) / 100));
+    eq("ובכל זאת מוצג בשתי ספרות", fmtCapitalAmount(p.effPosValue, "ILS"), "₪913.29");
+
+    // ⛔ אפס `toLocaleString()` חשוף על סכום כסף בשני האתרים שצולמו.
+    check("⛔ `POS. VALUE` ⛔ אינו `toLocaleString()` חשוף",
+      !/\$\{capSym\}\$\{effPosValue\.toLocaleString\(\)\}/.test(app));
+    check("`POS. VALUE` עובר ב-`fmtCapitalAmount`",
+      /fmtCapitalAmount\(effPosValue, capitalCurrency\)/.test(app));
+  }
+
+  // ── 13.9f ILA — ניתן לאחסון, ⛔ **בלתי-כתיב** ────────────────────────────
+  //
+  // ⚠️ המיגרציה הרחיבה את ה-CHECK ל-`ILA` בכוונה: הצרה שלו בחזרה הייתה
+  //    מוחקת את הכיוון. אבל `CURRENCY_SYMBOL` ⛔ אין בו `ILA`, ו-`minorUnit`
+  //    ⛔ אינו מיושם בקריאה (נמדד: 0 אתרי ייצור) ⇒ ILA שנכתב היום הוא נתון
+  //    שאי-אפשר לפרש. ⇒ ניתן לאחסון, וחסום **בכתיבה**, עד שהמסלול מקצה
+  //    לקצה קיים (פריט BACKLOG נפרד).
+  console.log("  13.9f · ILA חסום בכתיבה");
+  {
+    eq("⛔ אין ל-ILA סמל ⇒ אי-אפשר להציג אותו", CURRENCY_SYMBOL.ILA, undefined);
+    // ⛔ אף מסלול כתיבה ⛔ אינו יכול לייצר ILA היום — אסרציית **ערך** על המקור:
+    // רשימת המטבעות שמסלול הכתיבה יכול לבחור מהם.
+    const writable = [...new Set((app.match(/currency:\s*["'](\w+)["']/g) || [])
+      .map((s) => s.replace(/.*["'](\w+)["'].*/, "$1")))];
+    check(`⛔ ILA ⛔ אינו במסלולי הכתיבה (נמדד: ${JSON.stringify(writable)})`,
+      !writable.includes("ILA"));
+    eq("⛔ ואין `\"ILA\"` בשום מקום ב-SwingEdge_App.jsx", /["']ILA["']/.test(app), false);
   }
 
   // ── 13.9c המרה באתר הקריאה — הכיוון הוא ההוכחה ───────────────────────────
@@ -543,6 +704,54 @@ const aggressionOf = (trades, capitalCurrency) =>
       /paperCapSamePair\s*=\s*fxPairPlan\(PAPER_BASE, capitalCurrency, accountCurrency\)\.reusesAccountTable/.test(app));
     eq("⛔ אין העתקה מקבילה של התנאי בקומפוננטה",
       (app.match(/paperCapSamePair\s*=\s*capitalCurrency === accountCurrency/g) || []).length, 0);
+  }
+
+  // ── 13.9g החיווט — ההכרעה מגיעה לשלושת מסלולי הרינדור ────────────────────
+  //
+  // ⚠️ **אסרציות מקור מוצהרות #3–#5.** הן חוקיות כאן רק מפני ש-13.9b/13.9b′
+  //    כבר הוכיחו ב**ערך** שההכרעה נכונה; מה שנשאר לבדוק הוא ש-⛔ לא שכחנו
+  //    לחווט אותה. זו בדיוק ההבחנה שהגל הקודם פספס.
+  //
+  // ⛔ הקומפוננטות ⛔ **אינן** מייבאות `accountAmount` בעצמן: הן מקבלות
+  //    `fmtAcct` כ-prop. Hook-state (טבלה/סטטוס) חי ב-`SwingEdge_App`, ועותק
+  //    שני של ההכרעה בקומפוננטה הוא איך שהשניים נסחפים.
+  console.log("  13.9g · חיווט ההכרעה לשלושת מסלולי הרינדור");
+  {
+    const modal = src("../src/components/DayTradesModal.jsx");
+    const cal   = src("../src/components/TradeCalendar.jsx");
+
+    check("[מקור #3] `SwingEdge_App` צורך את `accountAmount`", /\baccountAmount\b/.test(app));
+
+    // 🔴 נמדד 2026-08-12: התפר המצרפי הוזן ב-`fxTable` = **הון→חשבון**, בעוד
+    //    `makeConvertingCalc` ממיר מ**מטבע הנייר** ו-`fx.js:69` דורש התאמת זוג
+    //    מדויקת ⇒ ביומן שקלי הוא החזיר את העסקה לא-מומרת. כלומר גם 7/7
+    //    המצרפים ⛔ לא הומרו — ⛔ לא רק אתרי השורה. ⇒ נעול כאן.
+    check("🔴 התפר המצרפי מוזן בטבלת **נייר→חשבון** ⛔ ולא הון→חשבון",
+      /makeConvertingCalc\(paperAcctTable, accountCurrency, paperAcctStatus\)/.test(app));
+    check("⛔ ⛔ אין יותר `makeConvertingCalc(fxTable`",
+      !/makeConvertingCalc\(fxTable/.test(app));
+    check("`fmtAcct` מוגדר פעם אחת ב-`SwingEdge_App`",
+      (app.match(/const fmtAcct = /g) || []).length === 1);
+
+    // ⚠️ "⛔ אין עותק שני" נבדק על שורות **ייבוא**, ⛔ לא על המחרוזת: הכלל
+    //    מצוטט בהערה בשתי הקומפוננטות, וסריקה נאיבית נפלה על התיעוד של עצמה.
+    const importsAccountAmount = (s) =>
+      s.split("\n").some((L) => /^\s*import\b/.test(L) && /\baccountAmount\b/.test(L));
+
+    check("[מקור #4] `MobileTradeCard` מקבל `fmtAcct` ומשתמש בו",
+      /fmtAcct/.test(card) && /<MobileTradeCard[\s\S]{0,400}?fmtAcct=\{/.test(app));
+    check("⛔ `MobileTradeCard` ⛔ אינו מייבא `accountAmount` (⛔ אין עותק שני)",
+      !importsAccountAmount(card));
+
+    check("[מקור #5] `TradeCalendar` מעביר `fmtAcct` הלאה ל-`DayTradesModal`",
+      /fmtAcct/.test(cal) && /fmtAcct=\{fmtAcct\}/.test(cal));
+    check("`DayTradesModal` צורך `fmtAcct`", /fmtAcct/.test(modal));
+    check("⛔ `DayTradesModal` ⛔ אינו מייבא `accountAmount`", !importsAccountAmount(modal));
+
+    // הנימוק מוצג — סירוב שקט הוא ⛔ לא סירוב.
+    check("סירוב נושא נימוק לקורא (`acctRefusalText`)", /acctRefusalText/.test(app));
+    check("הנימוק ממופה ל-i18n קיים ⛔ ולא למחרוזת קשיחה",
+      /ccyUnverifiedTip/.test(app) && /fxUnavailable/.test(app));
   }
 
   // ── 13.10 חוזים שאסור שיזוזו ─────────────────────────────────────────────

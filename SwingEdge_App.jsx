@@ -46,7 +46,7 @@ import { supabase, isSupabaseConfigured, tradeForSupabase, tradeFromSupabase } f
 import { cleanTrades, purgeInvalidTrades } from "./src/lib/cleanTrades.js";
 import { deleteTradeVerified, restoreAt, createPendingWrites, insertTradeRow, updateTradeRow, insertTradeRows, deleteTradeRows } from "./src/lib/tradeWrite.js";
 import { loadSettings, saveSettings, flushSettings, migrateFromLocalStorage } from "./src/lib/userSettings.js";
-import { calcTradeMetrics, fmt$, fmt$0, fmtR, fmtNum, fmtPrice, fmtBalance, numOrNull, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays, localDayKey, todayKey, realizedAt, realizedDayKey, currencyOf, fmtPaperPrice, paperCurrencyOf, CURRENCY_SYMBOL } from "./src/utils.js";
+import { calcTradeMetrics, fmt$, fmt$0, fmtR, fmtNum, fmtPrice, fmtBalance, numOrNull, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays, localDayKey, todayKey, realizedAt, realizedDayKey, currencyOf, fmtPaperPrice, paperCurrencyOf, CURRENCY_SYMBOL, fmtAccountAmount, fmtCapitalAmount } from "./src/utils.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell,
@@ -93,7 +93,7 @@ import {
   DNACard, EdgeCard, DecisionCoachPanel, TiltShield, GrowthChart, RegimeIndicator, PatternTags,
 } from "./src/intelligence/ui/IntelligenceUI.jsx";
 import { useTradingStats } from "./src/hooks/useTradingStats.js";
-import { useFxRates, realizedDayKeysOf, makeConvertingCalc, fxPairPlan } from "./src/hooks/useFxRates.js";
+import { useFxRates, realizedDayKeysOf, makeConvertingCalc, fxPairPlan, accountAmount } from "./src/hooks/useFxRates.js";
 import { convert } from "./src/lib/fx.js";
 import { resolveEquityBase } from "./src/lib/equityBase.js";
 import { horizonState, horizonLabel } from "./src/lib/tradeHorizon.js";
@@ -2006,6 +2006,8 @@ export default function SwingEdge() {
   // עלות אפס) ומשתמשים מחדש בטבלה שכבר נטענה, ⛔ במקום לשלם פעמיים.
   const paperCapSamePair = fxPairPlan(PAPER_BASE, capitalCurrency, accountCurrency).reusesAccountTable;
   const paperCapOwnFx = useFxRates(PAPER_BASE, paperCapSamePair ? PAPER_BASE : capitalCurrency, EMPTY_DAYS);
+  const paperAcctTable  = paperAcctFx.table;
+  const paperAcctStatus = paperAcctFx.status;
   const paperCapTable  = paperCapSamePair ? paperAcctFx.table  : paperCapOwnFx.table;
   const paperCapStatus = paperCapSamePair ? paperAcctFx.status : paperCapOwnFx.status;
 
@@ -2068,10 +2070,44 @@ export default function SwingEdge() {
 
   // Every aggregate flows through this one seam. Identity when there is nothing
   // to convert, which keeps a pure-dollar journal byte-identical to before.
+  //
+  // 🔴 נמדד 2026-08-12 — התפר הוזן ב-`fxTable`, שהוא **הון→חשבון**.
+  //    `makeConvertingCalc` ממיר מ**מטבע הנייר**, ו-`fx.js:69` דורש התאמת זוג
+  //    מדויקת (`rateTable.base === from`). ⇒ ביומן שקלי `fxTable` הוא `identity`
+  //    ⇒ `status !== "ready"` ⇒ התפר החזיר את העסקה **לא מומרת** — כלומר גם
+  //    7/7 המצרפים לא הומרו, ⛔ לא רק אתרי השורה. `paperAcctFx` כבר נטען בדיוק
+  //    בשביל זה ו⛔ לא נצרך בשום מקום. הזנה נכונה ⇒ ההמרה מתאפשרת בכלל.
+  //    ⚠️ ליומן דולרי (43/46) שני הביטויים `identity` ⇒ byte-identical.
   const stableCalcTradeMetrics = useMemo(
-    () => makeConvertingCalc(fxTable, accountCurrency, fxStatus),
-    [fxTable, accountCurrency, fxStatus]
+    () => makeConvertingCalc(paperAcctTable, accountCurrency, paperAcctStatus),
+    [paperAcctTable, accountCurrency, paperAcctStatus]
   );
+
+  // ─── אתרי **שורה** — אותה הכרעה בדיוק, ⛔ לא העתקה ──────────────────────────
+  //
+  // 🔴 החוזה של קטגוריה 2 (`src/utils.js`) ⛔ לא היה מקוים: 9/10 אתרי
+  // סכום-בחשבון קראו `calcTradeMetrics` הגולמי והדביקו עליו את סמל החשבון ⇒
+  // $500 הוצג כ-"₪500". `fmtAcct` הוא הקורא היחיד של אתרי-השורה, והוא רץ על
+  // **אותה** `accountAmount` שהתפר המצרפי למעלה רץ עליה.
+  //
+  // ⛔ מוגדר פעם אחת ומועבר כ-prop לקומפוננטות — ⛔ הן אינן מייבאות
+  // `accountAmount` בעצמן. מצב ה-Hook (טבלה + סטטוס) חי כאן, ועותק שני של
+  // ההכרעה בקומפוננטה הוא בדיוק איך שהשניים נסחפים זה מזה.
+  const acctDecision = useCallback(
+    (trade, amount) => accountAmount(trade, amount, accountCurrency, paperAcctTable, paperAcctStatus),
+    [accountCurrency, paperAcctTable, paperAcctStatus]
+  );
+  const fmtAcct = useCallback(
+    (trade, amount) => fmtAccountAmount(acctDecision(trade, amount)),
+    [acctDecision]
+  );
+  // הסירוב ⛔ אינו שקט. `"—"` בלי נימוק הוא בדיוק "כשל שקט" ש-CLAUDE.md §2
+  // אוסר; שתי משפחות הדחייה כבר יש להן טקסט ב-5 שפות, ⛔ אין מחרוזת קשיחה.
+  const acctRefusalText = useCallback((trade, amount) => {
+    const d = acctDecision(trade, amount);
+    if (d.ok || d.reason === "no_amount") return undefined;
+    return d.reason === "unverified_instrument" ? t.ccyUnverifiedTip : t.fxUnavailable;
+  }, [acctDecision, t]);
 
   const equityCurve = useMemo(
     () => generateEquityCurve(equityBase, realTrades, stableCalcTradeMetrics),
@@ -2679,8 +2715,11 @@ export default function SwingEdge() {
     // ⛔ אל תתקן ל-`fmtPaperPrice` — זה סכום-בחשבון, והתיקון הוא **המרה**
     // (דרך `stableCalcTradeMetrics`, שנמצא ב-scope כאן). גל ג׳ · docs/STATE.md.
     const { pnl } = calcTradeMetrics(closedTrade);
-    if (pnl > 0) toast.success(lang === "he" ? `רווח ${fmt$(Math.round(pnl), currencyOf(closedTrade))} נסגר בהצלחה` : `Closed with profit ${fmt$(Math.round(pnl), currencyOf(closedTrade))}`);
-    else if (pnl < 0) toast.error(lang === "he" ? `הפסד ${fmt$(Math.round(pnl), currencyOf(closedTrade))} — נסגר` : `Closed with loss ${fmt$(Math.round(pnl), currencyOf(closedTrade))}`);
+    // ⚠️ `Math.round` נשמר בדיוק כפי שהיה — הוא בחירת הדיוק של האתר על סכום
+    // ה**נייר**, ולכן ליומן דולרי (זהות) המחרוזת יוצאת byte-identical.
+    const shown = fmtAcct(closedTrade, Math.round(pnl));
+    if (pnl > 0) toast.success(lang === "he" ? `רווח ${shown} נסגר בהצלחה` : `Closed with profit ${shown}`);
+    else if (pnl < 0) toast.error(lang === "he" ? `הפסד ${shown} — נסגר` : `Closed with loss ${shown}`);
     else toast.info(lang === "he" ? "העסקה נסגרה" : "Trade closed");
 
     // ⚠️ A close that did not reach the DB reports a P&L that does not exist
@@ -3963,11 +4002,12 @@ export default function SwingEdge() {
                                 <td className="px-3 py-2 text-[var(--v3-text-lo)] font-mono">{tr.date}</td>
                                 <td className="px-3 py-2 text-end font-mono text-[var(--v3-text-mid)]">{tr.entry != null ? `${fmtPaperPrice(tr.entry, tr)}` : "—"}</td>
                                 <td className="px-3 py-2 text-end font-mono text-[var(--v3-text-mid)]">{closed && tr.exit != null ? `${fmtPaperPrice(tr.exit, tr)}` : "—"}</td>
-                                <td className={`px-3 py-2 text-end font-mono font-semibold ${!closed ? "text-[var(--v3-text-lo)]" : (mm.pnl || 0) >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>
-                                  {/* ⚑ סכום-בחשבון — 🔴 לא מומר. `calcTradeMetrics` הגולמי (מטבע ה**נייר**)
-    מוצג תחת סמל ה**חשבון**. ⛔ התיקון הוא **המרה**, ⛔ לא `fmtPaperPrice`.
-    גל ג׳ · docs/STATE.md */}
-                                  {closed ? fmt$(Math.round((mm.pnl || 0) * 100) / 100, currencyOf(tr)) : "—"}
+                                <td title={closed ? acctRefusalText(tr, Math.round((mm.pnl || 0) * 100) / 100) : undefined}
+                                    className={`px-3 py-2 text-end font-mono font-semibold ${!closed ? "text-[var(--v3-text-lo)]" : (mm.pnl || 0) >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>
+                                  {/* ✅ סכום-בחשבון **מומר** (גל ג׳, 2026-08-12) — `fmtAcct` ⇒ אותה
+    `accountAmount` שהתפר המצרפי רץ עליה. אין שער ⇒ `—` + נימוק ב-`title`,
+    ⛔ לא מספר לא-מומר תחת סמל החשבון. */}
+                                  {closed ? fmtAcct(tr, Math.round((mm.pnl || 0) * 100) / 100) : "—"}
                                 </td>
                                 <td className={`px-3 py-2 text-end font-mono ${!closed ? "text-[var(--v3-text-lo)]" : (mm.rMultiple || 0) >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>
                                   {closed ? fmtR(mm.rMultiple) : "—"}
@@ -4299,10 +4339,8 @@ export default function SwingEdge() {
                           <td className="py-2 pe-4 font-mono text-slate-300">{fmtPaperPrice(t.entry, t)}</td>
                           <td className="py-2 pe-4 font-mono text-slate-300">{fmtPaperPrice(t.exit, t)}</td>
                           <td className="py-2 pe-4 font-mono text-slate-400">{t.shares}</td>
-                          {/* ⚑ סכום-בחשבון — 🔴 לא מומר. `calcTradeMetrics` הגולמי (מטבע ה**נייר**)
-    מוצג תחת סמל ה**חשבון**. ⛔ התיקון הוא **המרה**, ⛔ לא `fmtPaperPrice`.
-    גל ג׳ · docs/STATE.md */}
-                          <td className={`py-2 pe-4 font-bold font-mono ${win ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>{fmt$(Math.round(pnl), currencyOf(t))}</td>
+                          {/* ✅ סכום-בחשבון **מומר** (גל ג׳, 2026-08-12). אין שער ⇒ `—` + נימוק. */}
+                          <td title={acctRefusalText(t, Math.round(pnl))} className={`py-2 pe-4 font-bold font-mono ${win ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>{fmtAcct(t, Math.round(pnl))}</td>
                           <td className={`py-2 pe-4 font-bold font-mono ${rMultiple == null ? "text-slate-600" : rMultiple >= 0 ? "text-cyan-400" : "text-[var(--v3-loss)]"}`}>{fmtR(rMultiple)}</td>
                           <td className="py-2 pe-4"><span className="inline-flex items-center gap-1"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">{labelFor("setup", t.setup, lang)}</span><SetupTagTip setup={t.setup} isRTL={isRTL} /></span></td>
                         </tr>
@@ -4313,7 +4351,7 @@ export default function SwingEdge() {
               </div>
               <div className="md:hidden flex flex-col gap-2">
                 {recentClosed.map(t => (
-                  <MobileTradeCard key={t.id} trade={t} isRTL={isRTL} lang={lang} />
+                  <MobileTradeCard key={t.id} trade={t} isRTL={isRTL} lang={lang} fmtAcct={fmtAcct} acctRefusalText={acctRefusalText} />
                 ))}
               </div>
             </div>
@@ -4735,6 +4773,8 @@ export default function SwingEdge() {
               <TradeCalendar
                 trades={getClosed(filteredTrades)}
                 calcMetrics={calcTradeMetrics}
+                fmtAcct={fmtAcct}
+                acctRefusalText={acctRefusalText}
                 lang={lang}
                 currency={statsCcy(journalStats)}
               />
@@ -4885,11 +4925,10 @@ export default function SwingEdge() {
                           })()}
                         </td>
                         <td className="p-3 font-mono text-slate-300">{t.exit ? `${fmtPaperPrice(t.exit, t)}` : "–"}</td>
-                        <td className={`p-3 font-bold font-mono text-sm ${isOpen ? "text-slate-500" : win ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>
-                          {/* ⚑ סכום-בחשבון — 🔴 לא מומר. `calcTradeMetrics` הגולמי (מטבע ה**נייר**)
-    מוצג תחת סמל ה**חשבון**. ⛔ התיקון הוא **המרה**, ⛔ לא `fmtPaperPrice`.
-    גל ג׳ · docs/STATE.md */}
-                          {isOpen ? "–" : fmt$(pnl, currencyOf(t))}
+                        <td title={isOpen ? undefined : acctRefusalText(t, pnl)}
+                            className={`p-3 font-bold font-mono text-sm ${isOpen ? "text-slate-500" : win ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>
+                          {/* ✅ סכום-בחשבון **מומר** (גל ג׳, 2026-08-12). אין שער ⇒ `—` + נימוק. */}
+                          {isOpen ? "–" : fmtAcct(t, pnl)}
                         </td>
                         <td className={`p-3 font-bold font-mono text-xs ${isOpen || rMultiple == null ? "text-slate-500" : rMultiple >= 0 ? "text-[var(--v3-info)]" : "text-[var(--v3-loss)]"}`}>
                           {isOpen ? "–" : fmtR(rMultiple)}
@@ -4964,6 +5003,8 @@ export default function SwingEdge() {
                   key={t.id}
                   trade={t}
                   lang={lang}
+                  fmtAcct={fmtAcct}
+                  acctRefusalText={acctRefusalText}
                   strategy={userProfile?.strategy}
                   onClick={handleEditOpen}
                   onClose={(tr) => { setClosingTrade(tr); setShowCloseForm(true); }}
@@ -7421,7 +7462,7 @@ export default function SwingEdge() {
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-[var(--v3-text-lo)] uppercase tracking-wider mb-0.5">Pos. Value</div>
-                    <div className={`text-sm font-bold font-mono truncate ${tradeValidity.valid && sizingOk?"text-white":"text-[var(--v3-text-lo)]"}`}>{tradeValidity.valid && sizingOk?`${capSym}${effPosValue.toLocaleString()}`:"—"}</div>
+                    <div className={`text-sm font-bold font-mono truncate ${tradeValidity.valid && sizingOk?"text-white":"text-[var(--v3-text-lo)]"}`}>{tradeValidity.valid && sizingOk?fmtCapitalAmount(effPosValue, capitalCurrency):"—"}</div>
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-[var(--v3-text-lo)] uppercase tracking-wider mb-0.5">Max Risk</div>
