@@ -48,8 +48,18 @@ const FILES = {
 };
 
 const ROW = /^\|\s*([BDC]-\d{3})\s*\|/;
+const ROW_R = /^\|\s*(R-\d)\s*\|/;
 const DATE = /\b\d{2}\.\d{2}\b/;
 const HASH = /[0-9a-f]{7,40}/;
+
+// ── מצבה — מצב-הסיום של מזהה `B-` (הכרעת 13.08, `docs/DECISIONS.md`) ─────────
+//
+// ⚠️ `B-126` תיעד סתירה **אמיתית** בין שתי אסרציות נכונות: `1.2` נועלת קידומת
+// לקובץ ⇒ פריט שהושלם חייב למחוק את `B-`; `6.1` אוסרת בדיוק את המחיקה הזו.
+// ההכרעה (ניב, 13.08, אפשרות א'): הפריט **נשאר** ב-`BACKLOG` כשורת **מצבה**
+// שסטטוסה `✅ בוצע → D-xxx`, והפירוט המלא עובר ל-`DONE` תחת ה-`D-` החדש.
+// ⇒ המזהה אינו נעלם, הקידומות נשארות נקיות, ו⛔ אין עותק שני של הפריט.
+const TOMB = /✅\s*בוצע\s*→\s*`?(D-\d{3})`?/;
 
 let pass = 0;
 const failures = [];
@@ -171,11 +181,15 @@ try {
 }
 const now = new Set([...backlog, ...done, ...checks].map((d) => d.id));
 const vanished = [...prev].filter((id) => !now.has(id));
+// ⚠️ שורת **מצבה** היא קיום חוקי לכל דבר: היא הגדרת-שורה ככל אחרת, ולכן היא
+// נספרת ב-`now` ומספקת את `6.1`. ⛔ זו אינה עקיפה — זה **הפתרון** ל-`B-126`:
+// המזהה נשאר בר-ציטוט אחרי שהפריט נסגר. מה שאוכף אותה הוא `8.4`.
+const tombs = backlog.filter((d) => TOMB.test(d.cells.at(-1) ?? ""));
 check("6.1", prev.size === 0
   ? "אין מרשם בקומיט הקודם — לידה, אין ממה להיעלם"
-  : `${prev.size - vanished.length}/${prev.size} מזהי הקומיט הקודם עדיין קיימים`,
+  : `${prev.size - vanished.length}/${prev.size} מזהי הקומיט הקודם עדיין קיימים (מתוכם ${tombs.length} מצבות)`,
   vanished.length === 0,
-  `${vanished.join(" · ")} — ⛔ מזהה אינו נמחק ואינו ממוחזר. פריט שהוכרע עובר ל-DONE או ל-❄️, ⛔ לא נמחק`);
+  `${vanished.join(" · ")} — ⛔ מזהה אינו נמחק ואינו ממוחזר. פריט שהוכרע נשאר כ**מצבה** \`✅ בוצע → D-xxx\`, ⛔ לא נמחק`);
 
 console.log("\n7 · ❄️ נושא נימוק");
 // ⚠️ ❄️ בלי נימוק נפתח מחדש בעוד חודש, ואיש לא יזכור למה נסגר.
@@ -185,6 +199,60 @@ check("7.1", `${frozen.length} פריטי ❄️ במרשם`, frozen.length > 0,
   "אפס ❄️ — או שאין הכרעות-לא-לעשות, או ש-ROW/הסטטוס נשברו. שער שסופר 0 עובר בשקט");
 check("7.2", `${frozen.length - noReason.length}/${frozen.length} נושאים "נימוק:"`, noReason.length === 0,
   noReason.map((d) => `${d.id} (${d.file}:${d.lineNo}) — ❄️ בלי נימוק`).join("\n      "));
+
+console.log("\n8 · שכבת השורשים והמצבה");
+// ⚠️ שכבת השורשים (`R-1`…`R-6`) היא **מיפוי**, ⛔ לא קטגוריה נוספת. ערכה כולו
+// בכך שהיא נשארת מסונכרנת עם הפריטים; מיפוי שנסחף גרוע ממיפוי שאינו קיים,
+// מפני שהוא נקרא כאילו הוא נכון. ⇒ ארבע האסרציות כאן בודקות **דו-כיווניות**.
+const roots = [];
+lines.BACKLOG.forEach((line, i) => {
+  const m = ROW_R.exec(line);
+  if (!m) return;
+  const cells = line.split(/(?<!\\)\|/).slice(1, -1).map((c) => c.trim());
+  roots.push({ id: m[1], cells, lineNo: i + 1, members: [...(cells[2] ?? "").matchAll(/B-\d{3}/g)].map((x) => x[0]) });
+});
+const backlogIds = new Set(backlog.map((d) => d.id));
+
+// 8.1 — שורש הוא הכללה. שורש עם חבר יחיד אינו מנגנון, הוא פריט בתחפושת.
+const thinRoots = roots.filter((r) => r.members.length < 2);
+const ghostMembers = roots.flatMap((r) => r.members.filter((b) => !backlogIds.has(b)).map((b) => `${r.id}→${b}`));
+check("8.1", `${roots.length} שורשים · ${roots.reduce((a, r) => a + r.members.length, 0)} שיוכים`,
+  roots.length >= 6 && thinRoots.length === 0 && ghostMembers.length === 0,
+  [roots.length < 6 ? `רק ${roots.length} שורשים — נמדדו 6 ב-13.08` : "",
+   thinRoots.map((r) => `${r.id} מפנה ל-${r.members.length} פריטים — שורש דורש ≥2`).join("\n      "),
+   ghostMembers.length ? `שיוך לפריט שאינו מוגדר: ${ghostMembers.join(" · ")}` : ""].filter(Boolean).join("\n      "));
+
+// 8.2 — כל תג ‹R-n› בגוף הטבלאות מפנה לשורש שקיים.
+const rootIds = new Set(roots.map((r) => r.id));
+const badTags = [];
+lines.BACKLOG.forEach((line, i) => {
+  if (ROW_R.test(line)) return;
+  for (const m of line.matchAll(/‹(R-\d)›/g)) if (!rootIds.has(m[1])) badTags.push(`${FILES.BACKLOG}:${i + 1} → ${m[1]}`);
+});
+check("8.2", `${rootIds.size} שורשים מוגדרים · כל תג ‹R-n› מפנה לשורש קיים`, badTags.length === 0,
+  badTags.join("\n      "));
+
+// 8.3 — ⚠️ דו-כיווניות. חבר ברשימת השורש **חייב** לשאת את התג בשורתו שלו,
+// אחרת נוצרים שני עותקים בלי בעלים — שהוא בדיוק `R-6`.
+const tagOf = new Map(backlog.map((d) => [d.id, [...d.cells[1].matchAll(/‹(R-\d)›/g)].map((x) => x[1])]));
+const untagged = roots.flatMap((r) => r.members.filter((b) => backlogIds.has(b) && !(tagOf.get(b) ?? []).includes(r.id)).map((b) => `${b} חבר ב-${r.id} ואינו נושא ‹${r.id}›`));
+const orphanTags = [...tagOf.entries()].flatMap(([id, ts]) => ts.filter((t) => !roots.find((r) => r.id === t)?.members.includes(id)).map((t) => `${id} נושא ‹${t}› ואינו ברשימת החברים שלו`));
+check("8.3", `שיוך דו-כיווני — רשימת השורש ותגי הפריטים מסכימים`, untagged.length === 0 && orphanTags.length === 0,
+  [...untagged, ...orphanTags].join("\n      "));
+
+// 8.4 — מצבה חייבת להצביע על `D-` שקיים. מצבה אל תוך החלל היא מזהה שנסגר
+// לכאורה ואי-אפשר לאתר לאן. ⚠️ זו האסרציה שסוגרת את `B-126`.
+const doneIds = new Set(done.map((d) => d.id));
+const danglingTombs = tombs.map((d) => ({ d, target: TOMB.exec(d.cells.at(-1))[1] })).filter((x) => !doneIds.has(x.target));
+check("8.4", `${tombs.length} מצבות, כולן מפנות ל-D- קיים`, danglingTombs.length === 0,
+  danglingTombs.map((x) => `${x.d.id} (${x.d.file}:${x.d.lineNo}) → ${x.target} — אינו מוגדר ב-${FILES.DONE}`).join("\n      "));
+
+// 8.5 — פריט שמקורו מדידה של 13.08 נושא את תאריך המדידה בעמודת "נמדד".
+// ⚠️ ממצא שנמדד ולא תוארך מתיישן בלי שאיש ידע — וזה כל ההבדל בין ממצא להשערה.
+const MEAS = 5;
+const undated = backlog.filter((d) => /13\.08/.test(d.cells[SRC] ?? "") && !/13\.08/.test(d.cells[MEAS] ?? ""));
+check("8.5", `${backlog.filter((d) => /13\.08/.test(d.cells[SRC] ?? "")).length} פריטי 13.08 נושאים תאריך מדידה`, undated.length === 0,
+  undated.map((d) => `${d.id} (${d.file}:${d.lineNo}) — מקור 13.08, עמודת "נמדד" = "${d.cells[MEAS] ?? ""}"`).join("\n      "));
 
 console.log("");
 if (failures.length) {
