@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { loadRateTable, convert } from "../lib/fx.js";
 import { realizedDayKey, calcTradeMetrics } from "../utils.js";
 // ⚠️ `instrumentCurrency.js` אינו מייבא דבר — אין מעגל ייבוא דרך `utils.js`.
-import { deriveInstrumentCurrency, isAggregatable } from "../lib/instrumentCurrency.js";
+import { deriveInstrumentCurrency, isAggregatable, PAPER_BASE } from "../lib/instrumentCurrency.js";
 
 /**
  * fxPairPlan — כמה **קריאות רשת** עולה ליומן אחד, ולמה.
@@ -141,7 +141,12 @@ export const realizedDayKeysOf = (trades) => {
  *    the population (which would silently shrink a denominator).
  */
 /**
- * accountAmount — **הכרעת ההמרה היחידה** מסכום במטבע נייר לסכום במטבע חשבון.
+ * amountAt — **הכרעת ההמרה היחידה** מסכום במטבע נייר לסכום במטבע חשבון.
+ *
+ * `dateKey` הוא ה**זמן**, והוא ההבדל **היחיד** בין עבר להווה: יום מסוים ⇒ ערך
+ * עבר (עסקה סגורה) · `undefined` ⇒ ערך הווה (spot, פוזיציה פתוחה). ⚠️ שתי
+ * פונקציות מקבילות כאן היו בדיוק המבנה שהקובץ אוסר שמונה שורות מטה. ⇒ ליבה
+ * אחת, ושני עוטפים בני שורה.
  *
  * ⚠️ קיים מפני שהחוזה של קטגוריה 2 (`src/utils.js`, הבלוק מעל `currencyOf`)
  * ⛔ לא היה מקוים: `makeConvertingCalc` הוזן ל-**מצרפים בלבד** (7/7), וכל אתר
@@ -160,7 +165,7 @@ export const realizedDayKeysOf = (trades) => {
  * ⛔ אין `|| 1` ואין ברירת מחדל: `ok:false` הוא תשובה שהמסך **מציג** (`—`
  * עם נימוק), ⛔ לא שגיאה שנבלעת ולא שער מנוחש.
  */
-export const accountAmount = (trade, amount, displayCurrency, table, status) => {
+const amountAt = (trade, amount, displayCurrency, table, status, dateKey) => {
   const refuse = (reason) => ({ ok: false, reason, value: null, currency: null });
   // `== null` ⛔ ולא `Number.isFinite`: התפר המצרפי בדק בדיוק את זה, ו-NaN
   // שנכנס לכאן חייב לצאת NaN כדי ש-`money()` יציג "—" כמו קודם. שינוי לבדיקת
@@ -172,9 +177,54 @@ export const accountAmount = (trade, amount, displayCurrency, table, status) => 
   const from = derived.code;
   if (from === displayCurrency) return { ok: true, reason: "identity", value: amount, currency: displayCurrency };
   if (status !== "ready" || !table) return refuse("no_table");
-  const { value, reason } = convert(amount, from, displayCurrency, table, realizedDayKey(trade));
+  const { value, reason } = convert(amount, from, displayCurrency, table, dateKey);
   if (value == null) return refuse(reason || "no_rate");
   return { ok: true, reason: "converted", value, currency: displayCurrency };
+};
+
+/**
+ * ערך **עבר** — עסקה סגורה, נעולה לשער של יום המימוש. ⛔ התנהגות לא זזה.
+ */
+export const accountAmount = (trade, amount, displayCurrency, table, status) =>
+  amountAt(trade, amount, displayCurrency, table, status, realizedDayKey(trade));
+
+/**
+ * ערך **הווה** — פוזיציה פתוחה, spot.
+ *
+ * 🔴 `dateKey` נמסר **חסר במפורש**, וזו כל הפונקציה. ⚠️ `realizedDayKey` נופל
+ * ל-`trade.date` (`src/utils.js:43`) ⇒ לעסקה **פתוחה** הוא מחזיר את יום
+ * ה**כניסה**, ⛔ לא `null` — ו-`byDay` אפילו **מכיל** את היום הזה, כי
+ * `fxDayKeys` רץ על כל `realTrades`. ⇒ שימוש חוזר ב-`accountAmount` היה
+ * מצליח **בשקט** בשער הלא-נכון, ומייצר מספר שסוטה ככל שהפוזיציה מוחזקת.
+ * ⛔ אין כאן ברירת מחדל — יש היעדר מכוון.
+ */
+export const spotAmount = (trade, amount, displayCurrency, table, status) =>
+  amountAt(trade, amount, displayCurrency, table, status, undefined);
+
+/**
+ * livePnlAmount — ההכרעה של ה-P&L ה**חי**. מצרף ושורה קוראים לאותה פונקציה.
+ *
+ * ⚠️ קיימת כפונקציה ⛔ ולא כתנאי בתוך ה-`useMemo` שב-`SwingEdge_App.jsx`,
+ * מפני שתנאי הכלוא ב-`.jsx` ⛔ אינו ניתן לייבוא ב-node ⇒ האסרציה עליו הייתה
+ * **מקור** ולא **ערך** — בדיוק "אסרציה ירוקה מעל פיצ'ר מת" (ראה הבלוק בראש
+ * הקובץ). כאן היא נמדדת.
+ *
+ * @param displayCurrency המטבע ש**המסך** מציג בו את ההון — ⛔ לא בהכרח
+ *   `accountCurrency`. `SwingEdge_App.jsx:2035` מפיל את `dispCcy` ל-
+ *   `capitalCurrency` כשההמרה נכשלה, ואז ההון הסגור מוצג **לא מומר** תחת סמל
+ *   אחר; חיבור סכום דולרי לשם היה מייצר ערבוב **חדש** דווקא במצב שבו ההגנה
+ *   אמורה לפעול.
+ */
+export const livePnlAmount = (trade, amount, accountCurrency, displayCurrency, table, status) => {
+  if (displayCurrency !== accountCurrency)
+    return { ok: false, reason: "fx_fallback", value: null, currency: null };
+  // ⚠️ **לפני** הגזירה, ובכוונה: ניתוב משתמש דולרי דרך
+  // `deriveInstrumentCurrency` היה מוציא פוזיציה פתוחה בעלת טיקר מספרי
+  // מהמצרף (`unverified_instrument`) — שינוי התנהגות ל-43/46 המשתמשים.
+  // הקדימות הזו הופכת את ה-no-op ל**מוכח סטטית**, בלי שאילתת DB.
+  if (accountCurrency === PAPER_BASE)
+    return { ok: true, reason: "identity", value: amount, currency: accountCurrency };
+  return spotAmount(trade, amount, accountCurrency, table, status);
 };
 
 export const makeConvertingCalc = (table, displayCurrency, status) =>

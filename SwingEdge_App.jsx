@@ -93,7 +93,7 @@ import {
   DNACard, EdgeCard, DecisionCoachPanel, TiltShield, GrowthChart, RegimeIndicator, PatternTags,
 } from "./src/intelligence/ui/IntelligenceUI.jsx";
 import { useTradingStats } from "./src/hooks/useTradingStats.js";
-import { useFxRates, realizedDayKeysOf, makeConvertingCalc, fxPairPlan, accountAmount } from "./src/hooks/useFxRates.js";
+import { useFxRates, realizedDayKeysOf, makeConvertingCalc, fxPairPlan, accountAmount, livePnlAmount } from "./src/hooks/useFxRates.js";
 import { convert } from "./src/lib/fx.js";
 import { resolveEquityBase } from "./src/lib/equityBase.js";
 import { horizonState, horizonLabel } from "./src/lib/tradeHorizon.js";
@@ -442,7 +442,11 @@ const exportTradesCSV = (trades) => {
 // calcTradeMetrics (unconverted) — one page, one "₪", two currencies. `capital`
 // must likewise arrive already converted; the caller passes `equityBase`, the
 // same base `stats` was computed from, so the page's curve and its KPIs agree.
-const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity, currency = "USD", calcFn = calcTradeMetrics) => {
+// `equityGaps` — how many open positions the equity figure EXCLUDES, and why.
+// A saved document that states a total which is missing a term, without saying
+// so, is the silent failure CLAUDE.md §2 forbids. The `missingCount` gap
+// predates B-119 and had no disclosure at all; both are covered by one line.
+const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity, currency = "USD", calcFn = calcTradeMetrics, equityGaps = null) => {
   const sym = CURRENCY_SYMBOL[currency] || CURRENCY_SYMBOL.USD;
   const now = new Date();
   const monthName = now.toLocaleString("en-US", { month: "long" });
@@ -464,6 +468,13 @@ const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity, cur
   // Unified full Account Equity (closed + live open P&L), passed from the
   // component so the report matches the dashboard exactly.
   const curEquity = accountEquity;
+  const noPrice = equityGaps?.missingCount || 0;
+  const noRate  = equityGaps?.unconvertedCount || 0;
+  const equityIncomplete = noPrice + noRate > 0
+    ? `Excludes ${noPrice + noRate} open position(s)`
+      + `${noPrice ? ` — ${noPrice} without a live price` : ""}`
+      + `${noRate ? ` — ${noRate} without an FX rate` : ""}`
+    : "";
 
   // Build equity curve points from all closed trades
   let runBalance = capital;
@@ -561,6 +572,7 @@ const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity, cur
     <div class="kpi">
       <div class="kpi-label">Portfolio Equity</div>
       <div class="kpi-value" style="color:#0f172a">${sym}${curEquity.toLocaleString("en-US",{minimumFractionDigits:2})}</div>
+      ${equityIncomplete ? `<div style="font-size:9px;color:#b45309;margin-top:2px">⚠️ ${equityIncomplete}</div>` : ""}
     </div>
     <div class="kpi">
       <div class="kpi-label">Net P&amp;L (All Time)</div>
@@ -2109,6 +2121,22 @@ export default function SwingEdge() {
     return d.reason === "unverified_instrument" ? t.ccyUnverifiedTip : t.fxUnavailable;
   }, [acctDecision, t]);
 
+  // ── P&L חי — ערך **הווה** ⇒ spot. התאום של `acctDecision`, על אותה ליבה.
+  //
+  // ⚠️ `dispCcy` נמסר ⛔ ולא רק `accountCurrency`: כשההמרה נכשלה הוא נופל ל-
+  // `capitalCurrency` (למעלה), והכותרת מציגה הון **לא מומר** תחת סמל אחר.
+  // חיבור סכום דולרי לשם היה ערבוב **חדש** — `livePnlAmount` מסרבת שם.
+  const liveDecision = useCallback(
+    (trade, amount) =>
+      livePnlAmount(trade, amount, accountCurrency, dispCcy, paperAcctTable, paperAcctStatus),
+    [accountCurrency, dispCcy, paperAcctTable, paperAcctStatus]
+  );
+  const spotRefusalText = useCallback((trade, amount) => {
+    const d = liveDecision(trade, amount);
+    if (d.ok || d.reason === "no_amount") return undefined;
+    return d.reason === "unverified_instrument" ? t.ccyUnverifiedTip : t.fxUnavailable;
+  }, [liveDecision, t]);
+
   const equityCurve = useMemo(
     () => generateEquityCurve(equityBase, realTrades, stableCalcTradeMetrics),
     [realTrades, equityBase, stableCalcTradeMetrics]
@@ -2307,17 +2335,29 @@ export default function SwingEdge() {
   // Live open P&L. Trades missing a live price are NOT silently dropped — they are
   // counted (missingCount) so the UI can disclose the gap. We never invent a price
   // or fall back to last-known: transparency over guessing.
+  //
+  // 🔴 B-119: the raw number here is in the PAPER currency, and it used to be
+  // added straight onto `stats.currentEquity`, which is already in the account
+  // currency. A cross-unit sum in the equity headline, which then leaked into
+  // the exported PDF. The conversion decision lives in `livePnlAmount` — this
+  // loop stays thin, because a condition trapped inside a `.jsx` useMemo cannot
+  // be asserted on by value.
   const openPnL = useMemo(() => {
-    let value = 0, missingCount = 0;
+    let value = 0, missingCount = 0, unconvertedCount = 0;
     for (const t of openTrades) {
       const lp = getLivePrice(t.ticker);
       if (!lp) { missingCount++; continue; }
-      value += t.side === "LONG"
+      const raw = t.side === "LONG"
         ? (lp.price - t.entry) * t.shares
         : (t.entry - lp.price) * t.shares;
+      const d = liveDecision(t, raw);
+      // Same treatment as a missing price: counted and disclosed, never guessed
+      // and never silently dropped from the sum.
+      if (!d.ok) { unconvertedCount++; continue; }
+      value += d.value;
     }
-    return { value, missingCount };
-  }, [openTrades, getLivePrice]);
+    return { value, missingCount, unconvertedCount };
+  }, [openTrades, getLivePrice, liveDecision]);
 
   // Single source of truth for full Account Equity: realized closed equity
   // (from the stats hub) + live open P&L. Every consumer — Header, StatCard,
@@ -2348,10 +2388,13 @@ export default function SwingEdge() {
   const dailyPnL = useMemo(() => {
     const today = localDayKey(new Date());
     const todayClosed = closedTrades.filter(t => realizedDayKey(t) === today);
-    const closedToday = todayClosed.reduce((s, t) => s + (calcTradeMetrics(t).pnl || 0), 0);
+    // 🔴 The CONVERTING seam, not raw `calcTradeMetrics`. Once `openPnL.value`
+    // became account-converted, a raw closed sum beside it would have recreated
+    // here exactly the cross-unit addition that B-119 removed from `curEquity`.
+    const closedToday = todayClosed.reduce((s, t) => s + (stableCalcTradeMetrics(t).pnl || 0), 0);
     // Open P&L change today (approximation using current live prices)
     return closedToday + openPnL.value;
-  }, [closedTrades, openPnL]);
+  }, [closedTrades, openPnL, stableCalcTradeMetrics]);
 
   // Win Streak Counter (delegated to Master Stats Hub).
   // stats.currentStreak is signed (negative for losing streak); the dashboard
@@ -4129,6 +4172,15 @@ export default function SwingEdge() {
               </div>
             )}
 
+            {/* B-119 · אין spot ⇒ הסכום הוא **חלקי**, והמונה נאמר. סכום שהושמט
+                ממנו איבר בלי לומר כמה הוא בדיוק גילוי שאי-אפשר לפעול לפיו. */}
+            {openPnL.unconvertedCount > 0 && (
+              <div className="mt-2 flex items-center gap-2 text-xs font-semibold text-amber-500 rtl:flex-row-reverse">
+                <AlertTriangle size={14} />
+                <span>{t.unconvertedPnlWarn.replace('{n}', String(openPnL.unconvertedCount))}</span>
+              </div>
+            )}
+
             {/* ══ SWINGEDGE AI — DNA · GROWTH · REGIME ══ */}
             {aiTilt && aiTilt.level > 0 && (
               <TiltShield
@@ -4246,9 +4298,14 @@ export default function SwingEdge() {
                     const livePnl = currentPrice
                       ? (tr.side === "LONG" ? (currentPrice - tr.entry) * tr.shares : (tr.entry - currentPrice) * tr.shares)
                       : null;
+                    // ⚠️ יחס בין שני מחירים באותו מטבע ⇒ חסין-מטבע כמו `rMultiple`.
+                    // ⛔ אינו מומר.
                     const livePnlPct = currentPrice && tr.entry
                       ? (tr.side === "LONG" ? ((currentPrice / tr.entry) - 1) * 100 : ((tr.entry / currentPrice) - 1) * 100)
                       : null;
+                    // 🔴 **אותה** הכרעה שהמצרף בכותרת קורא לה. `currencyOf(tr)`
+                    // הוא תווית מהעדפת החשבון ⇒ הדפיס `₪` על מספר דולרי.
+                    const liveD = livePnl !== null ? liveDecision(tr, livePnl) : null;
                     return (
                       <div key={tr.id} className="bg-white/3 rounded-lg p-3 border border-[var(--border-subtle)] dark:border-white/[0.06]">
                         <div className="flex items-center justify-between">
@@ -4282,11 +4339,9 @@ export default function SwingEdge() {
                           <span>Entry <span className="text-slate-300">{fmtPaperPrice(tr.entry, tr)}</span></span>
                           <span>Now <span className={currentPrice ? "text-cyan-300 font-bold" : "text-slate-600"}>{currentPrice ? `${fmtPaperPrice(currentPrice, tr)}` : "..."}</span></span>
                           <span>Stop <span className="text-[var(--v3-loss)]">{fmtPaperPrice(tr.stop, tr)}</span></span>
-                          {/* ⚑ סכום-בחשבון **לא ממומש** — 🔴 לא מומר, ו⚠️ ⛔ **אינו ניתן**
-    לתיקון דרך התפר הקיים: `calcTradeMetrics(עסקה פתוחה).pnl === null`
-    ⇒ `makeConvertingCalc` מדלג עליו. רווח לא-ממומש דורש **spot**
-    (`convert(…, dateKey=null)`), ⛔ לא קיבוע יום. הכרעה פתוחה — גל ג׳. */}
-                          <span>P&L <span className={livePnl !== null ? (livePnl >= 0 ? "text-[var(--v3-accent)] font-bold" : "text-[var(--v3-loss)] font-bold") : "text-slate-600"}>{livePnl !== null ? fmt$(Math.round(livePnl), currencyOf(tr)) : "..."}</span></span>
+                          {/* ✅ נסגר 2026-08-13 (B-119): סכום-בחשבון לא-ממומש מומר
+    ב-**spot** דרך `liveDecision`. הסירוב נושא נימוק ב-`title`, ⛔ לא `—` ערום. */}
+                          <span>P&L <span title={livePnl !== null ? spotRefusalText(tr, livePnl) : undefined} className={livePnl !== null ? (livePnl >= 0 ? "text-[var(--v3-accent)] font-bold" : "text-[var(--v3-loss)] font-bold") : "text-slate-600"}>{liveD ? (liveD.ok ? fmt$(Math.round(liveD.value), liveD.currency) : "—") : "..."}</span></span>
                         </div>
                         {livePnlPct !== null && (
                           <div className="mt-1.5 h-1 bg-white/5 rounded-full overflow-hidden">
@@ -4919,9 +4974,9 @@ export default function SwingEdge() {
                             const lp = t.side === "LONG"
                               ? (cp - t.entry) * t.shares
                               : (t.entry - cp) * t.shares;
-                            // ⚑ סכום-בחשבון **לא ממומש** — 🔴 לא מומר. `lp` מחושב inline
-                            // ממחיר חי ולכן ⛔ אינו עובר בתפר כלל. דורש **spot**. גל ג׳.
-                            return <span className={lp >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}>{fmt$(Math.round(lp), currencyOf(t))}</span>;
+                            // ✅ נסגר 2026-08-13 (B-119) — **אותה** הכרעה כמו הכותרת.
+                            const d = liveDecision(t, lp);
+                            return <span title={spotRefusalText(t, lp)} className={lp >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}>{d.ok ? fmt$(Math.round(d.value), d.currency) : "—"}</span>;
                           })()}
                         </td>
                         <td className="p-3 font-mono text-slate-300">{t.exit ? `${fmtPaperPrice(t.exit, t)}` : "–"}</td>
@@ -7184,7 +7239,7 @@ export default function SwingEdge() {
                       {t.pdfIncludes}
                     </p>
                     <button
-                      onClick={() => exportMonthlyPDF(realTrades, equityBase, stats, monthStats, curEquity, statsCcy(stats), stableCalcTradeMetrics)}
+                      onClick={() => exportMonthlyPDF(realTrades, equityBase, stats, monthStats, curEquity, statsCcy(stats), stableCalcTradeMetrics, openPnL)}
                       className="w-full py-2 rounded-lg bg-[var(--v3-info-glow)] border border-[#06b6d4]/25 text-[var(--v3-info)] text-xs font-bold hover:bg-[#06b6d4]/20 transition flex items-center justify-center gap-1.5">
                       <FileText size={12} /> {t.createPdf}
                     </button>

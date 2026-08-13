@@ -36,7 +36,8 @@ import { sizePosition } from "../src/lib/positionSizing.js";
 // ⚠️ הכלל הזה נצרך כאן **ובקומפוננטה** מאותו מקום — ⛔ אין העתקה מקבילה.
 // `accountAmount` הוא **אותה** הכרעת המרה שהתפר המצרפי רץ עליה — ⛔ לא העתקה,
 // ולכן `makeConvertingCalc` נבדק כאן דרך אותו ייבוא כדי להוכיח שהם לא נפרדו.
-import { fxPairPlan, accountAmount, makeConvertingCalc } from "../src/hooks/useFxRates.js";
+import { fxPairPlan, accountAmount, spotAmount, livePnlAmount,
+         makeConvertingCalc } from "../src/hooks/useFxRates.js";
 import { calculateTradeDNA } from "../src/intelligence/core/TradeDNA.js";
 import { calculateGrowthScore } from "../src/intelligence/core/GrowthTracker.js";
 
@@ -449,14 +450,19 @@ const aggressionOf = (trades, capitalCurrency) =>
       if (/^\s*currencyOf\(t\),\s*$/.test(L)) return n;  // קטגוריה 3 — עמודת ה-CSV
       return n + hits;
     }, 0);
-    // ⚠️ המספר ירד מ-10 ל-3 בגל ג׳ (2026-08-12). מה **שנשאר** הוא הרשימה
-    //    המלאה של מה שלא הומר, ⛔ לא שארית אקראית:
-    //      `:4249` · `:4884` — P&L **חי**. דורש spot ולא שער-יום-המימוש, ולכן
-    //                          ⛔ אינו עובר ב-`accountAmount` (שנועל על היום
-    //                          שבו העסקה מומשה). פריט BACKLOG נפרד.
-    //      `:4502`          — `riskDollar`, ה-1/10 שהיה תקין מלכתחילה: הוא
-    //                          מסורב ע"י `matchesCapital` ומציג `—`.
-    eq("3 מופעי סכום-בחשבון נותרו ב-app (2 P&L חי + riskDollar)", acctCount(app), 3);
+    // ⚠️ **הצהרת תזוזה — 2026-08-13, גל ד׳ (`B-119`).** המנייה ירדה `10 → 3`
+    //    בגל ג׳ ועכשיו `3 → 1`. הערך הישן והחדש **שניהם** כתובים כאן, כדי
+    //    שהקורא הבא יראה **מה** זז ולא רק שמשהו זז:
+    //
+    //      `:4325` · `:4958` — P&L **חי**. ✅ **הוסרו** — שני האתרים עברו ל-
+    //                          `liveDecision` ⇒ המרה ב-**spot**. זה בדיוק
+    //                          פריט ה-BACKLOG שהשורה הקודמת הפנתה אליו.
+    //      `:4595`          — `riskDollar`, ה-1/10 שהיה תקין מלכתחילה: הוא
+    //                          מסורב ע"י `matchesCapital` ומציג `—`. ⛔ נשאר.
+    //
+    // ⚠️ המספר ⛔ **לא רוכך כדי לעבור** — הוא ירד מפני שהאתרים תוקנו, והקובץ
+    //    מונה **אוכלוסייה**, ⛔ לא מקבע התנהגות שגויה. השורה הבאה היא המכנה.
+    eq("מופע סכום-בחשבון אחד נותר ב-app (riskDollar בלבד)", acctCount(app), 1);
     eq("⛔ אפס ב-MobileTradeCard", acctCount(card), 0);
     eq("⛔ אפס ב-DayTradesModal", acctCount(src("../src/components/DayTradesModal.jsx")), 0);
   }
@@ -771,6 +777,138 @@ const aggressionOf = (trades, capitalCurrency) =>
       check(`${nm} ⛔ אין בו fxTable`, !/fxTable/.test(s));
       check(`${nm} ⛔ אין בו async`, !/\basync\b/.test(s));
     }
+  }
+
+  // ── 14 · P&L חי — ערך **הווה**, spot (B-119, גל ד׳) ───────────────────────
+  //
+  // 🔴 מה שנמדד 13.08: `openPnL` חיבר P&L של פוזיציות פתוחות — במטבע ה**נייר**
+  //    הגולמי — ל-`stats.currentEquity` שכבר הומר למטבע החשבון. חיבור
+  //    חוצה-יחידות בכותרת ההון, שדלף גם ל-PDF המיוצא.
+  //
+  // ⚠️ המלכודת שבגללה הבלוק הזה ⛔ אינו כפילות של 13.9b″: שימוש חוזר ב-
+  //    `accountAmount` על פוזיציה פתוחה **עובד** — ומחזיר מספר **שגוי**.
+  //    `realizedDayKey` נופל ל-`trade.date` ⇒ יום ה**כניסה**, ו-`byDay` מכיל
+  //    אותו. ⇒ ⛔ אין סירוב, ⛔ אין "—", רק מספר סביר שסוטה עם משך ההחזקה.
+  //    אסרציה A2 היא היחידה שיכולה להבדיל בין השתיים.
+  //
+  // שער מקובע `r = 3.0` (הכרעת ניב 13.08 — תואם ל-Δ=₪49.50 שנמדד במסך).
+  // ⛔ אפס רשת: שער חי כציפייה הוא מספר שזז מעצמו (`fx.js:19-24`).
+  console.log("  14 · P&L חי — spot");
+  {
+    // פוזיציה **פתוחה**: יש `date`, ⛔ אין `closedAt`. AAPL ⇒ ASSUMED USD.
+    const open = { ticker: "AAPL", side: "LONG", status: "OPEN",
+                   entry: 100, exit: null, shares: 10, date: "2026-08-01" };
+    // 🔴 הפיקסצ׳ר של המלכודת: יום הכניסה נושא שער **אחר** מה-spot.
+    const table = { base: "USD", quote: "ILS",
+                    spot:  { rate: 3.0, rateDate: "2026-08-13" },
+                    byDay: { "2026-08-01": { rate: 2.0, rateDate: "2026-08-01" } } };
+    const PNL = 24.75;   // ה-P&L החי שצולם במסך
+
+    // A1 — ההמרה עצמה.
+    const a1 = spotAmount(open, PNL, "ILS", table, "ready");
+    eq("A1 · spot ממיר", a1.reason, "converted");
+    eq("A1 · $24.75 × 3.0 = ₪74.25", a1.value, 74.25);
+    eq("A1 · התווית היא מטבע החשבון", a1.currency, "ILS");
+
+    // A2 — 🔴 **האסרציה של הגל.** שתי הפונקציות על אותה פוזיציה פתוחה.
+    const a2 = accountAmount(open, PNL, "ILS", table, "ready");
+    eq("A2 · `accountAmount` ⛔ אינו מסרב על פתוחה — הוא **מצליח**", a2.ok, true);
+    eq("A2 · ...בשער יום ה**כניסה** (2.0) ⇒ ₪49.50 — המספר השגוי", a2.value, 49.5);
+    check("A2 · 🔴 spot ≠ יום-כניסה — ההפרדה בין שני הזמנים **נמדדת**",
+          a1.value !== a2.value);
+    eq("A2 · `realizedDayKey` על פתוחה מחזיר את יום הכניסה ⛔ ולא null",
+       realizedDayKey(open), "2026-08-01");
+
+    // A3 — `status:"ready"` בעוד `spot:null` (`fx.js:247-249`: ה-API נפל,
+    // המטמון ההיסטורי קיים). ⚠️ בדיקה על הסטטוס בלבד הייתה מפספסת את זה.
+    const noSpot = { ...table, spot: null };
+    const a3 = spotAmount(open, PNL, "ILS", noSpot, "ready");
+    eq("A3 · אין spot ⇒ ok שקר גם כש-status הוא ready", a3.ok, false);
+    eq("A3 · נימוק מובחן", a3.reason, "no_spot_rate");
+    eq("A3 · ⛔ אין נפילה שקטה — הערך ⛔ אינו 24.75", a3.value, null);
+    eq("A3 · המסך מציג `—`", fmtAccountAmount(a3), "—");
+
+    // A4 — 43/46 המשתמשים הדולריים. ⛔ byte-identical.
+    const a4 = spotAmount(open, PNL, "USD", null, "identity");
+    eq("A4 · זהות ⇒ ok", a4.reason, "identity");
+    eq("A4 · הערך byte-identical", Object.is(a4.value, PNL), true);
+
+    // A5 — טיקר מספרי (אג"ח SSE/SZSE) ⇒ ⛔ לא מנוחש ל-USD.
+    const a5 = spotAmount({ ...open, ticker: "600519" }, PNL, "ILS", table, "ready");
+    eq("A5 · טיקר מספרי ⇒ סירוב מוצהר", a5.reason, "unverified_instrument");
+    eq("A5 · ⛔ ולא מנוחש", a5.value, null);
+
+    // A6 — 🧊 קו קפוא: מסלול ה**עבר** ⛔ לא זז מהחילוץ.
+    const closed = { ticker: "AAPL", side: "LONG", entry: 100, exit: 150, shares: 10,
+                     status: "closed", date: "2026-03-01", closedAt: "2026-03-31" };
+    const pastTbl = { base: "USD", quote: "ILS", spot: { rate: 2.9992, rateDate: "2026-08-12" },
+                      byDay: { "2026-03-31": { rate: 3.5, rateDate: "2026-03-31" } } };
+    const a6 = accountAmount(closed, calcTradeMetrics(closed).pnl, "ILS", pastTbl, "ready");
+    eq("A6 · 🧊 סגורה עדיין בשער יום המימוש (3.5) ⛔ לא spot", a6.value, 1750);
+    eq("A6 · 🧊 והנימוק ⛔ לא זז", a6.reason, "converted");
+
+    // A7 — שער מבני. ⚠️ שורות הערה מנוכות (הכלל מצוטט בקובץ עצמו).
+    const hookCode = src("../src/hooks/useFxRates.js").split("\n")
+      .filter((L) => !/^\s*(\/\/|\*|\/\*)/.test(L)).join("\n");
+    check("A7 · ⛔ אין `|| 1` / `?? 1` בשלושת העוטפים", !/(\|\||\?\?)\s*1\b/.test(hookCode));
+    check("A7 · `spotAmount` מוסר `dateKey` **חסר**, ⛔ לא `realizedDayKey`",
+          /spotAmount\s*=\s*\([^)]*\)\s*=>\s*\n?\s*amountAt\([^)]*undefined\)/.test(hookCode));
+
+    // A8 — 🔴 **C1, המצב החמישי.** `dispCcy` נופל ל-`capitalCurrency` כשההמרה
+    // נכשלה (`SwingEdge_App.jsx:2035`) ⇒ ההון הסגור מוצג **לא מומר** תחת ₪,
+    // בעוד `accountCurrency === "USD" === PAPER_BASE`. בלי התנאי הזה
+    // `livePnlAmount` הייתה מחזירה `identity` ומחברת דולר גולמי מתחת ל-₪ —
+    // ערבוב **חדש** שהתיקון עצמו מייצר, דווקא כשההגנה אמורה לפעול.
+    const a8 = livePnlAmount(open, PNL, "USD", "ILS", table, "ready");
+    eq("A8 · ענף fallback ⇒ ok שקר", a8.ok, false);
+    eq("A8 · נימוק מובחן ⛔ ולא `identity`", a8.reason, "fx_fallback");
+    eq("A8 · ⛔ והערך ⛔ אינו 24.75", a8.value, null);
+
+    // ההכרעה המשותפת — שני המסלולים התקינים, כדי ש-A8 ⛔ לא תעבור ע"י
+    // פונקציה שמסרבת תמיד (סירוב גורף הוא מחיקת הפיצ'ר, ⛔ לא תיקון).
+    eq("livePnlAmount · חשבון $ + תצוגה $ ⇒ זהות byte-identical",
+       Object.is(livePnlAmount(open, PNL, "USD", "USD", null, "identity").value, PNL), true);
+    eq("livePnlAmount · חשבון ₪ + תצוגה ₪ ⇒ spot",
+       livePnlAmount(open, PNL, "ILS", "ILS", table, "ready").value, 74.25);
+    eq("livePnlAmount · חשבון ₪ בלי spot ⇒ סירוב",
+       livePnlAmount(open, PNL, "ILS", "ILS", noSpot, "ready").reason, "no_spot_rate");
+    // ⚠️ טיקר מספרי אצל משתמש **דולרי** ⇒ עדיין נספר. הקדימות בקוד היא מה
+    //    שמונע מהתיקון להוציא פוזיציה מהמצרף של 43/46 המשתמשים.
+    eq("🔴 טיקר מספרי + חשבון $ ⇒ ⛔ **לא** נושר מהמצרף",
+       livePnlAmount({ ...open, ticker: "600519" }, PNL, "USD", "USD", null, "identity").ok, true);
+  }
+
+  // ── 14.1 החיווט ב-`SwingEdge_App` — אסרציות **מקור** מוצהרות ──────────────
+  //
+  // ⚠️ חוקיות כאן **רק** מפני שבלוק 14 כבר הוכיח ב**ערך** שההכרעה נכונה.
+  //    ⛔ אינן מחליפות את אימות העין (`C-023`) — `useMemo` ב-`.jsx` ⛔ אינו
+  //    ניתן לייבוא, והמסך הוא מה שנמדד.
+  console.log("  14.1 · חיווט ה-P&L החי");
+  {
+    const app = src("../SwingEdge_App.jsx");
+    // ⚠️ הצריכה עוברת דרך `liveDecision` — התאום של `acctDecision`. מצב ה-Hook
+    //    (טבלה · סטטוס · `dispCcy`) חי בקומפוננטה, ועוטף אחד הוא מה שמונע
+    //    שלושה אתרים שכל אחד מרכיב את הארגומנטים בעצמו.
+    check("`liveDecision` מוגדר **פעם אחת** ועוטף את `livePnlAmount`",
+      (app.match(/const liveDecision = /g) || []).length === 1 &&
+      /const liveDecision = useCallback\([\s\S]{0,300}?livePnlAmount\(/.test(app));
+    check("`openPnL` צורך את ההכרעה ⛔ ולא מחשב אחת משלו",
+      /const openPnL = useMemo\([\s\S]{0,900}?liveDecision\(/.test(app));
+    check("🔴 `dispCcy` נמסר להכרעה (C1 — המצב החמישי)",
+      /livePnlAmount\(trade, amount, accountCurrency, dispCcy/.test(app));
+    check("⛔ `accountAmount` ⛔ אינו נצרך על פוזיציה פתוחה (מלכודת A2)",
+      !/const openPnL = useMemo\([\s\S]{0,900}?accountAmount\(/.test(app));
+    check("`unconvertedCount` מוחזר ומוצהר למסך",
+      /unconvertedCount/.test(app));
+    check("🔴 `dailyPnL` צורך את התפר ה**מומר** (אחרת נוצר חיבור חוצה-יחידות חדש)",
+      /const dailyPnL = useMemo\([\s\S]{0,600}?stableCalcTradeMetrics\(/.test(app));
+    // מצרף + שתי שורות = 3 אתרי צריכה, כולם על אותו עוטף.
+    check("שתי שורות ה-P&L החי צורכות את **אותה** הכרעה",
+      (app.match(/liveDecision\(t[r]?,/g) || []).length >= 3);
+    check("⛔ ⛔ אין `fmt$(Math.round(livePnl), currencyOf(` — הבאג `$500 → ₪500`",
+      !/fmt\$\(Math\.round\(livePnl\), currencyOf\(/.test(app));
+    check("הסירוב בשורה נושא נימוק ⛔ ולא `—` ערום", /spotRefusalText/.test(app));
+    check("ה-PDF מצהיר על מצרף חלקי", /partialEquityNote|equityIncomplete/.test(app));
   }
 }
 
