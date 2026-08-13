@@ -76,7 +76,7 @@ npm run verify   # test:coach → test:import → test:write → test:settings
 
 23 חוליות ואז `build`. **הרשימה נגזרת מ-`package.json` ומתעדכנת באותו קומיט שמשנה את השרשרת** — ראה `docs/DECISIONS.md` 2026-08-08.
 
-**להדביק את הפלט המלא בדיווח**, לא סיכום ולא "עבר". `test:coach` (111 assertions) חובה לפני *וגם* אחרי כל נגיעה ב-`src/intelligence/`; `test:import` לפני כל נגיעה ב-`src/import/` או בסכימת העסקה; `test:write` (25 assertions) לפני כל נגיעה ב-`src/lib/tradeWrite.js` או בכל מסלול שכותב ל-`trades` — כולל מסלולי ה-RPC ב-`AdminPanel.jsx`; `test:ocr` לפני כל נגיעה ב-`api/ocr.js`; `test:fx` לפני כל נגיעה ב-`src/lib/fx.js` או ב-`api/fx.js`; `test:digest` (9 assertions) לפני כל נגיעה ב-`scripts/daily-digest.mjs` או ב-`api/_lib/replyLedger.js`; `test:arch` (8 assertions) לפני כל נגיעה ב-`scripts/arch-auditor.mjs` — כולל הוספה לרשימת ה-`ACKNOWLEDGED`; `test:capability` (11 assertions) לפני כל נגיעה ב-`src/lib/imageResize.js`, בכל מסלול שמעלה תמונה ל-`/api/ocr`, או בכל צריכה של `navigator.clipboard` / `matchMedia`; `test:analytics` (14 assertions) לפני כל נגיעה ב-`src/lib/consent.js` או בכל אתר קריאה של `track*` ב-`SwingEdge_App.jsx` — כולל הוספת פרמטר לאירוע, שמוחזק ברשימה סגורה; `test:copy` (16 assertions) לפני כל נגיעה ב-`src/data/tooltips.js`, ב-`colorMap` של `OnboardingScreen.jsx`, או במתג השפה ב-`LandingPage.jsx` — **ואחרי כל עריכת tooltip יש להריץ `npm run glossary` באותו קומיט**, אחרת assertion 5 תתפוס סחיפה בין `tooltips.js` ל-`glossary.json`; `test:horizon` (140 assertions) לפני כל נגיעה ב-`src/lib/tradeHorizon.js`, בספי האופק, או בנקודת האופק בשני מסלולי הרינדור (`SwingEdge_App.jsx` + `src/components/MobileTradeCard.jsx`) — **הספים הם החלטת מוצר ולא ריפקטור**: מספר שזז בבלוק 1 משנה כמה משתמשים רואים את הפיצ'ר ומחייב עצירה, לא עדכון ציפייה; `test:syntax` (4 assertions) לפני כל נגיעה ב-`scripts/` או ב-`api/` — הוא החוליה **היחידה** שפורסת סוכני CI, ו-19 החוליות שלפניו היו ירוקות ביום שסוכן פרודקשן לא התקמפל; `test:instrument` (165 assertions) לפני כל נגיעה ב-`src/lib/instrumentCurrency.js`, ב-**`src/lib/positionSizing.js`**, ב-**`fxPairPlan`/`makeConvertingCalc` שב-`src/hooks/useFxRates.js`**, בכל שער שמשווה מטבע נייר להון (`SwingEdge_App.jsx` לוח הסיכון · `TradeDNA.measurableRisk` · `GrowthTracker.riskMgmtScore`), או ב-`pnlByCurrency` של `src/lib/tradingStats.js` — **הגזירה רצה בזמן קריאה ולעולם אינה נשמרת**, ובלוק 9 חוסם הוספת עמודת DB נגזרת. ⚠️ שער שמשווה `currencyOf(t)` (התווית השמורה) להון הוא טאוטולוגי ואינו יכול לירות — הבלוקים 5–7 קיימים כדי להוכיח שהשער **יכול** להיכשל. ⛔ **ואסור להכניס `|| 1` או `?? 1` למסלול גודל הפוזיציה** — פלט `sizePosition` הוא הוראת קנייה, ושער מנוחש שם הוא פקודה בגודל שגוי ⛔ ולא מספר מכוער על המסך. ⚠️ **אסרציה 13.9b היא קו קפוא על התנהגות שגויה שנדחתה במודע** (9/10 אתרי סכום-בחשבון מציגים מספר לא מומר, גל ג׳): מי שמתקן אותם **חייב** להסיר אותה במפורש — היא תיפול, וזו התכונה. ⛔ אל תעדכן את הציפייה כדי לעבור; `test:registry` (13 assertions) לפני כל נגיעה בחמשת קבצי המרשם (§14) — הוא בודק **צורה בלבד** (כפילות מזהה · מקור+תאריך · תקרת 100 שורות · hash · מפעיל לבדיקה · מזהה שנעלם · ❄️ בלי נימוק) ו**אינו יכול לדעת אם פריט נכון**. ⚠️ אסרציה `4.1` תפסה בריצתה הראשונה ש**קומיט אינו יכול לשאת את ה-hash של עצמו** ⇒ גל שסוגר את עצמו נרשם ב-DONE **בקומיט הבא**; ⛔ הכלל לא רוכך כדי לעבור, ו-`--amend` נשאר אסור (§5).
+**להדביק את הפלט המלא בדיווח**, לא סיכום ולא "עבר". `test:coach` (111 assertions) חובה לפני *וגם* אחרי כל נגיעה ב-`src/intelligence/`; `test:import` לפני כל נגיעה ב-`src/import/` או בסכימת העסקה; `test:write` (25 assertions) לפני כל נגיעה ב-`src/lib/tradeWrite.js` או בכל מסלול שכותב ל-`trades` — כולל מסלולי ה-RPC ב-`AdminPanel.jsx`; `test:ocr` לפני כל נגיעה ב-`api/ocr.js`; `test:fx` לפני כל נגיעה ב-`src/lib/fx.js` או ב-`api/fx.js`; `test:digest` (9 assertions) לפני כל נגיעה ב-`scripts/daily-digest.mjs` או ב-`api/_lib/replyLedger.js`; `test:arch` (8 assertions) לפני כל נגיעה ב-`scripts/arch-auditor.mjs` — כולל הוספה לרשימת ה-`ACKNOWLEDGED`; `test:capability` (11 assertions) לפני כל נגיעה ב-`src/lib/imageResize.js`, בכל מסלול שמעלה תמונה ל-`/api/ocr`, או בכל צריכה של `navigator.clipboard` / `matchMedia`; `test:analytics` (14 assertions) לפני כל נגיעה ב-`src/lib/consent.js` או בכל אתר קריאה של `track*` ב-`SwingEdge_App.jsx` — כולל הוספת פרמטר לאירוע, שמוחזק ברשימה סגורה; `test:copy` (16 assertions) לפני כל נגיעה ב-`src/data/tooltips.js`, ב-`colorMap` של `OnboardingScreen.jsx`, או במתג השפה ב-`LandingPage.jsx` — **ואחרי כל עריכת tooltip יש להריץ `npm run glossary` באותו קומיט**, אחרת assertion 5 תתפוס סחיפה בין `tooltips.js` ל-`glossary.json`; `test:horizon` (140 assertions) לפני כל נגיעה ב-`src/lib/tradeHorizon.js`, בספי האופק, או בנקודת האופק בשני מסלולי הרינדור (`SwingEdge_App.jsx` + `src/components/MobileTradeCard.jsx`) — **הספים הם החלטת מוצר ולא ריפקטור**: מספר שזז בבלוק 1 משנה כמה משתמשים רואים את הפיצ'ר ומחייב עצירה, לא עדכון ציפייה; `test:syntax` (4 assertions) לפני כל נגיעה ב-`scripts/` או ב-`api/` — הוא החוליה **היחידה** שפורסת סוכני CI, ו-19 החוליות שלפניו היו ירוקות ביום שסוכן פרודקשן לא התקמפל; `test:instrument` (165 assertions) לפני כל נגיעה ב-`src/lib/instrumentCurrency.js`, ב-**`src/lib/positionSizing.js`**, ב-**`fxPairPlan`/`makeConvertingCalc` שב-`src/hooks/useFxRates.js`**, בכל שער שמשווה מטבע נייר להון (`SwingEdge_App.jsx` לוח הסיכון · `TradeDNA.measurableRisk` · `GrowthTracker.riskMgmtScore`), או ב-`pnlByCurrency` של `src/lib/tradingStats.js` — **הגזירה רצה בזמן קריאה ולעולם אינה נשמרת**, ובלוק 9 חוסם הוספת עמודת DB נגזרת. ⚠️ שער שמשווה `currencyOf(t)` (התווית השמורה) להון הוא טאוטולוגי ואינו יכול לירות — הבלוקים 5–7 קיימים כדי להוכיח שהשער **יכול** להיכשל. ⛔ **ואסור להכניס `|| 1` או `?? 1` למסלול גודל הפוזיציה** — פלט `sizePosition` הוא הוראת קנייה, ושער מנוחש שם הוא פקודה בגודל שגוי ⛔ ולא מספר מכוער על המסך. ⚠️ **אסרציה 13.9b היא קו קפוא על התנהגות שגויה שנדחתה במודע** (9/10 אתרי סכום-בחשבון מציגים מספר לא מומר, גל ג׳): מי שמתקן אותם **חייב** להסיר אותה במפורש — היא תיפול, וזו התכונה. ⛔ אל תעדכן את הציפייה כדי לעבור; `test:registry` (26 assertions) לפני כל נגיעה בשבעת קבצי המרשם (§14) — הוא בודק **צורה בלבד** (כפילות מזהה · מקור+תאריך · תקרת 100 שורות · hash · מפעיל לבדיקה · מזהה שנעלם · ❄️ בלי נימוק · `NEXT`/`INBOX` · ⛔ מרשם בשורש · עמודת `T`) ו**אינו יכול לדעת אם פריט נכון**. ⚠️ אסרציה `4.1` תפסה בריצתה הראשונה ש**קומיט אינו יכול לשאת את ה-hash של עצמו** ⇒ גל שסוגר את עצמו נרשם ב-DONE **בקומיט הבא**; ⛔ הכלל לא רוכך כדי לעבור, ו-`--amend` נשאר אסור (§5).
 
 ⛔ **גרש-הפוך (`` ` ``) בהערת SQL בתוך `scripts/` או `api/` — אסור.** `--` הוא הערה ב-SQL ואינו הערה ב-JavaScript; בתוך template literal אין תחביר הערות כלל, והגרש סוגר את המחרוזת. ⚠️ **הכשל אינו תמיד רועש:** ציטוט שפותח בתו-מזהה (`` `date` ``) נופל ב-11/11 בפרסינג, אבל ציטוט שפותח בסימן פיסוק (`` `.length` ``, `` `,x,` ``) עובר ב-8/8 את `node --check` — ומקרה הפסיק מייצר SQL **קטוע** בשקט. לכן `test:syntax` §3 קיימת ואינה כפילות של §2. שמות עמודות נכתבים חשופים או במרכאות כפולות. `INCIDENTS#15`.
 
@@ -123,7 +123,8 @@ npm run verify   # test:coach → test:import → test:write → test:settings
 **שלב 2 — ביצוע.** נכתב **מהממצאים המדודים** ולא מההשערות · Plan Mode (§9) ·
 עצירה לאישור · ואז ריצה.
 
-**מפעילים:**
+**מתי? — כשהסיווג (§15) נותן `T3`.** ⛔ הרשימה למטה אינה מבוטלת: היא מונה את
+המקרים שהתשובות תופסות ממילא, ומשמשת כבדיקת-שפיות על הסיווג. **מפעילים:**
 
 - נגיעה בכסף · בנתוני משתמש · בסכימה
 - סתירה בין הנראה למתועד
@@ -259,7 +260,35 @@ push, **ואז עצירה.** אין נגיעה בקוד, ב-workflows, או הר
 קיום.** `STATE` מתעדכן כי §10.1 מכריח; למרשם לא היה מה שיכריח. `test:registry`
 הוא ההכרח הזה.
 
-## 15. הפניות
+⛔ **קובץ-מרשם מחוץ ל-`docs/` אסור — נאכף** ב-`test:registry` §10. `.md` בשורש
+שצבר שורות `| X-nnn |` או כותרת מרשם הוא מרשם שני, ⛔ ותשע האסרציות הראשונות
+אינן יכולות לראותו (`B-131`, נמדד 13.08).
+
+## 15. סיווג משימה — T1 · T2 · T3
+
+**סיווג משימה — שלוש שאלות בינאריות, בתחילת כל משימה:**
+1. נוגע בנתוני משתמש / DB / כסף-על-מסך?
+2. יותר מקובץ אחד או מסלול כתיבה (ידני/ייבוא/OCR)?
+3. נשען על הנחה שלא נמדדה ב-48 השעות האחרונות?
+
+| כן | רמה | אבחון-קדם | אימות-אחרי |
+|----|-----|-----------|-------------|
+| 0 | T1 | קריאת הקוד הרלוונטי | אסרציות + verify |
+| 1 | T2 | **מדידת כל הנחה** — בדוח | + אסרציית **ערך** שנצפתה אדומה |
+| 2-3 | T3 | אבחון read-only → audits/ → עצירה לאישור (§8.1) | + **אימות עין/דפדפן** — ⛔ אין סגירה בלעדיו |
+
+· Code מדווח "רמה: T_ · תשובות: _/_/_" ⛔ לפני שורת קוד ראשונה.
+· ⚠️ ספק ⇒ "כן". ⛔ רמה לא יורדת תוך משימה; עולה — עם דיווח.
+· הרמה נקבעת **מהתשובות**, ⛔ לא מ"כמה זה מסובך".
+· T3: אימות עין יכול ע"י Code+Chrome — פותח את האתר, מצלם,
+  **מחשב את המספר בעצמו** (חיבור, ⛔ לא "נראה סביר"), ניב
+  מאשר צילום. בלי דפדפן — ניב מצלם.
+
+**כותרת כל פרומפט נושאת "רמה משוערת: T_"** — הערכת ניב. Code מאמת מול שלוש
+השאלות ו**מתקן בדיווח** אם היא שגויה; ⛔ ההערכה בכותרת אינה מחליפה את הסיווג.
+כל שורת `DONE` נושאת עמודת `T`, נאכף ב-`test:registry` §11.
+
+## 16. הפניות
 
 - **כללי קוד 1–11** (`t.side` ולא `t.direction`, `calcTradeMetrics` ולא `trade.pnl`, NAV_KEYS…) → `CONTEXT.md` §Coding Rules
 - **אימות deploy** (למה לא `curl`, אימות מובייל ב-iframe 390px, Atom feed לאימות hash) → `CONTEXT.md` §Working procedures

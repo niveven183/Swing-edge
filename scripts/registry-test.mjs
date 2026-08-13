@@ -325,6 +325,62 @@ check("9.5", `${inboxRows.length - badInbox.length}/${inboxRows.length} שורו
   badInbox.length === 0,
   badInbox.map((r) => `docs/INBOX.md:${r.lineNo} — תאריך="${r.cells[0] ?? ""}" מקור="${r.cells[2] ?? ""}"`).join("\n      "));
 
+// ── §10 · ⛔ קובץ-מרשם מחוץ ל-`docs/` ────────────────────────────────────────
+//
+// ⚠️ **זו האסרציה שנולדה מכישלון מדוד, ⛔ לא מהשערה.** `SwingEdge-Master-Tasks.md`
+// נבנה 03.08 בשורש הריפו **בדיוק לאותה בעיה** שהמרשם פותר, נשכח תוך 10 ימים,
+// והמשיך להיקרא כתמונת מצב חיה. ⛔ **תשע האסרציות שמעל לא יכלו לראותו** — הן
+// קוראות חמישה נתיבים קבועים, וקובץ בשורש אינו אחד מהם. ⇒ הוא נסחף בשקט מוחלט
+// (`B-131`), ו-33 פריטיו מוינו ביד ב-13.08 — **10 מהם לא היה להם בית אחר**.
+//
+// ⛔ **הבדיקה היא על מבנה, ⛔ לא על שם.** קובץ בשם תמים שצבר טבלת מזהים הוא
+// אותה סחיפה בדיוק. ⇒ שני סמנים בלתי-תלויים: **שורת-הגדרה** (`| X-nnn |`),
+// או **כותרת** שמכריזה על עצמה כמרשם.
+//
+// ⚠️ נסרקים **קבצים עקובים בלבד** (`git ls-files`) ובעומק השורש בלבד: קובץ
+// שאינו בגיט אינו יכול להיסחף בין סשנים, ו-`HANDOFF*.md` אסור לקומיט ממילא (§5).
+const REGISTRY_ROW = /^\|\s*[A-Z]+-\d{2,3}\s*\|/;
+const REGISTRY_TITLE = /^#{1,3}\s.*(משימות|מרשם|TASKS|BACKLOG|REGISTRY)/i;
+const EXEMPT = new Set(["README.md", "CLAUDE.md", "CONTEXT.md"]);
+
+const rootMd = execFileSync("git", ["ls-files", "*.md"], { encoding: "utf8" })
+  .split("\n").filter((p) => p && !p.includes("/") && !EXEMPT.has(p));
+
+const rogue = rootMd.map((p) => {
+  const src = readFileSync(p, "utf8").split("\n");
+  const rows = src.filter((l) => REGISTRY_ROW.test(l)).length;
+  const title = src.some((l) => REGISTRY_TITLE.test(l));
+  return { p, rows, title };
+}).filter((f) => f.rows > 0 || f.title);
+
+check("10.1", `${rootMd.length} קבצי .md עקובים בשורש · ⛔ אף אחד אינו מרשם`,
+  rogue.length === 0,
+  rogue.map((f) => `${f.p} — ${f.rows} שורות-הגדרה${f.title ? " · כותרת מרשם" : ""}. ⇒ מרשם שני; העבר ל-docs/ או מזג ומחק (B-131)`).join("\n      "));
+
+// ── §11 · עמודת `T` — עומק האבחון והאימות (`CLAUDE.md` §15) ─────────────────
+//
+// ⚠️ **הרקע מדוד:** גל ג׳ נמרח על שלושה סבבים מפני שהאבחון **הניח** במקום למדוד
+// והאימות בדק **שנכתב** ולא **שנראה** ‹R-3›. הסיווג הופך את עומק העבודה לפונקציה
+// של שלוש שאלות בינאריות ⛔ ולא של תחושה, והעמודה היא מה שהופך אותו לניתן לביקורת.
+const T_COL = 5;                       // | מזהה | מה | תאריך | hash | איך אומת | T |
+const RETRO = /\(רטרו\)/;
+const noT = done.filter((d) => !/T[123]/.test(d.cells[T_COL] ?? ""));
+check("11.1", `${done.length - noT.length}/${done.length} שורות DONE נושאות רמת T`,
+  noT.length === 0,
+  noT.map((d) => `${d.id} (${d.file}:${d.lineNo}) — עמודת T = "${d.cells[T_COL] ?? ""}". ⛔ הרמה נקבעת מהתשובות, לא בדיעבד`).join("\n      "));
+
+// ⚠️ ⛔ **`/אומת בעין/` לבדה היא שער כוזב** — היא מתאימה גם ל"**לא** אומת בעין",
+// שהוא בדיוק מה ש-`D-009` ו-`D-011` כתובים. ⇒ נדרש סמן **חיובי**, ובמקביל
+// נדחית ההכחשה במפורש. ⛔ שורות `(רטרו)` פטורות: הסיווג שלהן נגזר ב-13.08
+// מטקסט השורה, ורטרו-התאמה שלהן כדי לעבור היא ההפרה עצמה.
+const EYE = /(אומת בעין|צילום|C-0\d\d)/;
+const DENIED = /לא\s+\*{0,2}אומת בעין/;
+const blindT3 = done.filter((d) => /T3/.test(d.cells[T_COL] ?? "") && !RETRO.test(d.cells[T_COL] ?? ""))
+  .filter((d) => { const proof = d.cells[T_COL - 1] ?? ""; return !EYE.test(proof) || DENIED.test(proof); });
+check("11.2", `${done.filter((d) => /T3/.test(d.cells[T_COL] ?? "") && !RETRO.test(d.cells[T_COL] ?? "")).length} שורות T3 לא-רטרו · כולן נושאות אימות עין`,
+  blindT3.length === 0,
+  blindT3.map((d) => `${d.id} (${d.file}:${d.lineNo}) — T3 בלי סמן אימות-עין. ⛔ אסרציה ירוקה אינה מסך`).join("\n      "));
+
 console.log("");
 if (failures.length) {
   console.error(`❌ registry: ${failures.length}/${pass + failures.length} assertion(s) failed.`);
