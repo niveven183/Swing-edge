@@ -373,10 +373,16 @@ check("11.1", `${done.length - noT.length}/${done.length} שורות DONE נוש
 // שהוא בדיוק מה ש-`D-009` ו-`D-011` כתובים. ⇒ נדרש סמן **חיובי**, ובמקביל
 // נדחית ההכחשה במפורש. ⛔ שורות `(רטרו)` פטורות: הסיווג שלהן נגזר ב-13.08
 // מטקסט השורה, ורטרו-התאמה שלהן כדי לעבור היא ההפרה עצמה.
+// ⚠️ ⛔ **וגם סמן חיובי אינו מספיק אם הוא מצוטט** — נמדד 13.08: `D-030` תואר
+// כ-`T3` זמנית ו**עבר בירוק** משום ששורתו **מתעדת את הרגקס עצמו** (`` `/אומת
+// בעין/` `` והציטוט `"לא אומת בעין"`). זו הפעם ה**שלישית** שאסרציה נופלת על
+// התיעוד של עצמה (`B-120`) ⇒ הציטוטים מנוכים **לפני** הבדיקה. ⛔ אל תסיר את
+// `strip` כדי לפשט — הוא ההבדל בין "מודד אמת" ל"מודד נוכחות מחרוזת" ‹R-4›.
 const EYE = /(אומת בעין|צילום|C-0\d\d)/;
-const DENIED = /לא\s+\*{0,2}אומת בעין/;
+const DENIED = /לא\**\s*\**\s*אומת בעין/;
+const strip = (s) => s.replace(/`[^`]*`/g, " ").replace(/"[^"]*"/g, " ");
 const blindT3 = done.filter((d) => /T3/.test(d.cells[T_COL] ?? "") && !RETRO.test(d.cells[T_COL] ?? ""))
-  .filter((d) => { const proof = d.cells[T_COL - 1] ?? ""; return !EYE.test(proof) || DENIED.test(proof); });
+  .filter((d) => { const proof = strip(d.cells[T_COL - 1] ?? ""); return !EYE.test(proof) || DENIED.test(proof); });
 check("11.2", `${done.filter((d) => /T3/.test(d.cells[T_COL] ?? "") && !RETRO.test(d.cells[T_COL] ?? "")).length} שורות T3 לא-רטרו · כולן נושאות אימות עין`,
   blindT3.length === 0,
   blindT3.map((d) => `${d.id} (${d.file}:${d.lineNo}) — T3 בלי סמן אימות-עין. ⛔ אסרציה ירוקה אינה מסך`).join("\n      "));
