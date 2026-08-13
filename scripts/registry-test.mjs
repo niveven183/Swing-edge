@@ -15,12 +15,18 @@
 //
 // ── מה נאכף ──────────────────────────────────────────────────────────────────
 //
-// חמישה קבצים, פריט חי באחד בלבד:
+// שבעה קבצים, פריט חי באחד בלבד:
+//   docs/NEXT.md     · ההמלצה — **3 בדיוק**, ≤40 שורות        (§9)
+//   docs/INBOX.md    · קליטה גולמית, שורה נושאת תאריך ומקור   (§9)
 //   docs/STATE.md    · 🔴 עכשיו · ⏭️ 3 הבאים · ⏸️ חסום · ⚠️ סיכונים · ≤100 שורות
 //   docs/BACKLOG.md  · כל פריט פתוח שאינו פעיל     (B-)
 //   docs/DONE.md     · הושלם, עם hash ועם איך אומת (D-)
 //   docs/CHECKS.md   · בדיקות חוזרות, עם מפעיל     (C-)
 //   docs/audits/STATE-ARCHIVE-*.md · סגור בלבד
+//
+// ⚠️ `NEXT` ו-`INBOX` ⛔ **אינם קבצי מזהים** — הם אינם מגדירים `B-`/`D-`/`C-`
+// ואינם משתתפים ב-§1 ו-§6. `NEXT` **מצטט** מזהה קיים; `INBOX` הוא מה שטרם קיבל
+// מזהה. ⇒ הם נקראים בנפרד מ-`FILES`, ובכוונה.
 //
 // ── ⚠️ הגדרת "הגדרת שורה" — זה מה שמאפשר ציטוט ──────────────────────────────
 //
@@ -253,6 +259,71 @@ const MEAS = 5;
 const undated = backlog.filter((d) => /13\.08/.test(d.cells[SRC] ?? "") && !/13\.08/.test(d.cells[MEAS] ?? ""));
 check("8.5", `${backlog.filter((d) => /13\.08/.test(d.cells[SRC] ?? "")).length} פריטי 13.08 נושאים תאריך מדידה`, undated.length === 0,
   undated.map((d) => `${d.id} (${d.file}:${d.lineNo}) — מקור 13.08, עמודת "נמדד" = "${d.cells[MEAS] ?? ""}"`).join("\n      "));
+
+console.log("\n9 · NEXT — ההמלצה · INBOX — הקליטה");
+// ⚠️ `BACKLOG` **אוסר** להמליץ סדר, ובצדק: 129 פריטים בסדר כלשהו הם רשימה
+// שמתחזה להכרעה. ⇒ ההכרעה יושבת בקובץ **נפרד** שכל כולו שלושה פריטים, ומה
+// שהופך אותו להכרעה הוא **התקרה**: רביעי מחייב להוציא אחד.
+// ⛔ ו-`NEXT` אינו מקור — הוא מצטט. פרט שנכתב בו הוא עותק שני שייסחף (`R-6`).
+const next = read("docs/NEXT.md");
+const inbox = read("docs/INBOX.md");
+
+// כותרת פריט: `## <n> · ...` — ⛔ לא כל `##`, כדי שכותרות פרוזה לא ייספרו.
+const ITEM = /^##\s+\d+\s+·\s+(.+)$/;
+const items = [];
+next.forEach((line, i) => {
+  const m = ITEM.exec(line);
+  if (m) items.push({ title: m[1], lineNo: i + 1, body: [] });
+});
+next.forEach((line, i) => {
+  const owner = items.filter((it) => it.lineNo <= i).at(-1);
+  if (owner && !ITEM.test(line)) owner.body.push(line);
+});
+
+check("9.1", `docs/NEXT.md = ${next.length} שורות (תקרה 40)`, next.length <= 40,
+  `חריגה של ${next.length - 40} שורות. ⛔ NEXT מצטט ואינו מפרט — הפירוט שייך ל-BACKLOG`);
+
+check("9.2", `${items.length} פריטים ב-NEXT (נדרש בדיוק 3)`, items.length === 3,
+  items.length > 3
+    ? `${items.length} פריטים — ⛔ הרביעי מחייב להוציא אחד. רשימה אינה הכרעה`
+    : `${items.length} פריטים — פחות מ-3 אינו כיוון, ו-0 פירושו שהפורמט נשבר`);
+
+// ⚠️ ההפניה היא כל ערכו של הקובץ: `NEXT` שמפנה למזהה שאינו קיים הוא המצאה.
+const nextRefs = items.map((it) => ({
+  it,
+  ids: [...(it.title + it.body.join("\n")).matchAll(/B-\d{3}/g)].map((x) => x[0]),
+}));
+const ghostRefs = nextRefs.flatMap(({ it, ids }) =>
+  ids.filter((id) => !backlogIds.has(id)).map((id) => `${it.title.slice(0, 40)} → ${id}`));
+const refless = nextRefs.filter(({ ids }) => ids.length === 0);
+check("9.3", `${nextRefs.reduce((a, r) => a + r.ids.length, 0)} הפניות B- מ-NEXT, כולן קיימות ב-BACKLOG`,
+  ghostRefs.length === 0 && refless.length === 0,
+  [ghostRefs.length ? `הפניה למזהה שאינו מוגדר: ${ghostRefs.join(" · ")}` : "",
+   refless.map((r) => `${r.it.title.slice(0, 40)} (docs/NEXT.md:${r.it.lineNo}) — ⛔ בלי הפניה ל-B-`).join("\n      ")]
+    .filter(Boolean).join("\n      "));
+
+// ⛔ "מדד סגירה" הוא מה שמבדיל המלצה ממשאלה. ⚠️ ניתן לצפייה או למדידה —
+// השער בודק **נוכחות** ו⛔ אינו יכול לדעת אם המדד באמת נצפה.
+const noMetric = items.filter((it) => !it.body.some((l) => l.includes("מדד סגירה")));
+check("9.4", `${items.length - noMetric.length}/${items.length} פריטי NEXT נושאים "מדד סגירה"`,
+  noMetric.length === 0,
+  noMetric.map((it) => `${it.title.slice(0, 40)} (docs/NEXT.md:${it.lineNo}) — ⛔ "הקוד נכתב" אינו מדד`).join("\n      "));
+
+// ⚠️ שורת INBOX בלי מקור אינה ניתנת ל-triage: אי-אפשר לחזור ולשאול את מי שאמר.
+// ⛔ ואי-אפשר לסמוך על הרג'קס לתפוס שורה חסרת-תאריך — היא פשוט לא הייתה נראית.
+// ⇒ נאספות **כל** שורות הטבלה, ואז נבדק כל תא.
+const inboxRows = [];
+inbox.forEach((line, i) => {
+  if (!/^\s*\|/.test(line)) return;
+  if (/^\s*\|[\s|:-]*$/.test(line)) return;               // מפריד
+  const cells = line.split(/(?<!\\)\|/).slice(1, -1).map((c) => c.trim());
+  if (cells[0] === "תאריך") return;                        // כותרת
+  inboxRows.push({ cells, lineNo: i + 1 });
+});
+const badInbox = inboxRows.filter((r) => !DATE.test(r.cells[0] ?? "") || !(r.cells[2] ?? "").trim());
+check("9.5", `${inboxRows.length - badInbox.length}/${inboxRows.length} שורות INBOX נושאות תאריך ומקור`,
+  badInbox.length === 0,
+  badInbox.map((r) => `docs/INBOX.md:${r.lineNo} — תאריך="${r.cells[0] ?? ""}" מקור="${r.cells[2] ?? ""}"`).join("\n      "));
 
 console.log("");
 if (failures.length) {
