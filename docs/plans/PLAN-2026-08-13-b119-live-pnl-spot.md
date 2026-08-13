@@ -1,20 +1,37 @@
 # PLAN — `B-119` · P&L חי מומר ב-spot
 
 **תאריך:** 2026-08-13 · **בסיס:** `docs/audits/AUDIT-2026-08-13-B119-live-pnl.md` (`0d2ccac`)
-**סיווג:** T3 · **מצב:** ⏸️ **awaiting approval** — ⛔ אפס נגיעה בקוד עד אישור ניב.
+**סיווג:** T3 · **מצב:** ✅ **מאושר בתנאי** (ניב, 13.08) — Q1/Q2/Q3 הוכרעו · **C1** שולב.
 **הכרעה מחייבת:** `docs/DECISIONS.md:161` — פתוחה ⇒ spot · סגורה ⇒ יום-סגירה · אין spot ⇒ `—` עם סיבה.
 
 ---
 
-## 0. שלוש הכרעות שנדרשות מניב לפני ביצוע
+## 0. שלוש ההכרעות — **נענו**
 
-| # | שאלה | המלצת האבחון | למה זו שאלה ולא החלטה |
-|---|-------|---------------|------------------------|
-| **Q1** | כשאין spot, מה מציגה **כותרת החשבון** (`curEquity`)? `DECISIONS:161` פוסק על ה-**P&L**, ⛔ לא על ה**סכום** | **ב׳** — הצג את ההון ה**סגור** (מומר, אמיתי) + תג גילוי גלוי "⛔ אינו כולל P&L פתוח — אין שער". ⛔ **לא** `—` על כל הכותרת | המוצר **כבר עושה ב׳** לפער אח: `openPnL.missingCount` ב-`:4125-4128` מציג סכום חלקי + אזהרת ענבר כשחסר מחיר חי. א׳ היה גורם לשני פערים שכנים להתנהג הפוך. ⚠️ אך זו הכרעת מוצר |
-| **Q2** | שער מקובע לאסרציות | `r = 3.0` בדיוק ⇒ `$24.75 → ₪74.25`, `Δ = ₪49.50` — **תואם למדידת המסך** | הפרומפט נקב `₪74.06` (⇒ `r=2.9923`) והמסך נתן `Δ=₪49.50` (⇒ `r=3.0000`). ⛔ **אף שער חי אינו קביל כציפייה** — `fx.js:19-24` אוסר מספר שזז מעצמו |
-| **Q3** | ה-PDF כשהמצרף **חלקי** (`missingCount + unconvertedCount > 0`) | הוסף שורת הערת-שוליים אחת. ⚠️ ⛔ אינה קיימת היום גם עבור `missingCount` — כלומר **פגם קיים** שהגל הזה חושף | מסמך שהמשתמש **שומר** ומצהיר סכום שהושמט ממנו איבר, בלי לומר זאת, הוא §2. הרחבת היקף — ולכן שאלה |
+| # | שאלה | **ההכרעה** | נימוק |
+|---|-------|-------------|--------|
+| **Q1** | כשאין spot, מה מציגה **כותרת החשבון** (`curEquity`)? | **ב׳ — סכום חלקי.** ההון הסגור (מומר) **+ כל פתוחה שכן הומרה** + תג כשה-`unconvertedCount > 0`. ⛔ **לא** "סגור בלבד" קשיח, ⛔ לא `—` על הכותרת. התג נושא **מונה**: `"אינו כולל P&L של N פוזיציות — אין שער"`, ב-5 שפות | המוצר **כבר עושה ב׳** לפער אח: `openPnL.missingCount` ב-`:4125-4128` מציג סכום חלקי + אזהרת ענבר. א׳ היה גורם לשני פערים שכנים להתנהג הפוך |
+| **Q2** | שער מקובע לאסרציות | **`r = 3.0` בדיוק** ⇒ `$24.75 → ₪74.25`, `Δ = ₪49.50`. ⛔ אפס `fetch` בטסטים | המסך נתן `Δ=₪49.50` (⇒ `r=3.0000`). ⛔ **אף שער חי אינו קביל כציפייה** — `fx.js:19-24` אוסר מספר שזז מעצמו |
+| **Q3** | ה-PDF כשהמצרף **חלקי** | **כן, מינימלי** — שורת הערת-שוליים **אחת** כאשר `missingCount + unconvertedCount > 0`, המכסה את **שני** הפערים כולל הקיים (`missingCount`). ⛔ שום דבר מעבר לזה בגל הזה | מסמך שהמשתמש **שומר** ומצהיר סכום שהושמט ממנו איבר, בלי לומר זאת, הוא §2 |
 
-⛔ **התוכנית מבוצעת רק אחרי שלוש התשובות.** בלעדיהן היא ניחוש מתחפש לתוכנית.
+### C1 — תיקון נדרש שהתקבל עם האישור: **המצב החמישי**
+
+`SwingEdge_App.jsx:2034-2036` מגדיר מצב שהטבלה בת-4-המצבים (אבחון §1.6) ⛔ **לא** כיסתה:
+
+```js
+const fxOk    = capitalCurrency === accountCurrency || displayCapital != null;
+const dispCcy = fxOk ? accountCurrency : capitalCurrency;   // ← ענף fallback
+```
+
+⇒ במשתמש הון-₪ / חשבון-$ בזמן **נפילת FX**, ההון הסגור מוצג **לא מומר ב-₪**, בעוד
+`accountCurrency === "USD" === PAPER_BASE` ⇒ קיצור ה-`identity` של §2.2 היה מוסיף
+**דולר גולמי** לסכום שקלי, **מתחת לסמל ₪**. כלומר: הגל היה **מייצר** ערבוב חדש בדיוק
+במצב שבו ההגנה אמורה לפעול.
+
+**הדרישה:** השער ב-§2.2 מותנה **גם ב-`dispCcy`**. כאשר `dispCcy !== accountCurrency`
+(ענף ה-fallback פעיל) — **כל** פתוחה נספרת `unconvertedCount` (סירוב מוצהר + תג Q1),
+⛔ **לא** `identity`. אסרציה **A8**. מצבי `C-023` נשארים 4; מצב 5 מאומת ב-DevTools
+יחד עם בדיקת אין-spot (§4 סיפא).
 
 ---
 
@@ -54,6 +71,21 @@ export const accountAmount = (t, a, d, tb, s) => amountAt(t, a, d, tb, s, realiz
 // ו-`byDay` אפילו **מכיל** אותו (`fxDayKeys` רץ על כל `realTrades`) ⇒ ההמרה
 // הייתה מצליחה **בשקט** בשער הלא-נכון. אין כאן ברירת מחדל — יש היעדר מכוון.
 export const spotAmount   = (t, a, d, tb, s) => amountAt(t, a, d, tb, s, undefined);
+
+// 🔴 **ההכרעה של ה-P&L החי** — מצרף ושורה קוראים ל**אותה** פונקציה.
+// ⚠️ קיימת מפני ש-C1 הוסיף תנאי שני (`dispCcy`), ותנאי שיושב ב-`.jsx` ⛔ אינו
+// ניתן לאסרציית **ערך** ב-node ⇒ היה חוזר בדיוק לכשל "אסרציה ירוקה מעל פיצ'ר
+// מת". כאן הוא נמדד. ⛔ ואין עותק מקביל (`:152-153`).
+export const livePnlAmount = (trade, amount, accountCurrency, displayCurrency, table, status) => {
+  // C1 — ענף ה-fallback: ההון הסגור מוצג **לא מומר** תחת סמל אחר ⇒ ⛔ אין
+  // לחבר לשם דבר. סירוב מוצהר, ⛔ לא identity ו⛔ לא המרה.
+  if (displayCurrency !== accountCurrency) return { ok: false, reason: "fx_fallback", value: null, currency: null };
+  // ⚠️ **לפני** הגזירה, ובכוונה: ניתוב משתמש דולרי דרך `deriveInstrumentCurrency`
+  // היה מוציא פתוחה בעלת טיקר מספרי מהמצרף. הקדימות הזו היא מה שהופך את
+  // ה-no-op ל**מוכח סטטית**, בלי שאילתת DB.
+  if (accountCurrency === PAPER_BASE) return { ok: true, reason: "identity", value: amount, currency: accountCurrency };
+  return spotAmount(trade, amount, accountCurrency, table, status);
+};
 ```
 
 `amountAt` מחזיר את אותה הכרעה מובחנת. ⛔ אפס `|| 1`, ⛔ אפס `?? 1`.
@@ -61,28 +93,26 @@ export const spotAmount   = (t, a, d, tb, s) => amountAt(t, a, d, tb, s, undefin
 
 ### 2.2 `SwingEdge_App.jsx:2310-2320` — `openPnL`
 
+⚠️ ה-`useMemo` נשאר **לולאה דקה** — ⛔ אפס הכרעה בתוכו. ההכרעה היא `livePnlAmount`.
+
 ```js
 const openPnL = useMemo(() => {
   let value = 0, missingCount = 0, unconvertedCount = 0;
-  // 🔴 קיצור ברמת ה**מצרף**, ⛔ לא פר-עסקה. מטבע הנייר (PAPER_BASE) = מטבע
-  // החשבון ⇒ ⛔ אין מה להמיר. ⚠️ ניתוב פר-עסקה דרך הגזירה היה מוציא עסקה
-  // פתוחה בעלת טיקר מספרי מהמצרף (`unverified_instrument`) — שינוי התנהגות
-  // למשתמש דולרי. הקיצור כאן הופך את ה-no-op ל**מוכח סטטית**, בלי שאילתת DB.
-  const identity = accountCurrency === PAPER_BASE;
   for (const t of openTrades) {
     const lp = getLivePrice(t.ticker);
     if (!lp) { missingCount++; continue; }
     const raw = t.side === "LONG" ? (lp.price - t.entry) * t.shares
                                   : (t.entry - lp.price) * t.shares;
-    if (identity) { value += raw; continue; }
-    const d = spotAmount(t, raw, accountCurrency, paperAcctTable, paperAcctStatus);
+    const d = livePnlAmount(t, raw, accountCurrency, dispCcy, paperAcctTable, paperAcctStatus);
     // ⛔ לא נשמט בשקט ו⛔ לא מנוחש — נספר ומוצהר, כמו `missingCount`.
     if (!d.ok) { unconvertedCount++; continue; }
     value += d.value;
   }
   return { value, missingCount, unconvertedCount };
-}, [openTrades, getLivePrice, accountCurrency, paperAcctTable, paperAcctStatus]);
+}, [openTrades, getLivePrice, accountCurrency, dispCcy, paperAcctTable, paperAcctStatus]);
 ```
+
+⚠️ **סדר הצהרה:** `dispCcy` מוגדר ב-`:2035` ו-`openPnL` ב-`:2310` ⇒ ⛔ אין בעיית TDZ.
 
 ### 2.3 `:2351` — `dailyPnL` (§1)
 
@@ -93,12 +123,14 @@ const openPnL = useMemo(() => {
 שתיהן מחשבות inline ומדפיסות `fmt$(…, currencyOf(t))` — ו-`currencyOf` הוא **התווית מהעדפת החשבון** (`useFxRates.js:185-188`) ⇒ אצל משתמש ₪ הן מדפיסות `₪` על מספר **דולרי**. זהו באג `$500 → "₪500"` ששרד את גל ג׳ בשני אתרים.
 
 ```js
-const d = spotAmount(tr, raw, accountCurrency, paperAcctTable, paperAcctStatus);
+// 🔴 **אותה** פונקציה שהמצרף קורא לה — כולל תנאי C1. ⛔ אין עותק מקביל.
+const d = livePnlAmount(tr, raw, accountCurrency, dispCcy, paperAcctTable, paperAcctStatus);
 // title = הנימוק, ⛔ לא "—" ערום.
-<span title={spotRefusalText(tr, raw)}>{fmtAccountAmount(d)}</span>
+<span title={spotRefusalText(d)}>{fmtAccountAmount(d)}</span>
 ```
 
 `spotRefusalText` — תאום ל-`acctRefusalText` (`:2106-2110`), על אותן מחרוזות מתורגמות (`t.ccyUnverifiedTip` · `t.fxUnavailable`). ⛔ אין מחרוזת קשיחה.
+⚠️ **שמות:** בזמן הכתיבה מיישרים למזהים ש**קיימים בפועל** (`paperAcctFx.table` · `fmtAcct` · …), ⛔ לא יוצרים כפילות. השמות כאן הם תיאור ההכרעה.
 ⚠️ `livePnlPct` (`:4249-4251`) ⛔ **אינו נוגע** — יחס בין שני מחירים באותו מטבע, חסין-מטבע כמו `rMultiple`.
 
 ### 2.5 `:3877` · `:4113` · `:7900` · PDF `:466`/`:483`/`:563`/`:613` — ⛔ **אפס שינוי קוד**
@@ -106,9 +138,17 @@ const d = spotAmount(tr, raw, accountCurrency, paperAcctTable, paperAcctStatus);
 כולם צורכים `curEquity`, שנרפא במקור ב-§2.2. ✅ **הם יורשים את התיקון.**
 זו התכונה של מקור-אמת-אחד, והיא הסיבה ש-`:483` (ציר גרף ה-PDF) מתיישר מעצמו.
 
-### 2.6 גילוי — `:4113` (תלוי **Q1**)
+### 2.6 גילוי — `:4113` (**Q1 = ב׳**)
 
-תג ליד כותרת ההון כאשר `unconvertedCount > 0`, באותו דפוס של אזהרת `missingCount` ב-`:4125-4128`. מחרוזת חדשה ב-5 שפות.
+תג ליד כותרת ההון כאשר `unconvertedCount > 0`, באותו דפוס של אזהרת `missingCount` ב-`:4125-4128`.
+מחרוזת חדשה ב-**5 שפות**, נושאת **מונה**: `"אינו כולל P&L של {n} פוזיציות — אין שער"`.
+⚠️ המונה ⛔ אינו קישוט — "חלק חסר" בלי כמה הוא בדיוק סוג הגילוי שאי-אפשר לפעול לפיו.
+
+### 2.7 PDF — הערת שוליים אחת (**Q3 = כן, מינימלי**)
+
+שורה **אחת** ב-`exportMonthlyPDF` כאשר `missingCount + unconvertedCount > 0`, המכסה את **שני** הפערים.
+⚠️ הפער של `missingCount` **קיים היום** ללא גילוי — הגל חושף אותו וסוגר אותו באותה שורה. ⛔ שום דבר מעבר.
+⇒ החתימה מקבלת את שני המונים (`openPnL` כבר זמין באתר הקריאה `:7187`).
 
 ---
 
@@ -126,8 +166,10 @@ const d = spotAmount(tr, raw, accountCurrency, paperAcctTable, paperAcctStatus);
 | **A5** | עסקה פתוחה, טיקר מספרי, `accountCurrency:"ILS"` | `{ok:false, reason:"unverified_instrument"}` — ⛔ **לא** מנוחשת ל-USD | ✅ כן |
 | **A6** | `accountAmount` על עסקה **סגורה** — 12 מקרים קיימים | ⛔ **ללא שינוי**, byte-identical | ⛔ **לא, ובכוונה** — קו קפוא שמוכיח שהחילוץ ⛔ לא הזיז את מסלול העבר |
 | **A7** | `amountAt` ⛔ אינו מכיל `\|\| 1` / `?? 1` — `readFileSync` על הקובץ | 0 מופעים | ⛔ לא — שער מבני |
+| **A8** | 🔴 **C1.** `livePnlAmount(openTrade, 24.75, "USD", "ILS", table, "ready")` — חשבון $, תצוגה ₪ (ענף fallback) | `{ok:false, reason:"fx_fallback", value:null}` — ⛔ **לא** `identity` ו⛔ לא `24.75` | ✅ **כן** — `livePnlAmount` ⛔ אינה קיימת. ⚠️ ובלי C1 היא הייתה מחזירה `identity` ומחברת דולר גולמי מתחת ל-`₪` |
 
-⚠️ **`openPnL` עצמו יושב ב-`.jsx` ו⛔ אינו ניתן לייבוא ב-node.** אסרציית-מקור עליו הייתה "אסרציה ירוקה מעל פיצ'ר מת" (`useFxRates.js:10-13`, `DECISIONS:155`). ⇒ **החיווט מאומת ב-C-023 בעין, ⛔ לא בטסט.** זו הסיבה ש-§4 אינו אופציונלי.
+⚠️ **A8 היא הסיבה ש-`livePnlAmount` חולצה ל-`useFxRates.js`.** תנאי `dispCcy` שהיה יושב בתוך ה-`useMemo` ב-`.jsx` ⛔ אינו ניתן לייבוא ב-node ⇒ האסרציה עליו הייתה **מקור**, לא **ערך** — בדיוק "אסרציה ירוקה מעל פיצ'ר מת" (`useFxRates.js:10-13`, `DECISIONS:155`).
+⚠️ מה ש**עדיין** אינו נמדד בטסט: ה**חיווט** עצמו (שהלולאה ב-`:2310` אכן קוראת לה, ושהתג מוצג). ⇒ מאומת ב-`C-023` **בעין**. §4 ⛔ אינו אופציונלי.
 
 **עדכון `CLAUDE.md` §7:** מונה `test:instrument` (`165` בטקסט · **`216` בפועל היום** — סחיפה שנמדדה בריצת ה-verify של האבחון) ⇒ יעודכן למספר החדש **באותו קומיט**.
 
@@ -149,13 +191,14 @@ const d = spotAmount(tr, raw, accountCurrency, paperAcctTable, paperAcctStatus);
 **נבדק בנוסף בכל מצב:** הסרגל העליון (`:3877`) · הפוטר (`:7900`) · **שלושתם נושאים את אותו מספר** · ה-PDF המיוצא נושא את הערך המומר · שורות ה-P&L החי (`:4247` · `:4920`) נושאות את אותו סמל כמו הכותרת.
 
 **אימות אין-spot:** חסימת `/api/fx` ב-DevTools ⇒ התנהגות Q1 + `title` נושא נימוק, ⛔ לא `—` ערום.
+**מצב 5 (C1) — באותה חסימה:** הון-₪ / חשבון-$ ⇒ `dispCcy` נופל ל-`ILS`. הציפייה: הכותרת ⛔ **אינה** גדלה ב-P&L החי, והתג נושא את המונה. ⚠️ ⛔ אינו מצב `C-023` נפרד — הוא בדיקת DevTools ליד בדיקת אין-spot.
 
 ---
 
 ## 5. סדר ביצוע
 
-1. `useFxRates.js` — חילוץ `amountAt` + `spotAmount` · A1–A7 **נצפות אדומות** (פלט מודבק) · `npm run test:instrument`
-2. `SwingEdge_App.jsx` — `openPnL` · `dailyPnL` · `:4247` · `:4920` · `spotRefusalText` · תג Q1
+1. `useFxRates.js` — חילוץ `amountAt` + `spotAmount` + `livePnlAmount` · A1–A8 **נצפות אדומות** (פלט מודבק) · `npm run test:instrument`
+2. `SwingEdge_App.jsx` — `openPnL` · `dailyPnL` · `:4247` · `:4920` · `spotRefusalText` · תג Q1 · הערת שוליים PDF (Q3)
 3. `npm run verify` (23 חוליות + build) — פלט מלא מודבק
 4. אימות עין `C-023` בארבעת המצבים + צילומים
 5. קומיט הסגירה: `docs/DONE.md` (עמודת `T` = T3 + סמן **`אומת בעין`**) · `docs/CHECKS.md` `C-023` → ✅ · `docs/NEXT.md` (§14 — גל שלא עדכן אותו משאיר את הצ'אט הבא בלי כיוון) · `docs/BACKLOG.md` (`B-119` → מצבה `✅ בוצע → D-xxx` + פריט חדש ל-`statsCcy`/`dispCcy` + פריט Q3 אם נדחה) · `CLAUDE.md` §7 מונה `test:instrument`
