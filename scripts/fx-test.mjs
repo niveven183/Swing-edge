@@ -236,9 +236,20 @@ console.log("\n7 · equity base · the curve does not move when spot does");
   eq("the base day is the FIRST realized trade's day",
     equityBaseDayKey(trades), "2026-07-28");
 
+  // 🔴 **Declared move — 2026-08-15, wave ה׳ (`B-142`).** `resolveEquityBase`
+  // returned a NUMBER and now returns a DECISION (`{ok, reason, value, currency}`),
+  // because the number alone never said which currency it was in — and the
+  // fall-back-to-raw-capital path (the last assertion in this block) produces a
+  // shekel base that was then printed under "$" and used as the denominator of
+  // the return %.
+  //
+  // ⚠️ What moved is the CALL (`.value`) — ⛔ NOT the expectation. All five
+  // expected values in this block (`59,999 × 0.3270` · `calm === moved` ·
+  // `59,999 × 0.4` · `59,999`) stay number-for-number. ⛔ None was softened.
+  //
   // Two tables identical in every historical fixing, differing ONLY in spot.
-  const calm  = resolveEquityBase({ ...args, fxTable: ilsUsd(0.3271) });
-  const moved = resolveEquityBase({ ...args, fxTable: ilsUsd(0.4000) });
+  const calm  = resolveEquityBase({ ...args, fxTable: ilsUsd(0.3271) }).value;
+  const moved = resolveEquityBase({ ...args, fxTable: ilsUsd(0.4000) }).value;
 
   eq("the base is priced at the base day's fixing, not spot",
     Math.round(calm * 100) / 100, Math.round(59_999 * 0.3270 * 100) / 100);
@@ -264,12 +275,12 @@ console.log("\n7 · equity base · the curve does not move when spot does");
     computeTradingStats(trades, oldMoved, calcTradeMetrics).returnPct);
 
   // No history yet → a single point, which IS a claim about now. Spot is right.
-  const noTrades = resolveEquityBase({ ...args, trades: [], fxTable: ilsUsd(0.4) });
+  const noTrades = resolveEquityBase({ ...args, trades: [], fxTable: ilsUsd(0.4) }).value;
   eq("with no closed trades the single point uses spot", noTrades, 59_999 * 0.4);
 
   // No fixing for the base day → keep the capital, never borrow spot.
   const noFixing = resolveEquityBase({ ...args, fxTable: buildRateTable(
-    "ILS", "USD", {}, { rate: 0.4, rateDate: "2026-08-09" }, []) });
+    "ILS", "USD", {}, { rate: 0.4, rateDate: "2026-08-09" }, []) }).value;
   eq("a missing base-day fixing falls back to the capital, NOT to spot", noFixing, 59_999);
 }
 

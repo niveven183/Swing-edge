@@ -71,12 +71,18 @@ export function computeTradingStats(trades, capital, calcTradeMetrics) {
   // התווית שמסלול הכתיבה חתם מהעדפת החשבון. יומן של 13 ניירות ת"א ועוד 2
   // אמריקאיים נשא 15 תוויות `USD`, ולכן `currencies.length === 1` והבאנר
   // דמם. שורה שמטבעה לא נמדד אינה תורמת לפילוח — היא נספרת כערבוב.
+  //
+  // 🔴 `B-142` — ומונה לצדו. סכום מפולח בלי לומר **על כמה עסקאות** הוא נשען הוא
+  // מנה בלי מכנה בתחפושת (§2): "₪1,200 · $80" ⛔ אינו מבדיל בין 13 שורות ת"א
+  // לשורה אחת. המונה נגזר מאותה לולאה בדיוק ו⛔ אינו מעבר שני.
   const derivations = metrics.map((m) => deriveInstrumentCurrency(m));
   const pnlByCurrency = {};
+  const tradesByCurrency = {};
   metrics.forEach((m, i) => {
     if (!isAggregatable(derivations[i])) return;
     const c = derivations[i].code;
     pnlByCurrency[c] = (pnlByCurrency[c] || 0) + (m.pnl || 0);
+    tradesByCurrency[c] = (tradesByCurrency[c] || 0) + 1;
   });
   const currencies = Object.keys(pnlByCurrency).sort();
   const mixedCurrency = isMixedCurrency(derivations);
@@ -207,7 +213,7 @@ export function computeTradingStats(trades, capital, calcTradeMetrics) {
     totalPnL, totalWin, totalLoss,
 
     // currency — `totalPnL` is only meaningful when `currencies` holds one entry.
-    pnlByCurrency, currencies, mixedCurrency,
+    pnlByCurrency, tradesByCurrency, currencies, mixedCurrency,
 
     // rates — all 0..100 (see SCALE BOUNDARY above).
     // winRate + lossRate + beRate === 100 exactly; `beRate` exists so that
@@ -221,6 +227,13 @@ export function computeTradingStats(trades, capital, calcTradeMetrics) {
     // Full Account Equity = currentEquity + live open P&L, assembled once at
     // the consumer (SwingEdge_App curEquity); open P&L needs live prices,
     // which are component state and must not enter this pure stats hub.
+    //
+    // ⚠️ **סכום בין-יחידות כשההמרה נכשלת** — `totalPnL` הוא `reduce` על כל
+    // העסקאות ו⛔ אינו שואל באיזה מטבע כל איבר. הכותרת ⛔ **אינה צורכת אותו
+    // יותר** (`B-142`, 15.08): `curEquity` מורכב מ-`equityBase + closedPnL +
+    // openPnL`, ושתי הרגליים מדירות עסקה מסומנת. הערך כאן ⛔ **לא שונה** —
+    // צרכניו הנותרים (`returnPct`, `menteeStats`, `monthStats`, `journalStats`)
+    // אינם מדפיסים הון או תשואה. ⇒ **בבעלות `B-143`.**
     currentEquity: capital + totalPnL,
     capital,
     returnPct: capital ? (totalPnL / capital) * 100 : 0,
@@ -272,7 +285,7 @@ function EMPTY_STATS(capital) {
   return {
     totalTrades: 0, total: 0, openTrades: 0, wins: 0, losses: 0, be: 0,
     totalPnL: 0, totalWin: 0, totalLoss: 0,
-    pnlByCurrency: {}, currencies: [], mixedCurrency: false,
+    pnlByCurrency: {}, tradesByCurrency: {}, currencies: [], mixedCurrency: false,
     winRate: 0, lossRate: 0, beRate: 0, profitFactor: 0,
     avgWin: 0, avgLoss: 0, avgR: null, rSampleSize: 0, bestWin: 0, worstLoss: 0,
     currentEquity: capital, capital, returnPct: 0,

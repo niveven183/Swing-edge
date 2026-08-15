@@ -339,6 +339,13 @@ const SCANNER_DATA = [
 // It also keeps the last curve point and the "Account Equity" KPI on the same
 // rate, since both now derive through this one function. Those two disagreeing
 // is exactly the bug family of T10 finding 2, wearing a different hat.
+//
+// 🔴 **B-142 · והדרישה הזו נאכפת עכשיו, ⛔ לא רק מוצהרת.** "אותה פונקציה" הבטיחה
+// אותו **שער**, ⛔ לא אותה **אוכלוסייה**: הכותרת סכמה את כל העסקאות והגרף סכם את
+// כל העסקאות — כולל אלה שלא הומרו — ולכן שניהם היו שגויים באותה מידה, וההערה
+// למעלה נשמעה מקוימת. מרגע ש-`makeConvertingCalc` מסמן סירוב, שתי הרגליים חייבות
+// לדלג על **אותו** סימון. השורה למטה היא הצד הגרפי של אותו דילוג בדיוק שב-
+// `closedPnL`, ו-15.7 נועלת את השתיים יחד.
 const generateEquityCurve = (cap, trades = [], calcFn = calcTradeMetrics) => {
   let balance = cap;
   const data = [];
@@ -348,7 +355,11 @@ const generateEquityCurve = (cap, trades = [], calcFn = calcTradeMetrics) => {
   const sortedTrades = getClosed(trades)
     .sort((a, b) => (realizedAt(a) ?? 0) - (realizedAt(b) ?? 0));
   sortedTrades.forEach(t => {
-    const pnl = calcFn(t).pnl || 0;
+    const m = calcFn(t);
+    // ⛔ נקודה שאי-אפשר לנקוב ב-`cap`'s currency ⛔ אינה מצוירת בכלל — ⛔ ולא
+    // מצוירת כאפס. אפס הוא טענה ("היום הזה לא הזיז את ההון"), וזו טענה שקרית.
+    if (m.fxUnconverted) return;
+    const pnl = m.pnl || 0;
     balance += pnl;
     data.push({ date: realizedDayKey(t), equity: Math.round(balance), ticker: t.ticker, pnl: Math.round(pnl) });
   });
@@ -849,8 +860,16 @@ const MixedCurrencyBanner = memo(({ stats, t }) => {
         <p className="mt-1 font-mono text-[11px] text-amber-200/80">
           {/* Signed: these are P&L figures, and a per-currency breakdown whose
               sign lives only in the color is the exact trap `money()` exists to
-              close. Routed through fmt$ so the symbol has one home (T10 A4). */}
-          {stats.currencies.map((c) => fmt$(stats.pnlByCurrency[c] ?? 0, c)).join("  ·  ")}
+              close. Routed through fmt$ so the symbol has one home (T10 A4).
+
+              🔴 `B-142` — ועם **מונה** לצד כל סכום. "₪1,200 · $80" ⛔ אינו אומר
+              אם מדובר ב-13 שורות ת"א מול אחת אמריקאית או בהיפך, וזה ההבדל בין
+              "היומן שלי מעורב" ל"נשארה לי שורה אחת חריגה". §2 — אין סכום בלי
+              האוכלוסייה שמאחוריו. `tradesByCurrency` מגיע מאותה לולאה של
+              `pnlByCurrency` ⇒ ⛔ אי-אפשר שהשניים ייסחפו. */}
+          {stats.currencies.map((c) =>
+            `${fmt$(stats.pnlByCurrency[c] ?? 0, c)} (${stats.tradesByCurrency?.[c] ?? 0})`
+          ).join("  ·  ")}
         </p>
       </div>
     </div>
@@ -2040,12 +2059,34 @@ export default function SwingEdge() {
     return value;
   }, [capital, capitalCurrency, accountCurrency, fxTable]);
 
+  // PAST value: the point the equity curve hangs from. `capitalShown` below is
+  // the present-tense "הון עכשיו" the header prints and must stay at spot; a
+  // curve base priced at spot slides the whole curve — and the return % with
+  // it — every morning the shekel moves, with nobody having touched a trade.
+  // See src/lib/equityBase.js for which day anchors it and why.
+  //
+  // 🔴 **B-142 · למה ה-`useMemo` הזה יושב כאן, מעל `fxOk`, ו⛔ אסור להחזירו
+  // מתחת לו.** עד 15.08 הוא ישב מתחת ל-`fxOk` (:2063), ולכן `fxOk` ⛔ לא יכול
+  // היה לשאול אותו דבר. זה הותיר מצב שלם ללא שם: spot **עובד**
+  // (`displayCapital != null` ⇒ `dispCcy === accountCurrency` ⇒ המסך מדפיס "$"),
+  // אבל אין fixing ליום הבסיס ⇒ `resolveEquityBase` מסרב ומחזיר את ההון הגולמי
+  // ב-`capitalCurrency`. אותם שקלים נדפסו תחת "$" ב-:4156 ושימשו **מכנה**
+  // ל-`curEquityReturnPct` ב-:2383 — יחס בין שתי יחידות, בשקט. הסדר כאן **הוא**
+  // התיקון: `fxOk` קורא את ההכרעה, ולכן הסמל ובסיס העקומה ⛔ אינם יכולים להיפרד.
+  const equityBaseD = useMemo(
+    () => resolveEquityBase({ capital, capitalCurrency, accountCurrency, fxTable, trades: realTrades }),
+    [capital, capitalCurrency, accountCurrency, fxTable, realTrades]
+  );
+
   // When no rate exists, converted figures must fall back to the currency the
   // number is actually denominated in — never to the requested one with an
   // unconverted number under it, which is precisely the $2,500 → "₪2,500" bug.
-  const fxOk = capitalCurrency === accountCurrency || displayCapital != null;
+  const fxOk = capitalCurrency === accountCurrency || (displayCapital != null && equityBaseD.ok);
   const dispCcy = fxOk ? accountCurrency : capitalCurrency;
-  const capitalShown = displayCapital != null ? displayCapital : capital;
+  // ⚠️ `fxOk &&` ⛔ אינו קישוט: מאז שהוא קורא את `equityBaseD.ok` הוא יכול להיות
+  // `false` בזמן ש-`displayCapital` **קיים**. בלי השער הזה היה נדפס כאן מספר
+  // מומר לדולרים תחת סמל השקל — אותו באג בדיוק, מהכיוון ההפוך.
+  const capitalShown = fxOk && displayCapital != null ? displayCapital : capital;
   // The one symbol every ACCOUNT-LEVEL figure prints. Deliberately distinct from
   // `accSym` (what the user ASKED for) — when there is no rate the two differ,
   // and printing the requested symbol over an unconverted number is exactly the
@@ -2055,15 +2096,24 @@ export default function SwingEdge() {
   // that currency — the position calculator and the trade form — because
   // converting a number the user just typed is not a display, it is an edit.
   const capSym = CURRENCY_SYMBOL[capitalCurrency] || CURRENCY_SYMBOL.USD;
-  // PAST value: the point the equity curve hangs from. `capitalShown` above is
-  // the present-tense "הון עכשיו" the header prints and must stay at spot; a
-  // curve base priced at spot slides the whole curve — and the return % with
-  // it — every morning the shekel moves, with nobody having touched a trade.
-  // See src/lib/equityBase.js for which day anchors it and why.
-  const equityBase = useMemo(
-    () => resolveEquityBase({ capital, capitalCurrency, accountCurrency, fxTable, trades: realTrades }),
-    [capital, capitalCurrency, accountCurrency, fxTable, realTrades]
-  );
+  // ⚠️ תמיד מספר, ⛔ לעולם לא `null` — ראה את חוזה `resolveEquityBase`.
+  //
+  // 🔴 **`fxOk ?` ⛔ אינו קישוט, והנוסח שקדם לו היה שקרי.** עד לאימות-העין של
+  // `C-023` עמדה כאן ההצהרה "נקוב ב-`equityBaseD.currency`, ואחרי השער למעלה
+  // זה **תמיד** `dispCcy`". הדפדפן הפריך אותה: כש-ה-spot נפל ו**יש** fixing
+  // ליום הבסיס, ההכרעה מצליחה ומחזירה ILS, בעוד `fxOk` שקר (בצדק — ערך הווה
+  // ⛔ אינו ניתן להמרה בלי spot) ⇒ `dispCcy` נופל ל-USD. התוצאה שנצפתה על
+  // המסך: `$20,100.00` = 20,000 **שקלים** ועוד 100 **דולר**, תחת "$".
+  //
+  // ⛔ זה ⛔ אינו קצה: `loadRateTable` מחזיר בדיוק טבלה כזו במסלול ה-`catch`
+  // שלו — `spot` ⛔ לעולם ⛔ אינו נשמר ל-localStorage (מכוון), ולכן ברגע
+  // שהרשת נופלת אחרי טעינה אחת, "יש `byDay`, אין `spot`" הוא ה**ברירה**.
+  //
+  // הבסיס ⛔ אינו איבר שניתן להחריג ולספור כמו עסקה — הוא ה**עוגן** שהסכום
+  // תלוי בו. לכן כש-`fxOk` שקר הוא חוזר להון הגולמי ב-`capitalCurrency`,
+  // שהוא בדיוק `dispCcy` באותו רגע. נמדד אדום ב-15.5c לפני השורה הזו.
+  const equityBase = fxOk ? equityBaseD.value : capital;
+
   // Present-value view of an amount denominated in the capital's currency.
   // Spot, not a past fixing: risk and position size are claims about NOW.
   // Falls back to the raw number only when `dispCcy` is already the capital's
@@ -2090,9 +2140,17 @@ export default function SwingEdge() {
   //    7/7 המצרפים לא הומרו, ⛔ לא רק אתרי השורה. `paperAcctFx` כבר נטען בדיוק
   //    בשביל זה ו⛔ לא נצרך בשום מקום. הזנה נכונה ⇒ ההמרה מתאפשרת בכלל.
   //    ⚠️ ליומן דולרי (43/46) שני הביטויים `identity` ⇒ byte-identical.
+  //
+  // 🔴 **B-142 · היעד הוא `dispCcy`, ⛔ לא `accountCurrency`.** השניים נפרדים
+  //    בדיוק כשאין שער, וזה המצב שבו התפר הזה שיקר: הוא המיר ל-`accountCurrency`
+  //    בזמן שהמסך הדפיס את סמל `capitalCurrency`, או — הרווח יותר — **לא** המיר
+  //    (`no_table`) והחזיר את המספר במטבע הנייר, שאותו הכותרת סכמה עם הבסיס
+  //    ⛔ כאילו היה באותה יחידה. עכשיו היעד הוא המטבע ש**נדפס בפועל**, וכל
+  //    עסקה שלא הגיעה אליו חוזרת מסומנת (`fxUnconverted`) ⛔ ולא מומצאת.
+  //    ⚠️ ביומן דולרי `dispCcy === accountCurrency` ⇒ ⛔ אין שינוי בכלל.
   const stableCalcTradeMetrics = useMemo(
-    () => makeConvertingCalc(paperAcctTable, accountCurrency, paperAcctStatus),
-    [paperAcctTable, accountCurrency, paperAcctStatus]
+    () => makeConvertingCalc(paperAcctTable, dispCcy, paperAcctStatus),
+    [paperAcctTable, dispCcy, paperAcctStatus]
   );
 
   // ─── אתרי **שורה** — אותה הכרעה בדיוק, ⛔ לא העתקה ──────────────────────────
@@ -2359,12 +2417,36 @@ export default function SwingEdge() {
     return { value, missingCount, unconvertedCount };
   }, [openTrades, getLivePrice, liveDecision]);
 
-  // Single source of truth for full Account Equity: realized closed equity
-  // (from the stats hub) + live open P&L. Every consumer — Header, StatCard,
-  // Footer, and the PDF export — reads this one value.
+  // ─── B-142 · הרגל הסגורה של אותה הכרעה בדיוק ────────────────────────────────
+  //
+  // 🔴 `openPnL` למעלה כבר סופר ומדיר עסקה שלא ניתן להמיר. הרגל ה**סגורה** לא —
+  // היא הגיעה כ-`stats.currentEquity`, ש-`tradingStats.js:221` מחשב כ-
+  // `capital + totalPnL`, ו-`totalPnL` הוא `reduce` שסוכם **הכל** בלי לשאול
+  // באיזו יחידה כל איבר. ⇒ עסקה שהתפר החזיר לא-מומרת (מטבע נייר) נכנסה לכותרת
+  // כאילו הייתה ב-`dispCcy`. אותה אסימטריה בדיוק שהערה :339-341 מתארת בין
+  // הגרף לכותרת — עכשיו שתיהן מדירות את אותן עסקאות, מאותו סימון.
+  //
+  // ⛔ אין כאן המרה שנייה ו⛔ אין ניחוש: `fxUnconverted` הוא תוצר-לוואי של
+  // ההכרעה שכבר נעשתה ב-`makeConvertingCalc`, והלולאה כאן רק **מצייתת** לו.
+  const closedPnL = useMemo(() => {
+    let value = 0, unconvertedCount = 0;
+    for (const m of (stats.closedMetrics || [])) {
+      if (m.fxUnconverted) { unconvertedCount++; continue; }
+      value += m.pnl || 0;
+    }
+    return { value, unconvertedCount, total: (stats.closedMetrics || []).length };
+  }, [stats.closedMetrics]);
+
+  // Single source of truth for full Account Equity: the curve's base + realized
+  // closed P&L + live open P&L. Every consumer — Header, StatCard, Footer, and
+  // the PDF export — reads this one value.
+  //
+  // ⚠️ ⛔ **לא** `stats.currentEquity`: הוא נושא בתוכו `totalPnL` בלתי-מסונן,
+  // ואי-אפשר להחסיר ממנו איבר בדיעבד בלי לדעת מי הוא. שלושת האיברים כאן נקובים
+  // כולם ב-`dispCcy` — הבסיס בזכות השער ב-:2046, ושתי הרגליים בזכות הסימון.
   const curEquity = useMemo(
-    () => stats.currentEquity + openPnL.value,
-    [stats.currentEquity, openPnL]
+    () => equityBase + closedPnL.value + openPnL.value,
+    [equityBase, closedPnL, openPnL]
   );
 
   // The equity card's trend must be the return on the equity the card is
@@ -4164,20 +4246,34 @@ export default function SwingEdge() {
               <StatCard label={t.streakCounter} value={<span className="flex items-center gap-1">{currentStreak > 0 && <Flame size={18} className="text-orange-400" />}{currentStreak}</span>} sub={`${t.bestStreak}: ${bestStreak}`} icon={Zap} accent={currentStreak >= 3 ? "green" : "amber"} />
             </div>
 
-            {/* Missing live-price disclosure — Account Equity & Today's P&L exclude these open trades */}
-            {openPnL.missingCount > 0 && (
-              <div className="mt-2 flex items-center gap-2 text-xs font-semibold text-amber-500 rtl:flex-row-reverse">
-                <AlertTriangle size={14} />
-                <span>{t.missingPriceWarn.replace('{n}', String(openPnL.missingCount))}</span>
-              </div>
-            )}
-
-            {/* B-119 · אין spot ⇒ הסכום הוא **חלקי**, והמונה נאמר. סכום שהושמט
-                ממנו איבר בלי לומר כמה הוא בדיוק גילוי שאי-אפשר לפעול לפיו. */}
-            {openPnL.unconvertedCount > 0 && (
-              <div className="mt-2 flex items-center gap-2 text-xs font-semibold text-amber-500 rtl:flex-row-reverse">
-                <AlertTriangle size={14} />
-                <span>{t.unconvertedPnlWarn.replace('{n}', String(openPnL.unconvertedCount))}</span>
+            {/* ─── B-142 · באנר גילוי **אחד**, שלושה מונים, כל אחד עם מכנה ──────
+                🔴 כאן ישבו **שני** `div` צמודים (`missingPriceWarn` ·
+                `unconvertedPnlWarn`), ושניהם דיווחו על הרגל ה**חיה** בלבד —
+                בזמן שהרגל ה**סגורה** השמיטה עסקאות מהכותרת בלי מילה. שני באנרים
+                שמדווחים על חצי מהבעיה הם גילוי שאי-אפשר לפעול לפיו.
+                ⛔ המספרים נמסרים עם מכנה (§2): "{n} מתוך {m}" — ⛔ לא "{n}",
+                ⛔ לא אחוז, ⛔ ולא 0 (הבאנר פשוט אינו קיים כשאין מה לגלות). */}
+            {(openPnL.missingCount > 0 || openPnL.unconvertedCount > 0 || closedPnL.unconvertedCount > 0) && (
+              <div className="mt-2 flex items-start gap-2 text-xs font-semibold text-amber-500 rtl:flex-row-reverse">
+                <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                <div className="flex flex-col gap-0.5">
+                  <span>{t.partialSumWarn}</span>
+                  {openPnL.missingCount > 0 && (
+                    <span className="font-normal text-amber-500/85">
+                      {t.missingPriceWarn.replace('{n}', String(openPnL.missingCount)).replace('{m}', String(openTrades.length))}
+                    </span>
+                  )}
+                  {openPnL.unconvertedCount > 0 && (
+                    <span className="font-normal text-amber-500/85">
+                      {t.unconvertedPnlWarn.replace('{n}', String(openPnL.unconvertedCount)).replace('{m}', String(openTrades.length))}
+                    </span>
+                  )}
+                  {closedPnL.unconvertedCount > 0 && (
+                    <span className="font-normal text-amber-500/85">
+                      {t.unconvertedClosedWarn.replace('{n}', String(closedPnL.unconvertedCount)).replace('{m}', String(closedPnL.total))}
+                    </span>
+                  )}
+                </div>
               </div>
             )}
 

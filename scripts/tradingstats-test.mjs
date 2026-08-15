@@ -28,6 +28,27 @@
 // `streakRuns`, all of them decision 2 ("break-even is an explicit third bucket
 // everywhere") and the streak-history extraction. Scenario 6 is new in v2.
 //
+// BASELINE VERSION: v4 (T3 · B-142 · docs/plans/PLAN-B142.md).
+// v3 → v4 was captured after the equity-headline unification. The full
+// structural diff, measured scenario by scenario before recapture, was:
+// **8 field ADDITIONS, 0 removals, and 0 changed values** — one addition per
+// fixture, all of them the same key, and every pre-existing number in all
+// eight v3 fixtures survived byte-for-byte.
+//
+// The added key is `tradesByCurrency` (plan §C6): a per-currency TRADE COUNT
+// published beside the existing `pnlByCurrency`. A per-currency P&L split that
+// does not say how many trades stand behind each figure is a quotient with no
+// denominator (CLAUDE.md §2) — "₪1,200 · $80" cannot tell 13 TASE rows from
+// one. It is derived inside `pnlByCurrency`'s own loop, so the split and its
+// denominator cannot drift; that is also why the counter was NOT computed in
+// the component instead (a second derivation loop with no owner).
+//
+// ⚠️ The gate fired correctly here: it caught a real shape change and the wave
+// stopped and reported rather than recapturing quietly. The recapture is
+// authorised in writing, and block 9 above pins `tradesByCurrency` by VALUE so
+// the new key does not enter the frozen line unverified — a baseline proves a
+// number has not MOVED, it cannot know the number was right the day it froze.
+//
 // lastWeekStats/lastMonthStats read the wall clock (Date.now()) inside
 // computeTradingStats — the one non-pure dependency in an otherwise pure
 // function (see PLAN doc §0.a). Date.now is stubbed to a fixed timestamp for
@@ -524,13 +545,73 @@ const mk = (over) => ({
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// 9 · FROZEN BASELINE — full-object regression gate for all 6 fixtures.
+// 9 · `tradesByCurrency` — the DENOMINATOR of `pnlByCurrency` (B-142 · C6)
+// ─────────────────────────────────────────────────────────────────────────
+// ⚠️ **קיים כדי ש-`tradesByCurrency` ⛔ לא ייכנס לבייסליין הקפוא בלי שאיש
+// אימת את ערכו.** בייסליין מגן על מספר מפני **תזוזה** — הוא ⛔ אינו יודע אם
+// המספר נכון ביום שנלכד. מפתח שנולד ישר לתוך קו קפוא הוא מספר שהוקפא בלי
+// שנבדק, וזה `R-3` בדיוק: אימות **כתיבה** במקום אימות **נראוּת**.
+//
+// 🔴 הנושא הוא ההצמדה: `pnlByCurrency[c]` ו-`tradesByCurrency[c]` נגזרים
+// מ**אותה לולאה** ולכן חייבים לכסות **בדיוק אותן שורות**. סכום שמפרסם מונה
+// שאינו האוכלוסייה שלו גרוע מסכום בלי מונה — הוא מנה עם מכנה **שקרי**.
+{
+  console.log("\n9 · tradesByCurrency — המכנה של pnlByCurrency (B-142 · C6)");
+
+  // 5 עסקאות סגורות. 3 ניתנות לצירוף (טיקר אלפביתי, ⛔ אין ראיה נגד ⇒ USD),
+  // ו-2 ⛔ אינן: טיקר מספרי (`AMBIGUOUS`) ותווית ILS על טיקר אלפביתי
+  // (`CONTRADICTED` — ILS ⛔ לא נמדד אף פעם, ראה instrumentCurrency.js:148).
+  const mixed = computeTradingStats([
+    mk({ id: "u1", ticker: "AAPL", entry: 100, stop: 90, exit: 120, shares: 10, date: daysAgo(3) }),
+    mk({ id: "u2", ticker: "MSFT", entry: 100, stop: 90, exit: 80,  shares: 10, date: daysAgo(6) }),
+    mk({ id: "u3", ticker: "NVDA", entry: 100, stop: 90, exit: 110, shares: 10, date: daysAgo(9) }),
+    mk({ id: "x1", ticker: "1234", entry: 100, stop: 90, exit: 150, shares: 10, date: daysAgo(12) }),
+    mk({ id: "x2", ticker: "TEVA", currency: "ILS", entry: 100, stop: 90, exit: 200, shares: 10, date: daysAgo(15) }),
+  ], CAPITAL, calcTradeMetrics);
+
+  eq("האוכלוסייה כולה — 5 סגורות", mixed.totalTrades, 5);
+  eq("🔴 המונה נעול על ערך: 3 עסקאות דולריות", mixed.tradesByCurrency.USD, 3);
+  eq("⛔ ו⛔ אין מפתח שני — היום {USD} היא הקבוצה הנגזרת כולה",
+    Object.keys(mixed.tradesByCurrency).join(","), "USD");
+  // 3/5 — המונה **והמכנה**, §2. השתיים שנותרו ⛔ אינן "אפס", הן **מחוץ** לפילוח.
+  eq("⇒ 3 מתוך 5 נכנסו לפילוח, ו-2 ⛔ לא",
+    `${Object.values(mixed.tradesByCurrency).reduce((a, b) => a + b, 0)}/${mixed.totalTrades}`,
+    "3/5");
+  check("⇒ ולכן הקבוצה ⛔ אינה מוכחת חד-מטבעית — הבאנר נדלק", mixed.mixedCurrency === true);
+
+  // 🔴 ההצמדה עצמה. הסכום של 3 הדולריות בלבד: +200 −200 +100 = +100.
+  // ⛔ אינו כולל את +500 של הטיקר המספרי ו-+1,000 של תווית ה-ILS.
+  eq("🔴 `pnlByCurrency.USD` מכסה את **אותן** 3 שורות בדיוק", mixed.pnlByCurrency.USD, 100);
+  eq("…בעוד `totalPnL` סוכם את כל 5 — וזה ההפרש שהמונה מגלה",
+    mixed.totalPnL, 100 + 500 + 1000);
+
+  // ── שיניים ────────────────────────────────────────────────────────────────
+  // בלי זה, מונה שמחזיר תמיד את `totalTrades` היה עובר את הכל למעלה.
+  const clean = computeTradingStats([
+    mk({ id: "c1", ticker: "AAPL", entry: 100, stop: 90, exit: 120, shares: 10, date: daysAgo(3) }),
+    mk({ id: "c2", ticker: "MSFT", entry: 100, stop: 90, exit: 80,  shares: 10, date: daysAgo(6) }),
+  ], CAPITAL, calcTradeMetrics);
+  eq("שיניים · יומן נקי ⇒ המונה **שווה** לאוכלוסייה", clean.tradesByCurrency.USD, 2);
+  eq("שיניים · 2 מתוך 2",
+    `${Object.values(clean.tradesByCurrency).reduce((a, b) => a + b, 0)}/${clean.totalTrades}`,
+    "2/2");
+  check("שיניים · ⛔ ואינו מדליק את הבאנר", clean.mixedCurrency === false);
+  eq("שיניים · המונה ⛔ אינו `totalTrades` בתחפושת — 3≠5 למעלה, 2=2 כאן",
+    mixed.tradesByCurrency.USD === mixed.totalTrades, false);
+
+  // יומן ריק: `{}`, ⛔ לא `{USD:0}`. אפס עסקאות דולריות ⛔ אינו טענה על מטבע.
+  eq("יומן ריק ⇒ פילוח ריק, ⛔ לא אפס מזויף",
+    JSON.stringify(computeTradingStats([], CAPITAL, calcTradeMetrics).tradesByCurrency), "{}");
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 10 · FROZEN BASELINE — full-object regression gate for all 8 fixtures.
 //     First run on a clean checkout writes the baseline (and the assertion
 //     trivially passes); every run after that diffs against the committed
 //     file. This is the T3 tripwire referenced in the plan doc.
 // ─────────────────────────────────────────────────────────────────────────
 {
-  console.log("\n9 · frozen full-object baseline v3 (scripts/fixtures/tradingstats-baseline.json)");
+  console.log("\n10 · frozen full-object baseline v4 (scripts/fixtures/tradingstats-baseline.json)");
   const scenarios = {
     empty: computeTradingStats([], CAPITAL, calcTradeMetrics),
     normal: computeTradingStats([

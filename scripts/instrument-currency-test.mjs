@@ -38,6 +38,12 @@ import { sizePosition } from "../src/lib/positionSizing.js";
 // ולכן `makeConvertingCalc` נבדק כאן דרך אותו ייבוא כדי להוכיח שהם לא נפרדו.
 import { fxPairPlan, accountAmount, spotAmount, livePnlAmount,
          makeConvertingCalc } from "../src/hooks/useFxRates.js";
+// ⚠️ `B-142` · בלוק 15 — הבסיס וההמרה נצרכים מ**אותם** מודולים שהמסך צורך,
+// ⛔ לא מהעתק בדוק. `resolveEquityBase` הוא ההכרעה שקובעת אם ההון בכלל נקוב
+// במטבע שהכותרת מדפיסה, ו-`convert` נדרש כדי למדוד את המצב שבו ה-spot **כן**
+// עובד והבסיס בכל זאת מסרב (15.5b).
+import { resolveEquityBase } from "../src/lib/equityBase.js";
+import { convert } from "../src/lib/fx.js";
 import { calculateTradeDNA } from "../src/intelligence/core/TradeDNA.js";
 import { calculateGrowthScore } from "../src/intelligence/core/GrowthTracker.js";
 
@@ -732,10 +738,27 @@ const aggressionOf = (trades, capitalCurrency) =>
     //    `makeConvertingCalc` ממיר מ**מטבע הנייר** ו-`fx.js:69` דורש התאמת זוג
     //    מדויקת ⇒ ביומן שקלי הוא החזיר את העסקה לא-מומרת. כלומר גם 7/7
     //    המצרפים ⛔ לא הומרו — ⛔ לא רק אתרי השורה. ⇒ נעול כאן.
-    check("🔴 התפר המצרפי מוזן בטבלת **נייר→חשבון** ⛔ ולא הון→חשבון",
-      /makeConvertingCalc\(paperAcctTable, accountCurrency, paperAcctStatus\)/.test(app));
+    // 🔴 **הצהרת תזוזה — 2026-08-15, גל ה׳ (`B-142`).** האסרציה הזו ישבה כאן
+    //    בנוסח:
+    //
+    //      /makeConvertingCalc\(paperAcctTable, accountCurrency, paperAcctStatus\)/
+    //
+    //    הערך הישן (`accountCurrency`) והחדש (`dispCcy`) **שניהם** כתובים כאן,
+    //    כדי שהקורא הבא יראה **מה** זז ולא רק שמשהו זז.
+    //
+    // ⚠️ ה**נושא** ⛔ לא זז: היא נועדה לנעול שהתפר מוזן בטבלת **נייר→חשבון**
+    //    ⛔ ולא ב-`fxTable` (הבאג מ-12.08 שמתועד ממש מעל), והשומר הזה נשאר
+    //    מילה במילה בשורה שאחריה. מה שזז הוא הארגומנט ש-`B-142` מזיז **במכוון**:
+    //    `accountCurrency` הוא מה שהמשתמש **ביקש**, `dispCcy` הוא מה שהמסך
+    //    **מדפיס**, והשניים נפרדים בדיוק כשההגנה של `:2047` פועלת — כלומר
+    //    בדיוק במצב שבו ההון הסגור היה סכום בין-יחידות. ⛔ לא רוכך כדי לעבור;
+    //    הערך נמדד אדום ב-15.1 לפני שהשורה הזו נגעה.
+    check("🔴 התפר המצרפי מוזן בטבלת **נייר→חשבון** ⛔ ולא הון→חשבון, וב-`dispCcy` (B-142)",
+      /makeConvertingCalc\(paperAcctTable, dispCcy, paperAcctStatus\)/.test(app));
     check("⛔ ⛔ אין יותר `makeConvertingCalc(fxTable`",
       !/makeConvertingCalc\(fxTable/.test(app));
+    check("⛔ ⛔ והתפר ⛔ אינו חוזר ל-`accountCurrency` (B-142)",
+      !/makeConvertingCalc\(paperAcctTable, accountCurrency/.test(app));
     check("`fmtAcct` מוגדר פעם אחת ב-`SwingEdge_App`",
       (app.match(/const fmtAcct = /g) || []).length === 1);
 
@@ -909,6 +932,367 @@ const aggressionOf = (trades, capitalCurrency) =>
       !/fmt\$\(Math\.round\(livePnl\), currencyOf\(/.test(app));
     check("הסירוב בשורה נושא נימוק ⛔ ולא `—` ערום", /spotRefusalText/.test(app));
     check("ה-PDF מצהיר על מצרף חלקי", /partialEquityNote|equityIncomplete/.test(app));
+  }
+}
+
+// ── 15 · ההון ה**סגור** — ⛔ אפס סכום בין-יחידות (B-142, גל ה׳) ──────────────
+//
+// 🔴 הפגם במשפט אחד: `stats.currentEquity = capital + Σ pnl`
+// (`src/lib/tradingStats.js:221-224`). כשאיבר בסכום ⛔ אינו נקוב במטבע שהכותרת
+// מודפסת בו, החיבור מחבר **יחידות שונות** — ו⛔**שום סמל אינו הופך אותו לנכון**.
+// ⇒ יישור סמלים היה **הסתרה**, ⛔ לא תיקון.
+//
+// האינווריאנטה שהבלוק הזה אוכף:
+//
+//   הכותרת נקובה ב-`dispCcy`. כל איבר שמטבעו ≠ `dispCcy` ו⛔אינו ניתן להמרה
+//   ל-`dispCcy` — ⛔ אינו נכנס לסכום, ו**נספר**.
+//
+// ⚠️ זו בדיוק התבנית ש-`B-119` קנה לצד ה**חי** (בלוק 14). הצד ה**סגור** נשאר
+//    מאחור, ושני צדי אותה כותרת התנהגו שונה. ⇒ נמדד כאן.
+//
+// ⚠️ הסימון (`fxUnconverted`) הוא **תוצר-לוואי של הכרעה שכבר התקבלה** בתוך
+//    `makeConvertingCalc` — ⛔ לא מעבר שני ו⛔לא חישוב מקביל. מעבר שני נסחף.
+console.log("\n15 · ההון הסגור — האינווריאנטה של יחידה אחת (B-142)");
+{
+  const DAY = "2026-03-31";
+  const mkTable = (base, quote, dayRate, spotRate) => ({
+    base, quote,
+    spot: { rate: spotRate, rateDate: "2026-08-13" },
+    byDay: { [DAY]: { rate: dayRate, rateDate: DAY } },
+  });
+  const aapl = (extra = {}) => ({ ticker: "AAPL", side: "LONG", entry: 100, exit: 110,
+    shares: 10, status: "CLOSED", date: "2026-03-01", closedAt: DAY, ...extra });
+
+  // ⚠️ הצרכן (`closedPnL`, `SwingEdge_App.jsx`) הוא `useMemo` ב-`.jsx` ו⛔אינו
+  //    ניתן לייבוא ב-node. הרדוקטור כאן מריץ את **אותה** שורה בדיוק, והחיווט
+  //    עצמו ננעל באסרציות המקור ב-15.8 — בדיוק הפיצול של 14 / 14.1.
+  const foldClosed = (base, trades, calc) => {
+    let value = base, unconvertedCount = 0;
+    for (const t of trades) {
+      const m = calc(t);
+      if (m.fxUnconverted) { unconvertedCount++; continue; }
+      value += m.pnl || 0;
+    }
+    return { value, unconvertedCount, total: trades.length };
+  };
+
+  // ── 15.1 · S5 — הון ILS · חשבון USD · ⛔ אין שער כלל ─────────────────────
+  //
+  // 🔴 **הערך שזז**: `₪10,100` ⇒ `₪10,000`. ה-10,100 היה 10,000 **שקלים**
+  //    ועוד 100 **דולר**, מודפסים תחת `₪`. נצפה אדום לפני התיקון.
+  console.log("  15.1 · S5 · הון ILS · חשבון USD · אין שער");
+  {
+    const EMPTY = { base: "USD", quote: "ILS", spot: null, byDay: {} };
+    const trades = [aapl()];
+    const eb = resolveEquityBase({ capital: 10_000, capitalCurrency: "ILS",
+      accountCurrency: "USD", fxTable: EMPTY, trades });
+
+    eq("הבסיס ⛔ אינו מומר ⇒ ההכרעה מסרבת", eb.ok, false);
+    eq("…והערך הוא ההון הגולמי — ⛔ לא null ו⛔לא spot", eb.value, 10_000);
+    eq("🔴 …ונקוב במטבע ה**הון**, ⛔ לא במטבע שהמשתמש ביקש", eb.currency, "ILS");
+
+    // ⇒ `dispCcy` נופל ל-`capitalCurrency`, והתפר המצרפי מוזן **בו**.
+    const calc = makeConvertingCalc(null, eb.currency, "identity");
+    const m = calc(trades[0]);
+    eq("נייר דולרי מול כותרת שקלית ⇒ ⛔ אינו מומר, ⛔ ואינו מנוחש", m.fxUnconverted, "no_table");
+    eq("⛔ הערך הגולמי ⛔ לא נדרס — המנוע ⛔ לא זז", m.pnl, 100);
+
+    const f = foldClosed(eb.value, trades, calc);
+    eq("🔴 **הערך שזז**: היה 10,100 (₪+$) ⇒ עכשיו 10,000", f.value, 10_000);
+    eq("…והחיסרון **נאמר**: 1 מתוך 1", `${f.unconvertedCount}/${f.total}`, "1/1");
+    // 🔴 המספר שהמסך הראה עד היום, על אותו יומן בדיוק — המסלול הישן חי ב-
+    //    `stats.currentEquity` (בבעלות `B-143`) ולכן ניתן למדידה, ⛔ לא לזיכרון.
+    eq("🔴 מה שהמסך הראה קודם — 10,000 שקלים ועוד 100 **דולר**, תחת ₪",
+       computeTradingStats(trades, 10_000, makeConvertingCalc(null, "USD", "identity")).currentEquity,
+       10_100);
+  }
+
+  // ── 15.2 · S7 — `fxOk === true`, ועסקה אחת בכל זאת מסרבת ─────────────────
+  //
+  // ⚠️ מפריך את שורת ה-`BACKLOG` שטענה "רק כשאין שער": כאן **יש** שער, הבסיס
+  //    הומר, והסכום עדיין היה בין-יחידות.
+  console.log("  15.2 · S7 · נייר לא-מאומת בתוך יומן שהומר בהצלחה");
+  {
+    const tbl = mkTable("USD", "ILS", 2.0, 3.0);
+    const good = aapl();
+    const bad  = aapl({ currency: "ILS" });   // תווית ILS על נייר דולרי ⇒ CONTRADICTED
+    const trades = [good, bad];
+    const eb = resolveEquityBase({ capital: 10_000, capitalCurrency: "USD",
+      accountCurrency: "ILS", fxTable: tbl, trades });
+
+    eq("הבסיס הומר בשער **יום הבסיס** (2.0)", eb.value, 20_000);
+    eq("…וההכרעה מצהירה על כך", eb.reason, "converted");
+    eq("…ובמטבע החשבון", eb.currency, "ILS");
+
+    const calc = makeConvertingCalc(tbl, "ILS", "ready");
+    eq("הנייר המאומת מומר (100$ × 2.0)", calc(good).pnl, 200);
+    eq("⛔ ואינו מסומן", calc(good).fxUnconverted, undefined);
+    eq("הנייר הלא-מאומת ⛔ אינו מומר ⛔ ואינו מנוחש",
+       calc(bad).fxUnconverted, "unverified_instrument");
+
+    const f = foldClosed(eb.value, trades, calc);
+    eq("🔴 **הערך שזז**: היה 20,300 (₪+$) ⇒ עכשיו 20,200", f.value, 20_200);
+    eq("…עם מכנה: 1 מתוך 2", `${f.unconvertedCount}/${f.total}`, "1/2");
+    eq("🔴 מה שהמסך הראה קודם — 20,200 שקלים ועוד 100 **דולר**, תחת ₪",
+       computeTradingStats(trades, 20_000, calc).currentEquity, 20_300);
+  }
+
+  // ── 15.3 · S8 — אין fixing ליום ה**מימוש** ──────────────────────────────
+  //
+  // ⚠️ P3 — `S8` נושא **שני** תפקידים. זה הראשון: היום החסר הוא יום ה**מימוש**
+  //    של עסקה סגורה. התפקיד השני (יום ה**בסיס**) נמדד בנפרד ב-15.5b, ⛔ ולא
+  //    כאן — אסרציה אחת שמכסה את שניהם ⛔ אינה יכולה לדעת מי משניהם נפל.
+  console.log("  15.3 · S8α · אין fixing ליום המימוש (P&L סגור)");
+  {
+    const tbl = mkTable("USD", "ILS", 2.0, 3.0);
+    const good = aapl();
+    const gap  = aapl({ ticker: "MSFT", closedAt: "2026-04-15" });  // ⛔ אין byDay ליום הזה
+    const trades = [good, gap];
+    const eb = resolveEquityBase({ capital: 10_000, capitalCurrency: "USD",
+      accountCurrency: "ILS", fxTable: tbl, trades });
+    const calc = makeConvertingCalc(tbl, "ILS", "ready");
+
+    eq("הבסיס נקבע מיום העסקה הסגורה ה**ראשונה**", eb.value, 20_000);
+    eq("אין שער ליום המימוש ⇒ נימוק מובחן ⛔ ולא 'אין טבלה'",
+       calc(gap).fxUnconverted, "no_rate_for_day");
+    const f = foldClosed(eb.value, trades, calc);
+    eq("🔴 **הערך שזז**: היה 20,300 ⇒ עכשיו 20,200", f.value, 20_200);
+    eq("…עם מכנה: 1 מתוך 2", `${f.unconvertedCount}/${f.total}`, "1/2");
+    eq("🔴 מה שהמסך הראה קודם — 20,200 שקלים ועוד 100 **דולר**, תחת ₪",
+       computeTradingStats(trades, 20_000, calc).currentEquity, 20_300);
+  }
+
+  // ── 15.4 · הקו הקפוא — S1 · S2 · S6 ⛔ לא זזים ───────────────────────────
+  //
+  // ⚠️ **S6 הוא ההוכחה שהאסימטריה הובנה ו⛔לא נמחקה בסירוב גורף.** הון USD ·
+  //    חשבון ILS · ⛔ אין שער ⇒ `dispCcy` נופל ל-USD, שהוא **גם** `PAPER_BASE`
+  //    ⇒ הבסיס והאיברים באותה יחידה ⇒ ⛔ אין כאן פגם, ו⛔אין מה לסמן.
+  //    סירוב גורף היה "מתקן" גם אותו — כלומר מוחק פיצ'ר מ-43/46 המשתמשים.
+  console.log("  15.4 · הקו הקפוא — S1 · S2 · S6 byte-identical");
+  {
+    const t = aapl();
+    const raw = calcTradeMetrics(t);
+
+    // S1 — יומן דולרי מלא (43/46). ⛔ אפס רשת, ⛔ אפס סימון.
+    const s1 = makeConvertingCalc(null, "USD", "identity")(t);
+    eq("S1 · `pnl` byte-identical", Object.is(s1.pnl, raw.pnl), true);
+    eq("S1 · `currency` ⛔ לא נדרס", Object.is(s1.currency, raw.currency), true);
+    eq("S1 · `rMultiple` ⛔ לא זז", Object.is(s1.rMultiple, raw.rMultiple), true);
+    eq("S1 · ⛔ אין סימון", "fxUnconverted" in s1, false);
+
+    // S2 — יומן שקלי מלא, טבלת נייר→חשבון תקינה ⇒ המרה, ⛔ לא סירוב.
+    const s2 = makeConvertingCalc(mkTable("USD", "ILS", 2.0, 3.0), "ILS", "ready")(t);
+    eq("S2 · מומר (100 × 2.0)", s2.pnl, 200);
+    eq("S2 · ⛔ אין סימון", "fxUnconverted" in s2, false);
+
+    // S6 — הון USD · חשבון ILS · ⛔ אין שער ⇒ `dispCcy` = USD = `PAPER_BASE`.
+    const eb6 = resolveEquityBase({ capital: 10_000, capitalCurrency: "USD",
+      accountCurrency: "ILS", fxTable: { base: "USD", quote: "ILS", spot: null, byDay: {} },
+      trades: [t] });
+    eq("S6 · הבסיס מסרב ונשאר במטבע ההון", eb6.currency, "USD");
+    const calc6 = makeConvertingCalc(null, eb6.currency, "loading");
+    eq("S6 · ⛔ אין סימון — הבסיס והאיבר באותה יחידה", "fxUnconverted" in calc6(t), false);
+    const f6 = foldClosed(eb6.value, [t], calc6);
+    eq("S6 · הסכום ⛔ לא זז (10,000 + 100, שניהם USD)", f6.value, 10_100);
+    eq("S6 · ⛔ אפס נספרים", f6.unconvertedCount, 0);
+  }
+
+  // ── 15.5 · `resolveEquityBase` — הכרעה מובחנת, ארבעה מסלולים ─────────────
+  console.log("  15.5 · resolveEquityBase — הכרעה ⛔ לא מספר");
+  {
+    const tbl = mkTable("USD", "ILS", 2.0, 3.0);
+    const trades = [aapl()];
+    const args = { capital: 10_000, capitalCurrency: "USD", accountCurrency: "ILS", trades };
+
+    const id = resolveEquityBase({ ...args, accountCurrency: "USD", fxTable: null });
+    eq("א. זהות ⇒ ok", id.ok, true);
+    eq("א. זהות ⇒ נימוק מובחן", id.reason, "identity");
+    eq("א. זהות ⇒ הערך byte-identical", Object.is(id.value, 10_000), true);
+
+    const conv = resolveEquityBase({ ...args, fxTable: tbl });
+    eq("ב. הומר בשער יום הבסיס", conv.reason, "converted");
+    eq("ב. ⛔ לא spot (3.0) אלא יום הבסיס (2.0)", conv.value, 20_000);
+
+    const spot = resolveEquityBase({ ...args, trades: [], fxTable: tbl });
+    eq("ג. ⛔ אין היסטוריה ⇒ נקודה יחידה ⇒ spot, וזה **מוצהר**", spot.reason, "spot");
+    eq("ג. …ובערך של spot (3.0)", spot.value, 30_000);
+
+    const gone = resolveEquityBase({ ...args,
+      fxTable: { base: "USD", quote: "ILS", spot: { rate: 3, rateDate: "x" }, byDay: {} } });
+    eq("ד. ⛔ אין fixing ליום הבסיס ⇒ ok שקר", gone.ok, false);
+    eq("ד. …בנימוק שעובר **כמו שהוא** מ-`convert`", gone.reason, "no_rate_for_day");
+    eq("ד. ⛔ ⛔ אין נפילה ל-spot (30,000) — ההון הגולמי", gone.value, 10_000);
+    eq("ד. …ונקוב במטבע ההון", gone.currency, "USD");
+  }
+
+  // ── 15.5b · S8β — היום החסר הוא יום ה**בסיס**, ו-`fxOk` היה `true` ───────
+  //
+  // 🔴 **המצב שלא היה לו שם עד היום.** ה-spot עבד ⇒ `fxOk === true` ⇒ `dispCcy`
+  //    נשאר `accountCurrency` — בעוד ה**בסיס** נשאר במטבע ההון. התוצאה: הבסיס
+  //    מודפס תחת הסמל הלא-נכון (`:4156`), **וגם** משמש מכנה ל-
+  //    `curEquityReturnPct` (`:2383`) שהמונה שלו ביחידה אחרת. זהו באג T10
+  //    ("יחס של שתי יחידות") חוזר דרך דלת אחורית, ובשקט מוחלט.
+  console.log("  15.5b · S8β · אין fixing ליום הבסיס בעוד spot עובד");
+  {
+    const noByDay = { base: "ILS", quote: "USD",
+      spot: { rate: 0.3, rateDate: "2026-08-13" }, byDay: {} };
+    const trades = [aapl()];
+    const capitalCurrency = "ILS", accountCurrency = "USD";
+    const eb = resolveEquityBase({ capital: 10_000, capitalCurrency, accountCurrency,
+      fxTable: noByDay, trades });
+
+    const displayCapital = convert(10_000, capitalCurrency, accountCurrency, noByDay).value;
+    eq("ה-spot **כן** עובד ⇒ `displayCapital` ⛔ אינו null", displayCapital, 3_000);
+    eq("🔴 ובכל זאת הבסיס מסרב", eb.ok, false);
+    eq("🔴 …ונשאר נקוב ב-ILS", eb.currency, capitalCurrency);
+
+    // הכלל הישן: `fxOk = capCcy === acctCcy || displayCapital != null`.
+    const oldFxOk  = capitalCurrency === accountCurrency || displayCapital != null;
+    const oldDisp  = oldFxOk ? accountCurrency : capitalCurrency;
+    eq("🔴 תחת הכלל ה**ישן** הסמל והבסיס **נפרדו**", oldDisp !== eb.currency, true);
+
+    // הכלל החדש. ⚠️ הביטוי עצמו ננעל ב-`SwingEdge_App.jsx` באסרציית מקור 15.8 —
+    //    כאן נמדדת ה**תוצאה**, שם נמדד שהמסך מריץ את אותו ביטוי.
+    const newFxOk = capitalCurrency === accountCurrency || (displayCapital != null && eb.ok);
+    const newDisp = newFxOk ? accountCurrency : capitalCurrency;
+    eq("✅ תחת הכלל החדש הסמל והבסיס ⛔ אינם יכולים להיפרד", newDisp, eb.currency);
+    // המכנה של `curEquityReturnPct` הוא `equityBase`, והמונה הוא `curEquity`
+    // שנבנה ב-`dispCcy`. שוויון היחידות הוא כל מה שהופך את היחס ליחס.
+    eq("✅ …ולכן המונה והמכנה של ה-% באותה יחידה", newDisp === eb.currency, true);
+  }
+
+  // ── 15.5c · S8γ — ה**מראה** של 15.5b: ה-spot נפל, יום הבסיס **קיים** ────
+  //
+  // 🔴 **נמצא באימות-העין של `C-023`, ⛔ לא בתכנון.** 15.5b סגר כיוון אחד
+  //    (spot עובד · יום הבסיס חסר). הכיוון ההפוך נשאר פתוח, וההערה ב-
+  //    `SwingEdge_App.jsx:2099` הצהירה עליו במפורש שהוא ⛔ אינו יכול לקרות:
+  //    "הוא נקוב ב-`equityBaseD.currency`, ואחרי השער למעלה זה **תמיד**
+  //    `dispCcy`". ההצהרה הזו הייתה **שקרית**, והדפדפן הראה אותה: ₪ הפך ל-$.
+  //
+  // ⚠️ ⛔ זה ⛔ אינו מצב תיאורטי. `loadRateTable` מחזיר בדיוק את הטבלה הזו
+  //    במסלול ה-`catch` שלו — הרשת נפלה, וההיסטוריה החסינה יושבת ב-
+  //    localStorage. כלומר: כל משתמש שנופל לו האינטרנט אחרי שכבר טען פעם
+  //    אחת. `spot` ⛔ לעולם ⛔ אינו נשמר לקאש (מכוון), ולכן הצירוף
+  //    "יש `byDay`, אין `spot`" הוא ה**ברירה** במסלול הזה, ⛔ לא הקצה שלו.
+  console.log("  15.5c · S8γ · ה-spot נפל בעוד fixing יום הבסיס קיים");
+  {
+    const capital = 10_000;
+    const capitalCurrency = "USD", accountCurrency = "ILS";
+    // ⛔ אין `spot`, **יש** `byDay` — פלט `loadRateTable` במסלול ה-catch.
+    const noSpot = { base: "USD", quote: "ILS", spot: null,
+      byDay: { [DAY]: { rate: 2.0, rateDate: DAY } } };
+    const trades = [aapl()];
+    const eb = resolveEquityBase({ capital, capitalCurrency, accountCurrency,
+      fxTable: noSpot, trades });
+
+    const displayCapital = convert(capital, capitalCurrency, accountCurrency, noSpot).value;
+    eq("ה-spot נפל ⇒ `displayCapital` הוא null", displayCapital, null);
+    eq("🔴 ובכל זאת הבסיס **הומר** — יום הבסיס קיים", eb.ok, true);
+    eq("🔴 …ולכן ההכרעה נקובה ב-ILS", eb.currency, accountCurrency);
+
+    // `fxOk` שקר — ו**בצדק**: `capitalShown` הוא ערך הווה ו⛔אינו יכול להמיר
+    // בלי spot. הפגם ⛔ אינו ב-`fxOk`, אלא בהנחה שהבסיס עוקב אחריו מאליו.
+    const fxOk = capitalCurrency === accountCurrency || (displayCapital != null && eb.ok);
+    eq("`fxOk` שקר — `capitalShown` ⛔ אינו יכול להמיר בלי spot", fxOk, false);
+    const dispCcy = fxOk ? accountCurrency : capitalCurrency;
+    eq("⇒ הכותרת מדפיסה את הסמל של USD", dispCcy, "USD");
+    eq("🔴 בעוד ההכרעה נקובה ILS ⇒ הסמל וההכרעה **נפרדו**", dispCcy !== eb.currency, true);
+
+    // 🔴 **הערך שזז** — נצפה בדפדפן לפני שהשורה הזו נגעה: `$20,100.00`.
+    //    20,000 **שקלים** ועוד 100 **דולר**, מודפסים תחת "$".
+    const calc = makeConvertingCalc(null, dispCcy, "identity");
+    const oldFold = foldClosed(eb.value, trades, calc);
+    eq("🔴 מה שהמסך הראה — 20,000 ₪ + 100 $ תחת '$'", oldFold.value, 20_100);
+    eq("…ו⛔בלי שאיש נספר, כי ה**בסיס** ⛔ אינו איבר שאפשר להחריג", oldFold.unconvertedCount, 0);
+
+    // ✅ התיקון. הבסיס ⛔ אינו איבר שניתן להחריג ולספור — הוא ה**עוגן**. לכן
+    //    כש-`fxOk` שקר הוא חוזר להיות ההון הגולמי במטבע ההון, בדיוק כמו
+    //    שההכרעה עצמה עושה בשלושת המסלולים האחרים. הביטוי ננעל ב-15.8.
+    const newBase = fxOk ? eb.value : capital;
+    eq("✅ הבסיס חוזר להון הגולמי ⇒ נקוב ב-`dispCcy`", newBase, 10_000);
+    const newFold = foldClosed(newBase, trades, calc);
+    eq("✅ **הערך שזז**: היה 20,100 (₪+$) ⇒ עכשיו 10,100, כולו USD", newFold.value, 10_100);
+    eq("✅ …ו⛔אין מה לספור — ⛔ אף איבר ⛔ לא הוחרג", newFold.unconvertedCount, 0);
+
+    // ⚠️ שיניים — התיקון ⛔ אינו רשאי לגעת בשלושת המסלולים שכבר עבדו.
+    const tbl = mkTable("USD", "ILS", 2.0, 3.0);
+    const ok = resolveEquityBase({ capital, capitalCurrency, accountCurrency, fxTable: tbl, trades });
+    const okFxOk = convert(capital, capitalCurrency, accountCurrency, tbl).value != null && ok.ok;
+    eq("שיניים · המסלול התקין ⛔ לא זז", okFxOk ? ok.value : capital, 20_000);
+  }
+
+  // ── 15.6 · שיניים — סירוב **גורף** ⛔ אינו יכול לעבור ────────────────────
+  //
+  // ⚠️ בלעדי הבלוק הזה, "תיקון" שמסמן כל עסקה היה מאפס את הכותרת ועובר את
+  //    15.1-15.3 בגאווה. זו מחיקת פיצ'ר, ⛔ לא תיקון.
+  console.log("  15.6 · שיניים — S3/S4 מומרים, ⛔ אפס סימון");
+  {
+    const t = aapl();
+    // S3 — הון USD · חשבון ILS · שער קיים ⇒ המרה מלאה.
+    const s3 = makeConvertingCalc(mkTable("USD", "ILS", 2.0, 3.0), "ILS", "ready")(t);
+    eq("S3 · מומר", s3.pnl, 200);
+    eq("S3 · ⛔ אין סימון", "fxUnconverted" in s3, false);
+    // S4 — הון ILS · חשבון USD ⇒ `dispCcy` = USD = מטבע הנייר ⇒ זהות.
+    const s4 = makeConvertingCalc(null, "USD", "identity")(t);
+    eq("S4 · זהות ⇒ הערך עובר כמו שהוא", s4.pnl, 100);
+    eq("S4 · ⛔ אין סימון", "fxUnconverted" in s4, false);
+  }
+
+  // ── 15.7 + 15.8 · החיווט ב-`SwingEdge_App` — אסרציות **מקור** מוצהרות ────
+  //
+  // ⚠️ חוקיות כאן **רק** מפני ש-15.1-15.6 כבר הוכיחו ב**ערך** שההכרעה נכונה.
+  //    `generateEquityCurve` · `closedPnL` · `fxOk` הם `useMemo`/פונקציה
+  //    פרטית בתוך `.jsx` ⛔ שאינו ניתן לייבוא ב-node — בדיוק כמו 14.1.
+  //    ⛔ אינן מחליפות את אימות העין (`C-023`).
+  console.log("  15.7+15.8 · חיווט ההון הסגור");
+  {
+    const app = src("../SwingEdge_App.jsx");
+
+    // ⚠️ הזנת התפר ב-`dispCcy` ננעלת ב-**13.9g** (הצהרת התזוזה `M1` של `B-142`
+    //    יושבת שם, במקום שבו האסרציה הישנה חיה) — ⛔ אין כאן עותק שני שלה.
+
+    check("`closedPnL` צורך את הסימון ⛔ ואינו מחשב הכרעה משלו",
+      /const closedPnL = useMemo\([\s\S]{0,700}?fxUnconverted/.test(app) &&
+      !/const closedPnL = useMemo\([\s\S]{0,700}?accountAmount\(/.test(app));
+    check("`curEquity` נבנה מ-`equityBase` + סגור + חי ⛔ ולא מ-`currentEquity`",
+      /const curEquity = useMemo\(\s*\(\) => equityBase \+ closedPnL\.value \+ openPnL\.value/.test(app));
+    // ⚠️ **נמדד על הקוד בלבד.** הניסוח הראשון היה `!/stats\.currentEquity/`
+    // על הקובץ כולו, והוא נכשל על **שלוש הערות** שמסבירות למה השדה נעזב —
+    // כלומר על התיעוד שהגל הזה נדרש לכתוב. אסרציה שמענישה הסבר מודדת נוכחות
+    // של טקסט ⛔ ולא **צריכה**, וזה ⛔ אינו הנושא שלה. הנושא נשמר מילה במילה:
+    // אף מסלול רינדור ⛔ אינו קורא את השדה. ⛔ הסף לא רוכך — הוא חודד.
+    const code = app.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    check("⛔ `stats.currentEquity` ⛔ אינו נצרך יותר בכותרת (B-143 בעליו)",
+      !/stats\.currentEquity/.test(code));
+    check("…ולאסרציה יש שיניים — היא רואה צריכה אמיתית כשיש כזו",
+      /stats\.closedMetrics/.test(code));
+
+    // 15.7 — הגרף והכותרת ⛔ אינם יכולים להיחלק.
+    check("🔴 15.7 · עקומת ההון מדלגת על איבר מסומן",
+      /generateEquityCurve[\s\S]{0,900}?fxUnconverted/.test(app));
+    check("…ותלויה ב-`equityBase` — אותו בסיס שהכותרת מדפיסה",
+      /generateEquityCurve\(equityBase, realTrades, stableCalcTradeMetrics\)/.test(app));
+
+    // 15.5c — הבסיס עוקב אחרי `fxOk`, ⛔ לא אחרי עצמו. ⚠️ האסרציה הזו נמדדה
+    // **אדומה** על הקוד שנדחף ב-`be41b78`, אחרי שהדפדפן הראה `$20,100.00`.
+    check("🔴 15.5c · `equityBase` נופל להון הגולמי כש-`fxOk` שקר",
+      /const equityBase = fxOk \? equityBaseD\.value : capital;/.test(app));
+
+    // ה-`useMemo` המוזז — ⛔ אסור להחזירו מתחת ל-`fxOk`.
+    const iEb = app.indexOf("const equityBaseD");
+    const iFx = app.indexOf("const fxOk =");
+    check("🔴 `equityBaseD` מחושב **מעל** `fxOk` (⛔ אחרת `fxOk` קורא ערך שטרם קיים)",
+      iEb > 0 && iFx > 0 && iEb < iFx);
+    check("`fxOk` צורך את הכרעת הבסיס", /const fxOk = [^\n]*equityBaseD\.ok/.test(app));
+
+    // הגילוי — באנר **אחד** עם שלושת המונים, ⛔ לא שניים סמוכים.
+    check("באנר אחד מאוחד נושא את מוני הסגור וה**חי** יחד",
+      /closedPnL\.unconvertedCount/.test(app) && /openPnL\.unconvertedCount/.test(app) &&
+      /openPnL\.missingCount/.test(app));
+    check("⛔ המונה נמסר עם **מכנה** (§2 — אפס מנה בלי מכנה)",
+      /partialSumWarn/.test(app) && /\{m\}/.test(src("../src/i18n.js")));
+    check("באנר הערבוב נושא מונה ⛔ ולא רק רשימת מטבעות",
+      /mixedCurrencyCounts|tradesByCurrency/.test(app));
   }
 }
 

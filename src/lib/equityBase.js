@@ -55,28 +55,53 @@ export const equityBaseDayKey = (trades = []) => {
 };
 
 /**
- * The capital base the equity curve and the return % are computed from,
- * expressed in the display currency.
+ * The capital base the equity curve and the return % are computed from.
  *
- * @returns {number} never null — a base is always a usable number, but a base
- *          that could not be honestly converted stays in its own currency
- *          rather than borrowing today's rate.
+ * ── B-142 (2026-08-15) · returns a DECISION, not a number ────────────────────
+ *
+ * 🔴 It used to return a bare number, and the degradation path above meant that
+ * number was SOMETIMES denominated in `accountCurrency` and sometimes in
+ * `capitalCurrency` — with nothing on it saying which. The caller printed it
+ * under the account symbol either way, and divided `curEquity` by it to get the
+ * return %. A base in shekels under a dollar sign, and a percentage that is a
+ * ratio of two different units. Both silent. That was T10 finding 2 coming back
+ * through a side door, and it is exactly the shape `livePnlAmount` already
+ * refuses in `useFxRates.js`.
+ *
+ * ⇒ same shape as every other FX decision in this codebase:
+ *
+ *   { ok:true,  reason:"identity"|"converted"|"spot", value, currency:accountCurrency }
+ *   { ok:false, reason:<convert's own reason>,        value:<raw capital>, currency:capitalCurrency }
+ *
+ * ⚠️ `value` is NEVER null — unlike `amountAt`. A curve must have an origin, and
+ * the contract at the top of this file (the degradation path) says the shortfall
+ * comes back as the RAW capital and never as spot. That has not moved. What
+ * moved is that the caller now LEARNS which currency it got, instead of assuming.
+ *
+ * ⛔ No `|| 1` and no guessed rate: `ok:false` is an answer the screen acts on.
  */
 export const resolveEquityBase = ({ capital, capitalCurrency, accountCurrency, fxTable, trades = [] }) => {
   const cap = Number(capital) || 0;
+  // The refusal keeps the capital AS IT IS, and says so in its own currency.
+  const refuse = (reason) => ({ ok: false, reason, value: cap, currency: capitalCurrency });
 
   // Identity is not a conversion (fx.js:64-67).
-  if (capitalCurrency === accountCurrency) return cap;
+  if (capitalCurrency === accountCurrency)
+    return { ok: true, reason: "identity", value: cap, currency: accountCurrency };
 
   const dayKey = equityBaseDayKey(trades);
   if (!dayKey) {
     // No closed trades: the curve is a single point, and a single point is a
-    // claim about NOW. Spot is the correct rate for a present value.
-    const { value } = convert(cap, capitalCurrency, accountCurrency, fxTable);
-    return value == null ? cap : value;
+    // claim about NOW. Spot is the correct rate for a present value — and it is
+    // reported as "spot" rather than "converted" so the distinction stays
+    // readable at the call site instead of living only in this comment.
+    const { value, reason } = convert(cap, capitalCurrency, accountCurrency, fxTable);
+    if (value == null) return refuse(reason || "no_spot_rate");
+    return { ok: true, reason: "spot", value, currency: accountCurrency };
   }
 
-  const { value } = convert(cap, capitalCurrency, accountCurrency, fxTable, dayKey);
+  const { value, reason } = convert(cap, capitalCurrency, accountCurrency, fxTable, dayKey);
   // No fixing for the base day → keep the capital as it is. Never spot.
-  return value == null ? cap : value;
+  if (value == null) return refuse(reason || "no_rate_for_day");
+  return { ok: true, reason: "converted", value, currency: accountCurrency };
 };

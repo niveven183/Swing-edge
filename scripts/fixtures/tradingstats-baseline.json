@@ -10,6 +10,7 @@
     "totalWin": 0,
     "totalLoss": 0,
     "pnlByCurrency": {},
+    "tradesByCurrency": {},
     "currencies": [],
     "mixedCurrency": false,
     "winRate": 0,
@@ -71,6 +72,9 @@
     "totalLoss": 280,
     "pnlByCurrency": {
       "USD": 230
+    },
+    "tradesByCurrency": {
+      "USD": 8
     },
     "currencies": [
       "USD"
@@ -550,6 +554,9 @@
     "pnlByCurrency": {
       "USD": 50
     },
+    "tradesByCurrency": {
+      "USD": 6
+    },
     "currencies": [
       "USD"
     ],
@@ -922,6 +929,9 @@
     "pnlByCurrency": {
       "USD": 300
     },
+    "tradesByCurrency": {
+      "USD": 5
+    },
     "currencies": [
       "USD"
     ],
@@ -1259,6 +1269,9 @@
     "pnlByCurrency": {
       "USD": 100
     },
+    "tradesByCurrency": {
+      "USD": 3
+    },
     "currencies": [
       "USD"
     ],
@@ -1515,6 +1528,9 @@
     "pnlByCurrency": {
       "USD": 0
     },
+    "tradesByCurrency": {
+      "USD": 2
+    },
     "currencies": [
       "USD"
     ],
@@ -1719,6 +1735,9 @@
     "totalLoss": 150,
     "pnlByCurrency": {
       "USD": 50
+    },
+    "tradesByCurrency": {
+      "USD": 2
     },
     "currencies": [
       "USD"
@@ -1931,6 +1950,9 @@
     "totalLoss": 200,
     "pnlByCurrency": {
       "USD": 0
+    },
+    "tradesByCurrency": {
+      "USD": 2
     },
     "currencies": [
       "USD"
