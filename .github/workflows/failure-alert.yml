@@ -19,6 +19,10 @@ jobs:
       MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
     steps:
       - name: Email failure alert
+        id: mail
+        # continue-on-error so a dead SMTP does not hide a working Discord. The
+        # run's verdict is decided by the delivery gate at the end, never here.
+        continue-on-error: true
         if: ${{ env.MAIL_USERNAME != '' && env.MAIL_PASSWORD != '' }}
         uses: dawidd6/action-send-mail@v3
         with:
@@ -40,18 +44,61 @@ jobs:
         run: echo "::warning::MAIL_USERNAME/MAIL_PASSWORD not set — email skipped."
 
       - name: Report to Discord
+        id: discord
+        # continue-on-error mirrors the mail step: this step REPORTS delivery,
+        # it does not decide the run. Before 2026-08-15 it also swallowed the
+        # HTTP status — `curl -sS` without --fail exits 0 on 401/404/500, so a
+        # revoked webhook printed "HTTP 401" and the step stayed green. The
+        # status is now compared explicitly and published as an output.
         continue-on-error: true
         env:
           DISCORD_WEBHOOK: ${{ secrets.SENTINEL_DISCORD_WEBHOOK }}
           FA_WF_NAME: ${{ github.event.workflow_run.name }}
           FA_RUN_URL: ${{ github.event.workflow_run.html_url }}
         run: |
+          set -uo pipefail
+          # `delivered` is written ONCE, only on HTTP 204. Every other path —
+          # missing secret, curl error, non-204 — leaves it unset, and the gate
+          # treats unset as "not delivered". Deliberately not written as a
+          # `false` default first: that would depend on last-write-wins.
           if [ -z "${DISCORD_WEBHOOK:-}" ]; then
-            echo "::warning::SENTINEL_DISCORD_WEBHOOK not set — skipping Discord."
-            exit 0
+            echo "::error::SENTINEL_DISCORD_WEBHOOK not set — Discord channel unavailable."
+            exit 1
           fi
           DESC="$(printf '%s\n' "הריצה של $FA_WF_NAME נכשלה." "פרטים: $FA_RUN_URL")"
           payload="$(jq -n --arg u "SwingEdge Failure Alert" --arg t "🚨 Failure Alert" --arg d "$DESC" --argjson c 15158332 \
             '{username:$u, embeds:[{title:$t, description:$d, color:$c}]}')"
-          curl -sS -o /dev/null -w 'discord POST -> HTTP %{http_code}\n' \
-            -X POST -H "Content-Type: application/json" -d "$payload" "$DISCORD_WEBHOOK"
+          code="$(curl -sS -o /tmp/discord.out -w '%{http_code}' \
+            -X POST -H "Content-Type: application/json" -d "$payload" "$DISCORD_WEBHOOK")"
+          echo "discord POST -> HTTP $code"
+          if [ "$code" != "204" ]; then
+            echo "::error::Discord rejected the alert (HTTP $code)"
+            head -c 500 /tmp/discord.out || true
+            exit 1
+          fi
+          echo "delivered=true" >> "$GITHUB_OUTPUT"
+
+      # The run's only real verdict. An alert that reached NOBODY must go red —
+      # otherwise a green Failure Alert run means "we tried", which is exactly
+      # the silent success this workflow exists to prevent. One channel down is
+      # a warning; both down is a failure.
+      - name: Delivery gate
+        if: ${{ always() }}
+        env:
+          MAIL_OUTCOME: ${{ steps.mail.outcome }}
+          DISCORD_DELIVERED: ${{ steps.discord.outputs.delivered }}
+        run: |
+          set -uo pipefail
+          echo "mail step outcome : ${MAIL_OUTCOME:-<not run>}"
+          echo "discord delivered : ${DISCORD_DELIVERED:-<not run>}"
+          ok=0
+          if [ "${MAIL_OUTCOME:-}" = "success" ]; then ok=$((ok+1)); fi
+          if [ "${DISCORD_DELIVERED:-}" = "true" ]; then ok=$((ok+1)); fi
+          echo "channels delivered: $ok/2"
+          if [ "$ok" -eq 0 ]; then
+            echo "::error::ההתראה ⛔ לא נמסרה באף ערוץ — מייל וגם דיסקורד נכשלו. הכשל המקורי ⛔ לא דווח לאיש."
+            exit 1
+          fi
+          if [ "$ok" -eq 1 ]; then
+            echo "::warning::ערוץ אחד בלבד מסר את ההתראה. בדוק את הערוץ השני."
+          fi

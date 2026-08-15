@@ -121,15 +121,20 @@ jobs:
           jq -n --argjson c "$color" --arg d "$desc" '{color:$c,description:$d}' > watchdog-result.json
           echo "watchdog-result:"; cat watchdog-result.json
 
+      # Discord is Watchdog's ONLY output channel — there is no mail fallback.
+      # A post that does not land means the daily green/amber/red report reached
+      # nobody, so this step must be able to fail the run (Watchdog is itself in
+      # failure-alert.yml's watch list, so a red run does get reported). Before
+      # 2026-08-15 it was continue-on-error with an unchecked `curl -sS`: a
+      # revoked webhook printed "HTTP 401" and the run stayed green forever.
       - name: Report to Discord
-        continue-on-error: true
         env:
           DISCORD_WEBHOOK: ${{ secrets.SENTINEL_DISCORD_WEBHOOK }}
         run: |
           set -uo pipefail
           if [ -z "${DISCORD_WEBHOOK:-}" ]; then
-            echo "::warning::SENTINEL_DISCORD_WEBHOOK not set — skipping Discord."
-            exit 0
+            echo "::error::SENTINEL_DISCORD_WEBHOOK not set — the daily report has nowhere to go."
+            exit 1
           fi
           if [ -f watchdog-result.json ]; then
             color="$(jq -r '.color' watchdog-result.json)"
@@ -142,5 +147,11 @@ jobs:
           fi
           payload="$(jq -n --arg u "SwingEdge Watchdog" --arg d "$desc" --argjson c "$color" \
             '{username:$u, embeds:[{description:$d, color:$c}]}')"
-          curl -sS -o /dev/null -w 'discord POST -> HTTP %{http_code}\n' \
-            -X POST -H "Content-Type: application/json" -d "$payload" "$DISCORD_WEBHOOK"
+          code="$(curl -sS -o /tmp/discord.out -w '%{http_code}' \
+            -X POST -H "Content-Type: application/json" -d "$payload" "$DISCORD_WEBHOOK")"
+          echo "discord POST -> HTTP $code"
+          if [ "$code" != "204" ]; then
+            echo "::error::Discord rejected the watchdog report (HTTP $code)"
+            head -c 500 /tmp/discord.out || true
+            exit 1
+          fi
