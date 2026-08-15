@@ -35,7 +35,14 @@ const SUPA_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON
 const TICKER = 'SNTNL';
 const FIXED_TRADES = ['AAPL', 'NVDA', 'BTC-USD'];
 const COMPONENT = 'דפדפן (מחובר)';
-const ROWS = 'table.w-full.text-xs tbody tr';
+// Scoped to the journal table's own data-testid, NOT to `table.w-full.text-xs`:
+// that class trio matches 3 tables in SwingEdge_App.jsx and 3 more in AdminPanel.jsx
+// (B-146). Two consequences, both real: `waitFor` below hit a strict-mode violation,
+// and `rows.count()` in check 4 is compared as `n < FIXED_TRADES.length` — so rows
+// borrowed from a second matching table INFLATE the count and make the assertion
+// pass when it should fail. An over-counting check is a silent pass, not a nuisance.
+const JOURNAL_TABLE = '[data-testid="journal-table"]';
+const ROWS = `${JOURNAL_TABLE} tbody tr`;
 
 const IGNORE_SUBSTR = [
   'vercel', 'va.vercel-scripts', '/_vercel/insights',
@@ -201,7 +208,7 @@ function sntnlRows(page) {
 
 async function openJournal(page) {
   await page.locator('[data-tour-tab="journal"]').click();
-  await page.locator('table.w-full.text-xs').waitFor({ state: 'visible', timeout: 15_000 });
+  await page.locator(JOURNAL_TABLE).waitFor({ state: 'visible', timeout: 15_000 });
 }
 
 // Deletes the SNTNL row through the UI, exactly the way a user would.

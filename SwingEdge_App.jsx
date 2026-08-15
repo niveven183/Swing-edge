@@ -4977,7 +4977,10 @@ export default function SwingEdge() {
               </div>
             )}
             <div className="hidden md:block overflow-x-auto bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl">
-              <table className="w-full text-xs">
+              {/* data-testid is the STABLE handle for the journal table. `table.w-full.text-xs`
+                  matches 3 tables in this file and 3 more in AdminPanel.jsx, so Sentinel's
+                  selector hit a strict-mode violation the moment two were visible (B-146). */}
+              <table data-testid="journal-table" className="w-full text-xs">
                 <thead>
                   <tr className="text-slate-600 border-b border-[var(--border-subtle)] dark:border-white/[0.06] text-[10px] tracking-widest uppercase">
                     <th className="p-3 text-start font-semibold w-8">

@@ -5,6 +5,11 @@ name: Health Monitor
 # domain and more (parses status, failing[] incl. Supabase, warnings[]).
 # Schedule removed to stop noise/concurrency conflicts with Sentinel; kept
 # dispatchable for manual backup. Do not delete.
+#
+# Deliberately NOT on failure-alert.yml's watch list and NOT in watchdog.yml's
+# MAXAGE table: it has no `schedule:`, so it only ever runs when a human dispatches
+# it and is watching the result. Staleness here means "nobody needed it", not "it
+# died". This line exists so the absence reads as a decision, not an oversight.
 
 on:
   workflow_dispatch:
