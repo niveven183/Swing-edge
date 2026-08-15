@@ -1,0 +1,67 @@
+name: 🐤 Canary Drill — התראת-בדיקה
+
+# WHY THIS EXISTS
+# ---------------
+# Every other guardian in this repo measures *presence* — "did X run recently?".
+# Nothing measured whether an alert, once triggered, is actually DELIVERED. The
+# steady-state of failure-alert.yml is silence, and silence is indistinguishable
+# from a dead webhook, an expired SMTP secret, or a `curl` that printed HTTP 401
+# and exited 0. Measured 2026-08-15: 1,460 Failure Alert runs, 299/300 of the
+# recent ones `skipped`, exactly ONE real alert in 7 days. A network that fires
+# once a week cannot be validated by waiting for it to fire.
+#
+# This workflow produces a CONTROLLED failure on demand so the real, untouched
+# alerting path can be observed end to end.
+#
+# SAFETY — read before adding any trigger
+# ---------------------------------------
+#  * `workflow_dispatch` ONLY. There is deliberately NO `schedule:` and NO
+#    `push:`. Nothing here can generate a failure unless a human typed it.
+#    Adding a trigger would make this repo self-alarming on a timer — that was
+#    considered and rejected (docs/plans/PLAN-guardians.md §5.1).
+#  * Because there is no `schedule:`, watchdog.yml's consistency check (which
+#    only flags files carrying a `schedule:` key) correctly ignores this file.
+#    It needs no MAXAGE row and is not an orphan.
+#  * `mode` defaults to `pass`. The failing path requires an explicit choice.
+#
+# HOW IT IS OBSERVED
+# ------------------
+# failure-alert.yml watches this workflow by name and builds the mail subject
+# from `github.event.workflow_run.name`, so the 🐤 tag reaches the inbox subject
+# line, not just Discord. The drill therefore travels the REAL path to the REAL
+# channel — a dedicated webhook would only have proven the dedicated webhook.
+#
+# Runbook: docs/RUNBOOK.md § תרגיל הקנרית · Check: docs/CHECKS.md C-026
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'pass = בקרה שלילית (⛔ אסור שתיווצר התראה) · fail = תרגיל (חייבת להגיע התראה)'
+        type: choice
+        options: [pass, fail]
+        default: pass
+
+permissions:
+  contents: read
+
+concurrency:
+  group: canary-drill
+  cancel-in-progress: false
+
+jobs:
+  drill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Drill outcome
+        env:
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -uo pipefail
+          echo "🐤 Canary Drill — mode=${MODE}"
+          if [ "$MODE" = "fail" ]; then
+            echo "::error::🐤 זהו תרגיל. כשל מכוון כדי לאמת שרשת ההתראות מוסרת בפועל. אין תקלה אמיתית."
+            exit 1
+          fi
+          echo "בקרה שלילית: הריצה מסתיימת ירוקה. ⛔ אסור שתיווצר ולו התראה אחת."
