@@ -325,6 +325,46 @@ check("9.5", `${inboxRows.length - badInbox.length}/${inboxRows.length} שורו
   badInbox.length === 0,
   badInbox.map((r) => `docs/INBOX.md:${r.lineNo} — תאריך="${r.cells[0] ?? ""}" מקור="${r.cells[2] ?? ""}"`).join("\n      "));
 
+// ⚠️ **9.6 — `STATE ⏭️` מצטט את `NEXT`, ⛔ ואינו מחזיק רשימה משלו.**
+//
+// ⛔ **האסרציה הזו נולדה מסתירה מדודה, ⛔ לא מהשערה.** 15.08 נמדד שהשתיים חיו
+// במקביל ב-**0/3 חפיפה**: `STATE ⏭️` נשא `B-007`·`B-009`·`B-006` בעוד `NEXT`
+// נשא `B-001`+`B-002`+`B-018`·`B-129`·`B-143` (`B-145`). ⇒ שתי הכרעות בלי בעלים
+// אחד, והקורא ⛔ אינו יודע איזו מהן חיה.
+//
+// 🔴 **ו-`9.1`–`9.5` ⛔ לא יכלו לתפוס זאת** — חמשתן קוראות את `NEXT` **לבדו**
+// ומאמתות שהוא **תקין בפני עצמו**: תקרה · מניין · הפניות קיימות · מדד סגירה.
+// ⛔ **שער שמאמת נוכחות ואינו מאמת הסכמה הוא `R-3`** — הוא ירוק בדיוק ביום
+// שבו שני הקבצים אומרים דברים הפוכים.
+//
+// ⚠️ **ההשוואה מול ה**כותרות** בלבד, ⛔ לא מול גוף הפריט.** הגוף מצטט מזהי
+// **הקשר** (`B-142` ו-`B-144` יושבים שם היום), ודרישה ש-`STATE` ישקף גם אותם
+// הייתה הופכת אותו לעותק שני של הפרוזה — בדיוק ה-`R-6` שהשער נועד למנוע.
+// ⇒ **הכותרת היא ההכרעה; הגוף הוא ההנמקה.**
+//
+// ⚠️ **והבדיקה דו-כיוונית בכוונה.** "כל מזהה של `NEXT` מופיע ב-`STATE`" לבדה
+// עוברת גם כשב-`STATE` יושבים שלושה פריטים **נוספים** — כלומר בדיוק המצב
+// שנמדד. ⇒ נבדק גם העודף.
+const NEXT_HEAD = /^##\s*⏭️/;
+const stStart = lines.STATE.findIndex((l) => NEXT_HEAD.test(l));
+const stEnd = stStart < 0 ? -1
+  : lines.STATE.findIndex((l, i) => i > stStart && (/^##\s/.test(l) || /^---\s*$/.test(l)));
+const stBlock = stStart < 0 ? []
+  : lines.STATE.slice(stStart, stEnd < 0 ? lines.STATE.length : stEnd);
+const ids = (s) => [...s.matchAll(/B-\d{3}/g)].map((x) => x[0]);
+const stateNextIds = new Set(ids(stBlock.join("\n")));
+const nextTitleIds = new Set(items.flatMap((it) => ids(it.title)));
+const missingInState = [...nextTitleIds].filter((id) => !stateNextIds.has(id));
+const extraInState = [...stateNextIds].filter((id) => !nextTitleIds.has(id));
+check("9.6",
+  `STATE ⏭️ = NEXT — ${stateNextIds.size} מזהים משני הצדדים, זהות דו-כיוונית`,
+  stStart >= 0 && nextTitleIds.size > 0 && missingInState.length === 0 && extraInState.length === 0,
+  stStart < 0 ? "⛔ מקטע ⏭️ לא נמצא ב-docs/STATE.md — הפורמט נשבר"
+    : nextTitleIds.size === 0 ? "⛔ אפס מזהים בכותרות NEXT — הפורמט נשבר, וזהות מול ריק אינה זהות"
+    : [missingInState.length ? `ב-NEXT ⛔ ואינו ב-STATE ⏭️: ${missingInState.join(" · ")}` : "",
+       extraInState.length ? `ב-STATE ⏭️ ⛔ ואינו ב-NEXT: ${extraInState.join(" · ")} — ⛔ STATE מצטט, ⛔ אינו מכריע` : ""]
+      .filter(Boolean).join("\n      "));
+
 // ── §10 · ⛔ קובץ-מרשם מחוץ ל-`docs/` ────────────────────────────────────────
 //
 // ⚠️ **זו האסרציה שנולדה מכישלון מדוד, ⛔ לא מהשערה.** `SwingEdge-Master-Tasks.md`
