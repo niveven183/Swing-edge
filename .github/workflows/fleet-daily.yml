@@ -2,8 +2,9 @@ name: Fleet Daily
 
 # 24/7 replacement for two local Cowork agents (Cost Watchdog + Growth Pulse).
 # Runs in GitHub Actions so it no longer depends on Niv's Mac being awake and
-# Claude Desktop being open. Reports three Discord embeds (💰 Cost, 📈 Growth,
-# 🐕 Watchdog liveness) via the shared Sentinel webhook. Read-only: SELECT-only psql over the existing
+# Claude Desktop being open. Reports four Discord embeds (💰 Cost, 📈 Growth,
+# 🐕 Watchdog liveness, 🔗 Alert correlation) via the shared Sentinel webhook.
+# Read-only: SELECT-only psql over the existing
 # SUPABASE_DB_URL, zero repo writes, aggregate numbers only (no PII, no secrets
 # in output). Day-over-day deltas persist via the Actions cache (Sentinel's
 # pattern). Complements — never replaces — Sentinel/health/smoke.
@@ -267,6 +268,104 @@ jobs:
           jq -n --argjson c "$color" --arg d "$desc" '{color:$c,description:$d}' > watchdog-embed.json
           echo "watchdog-embed:"; cat watchdog-embed.json
 
+      - name: Alert correlation
+        # Every other guardian measures PRESENCE ("did X run?"). This one measures
+        # COVERAGE: of the runs that actually failed in the last 24h and are on
+        # failure-alert.yml's watch list, how many produced an alert run? Its
+        # denominator is REAL FAILURES, not time — so in a quiet week it reports
+        # "0 failures" and is structurally incapable of false-alarming.
+        #
+        # Three measured limitations, stated rather than hidden (2026-08-15):
+        #  1. A Failure Alert run carries NO field naming the run that triggered it,
+        #     so the match is by TIME (alert created within WINDOW_MIN of the failed
+        #     run's conclusion), not by id. Two failures inside one window are
+        #     indistinguishable — this over-credits, never under-credits.
+        #  2. `status=success`, not `completed`: 299 of the last 300 Failure Alert
+        #     runs are `skipped` (the job-level `if:` gate on non-failure
+        #     conclusions), so `completed` would count skips as alerts.
+        #  3. Retrospective, ≤24h, and it does NOT replace the canary drill —
+        #     it can only see failures that happened, never prove one would fire.
+        #
+        # The watch list is READ FROM failure-alert.yml over the contents API rather
+        # than restated here: this workflow has no checkout step, and a second copy
+        # of the list is a copy that drifts (R-6).
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          WINDOW_MIN: '15'
+        run: |
+          set -uo pipefail
+          set +e                    # runner injects `bash -e`; a failed API call must degrade to 🔴, not abort
+          RED=15158332; GREEN=3066993
+          stamp="$(date -u '+%Y-%m-%d %H:%M UTC')"
+          since="$(date -u -d '24 hours ago' '+%Y-%m-%dT%H:%M:%SZ')"
+
+          bail() { # colour-red embed + exit 0 — a broken check must SPEAK, never vanish
+            jq -n --argjson c "$RED" --arg d "$(printf '🔗 Alert Correlation — הבדיקה עצמה נכשלה\n🔴 %s\nנבדק: %s' "$1" "$stamp")" \
+              '{color:$c,description:$d}' > alertcorr-embed.json
+            echo "alertcorr-embed:"; cat alertcorr-embed.json
+            exit 0
+          }
+
+          fa_b64="$(gh api "/repos/$REPO/contents/.github/workflows/failure-alert.yml" --jq '.content' 2>/tmp/acerr)"
+          [ $? -eq 0 ] && [ -n "$fa_b64" ] || bail "לא ניתן לקרוא את failure-alert.yml: $(head -1 /tmp/acerr 2>/dev/null || echo 'gh api error')"
+          watch="$(printf '%s' "$fa_b64" | tr -d '\n' | base64 -d 2>/dev/null \
+            | grep -oE 'workflows: \[[^]]*\]' | grep -oE '"[^"]+"' | tr -d '"')"
+          [ -n "$watch" ] || bail "רשימת הצפייה נקראה ריקה — ייתכן ש-failure-alert.yml שינה מבנה"
+          n_watch="$(printf '%s\n' "$watch" | grep -c .)"
+
+          runs="$(gh api "/repos/$REPO/actions/runs?status=failure&created=%3E$since&per_page=100" \
+            --jq '.workflow_runs[] | [.name, .updated_at, .html_url] | @tsv' 2>/tmp/acerr)"
+          [ $? -eq 0 ] || bail "לא ניתן לקרוא ריצות כושלות: $(head -1 /tmp/acerr 2>/dev/null || echo 'gh api error')"
+
+          alerts="$(gh api "/repos/$REPO/actions/workflows/failure-alert.yml/runs?status=success&created=%3E$since&per_page=100" \
+            --jq '.workflow_runs[].created_at' 2>/tmp/acerr)"
+          [ $? -eq 0 ] || bail "לא ניתן לקרוא ריצות Failure Alert: $(head -1 /tmp/acerr 2>/dev/null || echo 'gh api error')"
+          alert_epochs=""
+          while IFS= read -r a; do
+            [ -n "$a" ] || continue
+            ae="$(date -u -d "$a" +%s 2>/dev/null)" && alert_epochs="$alert_epochs $ae"
+          done <<< "$alerts"
+
+          window=$(( WINDOW_MIN * 60 ))
+          total=0; covered=0; miss_lines=""
+          while IFS="$(printf '\t')" read -r wname wupd wurl; do
+            [ -n "$wname" ] || continue
+            printf '%s\n' "$watch" | grep -Fxq "$wname" || continue   # not watched by design
+            total=$((total+1))
+            fe="$(date -u -d "$wupd" +%s 2>/dev/null)"
+            if [ -z "$fe" ]; then
+              miss_lines="${miss_lines}"$'\n'"🔴 $wname — timestamp לא תקין ($wupd)"
+              continue
+            fi
+            hit=0
+            for ae in $alert_epochs; do
+              # allow 60s of clock skew before the conclusion timestamp
+              if [ "$ae" -ge $((fe-60)) ] && [ "$ae" -le $((fe+window)) ]; then hit=1; break; fi
+            done
+            if [ "$hit" = "1" ]; then
+              covered=$((covered+1))
+            else
+              miss_lines="${miss_lines}"$'\n'"🔴 $wname — נכשל ב-$wupd ⛔ ובלי התראה תוך ${WINDOW_MIN} דק' · $wurl"
+            fi
+          done <<< "$runs"
+
+          if [ "$total" -eq 0 ]; then
+            color=$GREEN
+            body="$(printf '🟢 0 כשלים ב-24ש%s אצל %s ה-workflows שבצפייה — ⚠️ מכנה ריק ⛔ אינו ראיה שהרשת עובדת. ההוכחה היא תרגיל הקנרית.' "'" "$n_watch")"
+          elif [ -z "$miss_lines" ]; then
+            color=$GREEN
+            body="$(printf '🟢 %s/%s כשלים שבצפייה קיבלו התראה תוך %s דק%s' "$covered" "$total" "$WINDOW_MIN" "'")"
+          else
+            color=$RED
+            body="$(printf '🔴 %s/%s כשלים שבצפייה קיבלו התראה — %s ⛔ ללא התראה:%b' \
+              "$covered" "$total" "$((total-covered))" "$miss_lines")"
+          fi
+          desc="$(printf '🔗 Alert Correlation — האם התראות באמת נמסרו\n%s\nנבדק: %s' "$body" "$stamp")"
+          jq -n --argjson c "$color" --arg d "$desc" '{color:$c,description:$d}' > alertcorr-embed.json
+          echo "alertcorr-embed:"; cat alertcorr-embed.json
+
       - name: Report to Discord
         env:
           DISCORD_WEBHOOK: ${{ secrets.SENTINEL_DISCORD_WEBHOOK }}
@@ -294,6 +393,7 @@ jobs:
           post cost-embed.json
           post growth-embed.json
           post watchdog-embed.json
+          post alertcorr-embed.json
 
       - name: Save day-over-day state
         if: always()
