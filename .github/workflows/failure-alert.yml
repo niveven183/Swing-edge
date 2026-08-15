@@ -2,18 +2,35 @@ name: Failure Alert
 
 # Instant failure email for workflows whose own email step is content-gated
 # (findings/output non-empty) rather than failure-gated, so a hard crash today
-# produces silence. Excludes: Health Monitor/Smoke Tests/Build/Supabase Backup
-# (already covered by Triage's workflow_run watch list) and Restore Drill
-# (already self-alarms on its own failure condition) — avoids duplicate mail.
+# produces silence.
+#
+# WHAT IS AND IS NOT COVERED (rewritten 2026-08-15 — the previous wording claimed
+# Restore Drill "already self-alarms on its own failure condition", which declared
+# a state impossible while it was possible):
+#  * Excluded — Health Monitor / Smoke Tests / Build / Supabase Backup: genuinely
+#    covered elsewhere, by Triage's own workflow_run watch list. Listing them here
+#    too would only duplicate mail.
+#  * NO LONGER excluded — Restore Drill. Its `always()` alarm step covers every
+#    failure of a job that STARTED, but `always()` cannot run in a job that never
+#    started: broken YAML, a postgres service container that never turns healthy,
+#    a cancelled run, or a timeout. In those modes the drill failed and alarmed
+#    NOBODY. It is now watched. The cost is one duplicate mail on the paths its own
+#    alarm does cover — a bounded price (the drill is monthly) for closing a silent
+#    mode, and duplicate mail is strictly better than no mail.
 on:
   workflow_run:
-    workflows: ["Analyst", "Architecture Auditor", "Daily Digest", "Data Guardian", "Triage", "Sentinel", "Fleet Daily", "Fleet Weekly", "Email Campaign", "Watchdog", "User Analytics", "🐤 Canary Drill — התראת-בדיקה"]
+    workflows: ["Analyst", "Architecture Auditor", "Daily Digest", "Data Guardian", "Triage", "Sentinel", "Fleet Daily", "Fleet Weekly", "Email Campaign", "Watchdog", "User Analytics", "Restore Drill", "🐤 Canary Drill — התראת-בדיקה"]
     types: [completed]
 
 jobs:
   alert:
     if: ${{ github.event.workflow_run.conclusion == 'failure' }}
     runs-on: ubuntu-latest
+    # Derived: 9/9 recent successful alert runs finished in 8–30s (max 30s). The default
+    # cap is 360 minutes. A hung SMTP handshake in the ALERT path is the worst place to
+    # wait six hours — the whole point of this workflow is that the failure is reported
+    # NOW. 5m is 10× the observed max and still same-minute in practice.
+    timeout-minutes: 5
     env:
       MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
       MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}

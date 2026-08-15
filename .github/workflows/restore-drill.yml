@@ -26,6 +26,13 @@ permissions:
 jobs:
   drill:
     runs-on: ubuntu-latest
+    # Derived, not guessed: all 4 runs in history finished in 45s–1m22s (max 1m22s).
+    # The GitHub default is 360 minutes — 263× the observed max, i.e. a hung drill
+    # (service container never healthy, apt mirror stalling, pg_restore blocked)
+    # would sit silent for six hours on a workflow that only runs monthly. 20m is
+    # ~15× the observed max: wide enough for a larger DB and apt variance, narrow
+    # enough that a hang becomes a reported failure the same hour.
+    timeout-minutes: 20
     env:
       MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
       MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
@@ -211,8 +218,17 @@ jobs:
           DESC="$(printf '%s\n' "שחזור אומת: $RD_ROWS שורות ב-$RD_TABLES טבלאות ($RD_DATE)." "כולל כל האינדקסים.")"
           payload="$(jq -n --arg u "SwingEdge Restore Drill" --arg t "✅ Restore Drill" --arg d "$DESC" --argjson c 3066993 \
             '{username:$u, embeds:[{title:$t, description:$d, color:$c}]}')"
-          curl -sS -o /dev/null -w 'discord POST -> HTTP %{http_code}\n' \
-            -X POST -H "Content-Type: application/json" -d "$payload" "$DISCORD_WEBHOOK"
+          # The status is COMPARED, not merely printed: `curl -sS` without --fail exits 0
+          # on 401/404/500, so the old form printed "HTTP 401" and stayed green. Discord is
+          # the SECONDARY channel here (mail is primary), so a rejected post must not
+          # repaint a passing drill red — it warns loudly instead of exiting 1.
+          code="$(curl -sS -o /tmp/discord.out -w '%{http_code}' \
+            -X POST -H "Content-Type: application/json" -d "$payload" "$DISCORD_WEBHOOK")"
+          echo "discord POST -> HTTP $code"
+          if [ "$code" != "204" ]; then
+            echo "::warning::Discord rejected the restore-drill report (HTTP $code) — התוצאה נמסרה במייל בלבד."
+            head -c 500 /tmp/discord.out || true
+          fi
 
       - name: Report failure to Discord
         if: ${{ always() && steps.compare.outputs.status != 'pass' }}
@@ -228,8 +244,16 @@ jobs:
           DESC="$(printf '%s\n' "תרגיל שחזור הגיבוי נכשל — הגיבוי אולי אינו ניתן לשחזור. טפל מיד." "ריצה: $RD_RUN_URL")"
           payload="$(jq -n --arg u "SwingEdge Restore Drill" --arg t "🚨 Restore Drill FAILED" --arg d "$DESC" --argjson c 15158332 \
             '{username:$u, embeds:[{title:$t, description:$d, color:$c}]}')"
-          curl -sS -o /dev/null -w 'discord POST -> HTTP %{http_code}\n' \
-            -X POST -H "Content-Type: application/json" -d "$payload" "$DISCORD_WEBHOOK"
+          # Same comparison as the success path. The run is already going red via
+          # "Enforce drill result", and Restore Drill is now on failure-alert.yml's watch
+          # list, so a Discord outage on THIS path still reaches Niv by another route.
+          code="$(curl -sS -o /tmp/discord.out -w '%{http_code}' \
+            -X POST -H "Content-Type: application/json" -d "$payload" "$DISCORD_WEBHOOK")"
+          echo "discord POST -> HTTP $code"
+          if [ "$code" != "204" ]; then
+            echo "::warning::Discord rejected the restore-drill alarm (HTTP $code)"
+            head -c 500 /tmp/discord.out || true
+          fi
 
       - name: Enforce drill result (red on mismatch)
         if: always()
