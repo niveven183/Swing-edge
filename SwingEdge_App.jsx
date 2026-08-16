@@ -4820,8 +4820,11 @@ export default function SwingEdge() {
                 This used to gate on `closedTrades` (unfiltered) while printing
                 `journalStats` (filtered), so any filter matching no closed
                 trade rendered seven tiles of EMPTY_STATS. That was the only
-                path on which an active user ever saw it. */}
-            {!journalStats.isEmpty && (
+                path on which an active user ever saw it.
+                B-160 — `isEmpty` was a hand-kept literal duplicating this
+                exact condition (`isEmpty ⟺ total === 0`, measured 4/4). The
+                gate now reads the same field the first tile prints. */}
+            {journalStats.total > 0 && (
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
                 <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600">{lang === "he" ? "סה״כ סגורות" : "Closed"}</div>

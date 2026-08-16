@@ -59,8 +59,7 @@
     "byDayOfWeek": [],
     "topEdges": [],
     "antiEdges": [],
-    "closedMetrics": [],
-    "isEmpty": true
+    "closedMetrics": []
   },
   "normal": {
     "totalTrades": 8,
@@ -540,8 +539,7 @@
         "pnl": -120,
         "rMultiple": -2
       }
-    ],
-    "isEmpty": false
+    ]
   },
   "withBreakEven": {
     "totalTrades": 6,
@@ -915,8 +913,7 @@
         "pnl": 0,
         "rMultiple": 0
       }
-    ],
-    "isEmpty": false
+    ]
   },
   "missingStops": {
     "totalTrades": 5,
@@ -1255,8 +1252,7 @@
         "pnl": 100,
         "rMultiple": null
       }
-    ],
-    "isEmpty": false
+    ]
   },
   "openPositions": {
     "totalTrades": 3,
@@ -1514,8 +1510,7 @@
         "pnl": 100,
         "rMultiple": 2
       }
-    ],
-    "isEmpty": false
+    ]
   },
   "closedWithoutExit": {
     "totalTrades": 2,
@@ -1722,8 +1717,7 @@
         "pnl": -200,
         "rMultiple": -2
       }
-    ],
-    "isEmpty": false
+    ]
   },
   "dormantWindows": {
     "totalTrades": 2,
@@ -1937,8 +1931,7 @@
         "pnl": -150,
         "rMultiple": -1.5
       }
-    ],
-    "isEmpty": false
+    ]
   },
   "allOnPlan": {
     "totalTrades": 2,
@@ -2152,7 +2145,6 @@
         "pnl": -200,
         "rMultiple": -2
       }
-    ],
-    "isEmpty": false
+    ]
   }
 }

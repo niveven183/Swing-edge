@@ -272,8 +272,6 @@ export function computeTradingStats(trades, capital, calcTradeMetrics) {
 
     // raw enriched metrics (closed trades with pnl/rMultiple already attached)
     closedMetrics: metrics,
-
-    isEmpty: false,
   };
 }
 
@@ -327,7 +325,6 @@ function EMPTY_STATS(capital) {
     bySetup: [], byEmotion: [], byMarket: [], byEntryQuality: [], byDayOfWeek: [],
     topEdges: [], antiEdges: [],
     closedMetrics: [],
-    isEmpty: true,
   };
 }
 

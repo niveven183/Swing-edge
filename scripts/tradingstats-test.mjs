@@ -64,6 +64,22 @@
 // keys and EMPTY_STATS emitted three, so one object had two shapes depending
 // on whether the journal was empty.
 //
+// BASELINE VERSION: v6 (T3 · B-160 · docs/plans/PLAN-B160.md).
+// v5 → v6 removed the `isEmpty` key from both producers. It was a hand-kept
+// literal duplicating `total === 0` (measured 4/4, no third state — R-6), and
+// SwingEdge_App.jsx:4824 is the only consumer, now reading `total` directly.
+// Predicted diff, written BEFORE recapture: 8 lines removed (the `isEmpty`
+// key, last in every one of the 8 scenario objects) + 8 lines modified
+// (trailing comma stripped from the new last key) + 0 added = 16 deletions /
+// 8 insertions. Measured `diff -u` against the pre-recapture baseline: 16
+// deletions / 8 insertions — exact match, every hunk touches only that key.
+// Bidirectional discrimination proof run against the fresh v6 baseline before
+// it was trusted: mutating `winRate` in the live path turned BOTH the value
+// assertions and the baseline red (7 fixtures); mutating `bestStreak` (0
+// assertion coverage — not in the `SCALARS` list) turned ONLY the baseline
+// red, on the 7 fixtures that reach the live path (`empty` is unaffected —
+// it never reaches this alias). Both mutations reverted before commit.
+//
 // ⚠️ Everything that stayed 0 stayed for a REASON, and block 9b §5 pins it:
 // maxDrawdown / maxDD / currentDrawdown / currentStreak / totalPnL /
 // totalTrades / currentEquity / lastWeekStats.pnl / .count are counts, sums
@@ -117,20 +133,16 @@ const completeness = (label, input, s, expectedUnaccounted) => {
 
 // The three rates are a partition of the closed population — they must sum to
 // exactly 100, not "about" 100 (decision 2).
-// ⚠️ `isEmpty` used to SKIP this check — `if (s.isEmpty) return`. A flag that
-// buys an assertion the right not to run is not a contract, it is permission
-// not to look, and it is the reason "0% win rate on an empty journal" survived
-// every green run of this suite (R-3). It now BRANCHES: the empty journal has
-// its own partition to satisfy, and there is no third state.
+// B-160 — this used to branch on `s.isEmpty`, but 0 of its 5 callers below
+// ever pass empty stats, so the branch never ran, before OR after B-009. What
+// actually kept "0% win rate on an empty journal" alive through every green
+// run was block 1 (`:158` at extraction time) asserting `winRate === 0` as
+// the CONTRACT — a green gate that pinned the bug, not one that skipped past
+// it (R-3, corrected in DONE.md D-041). The unique assertion this branch
+// carried (`wins + losses + be === 0` on empty stats) now lives in block 9b.
+// A caller that DOES pass empty stats here fails loudly: null+null+null is
+// 0, not 100.
 const ratesSumTo100 = (label, s) => {
-  if (s.isEmpty) {
-    eq(`${label} — ריק: winRate הוא null`,  s.winRate,  null);
-    eq(`${label} — ריק: lossRate הוא null`, s.lossRate, null);
-    eq(`${label} — ריק: beRate הוא null`,   s.beRate,   null);
-    eq(`${label} — ריק: wins + losses + be === 0`, s.wins + s.losses + s.be, 0);
-    eq(`${label} — ריק: totalTrades === 0`, s.totalTrades, 0);
-    return;
-  }
   close(`${label} — winRate + lossRate + beRate === 100`, s.winRate + s.lossRate + s.beRate, 100);
   eq(`${label} — wins + losses + be === totalTrades`, s.wins + s.losses + s.be, s.totalTrades);
 };
@@ -155,7 +167,7 @@ const mk = (over) => ({
 {
   console.log("\n1 · empty portfolio → EMPTY_STATS shape");
   const s = computeTradingStats([], CAPITAL, calcTradeMetrics);
-  eq("isEmpty", s.isEmpty, true);
+  eq("total — B-160: the field SwingEdge_App.jsx:4824 gates the stats bar on", s.total, 0);
   eq("totalTrades", s.totalTrades, 0);
   eq("openTrades", s.openTrades, 0);
   // B-009 — these four asserted `0` from the day this suite was written. They
@@ -533,7 +545,7 @@ const mk = (over) => ({
   ];
   const d = computeTradingStats(DORMANT, CAPITAL, calcTradeMetrics);
 
-  eq("dormant — journal is NOT empty", d.isEmpty, false);
+  eq("dormant — total", d.total, 2);
   eq("dormant — totalTrades", d.totalTrades, 2);
   eq("dormant — all-time winRate is a real 1/2", d.winRate, 50);
   // The denominator of both windows is genuinely zero…
@@ -646,9 +658,9 @@ const mk = (over) => ({
 // 9b · B-009 — THE EMPTY JOURNAL. Block 8 closed the zero-denominator case
 //      for populations INSIDE an active journal (a dormant week, an empty
 //      plan bucket). It could not reach `EMPTY_STATS`, because every fixture
-//      it uses has `isEmpty === false`. `EMPTY_STATS` is the one branch a
-//      BRAND-NEW user sees, and it was the last place still publishing
-//      invented numbers.
+//      it uses has `total > 0`. `EMPTY_STATS` is the one branch a BRAND-NEW
+//      user sees, and it was the last place still publishing invented
+//      numbers.
 //
 //      Three assertions, and the second and third are shaped deliberately:
 //
@@ -688,6 +700,11 @@ const mk = (over) => ({
   eq("ריק — planAdherence הוא null, ⛔ לא 0", empty.planAdherence, null);
   eq("ריק — planFollowedWR הוא null, ⛔ לא 0", empty.planFollowedWR, null);
   eq("ריק — planIgnoredWR הוא null, ⛔ לא 0", empty.planIgnoredWR, null);
+  // B-160 — relocated from the dead `ratesSumTo100` branch (0 of its 5
+  // callers ever passed empty stats — the branch never ran, before OR after
+  // B-009). The other 4 assertions in that branch were already duplicated
+  // here; this was the one unique to it.
+  eq("ריק — wins + losses + be === 0", empty.wins + empty.losses + empty.be, 0);
 
   // ── 2. Out of range — the PAIR. Neither half proves it alone. ───────────
   eq("ריק — bestWin הוא null", empty.bestWin, null);
@@ -744,7 +761,7 @@ const mk = (over) => ({
 //     file. This is the T3 tripwire referenced in the plan doc.
 // ─────────────────────────────────────────────────────────────────────────
 {
-  console.log("\n10 · frozen full-object baseline v5 (scripts/fixtures/tradingstats-baseline.json)");
+  console.log("\n10 · frozen full-object baseline v6 (scripts/fixtures/tradingstats-baseline.json)");
   const scenarios = {
     empty: computeTradingStats([], CAPITAL, calcTradeMetrics),
     normal: computeTradingStats([
