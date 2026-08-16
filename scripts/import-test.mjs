@@ -18,6 +18,7 @@ import {
   normalizeSide, normalizeCurrency, fieldForHeader, MAPPABLE_FIELDS, REQUIRED_FIELDS,
 } from "../src/import/synonyms.js";
 import { fifoMatch } from "../src/import/fifoMatch.js";
+import { CURRENCY_SOURCE, isEvidenceBacked } from "../src/lib/instrumentCurrency.js";
 
 const FIX = join(dirname(fileURLToPath(import.meta.url)), "import-fixtures");
 let failures = 0;
@@ -288,9 +289,20 @@ console.log("test:import — pipeline over 14 fixtures\n");
   const TRADE_KEYS_PRE_T9 = "id,ticker,date,createdAt,side,entry,stop,target,exit,shares,status,setup,notes," +
     "marketCondition,emotionAtEntry,entryQuality,tradeImage,exitReason,followedPlan,lessonLearned," +
     "maxFavorable,maxAdverse,closedAt,_capitalAtEntry,_prediction,isDemo";
-  const TRADE_KEYS = TRADE_KEYS_PRE_T9.replace("side,", "side,currency,");
+  const TRADE_KEYS_T9 = TRADE_KEYS_PRE_T9.replace("side,", "side,currency,");
   check("T9 adds exactly one key",
-    TRADE_KEYS.split(",").length - TRADE_KEYS_PRE_T9.split(",").length, 1);
+    TRADE_KEYS_T9.split(",").length - TRADE_KEYS_PRE_T9.split(",").length, 1);
+  // ⚠️ הקו הקפוא **זז במכוון** בגל `B-129`, ⛔ ולא "עודכן כדי לעבור". שני
+  // מפתחות נוספו, שניהם על אותה שורה בבנייה, ושניהם עמודות אמיתיות שמיגרציית
+  // 20260816120000 יצרה:
+  //   `currency_source` — איזו דרגה בסולם קבעה את התווית (ראיה מול הנחה)
+  //   `source`          — מסלול הכתיבה שיצר את השורה (`B-071`)
+  // ⛔ `import_batch_id` ⛔ אינו כאן: הוא נקבע פעם אחת לכל **הרצת** ייבוא
+  //    (`SwingEdge_App.jsx` · `handleImportTrades`) ⛔ ולא פר-שורה.
+  // ⛔ `inserted_at` ⛔ אינו כאן: השרת כותב אותו.
+  const TRADE_KEYS = TRADE_KEYS_T9.replace("currency,", "currency,currency_source,source,");
+  check("B-129 adds exactly two keys",
+    TRADE_KEYS.split(",").length - TRADE_KEYS_T9.split(",").length, 2);
   for (const f of ["en-standard.csv", "he-semicolon.csv", "bad-rows.csv"]) {
     const { headers, rows } = parseCSV(readFileSync(join(FIX, f), "utf8"));
     const det = detectColumns(headers, rows);
@@ -775,6 +787,89 @@ const near = (name, actual, expected) => {
   check("has a Hebrew reason", typeof bad.detail?.he, "string");
 }
 
+// ── §B-129 · תעודת מקור: ראיה מול הנחה ──────────────────────────────────────
+//
+// הסולם ב-`normalizeRow` תמיד הכריע נכון. מה שחסר היה **תעודה**: ארבע הדרגות
+// כתבו למחרוזת שטוחה אחת, ולכן `USD` שקובץ הצהיר עליו ו-`USD` שנוחש נראו
+// זהים בכל בית — וכך 13 שורות ת"א שנקובות באגורות נושאות `USD` עד היום.
+//
+// ⚠️ הבדיקה כאן ⛔ אינה על הערך `currency` — הוא ⛔ לא זז. היא על מה
+//    ש**אפשר לדעת** עליו אחרי הכתיבה.
+{
+  console.log("33) B-129 — כל דרגה בסולם מצהירה על עצמה");
+
+  // V1 · דרגה 1 — ראיה. הפרופיל גזר את המטבע מהאריתמטיקה של השורה עצמה.
+  const ibi = runProfile("ibi-currency.xlsx", { fifo: true }).res;
+  const ibiIls = ibi.valid.find((t) => t.ticker === "מזרחי טפחות");
+  const ibiUsd = ibi.valid.find((t) => t.ticker === "NFLX");
+  check("V1 · ת\"א מ-IBI — ראיה אריתמטית", ibiIls.currency_source, "broker_arithmetic");
+  check("V1 · גם השורה הדולרית מאותו קובץ", ibiUsd.currency_source, "broker_arithmetic");
+
+  // V2 · דרגה 2 — ראיה. הקובץ הצהיר בעמודת `מטבע`, ⛔ ואין ממה לגזור: לקובץ
+  //      הזה אין עמודות `תמורה במט"ח`/`תמורה בשקלים`, ולכן הדרגה הראשונה
+  //      אילמת והשנייה היא זו שמכריעה.
+  const style = runCSV("altshuler-style.csv").res;
+  check("V2 · מטבע מהעמודה — ראיה", style.valid[0].currency_source, "file_cell");
+
+  // ⚠️ נמדד בכתיבת הבלוק, ⛔ ולא הונח: ב-`altshuler-agorot.csv` **שתי**
+  //    הדרגות זמינות — יש עמודת `מטבע` **וגם** זוג תמורות. הדרגה הראשונה
+  //    גוברת, ולכן אותה שורה נושאת `broker_arithmetic` ⛔ ולא `file_cell`.
+  //    הקדימות עצמה כבר נעולה למעלה ("resolver beats the cell"); כאן נעול
+  //    שה**תעודה** נוסעת עם המכריע בפועל ⛔ ולא עם הדרגה החלשה יותר.
+  const alt = runProfile("altshuler-agorot.csv", { fifo: true }).res;
+  check("V2 · ⚠️ כששתי הדרגות זמינות — התעודה היא של המכריע",
+    alt.valid.find((t) => t.ticker === "NFLX").currency_source, "broker_arithmetic");
+
+  // V3 · דרגה 3 — הנחה. מטבע ההון, ⛔ ולא הצהרה של הקובץ.
+  const acct = runCSV("en-standard.csv", { defaultCurrency: "ILS" }).res.valid[0];
+  check("V3 · מטבע ההון", acct.currency, "ILS");
+  check("V3 · ⛔ ואינו מסומן כהצהרת קובץ", acct.currency_source, "account_default");
+
+  // V4 · דרגה 4 — הנחה. הליטרל, המקום שבו אגורות הפכו ל"דולר".
+  const bare = runCSV("en-standard.csv").res.valid[0];
+  check("V4 · הליטרל עדיין USD", bare.currency, "USD");
+  check("V4 · ומוצהר ככזה", bare.currency_source, "literal_fallback");
+
+  // 🔴 V5 · **האסרציה שמגדירה את הגל.** שתי שורות, אותה תווית בדיוק, ומקור
+  //     שונה. לפני הגל שתיהן היו `"USD"` ותו לא ⇒ ⛔ לא היה מה שיכול להבדיל.
+  check("V5 · אותה תווית בשתי השורות", `${ibiUsd.currency}|${bare.currency}`, "USD|USD");
+  check("V5 · ⚠️ ⛔ ואינן שוות ערך — אחת נמדדה והשנייה נוחשה",
+    `${isEvidenceBacked(ibiUsd.currency_source)}|${isEvidenceBacked(bare.currency_source)}`,
+    "true|false");
+
+  // V5-הפוכה · ⚠️ סירוב גורף הוא כישלון, ⛔ לא הצלחה. שער שמסמן **הכל**
+  //            כהנחה עובר את V5 ⛔ ואינו שווה כלום.
+  check("V5⁻¹ · שורה מדרגה 1 ⛔ אינה הנחה", isEvidenceBacked(ibiIls.currency_source), true);
+  check("V5⁻¹ · שורה מדרגה 2 ⛔ אינה הנחה",
+    isEvidenceBacked(style.valid[0].currency_source), true);
+  check("V5⁻¹ · ...ודרגה 2 היא ⛔ אכן דרגה 2, לא 1 שהתחפשה",
+    style.valid[0].currency_source, CURRENCY_SOURCE.FILE_CELL);
+  check("V5⁻¹ · ⛔ ולא הכל ראיה — דרגה 3 היא הנחה", isEvidenceBacked(acct.currency_source), false);
+
+  // V8 · ⛔ אף דרגה ⛔ אינה מייצרת `null`. ‏`null` שמור לשורות טרום-גל, ולכן
+  //      מסלול כתיבה שישמיט את התעודה יסגיר את עצמו בשאילתה אחת.
+  const ALLOWED = new Set(["broker_arithmetic", "file_cell", "account_default", "literal_fallback"]);
+  let rows = 0, tagged = 0, fromImport = 0;
+  for (const f of ["en-standard.csv", "he-semicolon.csv", "bad-rows.csv", "duplicates.csv", "perf-200.csv"]) {
+    for (const t of runCSV(f).res.valid) {
+      rows++;
+      if (ALLOWED.has(t.currency_source)) tagged++;
+      if (t.source === "import") fromImport++;
+    }
+  }
+  check(`V8 · ${tagged}/${rows} שורות נושאות תעודה מוכרת`, tagged, rows);
+  check(`V8 · ${fromImport}/${rows} מסומנות כייבוא`, fromImport, rows);
+  check("V8 · ⛔ והאוכלוסייה ⛔ אינה ריקה", rows > 200, true);
+
+  // ⚠️ ה-CHECK בשרת מונה **חמישה** ערכים; ארבעה נכתבים כאן, החמישי
+  //    (`manual_capital`) במסלול הידני. הרשימה בקוד היא המקור, ⛔ לא מחרוזות.
+  check("חמישה ערכים ב-CURRENCY_SOURCE, ⛔ בלי unknown",
+    Object.values(CURRENCY_SOURCE).sort().join(","),
+    "account_default,broker_arithmetic,file_cell,literal_fallback,manual_capital");
+  check("ערך לא-מוכר ⛔ אינו ראיה", isEvidenceBacked("something_else"), false);
+  check("null ⛔ אינו ראיה", isEvidenceBacked(null), false);
+}
+
 // ── §5 · the day a trade is stamped with is the LOCAL day ────────────────────
 // Runs in a CHILD process with TZ=Asia/Jerusalem so the parent's timezone — and
 // every other date assertion in this file — is untouched. "Now" is frozen at
@@ -969,4 +1064,4 @@ if (failures > 0) {
   console.error(`❌ test:import — ${failures} assertion(s) failed`);
   process.exit(1);
 }
-console.log("✅ test:import — all fixtures passed (32 scenarios)");
+console.log("✅ test:import — all fixtures passed (33 scenarios)");

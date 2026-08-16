@@ -97,7 +97,7 @@ import { useFxRates, realizedDayKeysOf, makeConvertingCalc, fxPairPlan, accountA
 import { convert } from "./src/lib/fx.js";
 import { resolveEquityBase } from "./src/lib/equityBase.js";
 import { horizonState, horizonLabel } from "./src/lib/tradeHorizon.js";
-import { deriveInstrumentCurrency, matchesCapital, isUnverified, INSTRUMENT_STATE, PAPER_BASE } from "./src/lib/instrumentCurrency.js";
+import { deriveInstrumentCurrency, matchesCapital, isUnverified, INSTRUMENT_STATE, PAPER_BASE, CURRENCY_SOURCE } from "./src/lib/instrumentCurrency.js";
 import { sizePosition } from "./src/lib/positionSizing.js";
 
 // ⚠️ קבוע מודול, ⛔ לא `[]` inline: מערך טרי בכל רינדור הוא תלות טרייה ב-
@@ -2735,6 +2735,12 @@ export default function SwingEdge() {
       // entry saved as "₪150" and then converted again on the way out, so
       // merely looking at the journal in shekels would silently rewrite it.
       currency: capitalCurrency,
+      // ⚠️ **הנחה, ⛔ לא ראיה** — וזה בדיוק מה שהשדה אומר. הנימוק שמעל תקף,
+      // אבל הוא נשען על מבנה הטופס ⛔ ולא על משהו שנמדד בשורה עצמה: משתמש
+      // שהונו בדולרים ומקליד נייר ת"א מקבל `USD` שגוי, ובלי התעודה הזו הוא
+      // ייראה זהה ל-`USD` שקובץ הצהיר עליו. `B-129`.
+      currency_source: CURRENCY_SOURCE.MANUAL_CAPITAL,
+      source: "manual",
       entry: entryN, stop: stopN, target: targetN,
       shares: effShares, status: "OPEN", exit: null,
       setup: form.setup, notes: form.notes,
@@ -3030,7 +3036,14 @@ export default function SwingEdge() {
     // path, verified 08.08. That is fine, but it means a payload the server
     // refuses used to fail SILENTLY: `.then(({error}))` only warned to the
     // console and the user was told every row was imported.
-    const rows = imported.map(t => tradeForSupabase({ ...t, user_id: authUser.id, is_demo: false }));
+    // מזהה אחד לכל הרצת ייבוא. ⚠️ נוצר **כאן** ⛔ ולא ב-`normalizeRow`: שם הוא
+    // היה שונה בכל שורה, וכל מטרתו היא שאפשר יהיה לבודד את השורות שהרצה אחת
+    // יצרה — ולהתאושש אם השידוך היה שגוי (`B-071`).
+    const importBatchId =
+      (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : null;
+    const rows = imported.map(t => tradeForSupabase({
+      ...t, user_id: authUser.id, is_demo: false, import_batch_id: importBatchId,
+    }));
     const writing = insertTradeRows(supabase, { rows });
     // Each id is registered so an undo (or a delete) issued right after the
     // import waits for its own row instead of racing it.
@@ -3430,6 +3443,12 @@ export default function SwingEdge() {
           status: "ok",
           confidence: result.confidence ?? 0,
           detection,
+          // `B-080` · הדרך שאינה נוגעת בפרומפט (`B-110` ❄️): הטיקר שחזר נגזר
+          // **בלקוח**, בזמן קדם-המילוי. טיקר מספרי (604611) הוא `AMBIGUOUS`,
+          // והמסלול הידני עומד לחתום עליו `currency: capitalCurrency` —
+          // כלומר הנחה. ⇒ מצהירים לפני השמירה, ⛔ לא חוסמים.
+          // ⚠️ מכסה טיקר מספרי בלבד; חוזה ה-Vision נשאר פתוח ב-`B-080`.
+          ccyUnverified: isUnverified(deriveInstrumentCurrency({ ticker: result.ticker })),
           // Kept as the RESPONSE's direction, not as a conflict boolean: the banner
           // compares it against the live toggle, so resolving the conflict by hand
           // dismisses the banner without any extra bookkeeping.
@@ -3694,6 +3713,7 @@ export default function SwingEdge() {
         status: "ok", confidence, detection,
         ocrSide: result.side ?? null,
         sideSource: result.sideSource ?? null,
+        ccyUnverified: isUnverified(deriveInstrumentCurrency({ ticker: result.ticker })), // B-080 — ראה handleImageUpload
       });
       setShowForm(true);
       trackTradeFormOpened("ocr");
@@ -7762,6 +7782,17 @@ export default function SwingEdge() {
                   </div>
                 );
               })()}
+
+              {/* `B-080` · הצהרה, ⛔ לא חסימה. הטיקר שה-OCR קרא לא נגזר למטבע
+                  (טיקר מספרי של ת"א הוא המקרה), והשמירה עומדת לחתום עליו את
+                  מטבע ההון — הנחה. ⚠️ הכפתור נשאר פעיל: המשתמש יודע מה קנה,
+                  ⛔ ואנחנו לא. */}
+              {ocrStatus?.ccyUnverified && (
+                <div className="flex items-start gap-2 px-2.5 py-1.5 rounded-[var(--v3-radius-chip)] border text-[11px] bg-[var(--v3-warn)]/5 border-[var(--v3-warn)]/20 text-[var(--v3-warn)]">
+                  <AlertTriangle size={12} className="shrink-0 mt-0.5" />
+                  <span className="leading-snug">{t.ccyUnverifiedChip} — {t.ccyUnverifiedTip}</span>
+                </div>
+              )}
 
               {/* ── Trade context (journaling metadata) — collapsed by default ── */}
               <button type="button" onClick={()=>setShowTradeContext(v=>!v)}

@@ -53,8 +53,12 @@ const TRADE_COLUMNS = new Set([
   "createdAt",
   "closedAt",
   "is_demo",
-  // T9 — נוסף אחרי שמיגרציית 20260802140000 הורצה ואומת ב-information_schema
-  // (text, default 'USD'). לפני ההרצה מפתח כזה היה מפיל כל INSERT.
+  // T9 — נוסף אחרי שמיגרציית 20260802140000 הורצה ואומת ב-information_schema.
+  // ⚠️ **`default 'USD'` כבר אינו קיים**: `20260812120000` הסירה אותו במכוון
+  // (`D-026` — הורצה ואומתה 12.08: `is_nullable=YES` · `column_default=null`),
+  // מפני שברירת מחדל שאומרת "אם לא ידעת, זה דולר" מחליפה נתון אמיתי. ⇒ מסלול
+  // כתיבה שישמיט את השדה יכתוב `null` ⛔ ולא `USD`. `B-152`.
+  // לפני ההרצה מפתח כזה היה מפיל כל INSERT.
   "currency",
   // גל אופק העסקה — נוסף יחד עם מיגרציית 20260810143000 (text nullable,
   // check: short|medium|long). ⚠️ הסדר כפוי: עד שהמיגרציה רצה, המפתח נזרק כאן
@@ -62,6 +66,18 @@ const TRADE_COLUMNS = new Set([
   // ההצהרה בלבד — הסימן עצמו נגזר ברינדור ולעולם אינו נשמר
   // (src/lib/tradeHorizon.js).
   "horizon",
+  // גל תעודת-המקור (`B-129`) — נוספו אחרי שמיגרציית 20260816120000 הורצה
+  // ואומתה ב-information_schema (16.08: ארבע עמודות · `is_nullable=YES`
+  // בארבעתן · `column_default` ל-`inserted_at` בלבד · ה-CHECK של
+  // `currency_source` מונה חמישה ערכים, ושל `source` שניים).
+  // ⚠️ הסדר כפוי ⛔ ואינו סגנוני: מפתח שיושב כאן ועמודתו חסרה בשרת גורם
+  // ל-PostgREST לדחות את **כל** ה-INSERT — כל כתיבה, לכל המשתמשים.
+  "currency_source",
+  "source",
+  "import_batch_id",
+  // ⛔ `inserted_at` ⛔ **אינו** כאן, ובכוונה: הוא נכתב ב**שרת** (`default now()`).
+  //    מפתח מהלקוח היה גובר על ה-default ומחזיר בדיוק את מה שהוא בא לתקן —
+  //    חותמת שהלקוח סינתז (`B-042`).
 ]);
 
 // Client-side-only fields. They are dropped on write by design, so dropping
@@ -72,6 +88,20 @@ const LOCAL_ONLY = new Set([
   "tradeImagePreview",  // form-only preview, never part of a persisted trade
   "_prediction",        // AI snapshot graded locally by LearningEngine
   "openDate",           // legacy read-only alias for `date`; never had a column
+]);
+
+// עמודות שה**שרת** בעליהן. הן חוזרות ב-`select("*")`, נוסעות בתוך אובייקט
+// העסקה שב-state, ומגיעות חזרה לכאן בכל `updateTradeRow(... patch:
+// tradeForSupabase(trade))`. ⛔ אסור לשלוח אותן — שליחה מהלקוח גוברת על
+// ה-`default` של השרת ומחזירה בדיוק את מה שהעמודה באה לתקן.
+//
+// ⚠️ הן ⛔ אינן `LOCAL_ONLY`: הרשימה ההיא אומרת "שדה שקיים רק בלקוח", וזה
+// ההפך. אבל **הזריקה חייבת להיות שקטה** מאותה סיבה בדיוק — בלי הרשימה הזו כל
+// סגירה ועריכה של עסקה שנטענה מה-DB הייתה מדפיסה
+// `dropped unknown column(s): inserted_at`, ⇒ רעש שמאמן להתעלם מ-console.error
+// שנועד לתפוס סחיפת סכימה אמיתית. נמדד 16.08 מיד אחרי שהמיגרציה רצה.
+const SERVER_OWNED = new Set([
+  "inserted_at",        // timestamptz default now() — B-042
 ]);
 
 export function tradeForSupabase(trade) {
@@ -85,6 +115,7 @@ export function tradeForSupabase(trade) {
       if (v !== undefined) out.is_demo = v === true;
       continue;
     }
+    if (SERVER_OWNED.has(k)) continue;
     if (TRADE_COLUMNS.has(k)) { out[k] = v; continue; }
     if (!LOCAL_ONLY.has(k)) dropped.push(k);
   }

@@ -28,6 +28,7 @@ import {
   INSTRUMENT_STATE, deriveInstrumentCurrency, normalizeProviderCurrency,
   normalizeTicker, pairQuoteCurrency, isAggregatable, isUnverified,
   isMixedCurrency, matchesCapital, PAPER_BASE,
+  CURRENCY_SOURCE, isEvidenceBacked,
 } from "../src/lib/instrumentCurrency.js";
 import { computeTradingStats } from "../src/lib/tradingStats.js";
 import { calcTradeMetrics, fmtPaperPrice, paperCurrencyOf, fmt$, currencyOf, realizedDayKey,
@@ -1294,6 +1295,80 @@ console.log("\n15 · ההון הסגור — האינווריאנטה של יח�
     check("באנר הערבוב נושא מונה ⛔ ולא רק רשימת מטבעות",
       /mixedCurrencyCounts|tradesByCurrency/.test(app));
   }
+}
+
+// ── בלוק 15 · תעודת המקור של התווית (`B-129`) ───────────────────────────────
+//
+// ⚠️ **⛔ אינו כפילות של `INSTRUMENT_STATE`.** המצבים שמעל עונים על "מה אני
+//    יודע על המכשיר **בקריאה**"; `CURRENCY_SOURCE` עונה על "**איך** התווית
+//    נקבעה **בכתיבה**". שורה יכולה להיות `AMBIGUOUS` בקריאה ו-`file_cell`
+//    בכתיבה — שתי עובדות נכונות בו-זמנית על אותה שורה.
+{
+  console.log("\n── 15 · תעודת המקור (B-129) ──");
+
+  eq("חמישה ערכים, ⛔ ובלי unknown",
+    Object.values(CURRENCY_SOURCE).sort().join(","),
+    "account_default,broker_arithmetic,file_cell,literal_fallback,manual_capital");
+
+  // ⚠️ שני ערכים **בכל צד**. שער שמחזיר `true` להכל, או `false` להכל, עובר
+  //    כל בדיקה של צד אחד ⛔ ואינו שווה כלום.
+  eq("דרגה 1 — ראיה", isEvidenceBacked(CURRENCY_SOURCE.BROKER_ARITHMETIC), true);
+  eq("דרגה 2 — ראיה", isEvidenceBacked(CURRENCY_SOURCE.FILE_CELL), true);
+  eq("דרגה 3 — הנחה", isEvidenceBacked(CURRENCY_SOURCE.ACCOUNT_DEFAULT), false);
+  eq("דרגה 4 — הנחה", isEvidenceBacked(CURRENCY_SOURCE.LITERAL_FALLBACK), false);
+  eq("ידני — הנחה", isEvidenceBacked(CURRENCY_SOURCE.MANUAL_CAPITAL), false);
+
+  // ⛔ אין ברירת מחדל, ⛔ ואין זריקה. קלט זר הוא "לא ראיה", ⛔ לא קריסה.
+  eq("ערך לא-מוכר", isEvidenceBacked("provider_api"), false);
+  eq("null — שורה טרום-גל", isEvidenceBacked(null), false);
+  eq("undefined", isEvidenceBacked(undefined), false);
+  eq("מספר", isEvidenceBacked(1), false);
+  eq("אובייקט", isEvidenceBacked({ source: "file_cell" }), false);
+  eq("מחרוזת ריקה", isEvidenceBacked(""), false);
+  // ⚠️ ⛔ ללא נרמול בכוונה: הערך נכתב מהקבוע, ⛔ ולא מוקלד. שער שמקבל
+  //    `"File_Cell"` מזמין מסלול כתיבה שממציא ערך משלו.
+  eq("⛔ אינו מנרמל רישיות", isEvidenceBacked("FILE_CELL"), false);
+
+  // 🔴 ההפרדה עצמה: אותה תווית, שני מקורות, תשובה שונה.
+  eq("אותו USD — הקובץ הצהיר",
+    isEvidenceBacked(CURRENCY_SOURCE.FILE_CELL), true);
+  eq("אותו USD — הליטרל ניחש",
+    isEvidenceBacked(CURRENCY_SOURCE.LITERAL_FALLBACK), false);
+
+  // ⚠️ ה-CHECK בשרת הוא מקור-האמת השני. סחיפה בין הקבוע לבין המיגרציה היא
+  //    `R-6`: הלקוח היה כותב ערך שה-DB דוחה, וכל ה-INSERT היה נופל.
+  const mig = src("../supabase/migrations/20260816120000_trades_provenance.sql");
+  for (const v of Object.values(CURRENCY_SOURCE)) {
+    check(`ה-CHECK בשרת מונה \`${v}\``, new RegExp(`'${v}'`).test(mig));
+  }
+  check("⛔ ואין ערך בשרת שאינו בקבוע",
+    (mig.match(/'(broker_arithmetic|file_cell|account_default|literal_fallback|manual_capital|unknown)'/g) || []).length
+      === Object.values(CURRENCY_SOURCE).length);
+  check("⛔ `unknown` ⛔ אינו במיגרציה", !/'unknown'/.test(mig));
+}
+
+// ── בלוק 16 · `B-080` · הצהרה בקדם-המילוי, ⛔ בלי לגעת בפרומפט ───────────────
+//
+// ⚠️ הדרך השלישית: המטבע נגזר **בלקוח** מהטיקר שה-OCR החזיר, ⛔ ולא מתוסף
+//    לחוזה ה-JSON של Vision — `B-110` ❄️ נשאר קפוא. ⛔ מכסה טיקר מספרי בלבד.
+{
+  console.log("\n── 16 · הצהרת מטבע בקדם-מילוי OCR (B-080) ──");
+
+  // המקרה עצמו: מספר נייר של ת"א. ⛔ לא ILS — "לא ידוע", והמסלול הידני עומד
+  // לחתום עליו את מטבע ההון.
+  eq("טיקר מספרי ⛔ אינו נגזר", deriveInstrumentCurrency({ ticker: "604611" }).reason, "numeric_ticker");
+  eq("...ולכן מוצהר", isUnverified(deriveInstrumentCurrency({ ticker: "604611" })), true);
+  // ⚠️ הצד השני: שער שמצהיר על **כל** קריאת OCR הוא רעש, ⛔ לא הצהרה.
+  eq("⛔ וטיקר אמריקאי ⛔ אינו מצהיר", isUnverified(deriveInstrumentCurrency({ ticker: "NFLX" })), false);
+  eq("⛔ וגם לא זוג מט\"ח", isUnverified(deriveInstrumentCurrency({ ticker: "EURUSD" })), false);
+
+  // שני מסלולי ה-OCR — קובץ ולכידת מסך — חייבים לשאת את אותה הצהרה.
+  const app = src("../SwingEdge_App.jsx");
+  const sites = (app.match(/ccyUnverified:\s*isUnverified\(deriveInstrumentCurrency\(\{ ticker: result\.ticker \}\)\)/g) || []).length;
+  eq("2/2 מסלולי OCR גוזרים בקדם-המילוי", sites, 2);
+  check("ההצהרה מרונדרת במודאל", /ocrStatus\?\.ccyUnverified &&/.test(app));
+  // 🔴 הצהרה, ⛔ לא חסימה: אין תנאי שמוסיף `ccyUnverified` לנעילת כפתור.
+  check("⛔ ואינה חוסמת שמירה", !/disabled=\{[^}]*ccyUnverified/.test(app));
 }
 
 // ── SUMMARY ──────────────────────────────────────────────────────────────────

@@ -159,8 +159,13 @@ export const CURRENCY_SYMBOL = { USD: "$", ILS: "₪" };
 // ⇒ `currencyOf` נשאר קורא-תווית, ו-`fmtPaperPrice` הוא הקורא הנפרד. השמות
 // מפורשים כדי שהעורך הבא ⛔ לא יאחד אותם בחזרה.
 //
-// A trade without a currency predates the column and is a dollar trade — the
-// migration's `default 'USD'` says the same thing on the server side.
+// A trade without a currency predates the column and is displayed as a dollar
+// trade. ⚠️ **⛔ אין לזה יותר גיבוי בשרת**: `20260812120000` הסירה במכוון את
+// `default 'USD'` (`D-026`, אומתה 12.08 — `column_default=null`), מפני שברירת
+// מחדל שאומרת "אם לא ידעת, זה דולר" מחליפה נתון אמיתי. ⇒ הליטרל כאן הוא
+// **החלטת תצוגה בלבד**, והוא מה שגורם ל-`null` ול-`USD` להיראות זהים על המסך.
+// ⛔ לכן ⛔ אל תקרא ממנו על מה שנשמר: מי ששואל "האם המטבע נמדד?" קורא את
+// `currency_source` (`instrumentCurrency.js` · `isEvidenceBacked`). `B-152`.
 export const currencyOf = (trade) =>
   CURRENCY_SYMBOL[trade?.currency] ? trade.currency : "USD";
 

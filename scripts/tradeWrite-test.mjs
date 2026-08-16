@@ -490,6 +490,56 @@ const rowsOf = (n) => Array.from({ length: n }, (_, i) => ({ id: `id-${i}` }));
   );
 }
 
+// ─── 26–29 · B-129 · תעודת המקור שורדת את מסלול הכתיבה ──────────────────────
+//
+// ⚠️ ‏25 האסרציות שמעל שואלות "האם הכתיבה קרתה". אלה שואלות שאלה אחרת:
+//    **מה בדיוק יוצא מהלקוח אל השרת.** מפתח נכון שנזרק ב-`tradeForSupabase`
+//    הוא כשל שקט מושלם — ה-INSERT מצליח, ⛔ והתעודה אינה שם.
+{
+  const { tradeForSupabase } = await import("../src/supabaseClient.js");
+  const { CURRENCY_SOURCE } = await import("../src/lib/instrumentCurrency.js");
+
+  const out = tradeForSupabase({
+    id: ID, ticker: "AAPL", currency: "USD",
+    currency_source: CURRENCY_SOURCE.MANUAL_CAPITAL,
+    source: "manual",
+    import_batch_id: "33333333-3333-4333-8333-333333333333",
+  });
+  check(26, "שלושת שדות התעודה שורדים את tradeForSupabase",
+    out.currency_source === "manual_capital" && out.source === "manual" &&
+      out.import_batch_id === "33333333-3333-4333-8333-333333333333",
+    `יצא ${JSON.stringify(out)} — מפתח שאינו ב-TRADE_COLUMNS נזרק, וה-INSERT ` +
+      `היה מצליח בלי התעודה. זו הדרך שבה שדה מקור נעלם בלי שאיש ישים לב`);
+
+  // `inserted_at` חוזר מ-`select("*")`, נוסע ב-state, ומגיע לכאן בכל עריכה.
+  // ⛔ אסור שיישלח — הוא ייגבר על ה-`default now()` של השרת.
+  const errs = [];
+  const realError = console.error;
+  console.error = (...a) => errs.push(a.join(" "));
+  const round = tradeForSupabase({
+    id: ID, ticker: "AAPL", currency: "USD", inserted_at: "2026-08-16T10:00:00Z",
+  });
+  console.error = realError;
+  check(27, "inserted_at ⛔ אינו נשלח — השרת בעליו",
+    !("inserted_at" in round),
+    `יצא ${JSON.stringify(round)} — ערך מהלקוח גובר על default now(), כלומר ` +
+      `העמודה שנועדה לתקן חותמת מסונתזת הייתה מקבלת חותמת מסונתזת`);
+  check(28, "⛔ והזריקה שקטה — ⛔ לא רעש בכל עריכה",
+    errs.length === 0,
+    `הודפסו ${errs.length} שגיאות: ${errs.join(" | ")} — console.error שיורה ` +
+      `בכל סגירת עסקה מאמן להתעלם ממנו, וזו בדיוק ההודעה שנועדה לתפוס סחיפת סכימה`);
+
+  // ⚠️ המסלול הידני חי ב-JSX ו-⛔ אינו ניתן לייבוא (7,340 שורות · recharts).
+  //    לכן זו בדיקת טקסט — ⛔ ופחות טובה מהרצה. היא נועלת את מה שאפשר לנעול:
+  //    שהאובייקט הידני מצהיר, ושהוא מצהיר **הנחה** ⛔ ולא ראיה.
+  const { readFileSync } = await import("node:fs");
+  const app = readFileSync(new URL("../SwingEdge_App.jsx", import.meta.url), "utf8");
+  check(29, "המסלול הידני מצהיר manual_capital ומקור manual",
+    /currency:\s*capitalCurrency,[\s\S]{0,600}?currency_source:\s*CURRENCY_SOURCE\.MANUAL_CAPITAL,\s*\n\s*source:\s*"manual",/.test(app),
+    `⛔ לא נמצא ליד currency: capitalCurrency — עסקה ידנית בלי תעודה נכתבת ` +
+      `כ-null, ו-null אומר "נכתב לפני הגל". זו תווית שקר על שורה חדשה`);
+}
+
 console.log(`\n${ran - failures.length}/${ran} passed`);
 if (failures.length) {
   console.error(`FAILED: ${failures.join(", ")}`);
