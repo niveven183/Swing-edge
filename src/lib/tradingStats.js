@@ -281,20 +281,49 @@ export function computeTradingStats(trades, capital, calcTradeMetrics) {
 // Helpers
 // ───────────────────────────────────────────────────────────────
 
+// A journal with no closed trades. Every field below is decided by three tests
+// applied in order (PLAN-B009.md §1 · §1.1), not by what reads nicely:
+//
+//   1. RANGE     — can the live path produce this value at all? `bestWin` is
+//                  `pnl > 0` by definition, so `bestWin: 0` is not "unmeasured",
+//                  it is a value the engine can never emit. Fails here ⇒ null.
+//   2. IDENTITY  — is 0 the identity element of the aggregation over the empty
+//                  set? Sums and counts: yes. Quotients and extrema: no.
+//   3. COLLISION — does the live path produce 0 under some OTHER meaningful
+//                  condition? `returnPct: 0` also means "you traded and netted
+//                  zero", so the reader cannot tell the two apart.
+//
+// Pass all three and 0 is a MEASUREMENT that stays. `avgR` has returned null
+// for exactly this reason since A5; the rest of the object now says the same
+// thing in the same way.
 function EMPTY_STATS(capital) {
   return {
+    // counts and sums — identity 0 over the empty set, so these are measured
     totalTrades: 0, total: 0, openTrades: 0, wins: 0, losses: 0, be: 0,
     totalPnL: 0, totalWin: 0, totalLoss: 0,
     pnlByCurrency: {}, tradesByCurrency: {}, currencies: [], mixedCurrency: false,
-    winRate: 0, lossRate: 0, beRate: 0, profitFactor: 0,
-    avgWin: 0, avgLoss: 0, avgR: null, rSampleSize: 0, bestWin: 0, worstLoss: 0,
-    currentEquity: capital, capital, returnPct: 0,
+    rSampleSize: 0,
+    // quotients — no identity over an empty set
+    winRate: null, lossRate: null, beRate: null, profitFactor: null,
+    avgWin: null, avgLoss: null, avgR: null,
+    planFollowedWR: null, planIgnoredWR: null, planAdherence: null,
+    avgHoldHours: null, avgHold: null,
+    // extrema — and out of range besides: a win is pnl>0, a loss is pnl<0
+    bestWin: null, worstLoss: null,
+    // returnPct fails the COLLISION test, not the identity one: 0% is also
+    // what an active trader who netted exactly zero sees. Stated plainly
+    // rather than filed under the same reason as the quotients above.
+    currentEquity: capital, capital, returnPct: null,
+    // drawdown is seeded at 0, [0,100] contains 0, and "never declined from
+    // peak" is equally true of a journal with nothing in it — all three tests
+    // pass, so this 0 is a measurement and stays one.
     equityCurve: [], maxDrawdown: 0, maxDD: 0, currentDrawdown: 0,
     currentStreak: 0, maxWinStreak: 0, maxLossStreak: 0, bestStreak: 0, streakRuns: [],
-    planFollowedWR: 0, planIgnoredWR: 0, planAdherence: 0,
-    avgHoldHours: 0, avgHold: 0,
-    lastWeekStats:  { count: 0, pnl: 0, winRate: 0 },
-    lastMonthStats: { count: 0, pnl: 0, winRate: 0 },
+    // B-065 — same key set as summarize(), which emits four. Three keys here
+    // meant a consumer read `.beRate` as undefined on an empty journal and as
+    // a number on a full one, and neither is the null that was intended.
+    lastWeekStats:  { count: 0, pnl: 0, winRate: null, beRate: null },
+    lastMonthStats: { count: 0, pnl: 0, winRate: null, beRate: null },
     bySetup: [], byEmotion: [], byMarket: [], byEntryQuality: [], byDayOfWeek: [],
     topEdges: [], antiEdges: [],
     closedMetrics: [],

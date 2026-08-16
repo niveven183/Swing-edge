@@ -934,7 +934,10 @@ const StatCard = ({ label, value, sub, trend, trendText, icon: Icon, accent = "c
       </span>
       <span className={`text-lg md:text-2xl font-bold font-mono ${iconColor}`}>{value}</span>
       {sub && <span className="text-xs text-slate-600">{sub}</span>}
-      {trend !== undefined && (
+      {/* `trend != null`, not `!== undefined`: `null >= 0` is `true`, so a null
+          trend used to render a green ▲ next to a "—" — a direction invented
+          for a measurement that does not exist. */}
+      {trend != null && (
         <span className={`text-xs font-semibold ${trend >= 0 ? "text-[#10b981]" : "text-[#ef4444]"}`}>
           {trend >= 0 ? "▲" : "▼"} {trendText != null ? trendText : `${Math.abs(trend).toFixed(1)}%`}
         </span>
@@ -4813,7 +4816,12 @@ export default function SwingEdge() {
             </div>
 
             {/* ── PRO STATS BAR ── */}
-            {closedTrades.length > 0 && (
+            {/* B-157 — the gate and the figures must read the SAME population.
+                This used to gate on `closedTrades` (unfiltered) while printing
+                `journalStats` (filtered), so any filter matching no closed
+                trade rendered seven tiles of EMPTY_STATS. That was the only
+                path on which an active user ever saw it. */}
+            {!journalStats.isEmpty && (
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
                 <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600">{lang === "he" ? "סה״כ סגורות" : "Closed"}</div>
@@ -4825,21 +4833,23 @@ export default function SwingEdge() {
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{lang === "he" ? "רווח ממוצע" : "Avg Win"}<TermTooltip term="avgWin" lang={lang} /></div>
-                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-accent)]">{fmt$(Math.round(journalStats.avgWin), statsCcy(journalStats))}</div>
+                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-accent)]">{journalStats.avgWin == null ? "—" : fmt$(Math.round(journalStats.avgWin), statsCcy(journalStats))}</div>
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{lang === "he" ? "הפסד ממוצע" : "Avg Loss"}<TermTooltip term="avgLoss" lang={lang} /></div>
-                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-loss)]">{fmt$(-Math.round(journalStats.avgLoss), statsCcy(journalStats))}</div>
+                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-loss)]">{journalStats.avgLoss == null ? "—" : fmt$(-Math.round(journalStats.avgLoss), statsCcy(journalStats))}</div>
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{t.profitFactor}<TermTooltip term="profitFactor" lang={lang} /></div>
-                  {/* profitFactor is Infinity when there are wins and no losses — a
-                      DECLARED sentinel that must stay Infinity in the engine (see
-                      statisticalModels.js:159-164; null would pass isFinite and throw
-                      on .toFixed). "∞" read as a broken number to traders, so the
-                      translation happens here, in the display layer only. Smaller,
-                      non-mono type marks it as a state rather than a measurement. */}
-                  {Number.isFinite(journalStats.profitFactor) ? (
+                  {/* Three states, not two. profitFactor is Infinity when there are
+                      wins and no losses — a DECLARED sentinel that stays Infinity in
+                      the engine (statisticalModels.js:159-164). It is null when there
+                      is nothing to measure. `Number.isFinite(null)` is `false` — it
+                      does NOT coerce — so a two-branch test merged the two sentinels
+                      and printed "no losses" on a journal with no trades at all. */}
+                  {journalStats.profitFactor == null ? (
+                    <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-info)]">—</div>
+                  ) : Number.isFinite(journalStats.profitFactor) ? (
                     <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-info)]">{journalStats.profitFactor.toFixed(2)}</div>
                   ) : (
                     <div className="text-xs font-bold mt-0.5 text-[var(--v3-info)]" title={t.pfNoLosses}>{t.pfNoLosses}</div>
@@ -4851,7 +4861,7 @@ export default function SwingEdge() {
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{lang === "he" ? "זמן החזקה" : "Avg Hold"}<TermTooltip term="avgHold" lang={lang} /></div>
-                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-purple)]">{journalStats.avgHold.toFixed(1)}d</div>
+                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-purple)]">{journalStats.avgHold == null ? "—" : `${journalStats.avgHold.toFixed(1)}d`}</div>
                 </div>
               </div>
             )}

@@ -49,6 +49,28 @@
 // the new key does not enter the frozen line unverified — a baseline proves a
 // number has not MOVED, it cannot know the number was right the day it froze.
 //
+// BASELINE VERSION: v5 (T3 · B-009 · docs/plans/PLAN-B009.md).
+// v4 → v5 was captured after EMPTY_STATS stopped publishing invented numbers.
+// The full structural diff, measured before recapture, was:
+// **16 CHANGED values, 2 additions, 0 removals — all of them in the `empty`
+// scenario alone.** The other seven fixtures are byte-identical to v4.
+//
+// Every changed value is `0 → null`, and each one was decided by the three
+// tests in PLAN-B009.md §1 rather than by what reads nicely: winRate,
+// lossRate, beRate, profitFactor, avgWin, avgLoss, bestWin, worstLoss,
+// returnPct, planFollowedWR, planIgnoredWR, planAdherence, avgHoldHours,
+// avgHold, lastWeekStats.winRate, lastMonthStats.winRate. The two additions
+// are `beRate` on lastWeekStats/lastMonthStats (B-065): summarize() emits four
+// keys and EMPTY_STATS emitted three, so one object had two shapes depending
+// on whether the journal was empty.
+//
+// ⚠️ Everything that stayed 0 stayed for a REASON, and block 9b §5 pins it:
+// maxDrawdown / maxDD / currentDrawdown / currentStreak / totalPnL /
+// totalTrades / currentEquity / lastWeekStats.pnl / .count are counts, sums
+// and a seeded extremum — 0 is their identity element over the empty set, so
+// 0 there is a measurement. A blanket "—" is the same bug with the sign
+// flipped, and §5 is what would catch it.
+//
 // lastWeekStats/lastMonthStats read the wall clock (Date.now()) inside
 // computeTradingStats — the one non-pure dependency in an otherwise pure
 // function (see PLAN doc §0.a). Date.now is stubbed to a fixed timestamp for
@@ -95,8 +117,20 @@ const completeness = (label, input, s, expectedUnaccounted) => {
 
 // The three rates are a partition of the closed population — they must sum to
 // exactly 100, not "about" 100 (decision 2).
+// ⚠️ `isEmpty` used to SKIP this check — `if (s.isEmpty) return`. A flag that
+// buys an assertion the right not to run is not a contract, it is permission
+// not to look, and it is the reason "0% win rate on an empty journal" survived
+// every green run of this suite (R-3). It now BRANCHES: the empty journal has
+// its own partition to satisfy, and there is no third state.
 const ratesSumTo100 = (label, s) => {
-  if (s.isEmpty) return;
+  if (s.isEmpty) {
+    eq(`${label} — ריק: winRate הוא null`,  s.winRate,  null);
+    eq(`${label} — ריק: lossRate הוא null`, s.lossRate, null);
+    eq(`${label} — ריק: beRate הוא null`,   s.beRate,   null);
+    eq(`${label} — ריק: wins + losses + be === 0`, s.wins + s.losses + s.be, 0);
+    eq(`${label} — ריק: totalTrades === 0`, s.totalTrades, 0);
+    return;
+  }
   close(`${label} — winRate + lossRate + beRate === 100`, s.winRate + s.lossRate + s.beRate, 100);
   eq(`${label} — wins + losses + be === totalTrades`, s.wins + s.losses + s.be, s.totalTrades);
 };
@@ -124,17 +158,21 @@ const mk = (over) => ({
   eq("isEmpty", s.isEmpty, true);
   eq("totalTrades", s.totalTrades, 0);
   eq("openTrades", s.openTrades, 0);
-  eq("winRate", s.winRate, 0);
-  eq("profitFactor", s.profitFactor, 0);
+  // B-009 — these four asserted `0` from the day this suite was written. They
+  // were not wrong about the code; they were the code's contract, and the
+  // contract was the bug. Block 9b below now owns the replacement, and these
+  // read null so the two blocks cannot disagree about the same object.
+  eq("winRate", s.winRate, null);
+  eq("profitFactor", s.profitFactor, null);
   eq("avgR", s.avgR, null);
   eq("rSampleSize", s.rSampleSize, 0);
   eq("currentEquity", s.currentEquity, CAPITAL);
-  eq("returnPct", s.returnPct, 0);
+  eq("returnPct", s.returnPct, null);
   eq("equityCurve.length", s.equityCurve.length, 0);
   eq("bySetup.length", s.bySetup.length, 0);
   eq("topEdges.length", s.topEdges.length, 0);
   eq("be", s.be, 0);
-  eq("beRate", s.beRate, 0);
+  eq("beRate", s.beRate, null);
   eq("streakRuns", s.streakRuns.length, 0);
   completeness("empty", [], s, 0);
 }
@@ -605,13 +643,108 @@ const mk = (over) => ({
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// 9b · B-009 — THE EMPTY JOURNAL. Block 8 closed the zero-denominator case
+//      for populations INSIDE an active journal (a dormant week, an empty
+//      plan bucket). It could not reach `EMPTY_STATS`, because every fixture
+//      it uses has `isEmpty === false`. `EMPTY_STATS` is the one branch a
+//      BRAND-NEW user sees, and it was the last place still publishing
+//      invented numbers.
+//
+//      Three assertions, and the second and third are shaped deliberately:
+//
+//      1. `winRate` — the plain "not measured" case. 0% is a value the live
+//         path CAN produce (a trader who lost every trade), so 0 here is
+//         indistinguishable from a real measurement. This is R-2.
+//
+//      2. `bestWin` / `worstLoss` — a STRICTLY STRONGER failure, and it needs
+//         a PAIR to prove it. A win is by definition `pnl > 0` and a loss
+//         `pnl < 0`, so `bestWin === 0` is not merely unmeasured — it is a
+//         value the live path can NEVER produce. The empty half alone cannot
+//         show that; the live half is what proves 0 is out of range. See
+//         PLAN-B009.md §1.1 — this is the RANGE test, and it outranks both
+//         the identity test and the collision test.
+//
+//      3. `lastWeekStats` SHAPE — B-065. `summarize()` emits 4 keys and
+//         `EMPTY_STATS` emitted 3. A consumer reading `.beRate` got
+//         `undefined` on an empty journal and a number on a full one, and
+//         neither is the intended null. This asserts KEY SETS, not values:
+//         the values are block 8's job, the shape is what silently drifted.
+// ─────────────────────────────────────────────────────────────────────────
+{
+  console.log("\n9b · B-009 — יומן ריק: null אם״ם הערך אינו מדיד מאפס עסקאות");
+
+  const empty = computeTradingStats([], CAPITAL, calcTradeMetrics);
+
+  // ── 1. Not measured ─────────────────────────────────────────────────────
+  eq("ריק — winRate הוא null, ⛔ לא 0", empty.winRate, null);
+  eq("ריק — lossRate הוא null, ⛔ לא 0", empty.lossRate, null);
+  eq("ריק — beRate הוא null, ⛔ לא 0", empty.beRate, null);
+  eq("ריק — profitFactor הוא null, ⛔ לא 0", empty.profitFactor, null);
+  eq("ריק — avgWin הוא null, ⛔ לא 0", empty.avgWin, null);
+  eq("ריק — avgLoss הוא null, ⛔ לא 0", empty.avgLoss, null);
+  eq("ריק — avgHold הוא null, ⛔ לא 0", empty.avgHold, null);
+  eq("ריק — avgHoldHours הוא null, ⛔ לא 0", empty.avgHoldHours, null);
+  eq("ריק — returnPct הוא null, ⛔ לא 0", empty.returnPct, null);
+  eq("ריק — planAdherence הוא null, ⛔ לא 0", empty.planAdherence, null);
+  eq("ריק — planFollowedWR הוא null, ⛔ לא 0", empty.planFollowedWR, null);
+  eq("ריק — planIgnoredWR הוא null, ⛔ לא 0", empty.planIgnoredWR, null);
+
+  // ── 2. Out of range — the PAIR. Neither half proves it alone. ───────────
+  eq("ריק — bestWin הוא null", empty.bestWin, null);
+  eq("ריק — worstLoss הוא null", empty.worstLoss, null);
+  const ONE_WIN = [mk({ id: "w1", entry: 100, stop: 90, exit: 120, shares: 10, date: daysAgo(3) })];
+  const ONE_LOSS = [mk({ id: "l1", entry: 100, stop: 90, exit: 80, shares: 10, date: daysAgo(3) })];
+  const w = computeTradingStats(ONE_WIN, CAPITAL, calcTradeMetrics);
+  const l = computeTradingStats(ONE_LOSS, CAPITAL, calcTradeMetrics);
+  check("חי — bestWin > 0 תמיד כשהוא מוגדר ⇒ 0 מחוץ לטווח, ⛔ לא 'לא נמדד'",
+    w.bestWin > 0);
+  check("חי — worstLoss < 0 תמיד כשהוא מוגדר ⇒ 0 מחוץ לטווח",
+    l.worstLoss < 0);
+  // ...and avgLoss accumulates Math.abs(), so IT is strictly positive too.
+  check("חי — avgLoss > 0 תמיד כשהוא מוגדר ⇒ avgLoss:0 היה מחוץ לטווח",
+    l.avgLoss > 0);
+
+  // ── 3. B-065 — one shape, both branches ─────────────────────────────────
+  const full = computeTradingStats(ONE_WIN, CAPITAL, calcTradeMetrics);
+  for (const key of ["lastWeekStats", "lastMonthStats"]) {
+    eq(`B-065 · ${key} — אותה קבוצת מפתחות בריק ובמלא`,
+      Object.keys(empty[key]).sort().join(","),
+      Object.keys(full[key]).sort().join(","));
+  }
+
+  // ── 4. null must not be re-coerced back into a number, same as block 8d ─
+  for (const [label, v] of [
+    ["winRate", empty.winRate], ["avgWin", empty.avgWin], ["avgLoss", empty.avgLoss],
+    ["avgHold", empty.avgHold], ["returnPct", empty.returnPct],
+    ["bestWin", empty.bestWin], ["worstLoss", empty.worstLoss],
+    ["profitFactor", empty.profitFactor],
+  ]) {
+    check(`ריק · ${label} — Number.isFinite() הוא false`, Number.isFinite(v) === false);
+    check(`ריק · ${label} — ⛔ אינו שווה 0`, v !== 0);
+  }
+
+  // ── 5. …and what IS measured at zero stays a number. A blanket refusal is
+  //       the same bug with the sign flipped: a metric that abstains when it
+  //       IS measurable lies exactly as loudly as one that invents.
+  eq("ריק — maxDrawdown נשאר 0 (איבר יחידה · בטווח · ⛔ אין התנגשות)", empty.maxDrawdown, 0);
+  eq("ריק — maxDD נשאר 0", empty.maxDD, 0);
+  eq("ריק — currentDrawdown נשאר 0", empty.currentDrawdown, 0);
+  eq("ריק — currentStreak נשאר 0 (מונה)", empty.currentStreak, 0);
+  eq("ריק — totalPnL נשאר 0 (סכום)", empty.totalPnL, 0);
+  eq("ריק — totalTrades נשאר 0 (מונה)", empty.totalTrades, 0);
+  eq("ריק — currentEquity נשאר ההון שהוזן", empty.currentEquity, CAPITAL);
+  eq("ריק — lastWeekStats.pnl נשאר 0 (סכום)", empty.lastWeekStats.pnl, 0);
+  eq("ריק — lastWeekStats.count נשאר 0 (מונה)", empty.lastWeekStats.count, 0);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // 10 · FROZEN BASELINE — full-object regression gate for all 8 fixtures.
 //     First run on a clean checkout writes the baseline (and the assertion
 //     trivially passes); every run after that diffs against the committed
 //     file. This is the T3 tripwire referenced in the plan doc.
 // ─────────────────────────────────────────────────────────────────────────
 {
-  console.log("\n10 · frozen full-object baseline v4 (scripts/fixtures/tradingstats-baseline.json)");
+  console.log("\n10 · frozen full-object baseline v5 (scripts/fixtures/tradingstats-baseline.json)");
   const scenarios = {
     empty: computeTradingStats([], CAPITAL, calcTradeMetrics),
     normal: computeTradingStats([
