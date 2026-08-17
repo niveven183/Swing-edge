@@ -633,3 +633,70 @@ Every production incident gets one short entry: what broke, root cause, fix, pre
 - **⚠️ Still open, deliberately:** the 61 stored labels are **unchanged** — they are simply no
   longer trusted. ⛔ The `BE` row was not corrected; it is the evidence. Wave ב' (the 13 TASE
   rows) waits on advance notice to `e403e391`; the migration is ⏸️ blocked on Niv (§12).
+
+---
+
+## #17 — 2026-08-17 — The alert network was silent for 48 minutes, and the verdict mechanism died inside the job it judges
+- **Symptom:** between **15:17:16Z and 16:05:00Z (47m 44s)** six runs failed and **0/6 produced an
+  alert on either channel** — no Discord message, no mail. The denominator is the six real failures
+  in that window (`Smoke Tests` 32041053330 · `Smoke Tests` 32041651321 · `Triage` 32041853172 ·
+  `Failure Alert` 32041897972 · `Sentinel` 32044102616 · `Failure Alert` 32044223847); the seventh
+  red run of the day, `🐤 Canary Drill` 32058659008 at 19:08Z, is **red on purpose** — it is the
+  drill of D4, and counting it would invent a failure that does not exist. Niv saw a red Smoke run
+  in the GitHub UI and nothing else. **Nobody was told.**
+- **Root cause — external, and this is the finding that decides what a fix can be:**
+  `codeload.github.com` returned **429 Too Many Requests** on action tarball downloads. Verbatim,
+  from `Failure Alert` 32041897972:
+  ```
+  15:18:26.8305657Z ##[warning]Failed to download action 'https://codeload.github.com/dawidd6/
+    action-send-mail/tar.gz/4226df7daafa6fc901a43789c49bf7ab309066e7'. Error: Response status code
+    does not indicate success: 429 (Too Many Requests).
+  15:18:26.8322008Z ##[warning]Back off 26.85 seconds before retry.
+  15:19:25.6667567Z ##[error]Failed to download archive '…' after 3 attempts.
+  ```
+  ⛔ **Not our configuration, and not one vendor's action.** The same 429 killed
+  `actions/download-artifact@v7` — **GitHub's own first-party action** — in `Sentinel` job `watch`
+  at 16:02–16:03Z. Two independent publishers, one host. ⇒ **This class cannot be prevented from
+  inside the repo. It can only be detected.** Every direction discussed below is a *detection*
+  direction; anything phrased as prevention is a category error.
+- **Where it hit — the failure is in `Set up job`, before step 1:** action tarballs are fetched
+  during job setup. The job for `Failure Alert` 32041897972 has exactly **one step**:
+  `{ number:1, name:"Set up job", conclusion:"failure" }`. There was no step 2 to run.
+- **⚠️ The structural half, and the larger one: the delivery gate sits inside the job it judges.**
+  `failure-alert.yml:102-118` is the whole verdict mechanism — it is what turns "the alert was not
+  delivered on any channel" into a red run. It carries `if: always()`. **`always()` is a condition
+  on a *step*, and the steps were never born.** So all three `exit 1` paths that exist in that file
+  — `:83` (webhook secret missing) · `:94` (Discord did not return 204) · `:117` (delivered on zero
+  channels) — **fired zero times**. The gate did not work and did not break: it never existed for
+  this run. ⛔ This is a **fourth mode**, distinct from the three `D-036` closed on 15.08.
+- **⚠️ The blind-spot list in that file names this class and omits this member.** Its header
+  (`failure-alert.yml:13-19`) already says `always()` "cannot run in a job that never started" and
+  enumerates broken YAML, an unhealthy service container, a cancellation, a timeout — written 15.08
+  as the correction to an earlier comment that had declared a possible state impossible. **Action
+  download failure is not on it**, and it is the member that killed the watcher itself. A list of
+  known unknowns is not the same as coverage.
+- **Two layers deep, both by design, both dead the same way:** `Triage` watches Smoke and died at
+  15:17:29Z of the identical 429; `Failure Alert` watches `Triage` and died at 15:18:14Z of the
+  identical 429. Escalation designed to be independent was **not** independent — the two layers
+  share one transport.
+- **⛔ What this was NOT:** not a channel fault. The canary drill at 19:08Z drove the same code path
+  end to end: `discord POST -> HTTP 204`, `channels delivered: 2/2`, and the run that carried it
+  (`Failure Alert` 32058677953) was green. The webhook and the SMTP credentials were fine the whole
+  time. It was also **not** `class:config` on the Smoke side — the deploy gate refused a false green
+  exactly as designed, because Vercel's deployment record for `37e7f13` arrived **+62m 03s** after
+  the commit against a **33–73s** baseline over the 5 control commits outside the window (filed
+  separately as `B-164`; the 180s ceiling is 2.5–5.5× the measured baseline and is **not** a wrong
+  threshold).
+- **The only backstop, and its size:** the alert correlator in `fleet-daily`, which last ran
+  **06:38:02Z** — ~8.5 hours before the event — and next on 18.08. ⇒ **up to ~24 hours of blindness**
+  for a failure of the watcher itself. ⚠️ That gap is not a separate item; it is the same item,
+  because it is the only thing standing behind the gate that cannot run.
+- **Fix: ⛔ none in this commit, deliberately.** This was a read-only diagnosis (§8.1 stage 1); the
+  report is `docs/audits/AUDIT-alert-incident-1708.md`, pushed before any code was touched. The
+  finding is filed as **`B-163`** with four directions **recorded and none decided** — ⚠️ and one of
+  them is already refuted by measurement: **SHA pinning does not help**, because the downloads that
+  failed were already pinned to an explicit SHA (`4226df7…`). Writing a decision here would be the
+  invention the audit exists to prevent.
+- **Prevention — stated honestly:** ⛔ there is none for the root. The 429 is upstream and
+  cross-vendor. What can change is **time to detection**, which today is bounded by a daily
+  correlator, and **where the verdict lives**, which today is inside the thing it judges.
