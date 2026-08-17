@@ -346,6 +346,17 @@ const SCANNER_DATA = [
 // למעלה נשמעה מקוימת. מרגע ש-`makeConvertingCalc` מסמן סירוב, שתי הרגליים חייבות
 // לדלג על **אותו** סימון. השורה למטה היא הצד הגרפי של אותו דילוג בדיוק שב-
 // `closedPnL`, ו-15.7 נועלת את השתיים יחד.
+//
+// ⚠️ **B-143 — הפונקציה הזו ⛔ לא נגעה בגל, וזו החלטה נמדדת ⛔ ולא השמטה.**
+// הגל תיקן שלוש עקומות הון: `stats.equityCurve` (`tradingStats.js`) ועקומת
+// ה-PDF (`exportMonthlyPDF`) שתיהן סכמו איברים לא-מומרים; **זו** כבר דילגה
+// עליהם מ-B-142 (`if (m.fxUnconverted) return;` למטה), ולכן היא הייתה
+// הפונקציה ה**נכונה** משלוש — היעד שאליו הותאמו השתיים האחרות, ⛔ לא פריט
+// שנשכח. שינוי כלשהו כאן היה מרחיק אותה מהיעד.
+//
+// ⛔ ולכן גם ⛔ אין כאן "עוד מונה": המונה של הדילוג הזה כבר מוצג על המסך
+// כתג אחד מאוחד ליד כותרת ההון (אותו תג שנושא את הרגליים הפתוחות), ותג שני
+// ליד הגרף היה מציג לקורא את אותו מספר פעמיים כאילו הם שני חסרים נפרדים.
 const generateEquityCurve = (cap, trades = [], calcFn = calcTradeMetrics) => {
   let balance = cap;
   const data = [];
@@ -481,19 +492,44 @@ const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity, cur
   const curEquity = accountEquity;
   const noPrice = equityGaps?.missingCount || 0;
   const noRate  = equityGaps?.unconvertedCount || 0;
-  const equityIncomplete = noPrice + noRate > 0
-    ? `Excludes ${noPrice + noRate} open position(s)`
-      + `${noPrice ? ` — ${noPrice} without a live price` : ""}`
-      + `${noRate ? ` — ${noRate} without an FX rate` : ""}`
-    : "";
 
-  // Build equity curve points from all closed trades
+  // Build equity curve points from the closed trades that reached `currency`.
+  //
+  // 🔴 **B-143.** This ran over `allClosed` and added `calcFn(t).pnl` whatever
+  // unit it came back in. An equity curve is a RUNNING TOTAL, so a single
+  // unconvertible member does not misprint one point — it displaces every
+  // point after it, and it stretches `maxEq` below, which bends the AXIS the
+  // whole chart is drawn against. A reader cannot see that: the line still
+  // looks like a line.
+  //
+  // ⚠️ And this is the exported, archived document — the copy that outlives the
+  // session and that nobody re-derives. It is the last place a silent unit
+  // error may survive.
   let runBalance = capital;
-  const equityPoints = allClosed.map(t => {
-    const pnl = calcFn(t).pnl || 0;
-    runBalance += pnl;
-    return { date: t.date, ticker: t.ticker, equity: Math.round(runBalance) };
-  });
+  const closedMetrics = allClosed.map(t => ({ t, m: calcFn(t) }));
+  const closedNoRate = closedMetrics.filter(x => x.m.fxUnconverted).length;
+  const equityPoints = closedMetrics
+    .filter(x => !x.m.fxUnconverted)
+    .map(({ t, m }) => {
+      runBalance += m.pnl || 0;
+      return { date: t.date, ticker: t.ticker, equity: Math.round(runBalance) };
+    });
+
+  // ONE disclosure line, three reasons — ⛔ not two neighbouring counters.
+  //
+  // ⚠️ The open-position gaps (no live price / no FX rate) and the closed-side
+  // FX refusal are different causes, but to the reader they are one question:
+  // "how much of my journal is NOT in this number?". Two separate footnotes
+  // invite the reader to answer it twice and get two different answers, which
+  // is how a disclosure stops disclosing. The reasons stay itemised INSIDE the
+  // single sentence, so nothing is lost by unifying the count.
+  const excludedTotal = noPrice + noRate + closedNoRate;
+  const equityIncomplete = excludedTotal > 0
+    ? `Excludes ${excludedTotal} trade(s) from the totals and the equity curve`
+      + `${noPrice ? ` — ${noPrice} open without a live price` : ""}`
+      + `${noRate ? ` — ${noRate} open without an FX rate` : ""}`
+      + `${closedNoRate ? ` — ${closedNoRate} closed without an FX rate to ${currency}` : ""}`
+    : "";
 
   // Lessons from this month
   const lessons = monthClosed.filter(t => t.lessonLearned && t.lessonLearned.trim()).map(t => ({ ticker: t.ticker, lesson: t.lessonLearned }));
@@ -1303,10 +1339,22 @@ export default function SwingEdge() {
   // Symbol for money derived from `capital` (equity, position size, risk). Money
   // that belongs to one trade must use CURRENCY_SYMBOL[currencyOf(trade)] instead.
   const accSym = CURRENCY_SYMBOL[accountCurrency];
-  // Currency for an AGGREGATE figure. A journal holding exactly one currency prints
-  // in it, whatever it is. A mixed journal has no honest single symbol — it falls
-  // back to the account's, and the mixed-currency banner says the total is not a sum.
-  const statsCcy = (st) => (st?.currencies?.length === 1 ? st.currencies[0] : accountCurrency);
+  // 🔴 **B-143 — `statsCcy` נמחק, ⛔ ולא הוחלף בגרסה חכמה יותר.**
+  //
+  // הוא בחר סמל למצרף מתוך `stats.currencies` — פילוח של מטבעות ה**ניירות**
+  // ביומן — והדפיס אותו מעל `stats.totalPnL`. אבל `totalPnL` ⛔ אינו מחושב
+  // באף אחד מהמטבעות האלה: הוא סוכם את מה ש-`makeConvertingCalc` הצליח להמיר
+  // ל-`dispCcy`. כלומר הסמל נגזר ממקור אחד והמספר ממקור אחר, ⛔ ושום ערך של
+  // `st` לא יכול היה לתקן זאת — הפונקציה שאלה את השאלה הלא-נכונה.
+  //
+  // ⚠️ 28 אתרים עברו ל-`dispCcy`, שהוא **בדיוק** היעד ש-`stableCalcTradeMetrics`
+  // ממיר אליו (`makeConvertingCalc(paperAcctTable, dispCcy, …)`), ולכן הסמל
+  // והמספר נגזרים עכשיו מאותה החלטה אחת. ⚠️ כולל `menteeStats`, שנמדד: הוא
+  // מחושב עם **אותו** calc ⇒ הכסף שלו כבר ב-`dispCcy` ו⛔ לא במטבע החניך.
+  //
+  // ⚠️ והבאנר ⛔ לא נמחק איתו — `mixedCurrency` עדיין נכון ועדיין מוצג; מה
+  // שהשתנה הוא **מה הוא אומר** (i18n · `mixedCurrencyBody`): לא עוד "הסכומים
+  // מחברים מטבעות שונים", אלא שיש עסקאות שלא נכללו — עם מונה.
 
   // Personal risk-per-trade %, seeded once from the onboarding profile, editable in Settings.
   // Stored as a percent (1 = 1%), not a fraction. Settings is the source of truth after seeding.
@@ -4117,7 +4165,7 @@ export default function SwingEdge() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <StatCard label={t.winRate}      value={formatPct(menteeStats.winRate)} sub={winLossBeSub(menteeStats)} icon={Target}     accent="purple" />
                       <StatCard label={t.avgRMultiple} value={fmtR(menteeStats.avgR)}         sub={rSampleSub(t, menteeStats)}                      icon={Activity}   accent="amber" />
-                      <StatCard label={t.netPnlClosed} value={fmt$(Math.round(menteeStats.totalPnL * 100) / 100, statsCcy(menteeStats))} sub={`${menteeStats.total} ${t.closedTrades}`} icon={TrendingUp} accent={menteeStats.totalPnL >= 0 ? "green" : "red"} />
+                      <StatCard label={t.netPnlClosed} value={fmt$(Math.round(menteeStats.totalPnL * 100) / 100, dispCcy)} sub={`${menteeStats.total} ${t.closedTrades}`} icon={TrendingUp} accent={menteeStats.totalPnL >= 0 ? "green" : "red"} />
                       <StatCard label={t.streakCounter} value={menteeStats.currentStreak}      sub={`${t.bestStreak}: ${menteeStats.bestStreak}`}    icon={Zap}        accent={menteeStats.currentStreak >= 3 ? "green" : "amber"} />
                     </div>
 
@@ -4262,10 +4310,10 @@ export default function SwingEdge() {
                 info={lang === "he"
                   ? `הון = בסיס ההון שהגדרת (${dispSym}${Math.round(equityBase).toLocaleString()}) בתוספת P&L מצטבר מעסקאות סגורות ופתוחות. הסיכון לכל עסקה מחושב תמיד מבסיס ההון הקבוע — לא מההון הנוכחי.`
                   : `Equity = your capital base (${dispSym}${Math.round(equityBase).toLocaleString()}) plus cumulative P&L from closed & open trades. Per-trade risk is always sized from your fixed capital base — not current equity.`} />
-              <StatCard label={t.netPnlClosed} value={fmt$(Math.round(totalPnL * 100) / 100, statsCcy(stats))} sub={`${closedTrades.length} ${t.closedTrades}`} trend={stats.returnPct} trendText={formatReturnPct(stats.returnPct)} icon={TrendingUp} accent={totalPnL >= 0 ? "green" : "red"} />
+              <StatCard label={t.netPnlClosed} value={fmt$(Math.round(totalPnL * 100) / 100, dispCcy)} sub={`${closedTrades.length} ${t.closedTrades}`} trend={stats.returnPct} trendText={formatReturnPct(stats.returnPct)} icon={TrendingUp} accent={totalPnL >= 0 ? "green" : "red"} />
               <StatCard label={<span className="flex items-center gap-1">{t.winRate}<TermTooltip term="winRate" lang={lang} /></span>} value={formatPct(winRate)} sub={winLossBeSub(stats)} icon={Target} accent="purple" />
               <StatCard label={<span className="flex items-center gap-1">{t.avgRMultiple}<TermTooltip term="avgR" lang={lang} /></span>} value={fmtR(avgR)} sub={rSampleSub(t, stats)} icon={Activity} accent="amber" />
-              <StatCard label={t.dailyPnl} value={fmt$(Math.round(dailyPnL), statsCcy(stats))} sub={t.todayTrades} icon={DollarSign} accent={dailyPnL >= 0 ? "green" : "red"} />
+              <StatCard label={t.dailyPnl} value={fmt$(Math.round(dailyPnL), dispCcy)} sub={t.todayTrades} icon={DollarSign} accent={dailyPnL >= 0 ? "green" : "red"} />
               <StatCard label={t.streakCounter} value={<span className="flex items-center gap-1">{currentStreak > 0 && <Flame size={18} className="text-orange-400" />}{currentStreak}</span>} sub={`${t.bestStreak}: ${bestStreak}`} icon={Zap} accent={currentStreak >= 3 ? "green" : "amber"} />
             </div>
 
@@ -4352,7 +4400,7 @@ export default function SwingEdge() {
                         </div>
                         <div className="text-end">
                           <div className="text-emerald-400 font-bold text-sm">{formatPct(edge.winRate)} WR</div>
-                          <div className="text-slate-300 text-xs">{fmt$0(edge.totalPnL, statsCcy(stats))}</div>
+                          <div className="text-slate-300 text-xs">{fmt$0(edge.totalPnL, dispCcy)}</div>
                         </div>
                       </div>
                     ))}
@@ -4369,7 +4417,7 @@ export default function SwingEdge() {
                         </div>
                         <div className="text-end">
                           <div className="text-rose-400 font-bold text-sm">{formatPct(edge.winRate)} WR</div>
-                          <div className="text-slate-300 text-xs">{fmt$0(edge.totalPnL, statsCcy(stats))}</div>
+                          <div className="text-slate-300 text-xs">{fmt$0(edge.totalPnL, dispCcy)}</div>
                         </div>
                       </div>
                     ))}
@@ -4836,11 +4884,11 @@ export default function SwingEdge() {
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{lang === "he" ? "רווח ממוצע" : "Avg Win"}<TermTooltip term="avgWin" lang={lang} /></div>
-                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-accent)]">{journalStats.avgWin == null ? "—" : fmt$(Math.round(journalStats.avgWin), statsCcy(journalStats))}</div>
+                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-accent)]">{journalStats.avgWin == null ? "—" : fmt$(Math.round(journalStats.avgWin), dispCcy)}</div>
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{lang === "he" ? "הפסד ממוצע" : "Avg Loss"}<TermTooltip term="avgLoss" lang={lang} /></div>
-                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-loss)]">{journalStats.avgLoss == null ? "—" : fmt$(-Math.round(journalStats.avgLoss), statsCcy(journalStats))}</div>
+                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-loss)]">{journalStats.avgLoss == null ? "—" : fmt$(-Math.round(journalStats.avgLoss), dispCcy)}</div>
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{t.profitFactor}<TermTooltip term="profitFactor" lang={lang} /></div>
@@ -4860,7 +4908,7 @@ export default function SwingEdge() {
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{t.maxDD}<TermTooltip term="maxDD" lang={lang} /></div>
-                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-loss)]">{fmt$(-Math.round(journalStats.maxDD), statsCcy(journalStats))}</div>
+                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-loss)]">{fmt$(-Math.round(journalStats.maxDD), dispCcy)}</div>
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{lang === "he" ? "זמן החזקה" : "Avg Hold"}<TermTooltip term="avgHold" lang={lang} /></div>
@@ -4960,7 +5008,7 @@ export default function SwingEdge() {
                 fmtAcct={fmtAcct}
                 acctRefusalText={acctRefusalText}
                 lang={lang}
-                currency={statsCcy(journalStats)}
+                currency={dispCcy}
               />
             ) : trades.length === 0 ? (
               <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-2xl p-12 text-center">
@@ -5860,7 +5908,7 @@ export default function SwingEdge() {
                     {lang === "he" ? "הסיפור של החשבון שלך" : "The story of your account"}
                   </span>
                   <div className={`se-serif mt-2 text-5xl md:text-6xl leading-none tracking-tight ${totalPnL>=0?"text-[var(--v3-accent)]":"text-[var(--v3-loss)]"}`}>
-                    {fmt$(Math.round(totalPnL * 100) / 100, statsCcy(stats))}
+                    {fmt$(Math.round(totalPnL * 100) / 100, dispCcy)}
                   </div>
                   <div className="mt-2.5 flex items-center gap-2 text-xs text-slate-500">
                     <span className={`font-mono font-semibold ${totalPnL>=0?"text-[var(--v3-accent)]":"text-[var(--v3-loss)]"}`}>
@@ -5900,7 +5948,7 @@ export default function SwingEdge() {
               <StatCard label={t.totalTrades}  value={realTrades.length} sub={t.allTime}      icon={Layers}    accent="cyan"   />
               <StatCard label={<span className="flex items-center gap-1">{t.winRate}<TermTooltip term="winRate" lang={lang} /></span>} value={formatPct(winRate)} sub={`${stats.wins} ${t.wins}`} icon={CheckCircle} accent="green" />
               <StatCard label={<span className="flex items-center gap-1">{t.avgRMultiple}<TermTooltip term="avgR" lang={lang} /></span>} value={fmtR(avgR)} sub={rSampleSub(t, stats)} icon={Activity}  accent="purple" />
-              <StatCard label={t.totalReturn}   value={formatReturnPct(stats.returnPct)} sub={`${fmt$0(totalPnL, statsCcy(stats))} P&L`} icon={TrendingUp} accent={totalPnL>=0?"green":"red"} />
+              <StatCard label={t.totalReturn}   value={formatReturnPct(stats.returnPct)} sub={`${fmt$0(totalPnL, dispCcy)} P&L`} icon={TrendingUp} accent={totalPnL>=0?"green":"red"} />
             </div>
 
             {/* Per-trade P&L bars */}
@@ -5910,8 +5958,8 @@ export default function SwingEdge() {
                 <BarChart data={closedTrades.map(t => ({ name: t.ticker, pnl: Math.round(calcTradeMetrics(t).pnl || 0) }))}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={(v) => fmt$0(v, statsCcy(stats))} />
-                  <Tooltip contentStyle={{ background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 10, fontSize: 11 }} formatter={v=>[fmt$(v, statsCcy(stats)),"P&L"]} />
+                  <YAxis tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={(v) => fmt$0(v, dispCcy)} />
+                  <Tooltip contentStyle={{ background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 10, fontSize: 11 }} formatter={v=>[fmt$(v, dispCcy),"P&L"]} />
                   <ReferenceLine y={0} stroke="var(--v3-text-lo)" />
                   <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
                     {closedTrades.map((t, i) => {
@@ -5962,10 +6010,10 @@ export default function SwingEdge() {
                     <BarChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
                       <XAxis dataKey="day" tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => dayLabel(v, lang)} />
-                      <YAxis tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={(v) => fmt$0(v, statsCcy(stats))} />
+                      <YAxis tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={(v) => fmt$0(v, dispCcy)} />
                       <Tooltip
                         contentStyle={{ background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 10, fontSize: 11 }}
-                        formatter={(v, n, p) => [`${fmt$(v, statsCcy(stats))} · ${nTrades(p.payload.count, lang)}`, "P&L"]}
+                        formatter={(v, n, p) => [`${fmt$(v, dispCcy)} · ${nTrades(p.payload.count, lang)}`, "P&L"]}
                         labelFormatter={l => lang === "he"
                           ? dayLabel(l, "he")
                           : (["Sun","Mon","Tue","Wed","Thu","Fri"].includes(l) ? ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday"][["Sun","Mon","Tue","Wed","Thu","Fri"].indexOf(l)] : l)}
@@ -6051,7 +6099,7 @@ export default function SwingEdge() {
                     {bestDayEntry ? (
                       <>
                         <div className="text-2xl font-bold text-white font-mono">{dayLabel(bestDayEntry[0], lang)}</div>
-                        <div className="text-xs text-slate-500 mt-1">{fmt$(Math.round(bestDayEntry[1].pnl), statsCcy(stats))} · {nTrades(bestDayEntry[1].count, lang)}</div>
+                        <div className="text-xs text-slate-500 mt-1">{fmt$(Math.round(bestDayEntry[1].pnl), dispCcy)} · {nTrades(bestDayEntry[1].count, lang)}</div>
                       </>
                     ) : (
                       <div className="text-sm text-slate-600">{t.logClosedForInsights}</div>
@@ -6105,7 +6153,7 @@ export default function SwingEdge() {
                         </div>
                         <div className="text-end">
                           <div className="text-emerald-400 font-bold text-sm">{formatPct(edge.winRate)} WR</div>
-                          <div className="text-slate-300 text-xs">{fmt$0(edge.totalPnL, statsCcy(stats))}</div>
+                          <div className="text-slate-300 text-xs">{fmt$0(edge.totalPnL, dispCcy)}</div>
                         </div>
                       </div>
                     ))}
@@ -6122,7 +6170,7 @@ export default function SwingEdge() {
                         </div>
                         <div className="text-end">
                           <div className="text-rose-400 font-bold text-sm">{formatPct(edge.winRate)} WR</div>
-                          <div className="text-slate-300 text-xs">{fmt$0(edge.totalPnL, statsCcy(stats))}</div>
+                          <div className="text-slate-300 text-xs">{fmt$0(edge.totalPnL, dispCcy)}</div>
                         </div>
                       </div>
                     ))}
@@ -6250,8 +6298,8 @@ export default function SwingEdge() {
                         <BarChart data={pnlByMonth} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
                           <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} />
-                          <YAxis tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={(v) => fmt$0(v, statsCcy(stats))} />
-                          <Tooltip contentStyle={darkTooltip} formatter={(v, n, p) => [`${fmt$(v, statsCcy(stats))} · ${p.payload.count} trade${p.payload.count !== 1 ? "s" : ""}`, "P&L"]} />
+                          <YAxis tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={(v) => fmt$0(v, dispCcy)} />
+                          <Tooltip contentStyle={darkTooltip} formatter={(v, n, p) => [`${fmt$(v, dispCcy)} · ${p.payload.count} trade${p.payload.count !== 1 ? "s" : ""}`, "P&L"]} />
                           <ReferenceLine y={0} stroke="var(--v3-text-lo)" />
                           <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
                             {pnlByMonth.map((d, i) => (
@@ -6277,8 +6325,8 @@ export default function SwingEdge() {
                         <BarChart data={emotionStatsArr} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
                           <XAxis dataKey="emotion" tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={v => labelFor("emotion", v, lang)} />
-                          <YAxis tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={(v) => fmt$0(v, statsCcy(stats))} />
-                          <Tooltip contentStyle={darkTooltip} formatter={(v, n, p) => [`${fmt$(v, statsCcy(stats))} · ${formatPct(p.payload.winRate)} WR`, "P&L"]} />
+                          <YAxis tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={(v) => fmt$0(v, dispCcy)} />
+                          <Tooltip contentStyle={darkTooltip} formatter={(v, n, p) => [`${fmt$(v, dispCcy)} · ${formatPct(p.payload.winRate)} WR`, "P&L"]} />
                           <ReferenceLine y={0} stroke="var(--v3-text-lo)" />
                           <Bar dataKey="totalPnL" radius={[4, 4, 0, 0]}>
                             {emotionStatsArr.map((e, i) => (
@@ -6384,7 +6432,7 @@ export default function SwingEdge() {
                                 )}
                               </td>
                               <td className={`py-2.5 px-1 sm:px-0 text-end font-mono font-bold text-[10px] sm:text-sm ${s.totalPnL >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>
-                                {fmt$(s.totalPnL, statsCcy(stats))}
+                                {fmt$(s.totalPnL, dispCcy)}
                               </td>
                             </tr>
                           ))}
@@ -6426,7 +6474,7 @@ export default function SwingEdge() {
                             tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }}
                             tickLine={false}
                             axisLine={false}
-                            tickFormatter={(v) => fmt$0(v, statsCcy(stats))}
+                            tickFormatter={(v) => fmt$0(v, dispCcy)}
                           />
                           <ReferenceLine y={0} stroke="var(--v3-text-lo)" />
                           <Tooltip
@@ -6438,7 +6486,7 @@ export default function SwingEdge() {
                                 <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-[var(--v3-line)] rounded-lg px-3 py-2 text-xs shadow-xl">
                                   <p className="font-mono font-bold text-[var(--text-primary)] dark:text-white">{d.ticker}</p>
                                   <p className="text-slate-400">{lang === "he" ? "ימים" : "Days"}: {d.hold}</p>
-                                  <p className={d.pnl >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}>{fmt$(d.pnl, statsCcy(stats))}</p>
+                                  <p className={d.pnl >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}>{fmt$(d.pnl, dispCcy)}</p>
                                 </div>
                               );
                             }}
@@ -7371,7 +7419,7 @@ export default function SwingEdge() {
                       {t.pdfIncludes}
                     </p>
                     <button
-                      onClick={() => exportMonthlyPDF(realTrades, equityBase, stats, monthStats, curEquity, statsCcy(stats), stableCalcTradeMetrics, openPnL)}
+                      onClick={() => exportMonthlyPDF(realTrades, equityBase, stats, monthStats, curEquity, dispCcy, stableCalcTradeMetrics, openPnL)}
                       className="w-full py-2 rounded-lg bg-[var(--v3-info-glow)] border border-[#06b6d4]/25 text-[var(--v3-info)] text-xs font-bold hover:bg-[#06b6d4]/20 transition flex items-center justify-center gap-1.5">
                       <FileText size={12} /> {t.createPdf}
                     </button>
@@ -7431,7 +7479,7 @@ export default function SwingEdge() {
             t={t}
             lang={lang}
             isRTL={isRTL}
-            currency={statsCcy(stats)}
+            currency={dispCcy}
           />
         )}
 
@@ -7450,7 +7498,7 @@ export default function SwingEdge() {
             t={t}
             lang={lang}
             isRTL={isRTL}
-            currency={statsCcy(stats)}
+            currency={dispCcy}
           />
         )}
 

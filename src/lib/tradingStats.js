@@ -58,14 +58,45 @@ export function computeTradingStats(trades, capital, calcTradeMetrics) {
   const losers  = rates.losses;
   const breakEvens = rates.be;
 
-  const totalPnL = metrics.reduce((s, m) => s + (m.pnl || 0), 0);
-  const { grossWin: totalWin, grossLoss: totalLoss } = grossPnl(metrics.map(pnlOfMetric));
+  // ─── The money population (B-143) ──────────────────────────────────────
+  //
+  // A shekel and a dollar do not add up. The FX seam
+  // (useFxRates.makeConvertingCalc) already decided which members it could
+  // price in the display currency; the ones it could not, it handed back
+  // UNCONVERTED — original number, original currency — and named the reason on
+  // `fxUnconverted`. Every money figure below therefore sums THIS set, and
+  // every one of them is guaranteed to be in a single unit as a result.
+  //
+  // ⚠️ This is a split by METRIC TYPE, not by field, and the other half matters
+  // just as much:
+  //
+  //   · COUNTS and RATES (`totalTrades`, `wins`, `winRate`, `planAdherence`…)
+  //     keep EVERY closed metric. The sign of a P&L is currency-independent —
+  //     a trade that made money made money whether or not we could price it in
+  //     the account's currency. Excluding it there would delete half the
+  //     journal's behavioural record to fix an arithmetic problem, which is the
+  //     same bug with the sign flipped.
+  //   · `avgR` / `rSampleSize` likewise: R is a ratio taken INSIDE the trade's
+  //     own currency, so it is unit-free by construction.
+  //
+  // ⚠️ And every money AVERAGE takes its denominator from this same set — see
+  // `avgWin` below. A filtered numerator over an unfiltered denominator is
+  // strictly worse than the bug it replaces: today's cross-unit `avgWin` is
+  // wrong and visibly so; that version would be wrong and plausible.
+  const aggregatable = metrics.filter(m => !m.fxUnconverted);
+  const fxAggregatableCount = aggregatable.length;
+  const fxUnconvertedCount  = metrics.length - fxAggregatableCount;
+  // Outcome buckets over the money population — the denominators of avgWin /
+  // avgLoss / bestWin / worstLoss. `rates` above stays the FULL population and
+  // the two must not be conflated.
+  const aggRates = outcomeRates(aggregatable, pnlOfMetric);
 
-  // A shekel and a dollar do not add up, and `totalPnL` above adds them anyway
-  // because every figure downstream of it is one number. Rather than silently
-  // producing a sum that means nothing, the split is published beside it and the
-  // consumer is told when the set is mixed (§2 — no ratio without a denominator,
-  // and no total without a unit).
+  const totalPnL = aggregatable.reduce((s, m) => s + (m.pnl || 0), 0);
+  const { grossWin: totalWin, grossLoss: totalLoss } = grossPnl(aggregatable.map(pnlOfMetric));
+
+  // The per-currency split is published beside the total and the consumer is
+  // told when the set is mixed (§2 — no ratio without a denominator, and no
+  // total without a unit).
   //
   // ⚠️ המפתח הוא מטבע ה**נייר** הנגזר, ⛔ לא `currencyOf` — זו הייתה קריאה של
   // התווית שמסלול הכתיבה חתם מהעדפת החשבון. יומן של 13 ניירות ת"א ועוד 2
@@ -100,18 +131,30 @@ export function computeTradingStats(trades, capital, calcTradeMetrics) {
   const lossRate = toPct(rates.lossRate);
   const beRate   = toPct(rates.beRate);
 
-  const profitFactor = profitFactorFromPnls(metrics.map(pnlOfMetric));
-  const avgWin       = winners.length ? totalWin / winners.length : 0;
-  const avgLoss      = losers.length  ? totalLoss / losers.length : 0;
+  // Money — numerator AND denominator from `aggregatable` (see the block above).
+  // `aggRates.wins`, not `winners`: the two differ by exactly the members whose
+  // P&L is denominated in another currency.
+  const profitFactor = profitFactorFromPnls(aggregatable.map(pnlOfMetric));
+  const avgWin       = aggRates.wins.length   ? totalWin / aggRates.wins.length   : 0;
+  const avgLoss      = aggRates.losses.length ? totalLoss / aggRates.losses.length : 0;
+  // Unit-free — every closed metric, same as the rates.
   const { avg: avgR, n: rSampleSize } = rSumStats(metrics);
-  const bestWin      = winners.length ? Math.max(...winners.map(m => m.pnl)) : 0;
-  const worstLoss    = losers.length  ? Math.min(...losers.map(m => m.pnl)) : 0;
+  // Extrema are money too: a max over mixed units picks the biggest NUMBER, not
+  // the biggest win.
+  const bestWin      = aggRates.wins.length   ? Math.max(...aggRates.wins.map(m => m.pnl))   : 0;
+  const worstLoss    = aggRates.losses.length ? Math.min(...aggRates.losses.map(m => m.pnl)) : 0;
 
   // ─── Equity curve + Max Drawdown ───────────────────────────
   // Ordered by close, not entry: drawdown is a statement about the sequence the
   // account actually lived through, so a January entry closed in June belongs
   // after everything closed in between.
-  const sorted = [...metrics].sort((a, b) => (realizedAt(a) ?? 0) - (realizedAt(b) ?? 0));
+  //
+  // ⚠️ Two orderings, on purpose. `sorted` is the MONEY sequence and holds the
+  // convertible members only — an equity curve is a running total, so one
+  // foreign-currency member displaces every point after it and invents a
+  // drawdown the account never lived through. `sortedAll` below is the
+  // behavioural sequence (streaks), which counts signs and needs no rate.
+  const sorted = [...aggregatable].sort((a, b) => (realizedAt(a) ?? 0) - (realizedAt(b) ?? 0));
   let equity = capital;
   let peak = capital;
   let maxDDPct = 0;       // % drawdown from peak equity
@@ -146,7 +189,11 @@ export function computeTradingStats(trades, capital, calcTradeMetrics) {
   // they neither extend nor break a run, matching the maxima above.
   const streakRuns = [];
   let runType = null, runLen = 0;
-  sorted.forEach((m, i) => {
+  // FULL population — a streak counts SIGNS, and a sign needs no exchange rate.
+  // Dropping a trade here would silently join two runs that a real losing trade
+  // separated.
+  const sortedAll = [...metrics].sort((a, b) => (realizedAt(a) ?? 0) - (realizedAt(b) ?? 0));
+  sortedAll.forEach((m, i) => {
     const p = m.pnl || 0;
     if (p > 0) {
       tw++; tl = 0;
@@ -160,7 +207,7 @@ export function computeTradingStats(trades, capital, calcTradeMetrics) {
       if (runType === null || runType === nt) { runType = nt; runLen++; }
       else { streakRuns.push({ type: runType, length: runLen }); runType = nt; runLen = 1; }
     }
-    if (i === sorted.length - 1) currentStreak = tw > 0 ? tw : -tl;
+    if (i === sortedAll.length - 1) currentStreak = tw > 0 ? tw : -tl;
   });
   if (runLen > 0 && runType) streakRuns.push({ type: runType, length: runLen });
 
@@ -209,10 +256,17 @@ export function computeTradingStats(trades, capital, calcTradeMetrics) {
     losses:      losers.length,
     be:          breakEvens.length,
 
-    // pnl
+    // pnl — the convertible population only (B-143). Guaranteed single-unit.
     totalPnL, totalWin, totalLoss,
 
-    // currency — `totalPnL` is only meaningful when `currencies` holds one entry.
+    // …and the denominator that makes the figure above readable (§2). A total
+    // that excludes members without saying how many is a sum with a hole in it.
+    // The screen renders this as one unified tag beside the equity headline
+    // (SwingEdge_App.jsx — the same tag that carries the open-position legs, so
+    // there is exactly ONE counter on screen, not two neighbours).
+    fxUnconvertedCount, fxAggregatableCount,
+
+    // currency — the per-instrument split.
     pnlByCurrency, tradesByCurrency, currencies, mixedCurrency,
 
     // rates — all 0..100 (see SCALE BOUNDARY above).
@@ -228,12 +282,11 @@ export function computeTradingStats(trades, capital, calcTradeMetrics) {
     // the consumer (SwingEdge_App curEquity); open P&L needs live prices,
     // which are component state and must not enter this pure stats hub.
     //
-    // ⚠️ **סכום בין-יחידות כשההמרה נכשלת** — `totalPnL` הוא `reduce` על כל
-    // העסקאות ו⛔ אינו שואל באיזה מטבע כל איבר. הכותרת ⛔ **אינה צורכת אותו
-    // יותר** (`B-142`, 15.08): `curEquity` מורכב מ-`equityBase + closedPnL +
-    // openPnL`, ושתי הרגליים מדירות עסקה מסומנת. הערך כאן ⛔ **לא שונה** —
-    // צרכניו הנותרים (`returnPct`, `menteeStats`, `monthStats`, `journalStats`)
-    // אינם מדפיסים הון או תשואה. ⇒ **בבעלות `B-143`.**
+    // `totalPnL` is single-unit as of B-143, so this addition is now between
+    // two figures in the same currency. The headline still does NOT read this
+    // field — it assembles `equityBase + closedPnL + openPnL` so that the live
+    // leg is included (B-142) — but the remaining consumers (`returnPct`,
+    // `menteeStats`, `monthStats`, `journalStats`) read a clean number.
     currentEquity: capital + totalPnL,
     capital,
     returnPct: capital ? (totalPnL / capital) * 100 : 0,
@@ -299,6 +352,8 @@ function EMPTY_STATS(capital) {
     // counts and sums — identity 0 over the empty set, so these are measured
     totalTrades: 0, total: 0, openTrades: 0, wins: 0, losses: 0, be: 0,
     totalPnL: 0, totalWin: 0, totalLoss: 0,
+    // B-143 — counts over the empty set, identity 0, so these are measurements.
+    fxUnconvertedCount: 0, fxAggregatableCount: 0,
     pnlByCurrency: {}, tradesByCurrency: {}, currencies: [], mixedCurrency: false,
     rSampleSize: 0,
     // quotients — no identity over an empty set
@@ -317,11 +372,13 @@ function EMPTY_STATS(capital) {
     // pass, so this 0 is a measurement and stays one.
     equityCurve: [], maxDrawdown: 0, maxDD: 0, currentDrawdown: 0,
     currentStreak: 0, maxWinStreak: 0, maxLossStreak: 0, bestStreak: 0, streakRuns: [],
-    // B-065 — same key set as summarize(), which emits four. Three keys here
-    // meant a consumer read `.beRate` as undefined on an empty journal and as
-    // a number on a full one, and neither is the null that was intended.
-    lastWeekStats:  { count: 0, pnl: 0, winRate: null, beRate: null },
-    lastMonthStats: { count: 0, pnl: 0, winRate: null, beRate: null },
+    // B-065 — same key set as summarize(), which emits FIVE as of B-143. Three
+    // keys here meant a consumer read `.beRate` as undefined on an empty
+    // journal and as a number on a full one, and neither is the null that was
+    // intended. `fxUnconvertedCount` is the fifth and is a count, so 0 is its
+    // identity over the empty set — the same reasoning as the top-level pair.
+    lastWeekStats:  { count: 0, pnl: 0, winRate: null, beRate: null, fxUnconvertedCount: 0 },
+    lastMonthStats: { count: 0, pnl: 0, winRate: null, beRate: null, fxUnconvertedCount: 0 },
     bySetup: [], byEmotion: [], byMarket: [], byEntryQuality: [], byDayOfWeek: [],
     topEdges: [], antiEdges: [],
     closedMetrics: [],
@@ -340,7 +397,12 @@ function groupAndAnalyze(metrics, field, keyFn) {
     // Same three-outcome rule and same profit-factor path as the top-level
     // figures — a group's win rate must mean what the headline win rate means.
     const rates    = outcomeRates(items, pnlOfMetric);
-    const totalPnL = items.reduce((s, m) => s + (m.pnl || 0), 0);
+    // B-143 — same split as the top level, and it matters MORE here: this
+    // object publishes `totalPnL` and `count` side by side, so a filtered sum
+    // divided by `items.length` would be a cross-population quotient hidden
+    // inside a single object literal. `avgPnL` is that quotient.
+    const money    = items.filter(m => !m.fxUnconverted);
+    const totalPnL = money.reduce((s, m) => s + (m.pnl || 0), 0);
     const r        = rSumStats(items);
     return {
       name,
@@ -352,14 +414,15 @@ function groupAndAnalyze(metrics, field, keyFn) {
       lossRate: toPct(rates.lossRate),
       beRate:   toPct(rates.beRate),
       totalPnL,
-      avgPnL: totalPnL / items.length,
+      fxUnconvertedCount: items.length - money.length,
+      avgPnL: money.length ? totalPnL / money.length : null,
       totalR: r.total,
       avgR: r.avg,
       rSampleSize: r.n,
       // Infinity is possible here exactly as it is at the top level. Any
       // consumer that renders this must guard with Number.isFinite — see the
       // journal profit-factor tile in SwingEdge_App.jsx.
-      profitFactor: profitFactorFromPnls(items.map(pnlOfMetric)),
+      profitFactor: profitFactorFromPnls(money.map(pnlOfMetric)),
     };
   }).sort((a, b) => b.totalPnL - a.totalPnL);
 }
@@ -378,12 +441,17 @@ function analyzeByDay(metrics) {
     .filter(d => d.items.length > 0)
     .map(d => {
       const rates = outcomeRates(d.items, pnlOfMetric);
+      // B-143 — `count` counts every trade that day; `totalPnL` sums only the
+      // ones that reached the display currency. The two are deliberately drawn
+      // from different populations, so the gap is published, not implied.
+      const money = d.items.filter(m => !m.fxUnconverted);
       return {
         name: d.name,
         count: d.items.length,
         winRate: toPct(rates.winRate),   // scale boundary
         beRate:  toPct(rates.beRate),
-        totalPnL: d.items.reduce((s, m) => s + (m.pnl || 0), 0),
+        totalPnL: money.reduce((s, m) => s + (m.pnl || 0), 0),
+        fxUnconvertedCount: d.items.length - money.length,
       };
     });
 }
@@ -393,13 +461,20 @@ function analyzeByDay(metrics) {
 // in which you placed no trades has no win rate, and reporting 0 tells the
 // trader they lost every trade in a week they sat out (A5 · §2).
 function summarize(metrics) {
-  if (!metrics.length) return { count: 0, pnl: 0, winRate: null, beRate: null };
+  if (!metrics.length) {
+    return { count: 0, pnl: 0, winRate: null, beRate: null, fxUnconvertedCount: 0 };
+  }
   const rates = outcomeRates(metrics, pnlOfMetric);
+  // B-143 — `pnl` is money and therefore single-unit; `count` is the full
+  // window. A window in which every trade was refused reports `pnl: 0` WITH
+  // `fxUnconvertedCount === count`, which is not the same claim as "flat week".
+  const money = metrics.filter(m => !m.fxUnconverted);
   return {
     count: metrics.length,
-    pnl: metrics.reduce((s, m) => s + (m.pnl || 0), 0),
+    pnl: money.reduce((s, m) => s + (m.pnl || 0), 0),
     winRate: toPct(rates.winRate),   // scale boundary
     beRate:  toPct(rates.beRate),
+    fxUnconvertedCount: metrics.length - money.length,
   };
 }
 
@@ -424,6 +499,10 @@ function findEdges(metrics, type) {
       const wins = rates.wins.length;
       const n = items.length;
       const { avg: avgR, n: rSampleSize } = rSumStats(items);
+      // B-143 — the RANKING (Wilson × R) stays on the full population: a P&L's
+      // sign and its R are currency-independent. Only the displayed `totalPnL`
+      // narrows to the convertible subset.
+      const money = items.filter(m => !m.fxUnconverted);
       // `?? 0` in the two ranking scores is a declared neutral, not a
       // measurement: a combo with no measurable R ranks on Wilson alone.
       const rScore = avgR ?? 0;
@@ -434,7 +513,8 @@ function findEdges(metrics, type) {
         count: n,
         winRate: toPct(rates.winRate),   // scale boundary
         beRate:  toPct(rates.beRate),
-        totalPnL: items.reduce((s, m) => s + (m.pnl || 0), 0),
+        totalPnL: money.reduce((s, m) => s + (m.pnl || 0), 0),
+        fxUnconvertedCount: n - money.length,
         avgR,
         rSampleSize,
         score: edgeScore(wins, n, rScore),

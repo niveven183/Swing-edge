@@ -80,6 +80,40 @@
 // red, on the 7 fixtures that reach the live path (`empty` is unaffected —
 // it never reaches this alias). Both mutations reverted before commit.
 //
+// BASELINE VERSION: v7 (T3 · B-143 · docs/plans/PLAN-B143.md).
+// v6 → v7 was captured after the money population split off from the count
+// population: every money figure now sums the members the FX seam could price
+// in the display currency, and publishes how many it left out.
+//
+// Predicted diff, written BEFORE recapture (PLAN-B143.md §4.1): **pure
+// additions, 0 changed values, 0 removals** — because not one of the eight
+// baseline fixtures ever sets `fxUnconverted`, so `aggregatable === metrics`
+// in all of them and every existing number must survive byte-for-byte.
+//
+// Measured: 132 `+` lines / 40 `-` lines. The 40 are the trailing-comma
+// artifact of JSON, not value changes, and that was PROVEN rather than
+// assumed: every removed line reappears among the added lines identically
+// once a trailing comma is stripped (`comm -23` of the two sorted, comma-
+// normalised sets is EMPTY). Net: **+92 keys, 0 changed values, 0 removals** —
+// 84 × `fxUnconvertedCount` (top level, every breakdown group, every weekday,
+// every edge, both rolling windows) + 8 × `fxAggregatableCount` (top level,
+// one per fixture). All 84 of the new counters read 0, verified by value.
+//
+// ⚠️ That last fact is this wave's REVERSE assertion in machine form. The
+// danger in a change like this is not the mixed-currency journal it fixes but
+// the single-currency journal it must leave alone: a blanket exclusion would
+// silently shrink every average, and "avgWin dropped" is a bug that looks like
+// a result. 0 changed values across 8 fixtures is the proof that nothing moved
+// for the journals that never had a conversion problem. Block 11.8 asserts the
+// same contract by hand on a fixture built for it.
+//
+// Bidirectional discrimination proof run against the fresh v7 baseline before
+// it was trusted: mutating `fxAggregatableCount` (covered — block 11.3) turned
+// BOTH layers red, 7 baseline fixtures + 4 value assertions; mutating
+// `bestStreak` (0 assertion coverage) turned ONLY the baseline red, on the
+// same 7 fixtures that reach the live path (`empty` is unaffected — it never
+// reaches the alias). Both mutations reverted before commit.
+//
 // ⚠️ Everything that stayed 0 stayed for a REASON, and block 9b §5 pins it:
 // maxDrawdown / maxDD / currentDrawdown / currentStreak / totalPnL /
 // totalTrades / currentEquity / lastWeekStats.pnl / .count are counts, sums
@@ -100,6 +134,9 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { computeTradingStats } from "../src/lib/tradingStats.js";
 import { calcTradeMetrics } from "../src/utils.js";
+// B-143 — the refusal marker is NOT synthesised here. Block 11 drives the real
+// conversion seam so the fixture cannot drift from what the app actually does.
+import { makeConvertingCalc } from "../src/hooks/useFxRates.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BASELINE_PATH = join(__dirname, "fixtures", "tradingstats-baseline.json");
@@ -761,7 +798,7 @@ const mk = (over) => ({
 //     file. This is the T3 tripwire referenced in the plan doc.
 // ─────────────────────────────────────────────────────────────────────────
 {
-  console.log("\n10 · frozen full-object baseline v6 (scripts/fixtures/tradingstats-baseline.json)");
+  console.log("\n10 · frozen full-object baseline v7 (scripts/fixtures/tradingstats-baseline.json)");
   const scenarios = {
     empty: computeTradingStats([], CAPITAL, calcTradeMetrics),
     normal: computeTradingStats([
@@ -833,6 +870,171 @@ const mk = (over) => ({
         console.error(`    ${BASELINE_PATH} and rerun to recapture, with the diff reviewed in the plan doc.`);
       }
     }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 11 · B-143 — a cross-unit sum is not a sum.
+//
+//   `totalPnL` was a `reduce` over every closed metric that never asked what
+//   currency each member was in. When the FX layer refuses a conversion it
+//   marks the metric `fxUnconverted` and hands back the ORIGINAL number in the
+//   ORIGINAL currency (useFxRates.makeConvertingCalc) — so the reduce added
+//   shekels to dollars and every figure downstream of it inherited the mix:
+//   totalWin, avgWin, bestWin, worstLoss, currentEquity, the equity curve, and
+//   both drawdowns. B-142 fixed the HEADLINE by assembling it from
+//   exclude-and-count legs; the hub underneath it was left contaminated and
+//   handed to this wave.
+//
+//   The rule this block pins, and it is a SPLIT BY METRIC TYPE, not by field:
+//
+//     · COUNTS and RATES keep every closed metric. The SIGN of a P&L is
+//       currency-independent — a trade that made money made money whether or
+//       not we could price it in the account's currency. Excluding it here
+//       would lie about the win rate, which is the one number on the dashboard
+//       that has nothing to do with currency.
+//     · MONEY sums use the convertible subset ONLY, and each one carries a
+//       denominator drawn from that SAME subset (§2). A filtered numerator
+//       over an unfiltered denominator is strictly worse than today's bug:
+//       today `avgWin` is wrong and visibly so; that version would be wrong
+//       and plausible.
+//     · `avgR` / `rSampleSize` keep everything — R is a ratio taken INSIDE the
+//       trade's own currency, so it is unit-free by construction.
+//
+//   ⚠️ The fixture below is the case that REFUTED the audit's first
+//   conclusion. The audit swept 24 state combinations with one trade each,
+//   measured 12/12 clean whenever `fxOk === true`, and concluded that a failed
+//   FX load was a NECESSARY condition for divergence. A single-trade fixture
+//   cannot produce a PARTIAL refusal, which is the whole failure mode: here
+//   `fxOk === true`, the rate table loaded, and the journal still mixes units
+//   because ONE member's realized day has no fixing. Two trades, not one, is
+//   the difference between the sweep and the bug.
+// ─────────────────────────────────────────────────────────────────────────
+{
+  console.log("\n11 · B-143 — money aggregates exclude-and-count, counts do not");
+
+  // The gap day is BEFORE every fixing on purpose. `fx.convert` walks back up
+  // to 7 days looking for a rate, so a gap day placed AFTER a good day would
+  // silently resolve and the fixture would prove nothing.
+  const GAP_A = "2026-01-05", GAP_B = "2026-01-06";
+  const FIX_A = "2026-02-10", FIX_B = "2026-02-12";
+  const TABLE = {
+    base: "USD", quote: "ILS",
+    spot: { rate: 2, rateDate: FIX_B },
+    byDay: { [FIX_A]: { rate: 2, rateDate: FIX_A }, [FIX_B]: { rate: 2, rateDate: FIX_B } },
+  };
+  // fxOk === TRUE. The table loaded. `dispCcy` is ILS. This is a HEALTHY app.
+  const conv = makeConvertingCalc(TABLE, "ILS", "ready");
+  const usd = (o) => mk({ currency: "USD", ...o, closedAt: o.date });
+
+  //   rfL  MSFT  −$300  refused (no fixing 2026-01-05)
+  //   rfW  TSLA  +$100  refused (no fixing 2026-01-06)
+  //   cv1  AAPL  +$100  → ₪200
+  //   cv2  NVDA  −$50   → ₪−100
+  const MIXED = [
+    usd({ id: "rfL", ticker: "MSFT", entry: 100, stop: 95, exit: 70,  shares: 10, date: GAP_A }),
+    usd({ id: "rfW", ticker: "TSLA", entry: 100, stop: 95, exit: 110, shares: 10, date: GAP_B }),
+    usd({ id: "cv1", ticker: "AAPL", entry: 100, stop: 95, exit: 110, shares: 10, date: FIX_A }),
+    usd({ id: "cv2", ticker: "NVDA", entry: 100, stop: 95, exit: 95,  shares: 10, date: FIX_B }),
+  ];
+
+  // ── 11.0 · the fixture is the bug, not a stand-in for it ────────────────
+  eq("11.0 · the converted member really converted ($100 → ₪200)", conv(MIXED[2]).pnl, 200);
+  eq("11.0 · …and is NOT marked", conv(MIXED[2]).fxUnconverted, undefined);
+  eq("11.0 · the refused member keeps its ORIGINAL number", conv(MIXED[0]).pnl, -300);
+  eq("11.0 · …and names its refusal", conv(MIXED[0]).fxUnconverted, "no_rate_for_day");
+
+  const s = computeTradingStats(MIXED, 10_000, conv);
+
+  // ── 11.1 · A1 — the sum. ₪200 − ₪100 = ₪100. The −300 and +100 are DOLLARS.
+  eq("11.1 · A1 · totalPnL excludes the two refused members", s.totalPnL, 100);
+  eq("11.1 · A1 · …and the contaminated value it replaces was −100", s.totalPnL !== -100, true);
+
+  // ── 11.2 · A2 — every money average over ITS OWN denominator ────────────
+  // Contaminated: avgWin = (100+200)/2 = 150 — the mean of a dollar and a
+  // shekel. Filtered numerator over unfiltered denominator: 200/2 = 100 —
+  // wrong AND plausible. Correct: 200/1.
+  eq("11.2 · A2 · avgWin = ₪200 / 1 convertible winner", s.avgWin, 200);
+  eq("11.2 · A2 · avgLoss = ₪100 / 1 convertible loser", s.avgLoss, 100);
+  eq("11.2 · A2 · ⛔ NOT the filtered-numerator/unfiltered-denominator value", s.avgWin !== 100, true);
+  eq("11.2 · A2 · totalWin", s.totalWin, 200);
+  eq("11.2 · A2 · totalLoss", s.totalLoss, 100);
+  eq("11.2 · A2 · profitFactor = 200/100", s.profitFactor, 2);
+  eq("11.2 · A2 · bestWin", s.bestWin, 200);
+  eq("11.2 · A2 · worstLoss — ⛔ not the −300 DOLLAR loss", s.worstLoss, -100);
+
+  // ── 11.3 · A3 — the population, with its denominator (§2) ───────────────
+  eq("11.3 · A3 · excluded, with denominator",
+     `${s.fxUnconvertedCount}/${s.totalTrades}`, "2/4");
+  eq("11.3 · A3 · …and the convertible count it leaves", s.fxAggregatableCount, 2);
+
+  // ── 11.4 · A4 — the equity curve is the same population as the sum ──────
+  eq("11.4 · A4 · equityCurve holds only convertible members", s.equityCurve.length, 2);
+  eq("11.4 · A4 · last equity === currentEquity — ⛔ they cannot disagree",
+     s.equityCurve[s.equityCurve.length - 1].equity, s.currentEquity);
+  eq("11.4 · A4 · currentEquity = 10,000 + ₪100 (was 9,900 cross-unit)", s.currentEquity, 10_100);
+
+  // ── 11.5 · A5 — drawdown is derived from the CLEAN curve ────────────────
+  // Contaminated: the −$300 opened a ₪300 hole that never existed ⇒ maxDD 300,
+  // maxDrawdown 3%. Clean: peak ₪10,200, trough ₪10,100 ⇒ 100 and ~0.98%.
+  eq("11.5 · A5 · maxDD ($) — ⛔ not the 300 the dollar loss invented", s.maxDD, 100);
+  close("11.5 · A5 · maxDrawdown (%) off the clean peak", s.maxDrawdown, (100 / 10_200) * 100);
+  close("11.5 · A5 · currentDrawdown", s.currentDrawdown, (100 / 10_200) * 100);
+
+  // ── 11.6 · A6 — THE OTHER HALF. Exclusion must NOT reach counts or rates.
+  // A blanket refusal would "fix" the money by deleting half the journal's
+  // behavioural record. The sign of a P&L needs no exchange rate.
+  eq("11.6 · A6 · totalTrades keeps ALL four", s.totalTrades, 4);
+  eq("11.6 · A6 · wins keeps both winners", s.wins, 2);
+  eq("11.6 · A6 · losses keeps both losers", s.losses, 2);
+  eq("11.6 · A6 · winRate is a rate, ⛔ not money", s.winRate, 50);
+  eq("11.6 · A6 · rSampleSize keeps all — R is unit-free", s.rSampleSize, 4);
+  ratesSumTo100("11.6 · A6", s);
+  completeness("11.6 · A6", MIXED, s, 0);
+
+  // ── 11.7 · A7 — breakdowns bundle money WITH counts in one object ───────
+  // All four share setup "Breakout". `avgPnL` is the trap in miniature: its
+  // numerator and denominator live in the same object literal, so a filtered
+  // sum over `items.length` would be invisible.
+  const bo = s.bySetup.find(g => g.name === "Breakout");
+  eq("11.7 · A7 · breakdown count keeps all four", bo.count, 4);
+  eq("11.7 · A7 · breakdown totalPnL excludes (was −100)", bo.totalPnL, 100);
+  eq("11.7 · A7 · breakdown avgPnL over ITS OWN denominator — ₪100/2, ⛔ not /4",
+     bo.avgPnL, 50);
+  eq("11.7 · A7 · …and the group states what it dropped", bo.fxUnconvertedCount, 2);
+  eq("11.7 · A7 · breakdown winRate untouched by exclusion", bo.winRate, 50);
+
+  // ── 11.8 · the reverse assertion — a blanket refusal is the same bug ────
+  // A single-currency journal must come through byte-identical: nothing turns
+  // null, no average drops, no count shrinks. This is what stops "exclude" from
+  // quietly becoming "exclude everything I am unsure about".
+  {
+    const CLEAN = [
+      mk({ id: "c1", entry: 100, stop: 95, exit: 115, shares: 10, date: daysAgo(2) }),
+      mk({ id: "c2", entry: 100, stop: 95, exit: 90,  shares: 10, date: daysAgo(5) }),
+      mk({ id: "c3", entry: 50,  stop: 48, exit: 56,  shares: 20, date: daysAgo(9) }),
+    ];
+    const c = computeTradingStats(CLEAN, CAPITAL, calcTradeMetrics);
+    eq("11.8 · nothing was excluded", c.fxUnconvertedCount, 0);
+    eq("11.8 · …and the denominator is the whole journal", c.fxAggregatableCount, c.totalTrades);
+    eq("11.8 · totalPnL = 150 − 100 + 120", c.totalPnL, 170);
+    eq("11.8 · avgWin = (150+120)/2 — ⛔ did NOT drop", c.avgWin, 135);
+    eq("11.8 · avgLoss", c.avgLoss, 100);
+    eq("11.8 · bestWin", c.bestWin, 150);
+    eq("11.8 · equityCurve keeps every member", c.equityCurve.length, 3);
+    eq("11.8 · currentEquity", c.currentEquity, CAPITAL + 170);
+    check("11.8 · ⛔ no money field collapsed to null",
+      [c.totalPnL, c.totalWin, c.totalLoss, c.avgWin, c.avgLoss, c.bestWin, c.worstLoss,
+       c.currentEquity, c.maxDD, c.maxDrawdown].every(v => typeof v === "number"));
+    eq("11.8 · breakdown avgPnL denominator is the full group",
+      c.bySetup.find(g => g.name === "Breakout").avgPnL, 170 / 3);
+  }
+
+  // ── 11.9 · EMPTY_STATS carries the same shape ──────────────────────────
+  {
+    const e = computeTradingStats([], CAPITAL, calcTradeMetrics);
+    eq("11.9 · fxUnconvertedCount — 0 is the identity over the empty set", e.fxUnconvertedCount, 0);
+    eq("11.9 · fxAggregatableCount", e.fxAggregatableCount, 0);
   }
 }
 

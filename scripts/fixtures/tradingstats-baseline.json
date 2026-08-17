@@ -9,6 +9,8 @@
     "totalPnL": 0,
     "totalWin": 0,
     "totalLoss": 0,
+    "fxUnconvertedCount": 0,
+    "fxAggregatableCount": 0,
     "pnlByCurrency": {},
     "tradesByCurrency": {},
     "currencies": [],
@@ -44,13 +46,15 @@
       "count": 0,
       "pnl": 0,
       "winRate": null,
-      "beRate": null
+      "beRate": null,
+      "fxUnconvertedCount": 0
     },
     "lastMonthStats": {
       "count": 0,
       "pnl": 0,
       "winRate": null,
-      "beRate": null
+      "beRate": null,
+      "fxUnconvertedCount": 0
     },
     "bySetup": [],
     "byEmotion": [],
@@ -71,6 +75,8 @@
     "totalPnL": 230,
     "totalWin": 510,
     "totalLoss": 280,
+    "fxUnconvertedCount": 0,
+    "fxAggregatableCount": 8,
     "pnlByCurrency": {
       "USD": 230
     },
@@ -198,13 +204,15 @@
       "count": 3,
       "pnl": 100,
       "winRate": 66.66666666666666,
-      "beRate": 0
+      "beRate": 0,
+      "fxUnconvertedCount": 0
     },
     "lastMonthStats": {
       "count": 6,
       "pnl": 140,
       "winRate": 66.66666666666666,
-      "beRate": 0
+      "beRate": 0,
+      "fxUnconvertedCount": 0
     },
     "bySetup": [
       {
@@ -217,6 +225,7 @@
         "lossRate": 25,
         "beRate": 0,
         "totalPnL": 140,
+        "fxUnconvertedCount": 0,
         "avgPnL": 35,
         "totalR": 4.25,
         "avgR": 1.0625,
@@ -233,6 +242,7 @@
         "lossRate": 50,
         "beRate": 0,
         "totalPnL": 90,
+        "fxUnconvertedCount": 0,
         "avgPnL": 22.5,
         "totalR": 2.5,
         "avgR": 0.625,
@@ -251,6 +261,7 @@
         "lossRate": 33.33333333333333,
         "beRate": 0,
         "totalPnL": 100,
+        "fxUnconvertedCount": 0,
         "avgPnL": 33.333333333333336,
         "totalR": 2.25,
         "avgR": 0.75,
@@ -267,6 +278,7 @@
         "lossRate": 33.33333333333333,
         "beRate": 0,
         "totalPnL": 70,
+        "fxUnconvertedCount": 0,
         "avgPnL": 23.333333333333332,
         "totalR": 3,
         "avgR": 1,
@@ -283,6 +295,7 @@
         "lossRate": 50,
         "beRate": 0,
         "totalPnL": 60,
+        "fxUnconvertedCount": 0,
         "avgPnL": 30,
         "totalR": 1.5,
         "avgR": 0.75,
@@ -301,6 +314,7 @@
         "lossRate": 37.5,
         "beRate": 0,
         "totalPnL": 230,
+        "fxUnconvertedCount": 0,
         "avgPnL": 28.75,
         "totalR": 6.75,
         "avgR": 0.84375,
@@ -319,6 +333,7 @@
         "lossRate": 37.5,
         "beRate": 0,
         "totalPnL": 230,
+        "fxUnconvertedCount": 0,
         "avgPnL": 28.75,
         "totalR": 6.75,
         "avgR": 0.84375,
@@ -332,42 +347,48 @@
         "count": 1,
         "winRate": 100,
         "beRate": 0,
-        "totalPnL": 120
+        "totalPnL": 120,
+        "fxUnconvertedCount": 0
       },
       {
         "name": "Tuesday",
         "count": 1,
         "winRate": 0,
         "beRate": 0,
-        "totalPnL": -100
+        "totalPnL": -100,
+        "fxUnconvertedCount": 0
       },
       {
         "name": "Wednesday",
         "count": 1,
         "winRate": 100,
         "beRate": 0,
-        "totalPnL": 150
+        "totalPnL": 150,
+        "fxUnconvertedCount": 0
       },
       {
         "name": "Thursday",
         "count": 2,
         "winRate": 50,
         "beRate": 0,
-        "totalPnL": -20
+        "totalPnL": -20,
+        "fxUnconvertedCount": 0
       },
       {
         "name": "Friday",
         "count": 1,
         "winRate": 100,
         "beRate": 0,
-        "totalPnL": 150
+        "totalPnL": 150,
+        "fxUnconvertedCount": 0
       },
       {
         "name": "Saturday",
         "count": 2,
         "winRate": 50,
         "beRate": 0,
-        "totalPnL": -70
+        "totalPnL": -70,
+        "fxUnconvertedCount": 0
       }
     ],
     "topEdges": [
@@ -379,6 +400,7 @@
         "winRate": 66.66666666666666,
         "beRate": 0,
         "totalPnL": 100,
+        "fxUnconvertedCount": 0,
         "avgR": 0.75,
         "rSampleSize": 3,
         "score": 0.3633961714713538,
@@ -551,6 +573,8 @@
     "totalPnL": 50,
     "totalWin": 400,
     "totalLoss": 350,
+    "fxUnconvertedCount": 0,
+    "fxAggregatableCount": 6,
     "pnlByCurrency": {
       "USD": 50
     },
@@ -644,13 +668,15 @@
       "count": 1,
       "pnl": 0,
       "winRate": 0,
-      "beRate": 100
+      "beRate": 100,
+      "fxUnconvertedCount": 0
     },
     "lastMonthStats": {
       "count": 1,
       "pnl": 0,
       "winRate": 0,
-      "beRate": 100
+      "beRate": 100,
+      "fxUnconvertedCount": 0
     },
     "bySetup": [
       {
@@ -663,6 +689,7 @@
         "lossRate": 33.33333333333333,
         "beRate": 33.33333333333333,
         "totalPnL": 50,
+        "fxUnconvertedCount": 0,
         "avgPnL": 8.333333333333334,
         "totalR": 0.5,
         "avgR": 0.08333333333333333,
@@ -681,6 +708,7 @@
         "lossRate": 33.33333333333333,
         "beRate": 33.33333333333333,
         "totalPnL": 50,
+        "fxUnconvertedCount": 0,
         "avgPnL": 8.333333333333334,
         "totalR": 0.5,
         "avgR": 0.08333333333333333,
@@ -699,6 +727,7 @@
         "lossRate": 33.33333333333333,
         "beRate": 33.33333333333333,
         "totalPnL": 50,
+        "fxUnconvertedCount": 0,
         "avgPnL": 8.333333333333334,
         "totalR": 0.5,
         "avgR": 0.08333333333333333,
@@ -717,6 +746,7 @@
         "lossRate": 33.33333333333333,
         "beRate": 33.33333333333333,
         "totalPnL": 50,
+        "fxUnconvertedCount": 0,
         "avgPnL": 8.333333333333334,
         "totalR": 0.5,
         "avgR": 0.08333333333333333,
@@ -730,42 +760,48 @@
         "count": 1,
         "winRate": 0,
         "beRate": 0,
-        "totalPnL": -200
+        "totalPnL": -200,
+        "fxUnconvertedCount": 0
       },
       {
         "name": "Tuesday",
         "count": 1,
         "winRate": 100,
         "beRate": 0,
-        "totalPnL": 200
+        "totalPnL": 200,
+        "fxUnconvertedCount": 0
       },
       {
         "name": "Wednesday",
         "count": 1,
         "winRate": 0,
         "beRate": 100,
-        "totalPnL": 0
+        "totalPnL": 0,
+        "fxUnconvertedCount": 0
       },
       {
         "name": "Thursday",
         "count": 1,
         "winRate": 100,
         "beRate": 0,
-        "totalPnL": 200
+        "totalPnL": 200,
+        "fxUnconvertedCount": 0
       },
       {
         "name": "Friday",
         "count": 1,
         "winRate": 0,
         "beRate": 100,
-        "totalPnL": 0
+        "totalPnL": 0,
+        "fxUnconvertedCount": 0
       },
       {
         "name": "Saturday",
         "count": 1,
         "winRate": 0,
         "beRate": 0,
-        "totalPnL": -150
+        "totalPnL": -150,
+        "fxUnconvertedCount": 0
       }
     ],
     "topEdges": [
@@ -777,6 +813,7 @@
         "winRate": 33.33333333333333,
         "beRate": 33.33333333333333,
         "totalPnL": 50,
+        "fxUnconvertedCount": 0,
         "avgR": 0.08333333333333333,
         "rSampleSize": 6,
         "score": 0.10483344360581824,
@@ -792,6 +829,7 @@
         "winRate": 33.33333333333333,
         "beRate": 33.33333333333333,
         "totalPnL": 50,
+        "fxUnconvertedCount": 0,
         "avgR": 0.08333333333333333,
         "rSampleSize": 6,
         "score": 0.10483344360581824,
@@ -925,6 +963,8 @@
     "totalPnL": 300,
     "totalWin": 600,
     "totalLoss": 300,
+    "fxUnconvertedCount": 0,
+    "fxAggregatableCount": 5,
     "pnlByCurrency": {
       "USD": 300
     },
@@ -1023,13 +1063,15 @@
       "count": 1,
       "pnl": 200,
       "winRate": 100,
-      "beRate": 0
+      "beRate": 0,
+      "fxUnconvertedCount": 0
     },
     "lastMonthStats": {
       "count": 5,
       "pnl": 300,
       "winRate": 60,
-      "beRate": 0
+      "beRate": 0,
+      "fxUnconvertedCount": 0
     },
     "bySetup": [
       {
@@ -1042,6 +1084,7 @@
         "lossRate": 40,
         "beRate": 0,
         "totalPnL": 300,
+        "fxUnconvertedCount": 0,
         "avgPnL": 60,
         "totalR": 0,
         "avgR": 0,
@@ -1060,6 +1103,7 @@
         "lossRate": 40,
         "beRate": 0,
         "totalPnL": 300,
+        "fxUnconvertedCount": 0,
         "avgPnL": 60,
         "totalR": 0,
         "avgR": 0,
@@ -1078,6 +1122,7 @@
         "lossRate": 40,
         "beRate": 0,
         "totalPnL": 300,
+        "fxUnconvertedCount": 0,
         "avgPnL": 60,
         "totalR": 0,
         "avgR": 0,
@@ -1096,6 +1141,7 @@
         "lossRate": 40,
         "beRate": 0,
         "totalPnL": 300,
+        "fxUnconvertedCount": 0,
         "avgPnL": 60,
         "totalR": 0,
         "avgR": 0,
@@ -1109,35 +1155,40 @@
         "count": 1,
         "winRate": 0,
         "beRate": 0,
-        "totalPnL": -100
+        "totalPnL": -100,
+        "fxUnconvertedCount": 0
       },
       {
         "name": "Tuesday",
         "count": 1,
         "winRate": 100,
         "beRate": 0,
-        "totalPnL": 200
+        "totalPnL": 200,
+        "fxUnconvertedCount": 0
       },
       {
         "name": "Wednesday",
         "count": 1,
         "winRate": 100,
         "beRate": 0,
-        "totalPnL": 100
+        "totalPnL": 100,
+        "fxUnconvertedCount": 0
       },
       {
         "name": "Thursday",
         "count": 1,
         "winRate": 0,
         "beRate": 0,
-        "totalPnL": -200
+        "totalPnL": -200,
+        "fxUnconvertedCount": 0
       },
       {
         "name": "Saturday",
         "count": 1,
         "winRate": 100,
         "beRate": 0,
-        "totalPnL": 300
+        "totalPnL": 300,
+        "fxUnconvertedCount": 0
       }
     ],
     "topEdges": [
@@ -1149,6 +1200,7 @@
         "winRate": 60,
         "beRate": 0,
         "totalPnL": 300,
+        "fxUnconvertedCount": 0,
         "avgR": 0,
         "rSampleSize": 2,
         "score": 0.23071993220883702,
@@ -1264,6 +1316,8 @@
     "totalPnL": 100,
     "totalWin": 300,
     "totalLoss": 200,
+    "fxUnconvertedCount": 0,
+    "fxAggregatableCount": 3,
     "pnlByCurrency": {
       "USD": 100
     },
@@ -1340,13 +1394,15 @@
       "count": 1,
       "pnl": 200,
       "winRate": 100,
-      "beRate": 0
+      "beRate": 0,
+      "fxUnconvertedCount": 0
     },
     "lastMonthStats": {
       "count": 3,
       "pnl": 100,
       "winRate": 66.66666666666666,
-      "beRate": 0
+      "beRate": 0,
+      "fxUnconvertedCount": 0
     },
     "bySetup": [
       {
@@ -1359,6 +1415,7 @@
         "lossRate": 33.33333333333333,
         "beRate": 0,
         "totalPnL": 100,
+        "fxUnconvertedCount": 0,
         "avgPnL": 33.333333333333336,
         "totalR": 2,
         "avgR": 0.6666666666666666,
@@ -1377,6 +1434,7 @@
         "lossRate": 33.33333333333333,
         "beRate": 0,
         "totalPnL": 100,
+        "fxUnconvertedCount": 0,
         "avgPnL": 33.333333333333336,
         "totalR": 2,
         "avgR": 0.6666666666666666,
@@ -1395,6 +1453,7 @@
         "lossRate": 33.33333333333333,
         "beRate": 0,
         "totalPnL": 100,
+        "fxUnconvertedCount": 0,
         "avgPnL": 33.333333333333336,
         "totalR": 2,
         "avgR": 0.6666666666666666,
@@ -1413,6 +1472,7 @@
         "lossRate": 33.33333333333333,
         "beRate": 0,
         "totalPnL": 100,
+        "fxUnconvertedCount": 0,
         "avgPnL": 33.333333333333336,
         "totalR": 2,
         "avgR": 0.6666666666666666,
@@ -1426,14 +1486,16 @@
         "count": 1,
         "winRate": 100,
         "beRate": 0,
-        "totalPnL": 100
+        "totalPnL": 100,
+        "fxUnconvertedCount": 0
       },
       {
         "name": "Thursday",
         "count": 2,
         "winRate": 50,
         "beRate": 0,
-        "totalPnL": 0
+        "totalPnL": 0,
+        "fxUnconvertedCount": 0
       }
     ],
     "topEdges": [
@@ -1445,6 +1507,7 @@
         "winRate": 66.66666666666666,
         "beRate": 0,
         "totalPnL": 100,
+        "fxUnconvertedCount": 0,
         "avgR": 0.6666666666666666,
         "rSampleSize": 3,
         "score": 0.3460915918774798,
@@ -1522,6 +1585,8 @@
     "totalPnL": 0,
     "totalWin": 200,
     "totalLoss": 200,
+    "fxUnconvertedCount": 0,
+    "fxAggregatableCount": 2,
     "pnlByCurrency": {
       "USD": 0
     },
@@ -1587,13 +1652,15 @@
       "count": 1,
       "pnl": 200,
       "winRate": 100,
-      "beRate": 0
+      "beRate": 0,
+      "fxUnconvertedCount": 0
     },
     "lastMonthStats": {
       "count": 2,
       "pnl": 0,
       "winRate": 50,
-      "beRate": 0
+      "beRate": 0,
+      "fxUnconvertedCount": 0
     },
     "bySetup": [
       {
@@ -1606,6 +1673,7 @@
         "lossRate": 50,
         "beRate": 0,
         "totalPnL": 0,
+        "fxUnconvertedCount": 0,
         "avgPnL": 0,
         "totalR": 0,
         "avgR": 0,
@@ -1624,6 +1692,7 @@
         "lossRate": 50,
         "beRate": 0,
         "totalPnL": 0,
+        "fxUnconvertedCount": 0,
         "avgPnL": 0,
         "totalR": 0,
         "avgR": 0,
@@ -1642,6 +1711,7 @@
         "lossRate": 50,
         "beRate": 0,
         "totalPnL": 0,
+        "fxUnconvertedCount": 0,
         "avgPnL": 0,
         "totalR": 0,
         "avgR": 0,
@@ -1660,6 +1730,7 @@
         "lossRate": 50,
         "beRate": 0,
         "totalPnL": 0,
+        "fxUnconvertedCount": 0,
         "avgPnL": 0,
         "totalR": 0,
         "avgR": 0,
@@ -1673,7 +1744,8 @@
         "count": 2,
         "winRate": 50,
         "beRate": 0,
-        "totalPnL": 0
+        "totalPnL": 0,
+        "fxUnconvertedCount": 0
       }
     ],
     "topEdges": [],
@@ -1729,6 +1801,8 @@
     "totalPnL": 50,
     "totalWin": 200,
     "totalLoss": 150,
+    "fxUnconvertedCount": 0,
+    "fxAggregatableCount": 2,
     "pnlByCurrency": {
       "USD": 50
     },
@@ -1794,13 +1868,15 @@
       "count": 0,
       "pnl": 0,
       "winRate": null,
-      "beRate": null
+      "beRate": null,
+      "fxUnconvertedCount": 0
     },
     "lastMonthStats": {
       "count": 0,
       "pnl": 0,
       "winRate": null,
-      "beRate": null
+      "beRate": null,
+      "fxUnconvertedCount": 0
     },
     "bySetup": [
       {
@@ -1813,6 +1889,7 @@
         "lossRate": 50,
         "beRate": 0,
         "totalPnL": 50,
+        "fxUnconvertedCount": 0,
         "avgPnL": 25,
         "totalR": 0.5,
         "avgR": 0.25,
@@ -1831,6 +1908,7 @@
         "lossRate": 50,
         "beRate": 0,
         "totalPnL": 50,
+        "fxUnconvertedCount": 0,
         "avgPnL": 25,
         "totalR": 0.5,
         "avgR": 0.25,
@@ -1849,6 +1927,7 @@
         "lossRate": 50,
         "beRate": 0,
         "totalPnL": 50,
+        "fxUnconvertedCount": 0,
         "avgPnL": 25,
         "totalR": 0.5,
         "avgR": 0.25,
@@ -1867,6 +1946,7 @@
         "lossRate": 50,
         "beRate": 0,
         "totalPnL": 50,
+        "fxUnconvertedCount": 0,
         "avgPnL": 25,
         "totalR": 0.5,
         "avgR": 0.25,
@@ -1880,14 +1960,16 @@
         "count": 1,
         "winRate": 100,
         "beRate": 0,
-        "totalPnL": 200
+        "totalPnL": 200,
+        "fxUnconvertedCount": 0
       },
       {
         "name": "Saturday",
         "count": 1,
         "winRate": 0,
         "beRate": 0,
-        "totalPnL": -150
+        "totalPnL": -150,
+        "fxUnconvertedCount": 0
       }
     ],
     "topEdges": [],
@@ -1943,6 +2025,8 @@
     "totalPnL": 0,
     "totalWin": 200,
     "totalLoss": 200,
+    "fxUnconvertedCount": 0,
+    "fxAggregatableCount": 2,
     "pnlByCurrency": {
       "USD": 0
     },
@@ -2008,13 +2092,15 @@
       "count": 2,
       "pnl": 0,
       "winRate": 50,
-      "beRate": 0
+      "beRate": 0,
+      "fxUnconvertedCount": 0
     },
     "lastMonthStats": {
       "count": 2,
       "pnl": 0,
       "winRate": 50,
-      "beRate": 0
+      "beRate": 0,
+      "fxUnconvertedCount": 0
     },
     "bySetup": [
       {
@@ -2027,6 +2113,7 @@
         "lossRate": 50,
         "beRate": 0,
         "totalPnL": 0,
+        "fxUnconvertedCount": 0,
         "avgPnL": 0,
         "totalR": 0,
         "avgR": 0,
@@ -2045,6 +2132,7 @@
         "lossRate": 50,
         "beRate": 0,
         "totalPnL": 0,
+        "fxUnconvertedCount": 0,
         "avgPnL": 0,
         "totalR": 0,
         "avgR": 0,
@@ -2063,6 +2151,7 @@
         "lossRate": 50,
         "beRate": 0,
         "totalPnL": 0,
+        "fxUnconvertedCount": 0,
         "avgPnL": 0,
         "totalR": 0,
         "avgR": 0,
@@ -2081,6 +2170,7 @@
         "lossRate": 50,
         "beRate": 0,
         "totalPnL": 0,
+        "fxUnconvertedCount": 0,
         "avgPnL": 0,
         "totalR": 0,
         "avgR": 0,
@@ -2094,14 +2184,16 @@
         "count": 1,
         "winRate": 0,
         "beRate": 0,
-        "totalPnL": -200
+        "totalPnL": -200,
+        "fxUnconvertedCount": 0
       },
       {
         "name": "Thursday",
         "count": 1,
         "winRate": 100,
         "beRate": 0,
-        "totalPnL": 200
+        "totalPnL": 200,
+        "fxUnconvertedCount": 0
       }
     ],
     "topEdges": [],
