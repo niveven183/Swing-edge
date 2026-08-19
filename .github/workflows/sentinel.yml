@@ -57,8 +57,15 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-      - name: Install Chromium (OS deps always; binary skipped on cache hit)
-        run: npx playwright install --with-deps chromium
+      # B-166: --with-deps triggers apt-get on every run (regardless of binary
+      # cache hit) to install OS packages. Measured 19.08: ubuntu-latest already
+      # carries every runtime lib chromium needs (libnspr4/libnss3/libgbm1/xvfb/...
+      # all "already the newest version"); the only packages apt would add are 9
+      # CJK/Thai glyph fonts irrelevant to this Hebrew/English site. apt's mirror
+      # (azure.archive.ubuntu.com) is what hangs — dropping --with-deps removes
+      # the apt call, and with it this failure class, entirely.
+      - name: Install Chromium (binary only — OS deps already present, see B-166)
+        run: npx playwright install chromium
       # The authenticated layer (A2) runs once an hour, not twice: it logs into the
       # live QA account and mutates data. The :50 run owns it. The window is
       # 45→09 and not 45-59 because the GitHub scheduler is routinely 5-15 min
