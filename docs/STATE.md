@@ -52,7 +52,7 @@
 
 1. ⏭️ `pnlByCurrency`/`tradesByCurrency` סופרים יחידת-תצוגה — **`B-144`**
 2. ⏭️ `TradeDNA`/`GrowthTracker` מחזירים `50` — **`B-156`**
-3. ⏭️ ספי `MAXAGE` ב-`watchdog.yml` — **`B-148`**
+3. ⏭️ 3/4 שכבות ההתראה עיוורות ל-`cancelled` — **`B-168`**
 
 ⛔ **אין להמליץ סדר בתוך קטגוריה** — הבחירה של ניב. שאר הפריטים הפתוחים ב-`docs/BACKLOG.md`.
 
