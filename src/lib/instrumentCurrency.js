@@ -16,10 +16,31 @@
 // לעומת זאת, נגזרת בזמן קריאה ולעולם אינה נשמרת: אין דגל ב-DB, אין שדה בעסקה,
 // ואין state שמחזיק אותה בין רינדורים. מספר שנגזר לא מתיישן.
 //
-// ⚠️ אחסון התצפית חסום נכון להיום: `trades.currency` הוא
-// `text NOT NULL DEFAULT 'USD'` עם `CHECK (currency IN ('USD','ILS'))`, כך
-// ש-`ILA` אינו ניתן לאחסון והשמטת המפתח מחזירה את הניחוש מ-Postgres. הענף
-// `MEASURED` כאן קיים ונבדק, ונדלק ברגע שהמיגרציה תיפתח.
+// 🔴 **הפסקה הזו הייתה שגויה עד 20.08, וההפרכה נמדדה ב-`B-144`.** היא טענה
+// ש-`trades.currency` נושא `CHECK (currency IN ('USD','ILS'))` ולכן `ILA` אינו
+// ניתן לאחסון. נמדד ב-`pg_get_constraintdef` (20.08):
+// `CHECK (currency IS NULL OR currency = ANY ('{USD,ILS,ILA,EUR,GBP}'))`
+// ⇒ **המיגרציה כבר נפתחה**, ו-`ILA` **כן** ניתן לאחסון.
+//
+// ⚠️ **ו⛔ זה לא מדליק את `MEASURED` — הענף נשאר בלתי-נגיש בפרודקשן, מסיבה
+// אחרת לגמרי.** `MEASURED` נגזר מ-`trade.instrumentCurrency` (שדה על אובייקט
+// העסקה), ⛔ **לא** מ-`trades.currency`. נמדד 20.08:
+//   • `{ticker:"TEVA", currency:"ILA"}`            → `assumed/USD` — התווית מוזנחת
+//   • `{ticker:"TEVA", instrumentCurrency:"ILA"}`  → `measured/ILS/provider_code`
+//   • ל-`trades` ⛔ **אין עמודת `instrument_currency`** (נמדד ב-
+//     `information_schema.columns`: `user_id`·`settings`·`updated_at` בלבד
+//     ל-`user_settings`, ושאילתה על `t.instrument_currency` נפלה ב-`42703`)
+//   • ⛔ **אף מסלול קוד בפרודקשן ⛔ אינו כותב `instrumentCurrency`** על אובייקט
+//     עסקה — `grep` על `src`·`SwingEdge_App.jsx`·`api`·`scripts` מחזיר ייבוא
+//     בלבד; ההופעות היחידות שמציבות ערך הן **fixtures של טסטים**.
+//
+// ⇒ **המסקנה המדודה, ו⛔ היא חייבת להיאמר בקול:** 324/324 צירופים של
+// (9 טיקרים × 6 ערכי `currency` × 6 ערכי `currency_source`) מחזירים קוד
+// aggregatable **יחיד: `USD`**. ⇒ `codes.size > 1` ב-`isMixedCurrency` הוא
+// **בלתי-נגיש בפרודקשן היום**, ⇒ `mixedCurrency === false` לכל משתמש, כל יומן,
+// תמיד. ⚠️ **זו ⛔ אינה הצדקה לרכך את השער** — הסמנטיקה הישנה ירתה על **כל**
+// יומן שיש בו נייר לא-מאומת, וזה היה הבאג. אבל ⛔ אסור לקרוא «הבאנר נעדר»
+// כהצלחה של הגזירה: היום הוא נעדר כי **אין לו איך להידלק**. ⇒ `B-172`.
 //
 // ── למה `^\d+$ → ILS` נפסל ───────────────────────────────────────────────────
 //
@@ -231,6 +252,12 @@ export const matchesCapital = (derived, capitalCurrency) =>
  * ⚠️ ולכן «לעולם לא יורה» הוא כישלון בדיוק כמו הבאג: `test:tradingstats`
  * בלוק 12.T ו-`test:instrument` §4 מחזיקים פיקסצ'ר שבו הוא **חייב** לירות
  * (`instrumentCurrency:"ILA"` ⇒ `ILS · measured`).
+ *
+ * 🔴 **ו-20.08 נמדד שהפיקסצ'ר הזה הוא ה**מקום היחיד** שבו הוא יורה.** בפרודקשן
+ * `codes.size > 1` **בלתי-נגיש** — 324/324 צירופים מחזירים `USD` בלבד, כי
+ * `instrumentCurrency` ⛔ אינו נכתב ע"י אף מסלול קוד. ⇒ הפונקציה נכונה ו**רדומה**
+ * כאחת. ⛔ **אל תקרא «הבאנר נעדר» כאימות של הגזירה** — ראה הבלוק בראש הקובץ
+ * ו-`B-172`.
  */
 export const isMixedCurrency = (derivations = []) => {
   const codes = new Set();
