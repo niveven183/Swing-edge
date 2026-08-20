@@ -42,6 +42,16 @@
 // יומן שיש בו נייר לא-מאומת, וזה היה הבאג. אבל ⛔ אסור לקרוא «הבאנר נעדר»
 // כהצלחה של הגזירה: היום הוא נעדר כי **אין לו איך להידלק**. ⇒ `B-172`.
 //
+// 🔴 **20.08 · `B-172` — נוסף ענף שני ל-`MEASURED`.** `currency_source`
+// (`B-129`) מספק ראיית ייבוא בלתי-תלויה ב-`instrumentCurrency`; שורה עם
+// `currency_source` ב-{`broker_arithmetic`,`file_cell`} עוברת `MEASURED`
+// דרך `currency_source_evidence` בלי לגעת ב-`provider_code`. ⚠️ **הפסקה
+// שממעל נשארת נכונה ל-78 השורות הקיימות **היום**:** 0/78 evidence-backed
+// (נמדד 20.08, `AUDIT-B172.md` D2) ⇒ הענף השני **מחובר ורדום**, לא פעיל —
+// אף שורה קיימת לא זזה מ-`ASSUMED`/`CONTRADICTED`. `isMixedCurrency` נשאר
+// בלתי-נגיש בפרודקשן עד שתי-אחת: שורה עם `instrumentCurrency`, או שורה
+// עם `currency_source` evidence-backed — אף אחת מהן טרם נכתבה.
+//
 // ── למה `^\d+$ → ILS` נפסל ───────────────────────────────────────────────────
 //
 // נמדד 2026-08-11 מול TradingView: טיקרים מספריים חיים ב-SSE ו-SZSE (אג"ח
@@ -182,6 +192,23 @@ export const deriveInstrumentCurrency = (trade, opts = {}) => {
     trade?.instrumentCurrency ?? opts.providerCurrency
   );
   if (measured) return { ...measured, state: MEASURED, reason: "provider_code" };
+
+  // 1.5 — B-172: תווית שנקנתה בראיה בזמן ייבוא/הזנה (`B-129`), ⛔ לא היסק
+  //       חדש. `currency_source` אומר *איך* התווית נקבעה; `normalizeProviderCurrency`
+  //       עדיין הפילטר היחיד על *מה* המטבע (USD/ILS/ILA בלבד).
+  //
+  //       ⚠️ ממוקם **לפני** בדיקת צורת הטיקר (מקדים גם את `pair_quote`)
+  //       במכוון, ⛔ לא בהיסח דעת: הראיה כאן בלתי-תלויה בצורת הסימבול —
+  //       בדיוק כמו `provider_code` — ולכן טיקר-זוג עם ראיית ייבוא צריך גם
+  //       הוא לקבל עדיפות על ניחוש הצורה, לא רק טיקר אלפביתי רגיל. נמדד
+  //       20.08: 0/78 שורות פרודקשן חופפות את שני התנאים בעת ובעונה אחת
+  //       (0/78 evidence-backed בכלל — ראה AUDIT-B172.md D2), כך שהסדר הזה
+  //       ⛔ אינו משנה אף שורה קיימת; הוא קובע התנהגות ליום שבו שורה כזו
+  //       תיכתב.
+  if (isEvidenceBacked(trade?.currency_source)) {
+    const evidenced = normalizeProviderCurrency(trade?.currency);
+    if (evidenced) return { ...evidenced, state: MEASURED, reason: "currency_source_evidence" };
+  }
 
   const ticker = normalizeTicker(trade?.ticker);
   if (!ticker) return unmeasured(AMBIGUOUS, "no_ticker");

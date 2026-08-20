@@ -1485,6 +1485,81 @@ console.log("\n15 · ההון הסגור — האינווריאנטה של יח�
   check("⛔ ואינה חוסמת שמירה", !/disabled=\{[^}]*ccyUnverified/.test(app));
 }
 
+// ── בלוק 17 · `B-172` — `currency_source` מזין `MEASURED` ────────────────────
+//
+// 🔴 התווית שקנתה ראיה ב**כתיבה** (`currency_source`, בלוק 15 שמעל) עכשיו
+//    קונה `MEASURED` גם ב**קריאה** — בלי היסק חדש, ורק דרך `isEvidenceBacked`
+//    הקיים. הענף יושב **לפני** בדיקת צורת הטיקר (מקדים גם את `pair_quote`),
+//    במכוון — ראה ההערה ב-`instrumentCurrency.js` מיד אחרי `provider_code`.
+{
+  console.log("\n── 17 · currency_source מזין MEASURED (B-172) ──");
+
+  // 1 — ⚠️ האסרציה שמוכיחה שהמיקום לפני ils_never_measured נכון: בלי הענף
+  //     החדש, TEVA/ILS הייתה נופלת ל-CONTRADICTED.
+  {
+    const d = deriveInstrumentCurrency({
+      ticker: "TEVA", currency: "ILS", currency_source: CURRENCY_SOURCE.BROKER_ARITHMETIC,
+    });
+    eq("1 · broker_arithmetic על ILS → MEASURED", d.state, MEASURED);
+    eq("1 · קוד ILS", d.code, "ILS");
+    eq("1 · הנימוק currency_source_evidence, ⛔ לא ils_never_measured", d.reason, "currency_source_evidence");
+  }
+
+  // 2 — file_cell, USD.
+  {
+    const d = deriveInstrumentCurrency({
+      ticker: "AAPL", currency: "USD", currency_source: CURRENCY_SOURCE.FILE_CELL,
+    });
+    eq("2 · file_cell על USD → MEASURED", d.state, MEASURED);
+    eq("2 · קוד USD", d.code, "USD");
+    eq("2 · הנימוק currency_source_evidence", d.reason, "currency_source_evidence");
+  }
+
+  // 3 — ⛔ manual_capital הנחה, ⛔ לא ראיה. ⛔ אינה עוברת דרך הענף החדש.
+  {
+    const d = deriveInstrumentCurrency({
+      ticker: "AAPL", currency: "USD", currency_source: CURRENCY_SOURCE.MANUAL_CAPITAL,
+    });
+    eq("3 · manual_capital ⛔ לא MEASURED-דרך-הענף", d.state, ASSUMED);
+    eq("3 · הנימוק נשאר no_evidence_against", d.reason, "no_evidence_against");
+  }
+
+  // 4 — null — 67 השורות הישנות. ⛔ זהה להתנהגות טרום-הגל.
+  {
+    const d = deriveInstrumentCurrency({ ticker: "AAPL", currency: "USD", currency_source: null });
+    eq("4 · currency_source:null ⛔ לא MEASURED-דרך-הענף", d.state, ASSUMED);
+    eq("4 · הנימוק נשאר no_evidence_against", d.reason, "no_evidence_against");
+  }
+
+  // 5 — רגרסיה: provider_code עדיין גובר על currency_source evidence.
+  {
+    const d = deriveInstrumentCurrency({
+      ticker: "TEVA", instrumentCurrency: "ILA", currency: "USD",
+      currency_source: CURRENCY_SOURCE.BROKER_ARITHMETIC,
+    });
+    eq("5 · provider_code גובר", d.state, MEASURED);
+    eq("5 · קוד ILS מ-ILA", d.code, "ILS");
+    eq("5 · הנימוק provider_code, ⛔ לא currency_source_evidence", d.reason, "provider_code");
+  }
+
+  // 6 — רגרסיה: שלוש שורות בלי currency_source נשארות בייט-לבייט זהות לפלט
+  //     מלפני הגל (pair_quote / numeric / alpha ASSUMED) — הענף החדש לא נכנס
+  //     כי אין ראיה, ואז ההתנהגות הישנה חייבת לרוץ ללא שינוי.
+  {
+    const pair = deriveInstrumentCurrency({ ticker: "BTC-USD" });
+    eq("6 · pair_quote ⛔ לא זז", pair.reason, "pair_quote");
+    eq("6 · pair_quote עדיין USD", pair.code, "USD");
+
+    const numeric = deriveInstrumentCurrency({ ticker: "604611" });
+    eq("6 · numeric_ticker ⛔ לא זז", numeric.reason, "numeric_ticker");
+    eq("6 · numeric_ticker נשאר AMBIGUOUS", numeric.state, AMBIGUOUS);
+
+    const alpha = deriveInstrumentCurrency({ ticker: "NFLX", currency: "USD" });
+    eq("6 · alpha ASSUMED ⛔ לא זז", alpha.reason, "no_evidence_against");
+    eq("6 · alpha נשאר ASSUMED", alpha.state, ASSUMED);
+  }
+}
+
 // ── SUMMARY ──────────────────────────────────────────────────────────────────
 console.log("");
 if (failures) {
