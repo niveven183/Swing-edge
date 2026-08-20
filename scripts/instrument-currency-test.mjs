@@ -237,12 +237,16 @@ const aggressionOf = (trades, capitalCurrency) =>
   eq("⛔ אותם ניירות עם טיקר אלפביתי נספרים — לאסרציה יש שיניים",
      aggressionOf(journalOf(["AAPL", "MSFT", "NVDA", "AMD"], "USD"), "USD"), 100);
 
-  // ⚠️ `riskMgmtScore` ממפה 1% ל-100 ו-2% ל-50, ואוכלוסייה ריקה גם היא ל-50 —
-  // פיקסצ'ר של 2% היה מייצר 50=50 ואסרציה שאינה יכולה להיכשל. לכן 1%.
+  // ⚠️ `riskMgmtScore` ממפה 1% ל-100 ו-2% ל-50 — פיקסצ'ר של 2% היה מייצר
+  // 50=50 ואסרציה שאינה יכולה להיכשל. לכן 1%.
+  // B-156 (20.08): אוכלוסייה ריקה כבר לא ל-50 המומצא — ל-`null`. תווית מספרית
+  // מוחרגת ⇒ `measurable` ריק ⇒ `pcts` ריק ⇒ אין ממוצע סיכון למדוד, ⛔ לא
+  // "בינוני" מומצא. השורה הזאת עצמה היא ההוכחה: לפני B-156 קיבלה 50 בגלל
+  // ה-fallback הישן, לא בגלל שהאוכלוסייה נראתה כמו 50 בפועל.
   const at1pct = (tickers) => journalOf(tickers, "USD").map(t => ({ ...t, stop: 95 }));
   const gs = (trades, cc) => calculateGrowthScore(trades, null, cc).sub.riskManagement;
-  eq("GrowthTracker — טיקר מספרי מוחרג ⇒ אוכלוסייה ריקה",
-     gs(at1pct(["1081843", "440016"]), "USD"), 50);
+  eq("GrowthTracker — טיקר מספרי מוחרג ⇒ אוכלוסייה ריקה ⇒ null, ⛔ לא 50 מומצא",
+     gs(at1pct(["1081843", "440016"]), "USD"), null);
   eq("GrowthTracker — ⛔ אלפביתי נספר, לאסרציה יש שיניים",
      gs(at1pct(["AAPL", "MSFT"]), "USD"), 100);
 }

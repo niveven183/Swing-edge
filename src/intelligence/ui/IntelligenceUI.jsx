@@ -23,7 +23,12 @@ import {
 const pick = (msg, lang) => (msg && typeof msg === "object" ? (msg[lang] || msg.en || "") : msg || "");
 
 // ─── Small utility for a 0..100 bar ──────────────────────────────────────────
-const ScoreBar = ({ value, accent = "cyan" }) => {
+// `value == null` (unmeasured, B-156) renders as an empty, muted track — never
+// a 0% bar, which would read as "measured and terrible" instead of "not
+// measured yet". `muted` lets a caller force the same treatment even when a
+// number is present (not currently used, kept for a future partial-confidence
+// case rather than adding a second component).
+const ScoreBar = ({ value, accent = "cyan", muted = false }) => {
   const colors = {
     cyan:   "bg-cyan-500 dark:bg-cyan-400",
     green:  "bg-emerald-500 dark:bg-emerald-400",
@@ -31,11 +36,13 @@ const ScoreBar = ({ value, accent = "cyan" }) => {
     violet: "bg-violet-500 dark:bg-violet-400",
     rose:   "bg-rose-500 dark:bg-rose-400",
   };
+  const isMuted = muted || value == null;
+  const pct = isMuted ? 0 : Math.max(0, Math.min(100, value));
   return (
     <div className="h-1.5 rounded-full bg-slate-200 dark:bg-white/[0.07] overflow-hidden">
       <div
-        className={`h-full ${colors[accent] || colors.cyan}`}
-        style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
+        className={`h-full ${isMuted ? "bg-slate-300 dark:bg-white/10" : (colors[accent] || colors.cyan)}`}
+        style={{ width: `${pct}%` }}
       />
     </div>
   );
@@ -45,8 +52,10 @@ const ScoreBar = ({ value, accent = "cyan" }) => {
 export const DNACard = ({ dna, lang = "he" }) => {
   if (!dna) return null;
   const labels = lang === "he"
-    ? { title: "ה-DNA המסחרי שלך", risk: "ניהול סיכון", discipline: "משמעת", consistency: "עקביות", growth: "צמיחה", sample: "עסקאות", maturity: { seed: "תחילת הדרך", learning: "לומד", established: "מבוסס", expert: "מומחה" } }
-    : { title: "Your Trade DNA", risk: "Risk", discipline: "Discipline", consistency: "Consistency", growth: "Growth", sample: "trades", maturity: { seed: "Seedling", learning: "Learning", established: "Established", expert: "Expert" } };
+    ? { title: "ה-DNA המסחרי שלך", risk: "ניהול סיכון", discipline: "משמעת", consistency: "עקביות", growth: "צמיחה", sample: "עסקאות", maturity: { seed: "תחילת הדרך", learning: "לומד", established: "מבוסס", expert: "מומחה" },
+        empty: "עדיין אין מספיק נתונים למדידה — סגור עסקה כדי לראות את ה-DNA שלך" }
+    : { title: "Your Trade DNA", risk: "Risk", discipline: "Discipline", consistency: "Consistency", growth: "Growth", sample: "trades", maturity: { seed: "Seedling", learning: "Learning", established: "Established", expert: "Expert" },
+        empty: "Not enough data yet — close a trade to see your DNA" };
 
   const rows = [
     { key: "risk",        value: dna.scores.risk,        accent: "cyan"   },
@@ -72,12 +81,24 @@ export const DNACard = ({ dna, lang = "he" }) => {
           <div key={r.key} className="space-y-1">
             <div className="flex items-center justify-between">
               <span className="text-[11px] text-slate-500 dark:text-slate-400">{labels[r.key]}</span>
-              <span className="text-xs font-bold font-mono text-slate-900 dark:text-white">{r.value}</span>
+              {/* B-156: a null score is UNMEASURED, not zero — an em dash, never
+                  the raw null rendering as the literal string "null", and never
+                  a fabricated 50/100. Muted colour matches the muted ScoreBar
+                  below it so the two never disagree about what "no data" looks like. */}
+              <span className={`text-xs font-bold font-mono ${r.value == null ? "text-slate-400 dark:text-slate-600" : "text-slate-900 dark:text-white"}`}>
+                {r.value == null ? "—" : r.value}
+              </span>
             </div>
             <ScoreBar value={r.value} accent={r.accent} />
           </div>
         ))}
       </div>
+      {/* Q3 (Niv, 20.08): the card stays visible even on a fully-unmeasured
+          journal — it anchors the onboarding tour's data-tour="trading-dna"
+          target — but must not let 4 dashes speak for themselves in silence. */}
+      {dna.sampleSize === 0 && (
+        <p className="mt-3 text-[11px] text-slate-500 dark:text-slate-400 text-center">{labels.empty}</p>
+      )}
     </div>
   );
 };
@@ -368,7 +389,7 @@ export const TiltShield = ({ tilt, lang = "he", onDismiss, onCooldown, onClearCo
 };
 
 // ─── GROWTH SCORE + CHART ────────────────────────────────────────────────────
-export const GrowthChart = ({ evolution, current, delta, lang = "he" }) => {
+export const GrowthChart = ({ evolution, current, delta, measuredCount, totalCount, lang = "he" }) => {
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
   useEffect(() => {
     const obs = new MutationObserver(() =>
@@ -389,10 +410,22 @@ export const GrowthChart = ({ evolution, current, delta, lang = "he" }) => {
           </span>
         </div>
         <div className="text-right">
-          <div className="text-xl font-bold font-mono text-slate-900 dark:text-white leading-none">{current}</div>
+          {/* B-156: `current` (aiGrowth.total) is null when nothing across all
+              5 sub-scores is measured yet — an em dash, not a fabricated 50. */}
+          <div className="text-xl font-bold font-mono text-slate-900 dark:text-white leading-none">
+            {current == null ? "—" : current}
+          </div>
           {delta != null && (
             <div className={`text-[10px] font-mono ${delta >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
               {delta >= 0 ? "▲" : "▼"} {Math.abs(delta)}
+            </div>
+          )}
+          {/* CLAUDE.md §2: `current` is itself an average — it must declare its
+              own denominator. Only shown while partial, so a fully-measured
+              journal (the common case) isn't cluttered with "5/5" forever. */}
+          {measuredCount != null && totalCount != null && measuredCount < totalCount && (
+            <div className="text-[10px] font-mono text-slate-400 dark:text-slate-500">
+              {measuredCount}/{totalCount} {lang === "he" ? "נמדד" : "measured"}
             </div>
           )}
         </div>

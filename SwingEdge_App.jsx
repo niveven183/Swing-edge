@@ -4364,6 +4364,8 @@ export default function SwingEdge() {
                 evolution={aiEvolution}
                 current={aiGrowth.total}
                 delta={aiGrowthReport.delta}
+                measuredCount={aiGrowth.measuredCount}
+                totalCount={aiGrowth.totalCount}
                 lang={lang}
               />
               <RegimeIndicator regime={aiRegime} lang={lang} />

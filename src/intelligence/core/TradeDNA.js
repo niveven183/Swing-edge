@@ -15,7 +15,7 @@
 import {
   getClosed, isWin, pnlOf, rValues, rStats, winRate, avgR, expectedValueR,
   profitFactor, sharpeR, streaks, kellyFraction, groupBy, dayOfWeek,
-  wilsonLowerBound, to100, MIN_SAMPLE_R,
+  wilsonLowerBound, to100, MIN_SAMPLE_R, stddev,
   MIN_SAMPLE_DNA, MIN_SAMPLE_PATTERNS, MIN_SAMPLE_FORECAST, MIN_SAMPLE_ML,
 } from "../utils/statisticalModels.js";
 import { disciplineRate, emotionPerformance } from "../utils/psychologyPatterns.js";
@@ -135,13 +135,20 @@ const inferStyle = (trades, capitalCurrency = null) => {
 };
 
 // ─── CORE SCORES ─────────────────────────────────────────────────────────────
+// B-156: each of the four scores has its own zero-population condition — the
+// SAME condition that already existed to trigger the fabricated 50/100
+// fallback, now returning null instead. No new thresholds are invented here
+// (PLAN-B156.md §1); `closed.length===0` is no longer a single shared
+// early-return because the four populations can be empty independently (e.g.
+// a non-empty journal with zero measurable risk — §2 below).
 const computeScores = (trades, capitalCurrency = null) => {
   const closed = getClosed(trades);
-  if (!closed.length) {
-    return { risk: 50, discipline: 50, consistency: 50, growth: 50 };
-  }
 
   // Risk score — 100 means always within the 1% rule, falls as risk drifts up.
+  // `risks.length===0` is "no denominator" in the literal sense (CLAUDE.md
+  // §2) — it used to fall through a `: 0.01` placeholder average and print a
+  // confident 100 for a population of zero. Unifies the closed-journal-empty
+  // path (old :141) and the no-measurable-risk path (old :156) into one.
   const risks = measurableRisk(closed, capitalCurrency)
     .map(t => {
       const entry = Number(t.entry);
@@ -153,34 +160,52 @@ const computeScores = (trades, capitalCurrency = null) => {
       return (Math.abs(entry - stop) * shares) / capital;
     })
     .filter(r => r > 0 && Number.isFinite(r));
-  const avgRiskPct = risks.length ? risks.reduce((s, x) => s + x, 0) / risks.length : 0.01;
-  const risk = to100(Math.max(0, 1 - Math.max(0, avgRiskPct - 0.01) * 50));
+  const risk = risks.length
+    ? to100(Math.max(0, 1 - Math.max(0, (risks.reduce((s, x) => s + x, 0) / risks.length) - 0.01) * 50))
+    : null;
 
-  // Discipline — share of trades where the plan was followed.
+  // Discipline — share of trades where the plan was followed. disciplineRate
+  // already returns null on an empty population; the old `== null ? 50` was
+  // itself the mistranslation from "unmeasured" to "exactly average".
   const dRate = disciplineRate(closed);
-  const discipline = dRate == null ? 50 : to100(dRate);
+  const discipline = dRate == null ? null : to100(dRate);
 
   // Consistency — penalise high variance of R-outcomes, over the measurable
   // population only. A null R entering this sum used to read as 0 and pull the
   // variance down, scoring an unmeasurable book as highly consistent.
+  //
+  // B-156 §7 (side-by-side, decided 20.08): this used to reimplement variance
+  // inline as POPULATION variance (÷n), while GrowthTracker.consistencyScore
+  // calls the shared `stddev()` from statisticalModels.js, which is SAMPLE
+  // variance (÷n−1, Bessel's correction). On the same 2-trade fixture the two
+  // engines produced different numbers (33 vs 6) even after the threshold
+  // was unified — the threshold was one symptom, the inline reimplementation
+  // was the actual drift (CLAUDE.md §13, "single source of truth… inline
+  // calculation = drift"). `stddev()` is already the convention every other
+  // consumer uses (e.g. `sharpeR`); TradeDNA now calls it too instead of
+  // carrying its own copy of the formula.
   const rs = rValues(closed);
-  let consistency = 50;
+  let consistency = null;
   if (rs.length >= MIN_SAMPLE_R) {
-    const meanR = rs.reduce((s, x) => s + x, 0) / rs.length;
-    const variance = rs.reduce((s, x) => s + (x - meanR) ** 2, 0) / rs.length;
-    const sd = Math.sqrt(variance);
+    const sd = stddev(rs);
     consistency = to100(Math.max(0, 1 - Math.min(1, sd / 3)));
   }
 
   // Growth — rolling equity slope over the last 20 measurable closed trades.
-  // A single null in this cumulative sum turned the whole curve to NaN.
+  // A single null in this cumulative sum turned the whole curve to NaN. With
+  // zero R-values there is no slope to measure — the old formula happened to
+  // converge on 50 when series.length===1, which was never a deliberate
+  // "unmeasured" signal, just an accident of the arithmetic.
   const recentR = rValues(closed).slice(-20);
-  const startEquity = 1;
-  let balance = startEquity;
-  const series = [startEquity];
-  for (const r of recentR) series.push(balance += r);
-  const slope = series.length > 1 ? (series[series.length - 1] - series[0]) / series.length : 0;
-  const growth = to100(0.5 + Math.max(-0.5, Math.min(0.5, slope / 2)));
+  let growth = null;
+  if (recentR.length) {
+    const startEquity = 1;
+    let balance = startEquity;
+    const series = [startEquity];
+    for (const r of recentR) series.push(balance += r);
+    const slope = (series[series.length - 1] - series[0]) / series.length;
+    growth = to100(0.5 + Math.max(-0.5, Math.min(0.5, slope / 2)));
+  }
 
   return { risk, discipline, consistency, growth };
 };

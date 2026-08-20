@@ -122,13 +122,23 @@ const mk = (i, setup, entry, stop, exit, shares = 10) => ({
   console.log("\n4 · stop:null → risk skipped, never the position's full value");
   // entry 100 × 10 shares = $1000 of position value against $2500 capital.
   // Pre-fix, |100 - null| × 10 = 1000 → a 40% "risk" that floors the score.
-  const withPhantom = [
+  // B-156 (20.08): `mk()` never set `_capitalAtEntry`, so `riskMgmtScore`'s
+  // `pcts` was ALWAYS empty for both fixtures below — this assertion was
+  // passing pre-fix only because the old empty-population fallback (50)
+  // trivially satisfied `a > 0`, not because real risk % was ever computed.
+  // Post-fix the honest empty-population answer is `null`, which correctly
+  // fails `a > 0` — exposing that the test never exercised its own premise.
+  // Fix: stamp `_capitalAtEntry` on every fixture trade so `pcts` is real.
+  // $10 risked (|100-99|×10) against $2500 capital = 0.4%, under the 1%
+  // target, so both fixtures score 100 — real math, not a fallback.
+  const withCapital = (arr) => arr.map(t => ({ ...t, _capitalAtEntry: 2500 }));
+  const withPhantom = withCapital([
     mk(1, "Breakout", 100, 99, 105), mk(2, "Breakout", 100, 99, 105),
     mk(3, "Breakout", 100, null, 105),
-  ];
-  const onlyReal = [
+  ]);
+  const onlyReal = withCapital([
     mk(1, "Breakout", 100, 99, 105), mk(2, "Breakout", 100, 99, 105),
-  ];
+  ]);
   const a = calculateGrowthScore(withPhantom).sub.riskManagement;
   const b = calculateGrowthScore(onlyReal).sub.riskManagement;
   eq("stop:null trade is skipped, not priced at position value", a, b);
