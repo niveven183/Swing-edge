@@ -56,7 +56,11 @@ export default function WeeklyReviewTab({ trades, capital, calcMetrics, authUser
     });
   }, [trades]);
 
-  const wStats = useTradingStats(weekly, capital, calcMetrics);
+  // B-144 — `null` ⛔ ולא `currency`: המסך הזה מקבל את `calcTradeMetrics`
+  // ה**גולמי** (`calcMetrics={calcTradeMetrics}`) ⇒ ⛔ אין המרה, וכל `pnl`
+  // נקוב במטבע ה**נייר** שלו. מסירת מטבע התצוגה כאן הייתה מתייגת שקלים
+  // כדולרים — מפתח דלי שאינו היחידה של הכסף שבתוכו.
+  const wStats = useTradingStats(weekly, capital, calcMetrics, null);
   const edges = useMemo(() => SwingEdgeAI.getEdges(weekly), [weekly]);
 
   // Best/worst setup from the engine breakdown (min sample 2 to avoid noise),

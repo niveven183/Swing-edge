@@ -2261,14 +2261,14 @@ export default function SwingEdge() {
   // Fed the equity BASE and the converting calc, so the return % is a ratio of
   // two frozen numbers in the same currency: a P&L priced at each trade's own
   // day over a base priced at the base day's. Neither moves after the fact.
-  const stats = useTradingStats(realTrades, equityBase, stableCalcTradeMetrics);
+  const stats = useTradingStats(realTrades, equityBase, stableCalcTradeMetrics, dispCcy);
   const { totalPnL, winRate, avgR } = stats;
 
   // Mentor Dashboard (B4.3) — derived analytics for the SELECTED mentee. Kept
   // separate from the mentor's own `stats`/`aiDNA` so the two never mix. Both
   // hooks run unconditionally with an empty default until a mentee is chosen.
   const menteeRealTrades = useMemo(() => menteeTrades.filter(t => !t.isDemo), [menteeTrades]);
-  const menteeStats = useTradingStats(menteeRealTrades, equityBase, stableCalcTradeMetrics);
+  const menteeStats = useTradingStats(menteeRealTrades, equityBase, stableCalcTradeMetrics, dispCcy);
   const menteeDNA = useMemo(() => calculateTradeDNA(menteeRealTrades, capitalCurrency), [menteeRealTrades, capitalCurrency]);
 
   // Current-month subset fed through the same hub — powers the monthly PDF export.
@@ -2282,7 +2282,7 @@ export default function SwingEdge() {
       return d.getMonth() === m && d.getFullYear() === y;
     });
   }, [realTrades]);
-  const monthStats = useTradingStats(currentMonthRealTrades, equityBase, stableCalcTradeMetrics);
+  const monthStats = useTradingStats(currentMonthRealTrades, equityBase, stableCalcTradeMetrics, dispCcy);
 
   // ─── MONTHLY REPORT — auto-popup modal (start of month, once) + QA shortcut ──
   const [showReportModal, setShowReportModal] = useState(false);
@@ -2362,7 +2362,7 @@ export default function SwingEdge() {
     () => filteredTrades.filter(t => !t.isDemo),
     [filteredTrades]
   );
-  const journalStats = useTradingStats(filteredRealTrades, equityBase, stableCalcTradeMetrics);
+  const journalStats = useTradingStats(filteredRealTrades, equityBase, stableCalcTradeMetrics, dispCcy);
 
   const uniqueSetups = useMemo(() => {
     const s = new Set(trades.map(t => t.setup).filter(Boolean));

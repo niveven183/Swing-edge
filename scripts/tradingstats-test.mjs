@@ -133,7 +133,9 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { computeTradingStats } from "../src/lib/tradingStats.js";
-import { calcTradeMetrics } from "../src/utils.js";
+// B-144 — `fmt$` is imported so block 12 can assert the mixed-currency banner's
+// line by VALUE, using the app's own formatter rather than a copy of it.
+import { calcTradeMetrics, fmt$ } from "../src/utils.js";
 // B-143 — the refusal marker is NOT synthesised here. Block 11 drives the real
 // conversion seam so the fixture cannot drift from what the app actually does.
 import { makeConvertingCalc } from "../src/hooks/useFxRates.js";
@@ -664,7 +666,23 @@ const mk = (over) => ({
   eq("⇒ 3 מתוך 5 נכנסו לפילוח, ו-2 ⛔ לא",
     `${Object.values(mixed.tradesByCurrency).reduce((a, b) => a + b, 0)}/${mixed.totalTrades}`,
     "3/5");
-  check("⇒ ולכן הקבוצה ⛔ אינה מוכחת חד-מטבעית — הבאנר נדלק", mixed.mixedCurrency === true);
+  // 🔴 **הפוכה ב-B-144 · 20.08.** האסרציה הזו דרשה `=== true`, כלומר: באנר
+  // ⟪היומן מחזיק יותר ממטבע אחד⟫ על יומן שכל **תוויותיו המאומתות** דולריות.
+  // ההכרעה (ניב, 20.08): `mixedCurrency` מצהיר על **ריבוי תוויות-נייר
+  // מאומתות**, ⛔ לא על קיום נייר לא-מאומת — כי הבאנר טוען טענה על ה**נתונים
+  // של המשתמש**, ⛔ לא על מצב הידיעה של המערכת, ומשתמש שרואה "מטבע מעורב"
+  // על יומן דולרי מקבל מידע **שגוי על היומן שלו** (`R-2`).
+  // ⛔ **הציפייה ⛔ לא רוככה כדי לעבור** — הסמנטיקה עצמה השתנתה, והאסרציה
+  // הנלווית מיד אחריה היא מה שמונע מהשינוי להיות "העלמה".
+  check("🔴 B-144 · 20.08 — 3 תוויות מאומתות דולריות ⇒ הבאנר ⛔ **אינו** נדלק",
+    mixed.mixedCurrency === false);
+  // 🔴 האסרציה הנלווית (D2) — השתיים שאינן ניתנות לצירוף ⛔ **לא נעלמו**, הן
+  // עברו **מכנה**: מהבאנר הזה אל `fxUnconvertedCount`, שנמסר עם מכנה (§2).
+  // ⚠️ בפיקסצ'ר הזה ה-calc **גולמי** ולכן ⛔ אינו מסמן `fxUnconverted` — מה
+  // שמדווח כאן הוא הפער בין האוכלוסייה לפילוח, וזה בדיוק אותו מספר.
+  eq("🔴 …ו⛔ הן לא נעלמו — 2 מתוך 5 מחוץ לפילוח, עם מכנה",
+    `${mixed.totalTrades - Object.values(mixed.tradesByCurrency).reduce((a, b) => a + b, 0)}/${mixed.totalTrades}`,
+    "2/5");
 
   // 🔴 ההצמדה עצמה. הסכום של 3 הדולריות בלבד: +200 −200 +100 = +100.
   // ⛔ אינו כולל את +500 של הטיקר המספרי ו-+1,000 של תווית ה-ILS.
@@ -1035,6 +1053,138 @@ const mk = (over) => ({
     const e = computeTradingStats([], CAPITAL, calcTradeMetrics);
     eq("11.9 · fxUnconvertedCount — 0 is the identity over the empty set", e.fxUnconvertedCount, 0);
     eq("11.9 · fxAggregatableCount", e.fxAggregatableCount, 0);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 12 · B-144 — `pnlByCurrency` · `tradesByCurrency` · `mixedCurrency` על שני
+//      צירים **נפרדים**, ומפתח הדלי שווה ליחידה של הכסף שבתוכו.
+//
+// ⚠️ בלוק 11 מוכיח שהשדות המצרפיים מחריגים-וסופרים. ⛔ הוא ⛔ אינו נוגע
+// בשלושת הפלטים האלה — הם היו הפלטים ש**אף אסרציה** לא אמרה עליהם דבר על
+// פיקסצ'ר עם המרה, וזה בדיוק החור שהגל הזה סוגר (`AUDIT-B144.md` §D6).
+//
+// 🔴 **ההכרעה שממומשת** (ניב, 20.08, `PLAN-B144.md` §1): `mixedCurrency`
+// מצהיר על **ריבוי תוויות-נייר מאומתות**, ⛔ לא על קיום נייר לא-מאומת.
+// הבאנר אומר ⟪היומן מחבר מטבעות שונים⟫ — טענה על **הנתונים של המשתמש**,
+// ⛔ לא על מצב הידיעה של המערכת. משתמש עם 2 מניות אמריקאיות שרואה "מטבע
+// מעורב" מקבל מידע **שגוי על היומן שלו** (`R-2`). הגילוי של מה שלא אומת
+// חי ב-`fxUnconvertedCount` ⇒ באנר `partialSumWarn`, **עם מכנה**.
+//
+// 🔴 **והאינוריאנטה:** מפתח הדלי = **היחידה** של הכסף שבתוכו. הפרמטר הרביעי
+// `pnlCurrency` הוא ההצהרה של הקורא על היחידה שה-calc שהוא מסר מייצר:
+// `dispCcy` ל-calc ממיר · `null` ל-calc **גולמי**, שאינו טוען דבר על יחידה
+// ולכן כל נייר נשאר במטבע שלו. ⛔ אין כאן ניחוש ו⛔ אין ברירת מחדל.
+// ─────────────────────────────────────────────────────────────────────────
+{
+  console.log("\n12 · B-144 — שני צירים: תווית-נייר מול יחידת-תצוגה");
+
+  // יום הפער מוקדם מכל שער בכוונה: `fx.convert` הולך אחורה עד 7 ימים, ולכן
+  // יום פער שיושב **אחרי** שער טוב היה נפתר בשקט והפיקסצ'ר לא היה מוכיח דבר.
+  const GAP = "2026-01-05", FIX = "2026-02-10";
+  const RATE = 3;
+  const usd = (o) => mk({ currency: "USD", ...o, closedAt: `${o.date}T20:00:00.000Z` });
+
+  //   AAPL  +$200  נסגר ביום שיש לו שער
+  //   MSFT  +$100  נסגר ביום הפער
+  const JOURNAL = [
+    usd({ id: "j1", ticker: "AAPL", entry: 100, stop: 90, exit: 120, shares: 10, date: FIX }),
+    usd({ id: "j2", ticker: "MSFT", entry: 100, stop: 90, exit: 110, shares: 10, date: GAP }),
+  ];
+  const TABLE_PARTIAL = {   // שער ל-FIX בלבד ⇒ MSFT **מסורב**
+    base: "USD", quote: "ILS", spot: { rate: RATE, rateDate: FIX },
+    byDay: { [FIX]: { rate: RATE, rateDate: FIX } },
+  };
+  const TABLE_FULL = {      // שער לשני הימים ⇒ **הכל** מומר
+    base: "USD", quote: "ILS", spot: { rate: RATE, rateDate: FIX },
+    byDay: { [FIX]: { rate: RATE, rateDate: FIX }, [GAP]: { rate: RATE, rateDate: GAP } },
+  };
+  // שורת הבאנר **בדיוק** כפי ש-`SwingEdge_App.jsx:906-908` מחשבת אותה, כולל
+  // `fmt$` המיובא ⇒ האסרציה מודדת את מה שהמשתמש **רואה**, ⛔ לא שם שדה.
+  const bannerLine = (s) => !s.mixedCurrency ? "(מוסתר)" : s.currencies
+    .map((c) => `${fmt$(s.pnlByCurrency[c] ?? 0, c)} (${s.tradesByCurrency?.[c] ?? 0})`)
+    .join("  ·  ");
+
+  // ── 12.A · קו קפוא — calc **גולמי**. ⛔ אסור שיזוז ─────────────────────────
+  {
+    const s = computeTradingStats(JOURNAL, CAPITAL, calcTradeMetrics, null);
+    eq("12.A · קפוא · tradesByCurrency", JSON.stringify(s.tradesByCurrency), '{"USD":2}');
+    eq("12.A · קפוא · pnlByCurrency", JSON.stringify(s.pnlByCurrency), '{"USD":300}');
+    eq("12.A · קפוא · mixedCurrency", s.mixedCurrency, false);
+    eq("12.A · קפוא · הבאנר מוסתר", bannerLine(s), "(מוסתר)");
+    eq("12.A · קפוא · ⛔ ואיש לא סורב", `${s.fxUnconvertedCount}/${s.totalTrades}`, "0/2");
+  }
+
+  // ── 12.D · קו קפוא — תצוגת USD דרך התפר (`identity`). ⛔ אסור שיזוז ────────
+  {
+    const s = computeTradingStats(JOURNAL, CAPITAL, makeConvertingCalc(null, "USD", "ready"), "USD");
+    eq("12.D · קפוא · tradesByCurrency", JSON.stringify(s.tradesByCurrency), '{"USD":2}');
+    eq("12.D · קפוא · pnlByCurrency", JSON.stringify(s.pnlByCurrency), '{"USD":300}');
+    eq("12.D · קפוא · mixedCurrency", s.mixedCurrency, false);
+    eq("12.D · קפוא · הבאנר מוסתר", bannerLine(s), "(מוסתר)");
+    eq("12.D · קפוא · `identity` ⛔ אינו סירוב", `${s.fxUnconvertedCount}/${s.totalTrades}`, "0/2");
+  }
+
+  // ── 12.R1/R2 · מצב B — ₪, שער ליום אחד ⇒ 1 מומר + 1 מסורב ────────────────
+  // 🔴 היום: `mixedCurrency === true` על יומן **2 ניירות USD**, והבאנר מדפיס
+  // «$100.00 (1)» — כלומר מציג למשתמש עסקה **אחת** מתוך שתיים, ומכריז ערבוב
+  // שאינו קיים ביומן שלו.
+  {
+    const s = computeTradingStats(JOURNAL, CAPITAL, makeConvertingCalc(TABLE_PARTIAL, "ILS", "ready"), "ILS");
+    eq("12.R1 · 🔴 2 ניירות USD ⛔ אינם יומן מעורב", s.mixedCurrency, false);
+    eq("12.R1 · ⇒ הבאנר **מוסתר**", bannerLine(s), "(מוסתר)");
+    eq("12.R2 · 🔴 המונה מכסה את **שתי** השורות, ⛔ לא אחת",
+      JSON.stringify(s.tradesByCurrency), '{"USD":2}');
+    // האינוריאנטה: ₪600 בדלי ILS (הומר), $100 בדלי USD (סורב). ⛔ אין סל
+    // חוצה-יחידות ו⛔ אין שורה שנעלמה.
+    eq("12.R2 · הכסף לפי **יחידה**: ₪600 מומר · $100 מסורב",
+      JSON.stringify(s.pnlByCurrency), '{"ILS":600,"USD":100}');
+    eq("12.R2 · סך הדליים = סך המומרים+המסורבים, ⛔ אפס אובדן",
+      Object.values(s.tradesByCurrency).reduce((a, b) => a + b, 0), s.totalTrades);
+    // 🔴 האסרציה הנלווית (D2): הלא-מאומת/המסורב ⛔ **לא נעלם** — הוא עבר מכנה.
+    eq("12.R2 · 🔴 והסירוב **מדווח** — `fxUnconvertedCount` עם מכנה",
+      `${s.fxUnconvertedCount}/${s.totalTrades}`, "1/2");
+  }
+
+  // ── 12.R3 · מצב C — ₪, שער לכל יום ⇒ **הכל** מומר ────────────────────────
+  // 🔴 זה המצב ש⛔ **איש לא ראה עד היום**: ההמרה **מצליחה**, ה-calc חותם
+  // `currency:"ILS"` מעל התווית, `instrumentCurrency.js:182` קורא זאת כראיה
+  // **נגד עצמה** (`ils_never_measured`) ⇒ שני החברים נושרים מהלולאה ⇒ פילוח
+  // **ריק** `{}` ובאנר **דלוק** מעליו. הצלחה מלאה שמייצרת אזהרה ריקה.
+  {
+    const s = computeTradingStats(JOURNAL, CAPITAL, makeConvertingCalc(TABLE_FULL, "ILS", "ready"), "ILS");
+    eq("12.R3 · 🔴 הפילוח ⛔ אינו ריק — ₪900 בדלי אחד",
+      JSON.stringify(s.pnlByCurrency), '{"ILS":900}');
+    eq("12.R3 · 🔴 והמונה ⛔ אינו ריק — 2 ניירות דולריים",
+      JSON.stringify(s.tradesByCurrency), '{"USD":2}');
+    eq("12.R3 · 🔴 ⛔ ואין באנר על יומן חד-מטבעי שהומר במלואו", s.mixedCurrency, false);
+    eq("12.R3 · ⇒ הבאנר מוסתר", bannerLine(s), "(מוסתר)");
+    eq("12.R3 · ⛔ ואיש לא סורב — ההמרה **הצליחה**",
+      `${s.fxUnconvertedCount}/${s.totalTrades}`, "0/2");
+    eq("12.R3 · הכסף שווה לסכום המצרפי — אותה אוכלוסייה בדיוק",
+      s.pnlByCurrency.ILS, s.totalPnL);
+  }
+
+  // ── 12.T · שיניים — «הבאנר לעולם לא יורה» הוא כישלון בדיוק כמו הבאג ──────
+  // ⚠️ בלי הבלוק הזה, מימוש שמחזיר `mixedCurrency:false` **תמיד** היה עובר
+  // את 12.A · 12.D · 12.R1 · 12.R2 · 12.R3 **כולם**. זו האסרציה שמונעת
+  // "תיקון" שהוא סירוב גורף.
+  //
+  // `instrumentCurrency:"ILA"` הוא המסלול ה**מדוד** היחיד לקוד לא-דולרי
+  // מאומת (`provider_code` ⇒ `ILS · measured`).
+  {
+    const TEETH = [
+      mk({ id: "t1", ticker: "AAPL", currency: "USD", entry: 100, stop: 90, exit: 120, shares: 10, date: FIX, closedAt: `${FIX}T20:00:00.000Z` }),
+      mk({ id: "t2", ticker: "TEVA", instrumentCurrency: "ILA", entry: 100, stop: 90, exit: 110, shares: 10, date: FIX, closedAt: `${FIX}T20:00:00.000Z` }),
+    ];
+    const s = computeTradingStats(TEETH, CAPITAL, calcTradeMetrics, null);
+    eq("12.T · 🔴 שני קודים **מאומתים** ⇒ הבאנר **נדלק**", s.mixedCurrency, true);
+    eq("12.T · currencies נושא את שניהם", JSON.stringify(s.currencies), '["ILS","USD"]');
+    eq("12.T · וכל דלי במטבע **שלו**", JSON.stringify(s.pnlByCurrency), '{"USD":200,"ILS":100}');
+    eq("12.T · ומונה לכל אחד", JSON.stringify(s.tradesByCurrency), '{"USD":1,"ILS":1}');
+    // 🔴 `B-170` בצורתה החדשה — בדיקת **ערך** על השורה הנראית, ⛔ לא regex.
+    eq("12.T · 🔴 שורת הבאנר, מחושבת מ-`fmt$` כמו במסך",
+      bannerLine(s), `${fmt$(100, "ILS")} (1)  ·  ${fmt$(200, "USD")} (1)`);
   }
 }
 

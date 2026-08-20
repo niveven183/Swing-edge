@@ -212,23 +212,28 @@ export const matchesCapital = (derived, capitalCurrency) =>
   isAggregatable(derived) && derived.code === capitalCurrency;
 
 /**
- * האם הקבוצה **מוכחת** חד-מטבעית.
+ * האם היומן מחזיק **יותר מתווית-נייר מאומתת אחת**.
  *
- * ⚠️ שתי דרכים להיכשל, ושתיהן נחשבות ערבוב:
- *   1. יותר מקוד אחד בין השורות שניתן לצרף.
- *   2. ולו שורה אחת שאינה ניתנת לצירוף — קבוצה שמכילה נייר שמטבעו לא
- *      נמדד אינה מוכחת חד-מטבעית, גם אם כל השאר דולריות. "לא ידוע" אינו
- *      "כמו כולם".
+ * 🔴 **B-144 · 20.08 — ההכרעה שהפכה את הסמנטיקה, ולמה.** עד לתאריך הזה
+ * הפונקציה החזירה `true` גם על נייר **אחד** שמטבעו לא אומת, בנימוק
+ * ⟪"לא ידוע" אינו "כמו כולם"⟫. הנימוק נכון על מצב ה**ידיעה** של המערכת —
+ * וזו ⛔ אינה הטענה שהצרכן היחיד מדפיס. הבאנר אומר ⟪היומן מחזיק יותר
+ * ממטבע אחד⟫: טענה על ה**נתונים של המשתמש**. משתמש עם שתי מניות
+ * אמריקאיות שרואה "מטבע מעורב" מקבל **מידע שגוי על היומן שלו** — `R-2`,
+ * ברירת מחדל שממציאה במקום להודות.
  *
- * זה מה שהחזיר `false` על יומן של 13 ניירות ת"א + 2 אמריקאיים: כל 15 נשאו
- * תווית USD, ולכן `currencies.length === 1`.
+ * ⇒ ⛔ **`hasUnverified` אינו מדליק את הבאנר.** מה שלא אומת ⛔ אינו נבלע:
+ * `amountAt` מסרב עליו `unverified_instrument` **לפני** שער ה-`identity`
+ * (`useFxRates.js:174`) ⇒ הוא מסומן `fxUnconverted` בכל מסלול, נספר
+ * ב-`fxUnconvertedCount`, ומדווח בבאנר `partialSumWarn` — **עם מונה
+ * ומכנה**, ב-5 שפות. הגילוי כבר קיים; מסר שני היה `R-6`.
+ *
+ * ⚠️ ולכן «לעולם לא יורה» הוא כישלון בדיוק כמו הבאג: `test:tradingstats`
+ * בלוק 12.T ו-`test:instrument` §4 מחזיקים פיקסצ'ר שבו הוא **חייב** לירות
+ * (`instrumentCurrency:"ILA"` ⇒ `ILS · measured`).
  */
 export const isMixedCurrency = (derivations = []) => {
   const codes = new Set();
-  let hasUnverified = false;
-  for (const d of derivations) {
-    if (isAggregatable(d)) codes.add(d.code);
-    else hasUnverified = true;
-  }
-  return hasUnverified || codes.size > 1;
+  for (const d of derivations) if (isAggregatable(d)) codes.add(d.code);
+  return codes.size > 1;
 };

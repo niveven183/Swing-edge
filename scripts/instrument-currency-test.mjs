@@ -156,11 +156,23 @@ const aggressionOf = (trades, capitalCurrency) =>
     isMixedCurrency([d({ ticker: "AAPL" }), d({ ticker: "MSFT" })]) === false);
   check("שני קודים ⇒ מעורבת",
     isMixedCurrency([d({ ticker: "AAPL" }), d({ ticker: "TEVA", instrumentCurrency: "ILA" })]));
-  check("⚠️ קבוצה שיש בה CONTRADICTED אינה מוכחת חד-מטבעית ⇒ הבאנר נדלק",
-    isMixedCurrency([d({ ticker: "AAPL" }), d({ ticker: "BE", currency: "ILS" })]));
-  check("⚠️ קבוצה שיש בה AMBIGUOUS אינה מוכחת חד-מטבעית ⇒ הבאנר נדלק",
-    isMixedCurrency([d({ ticker: "AAPL" }), d({ ticker: "1081843" })]));
-  check("⛔ 'לא ידוע' אינו 'כמו כולם'", isMixedCurrency([d({ ticker: "1081843" })]));
+  // 🔴 B-144 · 20.08 — ההכרעה שהפכה את שלוש האסרציות הבאות, ולמה.
+  // עד היום `isMixedCurrency` ספר גם איברים **לא-מאומתים** וקרא להם "מטבע שני",
+  // כך שאיבר יחיד שלא נגזר הדליק באנר שמצהיר "ביומן שלך יותר ממטבע אחד".
+  // זו הצהרה שאין מאחוריה מדידה — R-2: ברירת מחדל שממציאה במקום להודות.
+  // מהיום הפילוח נבנה מקודים **מאומתים בלבד**, והאיברים הלא-מאומתים ⛔ אינם
+  // נעלמים: הם יוצאים מהפילוח ונמסרים כמכנה (`fxUnconvertedCount` · §5 למטה).
+  check("🔴 B-144 · 20.08 — CONTRADICTED ⛔ אינו קוד שני ⇒ הבאנר ⛔ אינו נדלק",
+    isMixedCurrency([d({ ticker: "AAPL" }), d({ ticker: "BE", currency: "ILS" })]) === false);
+  check("🔴 B-144 · 20.08 — AMBIGUOUS ⛔ אינו קוד שני ⇒ הבאנר ⛔ אינו נדלק",
+    isMixedCurrency([d({ ticker: "AAPL" }), d({ ticker: "1081843" })]) === false);
+  check("🔴 B-144 · 20.08 — 'לא ידוע' לבדו ⇒ ⛔ אפס קודים מאומתים ⇒ ⛔ אינו מעורב",
+    isMixedCurrency([d({ ticker: "1081843" })]) === false);
+  // ⛔ ולאסרציות יש שיניים — קוד מאומת שני **כן** מדליק, גם בנוכחות לא-מאומת.
+  check("🔴 …ו⛔ ההיפוך אינו 'תמיד שקר' — שני קודים מאומתים מדליקים גם ליד לא-מאומת",
+    isMixedCurrency([d({ ticker: "AAPL" }),
+                     d({ ticker: "TEVA", instrumentCurrency: "ILA" }),
+                     d({ ticker: "1081843" })]));
 
   check("matchesCapital — MEASURED USD מול הון ILS נחסם",
     matchesCapital(d({ ticker: "BTCUSD" }), "ILS") === false);
@@ -171,16 +183,22 @@ const aggressionOf = (trades, capitalCurrency) =>
 }
 
 // ── 5 · ⚠️ הבאנר על היומן המעורב האמיתי ─────────────────────────────────────
-// 13 ניירות ת"א (טיקר מספרי, מתויגים USD) + 2 אמריקאיים. כל 15 נושאים USD,
-// ולכן `currencies.length === 1` ⇒ `mixedCurrency === false`. זה הבאג.
+// 13 ניירות ת"א (טיקר מספרי ⇒ AMBIGUOUS) + 2 אמריקאיים (ASSUMED USD).
+// 🔴 B-144 · 20.08 — לפני ההכרעה, 13 הלא-מאומתים נספרו כ"מטבע שני" והדליקו
+// את הבאנר. הם ⛔ אינם ראיה למטבע שני — הם ראיה ל**היעדר מדידה**, ולכן
+// הבאנר כבוי, וה-13 נמסרים כמכנה במקום להתחפש לממצא.
 {
   console.log("\n5 · הבאנר — 13 ת\"א + 2 אמריקאיות");
   const TASE = ["1081843", "440016", "587014", "691212", "1081843", "440016",
                 "587014", "691212", "1081843", "440016", "587014", "691212", "1081843"];
   const mixed = journalOf([...TASE, "AAPL", "MSFT"], "USD");
   eq("היומן הוא 15 שורות — 13 ת\"א + 2 אמריקאיות", mixed.length, 15);
-  const s = computeTradingStats(mixed, 40_000, calcTradeMetrics);
-  check("⚠️ mixedCurrency נדלק — 15 תוויות USD אינן 15 מדידות USD", s.mixedCurrency === true);
+  const s = computeTradingStats(mixed, 40_000, calcTradeMetrics, null);
+  check("🔴 B-144 · 20.08 — קוד מאומת אחד (USD) ⇒ הבאנר ⛔ אינו נדלק",
+    s.mixedCurrency === false);
+  eq("🔴 …ו⛔ 13 הלא-מאומתים לא נעלמו — הם מחוץ לפילוח, עם מכנה",
+    `${s.totalTrades - Object.values(s.tradesByCurrency).reduce((a, b) => a + b, 0)}/${s.totalTrades}`,
+    "13/15");
   // ⚠️ כל שורה כאן מרוויחה 50. `["USD"]` לבדו אינו מבדיל — הוא נכון גם היום,
   // כשכל 15 נספרות תחת USD. המכנה הוא מה שמבדיל: 2 שורות × 50, ⛔ לא 15.
   check("pnlByCurrency ממופתח בקוד הנגזר — רק 2 השורות המאומתות תורמות",
@@ -1348,8 +1366,48 @@ console.log("\n15 · ההון הסגור — האינווריאנטה של יח�
       /openPnL\.missingCount/.test(app));
     check("⛔ המונה נמסר עם **מכנה** (§2 — אפס מנה בלי מכנה)",
       /partialSumWarn/.test(app) && /\{m\}/.test(src("../src/i18n.js")));
-    check("באנר הערבוב נושא מונה ⛔ ולא רק רשימת מטבעות",
-      /mixedCurrencyCounts|tradesByCurrency/.test(app));
+    // 🔴 `B-170` · 20.08 — הייתה כאן בדיקת **נוכחות מזהה**:
+    //     `/mixedCurrencyCounts|tradesByCurrency/.test(app)`.
+    // `mixedCurrencyCounts` נמדד **1/1 מופעים בריפו — בתוך הרגקס עצמו** ⇒ ענף
+    // מת, ⛔ **והוא נמחק כאן ולא שומר.** החלופה שנשארה, `tradesByCurrency`,
+    // הייתה **בדיוק** הפלט שהחזיר `{}` במצב C ⇒ הבאנר נדלק עם שורת כסף
+    // **ריקה** בעוד האסרציה ירוקה. זה `R-3` על השער ה**יחיד** שמכסה את הבאנר:
+    // אימות מה ש**נכתב** במקום מה ש**נראה**.
+    //
+    // ⇒ במקומה בדיקת **ערך** על השורה הנראית עצמה, ועוד שער שחוסם השמטה של
+    // הצהרת-היחידה בארבעת אתרי הקריאה של המוצר.
+    check("🔴 שורת הבאנר נבנית מ-`currencies` + `pnlByCurrency` + `tradesByCurrency` באותו map",
+      /stats\.currencies\.map[\s\S]{0,260}?stats\.pnlByCurrency\[c\][\s\S]{0,120}?stats\.tradesByCurrency\?\.\[c\]/.test(app));
+    {
+      // הפיקסצ'ר היחיד עם **שני קודים מאומתים**: `instrumentCurrency:"ILA"`
+      // הוא המסלול המדוד היחיד לקוד לא-דולרי (`provider_code` ⇒ ILS·measured).
+      const teeth = [
+        { id: "b1", ticker: "AAPL", currency: "USD", side: "LONG", status: "CLOSED",
+          entry: 100, stop: 90, exit: 120, shares: 10, closedAt: "2026-02-10T20:00:00.000Z" },
+        { id: "b2", ticker: "TEVA", instrumentCurrency: "ILA", side: "LONG", status: "CLOSED",
+          entry: 100, stop: 90, exit: 110, shares: 10, closedAt: "2026-02-10T20:00:00.000Z" },
+      ];
+      const s = computeTradingStats(teeth, 40_000, calcTradeMetrics, null);
+      const line = s.currencies
+        .map((c) => `${fmt$(s.pnlByCurrency[c] ?? 0, c)} (${s.tradesByCurrency?.[c] ?? 0})`)
+        .join("  ·  ");
+      // ⛔ בדיקת **ערך**, ⛔ לא נוכחות שם שדה: מימוש שמחזיר פילוח ריק היה
+      // מייצר "+₪0.00 (0)" או "" — ושניהם נופלים כאן.
+      eq("🔴 B-170 · שורת הבאנר ב**ערך** — כל מטבע עם סכומו ומונהו",
+        line, `${fmt$(100, "ILS")} (1)  ·  ${fmt$(200, "USD")} (1)`);
+      check("🔴 B-170 · ⛔ ואין דלי ריק ואין מונה אפס",
+        s.currencies.length === 2 && s.currencies.every((c) => s.tradesByCurrency[c] > 0));
+    }
+    // 🔴 `B-144` — הצהרת היחידה ⛔ אינה ניתנת להשמטה בשקט. ארבעת אתרי הקריאה
+    // מוסרים `stableCalcTradeMetrics`, שהוא `makeConvertingCalc` ⇒ ה-`pnl`
+    // נקוב ב-`dispCcy`. אתר שישמיט את הפרמטר הרביעי יכניס כסף מומר לדלי של
+    // מטבע ה**נייר** — מספר שגוי **בשקט**, כי הבאנר מוסתר ממילא ביומן חד-מטבעי.
+    {
+      const sites = app.match(/useTradingStats\([^)]*\)/g) || [];
+      eq("🔴 B-144 · ארבעה אתרי `useTradingStats` במוצר", sites.length, 4);
+      check("🔴 B-144 · ⛔ וכולם מצהירים על יחידת ה-`pnl` (`dispCcy`)",
+        sites.every((s) => /stableCalcTradeMetrics,\s*dispCcy\s*\)$/.test(s)));
+    }
   }
 }
 

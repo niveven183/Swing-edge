@@ -37,9 +37,13 @@ function rSumStats(items) {
  * @param {Array}    trades            Array of trade objects.
  * @param {number}   capital           Starting capital (used for equity / drawdown / return %).
  * @param {Function} calcTradeMetrics  (trade) => { pnl, rMultiple }.
+ * @param {?string}  pnlCurrency       יחידת ה-`pnl` ש-`calcTradeMetrics` מייצר:
+ *   קוד מטבע ל-calc **ממיר** (`makeConvertingCalc`), ו-`null` ל-calc **גולמי**,
+ *   שאינו טוען דבר על יחידה ולכן כל נייר נשאר במטבע שלו. ⛔ אין ברירת מחדל —
+ *   ניחוש כאן הוא סל חוצה-יחידות (B-144).
  * @returns {Object} Comprehensive stats object (see EMPTY_STATS for shape).
  */
-export function computeTradingStats(trades, capital, calcTradeMetrics) {
+export function computeTradingStats(trades, capital, calcTradeMetrics, pnlCurrency) {
   // "Closed" has ONE definition, and it lives in statisticalModels.getClosed:
   // status CLOSED *and* an exit price. A row marked closed with no exit has no
   // realized P&L to contribute — counting it inflates the denominator of every
@@ -106,14 +110,35 @@ export function computeTradingStats(trades, capital, calcTradeMetrics) {
   // 🔴 `B-142` — ומונה לצדו. סכום מפולח בלי לומר **על כמה עסקאות** הוא נשען הוא
   // מנה בלי מכנה בתחפושת (§2): "₪1,200 · $80" ⛔ אינו מבדיל בין 13 שורות ת"א
   // לשורה אחת. המונה נגזר מאותה לולאה בדיוק ו⛔ אינו מעבר שני.
-  const derivations = metrics.map((m) => deriveInstrumentCurrency(m));
+  //
+  // ─── B-144 · שני צירים אורתוגונליים, גזירה **אחת** ─────────────────────────
+  //
+  // 🔴 הגזירה נלקחת על העסקה ה**גולמית** (`closed[i]`), ⛔ לא על המטריקה.
+  // ה-calc הממיר חותם `currency: dispCcy` **מעל** התווית, ו-`instrumentCurrency`
+  // קורא תווית `ILS` על טיקר אלפביתי כראיה **נגד עצמה** (`ils_never_measured`)
+  // ⇒ גזירה מ-`metrics` הפילה מהלולאה בדיוק את החברים שההמרה **הצליחה** עליהם.
+  // יומן שהומר במלואו הפיק פילוח **ריק** ובאנר דלוק מעליו.
+  //
+  // 🔴 והאינוריאנטה שנשברה: **מפתח הדלי = היחידה של הכסף שבתוכו.** שני הפלטים
+  // חולקים את **אותו** שער כניסה ⇒ המונה והמכנה מכסים בדיוק אותן שורות, והם
+  // נבדלים רק ב**מפתח**:
+  //
+  //   · `tradesByCurrency` — ציר **תווית-הנייר**. עסקה על נייר דולרי היא עסקה
+  //     דולרית גם אחרי שהמספר שלה הומר לשקלים.
+  //   · `pnlByCurrency` — ציר **יחידת-הכסף**. הכסף נקוב ב-`pnlCurrency` אם
+  //     ה-calc המיר אותו (⇒ ⛔ אינו מסומן), ובמטבע הנייר אם סורב (⇒ מסומן).
+  //     `pnlCurrency === null` = הקורא מסר calc **גולמי** ⛔ ואינו טוען דבר על
+  //     יחידה ⇒ כל נייר נשאר במטבע שלו. ⛔ אין כאן ניחוש — זו קריאה של הכרעה
+  //     שכבר התקבלה בתפר (`useFxRates.amountAt`).
+  const derivations = closed.map((t) => deriveInstrumentCurrency(t));
   const pnlByCurrency = {};
   const tradesByCurrency = {};
   metrics.forEach((m, i) => {
     if (!isAggregatable(derivations[i])) return;
-    const c = derivations[i].code;
-    pnlByCurrency[c] = (pnlByCurrency[c] || 0) + (m.pnl || 0);
-    tradesByCurrency[c] = (tradesByCurrency[c] || 0) + 1;
+    const paper = derivations[i].code;
+    const unit = !m.fxUnconverted && pnlCurrency ? pnlCurrency : paper;
+    pnlByCurrency[unit] = (pnlByCurrency[unit] || 0) + (m.pnl || 0);
+    tradesByCurrency[paper] = (tradesByCurrency[paper] || 0) + 1;
   });
   const currencies = Object.keys(pnlByCurrency).sort();
   const mixedCurrency = isMixedCurrency(derivations);
