@@ -25,7 +25,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install chromium
       # ⚠️ Until this step existed, NOTHING connected the `push: [main]` trigger to the
       # deploy the tests actually hit. The job started, installed, and requested
       # https://swing-edge.com — whatever was live at that moment.
