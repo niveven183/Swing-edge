@@ -18,6 +18,16 @@ permissions:
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    # Derived from THIS job's own measured practice, not copied from sentinel.yml's 12
+    # (B-173, 21.08). Every step but one is either fast or self-bounding: checkout/
+    # setup-node/npm ci max out at 8s/8s/11s across 60 successful runs; "Wait for this
+    # commit's deploy to be live" already enforces its own 180s TIMEOUT_S and exits 1
+    # rather than hang (observed max in practice: 12s, 180s never hit). The one step
+    # that WAS unbounded — `playwright install --with-deps chromium` — is fixed above;
+    # its CDN-only replacement measured 10s/11s/11s over 3 consecutive dispatched runs.
+    # Sum of practical worst-observed steps ≈110s; ×~5 margin for a genuinely bad
+    # network day, without leaving a multi-hour blind spot like the one this closes.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
