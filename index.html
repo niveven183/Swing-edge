@@ -169,6 +169,46 @@
         <div class="se-boot__mark">Swing<b>Edge</b></div>
       </div>
     </div>
-    <script type="module" src="/src/main.jsx"></script>
+    <script type="module" src="/src/main.jsx" id="se-main-script"></script>
+    <!-- One-shot recovery for B-164 (docs/audits/AUDIT-B164.md): during/after a
+         Vercel deploy, a stale hashed chunk name can briefly resolve to the SPA
+         catch-all fallback (200 text/html) instead of the real JS file, which the
+         browser refuses to execute as a module — firing `error` on this script tag,
+         before React ever mounts (a React ErrorBoundary cannot see this). We reload
+         once per tab/session (sessionStorage, not localStorage, so a genuinely new
+         tab always gets its own fresh attempt) to ride out the transition. If the
+         second attempt also fails, this is a real outage, not a transition window —
+         stop retrying and show a visible message instead of spinning forever. -->
+    <script>
+      (function () {
+        var KEY = 'swingedge-boot-retry';
+        function alreadyRetried() {
+          try { return sessionStorage.getItem(KEY) === '1'; } catch (e) { return false; }
+        }
+        function markRetried() {
+          try { sessionStorage.setItem(KEY, '1'); } catch (e) {}
+        }
+        var el = document.getElementById('se-main-script');
+        if (!el) return;
+        el.addEventListener('error', function () {
+          if (!alreadyRetried()) {
+            markRetried();
+            location.reload();
+            return;
+          }
+          var boot = document.getElementById('se-boot');
+          if (!boot) return;
+          boot.innerHTML =
+            '<div class="se-boot__mark" style="text-align:center;">' +
+              '<div>הטעינה נכשלה. אנא רענן את הדף.</div>' +
+              '<div style="opacity:.7;font-weight:500;font-size:14px;margin-top:4px;">Failed to load. Please refresh the page.</div>' +
+              '<button type="button" onclick="location.reload()" ' +
+                'style="margin-top:14px;padding:8px 20px;border-radius:8px;border:1px solid currentColor;background:transparent;color:inherit;font:inherit;cursor:pointer;">' +
+                'רענן · Refresh' +
+              '</button>' +
+            '</div>';
+        });
+      })();
+    </script>
   </body>
 </html>
