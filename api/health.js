@@ -86,11 +86,22 @@ async function checkFinnhub() {
 async function checkTwelveData() {
   const key = process.env.MARKETDATA_API_KEY || "";
   if (!key) return false;
-  const r = await timedFetch(
-    `${TWELVEDATA_BASE}/time_series?symbol=AAPL&interval=1day&outputsize=1&apikey=${key}`,
-    { headers: { Accept: "application/json" } }
-  );
-  if (!r.ok) return false;
+  let r;
+  try {
+    r = await timedFetch(
+      `${TWELVEDATA_BASE}/time_series?symbol=AAPL&interval=1day&outputsize=1&apikey=${key}`,
+      { headers: { Accept: "application/json" } }
+    );
+  } catch (err) {
+    const reason = err?.name === "AbortError" ? "timeout" : err?.message || "fetch failed";
+    console.error(`Twelve Data health check failed: ${reason}`);
+    return false;
+  }
+  if (!r.ok) {
+    const body = (await r.text().catch(() => "")).slice(0, 200);
+    console.error(`Twelve Data health check failed: HTTP ${r.status} ${body}`);
+    return false;
+  }
   const d = await r.json();
   return d?.status !== "error";
 }

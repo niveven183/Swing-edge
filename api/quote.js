@@ -249,7 +249,11 @@ async function fetchEquityHistory(symbols, key, outputsize) {
     `${TWELVEDATA_BASE}/time_series?symbol=${encodeURIComponent(symbols.join(","))}` +
     `&interval=1day&outputsize=${outputsize}&apikey=${key}`;
   const r = await fetchWithTimeout(url, { headers: { Accept: "application/json" } });
-  if (!r.ok) return {};
+  if (!r.ok) {
+    const body = (await r.text().catch(() => "")).slice(0, 200);
+    console.error(`Twelve Data history failed: HTTP ${r.status} ${body}`);
+    return {};
+  }
   const data = await r.json();
   if (!data || typeof data !== "object") return {};
   if (data.status === "error") return {}; // whole-request failure (bad key / rate limit)
