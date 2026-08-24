@@ -505,6 +505,16 @@ const _validDays = (days) => (OVERVIEW_RANGES.includes(days) ? days : 7);
 const _overviewLKG = new Map();      // days → Map(SYM → { sym, key, price, weekChangePct, closes })
 const _overviewInflight = new Map(); // days → promise (dedupe concurrent fetches per range)
 
+// B-171 §4 — backoff after a provider-degrade signal (429/timeout on the
+// upstream batch call, flagged by api/quote.js as `out._degraded`). Module
+// scope, same pattern as _overviewLKG. Flat 60s, NEVER exponential (an
+// exponential backoff on a 5–30 min poll cadence could silently reach hours).
+// Read by the caller (SwingEdge_App.jsx merged overview effect) BEFORE
+// deciding to poll again — this function only sets the flag, it never
+// retries on its own.
+let _overviewBackoffUntil = 0;
+export const isOverviewBackingOff = () => Date.now() < _overviewBackoffUntil;
+
 const _lkgFor = (days) => {
   let m = _overviewLKG.get(days);
   if (!m) {
@@ -553,6 +563,12 @@ export const fetchMarketOverview = async (days = 7) => {
 
   const run = (async () => {
     const map = await fetchChartResults(syms, { history: true, days });
+    // B-171 §4 — server-side sentinel (api/quote.js handleHistory) means the
+    // upstream batch call itself failed (429/timeout/whole-request error),
+    // not "this particular symbol has no data yet". Arm the flat 60s backoff
+    // so the poller (SwingEdge_App.jsx) skips its next tick(s) instead of
+    // hammering a provider that just told us it's out of credits.
+    if (map?._degraded) _overviewBackoffUntil = Date.now() + 60_000;
     for (const sym of syms) {
       const up = sym.toUpperCase();
       const q = parseChartResult(map[up] ?? map[sym], sym);
@@ -576,4 +592,39 @@ export const fetchMarketOverview = async (days = 7) => {
   } finally {
     if (_overviewInflight.get(days) === run) _overviewInflight.delete(days);
   }
+};
+
+// Days → outputsize the /api/quote history endpoint returns for that range.
+// MUST mirror api/quote.js's `RANGE` table (1D→2, 1W→6, 1M→23) — duplicated
+// here (not imported) because one file is a serverless function and the
+// other ships to the browser; kept in sync by test:instrument-adjacent eyes,
+// same duplication risk class already accepted for OVERVIEW_RANGES above.
+const _RANGE_OUT = { 1: 2, 7: 6, 30: 23 };
+
+/**
+ * B-171 §2 — derive the 1D/1W overview from an already-fetched 30-day (1M)
+ * overview instead of issuing a second network request. Same-day calls to
+ * TwelveData's outputsize=N return the N most-recent closes, so the last N
+ * points of a 23-point 30-day array ARE the N-point 1D/1W array (verified by
+ * code+contract reading in PLAN-B171.md §2.1, not a live A/B — see that
+ * section for the caveat). `price` is the current tick, range-independent,
+ * so it carries over unchanged; only `closes` is sliced and `weekChangePct`
+ * recomputed against the sliced window (same formula as parseChartResult).
+ * days===30 is a no-op passthrough — same reference, not recomputed.
+ */
+export const deriveOverviewForRange = (overview30, days) => {
+  if (!overview30 || days === 30) return overview30;
+  const n = _RANGE_OUT[days] ?? _RANGE_OUT[7];
+  const sliceEntry = (e) => {
+    const closes = Array.isArray(e.closes) ? e.closes.slice(-n) : e.closes;
+    const firstValidClose = closes && closes.length ? closes[0] : null;
+    const weekChangePct = firstValidClose ? ((e.price - firstValidClose) / firstValidClose) * 100 : 0;
+    return { ...e, closes, weekChangePct };
+  };
+  return {
+    indices: (overview30.indices || []).map(sliceEntry),
+    sectorsThemes: (overview30.sectorsThemes || [])
+      .map(sliceEntry)
+      .sort((a, b) => b.weekChangePct - a.weekChangePct),
+  };
 };

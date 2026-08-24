@@ -78,6 +78,7 @@ import {
   fetchPrices, fmtVolume, fmtMarketCap, searchTickers,
   fetchQuote, fetchEarnings, getMarketState, getMarketStateBadge, getRefreshInterval, MARKET_STATE,
   fetchMarketOverview, getOverviewRefreshInterval, MARKET_OVERVIEW,
+  deriveOverviewForRange, isOverviewBackingOff,
 } from "./src/priceService.js";
 import { POPULAR_TICKERS as STATIC_TICKERS, getTickerMeta, searchTickers as searchStaticTickers } from "./src/data/tickers.js";
 import { SwingEdgeAI } from "./src/intelligence/SwingEdgeAI.js";
@@ -2010,27 +2011,43 @@ export default function SwingEdge() {
   }, [fetchLivePrices, marketState]);
 
   // Market Overview (indices + sectors/themes) over a selectable range: 1D / 1W /
-  // 1M, default 1W. Cadence tracks market state (5 min open → 30 min closed);
-  // re-arms on state transitions AND range switches, and only the ACTIVE range
-  // polls. Data is cached per-range in state, so switching back to a visited range
-  // renders instantly (no spinner, no flicker); the service keeps a per-range
-  // last-known-good accumulator so partial cold-start responses converge. Retry
-  // once after 15s on failure.
-  const [moRange, setMoRange] = useState(7); // 1 | 7 | 30
-  const [moByRange, setMoByRange] = useState({}); // { [days]: overviewData }
-  const marketOverview = moByRange[moRange] ?? null;
-  // Market regime always reads the 30-day (≈23-session) window so its 20-SMA /
-  // realized-vol / structure criteria are computable regardless of the card's
-  // visible 1D/1W/1M toggle.
-  const regimeOverview = moByRange[30] ?? null;
+  // 1M, default 1W. B-171 §2: ONE always-on days=30 (1M) fetch — the 1D/1W views
+  // are DERIVED client-side from that same response (deriveOverviewForRange),
+  // never fetched separately. Switching the toggle is instant (no request, no
+  // spinner) and never doubles credit spend against two overlapping requests.
+  // Cadence tracks market state (5 min open → 30 min closed).
+  //
+  // B-171 §1 — visibility-gated: the guard lives INSIDE run(), not around
+  // setInterval/clearInterval. setInterval keeps ticking even while the tab is
+  // hidden; every tick that lands while hidden is a silent no-op (zero network
+  // request), never queued/rescheduled — structurally impossible to produce a
+  // "catch-up storm" of missed polls firing at once when the tab regains focus.
+  // A single conditional refresh fires on refocus, ONLY if the data is actually
+  // stale relative to the current cadence — not a blanket refetch on every focus.
+  //
+  // B-171 §4 — after the server signals `_degraded` (provider 429/timeout on the
+  // upstream batch call), the poller backs off for a flat 60s before its next
+  // attempt (no immediate retry, no exponential backoff).
+  const [moRange, setMoRange] = useState(7); // 1 | 7 | 30 — display toggle only, no network effect
+  const [overview30, setOverview30] = useState(null); // single fetched 1M payload
+  const marketOverview = useMemo(() => deriveOverviewForRange(overview30, moRange), [overview30, moRange]);
+  // Market regime always reads the full 30-day (≈23-session) window so its
+  // 20-SMA / realized-vol / structure criteria are computable regardless of the
+  // card's visible 1D/1W/1M toggle.
+  const regimeOverview = overview30;
   useEffect(() => {
     let cancelled = false;
     let retryTimer = null;
+    let lastFetchAt = null;
 
     const run = async () => {
+      if (document.hidden) return;              // §1 — silent no-op, never rescheduled/queued
+      if (isOverviewBackingOff()) return;        // §4 — skip while backing off after a provider 429
       try {
-        const data = await fetchMarketOverview(moRange);
-        if (!cancelled && data) setMoByRange((prev) => ({ ...prev, [moRange]: data }));
+        const data = await fetchMarketOverview(30);
+        if (cancelled) return;
+        lastFetchAt = Date.now();
+        if (data) setOverview30(data);
       } catch {
         if (!cancelled) retryTimer = setTimeout(() => { if (!cancelled) run(); }, 15000);
       }
@@ -2038,29 +2055,23 @@ export default function SwingEdge() {
 
     run();
     const interval = setInterval(run, getOverviewRefreshInterval(marketState));
+
+    // §1.1 — refocus triggers at most ONE conditional refresh, only if the
+    // data is stale relative to the current cadence (not every focus event).
+    const onVisibility = () => {
+      if (document.hidden) return;
+      const refreshMs = getOverviewRefreshInterval(marketState);
+      if (lastFetchAt == null || Date.now() - lastFetchAt > refreshMs) run();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
     return () => {
       cancelled = true;
       clearInterval(interval);
       if (retryTimer) clearTimeout(retryTimer);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [marketState, moRange]);
-
-  // Keep the 30-day overview warm for regime detection even when the visible
-  // toggle is 1D/1W. Rides the same cached fetch (server caches history ~60min;
-  // in-flight requests dedupe) — no extra API budget.
-  useEffect(() => {
-    if (moRange === 30) return; // already fetched by the effect above
-    let cancelled = false;
-    const run = async () => {
-      try {
-        const data = await fetchMarketOverview(30);
-        if (!cancelled && data) setMoByRange((prev) => ({ ...prev, 30: data }));
-      } catch { /* degrades to trade-tag fallback until data lands */ }
-    };
-    run();
-    const interval = setInterval(run, getOverviewRefreshInterval(marketState));
-    return () => { cancelled = true; clearInterval(interval); };
-  }, [marketState, moRange]);
+  }, [marketState]);
 
   const realTrades = useMemo(() => trades.filter(t => !t.isDemo), [trades]);
 

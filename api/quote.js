@@ -325,6 +325,15 @@ async function handleHistory(symbols, mdKey, days, res) {
   if (pick.length && mdKey) {
     tasks.push(
       fetchEquityHistory(pick, mdKey, RANGE[days].out).then((byS) => {
+        // B-171 §4 — fetchEquityHistory resolves {} ONLY when the whole batch
+        // call failed at the HTTP level (429/timeout) or the provider returned
+        // a whole-request error status — NOT when individual symbols simply
+        // have no data. That distinction is what makes this a reliable
+        // provider-degraded signal: a per-symbol miss still leaves `byS`
+        // non-empty for the OTHER symbols in the same batch. Additive field
+        // only (`_degraded`), never replaces/removes an existing key — same
+        // back-compat discipline as parseChartResult (CLAUDE.md §13).
+        if (pick.length && Object.keys(byS).length === 0) out._degraded = true;
         for (const sym of pick) {
           const result = byS[sym] || null;
           if (result) _histCache.set(ck(sym), { result, ts: now });
