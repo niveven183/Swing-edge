@@ -1989,13 +1989,23 @@ export default function SwingEdge() {
   //   PRE/AFTER → 30s
   //   CLOSED → 5 min
   // On failure, retry once after 10 seconds.
+  //
+  // B-176/B-178 — visibility-gated, same pattern as the Market Overview poller
+  // (B-171 §1): the guard lives INSIDE run(), not around setInterval/clearInterval.
+  // setInterval keeps ticking while the tab is hidden; every tick that lands while
+  // hidden is a silent no-op (zero network request, zero Finnhub calls), never
+  // queued/rescheduled. A single conditional refresh fires on refocus, only if the
+  // data is actually stale relative to the current cadence.
   useEffect(() => {
     let cancelled = false;
     let retryTimer = null;
+    let lastFetchAt = null;
 
     const run = async () => {
+      if (document.hidden) return;               // silent no-op, never rescheduled/queued
       const ok = await fetchLivePrices();
       if (cancelled) return;
+      lastFetchAt = Date.now();
       if (!ok) {
         retryTimer = setTimeout(() => { if (!cancelled) run(); }, 10000);
       }
@@ -2003,10 +2013,19 @@ export default function SwingEdge() {
 
     run();
     const interval = setInterval(run, getRefreshInterval(marketState));
+
+    const onVisibility = () => {
+      if (document.hidden) return;
+      const refreshMs = getRefreshInterval(marketState);
+      if (lastFetchAt == null || Date.now() - lastFetchAt > refreshMs) run();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
     return () => {
       cancelled = true;
       clearInterval(interval);
       if (retryTimer) clearTimeout(retryTimer);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [fetchLivePrices, marketState]);
 
