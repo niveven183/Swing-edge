@@ -51,9 +51,10 @@ const FILES = {
   BACKLOG: "docs/BACKLOG.md",
   DONE: "docs/DONE.md",
   CHECKS: "docs/CHECKS.md",
+  METRICS: "docs/METRICS.md",
 };
 
-const ROW = /^\|\s*([BDC]-\d{3})\s*\|/;
+const ROW = /^\|\s*([BDCM]-\d{3})\s*\|/;
 const ROW_R = /^\|\s*(R-\d)\s*\|/;
 const DATE = /\b\d{2}\.\d{2}\b/;
 const HASH = /[0-9a-f]{7,40}/;
@@ -103,17 +104,25 @@ const backlog = defs("BACKLOG");
 const done = defs("DONE");
 const checks = defs("CHECKS");
 const stateDefs = defs("STATE");
+// ⚠️ שורות השושלת ב-`METRICS` נושאות אף הן `| M-nnn |` בעמודה הראשונה, ולכן
+// `defs` תופס אותן. ⛔ זו **אינה** כפילות `1.1` — הן מכוונות: אותו מזהה, ערך
+// שהוחלף. ⇒ מסננים לפי מספר התאים (השושלת = 4, הפנקס = 7), ⛔ לא לפי כותרת
+// מקטע, כי כותרת ניתנת לשינוי בשקט בעוד שצורת השורה נשברת ברעש.
+const METRIC_CELLS = 7; // | מזהה | מה נמדד | ערך | מקור | נמדד | תוקף | סטטוס |
+const metricsAll = defs("METRICS");
+const metrics = metricsAll.filter((d) => d.cells.length === METRIC_CELLS);
+const lineage = metricsAll.filter((d) => d.cells.length !== METRIC_CELLS);
 
 console.log("\n0 · הקורפוס");
 // ⚠️ המכנה נאמר בקול: שער שסורק 0 שורות עובר בשקט מושלם.
-check("0.1", `${backlog.length} פריטי BACKLOG · ${done.length} פריטי DONE · ${checks.length} פריטי CHECKS`,
-  backlog.length >= 20 && done.length >= 5 && checks.length >= 5,
-  `רצפות: BACKLOG≥20 · DONE≥5 · CHECKS≥5. אחד מהם התכווץ, או ש-ROW נשבר`);
+check("0.1", `${backlog.length} פריטי BACKLOG · ${done.length} פריטי DONE · ${checks.length} פריטי CHECKS · ${metrics.length} מדדי METRICS`,
+  backlog.length >= 20 && done.length >= 5 && checks.length >= 5 && metrics.length >= 3,
+  `רצפות: BACKLOG≥20 · DONE≥5 · CHECKS≥5 · METRICS≥3. אחד מהם התכווץ, או ש-ROW נשבר`);
 
 console.log("\n1 · מזהה חי בקובץ אחד בלבד");
 // ⚠️ הגדרות בלבד. ציטוט ``B-004`` בפרוזה מותר בכל קובץ — ראה הכותרת.
 const home = new Map();
-for (const d of [...backlog, ...done, ...checks, ...stateDefs]) {
+for (const d of [...backlog, ...done, ...checks, ...metrics, ...stateDefs]) {
   if (!home.has(d.id)) home.set(d.id, []);
   home.get(d.id).push(`${d.file}:${d.lineNo}`);
 }
@@ -125,6 +134,7 @@ const wrongPrefix = [
   ...backlog.filter((d) => !d.id.startsWith("B-")),
   ...done.filter((d) => !d.id.startsWith("D-")),
   ...checks.filter((d) => !d.id.startsWith("C-")),
+  ...metricsAll.filter((d) => !d.id.startsWith("M-")),
 ];
 check("1.2", "כל מזהה יושב בקובץ של הקידומת שלו", wrongPrefix.length === 0,
   wrongPrefix.map((d) => `${d.id} ב-${d.file}:${d.lineNo}`).join("\n      "));
@@ -249,7 +259,7 @@ try {
   console.error(`❌ לא ניתן לקרוא את הקומיט הקודם: ${e.message}`);
   process.exit(1);
 }
-const now = new Set([...backlog, ...done, ...checks].map((d) => d.id));
+const now = new Set([...backlog, ...done, ...checks, ...metricsAll].map((d) => d.id));
 const vanished = [...prev].filter((id) => !now.has(id));
 // ⚠️ שורת **מצבה** היא קיום חוקי לכל דבר: היא הגדרת-שורה ככל אחרת, ולכן היא
 // נספרת ב-`now` ומספקת את `6.1`. ⛔ זו אינה עקיפה — זה **הפתרון** ל-`B-126`:
@@ -603,6 +613,82 @@ const fixFail = FIXTURES.filter(([, cell, want]) => markerVerdict(cell, FIX_CHEC
 check("11.3", `${FIXTURES.length - fixFail.length}/${FIXTURES.length} fixtures קפואים · המסווג מכריע נכון בשני הכיוונים`,
   fixFail.length === 0,
   fixFail.map(([n, cell, want]) => `⟪${n}⟫ — ציפייה ${want ? "עובר" : "נופל"}, בפועל ${markerVerdict(cell, FIX_CHECKS).ok ? "עובר" : "נופל"} (${markerVerdict(cell, FIX_CHECKS).why})`).join("\n      "));
+
+// ── §12 · `METRICS` — מדידה שפג תוקפה מכריזה על עצמה ────────────────────────
+//
+// 🔴 **הכלל נחקק 08.08 ו⛔ מעולם לא נאכף:** «מספר שנרשם פעם ולא נמדד שוב ⛔ אינו
+// עובדה». עד 26.08 הוא היה **פרוזה** — המספרים ישבו ב-`STATE` ובדוחות `audits/`,
+// התיישנו בשקט, והמשיכו להיקרא כאילו נמדדו היום. ⚠️ `STATE` אפילו **הצהיר** על
+// כך («נמדד לפני 14 יום ⇒ ⛔ אינו עובדה») — הצהרה ידנית שדרשה מאדם לחשב הפרש
+// תאריכים בראש בכל קריאה. ⛔ **זה בדיוק `R-5`** (מצב קריטי באחסון נדיף:
+// הזיכרון האנושי), ו-`CLAUDE.md` §2 קורא לזה «אפס תלות בזיכרון אנושי».
+//
+// ⚠️ **ומה שהכריח את הבנייה:** המדידה «0 עסקאות ב-70.4 שעות» חיה ב-`docs/INBOX.md`
+// — קובץ שהחוזה שלו מצהיר «⛔ פריט לא נשאר כאן מעבר לסשן אחד» — ו-`STATE`
+// **ציטט אותה משם**. ⇒ ציטוט שמצביע לקובץ שמוחק את עצמו.
+//
+// **מה השער מודד, ומה ⛔ אינו יכול למדוד:** הוא משווה `נמדד + תוקף` ל**היום**
+// ומחייב את השורה להכריז `⏳ פג`. ⛔ **הוא ⛔ אינו יודע אם המספר נכון** — רק אם
+// הוא **טרי**. ⛔ **והתיקון ⛔ אינו הארכת `תוקף`** — הוא מדידה חוזרת; הארכה כדי
+// לעבור היא בדיוק ‹R-4›, אותה טעות שהחזיקה את `100` בשלמות בזמן שהתוכן גדל ×9.2.
+console.log("\n12 · METRICS — מדידה שפג תוקפה מכריזה על עצמה");
+const M_SRC = 3, M_WHEN = 4, M_TTL = 5, M_STAT = 6;
+const EXPIRED = /⏳\s*פג/;
+const HISTORIC = /🧊/;
+
+const mNoSrc = metrics.filter((d) => !DATE.test(d.cells[M_SRC] ?? "") && !/[A-Za-z`(]/.test(d.cells[M_SRC] ?? ""));
+check("12.1", `${metrics.length - mNoSrc.length}/${metrics.length} מדדים נושאים פקודה/מקור`,
+  mNoSrc.length === 0,
+  mNoSrc.map((d) => `${d.id} (${d.file}:${d.lineNo}) — "${(d.cells[M_SRC] ?? "").slice(0, 60)}". ⛔ «מ-Supabase» אינו מקור; שאילתה כן`).join("\n      "));
+
+// ⚠️ **המכנה נאמר בקול, ועם שם האוכלוסייה** (`CLAUDE.md` §2). שיעור בלי מכנה
+// הוא המחלה עצמה — ⛔ ולא ייתכן שפנקס המדידות יהיה המקום היחיד שפטור ממנה.
+const RATIO = /\d+\s*\/\s*\d+/;
+const PCT = /\d+(?:\.\d+)?\s*%/;
+const mBarePct = metrics.filter((d) => PCT.test(d.cells[2] ?? "") && !RATIO.test(d.cells[2] ?? ""));
+check("12.2", `${metrics.length - mBarePct.length}/${metrics.length} — ⛔ אפס אחוז בלי מונה/מכנה`,
+  mBarePct.length === 0,
+  mBarePct.map((d) => `${d.id} (${d.file}:${d.lineNo}) — נושא % בלי \`a/b\`. ⛔ «74%» אינו מדידה; «34/46 = 74%» כן (§2)`).join("\n      "));
+
+// ⚠️ `DD.MM` בלי שנה — נפתר מול השנה הנוכחית. ⛔ **ותאריך עתידי ⛔ אינו «טרי»**,
+// הוא שעון שבור: שורה שנכתבה עם `31.12` הייתה עוברת לנצח. ⇒ נפסלת במפורש.
+const TODAY = new Date();
+const YEAR = TODAY.getFullYear();
+const parseDM = (s) => {
+  const m = /\b(\d{2})\.(\d{2})\b/.exec(s ?? "");
+  if (!m) return null;
+  const d = new Date(YEAR, Number(m[2]) - 1, Number(m[1]));
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+const daysAgo = (d) => Math.floor((TODAY - d) / 86400000);
+
+const mBadWhen = metrics.filter((d) => !parseDM(d.cells[M_WHEN]));
+const mBadTtl = metrics.filter((d) => !/^\d+$/.test((d.cells[M_TTL] ?? "").trim()));
+check("12.3", `${metrics.length - mBadWhen.length - mBadTtl.length}/${metrics.length} נושאים \`נמדד\` תקין ו-\`תוקף\` בימים`,
+  mBadWhen.length === 0 && mBadTtl.length === 0,
+  [...mBadWhen.map((d) => `${d.id} — \`נמדד\`="${d.cells[M_WHEN] ?? ""}" ⛔ אינו DD.MM`),
+   ...mBadTtl.map((d) => `${d.id} — \`תוקף\`="${d.cells[M_TTL] ?? ""}" ⛔ אינו מספר ימים. ⛔ אין «לתמיד»`)].join("\n      "));
+
+const aged = metrics
+  .filter((d) => parseDM(d.cells[M_WHEN]) && /^\d+$/.test((d.cells[M_TTL] ?? "").trim()))
+  .map((d) => ({ d, age: daysAgo(parseDM(d.cells[M_WHEN])), ttl: Number(d.cells[M_TTL].trim()) }));
+const future = aged.filter((x) => x.age < 0);
+// ⛔ `🧊 היסטורי` ⛔ אינו פטור-בדלת-אחורית: הוא **מצהיר** שהמספר ⛔ אינו חי, ולכן
+// ⛔ אינו נקרא כעובדה. פטור שאין לו הצהרה נראית הוא בדיוק מה ש-§1.3 פספס.
+const lying = aged.filter((x) => x.age >= 0 && x.age > x.ttl
+  && !EXPIRED.test(x.d.cells[M_STAT] ?? "") && !HISTORIC.test(x.d.cells[M_STAT] ?? ""));
+const stillFresh = aged.filter((x) => x.age >= 0 && x.age <= x.ttl && EXPIRED.test(x.d.cells[M_STAT] ?? ""));
+check("12.4", `${aged.filter((x) => x.age > x.ttl).length}/${aged.length} מדדים פגי-תוקף, וכולם מכריזים ⏳ פג`,
+  lying.length === 0 && future.length === 0 && stillFresh.length === 0,
+  [...lying.map((x) => `${x.d.id} — נמדד לפני ${x.age} יום, תוקף ${x.ttl} ⇒ ⛔ אינו עובדה, וסטטוסו "${x.d.cells[M_STAT]}". ⛔ התיקון הוא מדידה חוזרת, ⛔ לא הארכת התוקף`),
+   ...future.map((x) => `${x.d.id} — \`נמדד\` בעתיד (${-x.age} יום קדימה) ⇒ שעון שבור שיעבור לנצח`),
+   ...stillFresh.map((x) => `${x.d.id} — מוכרז ⏳ פג אך נמדד לפני ${x.age} יום מתוך ${x.ttl}. ⛔ הכרזת-פג שאינה נכונה מלמדת להתעלם מהדגל`)].join("\n      "));
+
+// ⚠️ שורת שושלת שמפנה למזהה שאינו בפנקס היא היסטוריה של כלום.
+const lineageOrphan = lineage.filter((d) => !metrics.some((m) => m.id === d.id));
+check("12.5", `${lineage.length} שורות שושלת · כולן מפנות ל-M- חי בפנקס`,
+  lineageOrphan.length === 0,
+  lineageOrphan.map((d) => `${d.id} (${d.file}:${d.lineNo}) — ⛔ אין לו שורה חיה. מזהה ⛔ אינו ממוחזר (§14)`).join("\n      "));
 
 console.log("");
 if (failures.length) {
