@@ -168,7 +168,10 @@ console.log("\n3 · תקציב STATE");
 // 26.08 הקובץ עמד על **6,925 בתים (43%)**, ⛔ ולא על 12,166 שנכתבו כאן בטיוטה
 // לפני שנמדד. ⛔ המספר המשוער הוחלף במדוד באותו קומיט — הערכה שנשארת בקוד
 // היא בדיוק `R-1` (נתון בלי תעודת מקור), והשער הזה קיים כדי לתפוס את זה.
-const STATE_BUDGET = 16000; // bytes · נחקק 26.08 · נמדד אחרי הגיזום: 6,925b (43%)
+// ⚠️ ⛔ אין כאן מספר "נוכחי" — הוא היה נסחף בשקט בדיוק כמו `100`.
+// הצילום היחיד שנרשם נושא את הקומיט שלו: `90d69da` = 6,925b (43%).
+// הערך החי נמדד בכל ריצה ומודפס בשורת `3.1`; אימות ידני: `wc -c docs/STATE.md`.
+const STATE_BUDGET = 16000; // bytes · נחקק 26.08 · `DECISIONS` 26.08
 const stateBytes = Buffer.byteLength(readFileSync(FILES.STATE, "utf8"), "utf8");
 const pct = Math.round((stateBytes / STATE_BUDGET) * 100);
 check("3.1", `docs/STATE.md = ${stateBytes.toLocaleString("en-US")} bytes מתוך ${STATE_BUDGET.toLocaleString("en-US")} (${pct}%) · ${lines.STATE.length} שורות`,
