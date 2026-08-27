@@ -334,6 +334,43 @@ const undated = backlog.filter((d) => /13\.08/.test(d.cells[SRC] ?? "") && !/13\
 check("8.5", `${backlog.filter((d) => /13\.08/.test(d.cells[SRC] ?? "")).length} פריטי 13.08 נושאים תאריך מדידה`, undated.length === 0,
   undated.map((d) => `${d.id} (${d.file}:${d.lineNo}) — מקור 13.08, עמודת "נמדד" = "${d.cells[MEAS] ?? ""}"`).join("\n      "));
 
+// 8.6 — ⚠️ **הפרוזה חייבת לשאת בדיוק את מה ש-8.1 מדד.** `B-250`.
+// 8.1 **הדפיס** את מספר השיוכים ו⛔ לא השווה אותו לכלום ⇒ הפרוזה בראש שכבת
+// השורשים נסחפה **ארבע פעמים באותה שורה** («126» 13.08 · «167·81·88·86» 19.08 ·
+// «170·82·89·88» 20.08 · «243·109·119·134» 26.08) והשער היה **ירוק** בכל אחת מהן.
+// ⛔ **התיקון אינו עדכון המספר** — זה מה שנעשה ארבע פעמים. התיקון הוא שהמספר
+// יפסיק להיות פרוזה ויהפוך לערך **נמדד** שנכשל כשהוא סוטה.
+//
+// ⚠️ ו**היעדר התאמה של התבנית הוא כשל, ⛔ לא דילוג**: אם מישהו ינסח מחדש את
+// הפרוזה, גרסה סלחנית תעבור על **אפס** השוואות — שהוא בדיוק `R-4` בתחפושת
+// חדשה. ⇒ כל תבנית חייבת להיתפס **בדיוק פעם אחת**.
+const rootProse = lines.BACKLOG.join("\n");
+const tagged = [...tagOf.values()].filter((t) => t.length > 0).length;
+const PROSE = {
+  "סה״כ פריטים":   { re: /\*\*(\d+) הפריטים\*\*/g,                        measured: backlog.length },
+  "עם שורש":       { re: /\*\*(\d+)\/(\d+) פריטים נבדלים ממופים\*\*/g,     measured: tagged },
+  "שיוכים":        { re: /\*\*(\d+) שיוכים\*\*/g,                          measured: roots.reduce((a, r) => a + r.members.length, 0) },
+  "בלי שורש":      { re: /\*\*(\d+)\/(\d+) ⛔ בלי שורש\*\*/g,              measured: backlog.length - tagged },
+};
+const proseErrs = [];
+const proseOk = [];
+for (const [name, { re, measured }] of Object.entries(PROSE)) {
+  const hits = [...rootProse.matchAll(re)];
+  if (hits.length !== 1) {
+    proseErrs.push(`"${name}" — התבנית נתפסה ${hits.length} פעמים ב-${FILES.BACKLOG}, נדרש בדיוק 1. ⛔ תבנית שאינה נתפסת אינה "אין מה להשוות" — היא שער עיוור`);
+    continue;
+  }
+  const stated = Number(hits[0][1]);
+  // תבנית `X/Y`: גם המכנה נבדק — "115/250" עם מכנה שגוי הוא מנה בלי מכנה (§2).
+  const denom = hits[0][2] !== undefined ? Number(hits[0][2]) : null;
+  if (stated !== measured) proseErrs.push(`"${name}" — הפרוזה אומרת ${stated}, המדידה ${measured}`);
+  else if (denom !== null && denom !== backlog.length) proseErrs.push(`"${name}" — המונה ${stated} נכון אך המכנה ${denom} ≠ ${backlog.length} פריטים`);
+  else proseOk.push(`${name}=${stated}`);
+}
+check("8.6", `הפרוזה של שכבת השורשים נושאת את המספרים המדודים (${proseOk.join(" · ")})`,
+  proseErrs.length === 0,
+  [...proseErrs, "⛔ אל תעדכן את המספר בפרוזה כדי לעבור אם ההפרש אמיתי — בדוק קודם איזה מהשניים שגוי (`B-250`)"].filter(Boolean).join("\n      "));
+
 console.log("\n9 · NEXT — ההמלצה · INBOX — הקליטה");
 // ⚠️ `BACKLOG` **אוסר** להמליץ סדר, ובצדק: 129 פריטים בסדר כלשהו הם רשימה
 // שמתחזה להכרעה. ⇒ ההכרעה יושבת בקובץ **נפרד** שכל כולו שלושה פריטים, ומה
