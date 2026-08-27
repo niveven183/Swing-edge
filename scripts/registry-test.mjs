@@ -727,6 +727,52 @@ check("12.5", `${lineage.length} שורות שושלת · כולן מפנות ל
   lineageOrphan.length === 0,
   lineageOrphan.map((d) => `${d.id} (${d.file}:${d.lineNo}) — ⛔ אין לו שורה חיה. מזהה ⛔ אינו ממוחזר (§14)`).join("\n      "));
 
+// ── §13 · הסעיף ב-`BACKLOG` מול הסטטוס, ורוחב השורה ──────────────────────
+// ⚠️ **השער קרא כותרות בארבעה קבצים ו⛔ מעולם לא ב-`BACKLOG`:** `:208`/`:211`
+// ב-`DONE` · `:383` ב-`NEXT` · `:459`/`:462` ב-`STATE` · `:494` ב-`.md` שבשורש.
+// ⇒ שורת `B-` **מעולם לא יוחסה לסעיף שמעליה**, ולכן שישה פריטים בסטטוס `פתוח`
+// ישבו תחת «❄️ מוכרע-לא-לעשות» מ-12.08 בלי שאף אסרציה תוכל לראות זאת.
+// המקור ⛔ אינו הכרעה: `3b1a1cf` הוסיף את הבלוק **בלי כותרת משלו** (0 שורות
+// `+## ` ב-diff) והוא ירש `❄️` **לפי מיקום בלבד**. §7.1 מסנן `❄️` ב**תא**,
+// ⛔ לא בכותרת, ולכן הוא עיוור לזה מבנית. ‹R-4›
+console.log("\n13 · הסעיף ב-BACKLOG מול הסטטוס");
+
+const HEAD = /^#{1,4}\s+(.*)$/;
+const sectionOf = (() => {
+  const marks = [];
+  lines.BACKLOG.forEach((l, i) => { const m = HEAD.exec(l); if (m) marks.push({ no: i + 1, title: m[1].trim() }); });
+  return (lineNo) => { let cur = null; for (const s of marks) { if (s.no < lineNo) cur = s; else break; } return cur; };
+})();
+
+// 13.1 — סעיף שהוא **הכרעה** מחייב סטטוס תואם. ⛔ הכלל מכוון לסעיף היחיד
+// שהוא הכרעה (`❄️`); `🟠 חשוב`/`⚪ חוב` הם **עדיפות**, ⛔ לא סטטוס, ושער
+// שהיה מאדים עליהם היה מודד רעש ומאלץ ריכוך — וריכוך כדי לעבור הוא `R-4`.
+// ⚠️ **מצבה עוברת בכוונה** — פריט שנסגר תחת `❄️` הוא היסטוריה תקינה (§8.4).
+const FROZEN_SEC = /❄️/;
+const underFrozen = backlog.filter((d) => FROZEN_SEC.test(sectionOf(d.lineNo)?.title ?? ""));
+const misfiled = underFrozen.filter((d) => {
+  const st = d.cells.at(-1) ?? "";
+  return !FROZEN_SEC.test(st) && !TOMB.test(st);
+});
+check("13.1", `${underFrozen.length - misfiled.length}/${underFrozen.length} השורות תחת כותרת ❄️ נושאות ❄️ או מצבה`,
+  misfiled.length === 0,
+  misfiled.map((d) => `${d.id} (${d.file}:${d.lineNo}) — סטטוס "${d.cells.at(-1)}" תחת «${sectionOf(d.lineNo).title}». ⛔ סעיף ⛔ אינו סטטוס: או שהפריט הוכרע, או שהוא זקוק לכותרת משלו`).join("\n      "));
+
+// 13.2 — רוחב השורה. ⚠️ קיים ל-`CHECKS` (§5.2) ו⛔ **לא** ל-`BACKLOG` ⇒ `|`
+// חשוף בתוך גוף מזיז את כל העמודות ימינה **בשקט**. היום העמודה האחרונה
+// עדיין נקראת נכון **במקרה**; שדה שיתווסף ייקרא מהתא השגוי ואיש לא יראה.
+const BACKLOG_CELLS = 7;
+const wrongWidth = [];
+lines.BACKLOG.forEach((line, i) => {
+  const m = ROW.exec(line);
+  if (!m) return;
+  const n = line.split(/(?<!\\)\|/).slice(1, -1).length;
+  if (n !== BACKLOG_CELLS) wrongWidth.push({ id: m[1], lineNo: i + 1, n });
+});
+check("13.2", `${backlog.length - wrongWidth.length}/${backlog.length} שורות BACKLOG נושאות ${BACKLOG_CELLS} תאים`,
+  wrongWidth.length === 0,
+  wrongWidth.map((x) => `${x.id} (${FILES.BACKLOG}:${x.lineNo}) — ${x.n} תאים במקום ${BACKLOG_CELLS}. ⛔ \`|\` בגוף חייב להיות מוברח \`\\|\``).join("\n      "));
+
 console.log("");
 if (failures.length) {
   console.error(`❌ registry: ${failures.length}/${pass + failures.length} assertion(s) failed.`);
