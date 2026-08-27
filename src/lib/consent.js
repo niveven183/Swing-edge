@@ -119,15 +119,26 @@ export function trackEvent(name, params) {
 // In-app tabs are useState, not routes — they do not navigate and are not counted.
 const ROUTES = new Set(["/", "/app", "/terms", "/privacy"]);
 
+// The allowlist itself, exported because TWO analytics channels need it and a
+// second copy would drift. GA4 reaches it through trackPageView below; Vercel
+// Analytics reaches it from src/main.jsx, where it pins the `beforeSend` url.
+//
+// This is an ALLOWLIST, not a filter. It never inspects what it was handed for
+// anything dangerous — an unknown path collapses to "/other" whatever it holds.
+// Stripping `access_token` by name would be the filter version, and the next
+// provider that renames the parameter walks straight through it.
+export function analyticsPath(pathname) {
+  return ROUTES.has(pathname) ? pathname : "/other";
+}
+
 // page_location is built from origin + an allowlisted path, never from href.
 // search and hash are dropped on purpose: the OAuth return carries the session
 // tokens in the fragment, and gtag's default would have shipped them (INCIDENTS #12).
 export function trackPageView(pathname) {
   if (readConsent() !== "granted") return;
   if (typeof window === "undefined" || typeof window.gtag !== "function") return;
-  const path = ROUTES.has(pathname) ? pathname : "/other";
   window.gtag("event", "page_view", {
-    page_location: window.location.origin + path,
+    page_location: window.location.origin + analyticsPath(pathname),
   });
 }
 

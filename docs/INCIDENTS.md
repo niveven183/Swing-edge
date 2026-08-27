@@ -700,3 +700,65 @@ Every production incident gets one short entry: what broke, root cause, fix, pre
 - **Prevention — stated honestly:** ⛔ there is none for the root. The 429 is upstream and
   cross-vendor. What can change is **time to detection**, which today is bounded by a daily
   correlator, and **where the verdict lives**, which today is inside the thing it judges.
+
+## #18 — 2026-08-27 — The same access token went to a *second* analytics vendor, and #12's fix could not see it
+
+- **Symptom:** none, again. No monitor fired, no user reported anything. Found while auditing
+  `B-184`, which had been filed months earlier on **evidence that was itself wrong** — a console
+  line from `localhost:5173`. That line came from `script.debug.js`, the **dev** script; the bug
+  is real, but nothing in the original report measured production. Had the audit stopped at
+  "the ticket already proves it", the fix would have been built on a false premise.
+- **Root cause — the exact seam as #12, one vendor over:** `src/supabaseClient.js:13` still runs
+  the **implicit** flow, so every OAuth / recovery return lands on
+  `https://swing-edge.com/#access_token=…&refresh_token=…` before the client strips the hash.
+  `src/main.jsx:15` called `inject()` from `@vercel/analytics` with **no arguments**, and the
+  script Vercel serves builds its payload as `{ o: location.href }` — **fragment included**.
+- **⚠️ Why reading the dependency proved nothing:** the npm package sends **no beacon at all**.
+  All it does is append `<script src>` and forward `beforeSend` through the `window.va`/`vaq`
+  queue. The URL capture and the POST live in the **bytes Vercel serves**
+  (`/_vercel/insights/script.js`, 2,495 bytes, sha256 `79bf638d…`). An audit that stops in
+  `node_modules` reads clean code and concludes there is no bug.
+- **⚠️ And the obvious test tool lies:** the served script opens with
+  `if (navigator.webdriver || navigator.userAgent.includes("Headless")) return;`. **Playwright
+  headless therefore measures "no leak" — a false negative,** and would have closed this ticket
+  green. Verification had to be a real browser against an isolated local harness.
+- **Scope — larger than #12 reported, in two directions:**
+  1. **Window: 54 days** (`ee2c00d`, 2026-07-04 → this fix), not 10. Vercel Analytics predates
+     GA4 by **23 days**, so this vendor was the **first** to receive tokens, not the second.
+     #12's stated window measured the gtag channel and was read as if it measured the exposure.
+  2. **No consent subset narrows it.** GA4 only fired for users who granted consent, which is why
+     #12 could say the affected set was un-countable but *bounded below* the OAuth population.
+     Vercel Analytics is **not consent-gated by design** (`LegalPages.jsx:162`) ⇒ **every** OAuth
+     return in the window sent the beacon, consent or not.
+  ⛔ The ceiling is **not measured here** — counting OAuth returns in the window needs a DB read
+  this wave did not perform. ⛔ Do not reuse #12's "8/41": different window, different vendor,
+  different denominator. Registered as an open measurement, not asserted.
+- **Fix (this commit):** `inject()` is pinned with a `beforeSend` that **rebuilds** the url from
+  `origin + analyticsPath(pathname)`. ⛔ It is deliberately **not** a filter: nothing looks for
+  `access_token`, because a filter only knows the parameter names someone already thought of.
+  `analyticsPath()` is exported from `src/lib/consent.js` so both channels share **one** allowlist
+  (§13) rather than a second copy that drifts.
+- **Measured, real browser, built `dist/` + the production script bytes:** URL carrying
+  `?sid=…#access_token=…&refresh_token=…&session_key=…` →
+  **before** `o` = 146 chars, hash **and** query present; **after** `o` = 22 chars
+  (`origin + "/"`), hash and query gone, **1 beacon** either way — the pageview still counts.
+  A non-allowlisted path collapsed to `origin + "/other"`. The synthetic `session_key` — a name
+  no filter could have known — fell with the rest, which is the allowlist doing the work.
+- **Why it shipped:** #12 fixed the channel it was looking at. `page_location` was pinned in
+  `index.html`, the reason was written inline, and the entry closed with "**⛔ Still open:** no
+  automated check asserts that nothing resembling a token reaches an outbound analytics call."
+  That sentence was correct and was left standing for 21 more days.
+- **Lesson:** **the contract test was structurally blind, and looked complete.** Assertion 12 of
+  `test:analytics` is literally `/(?<!window\.)\bgtag\s*\(/` — it can only ever see gtag. A
+  fourteen-assertion suite named "analytics" was green on every commit while a second analytics
+  vendor shipped the same secret. **A guard named after a category but written against one
+  implementation of it will report the category as safe.** When a leak is fixed in one channel,
+  the question is not "is this channel clean" but "how many channels are there".
+- **Prevention:** assertions **15–17** (`scripts/analytics-contract-test.mjs`). 15 fails if
+  `inject()` is called without a `beforeSend`; 16 fails unless the pin **rebuilds** from
+  `origin + analyticsPath(pathname)` and never reaches for `.href`/`.search`/`.hash`; 17 fails if
+  any file other than `src/main.jsx` speaks to the Vercel channel. ⚠️ 15 and 16 were **observed
+  red** against the unfixed tree before the fix existed; 17 was green from birth (no second call
+  site exists today), so it was mutant-tested instead — adding an `@vercel/analytics` import to
+  `consent.js` turned it red, and reverting turned it green.
+

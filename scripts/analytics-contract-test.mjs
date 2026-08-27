@@ -29,8 +29,10 @@ import { readFileSync } from "node:fs";
 
 const APP = new URL("../SwingEdge_App.jsx", import.meta.url);
 const CONSENT = new URL("../src/lib/consent.js", import.meta.url);
+const MAIN = new URL("../src/main.jsx", import.meta.url);
 const app = readFileSync(APP, "utf8");
 const consentSrc = readFileSync(CONSENT, "utf8");
+const mainSrc = readFileSync(MAIN, "utf8");
 
 let pass = 0;
 const failures = [];
@@ -191,6 +193,66 @@ const trackAt = submit.indexOf("trackFirstTradeSaved()");
 ok(14, "first_trade_saved fires only after the write is verified",
   awaitAt !== -1 && trackAt > awaitAt,
   trackAt === -1 ? "no call in handleSubmit" : trackAt < awaitAt ? "fires before the await — counts rolled-back trades" : "");
+
+// ── 15-17: THE SECOND CHANNEL ──────────────────────────────────────────────
+//
+// WHY THESE EXIST, AND WHY 1-14 COULD NOT HAVE CAUGHT IT.
+// Assertions 1-14 guard `gtag` and nothing else — assertion 12 is literally
+// /(?<!window\.)\bgtag\s*\(/. That is structural blindness, not an oversight:
+// `@vercel/analytics` never touches gtag, so a full green run said nothing
+// about it. INCIDENTS #12 pinned `page_location` for GA4 and closed with
+// "⛔ Still open: no automated check asserts that nothing resembling a token
+// reaches an outbound analytics call". This is that check, 21 days later, for
+// the channel the first fix did not reach.
+//
+// WHAT LEAKED, MEASURED — not quoted from the backlog row:
+// the script Vercel actually serves builds its payload as `{ o: location.href }`
+// (docs/audits/AUDIT-B184-vercel-analytics-2026-08-27.md §2). Supabase runs the
+// implicit flow (src/supabaseClient.js:13), so an OAuth return lands on
+// `/#access_token=…` before the client strips it. Measured in a real browser:
+// o = 115 chars WITH the fragment; with the pin, 28 chars without it.
+//
+// ⛔ THE HONEST LIMIT, same as 8-14: these are STATIC. They prove the pin is
+// WRITTEN, not that it RUNS. What proves it runs is the isolated harness in
+// §3/§4 of that audit — a real browser, because the served script aborts on
+// `navigator.webdriver`, so headless automation measures "no leak" and lies.
+//
+// ⛔ AND THE PIN IS AN ALLOWLIST, NOT A FILTER. Stripping `access_token` by name
+// would be a blacklist, and the next provider renames the parameter. The URL is
+// REBUILT from origin + a path that must already be in ROUTES.
+
+const injectCalls = [...mainSrc.matchAll(/\binject\s*\(([\s\S]{0,600}?)\)\s*;/g)];
+const injectArgs = injectCalls.length ? injectCalls[0][1] : "";
+
+// 15. The call itself. `inject()` bare is the leaking form, and it is what
+//     shipped for 21 days while every one of these assertions was green.
+ok(15, "inject() is never called without a beforeSend",
+  injectCalls.length === 1 && /beforeSend\s*:/.test(injectArgs),
+  injectCalls.length !== 1
+    ? `${injectCalls.length} inject() calls found`
+    : `args: ${injectArgs.replace(/\s+/g, " ").trim().slice(0, 90) || "(none)"}`);
+
+// 16. The SHAPE of the pin. Built from origin + an allowlisted path — the same
+//     construction as consent.js trackPageView, via the same ROUTES set, so a
+//     route added next month cannot widen either channel independently. And it
+//     must not reach for href/search/hash at all: a pin that reads the full URL
+//     and then edits it is one refactor away from being a filter again.
+const buildsFromParts = /location\.origin/.test(injectArgs)
+  && /location\.pathname/.test(injectArgs)
+  && /analyticsPath\s*\(/.test(injectArgs);
+const reachesForUrl = /\.href\b|\.search\b|\.hash\b|event\.url\b/.test(injectArgs);
+ok(16, "the pin REBUILDS the url from origin + an allowlisted path",
+  buildsFromParts && !reachesForUrl,
+  !buildsFromParts ? "does not use location.origin + analyticsPath(location.pathname)"
+    : "reads href/search/hash — that is a filter, not an allowlist");
+
+// 17. No third door. `window.va` is a global exactly like `gtag`, and `track()`
+//     from the same package reaches it without passing through inject()'s
+//     beforeSend at all. One file may speak to this channel.
+const strayVa = /\bwindow\.va\s*\(/.test(app) || /@vercel\/analytics/.test(app)
+  || /@vercel\/analytics/.test(consentSrc);
+ok(17, "only src/main.jsx speaks to the Vercel channel", !strayVa,
+  "a second call site bypasses the beforeSend pin entirely");
 
 console.log(`\n── ${pass}/${pass + failures.length} passed ──`);
 if (failures.length) {

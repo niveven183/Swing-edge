@@ -9,10 +9,31 @@ import { TermsPage, PrivacyPage } from "./components/LegalPages.jsx";
 import { ToastProvider, ConfirmProvider } from "./components/ToastProvider.jsx";
 import { ThemeProvider } from "./contexts/ThemeContext.jsx";
 import ConsentBanner from "./components/ConsentBanner.jsx";
-import { trackPageView } from "./lib/consent.js";
+import { trackPageView, analyticsPath } from "./lib/consent.js";
 import { inject } from "@vercel/analytics";
 
-inject();
+// ⛔ NEVER call inject() bare. The script Vercel serves builds its payload as
+// `{ o: location.href }` — fragment included — and supabase-js runs the implicit
+// flow (src/supabaseClient.js:13), so every OAuth return lands on
+// `/#access_token=…&refresh_token=…` before the client strips the hash. Bare
+// inject() therefore ships a live session token to a third party on those loads.
+//
+// This is INCIDENTS #12 in the second channel: that fix pinned `page_location`
+// for gtag and left this one open, because @vercel/analytics never touches gtag
+// and the contract test guarded gtag only. Measured in a real browser against
+// the bytes production actually serves: o was 115 chars WITH the fragment, and
+// 28 chars without it once pinned — the pageview still counts either way.
+// Full measurement: docs/audits/AUDIT-B184-vercel-analytics-2026-08-27.md
+//
+// The url is REBUILT from origin + an allowlisted path. It is deliberately not
+// a filter: nothing here looks for "access_token", because a filter only knows
+// the parameter names someone already thought of. Pinned by test:analytics 15-16.
+inject({
+  beforeSend: (event) => ({
+    ...event,
+    url: window.location.origin + analyticsPath(window.location.pathname),
+  }),
+});
 
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN,
