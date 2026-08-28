@@ -67,6 +67,17 @@ function makeMockClient(initialRows = {}, { failMode = false } = {}) {
   return { client: { from }, calls, rows };
 }
 
+// ── W-CAP · B-268/B-269 — the three-state load contract ────────────────────
+// { status: "ok" | "empty" | "failed", settings }
+//   ok     — a row was read.
+//   empty  — maybeSingle returned {data:null, error:null} ⇒ AUTHORITATIVE, no
+//            row exists. A brand-new user MUST still be able to write his first
+//            row, so `empty` stays writable. A two-state boolean would regress
+//            exactly that user.
+//   failed — non-empty error / throw / no client. Writes stay blocked.
+const statusOf = (r) => (r && typeof r === "object" ? r.status : undefined);
+const settingsOf = (r) => (r && typeof r === "object" && "settings" in r ? r.settings : r);
+
 // ── Tests ────────────────────────────────────────────────────────────────
 console.log("test:settings — userSettings module vs mock client (no real DB)\n");
 
@@ -97,11 +108,13 @@ console.log("test:settings — userSettings module vs mock client (no real DB)\n
     threw = true;
   }
   check("did not throw", threw === false);
-  check("returned mirror value", res?.lang === "he");
+  // The fact asserted is unchanged — the mirror comes back and nothing throws.
+  // Only the SHAPE moved, which is the point of the three-state contract.
+  check("returned mirror value", settingsOf(res)?.lang === "he");
 
   global.localStorage = makeLocalStorage(); // empty
   const empty = await loadSettings("u2b", null);
-  check("empty mirror -> {}", empty && Object.keys(empty).length === 0);
+  check("empty mirror -> {}", settingsOf(empty) && Object.keys(settingsOf(empty)).length === 0);
 }
 
 // 3) migrate runs once — second call sees the row and skips; _migrated is a
@@ -139,17 +152,6 @@ console.log("test:settings — userSettings module vs mock client (no real DB)\n
   const s = rows.get("u4") || {};
   check("merged payload has a+b+c", s.a === 1 && s.b === 2 && s.c === 3);
 }
-
-// ── W-CAP · B-268/B-269 — the three-state load contract ────────────────────
-// { status: "ok" | "empty" | "failed", settings }
-//   ok     — a row was read.
-//   empty  — maybeSingle returned {data:null, error:null} ⇒ AUTHORITATIVE, no
-//            row exists. A brand-new user MUST still be able to write his first
-//            row, so `empty` stays writable. A two-state boolean would regress
-//            exactly that user.
-//   failed — non-empty error / throw / no client. Writes stay blocked.
-const statusOf = (r) => (r && typeof r === "object" ? r.status : undefined);
-const settingsOf = (r) => (r && typeof r === "object" && "settings" in r ? r.settings : r);
 
 // 5) a failed read must SAY it failed — today it is indistinguishable from "no row".
 {

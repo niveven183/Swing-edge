@@ -58,6 +58,15 @@ function writeMirror(blob) {
 const cache = new Map(); // userId -> merged settings object
 const pending = new Map(); // userId -> { timer, client }
 
+// ⚠️ B-268 / P7 — a NON-EMPTY cache is NOT "we have this user's row". loadSettings
+// used to cache the localStorage mirror on a FAILED read too, so `cache.has(id)`
+// answers "did we put something there", never "is it authoritative". This set
+// answers the only question a write may be conditioned on: do we hold a blob we
+// are entitled to send? It is granted by an authoritative read (a row, or an
+// authoritative "no row"), by a successful migration, or by an explicit patch
+// from a caller that passed its own hydration gate — and REVOKED by a failed read.
+const writable = new Set(); // userId -> may be upserted
+
 function isPlainObject(v) {
   return v != null && typeof v === "object" && !Array.isArray(v);
 }
@@ -97,7 +106,21 @@ async function upsertBlob(userId, blob, client) {
 // ── Public API ─────────────────────────────────────────────────────────────
 
 // Supabase first; on any error / no client / no network → localStorage mirror.
-// Never throws. Returns a plain object (possibly empty).
+// Never throws. Returns { status, settings }:
+//
+//   ok     — a row was read. settings = the stored blob.
+//   empty  — maybeSingle resolved {data:null, error:null}. That is AUTHORITATIVE:
+//            there is no row. A brand-new user must still be able to write his
+//            first one, so `empty` stays writable. Collapsing empty into failed
+//            would regress exactly that user.
+//   failed — non-empty error / thrown / no client / no userId. The mirror is
+//            still returned FOR DISPLAY, but the cache is not seeded and the
+//            user is revoked, so nothing can be written back over the real row.
+//
+// ⚠️ B-269: `if (!error && data)` used to send a FAILED read down the same path
+// as "no row" — the caller could not tell them apart, marked hydration done, and
+// DEFAULT_CAPITAL was then persisted over the user's real capital (B-268).
+// ⛔ The contract is unchanged in one respect: this never throws.
 export async function loadSettings(userId, client = supabase) {
   if (client && userId) {
     try {
@@ -106,18 +129,32 @@ export async function loadSettings(userId, client = supabase) {
         .select("settings")
         .eq("user_id", userId)
         .maybeSingle();
-      if (!error && data && data.settings) {
+      if (error) return loadFailed(userId, error);
+      if (data && data.settings) {
         cache.set(userId, data.settings);
+        writable.add(userId);
         writeMirror(data.settings);
-        return data.settings;
+        return { status: "ok", settings: data.settings };
       }
-    } catch {
-      // fall through to mirror
+      // Authoritative "no row" (or a row with a null blob): writable.
+      const mirror = readMirror();
+      cache.set(userId, mirror);
+      writable.add(userId);
+      return { status: "empty", settings: mirror };
+    } catch (e) {
+      return loadFailed(userId, e);
     }
   }
-  const mirror = readMirror();
-  cache.set(userId, mirror);
-  return mirror;
+  return loadFailed(userId, "no client or no userId");
+}
+
+// Failed read: report it (same shape as upsertBlob:90 — ⛔ no silent failure),
+// hand back the mirror for DISPLAY, and ⛔ do NOT seed the cache — :119 seeding
+// the mirror here is what flushSettings later uploaded over the real row.
+function loadFailed(userId, err) {
+  console.error("userSettings: load rejected", err?.message || err);
+  if (userId) writable.delete(userId);
+  return { status: "failed", settings: readMirror() };
 }
 
 // Merge `partial` into the cached blob (merge, NOT overwrite), write the mirror
@@ -125,12 +162,16 @@ export async function loadSettings(userId, client = supabase) {
 export function saveSettings(userId, partial, client = supabase) {
   const merged = mergeSettings(cache.get(userId) || {}, partial || {});
   cache.set(userId, merged);
+  // An explicit patch from a caller that passed its own hydration gate. The
+  // mirror is written either way — a blocked DB write never costs local data.
+  writable.add(userId);
   writeMirror(merged);
 
   const existing = pending.get(userId);
   if (existing?.timer) clearTimeout(existing.timer);
   const timer = setTimeout(() => {
     pending.delete(userId);
+    if (!writable.has(userId)) return;
     upsertBlob(userId, cache.get(userId) || {}, client);
   }, DEBOUNCE_MS);
   if (typeof timer.unref === "function") timer.unref();
@@ -138,10 +179,17 @@ export function saveSettings(userId, partial, client = supabase) {
 }
 
 // Cancel any pending debounce and upsert immediately (M2 unmount / tests).
+// ⚠️ P7 — the third clobber path, found while writing assertion 7 and ⛔ absent
+// from the 28.08 audit: this used to upsert UNCONDITIONALLY. A failed read seeded
+// the cache with the mirror (or with `{}`), and closing the tab then wrote that
+// over the user's real row. The gate asks whether we hold an authoritative blob,
+// ⛔ not whether the cache is non-empty — the cache was non-empty in exactly the
+// failure case.
 export async function flushSettings(userId, client = supabase) {
   const existing = pending.get(userId);
   if (existing?.timer) clearTimeout(existing.timer);
   pending.delete(userId);
+  if (!writable.has(userId)) return;
   await upsertBlob(userId, cache.get(userId) || {}, existing?.client || client);
 }
 
@@ -157,7 +205,13 @@ export async function migrateFromLocalStorage(userId, client = supabase) {
       .select("user_id")
       .eq("user_id", userId)
       .maybeSingle();
-    if (!error && data) return { migrated: false, reason: "exists" };
+    // ⚠️ B-268 / 1a — the cleanest clobber path in the module, and one line.
+    // supabase-js RETURNS the error; `!error && data` sent an RLS denial straight
+    // through, and the function then built a blob from localStorage and let
+    // upsertBlob OVERWRITE an existing row. The catch below only ever saw
+    // network-level throws. ⛔ A check we could not complete is ⛔ not "no row".
+    if (error) return { migrated: false, reason: "check-failed" };
+    if (data) return { migrated: false, reason: "exists" };
   } catch {
     return { migrated: false, reason: "check-failed" };
   }
@@ -187,6 +241,7 @@ export async function migrateFromLocalStorage(userId, client = supabase) {
 
   blob._migrated = true;
   cache.set(userId, blob);
+  writable.add(userId); // the existence check completed and said "no row"
   writeMirror(blob);
   await upsertBlob(userId, blob, client);
   return { migrated: true };

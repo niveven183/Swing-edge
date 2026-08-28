@@ -762,3 +762,63 @@ Every production incident gets one short entry: what broke, root cause, fix, pre
   site exists today), so it was mutant-tested instead — adding an `@vercel/analytics` import to
   `consent.js` turned it red, and reverting turned it green.
 
+
+---
+
+## #19 — 2026-08-28 — A read that failed said "this user has no settings", and the default capital was written over the real one
+
+- **Symptom — the only one there was:** the `hydration-default` sentinel went red. The QA
+  account's capital moved `10,000 → 2,500` inside `26.08 09:59:41Z…16:05:27Z`, verified from
+  `browser-findings-auth.json` artifacts — **green on 14 healthy runs first**, so the gate was
+  right and the product was wrong. ⚠️ No user reported anything, because from the user's side
+  nothing looks broken: the number on screen is simply a different number.
+- **Root cause — `2,500` is `DEFAULT_CAPITAL`, and it reached the database.** supabase-js
+  **returns** errors, it does not throw them. Three sites read `{ data, error }` and treated a
+  non-empty `error` as "no row":
+  - `userSettings.js:109` — `if (!error && data && data.settings)`; a failed read fell through
+    to the localStorage mirror, **seeded the module cache with it**, and returned it
+    indistinguishable from a successful empty read.
+  - `SwingEdge_App.jsx:1724` — `if (!s) { hydratedRef.current = true; … }`. This is the false
+    authority: hydration failed, and the gate that exists to protect the row was opened anyway.
+    The persist effect then upserted the default over the real value.
+  - `userSettings.js:160` — `migrateFromLocalStorage` had the same `!error && data` shape, so an
+    errored existence check built a blob from localStorage and **upserted it over an existing
+    row**. A second, independent clobber path, ⛔ absent from the diagnosis.
+- **⚠️ A third path was found while writing the test, ⛔ not while planning:** `flushSettings:145`
+  called `upsertBlob` **unconditionally**. With the cache already poisoned by the failed read,
+  closing the tab wrote the mirror — or `{}` — over the row. The assertion "a failed read must
+  not poison the cache" could not go green without it, which is how it surfaced. **The planned
+  fix would have shipped with this hole still open.**
+- **Exposure, measured (⛔ not estimated):** `39/39` rows in `user_settings`; `4/39` carry
+  `capital = 2500`; `2/4` bear the clobber signature (`updated_at` on the morning of 27.08 **and**
+  an onboarding declaration that differs); `2/4` are pre-incident (20.07 / 24.07, zero trades)
+  and innocent. Write traffic: **3 writes / 24h**, ⛔ not hourly. `M-009`.
+- **⛔ No automatic restore, and ⛔ no `UPDATE`.** `onboarding.profile.defaults.capital` is what
+  the user declared at **sign-up**, ⛔ not his capital today — two rows diverge legitimately
+  (`4,192.94` vs a declared `49,000` · `59,999` vs `10,000`), and the QA account declared `1,700`
+  while its true capital is `10,000`. Affected users get a **banner**, ⛔ not a write. The one
+  exception is the QA account, whose true value is known independently from the sentinel, and it
+  is a hand-run `.sql` with the uid left blank (§12).
+- **Fix (this commit):** `loadSettings` returns `{ status: "ok" | "empty" | "failed", settings }`.
+  ⚠️ A boolean would have been wrong — `empty` (`{data:null, error:null}`) is **authoritative**
+  and must stay writable, or a brand-new user can never create his first row. `failed` reports to
+  the console, returns the mirror **for display only**, and ⛔ does not seed the cache. `migrate`
+  stops on `error`. `flushSettings` writes only when the module holds an **authoritative** blob —
+  ⛔ the question is not "is the cache non-empty", because the cache was non-empty in exactly the
+  failure case.
+- **Lesson:** **an unreachable database and an empty database are different facts, and every guard
+  here collapsed them into one.** `hydratedRef` was not missing — it was already there, already
+  gating the write, and it was *told* that hydration had succeeded. A gate that trusts a caller's
+  summary of a failure it never saw is not a gate. This is the `INCIDENTS#15` class in a third
+  file: **supabase-js returns errors, and `!error && data` is where they go to die.**
+- **Prevention:** `scripts/userSettings-test.mjs` — the mock could not previously express failure
+  (`maybeSingle` always returned `error: null`), so the entire failure class was structurally
+  untestable and the suite was green throughout. `failMode` returns `{data:null, error}`, the
+  shape supabase-js actually delivers. Blocks 5–8 (8 assertions) were **observed red against the
+  unfixed tree with the output pasted** before the fix landed; block 9 asserts the healthy path
+  and stayed green on both sides. 🔴 ⚠️ **And `verify` proves the module contract only** —
+  `SwingEdge_App.jsx` has ⛔ no harness, so the wiring, the early return and the banners are
+  ⛔ **not** proven by any link in the chain. `build` proves compilation and nothing else.
+  ⏳ **The eye verification — DevTools, the `user_settings` request blocked, confirming ⛔ no
+  `upsert` leaves the tab — is pending and is this wave's closing condition.** This entry is
+  written with the fix, per §10; it is ⛔ **not** a claim that the wiring has been observed.

@@ -1214,6 +1214,12 @@ export default function SwingEdge() {
   // hydratedRef gates the write; hydrationDone (state) re-triggers the betaWelcome decision.
   const hydratedRef = useRef(false);
   const [hydrationDone, setHydrationDone] = useState(false);
+  // B-268: a FAILED read is not "no row". It leaves hydratedRef false — every DB
+  // write stays blocked for the session — and feeds the banner below.
+  const [hydrationFailed, setHydrationFailed] = useState(false);
+  // B-268 banner: the row we read carries exactly DEFAULT_CAPITAL, which is what a
+  // clobber looks like. ⛔ Read-only — dismissal is localStorage, ⛔ never a DB write.
+  const [capitalMaybeClobbered, setCapitalMaybeClobbered] = useState(false);
 
   // Toast + Confirm (UX infrastructure)
   const toast = useToast();
@@ -1718,10 +1724,25 @@ export default function SwingEdge() {
     const hadPlaybook = had("swingEdgePlaybook");
 
     const hydrate = async () => {
-      await migrateFromLocalStorage(authUser.id); // DB row wins if it already exists
-      const s = await loadSettings(authUser.id);
+      // B-268: a check we could not complete means the DB is unreachable — ⛔ not
+      // "this user has no row". Marking hydration done here is what let the default
+      // capital be written back over the real one.
+      const m = await migrateFromLocalStorage(authUser.id); // DB row wins if it already exists
       if (cancelled) return;
-      if (!s) { hydratedRef.current = true; setHydrationDone(true); return; }
+      if (m.reason === "check-failed") {
+        console.error("[hydrate] settings check failed — writes stay blocked for this session");
+        setHydrationFailed(true);
+        return; // ⛔ hydratedRef stays false
+      }
+      const { status, settings: s } = await loadSettings(authUser.id);
+      if (cancelled) return;
+      if (status === "failed") {
+        console.error("[hydrate] settings read failed — writes stay blocked for this session");
+        setHydrationFailed(true);
+        return; // ⛔ hydratedRef stays false
+      }
+      // status === "empty" is AUTHORITATIVE (no row): skip reconciliation, but do
+      // mark hydrated — a brand-new user must be able to write his first row.
 
       if (typeof s.capital === "number" && s.capital > 0) {
         setCapital(s.capital);
@@ -1775,6 +1796,18 @@ export default function SwingEdge() {
       }
       // welcomeSeen: cross-device one-time flag for the WelcomeAnnouncement modal.
       welcomeSeenRef.current = s.welcomeSeen === true;
+
+      // B-268 — the stored capital is EXACTLY the system default. That is the
+      // signature of the clobber. ⚠️ We ⛔ cannot restore it: the onboarding number
+      // is what the user declared at SIGN-UP, ⛔ not his capital today (measured
+      // 28.08 — two accounts legitimately diverge, and the QA account declared
+      // 1,700 while its real capital is 10,000). So the user is told, ⛔ not
+      // "corrected". Dismissal is per-user localStorage — ⛔ zero DB writes (B-271).
+      if (status === "ok" && s.capital === DEFAULT_CAPITAL) {
+        let dismissed = false;
+        try { dismissed = localStorage.getItem(`swingEdgeCapitalConfirmed:${authUser.id}`) === "1"; } catch {}
+        if (!dismissed) setCapitalMaybeClobbered(true);
+      }
 
       hydratedRef.current = true;
       setHydrationDone(true);
@@ -3965,6 +3998,51 @@ export default function SwingEdge() {
 
       {/* ── iOS INSTALL BANNER ── */}
       <IOSInstallBanner />
+
+      {/* ── B-268 · SETTINGS READ FAILED — writes are blocked, and the user is told ──
+          ⛔ Not a toast: a toast that scrolls away turns a blocked session into a
+          silent one, and silence is the bug we are fixing. */}
+      {hydrationFailed && (
+        <div role="alert" className="mx-4 mt-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm" style={{ color: "#fcd34d" }}>
+          {isRTL
+            ? "⚠️ לא הצלחנו לקרוא את ההגדרות שלך מהשרת. אנחנו מציגים את הערכים השמורים במכשיר, ושינויים ⛔ לא יישמרו לחשבון עד לרענון מוצלח — כדי שלא נדרוס את הנתונים האמיתיים שלך."
+            : "⚠️ We couldn't read your settings from the server. Showing the values stored on this device; changes will NOT be saved to your account until a successful reload — so we don't overwrite your real data."}
+        </div>
+      )}
+
+      {/* ── B-268 · capital equals the system default — possible clobber ──
+          ⛔ Read-only. ⛔ We do not show the onboarding number as "your real capital":
+          it is what was declared at sign-up, ⛔ not the capital today. */}
+      {capitalMaybeClobbered && (
+        <div role="alert" className="mx-4 mt-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm flex flex-wrap items-center gap-3" style={{ color: "#fcd34d" }}>
+          <span className="flex-1 min-w-[12rem]">
+            {isRTL
+              ? `⚠️ ההון שלך רשום כ-${fmt$0(DEFAULT_CAPITAL)} — ברירת המחדל של המערכת. ייתכן שערך שהזנת נדרס בתקלה. בדוק ותקן בהגדרות.`
+              : `⚠️ Your capital is recorded as ${fmt$0(DEFAULT_CAPITAL)} — the system default. A value you entered may have been overwritten by a bug. Please check and correct it in Settings.`}
+          </span>
+          <button
+            type="button"
+            onClick={() => { setTab("settings"); setCapitalMaybeClobbered(false); }}
+            className="px-3 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 font-semibold"
+            style={{ color: "#fde68a" }}
+          >
+            {isRTL ? "לשדה ההון" : "Go to capital"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              // ⛔ localStorage ONLY — zero DB writes (B-271: the banner reappears on
+              // another device, and that price is accepted knowingly).
+              try { localStorage.setItem(`swingEdgeCapitalConfirmed:${authUser?.id}`, "1"); } catch {}
+              setCapitalMaybeClobbered(false);
+            }}
+            className="px-3 py-1 rounded-lg border border-amber-500/30"
+            style={{ color: "#fcd34d" }}
+          >
+            {isRTL ? "ההון שלי נכון" : "My capital is correct"}
+          </button>
+        </div>
+      )}
 
       {/* ── PRICE ALERT NOTIFICATION ── */}
       {alertNotification && (
