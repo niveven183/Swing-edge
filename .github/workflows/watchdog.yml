@@ -84,8 +84,12 @@ jobs:
               n_problem=$((n_problem+1))
               continue
             fi
-            age_h=$(( (now_epoch - upd_epoch) / 3600 ))
-            if [ "$age_h" -gt "$max_h" ]; then
+            # ⚠️ B-277 — ההשוואה היא **בשניות**. `$(( ))` קוטמת כלפי אפס, ולכן השוואת
+            # שעות שלמות עם `-gt` הזיזה **כל** סף בטבלה בשעה בדיוק: `3` התנהג כ-`4`.
+            # `age_h` נשאר מחושב **לתצוגה בלבד** — מחרוזת ההודעה ⛔ אינה משתנה.
+            age_s=$(( now_epoch - upd_epoch ))
+            age_h=$(( age_s / 3600 ))
+            if [ "$age_s" -gt "$(( max_h * 3600 ))" ]; then
               stale_lines="${stale_lines}\n🟠 $wf — ריצה מוצלחת אחרונה לפני ${age_h}ש' (סף: ${max_h}ש', $updated)"
               n_problem=$((n_problem+1))
             fi

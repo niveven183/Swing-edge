@@ -253,8 +253,10 @@ jobs:
               color=$RED
               line="🔴 בדיקת ה-Watchdog עצמה נכשלה: timestamp לא תקין ($updated)"
             else
-              age_h=$(( ( $(date -u +%s) - upd_epoch ) / 3600 ))
-              if [ "$age_h" -gt "$MAX_H" ]; then
+              # ⚠️ B-277 — אתר **שני** של אותו באג. השוואה בשניות; `age_h` לתצוגה בלבד.
+              age_s=$(( $(date -u +%s) - upd_epoch ))
+              age_h=$(( age_s / 3600 ))
+              if [ "$age_s" -gt "$(( MAX_H * 3600 ))" ]; then
                 color=$RED
                 line="🐕 Watchdog לא רץ בהצלחה מאז $updated (לפני ${age_h}ש', סף ${MAX_H}ש') — שומר הצי עצמו שקט"
               else

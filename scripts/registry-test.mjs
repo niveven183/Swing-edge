@@ -296,11 +296,18 @@ const backlogIds = new Set(backlog.map((d) => d.id));
 // 8.1 — שורש הוא הכללה. שורש עם חבר יחיד אינו מנגנון, הוא פריט בתחפושת.
 const thinRoots = roots.filter((r) => r.members.length < 2);
 const ghostMembers = roots.flatMap((r) => r.members.filter((b) => !backlogIds.has(b)).map((b) => `${r.id}→${b}`));
-check("8.1", `${roots.length} שורשים · ${roots.reduce((a, r) => a + r.members.length, 0)} שיוכים`,
+// ⚠️ `B-283` — המספר המודפס הוא **שיוכים קיימים**, ⛔ לא ספירת תגים. `members.length`
+// הגולמי מנפח ברפאים (נמדד `158` מול `157` אמיתיים ב-02.09), ו-§8.6 משווה את הפרוזה
+// **למספר הזה** ⇒ מזהה-רפאים היה מרים את המכנה של §8.6 בשקט. הרפאים ⛔ אינם נעלמים —
+// הם נמנים בהודעת הכשל בנפרד, ו-§8.1 אדומה עליהם ממילא.
+// ⚠️ **ומדידה 02.09 הפריכה חצי מ-`B-283`:** «מדולג בשקט» **שגוי** — §8.1 הייתה אדומה
+// ונקבה בשם (`R-6→B-282`). מה שנשאר נכון הוא **ספירת תגים במקום שיוכים**, וזה מתוקן כאן.
+const realAssoc = roots.reduce((a, r) => a + r.members.filter((b) => backlogIds.has(b)).length, 0);
+check("8.1", `${roots.length} שורשים · ${realAssoc} שיוכים`,
   roots.length >= 6 && thinRoots.length === 0 && ghostMembers.length === 0,
   [roots.length < 6 ? `רק ${roots.length} שורשים — נמדדו 6 ב-13.08` : "",
    thinRoots.map((r) => `${r.id} מפנה ל-${r.members.length} פריטים — שורש דורש ≥2`).join("\n      "),
-   ghostMembers.length ? `שיוך לפריט שאינו מוגדר: ${ghostMembers.join(" · ")}` : ""].filter(Boolean).join("\n      "));
+   ghostMembers.length ? `${ghostMembers.length} שיוכים לפריט שאינו מוגדר: ${ghostMembers.join(" · ")}` : ""].filter(Boolean).join("\n      "));
 
 // 8.2 — כל תג ‹R-n› בגוף הטבלאות מפנה לשורש שקיים.
 const rootIds = new Set(roots.map((r) => r.id));
@@ -315,7 +322,12 @@ check("8.2", `${rootIds.size} שורשים מוגדרים · כל תג ‹R-n›
 // 8.3 — ⚠️ דו-כיווניות. חבר ברשימת השורש **חייב** לשאת את התג בשורתו שלו,
 // אחרת נוצרים שני עותקים בלי בעלים — שהוא בדיוק `R-6`.
 const tagOf = new Map(backlog.map((d) => [d.id, [...d.cells[1].matchAll(/‹(R-\d)›/g)].map((x) => x[1])]));
-const untagged = roots.flatMap((r) => r.members.filter((b) => backlogIds.has(b) && !(tagOf.get(b) ?? []).includes(r.id)).map((b) => `${b} חבר ב-${r.id} ואינו נושא ‹${r.id}›`));
+// ⚠️ `B-283` — הפילטר `backlogIds.has(b) &&` הוסר. חבר ברשימת שורש ש⛔ אינו קיים
+// כפריט **נשר משני הכיוונים** ⇒ שער ששמו «דו-כיווני» היה **ירוק** עליו (נמדד 02.09).
+// ⛔ **וזה ⛔ אינו מוסיף כיסוי** — §8.1 תופסת את אותו מצב ממילא, ואומרים זאת בגלוי:
+// הערך כאן הוא ש**שמה** של §8.3 יחדל להצהיר על יותר ממה שהיא עושה (`R-4`), ⛔ לא
+// סתימת חור. כיסוי שקורה **במקרה** ע"י שער אחר ⛔ אינו כיסוי של השער הזה.
+const untagged = roots.flatMap((r) => r.members.filter((b) => !(tagOf.get(b) ?? []).includes(r.id)).map((b) => `${b} חבר ב-${r.id} ו${backlogIds.has(b) ? "אינו נושא" : "⛔ אינו קיים כפריט כלל ⇒ אינו יכול לשאת"} ‹${r.id}›`));
 const orphanTags = [...tagOf.entries()].flatMap(([id, ts]) => ts.filter((t) => !roots.find((r) => r.id === t)?.members.includes(id)).map((t) => `${id} נושא ‹${t}› ואינו ברשימת החברים שלו`));
 check("8.3", `שיוך דו-כיווני — רשימת השורש ותגי הפריטים מסכימים`, untagged.length === 0 && orphanTags.length === 0,
   [...untagged, ...orphanTags].join("\n      "));
@@ -349,7 +361,9 @@ const tagged = [...tagOf.values()].filter((t) => t.length > 0).length;
 const PROSE = {
   "סה״כ פריטים":   { re: /\*\*(\d+) הפריטים\*\*/g,                        measured: backlog.length },
   "עם שורש":       { re: /\*\*(\d+)\/(\d+) פריטים נבדלים ממופים\*\*/g,     measured: tagged },
-  "שיוכים":        { re: /\*\*(\d+) שיוכים\*\*/g,                          measured: roots.reduce((a, r) => a + r.members.length, 0) },
+  // ⚠️ `B-283` — משתמש ב-`realAssoc` של §8.1 ⛔ ולא בחישוב שני. שני עותקים של אותה
+  // נוסחה הם `R-6` בתוך השער שאוכף `R-6`. מקור-אמת-אחד (§13).
+  "שיוכים":        { re: /\*\*(\d+) שיוכים\*\*/g,                          measured: realAssoc },
   "בלי שורש":      { re: /\*\*(\d+)\/(\d+) ⛔ בלי שורש\*\*/g,              measured: backlog.length - tagged },
 };
 const proseErrs = [];
