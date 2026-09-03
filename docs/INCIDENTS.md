@@ -822,3 +822,22 @@ Every production incident gets one short entry: what broke, root cause, fix, pre
   ⏳ **The eye verification — DevTools, the `user_settings` request blocked, confirming ⛔ no
   `upsert` leaves the tab — is pending and is this wave's closing condition.** This entry is
   written with the fix, per §10; it is ⛔ **not** a claim that the wiring has been observed.
+- 🆕 **Registry link, added 2026-09-03 — the entry was written 28.08 with ⛔ no identifier in it.**
+  Measured that day: `grep -c '6fd3106\|W-CAP\|B-268'` over this section ⇒ **`0/3`**. The incident
+  was fully described and ⛔ **could not be cited from any registry file**, which is what §14 exists
+  to prevent. The links, measured ⛔ not recalled: **fix commit `6fd3106`** (the only commit in the
+  26.08→HEAD window besides `5255fa8` that touched product code) · **`B-268`** — the backlog item,
+  verified in production on the QA account (written `29.08 11:09:33Z`, capital **held** at `10000`)
+  · **`B-273`** — the JSX/browser layer this fix does ⛔ **not** cover, open and deliberately narrow
+  · **`C-036`** — the eye verification named in the last bullet above, **still open**, which is why
+  the wave has ⛔ no `DONE` row and `D-063` is **reserved and empty** · **`B-286`** — `P7`, the third
+  clobber path described three bullets up, registered 03.09 after measuring it carried ⛔ no id at all.
+- 🆕 **What was built afterwards, and what it does ⛔ not prove.** `test:hydration` (19 assertions,
+  29.08) is the **first and only** harness over `SwingEdge_App.jsx`; before it, ⛔ **zero** of the
+  wiring in that file was covered by any of the 25 `verify` links. ⚠️ **It does ⛔ not close `C-036`:**
+  `5/19` of its assertions are ⚪ invariants that are green in **both** trees and are therefore ⛔ **not**
+  evidence of the fix, and `3/14` more are red against the old tree only because the injected-dependency
+  contract itself changed. ⇒ the banner, both `onClick` handlers, RTL/contrast, React itself and
+  production remain covered by `C-036` **alone**. 🔴 **The tool that measures this file swallowed a
+  positional argument and printed `✅ 19/19` against the wrong tree — `B-279`, open, and it recurred
+  five days later in a second tool (`B-285`).**
