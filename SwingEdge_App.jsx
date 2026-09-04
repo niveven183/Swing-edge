@@ -4578,7 +4578,7 @@ export default function SwingEdge() {
                     // ⚠️ יחס בין שני מחירים באותו מטבע ⇒ חסין-מטבע כמו `rMultiple`.
                     // ⛔ אינו מומר.
                     const livePnlPct = currentPrice && tr.entry
-                      ? (tr.side === "LONG" ? ((currentPrice / tr.entry) - 1) * 100 : ((tr.entry / currentPrice) - 1) * 100)
+                      ? (tr.side === "LONG" ? ((currentPrice / tr.entry) - 1) * 100 : ((tr.entry - currentPrice) / tr.entry) * 100)
                       : null;
                     // 🔴 **אותה** הכרעה שהמצרף בכותרת קורא לה. `currencyOf(tr)`
                     // הוא תווית מהעדפת החשבון ⇒ הדפיס `₪` על מספר דולרי.
