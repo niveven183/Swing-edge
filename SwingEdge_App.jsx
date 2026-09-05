@@ -1639,9 +1639,9 @@ export default function SwingEdge() {
 
   // Watchlist state
   const DEFAULT_WATCHLIST = [
-    ...SCANNER_DATA.map(s => ({ ticker: s.ticker, price: s.price, change: s.change, setup: s.setup, chartSym: `NASDAQ:${s.ticker}` })),
-    { ticker: "BTC", price: null, change: null, setup: "Crypto", chartSym: "BINANCE:BTCUSDT" },
-    { ticker: "ETH", price: null, change: null, setup: "Crypto", chartSym: "BINANCE:ETHUSDT" },
+    ...SCANNER_DATA.map(s => ({ ticker: s.ticker, setup: s.setup, chartSym: `NASDAQ:${s.ticker}` })),
+    { ticker: "BTC", setup: "Crypto", chartSym: "BINANCE:BTCUSDT" },
+    { ticker: "ETH", setup: "Crypto", chartSym: "BINANCE:ETHUSDT" },
   ];
   const [watchlistItems, setWatchlistItems] = useState(() => {
     try {
@@ -1829,7 +1829,7 @@ export default function SwingEdge() {
 
     const patch = {
       capital, riskPct, lang, accountCurrency, capitalCurrency,
-      watchlist: watchlistItems,
+      watchlist: watchlistItems.map(({ ticker, setup, chartSym }) => ({ ticker, setup, chartSym })),
       priceAlerts,
       playbook: playbookSetups,
       tourDone,
@@ -6747,8 +6747,8 @@ export default function SwingEdge() {
                     return a.ticker.localeCompare(b.ticker);
                   }).map(s => {
                     const lp = getLivePrice(s.ticker);
-                    const price = lp?.price ?? s.price;
-                    const changePct = lp?.changePct ?? s.change ?? 0;
+                    const price = lp?.price;
+                    const changePct = lp?.changePct;
                     const meta = getTickerMeta(s.ticker);
                     const sectorColor = meta?.sector === 'ETF' ? 'bg-blue-500/20 text-blue-400' :
                       meta?.sector === 'Crypto' ? 'bg-amber-500/20 text-amber-400' :
@@ -6779,10 +6779,12 @@ export default function SwingEdge() {
                           {price != null ? (
                             <div>
                               <div className="text-[11px] font-mono font-bold text-slate-200">${typeof price === 'number' ? price.toFixed(2) : price}</div>
-                              <div className={`text-[9px] font-mono font-semibold flex items-center justify-end gap-0.5 ${changePct>=0?"text-[var(--v3-accent)]":"text-[var(--v3-loss)]"}`}>
-                                {changePct>=0?<ArrowUpRight size={8}/>:<ArrowDownRight size={8}/>}
-                                {changePct>=0?"+":""}{typeof changePct === 'number' ? changePct.toFixed(2) : changePct}%
-                              </div>
+                              {changePct != null && (
+                                <div className={`text-[9px] font-mono font-semibold flex items-center justify-end gap-0.5 ${changePct>=0?"text-[var(--v3-accent)]":"text-[var(--v3-loss)]"}`}>
+                                  {changePct>=0?<ArrowUpRight size={8}/>:<ArrowDownRight size={8}/>}
+                                  {changePct>=0?"+":""}{typeof changePct === 'number' ? changePct.toFixed(2) : changePct}%
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <div className="text-[10px] text-slate-600 font-mono">{pricesLoading ? <RefreshCw size={8} className="animate-spin" /> : "—"}</div>
