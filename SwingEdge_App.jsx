@@ -97,6 +97,7 @@ import { useTradingStats } from "./src/hooks/useTradingStats.js";
 import { useFxRates, realizedDayKeysOf, makeConvertingCalc, fxPairPlan, accountAmount, livePnlAmount } from "./src/hooks/useFxRates.js";
 import { convert } from "./src/lib/fx.js";
 import { resolveEquityBase } from "./src/lib/equityBase.js";
+import { deriveEquityState, equityFigure } from "./src/lib/equityState.js";
 import { horizonState, horizonLabel } from "./src/lib/tradeHorizon.js";
 import { deriveInstrumentCurrency, matchesCapital, isUnverified, INSTRUMENT_STATE, PAPER_BASE, CURRENCY_SOURCE } from "./src/lib/instrumentCurrency.js";
 import { sizePosition } from "./src/lib/positionSizing.js";
@@ -2563,6 +2564,43 @@ export default function SwingEdge() {
     [equityBase, closedPnL, openPnL]
   );
 
+  // ─── B-295 · ⛔ אין מספר עד שהוא שלם ────────────────────────────────────────
+  //
+  // 🔴 `curEquity` למעלה מסכם **גם** כשאיבר חסר — זה השורש, ⛔ לא באג תצוגה.
+  // המסך הראה `$3,000.00` ואז `$3,045.66` באותן הגדרות: 45.66 של P&L פתוח
+  // שטרם נחת, מוצג כסופי. ההכרעה **מה מותר להציג** יושבת ב-`src/lib/equityState.js`
+  // ⛔ ולא כאן — תנאי הכלוא ב-`.jsx` ⛔ אינו ניתן לייבוא ב-node, והאסרציה עליו
+  // הייתה **מקור** ולא **ערך** (`useFxRates.js:206`).
+  //
+  // ⛔ **הערך ⛔ אינו זז.** `curEquity`·`openPnL`·`dispCcy` נקראים כפי שהם.
+  const equityState = useMemo(
+    () => deriveEquityState({
+      missingCount: openPnL.missingCount,
+      unconvertedCount: openPnL.unconvertedCount,
+      closedUnconvertedCount: closedPnL.unconvertedCount,
+      pricesLoading,
+      pricesLastUpdated,
+      fxStatus,
+    }),
+    [openPnL, closedPnL, pricesLoading, pricesLastUpdated, fxStatus]
+  );
+
+  // מקור אחד לשלושת אתרי ההון — כותרת · כרטיס KPI · פוטר. ⛔ שלוש העתקות
+  // היו נסחפות, וזו בדיוק הסיבה ש-`B-142` חי היום באתר אחד מתוך שלושה.
+  const equityFig = useMemo(
+    () => equityFigure({
+      state: equityState,
+      text: fmtBalance(curEquity, dispCcy),
+      missingCount: openPnL.missingCount,
+      unconvertedCount: openPnL.unconvertedCount,
+      closedUnconvertedCount: closedPnL.unconvertedCount,
+      openCount: openTrades.length,
+      closedCount: closedPnL.total,
+      t,
+    }),
+    [equityState, curEquity, dispCcy, openPnL, closedPnL, openTrades.length, t]
+  );
+
   // The equity card's trend must be the return on the equity the card is
   // showing (FIN-013). It used to read `totalPnL / capital`, which is the
   // closed-only return, so with an open position the headline moved and the
@@ -4178,7 +4216,9 @@ export default function SwingEdge() {
           </div>
           <div className="text-end hidden sm:block">
             <div className="text-xs text-slate-500">{t.account}</div>
-            <div className="text-sm font-bold font-mono text-cyan-400">{fmtBalance(curEquity, dispCcy)}</div>
+            <div className="text-sm font-bold font-mono text-cyan-400" title={equityFig.label} aria-label={equityFig.label}>
+              {equityFig.text}{equityFig.mark && <span className="text-amber-400 ms-1">⚠</span>}
+            </div>
           </div>
         </div>
       </header>
@@ -4406,7 +4446,7 @@ export default function SwingEdge() {
             {/* C7 — the missing-rate marker. Silence and success look the
                 same on screen, so an unavailable rate has to say so where
                 the numbers are, not only in Settings. */}
-            {fxStatus === "unavailable" && (
+            {equityState === "no_fx" && (
               <p className="mb-4 flex items-start gap-1.5 text-[11px] leading-relaxed text-amber-400/90">
                 <AlertTriangle size={12} className="mt-0.5 shrink-0" />
                 <span>{t.fxUnavailable}</span>
@@ -4414,7 +4454,7 @@ export default function SwingEdge() {
             )}
             {/* KPI Row */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              <StatCard anchor="equity" label={t.accountEquity}  value={fmtBalance(curEquity, dispCcy)} sub={`${t.startedAt} ${dispSym}${Math.round(equityBase).toLocaleString()}`} trend={curEquityReturnPct} icon={DollarSign} accent="cyan"
+              <StatCard anchor="equity" label={t.accountEquity}  value={equityFig.text} sub={`${t.startedAt} ${dispSym}${Math.round(equityBase).toLocaleString()}`} trend={curEquityReturnPct} icon={DollarSign} accent="cyan"
                 info={lang === "he"
                   ? `הון = בסיס ההון שהגדרת (${dispSym}${Math.round(equityBase).toLocaleString()}) בתוספת P&L מצטבר מעסקאות סגורות ופתוחות. הסיכון לכל עסקה מחושב תמיד מבסיס ההון הקבוע — לא מההון הנוכחי.`
                   : `Equity = your capital base (${dispSym}${Math.round(equityBase).toLocaleString()}) plus cumulative P&L from closed & open trades. Per-trade risk is always sized from your fixed capital base — not current equity.`} />
@@ -4432,7 +4472,7 @@ export default function SwingEdge() {
                 שמדווחים על חצי מהבעיה הם גילוי שאי-אפשר לפעול לפיו.
                 ⛔ המספרים נמסרים עם מכנה (§2): "{n} מתוך {m}" — ⛔ לא "{n}",
                 ⛔ לא אחוז, ⛔ ולא 0 (הבאנר פשוט אינו קיים כשאין מה לגלות). */}
-            {(openPnL.missingCount > 0 || openPnL.unconvertedCount > 0 || closedPnL.unconvertedCount > 0) && (
+            {equityState === "partial" && (
               <div className="mt-2 flex items-start gap-2 text-xs font-semibold text-amber-500 rtl:flex-row-reverse">
                 <AlertTriangle size={14} className="mt-0.5 shrink-0" />
                 <div className="flex flex-col gap-0.5">
@@ -8255,7 +8295,7 @@ export default function SwingEdge() {
               </span>
             );
           })()}
-          <span>{t.accountEquity}: {fmtBalance(curEquity, dispCcy)}</span>
+          <span title={equityFig.label} aria-label={equityFig.label}>{t.accountEquity}: {equityFig.text}{equityFig.mark && <span className="text-amber-400 ms-1">⚠</span>}</span>
           <span>{t.riskPerTradeFooter}</span>
         </div>
         <div className="flex items-center gap-4">
