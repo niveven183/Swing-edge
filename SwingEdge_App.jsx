@@ -4618,7 +4618,7 @@ export default function SwingEdge() {
                           <span>Stop <span className="text-[var(--v3-loss)]">{fmtPaperPrice(tr.stop, tr)}</span></span>
                           {/* ✅ נסגר 2026-08-13 (B-119): סכום-בחשבון לא-ממומש מומר
     ב-**spot** דרך `liveDecision`. הסירוב נושא נימוק ב-`title`, ⛔ לא `—` ערום. */}
-                          <span>P&L <span title={livePnl !== null ? spotRefusalText(tr, livePnl) : undefined} className={livePnl !== null ? (livePnl >= 0 ? "text-[var(--v3-accent)] font-bold" : "text-[var(--v3-loss)] font-bold") : "text-slate-600"}>{liveD ? (liveD.ok ? fmt$(Math.round(liveD.value), liveD.currency) : "—") : "..."}</span></span>
+                          <span>P&L <span title={livePnl !== null ? spotRefusalText(tr, livePnl) : undefined} className={livePnl !== null ? (livePnl >= 0 ? "text-[var(--v3-accent)] font-bold" : "text-[var(--v3-loss)] font-bold") : "text-slate-600"}>{liveD ? (liveD.ok ? fmt$(liveD.value, liveD.currency) : "—") : "..."}</span></span>
                         </div>
                         {livePnlPct !== null && (
                           <div className="mt-1.5 h-1 bg-white/5 rounded-full overflow-hidden">
@@ -5266,7 +5266,7 @@ export default function SwingEdge() {
                               : (t.entry - cp) * t.shares;
                             // ✅ נסגר 2026-08-13 (B-119) — **אותה** הכרעה כמו הכותרת.
                             const d = liveDecision(t, lp);
-                            return <span title={spotRefusalText(t, lp)} className={lp >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}>{d.ok ? fmt$(Math.round(d.value), d.currency) : "—"}</span>;
+                            return <span title={spotRefusalText(t, lp)} className={lp >= 0 ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}>{d.ok ? fmt$(d.value, d.currency) : "—"}</span>;
                           })()}
                         </td>
                         <td className="p-3 font-mono text-slate-300">{t.exit ? `${fmtPaperPrice(t.exit, t)}` : "–"}</td>

@@ -262,7 +262,7 @@ export const fmtPrice = (n, currency = "USD") => {
 // בדיוק הניחוש שהמודול הזה קיים כדי למנוע.
 export const fmtPaperPrice = (n, trade) => {
   const v = Number(n);
-  if (!Number.isFinite(v)) return "—";
+  if (n == null || n === "" || !Number.isFinite(v)) return "—";
   const code = paperCurrencyOf(trade);
   const sym = code ? CURRENCY_SYMBOL[code] || "" : "";
   return `${sym}${v.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;

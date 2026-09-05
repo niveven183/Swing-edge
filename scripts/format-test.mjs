@@ -17,7 +17,7 @@
 // Pure Node, no network. Run: `node scripts/format-test.mjs`.
 
 import { readFileSync } from "node:fs";
-import { fmt$, fmt$0, fmtR, formatPct, formatReturnPct, isNegativeValue } from "../src/utils.js";
+import { fmt$, fmt$0, fmtR, formatPct, formatReturnPct, isNegativeValue, fmtPaperPrice } from "../src/utils.js";
 import { TRADING_TOOLTIPS } from "../src/data/tooltips.js";
 
 let failures = 0;
@@ -140,6 +140,35 @@ const LANGS = ["en", "he", "es", "pt", "ar"];
   const app = read("SwingEdge_App.jsx");
   check("SwingEdge_App has no P&L axis building `$${v}` inline",
     !/tickFormatter=\{v\s*=>\s*`\$\$\{v\}`\}/.test(app));
+}
+
+// ── 9 · fmtPaperPrice — null is an admission, 0 is a real price (D+E1, 05.09) ─
+//
+// `Number(null) === 0` while `Number(undefined) === NaN` — the same footgun
+// as fmt$/formatPct, but fmtPaperPrice's old guard (`!Number.isFinite(v)`)
+// only caught the NaN half. A missing stop-loss (`tr.stop === null`) rendered
+// as a confident "$0" instead of admitting there was no stop. `""` (an unfilled
+// form field coerces the same way — `Number("") === 0`) is the same trap and
+// is fixed by the same guard.
+{
+  console.log("\n9 · fmtPaperPrice · a missing price is not a $0 price");
+  const trade = { ticker: "AAPL" };
+  eq("fmtPaperPrice(null) — no stop must not print $0", fmtPaperPrice(null, trade), "—");
+  eq("fmtPaperPrice(undefined)", fmtPaperPrice(undefined, trade), "—");
+  eq("fmtPaperPrice(NaN)", fmtPaperPrice(NaN, trade), "—");
+  eq('fmtPaperPrice("") — same coercion trap as null', fmtPaperPrice("", trade), "—");
+  eq("fmtPaperPrice(0, trade) — a real $0 price is not a missing one", fmtPaperPrice(0, trade), "$0");
+}
+
+// ── 10 · grep guard · the D+E1 sites stay fixed ──────────────────────────────
+{
+  console.log("\n10 · grep guard · P&L keeps its cents, the fix lives in the function");
+  const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
+  const app = read("SwingEdge_App.jsx");
+  check("SwingEdge_App no longer rounds a live P&L value before fmt$ (D)",
+    !/Math\.round\([A-Za-z_$]{1,3}\.value\)/.test(app));
+  check("SwingEdge_App does not add a call-site null-guard around tr.stop (E1 fix lives in fmtPaperPrice, not the call site)",
+    app.includes('{fmtPaperPrice(tr.stop, tr)}'));
 }
 
 // ── SUMMARY ──────────────────────────────────────────────────────────────────
