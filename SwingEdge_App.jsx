@@ -94,10 +94,10 @@ import {
   DNACard, EdgeCard, DecisionCoachPanel, TiltShield, GrowthChart, RegimeIndicator, PatternTags,
 } from "./src/intelligence/ui/IntelligenceUI.jsx";
 import { useTradingStats } from "./src/hooks/useTradingStats.js";
-import { useFxRates, realizedDayKeysOf, makeConvertingCalc, fxPairPlan, accountAmount, livePnlAmount } from "./src/hooks/useFxRates.js";
+import { useFxRates, realizedDayKeysOf, makeConvertingCalc, fxPairPlan, accountAmount, livePnlAmount, riskInCapital } from "./src/hooks/useFxRates.js";
 import { convert } from "./src/lib/fx.js";
 import { resolveEquityBase } from "./src/lib/equityBase.js";
-import { deriveEquityState, equityFigure } from "./src/lib/equityState.js";
+import { deriveEquityState, equityFigure, deriveRiskState, riskFigure } from "./src/lib/equityState.js";
 import { horizonState, horizonLabel } from "./src/lib/tradeHorizon.js";
 import { deriveInstrumentCurrency, matchesCapital, isUnverified, INSTRUMENT_STATE, PAPER_BASE, CURRENCY_SOURCE } from "./src/lib/instrumentCurrency.js";
 import { sizePosition } from "./src/lib/positionSizing.js";
@@ -4746,28 +4746,59 @@ export default function SwingEdge() {
                 // ⚠️ מטבע ה**נייר** הנגזר, ⛔ לא `currencyOf(t)`. התווית השמורה
                 // נכתבה מהעדפת החשבון ולכן השוואתה להון החזירה `true` בהגדרה.
                 const derived = deriveInstrumentCurrency(t);
+                // 🔴 `G2` — `matchesCapital` **נשאר** ומדווח, ⛔ אך אינו מגדר
+                // עוד את החישוב: מטבע שונה מההון ⛔ אינו «סיכון לא-מדיד», הוא
+                // סיכון ש**צריך המרה**. ⛔ אין כאן העתקה — `riskInCapital`
+                // קורא ל-`spotAmount`, אותה הכרעה של כל שאר הכסף במסך.
                 const sameCcy = matchesCapital(derived, capitalCurrency);
-                const hasStop = sameCcy && t.stop != null && t.shares > 0;
-                const riskDollar = hasStop ? Math.abs(t.entry - t.stop) * t.shares : null;
-                const riskPct = hasStop && capital > 0 ? (riskDollar / capital) * 100 : null;
-                const rrRatio = hasStop && t.target ? priceBasedRR(t.entry, t.stop, t.target) : null;
-                return { ...t, derived, sameCcy, hasStop, riskDollar, riskPct, rrRatio };
+                const hasStop = t.stop != null && t.shares > 0;
+                const riskPaper = hasStop ? Math.abs(t.entry - t.stop) * t.shares : null;
+                const conv = riskInCapital(t, riskPaper, capitalCurrency, paperCapTable, paperCapStatus);
+                const riskDollar = conv.value;
+                const riskPct = riskDollar != null && capital > 0 ? (riskDollar / capital) * 100 : null;
+                const rrRatio = riskDollar != null && t.target ? priceBasedRR(t.entry, t.stop, t.target) : null;
+                return { ...t, derived, sameCcy, hasStop, conv, riskDollar, riskPct, rrRatio };
               });
 
               // Two different reasons for the same exclusion. Reporting them under
               // one label would tell a trader "no stop" about a trade that has one.
-              const unverifiedCcyCount = openRisks.filter(t => !t.sameCcy).length;
-              const noStopCount = openRisks.filter(t => t.sameCcy && !t.hasStop).length;
-              const unmeasuredRiskCount = unverifiedCcyCount + noStopCount;
+              //
+              // ⚠️ המונים נגזרים מ-`conv.reason` ⛔ ולא מהגדר שהוסר — אחרת הם
+              // היו מדווחים על אוכלוסייה שכבר אינה זו שנספרת.
+              // ⚠️ `conv.reason` הוא **ערך יחיד** ⇒ שלושת המונים זרים זה לזה
+              // בהגדרה, ו-`unmeasuredRiskCount` הוא בדיוק איחודם.
+              const unverifiedCcyCount = openRisks.filter(
+                t => t.conv.reason === "unverified_instrument" || t.conv.reason === "no_rate").length;
+              const noStopCount = openRisks.filter(t => t.conv.reason === "no_amount").length;
+              const riskLoadingCount = openRisks.filter(t => t.conv.reason === "loading").length;
+              const countedRisks = openRisks.filter(t => t.riskDollar != null);
+              const unmeasuredRiskCount = openRisks.length - countedRisks.length;
               // Of the rows that DO count, how many rest on an assumption rather
               // than a measurement. Declared, not warned about.
               const assumedCount = openRisks.filter(
-                t => t.hasStop && t.derived.state === INSTRUMENT_STATE.ASSUMED).length;
-              const totalRiskDollar = openRisks.reduce((s, t) => s + (t.riskDollar ?? 0), 0);
+                t => t.riskDollar != null && t.derived.state === INSTRUMENT_STATE.ASSUMED).length;
+              // השער שבו הומרה לפחות שורה אחת — להצהרה גלויה לצד המספר.
+              const riskRate = openRisks.find(t => t.conv.reason === "converted")?.conv ?? null;
+              // 🔴 ⛔ אין `?? 0` — האוכלוסייה **מסוננת בשם** ⛔ ולא מנוטרלת
+              // בשקט. עסקה שלא נספרה ⛔ אינה תורמת אפס; היא מוציאה את הסכום
+              // ממצב `complete`, וזה מה ש-`deriveRiskState` מכריע מיד אחרי.
+              const totalRiskDollar = countedRisks.reduce((s, t) => s + t.riskDollar, 0);
               const totalRiskPct = capital > 0 ? (totalRiskDollar / capital) * 100 : 0;
+              const riskState = deriveRiskState({
+                counted: countedRisks.length,
+                total: openRisks.length,
+                loading: riskLoadingCount > 0,
+              });
               const usedPct = Math.min((totalRiskPct / MAX_RISK_PCT) * 100, 100);
               const isOverLimit = totalRiskPct > MAX_RISK_PCT;
               const isWarning = totalRiskPct > MAX_RISK_PCT * 0.7;
+              // ⚠️ חסם תחתון: חריגה **מוכחת** גם על סכום חלקי, בטיחות ⛔ לא.
+              const riskFig = riskFigure({
+                state: riskState,
+                text: `${totalRiskPct.toFixed(2)}%`,
+                verdict: isOverLimit ? "over" : isWarning ? "caution" : "safe",
+                t,
+              });
 
               const meterColor = isOverLimit
                 ? { bar: "bg-[var(--v3-loss)]", text: "text-[var(--v3-loss)]", border: "border-[var(--v3-loss)]/30", bg: "bg-[var(--v3-loss)]/8" }
@@ -4791,9 +4822,13 @@ export default function SwingEdge() {
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">{t.riskDashboard}</span>
                     <div className="flex-1 h-px bg-white/[0.05]" />
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold font-mono ${meterColor.text} ${meterColor.border} ${meterColor.bg}`}>
-                      {isOverLimit ? t.riskOverLimit : isWarning ? t.riskCaution : t.riskSafe}
-                    </span>
+                    {/* 🔴 `riskSafe` ⛔ אינו מוצג על סכום חלקי — `riskFig.verdict`
+                        מוחק אותו, והמונה `N/M` שמתחת הוא מה שנשאר. */}
+                    {riskFig.verdict && (
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold font-mono ${meterColor.text} ${meterColor.border} ${meterColor.bg}`}>
+                        {riskFig.verdict === "over" ? t.riskOverLimit : riskFig.verdict === "caution" ? t.riskCaution : t.riskSafe}
+                      </span>
+                    )}
                   </div>
 
                   {/* KPI cards + meter */}
@@ -4801,8 +4836,11 @@ export default function SwingEdge() {
                     {/* Total open risk */}
                     <div className={`bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border rounded-xl p-4 ${meterColor.border}`}>
                       <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 block mb-1">{t.totalOpenRisk}</span>
-                      <span className={`text-2xl font-bold font-mono ${meterColor.text}`}>{totalRiskPct.toFixed(2)}%</span>
-                      <span className="text-xs text-slate-500 block mt-0.5 font-mono">{dispSym}{toDisp(totalRiskDollar).toFixed(2)}</span>
+                      <span className={`text-2xl font-bold font-mono ${meterColor.text}`}
+                            title={riskFig.label ?? undefined} aria-label={riskFig.label ?? undefined}>{riskFig.text}</span>
+                      <span className="text-xs text-slate-500 block mt-0.5 font-mono">
+                        {riskState === "loading" ? "…" : <>{riskState === "partial" ? "≥ " : null}{dispSym}{toDisp(totalRiskDollar).toFixed(2)}</>}
+                      </span>
                       <span className="text-[10px] text-slate-600 mt-1 block">
                         {openTrades.length - unmeasuredRiskCount}/{openTrades.length} {t.openTradesCount}
                       </span>
@@ -4819,6 +4857,14 @@ export default function SwingEdge() {
                       {assumedCount > 0 && (
                         <span className="text-[10px] text-slate-500 mt-1 block">
                           {plural(t, "ccyAssumedNote", assumedCount)}
+                        </span>
+                      )}
+                      {/* ⚠️ הצהרה גלויה — «לפי שער» בלי שער ותאריך היא מספר
+                          בלי מקור. מפתחות i18n **קיימים** בלבד. */}
+                      {riskRate?.rate != null && (
+                        <span className="text-[10px] text-slate-500 mt-1 block">
+                          {t.fxConvertedAt} <span className="font-mono">{riskRate.rate.toFixed(4)}</span>
+                          {riskRate.rateDate ? <> ({t.fxRateFrom} <span className="font-mono">{riskRate.rateDate}</span>)</> : null}
                         </span>
                       )}
                     </div>

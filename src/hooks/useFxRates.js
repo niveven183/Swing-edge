@@ -175,11 +175,15 @@ const amountAt = (trade, amount, displayCurrency, table, status, dateKey) => {
   // נייר שמטבעו לא אומת ⛔ אינו מומר ואינו מנוחש.
   if (!isAggregatable(derived)) return refuse("unverified_instrument");
   const from = derived.code;
-  if (from === displayCurrency) return { ok: true, reason: "identity", value: amount, currency: displayCurrency };
+  if (from === displayCurrency)
+    return { ok: true, reason: "identity", value: amount, currency: displayCurrency, rate: 1, rateDate: null };
   if (status !== "ready" || !table) return refuse("no_table");
-  const { value, reason } = convert(amount, from, displayCurrency, table, dateKey);
+  const { value, reason, rate, rateDate } = convert(amount, from, displayCurrency, table, dateKey);
   if (value == null) return refuse(reason || "no_rate");
-  return { ok: true, reason: "converted", value, currency: displayCurrency };
+  // ⚠️ `rate`/`rateDate` נמסרים הלאה **תוספתית** — `convert` תמיד החזיר אותם
+  // וכאן הם נזרקו. מסך שמצהיר «מומר לפי שער» בלי לומר איזה ומתי הוא הצהרה
+  // בלי מקור, כלומר המצאה בתחפושת של גילוי.
+  return { ok: true, reason: "converted", value, currency: displayCurrency, rate, rateDate };
 };
 
 /**
@@ -200,6 +204,33 @@ export const accountAmount = (trade, amount, displayCurrency, table, status) =>
  */
 export const spotAmount = (trade, amount, displayCurrency, table, status) =>
   amountAt(trade, amount, displayCurrency, table, status, undefined);
+
+/**
+ * riskInCapital — סיכון העסקה, במטבע ה**הון** (`G2`, 06.09).
+ *
+ * 🔴 **מה שנמדד:** לוח הסיכון גידר הכל ב-`matchesCapital(derived, capitalCurrency)`
+ * — **שוויון קודים**, ⛔ בלי ניסיון המרה ⇒ 2/41 העסקאות הפתוחות בפרודקשן
+ * (משתמש אחד, הון ב-₪) הציגו `—` בארבע העמודות. `matchesCapital` **נשאר
+ * במקומו ו⛔ לא זז**; מה שזז הוא מי שואל אותו.
+ *
+ * ⛔ **⛔ אינו העתקה של `spotAmount` — הוא קורא לו.** התוספת היחידה היא
+ * פירוק `no_table` לשניים: ללוח יש שני מסכים שונים לשני המצבים —
+ * `…` ל«טרם נחת» מול `—` ל«⛔ אין שער», ו-`no_table` הגנרי ⛔ אינו מבדיל.
+ *
+ * ⚠️ **`ASSUMED` מומר** (הכרעת ניב, `DECISIONS` 06.09) — עם הצהרה גלויה של
+ * השער ותאריכו. `CONTRADICTED` נשאר **מסורב**: תווית ונגזרת שסותרות זו את זו
+ * הן שני מקורות, ו⛔ אין הכרעה ביניהם בשקט.
+ *
+ * @param riskPaper הסיכון במטבע ה**נייר** — `|entry−stop| × shares`
+ * @returns `{ ok, reason, value, currency, rate, rateDate }`;
+ *   `reason` ∈ `identity`|`converted`|`unverified_instrument`|`no_amount`|
+ *   `loading`|`no_rate`
+ */
+export const riskInCapital = (trade, riskPaper, capitalCurrency, table, status) => {
+  const r = spotAmount(trade, riskPaper, capitalCurrency, table, status);
+  if (r.reason !== "no_table") return r;
+  return { ...r, reason: status === "loading" ? "loading" : "no_rate" };
+};
 
 /**
  * livePnlAmount — ההכרעה של ה-P&L ה**חי**. מצרף ושורה קוראים לאותה פונקציה.

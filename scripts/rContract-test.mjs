@@ -146,7 +146,15 @@ const mk = (i, setup, entry, stop, exit, shares = 10) => ({
 
   // FIN-012 — the risk card must not compute |entry - stop| without a guard.
   const app = readFileSync(new URL("../SwingEdge_App.jsx", import.meta.url), "utf8");
-  const riskCard = app.slice(app.indexOf("══ RISK DASHBOARD ══"), app.indexOf("══ RISK DASHBOARD ══") + 1200);
+  // ⚠️ **העוגן הוא הביטוי הנשמר, ⛔ לא כותרת המקטע.** גרסה קודמת חתכה 1,200
+  // בתים מכותרת ה-`RISK DASHBOARD`; הוספת שורות הערה מעל החישוב הזיזה את
+  // הגדר ל-1,371 והשער ירה **אדום כוזב** בזמן שהגדר במקומה. חלון שמרחקו
+  // מהנבדק הוא הנחה בלתי-מוצהרת ⇒ עוגנים על הנבדק עצמו.
+  const RISK_EXPR = "Math.abs(t.entry - t.stop)";
+  const nRisk = app.split(RISK_EXPR).length - 1;
+  check("⚙ ביטוי הסיכון מופיע בדיוק פעם אחת (שער-מטא)", nRisk === 1);
+  const at = app.indexOf(RISK_EXPR);
+  const riskCard = app.slice(Math.max(0, at - 600), at + 200);
   check("risk card guards stop == null before sizing risk",
     /stop\s*==\s*null|stop\s*!=\s*null/.test(riskCard));
 }

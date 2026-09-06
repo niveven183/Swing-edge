@@ -108,3 +108,37 @@ export const equityFigure = ({
 
   return { text, mark: false, label: null };
 };
+
+/**
+ * deriveRiskState — אותה הכרעה בדיוק, על לוח הסיכון (`G2`, 06.09).
+ *
+ * 🔴 **`totalRiskDollar` סיכם `riskDollar ?? 0`** ⇒ עסקה שלא נספרה תרמה
+ * **אפס**, והלוח הכריז «בטוח · 0.00%» על משתמש שנושא סיכון אמיתי. `0` שהחליף
+ * `null` הוא `R-2`, וכאן הוא לא רק מספר על מסך — הוא **פסק-דין**.
+ *
+ * ⛔ **⛔ אין ברירות מחדל בחתימה**, מאותו נימוק של `deriveEquityState`.
+ */
+export const deriveRiskState = ({ counted, total, loading }) => {
+  if (loading) return "loading";
+  if (counted < total) return "partial";
+  return "complete";
+};
+
+/**
+ * riskFigure — מה מרונדר בלוח, ומה **⛔ אינו** מרונדר.
+ *
+ * 🔴 **האסימטריה היא כל הפונקציה.** סכום חלקי הוא **חסם תחתון**: הוא יכול
+ * להוכיח חריגה (`over`/`caution` שורדים), ⛔ ולעולם לא בטיחות. `safe` על
+ * סכום שאינו שלם הוא הבטחה שלא נמדדה, ולכן הוא **נמחק** — המונה `N/M`
+ * שכבר מרונדר לצדו הוא מה שנשאר.
+ *
+ * ⚠️ `label` מ-`partialSumWarn` — מפתח i18n **קיים**, ⛔ אין מפתח חדש.
+ *
+ * @returns {{text: string, verdict: string|null, label: string|null}}
+ */
+export const riskFigure = ({ state, text, verdict, t }) => {
+  if (state === "loading") return { text: "…", verdict: null, label: t.loading };
+  if (state === "partial")
+    return { text: `≥ ${text}`, verdict: verdict === "safe" ? null : verdict, label: t.partialSumWarn };
+  return { text, verdict, label: null };
+};

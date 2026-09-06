@@ -1564,6 +1564,107 @@ console.log("\n15 · ההון הסגור — האינווריאנטה של יח�
   }
 }
 
+// ── בלוק 18 · `G2` — סיכון במטבע ההון (06.09) ────────────────────────────────
+//
+// 🔴 **מה שנמדד בפרודקשן:** 2/41 עסקאות פתוחות (משתמש **אחד**) יושבות במטבע
+//    שאינו מטבע ההון, ולוח הסיכון מציג להן `—` בכל ארבע העמודות. הגדר הוא
+//    `matchesCapital(derived, capitalCurrency)` (`SwingEdge_App.jsx:4749`) —
+//    שוויון קודים, ⛔ בלי ניסיון המרה.
+//
+// ⚠️ **ההבחנה שהבלוק הזה קיים בשבילה, ולא ניתן לראותה מהמסך:** `spotAmount`
+//    **כבר** מחזיר 165 היום על שני הפיקסצ׳רים — הסירוב חי ב-JSX, ⛔ לא במודול.
+//    לכן ⛔ **אין כאן «null → 165»**; שתי המחלקות שכן אדומות במודול הן:
+//
+//      א. **`rate`/`rateDate` נזרקים.** `amountAt` קורא ל-`convert` שמחזיר
+//         אותם ומוסר הלאה `{ok,reason,value,currency}` בלבד ⇒ ⛔ אי-אפשר
+//         להציג «שער 3.3 מ-06.09» לצד הערך. הצהרה בלי מקור היא המצאה.
+//
+//      ב. 🔴 **`unavailable` ו-`loading` בלתי-נבדלים.** שניהם חוזרים
+//         `no_table` (`useFxRates.js:180`) ⇒ ללוח ⛔ אין דרך להבדיל בין
+//         «⛔ אין שער» (סירוב סופי) ל«טרם נחת» (`…`). זו בדיוק ההכרעה
+//         ש-`equityState` עושה להון, ושלוח הסיכון ⛔ אינו יכול לעשות היום.
+//
+// ⚪ **V5·V6 ירוקות בשני העצים** — הן ⛔ **אינן** ראיה לתיקון, והן קיימות כדי
+//    ש-V1–V4 ⛔ לא יעברו ע"י פונקציה שממירה הכל או מסרבת הכל.
+console.log("  18 · G2 · סיכון במטבע ההון");
+{
+  // ⚠️ ייבוא **דינמי** בכוונה: ייבוא סטטי של יצוא שאינו קיים מפיל את הקישור
+  // ומאפס את 17 הבלוקים שמעליו ⇒ ⛔ אי-אפשר היה לצפות באדום בפועל.
+  const { riskInCapital } = await import("../src/hooks/useFxRates.js");
+  if (!riskInCapital)
+    console.error("  ⚠️ `riskInCapital` ⛔ אינו קיים — V1–V6 נמדדות מול היעדרו.");
+  const RC = riskInCapital ??
+    (() => ({ ok: false, reason: "⛔ absent", value: null, rate: null, rateDate: null }));
+
+  const CAP = "ILS";
+  const TBL = { base: "USD", quote: "ILS",
+                spot: { rate: 3.3, rateDate: "2026-09-06" }, byDay: {} };
+  const RISK = 50;                    // |entry−stop| × shares, במטבע ה**נייר**
+  const mk = (ticker, extra) => ({ ticker, side: "LONG", status: "OPEN",
+    entry: 100, stop: 95, shares: 10, date: "2026-09-01", ...extra });
+
+  // V1 — 🔴 `BTCUSD` ⇒ `measured/pair_quote`. הענף החזק ביותר: הקוד **נמדד**.
+  {
+    const v1 = RC(mk("BTCUSD"), RISK, CAP, TBL, "ready");
+    eq("V1 · measured + ready ⇒ ok", v1.ok, true);
+    eq("V1 · $50 × 3.3 = ₪165", v1.value, 165);
+    eq("V1 · הנימוק `converted`", v1.reason, "converted");
+    eq("V1 · 🔴 השער נמסר הלאה ⛔ ולא נזרק", v1.rate, 3.3);
+    eq("V1 · 🔴 ותאריכו — «לפי שער» בלי תאריך הוא מספר בלי מקור",
+       v1.rateDate, "2026-09-06");
+    // המקור: אותה זליגה נמדדת ישירות על העוטף שכבר קיים היום.
+    eq("V1 · `spotAmount` עצמו מוסר `rate`",
+       spotAmount(mk("BTCUSD"), RISK, CAP, TBL, "ready").rate, 3.3);
+  }
+
+  // V2 — `BE` ⇒ `assumed/no_evidence_against`. **הכרעת ניב 06.09:** ASSUMED
+  // **מומר עם הצהרה גלויה**; `CONTRADICTED` נשאר מסורב (V5).
+  {
+    const v2 = RC(mk("BE"), RISK, CAP, TBL, "ready");
+    eq("V2 · assumed ⇒ מומר ⛔ ולא מסורב", v2.ok, true);
+    eq("V2 · ₪165", v2.value, 165);
+    eq("V2 · 🔴 עם שער", v2.rate, 3.3);
+    eq("V2 · 🔴 ועם תאריך", v2.rateDate, "2026-09-06");
+  }
+
+  // V3 — ⛔ אין שער כלל. **סירוב סופי**, ⛔ לא טעינה.
+  {
+    const v3 = RC(mk("BE"), RISK, CAP, null, "unavailable");
+    eq("V3 · ⛔ אין שער ⇒ ok שקר", v3.ok, false);
+    eq("V3 · 🔴 נימוק **סופי** ⛔ ולא `no_table` הגנרי", v3.reason, "no_rate");
+    eq("V3 · ⛔ ואין נפילה ל-0 — `null` הוא הודאה", v3.value, null);
+  }
+
+  // V4 — 🔴 **הזוג של V3.** אותו קלט, סטטוס אחר. היום שניהם `no_table`
+  //      ⇒ הלוח ⛔ אינו יכול להבדיל בין `—` ל-`…`.
+  {
+    const v4 = RC(mk("BE"), RISK, CAP, null, "loading");
+    eq("V4 · טרם נחת ⇒ ok שקר", v4.ok, false);
+    eq("V4 · 🔴 `loading` ⛔ ולא `no_rate` — `…` ⛔ אינו `—`", v4.reason, "loading");
+    eq("V4 · ⛔ ואין ניחוש", v4.value, null);
+    // 🔴 ההבחנה עצמה, ⛔ לא כל צד לחוד: מדידה של השוויון בין השניים.
+    check("V4 · 🔴 `unavailable` ≠ `loading` — ההבחנה **נמדדת**",
+          RC(mk("BE"), RISK, CAP, null, "unavailable").reason !== v4.reason);
+  }
+
+  // V5 — ⚪ `NVDA` עם תווית `ILS` ⇒ `contradicted`. שני מקורות סותרים ⇒
+  //      ⛔ **אין הכרעה בשקט**. ירוקה בשני העצים.
+  {
+    const v5 = RC(mk("NVDA", { currency: "ILS" }), RISK, CAP, TBL, "ready");
+    eq("V5 ⚪ contradicted ⇒ מסורב", v5.reason, "unverified_instrument");
+    eq("V5 ⚪ ⛔ ולא מומר", v5.value, null);
+  }
+
+  // V6 — ⚪ 39/41 העסקאות שנמדדו בפרודקשן. `identity` יורה **לפני** כל בדיקת
+  //      טבלה (`useFxRates.js:178`) ⇒ אי-הרגרסיה היא סדר השורות, ⛔ לא תקווה.
+  {
+    const v6 = RC(mk("AAPL", { currency: "USD" }), RISK, "USD", null, "identity");
+    eq("V6 ⚪ זהות ⇒ ok", v6.ok, true);
+    eq("V6 ⚪ הערך byte-identical", Object.is(v6.value, RISK), true);
+    eq("V6 ⚪ הנימוק `identity`", v6.reason, "identity");
+  }
+}
+
 // ── SUMMARY ──────────────────────────────────────────────────────────────────
 console.log("");
 if (failures) {

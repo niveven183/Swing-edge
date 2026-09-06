@@ -121,6 +121,51 @@ for (const c of CASES) {
 const refresh = run({ ...BASE, pricesLoading: true });
 console.log(`⚪ W1 ריענון אחרי נחיתה ⛔ אינו מחזיר ל-loading: ${refresh.state}${refresh.state === "complete" ? "" : "  ⛔"}`);
 
+/* ── בלוק V — `G2` · לוח הסיכון (06.09) ─────────────────────────────────────
+   🔴 **אותה הכרעה בדיוק, מסך אחר.** `totalRiskDollar` (`SwingEdge_App.jsx:4766`)
+   מסכם `t.riskDollar ?? 0` ⇒ עסקה שלא נספרה תורמת **אפס**, והלוח מכריז
+   «בטוח · 0.00%» על משתמש שנושא סיכון אמיתי. זה `R-2` בטהרתו — `0` שהחליף
+   `null`, ⛔ ובאתר שנותן פסק-דין ⛔ ולא רק מציג מספר.
+
+   ⚠️ **`≥` ⛔ אינו קישוט.** סכום חלקי הוא **חסם תחתון**: הוא יכול להוכיח
+   חריגה, ⛔ ולעולם לא בטיחות. לכן `over`/`caution` שורדים על חלקי ו-`safe`
+   ⛔ אינו — V10 מודדת בדיוק את האסימטריה הזו.
+
+   ⚠️ ייבוא **דינמי** מאותו נימוק של בלוק 18 ב-`test:instrument`. */
+
+const { deriveRiskState, riskFigure } = await import("../src/lib/equityState.js");
+if (!deriveRiskState || !riskFigure)
+  console.log("⚠️ `deriveRiskState`/`riskFigure` ⛔ אינם קיימים — V7–V10 נמדדות מול היעדרם.");
+const DRS = deriveRiskState ?? (() => "⛔ absent");
+const RFG = riskFigure ?? (() => ({ text: "⛔ absent", verdict: "⛔ absent", label: null }));
+
+{
+  const s7 = DRS({ counted: 1, total: 2, loading: false });
+  ok("V7", "1 נספרה מתוך 2 ⇒ `partial`", s7 === "partial", s7);
+
+  const s8 = DRS({ counted: 2, total: 2, loading: false });
+  ok("V8", "2 מתוך 2 ⇒ `complete`", s8 === "complete", s8);
+
+  const s9 = DRS({ counted: 0, total: 2, loading: true });
+  ok("V9", "טבלת fx טרם נחתה ⇒ `loading`", s9 === "loading", s9);
+
+  // V10 — 🔴 האסימטריה. שלושה פסקי-דין על אותו מצב חלקי.
+  const safe = RFG({ state: "partial", text: "1.20%", verdict: "safe", t: T });
+  ok("V10a", "חלקי מתחת לתקרה ⇒ `safe` ⛔ אינו מוצג",
+     safe.verdict === null, JSON.stringify(safe.verdict));
+  ok("V10b", "…והמספר נושא `≥` — חסם תחתון ⛔ ולא ערך",
+     safe.text === "≥ 1.20%", JSON.stringify(safe.text));
+  const over = RFG({ state: "partial", text: "9.90%", verdict: "over", t: T });
+  ok("V10c", "⚠️ חלקי **מעל** התקרה ⇒ `over` **שורד** — חסם תחתון כן מוכיח חריגה",
+     over.verdict === "over", JSON.stringify(over.verdict));
+  const load = RFG({ state: "loading", text: "1.20%", verdict: "safe", t: T });
+  ok("V10d", "טעינה ⇒ `…` ו⛔ אין פסק-דין",
+     load.text === "…" && load.verdict === null, `"${load.text}" · ${JSON.stringify(load.verdict)}`);
+  const full = RFG({ state: "complete", text: "1.20%", verdict: "safe", t: T });
+  ok("V10e", "⚪ שלם ⇒ המספר והפסק ⛔ לא זזים",
+     full.text === "1.20%" && full.verdict === "safe", `"${full.text}" · ${JSON.stringify(full.verdict)}`);
+}
+
 /* ── בלוק C — חיווט שלושת אתרי ההון ────────────────────────────────────── */
 
 const A_HEADER = "text-end hidden sm:block";
@@ -175,6 +220,34 @@ ok("C11", "באנר B-142 מותנה ב-`equityState === \"partial\"` ⛔ ולא
 const fxGated = has(src, 'equityState === "no_fx"');
 ok("C12", "הודעת ה-fx מותנית ב-`equityState === \"no_fx\"`", fxGated, fxGated ? "כן" : "⛔ לא");
 
+/* ── בלוק S — חיווט לוח הסיכון (`G2`). ⚠️ **צורה בלבד**, כמו C1–C12. ────── */
+
+const A_RISK = "const openRisks";
+const A_PCT  = "const maxRiskDollar";
+const nR = countOccurrences(src, A_RISK);
+const nP = countOccurrences(src, A_PCT);
+const g4 = gate("M4", "עוגן לוח הסיכון מופיע בדיוק פעם אחת", nR === 1, `${nR}`);
+const g5 = gate("M5", "עוגן תקרת הסיכון מופיע בדיוק פעם אחת", nP === 1, `${nP}`);
+if (!g4 || !g5) {
+  console.log("\n⛔ חילוץ נכשל — אדום קשה, ⛔ לא דילוג (B-272).");
+  process.exit(1);
+}
+const RISK = slice(A_PCT, 0, 2400);  // ⚠️ הגודל **נמדד**: הצמצום ל-`?? 0` יושב 2,124 בתים אחרי העוגן
+
+const usesRIC = has(RISK, "riskInCapital(");
+ok("S1", "לוח הסיכון צורך `riskInCapital(` ⛔ ולא גדר שוויון-קודים", usesRIC, usesRIC ? "כן" : "⛔ לא");
+// ⚠️ `matchesCapital` **נשאר בקובץ** — הגבול שהגל ⛔ אינו נוגע בו. היעלמותו
+// היא שינוי חוזה שקט ⛔ ולא ניקיון.
+const keepsMC = countOccurrences(src, "matchesCapital") >= 3;
+ok("S2", "`matchesCapital` ⛔ לא הוסר — הגבול נשמר", keepsMC, `${countOccurrences(src, "matchesCapital")} מופעים`);
+// ⚠️ **על הקובץ כולו ⛔ ולא על החלון.** גרסה קודמת של השער סרקה חלון בגודל
+// קבוע, והוספת שורות הערה מעל הצמצום הזיזה אותו אל מחוץ לחלון ⇒ השער הודיע
+// «נקי» בזמן ש-`?? 0` ישב בקובץ. שער שגודלו הוא ההנחה שלו הוא שער עיוור.
+const noCoalesce = !/riskDollar\s*\?\?\s*0/.test(src);
+ok("S3", "🔴 סכום הסיכון ⛔ אינו נופל ל-`?? 0` — `null` הוא הודאה (R-2)", noCoalesce, noCoalesce ? "נקי" : "⛔ `?? 0`");
+const figGated = has(src, "riskFig.text");
+ok("S4", "המספר הגדול צורך `riskFig.text` ⛔ ולא `totalRiskPct.toFixed(2)` ערום", figGated, figGated ? "כן" : "⛔ מספר ערום");
+
 const total = pass + fail;
-console.log(`\n${pass}/${total} ✓ · ${fail}/${total} ✗${fail ? `  אדומות: ${reds.join(" ")}` : ""}   (אוכלוסייה: 18 = 6 ערך + 12 חיווט · ⛔ 3 שערי-מטא ו-⚪ W1 אינם נספרים)`);
+console.log(`\n${pass}/${total} ✓ · ${fail}/${total} ✗${fail ? `  אדומות: ${reds.join(" ")}` : ""}   (אוכלוסייה: 30 = 14 ערך + 16 חיווט · ⛔ 5 שערי-מטא ו-⚪ W1 אינם נספרים)`);
 process.exit(fail ? 1 : 0);
