@@ -883,3 +883,35 @@ Every production incident gets one short entry: what broke, root cause, fix, pre
   one and the other keeps running, silently, until it hits a `.`. ⚠️ And when a comment in the code
   states the risk in words, that is ⛔ **not** documentation — it is an assertion that was ⛔ never
   written. The `G2` wave had the finding and shipped the prose.
+
+### #20 · addendum, same day — the three consumers that ⛔ never threw
+
+The hotfix above closed `2/6` consumers: the one that threw and the one that invented `"$0"`.
+A second pass closed the remaining three, and they are the more instructive half.
+
+- **`rowColor` · `barColor` · `barWidth` (`SwingEdge_App.jsx:4930-4954`) compared `null` to a
+  number.** `null > MAX_RISK_PCT` is `false`, and `null > MAX_RISK_PCT * 0.5` is `false` too, so an
+  unmeasured row fell through **both** thresholds into the final branch and was painted
+  `text-[var(--v3-accent)]` — the **"safe" green**. `barWidth` divided `null` and got `0`, so its
+  bar rendered as zero risk.
+- 🔴 **This is worse than the crash, and it is the reason the addendum exists.** The crash was
+  loud: an Error Boundary, twelve Sentry events, a user reporting it within the hour. The green
+  row was silent — ⛔ no exception, ⛔ no Sentry event, ⛔ nothing for any boundary to catch. A
+  trader read **"this position is safe"** about risk that was ⛔ never measured. Measured
+  side by side, the unmeasured row and a genuinely-safe row produced **byte-identical** class
+  strings.
+- **The fix is one guard for all three** — `const measured = t.riskPct != null` — and an
+  unmeasured row is painted **slate**: ⛔ not green ("safe") and ⛔ not red ("over"), because both
+  are verdicts on something that was ⛔ never measured. ⛔ No `?? 0`.
+- ⚠️ **The assertion that matters is the comparison, ⛔ not the colour.** `P3`/`P4` assert that
+  "unmeasured" and "measured-and-safe" are two **different** appearances. An assertion pinned to a
+  literal colour string would have been passed by a palette change — the same mistake as asserting
+  on source text instead of behaviour (`R-3`).
+- 🔴 **And the blast radius is now recorded as its own item, `B-304`.** `src/main.jsx:97` wraps the
+  **entire** route tree in a single `Sentry.ErrorBoundary` whose fallback is a bare
+  `<p>`. That is what turned a one-cell bug into a whole-product outage: journal, import, coach and
+  settings all went dark because one number in one table in one tab was `null`. ⚠️ **This does
+  ⛔ not get solved by adding more guards.** On a ~6,800-line file with 63 `.toFixed` sites, a
+  forgotten guard is a statistical certainty; the blast radius is the only variable that does ⛔ not
+  depend on human memory (`CLAUDE.md` §2, "zero dependence on human memory"). `B-304` requires a
+  plan and approval — `main.jsx` is governed by `test:analytics` and §12.

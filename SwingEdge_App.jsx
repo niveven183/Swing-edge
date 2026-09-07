@@ -4927,19 +4927,31 @@ export default function SwingEdge() {
                           </thead>
                           <tbody>
                             {openRisks.map(t => {
-                              const rowColor = !t.hasStop
+                              // 🔴 `B-303` (3/6) — שלושת הצרכנים ה**שקטים**. אותו
+                              // שורש כמו שני התאים למטה, ⛔ אך בלי זריקה שתסגיר:
+                              // `null > MAX_RISK_PCT` הוא `false` בשתי הרמות ⇒
+                              // שורה שלא נמדדה נצבעה **ירוק «בטוח»**, ו-
+                              // `null / MAX_RISK_PCT` הוא `0` ⇒ הפס שלה נראה
+                              // כסיכון-אפס. ⛔ **זו המצאה, ⛔ לא הודאה** (`R-2`) —
+                              // וחמורה מהקריסה: קריסה נראית, ירוק שקרי ⛔ לא.
+                              // ⚠️ השומר הוא **הערך** (`riskPct != null`) ⛔ ולא
+                              // `hasStop`: סטופ קיים ⛔ אינו מבטיח שההמרה הצליחה.
+                              const measured = t.riskPct != null;
+                              const rowColor = !measured
                                 ? "text-slate-500"
                                 : t.riskPct > MAX_RISK_PCT
                                 ? "text-[var(--v3-loss)]"
                                 : t.riskPct > MAX_RISK_PCT * 0.5
                                 ? "text-amber-400"
                                 : "text-[var(--v3-accent)]";
-                              const barColor = t.riskPct > MAX_RISK_PCT
+                              const barColor = !measured
+                                ? "bg-slate-600"
+                                : t.riskPct > MAX_RISK_PCT
                                 ? "bg-[var(--v3-loss)]"
                                 : t.riskPct > MAX_RISK_PCT * 0.5
                                 ? "bg-amber-400"
                                 : "bg-[var(--v3-accent)]";
-                              const barWidth = t.hasStop ? Math.min((t.riskPct / MAX_RISK_PCT) * 100, 100) : 0;
+                              const barWidth = measured ? Math.min((t.riskPct / MAX_RISK_PCT) * 100, 100) : 0;
                               return (
                                 <tr key={t.id} className="border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors">
                                   <td className="py-2 pe-4 font-bold text-white font-mono">{t.ticker}</td>

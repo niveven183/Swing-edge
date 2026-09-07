@@ -339,6 +339,57 @@ const intact = !mp.threw && !md.threw && mp.out === "1.25%" && md.out === "$250"
 invariant("R5", 'שורה **מדידה** ⛔ לא זזה — הגדר ⛔ אינו `—` גורף',
   intact, `"${mp.out}" · "${md.out}"`);
 
+/* ── בלוק P · שלושת הצרכנים ה**שקטים** (`B-303` 3/6) ──────────────────────
+   ⚠️ אלה ⛔ אינם זורקים — ולכן ⛔ אף סנטרי, ⛔ אף Error Boundary ו⛔ אף
+   `R1`–`R4` לא יכלו לראותם. `null > MAX_RISK_PCT` הוא `false` בשתי הרמות
+   ⇒ שורה שלא נמדדה נפלה לענף האחרון ונצבעה **ירוק «בטוח»**.
+   🔴 **הנזק חמור מהקריסה:** קריסה נראית, ירוק שקרי ⛔ לא — הטריידר קרא
+   «הפוזיציה הזו בטוחה» על סיכון ש⛔ מעולם לא נמדד.
+   ⚠️ **האסרציה המכריעה היא ההשוואה** (`P3`/`P4`), ⛔ לא הצבע כשלעצמו:
+   «לא-מדוד» ו«מדוד ובטוח» חייבים להיות **שני מראות שונים**. אסרציה על
+   מחרוזת-צבע קבועה הייתה נעברת ע"י שינוי פלטה. */
+const A_PAINT = "const measured = t.riskPct != null;";
+const A_BW = "const barWidth = measured ?";
+const nPaint = countOccurrences(src, A_PAINT);
+const nBw = countOccurrences(src, A_BW);
+const g10 = gate("M10", "עוגן גוש הצביעה מופיע בדיוק פעם אחת", nPaint === 1, `${nPaint}`);
+const g11 = gate("M11", "עוגן `barWidth` מופיע בדיוק פעם אחת", nBw === 1, `${nBw}`);
+const SEG = g10 && g11
+  ? src.slice(src.indexOf(A_PAINT), src.indexOf(";", src.indexOf(A_BW)) + 1)
+  : "";
+const g12 = gate("M12", "גוש הצביעה מאוזן בסוגריים", balanced(SEG) && SEG.length > 0, `${SEG.length}b`);
+const g13 = gate("M13", "זנב הגוש הוא `: 0;`", SEG.trimEnd().endsWith(": 0;"),
+  SEG.trimEnd().endsWith(": 0;") ? "כן" : "⛔ לא");
+if (!g10 || !g11 || !g12 || !g13) {
+  console.log("\n⛔ חילוץ נכשל — אדום קשה, ⛔ לא דילוג (B-272).");
+  process.exit(1);
+}
+
+const MAX_RISK_PCT = 6;
+const paint = (t) =>
+  new Function("t", "MAX_RISK_PCT", `${SEG}\nreturn { rowColor, barColor, barWidth };`)(t, MAX_RISK_PCT);
+
+const pRefused = paint(REFUSED);
+const pSafe = paint({ ...MEASURED, riskPct: 1.25 });
+const pOver = paint({ ...MEASURED, riskPct: 9 });
+
+ok("P1", "🔴 שורה לא-מדודה ⛔ אינה נצבעת בירוק-«בטוח»",
+   !pRefused.rowColor.includes("v3-accent"), `"${pRefused.rowColor}"`);
+ok("P2", "🔴 …וגם הפס שלה ⛔ אינו ירוק-«בטוח»",
+   !pRefused.barColor.includes("v3-accent"), `"${pRefused.barColor}"`);
+ok("P3", "🔴 «לא-מדוד» ⛔ אינו נראה כמו «מדוד ובטוח» — טקסט",
+   pRefused.rowColor !== pSafe.rowColor, `"${pRefused.rowColor}" ≠ "${pSafe.rowColor}"`);
+ok("P4", "🔴 …ולא בפס",
+   pRefused.barColor !== pSafe.barColor, `"${pRefused.barColor}" ≠ "${pSafe.barColor}"`);
+
+/* ⚪ ירוקות בשני העצים — ⛔ אינן ראיה לתיקון; הן מונעות מ-`P1`–`P4` להיעבר
+   ע"י «סלייט גורף» על כל שורה, ומוודאות ש-`null` ⛔ לא הפך ל-`NaN`. */
+invariant("P5", "שורה מדודה ⛔ לא זזה — בטוח ירוק · חריגה אדומה",
+  pSafe.rowColor.includes("v3-accent") && pOver.rowColor.includes("v3-loss"),
+  `"${pSafe.rowColor}" · "${pOver.rowColor}"`);
+invariant("P6", "`barWidth` של שורה לא-מדודה הוא `0` ⛔ ולא `NaN`",
+  pRefused.barWidth === 0 && Number.isFinite(pRefused.barWidth), `${pRefused.barWidth}`);
+
 const total = pass + fail;
-console.log(`\n${pass}/${total} ✓ · ${fail}/${total} ✗${fail ? `  אדומות: ${reds.join(" ")}` : ""}   (אוכלוסייה: 34 = 18 ערך + 16 חיווט · ⛔ 7 שערי-מטא ו-⚪ R5 אינם נספרים)`);
+console.log(`\n${pass}/${total} ✓ · ${fail}/${total} ✗${fail ? `  אדומות: ${reds.join(" ")}` : ""}   (אוכלוסייה: 38 = 22 ערך + 16 חיווט · ⛔ 11 שערי-מטא ו-⚪ R5·P5·P6 אינם נספרים)`);
 process.exit(fail ? 1 : 0);
