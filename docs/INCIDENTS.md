@@ -841,3 +841,45 @@ Every production incident gets one short entry: what broke, root cause, fix, pre
   production remain covered by `C-036` **alone**. 🔴 **The tool that measures this file swallowed a
   positional argument and printed `✅ 19/19` against the wrong tree — `B-279`, open, and it recurred
   five days later in a second tool (`B-285`).**
+
+---
+
+## #20 — 2026-09-07 — A gate was removed from one line and its consumers were never scanned; the comment above the crash had warned about it in words
+
+- **Symptom:** the risk panel in `/app` threw into the React Error Boundary. `TypeError: Cannot
+  read properties of null (reading 'toFixed')`, release `51a12d2`. Reported through Sentry, ⛔ not
+  by a monitor of ours and ⛔ not by a `verify` link — all 28 were green on the commit that shipped it.
+- **Root cause — a regression of `G2` (`D-071`), one day old.** `G2` deliberately released
+  `hasStop` from `matchesCapital`, because "risk in another currency" is ⛔ not unmeasurable, it is
+  risk that **needs converting**. That decision was correct and is ⛔ not being reverted. What was
+  ⛔ not done is the other half: `hasStop` had been carrying a **second, undeclared** meaning —
+  "this row's risk is a number" — and **six** places in the table below still read it that way.
+  After the change, a trade with a stop whose conversion refused (`conv.reason ∈
+  {unverified_instrument, no_rate, loading}`) produces `hasStop === true` **and** `riskPct === null`.
+- 🔴 **The code comment directly above the crashing line predicted this, verbatim:** *"⚠️ הסרת
+  השער מפילה את האתר הזה לתוך אותו חוב של 9 האחרים."* It was written by the same wave that then
+  removed the gate. ⛔ **A comment is ⛔ not a gate.** `S1`–`S4`, added by `G2` over exactly this
+  panel, read **bytes**; ⛔ none of them can execute a cell, so ⛔ none of them could fire.
+- **Consumer scan — the step that was skipped, run now. `6` readers in `:4930-4961`:**
+  `1` threw (`riskPct.toFixed`) · `1` **invented** (`fmtPrice(t.riskDollar)` — `Number(null) === 0`
+  passes `Number.isFinite`, so an unmeasured risk rendered **`"$0"`**, `R-2`; it was hidden only
+  because the throw two lines down killed the row first) · `3` silently wrong and ⛔ **not fixed**
+  here (`rowColor` and `barColor` compare `null > n`, which is `false`, so an unmeasured row is
+  painted the **safe green**; `barWidth` divides `null` and gets `0`) · `1` already correct
+  (`rrRatio !== null`). The three silent ones are `B-303`, open, ⛔ deliberately outside a P0 hotfix.
+- **Fix:** two guards moved from the *proxy* to the *value* — `t.riskDollar != null` and
+  `t.riskPct != null`. ⛔ **`matchesCapital` was ⛔ not restored** and ⛔ **no `|| 0` was added**;
+  either would have traded a loud crash for a quiet wrong number.
+- **Verification:** `test:equitystate` grew `30 → 34` with block `R`, which ⛔ **executes** the two
+  cell expressions rather than grepping them — extracted by anchor, guarded by four hard meta-gates
+  (`B-272`). `R1`–`R4` were **observed red on the pre-fix tree**, `R1` reproducing the production
+  `TypeError` by message. `R5` ⚪ is green in both trees and is ⛔ **not** evidence; it exists so a
+  blanket `—` cannot pass `R1`–`R4`.
+- 🔴 **What is ⛔ still not proven: the screen.** `C-042` covers the browser and is ⛔ **not closed** —
+  the crash *is* its first recorded failure. And the account that reproduces it is `1/46` in
+  production, ⛔ **not reachable by me**, so this rests on a local repro, ⛔ not a screenshot.
+- **Lesson — the one that generalises:** *a gate that is removed demands a scan of **every** one of
+  its consumers.* A boolean that gates two different things is two contracts sharing a name; drop
+  one and the other keeps running, silently, until it hits a `.`. ⚠️ And when a comment in the code
+  states the risk in words, that is ⛔ **not** documentation — it is an assertion that was ⛔ never
+  written. The `G2` wave had the finding and shipped the prose.

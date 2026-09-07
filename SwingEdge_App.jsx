@@ -4951,12 +4951,14 @@ export default function SwingEdge() {
                                   <td className="py-2 pe-4 font-mono text-slate-300">{fmtPaperPrice(t.entry, t)}</td>
                                   <td className="py-2 pe-4 font-mono text-[var(--v3-loss)]">{t.hasStop ? `${fmtPaperPrice(t.stop, t)}` : "—"}</td>
                                   <td className="py-2 pe-4 font-mono text-slate-400">{t.shares}</td>
-                                  {/* ⚑ סכום-בחשבון — ✅ **האתר התקין היחיד מה-10**, ולא במקרה:
-    `riskDollar` מחושב רק כש-`hasStop`, ו-`hasStop` חסום ב-`matchesCapital`
-    (מעל) ⇒ כשמטבע הנייר ≠ ההון הערך הוא `null` ומוצג `—`.
-    ⚠️ הסרת השער מפילה את האתר הזה לתוך אותו חוב של 9 האחרים. */}
-                                  <td className={`py-2 pe-4 font-bold font-mono ${rowColor}`}>{t.hasStop ? `${fmtPrice(t.riskDollar, currencyOf(t))}` : "—"}</td>
-                                  <td className={`py-2 pe-4 font-bold font-mono ${rowColor}`}>{t.hasStop ? `${t.riskPct.toFixed(2)}%` : "—"}</td>
+                                  {/* ⚑ סכום-בחשבון. 🔴 `B-303` — ההערה שישבה כאן צפתה את הקריסה
+    במילים ו⛔ לא נאכפה: `G2` הסיר את `sameCcy` מ-`hasStop` (מעל), והשומר כאן
+    נשאר `hasStop` ⇒ שורה שסירבה להמרה נתנה `riskPct=null` ל-`.toFixed`.
+    ⚠️ השומר הוא **הערך עצמו**, ⛔ לא `hasStop`: סטופ קיים ⛔ אינו מבטיח המרה.
+    ⛔ ואין `|| 0` — `fmtPrice(null)` מחזיר `"$0"` (`Number(null) === 0` עובר
+    את `Number.isFinite`), וסיכון לא-מדיד שמוצג כאפס הוא `R-2`. */}
+                                  <td className={`py-2 pe-4 font-bold font-mono ${rowColor}`}>{t.riskDollar != null ? `${fmtPrice(t.riskDollar, currencyOf(t))}` : "—"}</td>
+                                  <td className={`py-2 pe-4 font-bold font-mono ${rowColor}`}>{t.riskPct != null ? `${t.riskPct.toFixed(2)}%` : "—"}</td>
                                   <td className="py-2 pe-4 font-mono text-slate-400">
                                     {t.rrRatio !== null ? `${t.rrRatio.toFixed(2)}:1` : "—"}
                                   </td>

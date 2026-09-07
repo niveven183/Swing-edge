@@ -19,17 +19,26 @@
  */
 import { readFileSync } from "node:fs";
 import { deriveEquityState, equityFigure } from "../src/lib/equityState.js";
+// ⚠️ ה-`fmtPrice` ה**אמיתי** ⛔ ולא stub — `R3` מודדת ש-`Number(null) === 0`
+// עובר את `Number.isFinite` ומייצר `"$0"`. stub היה מסתיר בדיוק את הבאג.
+import { fmtPrice, currencyOf } from "../src/utils.js";
 
 const argv = process.argv.slice(2);
 const appIdx = argv.indexOf("--app");
 const APP = appIdx >= 0 ? argv[appIdx + 1] : new URL("../SwingEdge_App.jsx", import.meta.url).pathname;
 const src = readFileSync(APP, "utf8");
 
-let pass = 0, fail = 0;
+let pass = 0, fail = 0, inv = 0;
 const reds = [];
 function ok(id, label, cond, got) {
   if (cond) { pass++; console.log(`${id} ${label}: ${got} ✓`); }
   else { fail++; reds.push(id); console.log(`${id} ${label}: ${got} ✗ RED`); }
+}
+// ⚪ ירוקה בשני העצים ⇒ ⛔ **אינה ראיה לתיקון**, ⛔ ואינה נספרת באוכלוסייה.
+// חוסמת בכל זאת: היא מה שמונע מ-`R1`–`R4` להיעבר ע"י `—` גורף.
+function invariant(id, label, cond, got) {
+  if (cond) { inv++; console.log(`${id} ⚪ אינווריאנטה — ${label}: ${got}`); }
+  else { fail++; reds.push(id); console.log(`${id} ⚪ אינווריאנטה — ${label}: ${got} ✗ RED`); }
 }
 
 const countOccurrences = (hay, needle) => {
@@ -248,6 +257,88 @@ ok("S3", "🔴 סכום הסיכון ⛔ אינו נופל ל-`?? 0` — `null` 
 const figGated = has(src, "riskFig.text");
 ok("S4", "המספר הגדול צורך `riskFig.text` ⛔ ולא `totalRiskPct.toFixed(2)` ערום", figGated, figGated ? "כן" : "⛔ מספר ערום");
 
+/* ── בלוק R — שורת הטבלה (`B-303`). ⚠️ אלה אסרציות **ערך**, ⛔ לא צורה:
+      הן **מריצות** את הביטוי שבתא ⛔ ולא מחפשות בו תבנית — ולכן `R1` יכולה
+      לזרוק, וזרקה, על העץ שלפני התיקון.
+
+      🔴 מה זה מודד: `G2` הסיר את `sameCcy` מ-`hasStop` (`:4753`), אבל שני
+      התאים המשיכו להניח `hasStop ⇒ riskDollar/riskPct ≠ null`. עסקה עם
+      סטופ ו-`conv.reason ∈ {unverified_instrument, no_rate, loading}` נותנת
+      `hasStop=true` ∧ `riskPct=null` ⇒ `null.toFixed` ⇒ Error Boundary.
+      ההערה שמעל תא הכסף (`:4955-4957`) צפתה זאת **במילים**, ו⛔ שום שער
+      ⛔ לא יכול היה לראות זאת: `S1`–`S4` קוראות בייטים.
+
+      ⛔ **כשל חילוץ הוא אדום קשה ⛔ ולעולם לא דילוג** (`B-272`). ────────── */
+
+const A_RD = "fmtPrice(t.riskDollar, currencyOf(t))";
+const A_RP = "t.riskPct.toFixed(2)";
+const nRD = countOccurrences(src, A_RD);
+const nRP = countOccurrences(src, A_RP);
+const g6 = gate("M6", "עוגן תא «סיכון $» מופיע בדיוק פעם אחת", nRD === 1, `${nRD}`);
+const g7 = gate("M7", "עוגן תא «סיכון %» מופיע בדיוק פעם אחת", nRP === 1, `${nRP}`);
+if (!g6 || !g7) {
+  console.log("\n⛔ חילוץ נכשל — אדום קשה, ⛔ לא דילוג (B-272).");
+  process.exit(1);
+}
+
+// גבולות התא: `}>{` שלפני הביטוי ו-`}</td>` שאחריו. ⚠️ ה-`}` של ה-template
+// שבתוך הביטוי ⛔ אינו מתנגש — אחריו בא `` ` `` או `%`, ⛔ לא `<`.
+const cellExpr = (anchor) => {
+  const i = src.indexOf(anchor);
+  return src.slice(src.lastIndexOf("}>{", i) + 3, src.indexOf("}</td>", i));
+};
+const EXPR_RD = cellExpr(A_RD);
+const EXPR_RP = cellExpr(A_RP);
+const balanced = (s) => {
+  let d = 0;
+  for (const c of s) { if (c === "{") d++; else if (c === "}") d--; if (d < 0) return false; }
+  return d === 0;
+};
+const g8 = gate("M8", "שני הביטויים מאוזנים בסוגריים",
+  balanced(EXPR_RD) && balanced(EXPR_RP), `${EXPR_RD.length}b · ${EXPR_RP.length}b`);
+const tails = EXPR_RD.trimEnd().endsWith(': "—"') && EXPR_RP.trimEnd().endsWith(': "—"');
+const g9 = gate("M9", 'זנב שני הביטויים הוא `: "—"`', tails, tails ? "כן" : "⛔ לא");
+if (!g8 || !g9) {
+  console.log("\n⛔ חילוץ נכשל — אדום קשה, ⛔ לא דילוג (B-272).");
+  process.exit(1);
+}
+
+const cell = (expr, t) =>
+  new Function("t", "fmtPrice", "currencyOf", `return (${expr});`)(t, fmtPrice, currencyOf);
+const attempt = (expr, t) => {
+  try { return { threw: false, out: cell(expr, t) }; }
+  catch (e) { return { threw: true, out: `${e.constructor.name}: ${e.message}` }; }
+};
+
+/* שורה שסירבה: סטופ **קיים**, המרה ⛔ לא. בדיוק מה שקרס בפרודקשן. */
+const REFUSED = {
+  hasStop: true, stop: 215, shares: 1, entry: 220,
+  conv: { value: null, reason: "unverified_instrument" },
+  riskDollar: null, riskPct: null, rrRatio: null, currency: "USD",
+};
+
+const rp = attempt(EXPR_RP, REFUSED);
+ok("R1", "🔴 תא «סיכון %» — סטופ קיים ו-`riskPct=null` ⇒ ⛔ אינו זורק",
+   !rp.threw, rp.threw ? `⛔ ${rp.out}` : `"${rp.out}"`);
+ok("R2", "🔴 …ומחזיר `—` ⛔ ולא מספר מומצא",
+   !rp.threw && rp.out === "—", rp.threw ? "⛔ זרק" : `"${rp.out}"`);
+
+const rd = attempt(EXPR_RD, REFUSED);
+// ⚠️ `Number(null) === 0` ⇒ `Number.isFinite` **true** ⇒ `fmtPrice(null)`
+// מחזיר `"$0"`, ⛔ לא `"—"`. סיכון לא-מדיד שהוצג כאפס הוא `R-2`, ⛔ לא נוי.
+ok("R3", "🔴 תא «סיכון $» — `riskDollar=null` ⇒ ⛔ אינו מחזיר `$0`",
+   !rd.threw && rd.out !== "$0", rd.threw ? `⛔ ${rd.out}` : `"${rd.out}"`);
+ok("R4", "🔴 …ומחזיר `—` — הודאה, ⛔ לא המצאה",
+   !rd.threw && rd.out === "—", rd.threw ? "⛔ זרק" : `"${rd.out}"`);
+
+/* ⚪ ביקורת חיובית. ⛔ **אינה ראיה לתיקון** — היא ירוקה בשני העצים; היא
+   קיימת כדי ש-`R1`–`R4` ⛔ לא ייעברו ע"י `"—"` גורף על כל שורה. */
+const MEASURED = { ...REFUSED, riskDollar: 250, riskPct: 1.25, conv: { value: 250, reason: "converted" } };
+const mp = attempt(EXPR_RP, MEASURED), md = attempt(EXPR_RD, MEASURED);
+const intact = !mp.threw && !md.threw && mp.out === "1.25%" && md.out === "$250";
+invariant("R5", 'שורה **מדידה** ⛔ לא זזה — הגדר ⛔ אינו `—` גורף',
+  intact, `"${mp.out}" · "${md.out}"`);
+
 const total = pass + fail;
-console.log(`\n${pass}/${total} ✓ · ${fail}/${total} ✗${fail ? `  אדומות: ${reds.join(" ")}` : ""}   (אוכלוסייה: 30 = 14 ערך + 16 חיווט · ⛔ 5 שערי-מטא ו-⚪ W1 אינם נספרים)`);
+console.log(`\n${pass}/${total} ✓ · ${fail}/${total} ✗${fail ? `  אדומות: ${reds.join(" ")}` : ""}   (אוכלוסייה: 34 = 18 ערך + 16 חיווט · ⛔ 7 שערי-מטא ו-⚪ R5 אינם נספרים)`);
 process.exit(fail ? 1 : 0);
