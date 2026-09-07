@@ -915,3 +915,74 @@ A second pass closed the remaining three, and they are the more instructive half
   forgotten guard is a statistical certainty; the blast radius is the only variable that does ⛔ not
   depend on human memory (`CLAUDE.md` §2, "zero dependence on human memory"). `B-304` requires a
   plan and approval — `main.jsx` is governed by `test:analytics` and §12.
+
+### #20 · addendum ב׳, same day — the product was broken 18h34m and ⛔ no monitor knew
+
+Read-only diagnostic, `docs/audits/AUDIT-2026-09-07-alerting-gap.md` (§8.1 stage 1 — ⛔ 0 code
+files · 0 workflows · 0 Sentry rules · 0 webhooks · 0 new alerts · 0 thresholds moved). The two
+addenda above ask *why the cell broke*. This one asks **why nobody was told**, and the answer is
+⛔ not "a monitor was down" — it is that **`3/6` layers were blind by construction**.
+
+- **Measured window (UTC, re-derived with `--date=format-local:` after `--date=format:` printed
+  commit-local times under a hand-written `UTC` label — `R-3`, caught twice):** `70816e1` shipped
+  **2026-09-06T19:08:29Z**; the only alert in the whole window is a **Sentry email at
+  2026-09-07T13:43:09Z**; hotfix `1b8e44b` at **14:02:02Z**. ⇒ ship→alert **18:34:40**, ship→fix
+  **18:53:33**. ⚠️ The prompt's premise said "~20 hours" — measured **18:34:40**, i.e. the stated
+  figure was **~1:06 high**. ⛔ That softens nothing; it pins it to a number that can be re-measured.
+- 🔴 **⛔ Do ⛔ not conclude "Sentry worked".** `SWING-EDGE-A` is ⛔ **not** a new issue: the
+  identical signature opened as a **New issue on 2026-07-24T06:12:31Z** (`transaction=/app`,
+  `handled=yes`, `mechanism=generic`, `alert_rule_id=17075516`) and was later **resolved**. The
+  09-07 mail states verbatim that Sentry *"marked SWING-EDGE-A as a regression in 51a12d24bbcd"*.
+  ⇒ **only the regression channel was measured firing.** Whether a *new* fault would alert is
+  ⛔ **an open question** — the alert rules could ⛔ not be read (⛔ no Sentry MCP, ⛔ no token, §12)
+  and were ⛔ **not guessed**. The class is **44d 12:55:58** old.
+- 🔴 **The Health Monitor was ⛔ not "green during the crash" — it did ⛔ not run.** `health.yml`
+  has carried `on: workflow_dispatch:` only since 25.07; last run **2026-07-25T14:27:03Z** =
+  **43d 4:41:26** before the ship. ⚠️ **And even at 30-minute cadence it could ⛔ not see this:**
+  `api/health.js` never executes React. Structural, ⛔ not schedule. (`B-278` is exactly this.)
+- 🔴 **Sentinel was green for two ⛔ independent reasons, and the schedule is the ⛔ lesser one.**
+  (a) `sentinel.yml:378-395` queries `is:unresolved firstSeen:-35m`; a regression keeps its
+  original `firstSeen` ⇒ it could ⛔ **never** match — measured: `6/6` runs printed
+  «אין issues חדשים (35 דק')» while events accrued. ⚠️ **⇒ raising the cron would ⛔ not have
+  helped** — `48/48` runs would print the same line. (b) **the fixture.** `FIXED_TRADES =
+  ['AAPL','NVDA','BTC-USD']` — `3/3` USD, `0/3` `contradicted`; `grep` for
+  `contradicted|unverified_instrument` across `tests-sentinel/` and `tests/` returns **⛔ nothing**
+  ⇒ `riskPct === null` is ⛔ never produced in the QA account. **Proven it *would* have gone red:**
+  the risk panel sits in `tab === "dashboard"`, the **default** tab (`:1410-1417`), so the boundary
+  trips on load — `pageerror` capture, the journal-render check, and check 6 (which explicitly
+  clicks `[data-tour-tab="dashboard"]`) are **`3` separate reds**.
+- **Execution, for the record — ⛔ not the cause:** `6/37 = 16.2%` of scheduled slots ran, `6/6`
+  `success`; `3/6` ran the authenticated layer; the last authenticated run was **7:34:05** before
+  the alert; Sentry polling covered `210/1,114.67` min = **18.8%**, leaving **81.2%** ⛔ never
+  sampled. And `watchdog.yml` — whose `MAXAGE[sentinel.yml]=3` exists precisely to catch a stale
+  Sentinel — had **`0` runs in the window** (the next landed 13:54:14Z, **11 minutes after** the
+  alert). ⚠️ **The watchdog suffers the same repo-level scheduler degradation it watches for
+  (`M-012`) ⇒ it is ⛔ not an independent layer.**
+- 🔴 **The Error Boundary is the layer that ⛔ knew, and it is wired to ⛔ nothing.** `main.jsx:97`
+  caught the throw and swapped the screen. Measured: `onError` · `beforeCapture` · tags ·
+  `showDialog` = **`0/4`**; `Sentry.init` carries ⛔ no `beforeSend`. ⇒ **⛔ nothing we added
+  distinguished this event** — every attribute in Sentry came from Sentry. And the fallback string
+  the user actually stared at for 18 hours, «משהו השתבש», is asserted by **`0`** tests.
+- 🔴 **Discord: `14/14` workflows post through one secret, and `14/14` watch ⛔ CI, ⛔ not users.**
+  ⛔ **`0`** channels are wired to a browser error, to the boundary opening, or to Sentry (that last
+  one ⛔ unmeasured, §A2 blocked). The one live path out of the user's browser is **an email in
+  Niv's inbox** — an alert that requires a human to open mail.
+- 🔴 **`verify` could ⛔ not have caught it, and this is ⛔ not "a missing test".** The `verify`
+  string is **byte-identical** at `51a12d2` and `dcf508d` (`md5` match) ⇒ the same 28 links ran.
+  `test:equitystate` was added by `G2` **over this exact panel** — and `grep -c "riskPct"` in
+  `scripts/equity-state-test.mjs` was **`0`** at `51a12d2` (it is `9` now). `S1`–`S4` read
+  **bytes**. ⇒ a failure of **evidence type**, ⛔ not of coverage: the assertions were on the right
+  file, over the right panel, in the right wave — and green.
+- **What could ⛔ not be measured, declared and ⛔ not replaced by a guess:** Sentry alert rules ·
+  Sentry-side Discord integration · Allowed Domains (⛔ no Sentry MCP — the prompt header declared
+  one; it does ⛔ not exist) · the whole UptimeRobot console (⛔ no credentials). ⚠️ What *is*
+  derivable from the repo: if UptimeRobot targets `/api/health` as documented (`AGENTS.md:14`),
+  it returns **200** while the boundary is on screen ⇒ an HTTP check ⛔ **cannot** see this class.
+- **Lesson — the one that generalises, and it is ⛔ not "add a monitor":** *a green check over a
+  population that cannot contain the phenomenon is ⛔ not evidence* — it is a denominator that
+  cannot hold what is counted (§2). That single sentence covers **three** of the six layers here:
+  Sentinel's fixture, Sentinel's Sentry query, and `S1`–`S4`. ⚠️ **And a guard that shares a
+  failure mode with the thing it guards is ⛔ not a second layer** — `watchdog` vs `sentinel`,
+  measured at `0` runs. 🔴 **Niv's ruling, same day: `B-275` moves from "recommended" to `P0` —
+  Sentinel at ~10% execution is ⛔ not a monitor** (`DECISIONS` 07.09). Alternatives are priced in
+  the audit **without a recommendation**; ⛔ **nothing was built.**
