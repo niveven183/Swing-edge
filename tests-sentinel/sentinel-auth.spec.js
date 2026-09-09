@@ -285,6 +285,44 @@ function rowsFor(page, sym) {
 function sntnlRows(page) {
   return rowsFor(page, TICKER);
 }
+// The sacred ticker whose logo LOADS (FMP 200 → <img>, alt is not textContent),
+// so it is the only one measured to carry no text badge. Named, not indexed into
+// FIXED_TRADES: NVDA/BTC-USD were never measured for this.
+const ANCHOR_CONTROL = 'AAPL';
+
+// ─── the anchor counts, printed (B-312) ─────────────────────────────────────
+//
+// The three anchor controls are Playwright assertions, and a passing assertion
+// prints NOTHING. A fully green run left `findings: 0`, `removed 0` and no count
+// anywhere, so "3 controls observed" could never be quoted from a log — the one
+// string that did appear rode on an incidental yellow finding. These lines print
+// the numbers :436-437 already read. Measured counts, never "passed", and no
+// assertion of their own.
+//
+// The control line re-measures the SAME rows at the SAME moment with the shape
+// B-305 replaced — `hasText: /\bSNTNL1\b/`. `legacy=0 anchor=1` is the evidence
+// the anchor fixed something. `legacy=1` means the TickerLogo badge did not fall
+// back on this run, so the journey never carried the 07.09 defect and the anchor
+// is unproven — a number to read and stop on, NOT a failure. Measurement only:
+// this arm is allowed to fall, which is why it can never throw out of here.
+async function logAnchorCounts(page) {
+  try {
+    const sntnl = await rowsFor(page, TICKER).count();
+    const sntnl1 = await rowsFor(page, RISK_TICKER).count();
+    const control = await rowsFor(page, ANCHOR_CONTROL).count();
+    const legacy = await page.locator(ROWS)
+      .filter({ hasText: new RegExp(`\\b${RISK_TICKER}\\b`) })
+      .count();
+    // eslint-disable-next-line no-console
+    console.log(`sentinel anchor: ${TICKER}=${sntnl} ${RISK_TICKER}=${sntnl1} ${ANCHOR_CONTROL}=${control}`);
+    // eslint-disable-next-line no-console
+    console.log(`sentinel control: legacy=${legacy} anchor=${sntnl1}`);
+  } catch (e) {
+    // Swallowing the count would be the silent failure this whole item is about.
+    // eslint-disable-next-line no-console
+    console.log(`sentinel anchor: unmeasured — ${e.message}`);
+  }
+}
 // Anything this run owns, for the leftover sweep: one locator, both tickers.
 function testRows(page) {
   return page.locator(ROWS).filter({
@@ -435,6 +473,7 @@ async function renameToRiskTicker(page) {
   // edit, otherwise hasStop is false and the fixture is benign again.
   await expect(rowsFor(page, RISK_TICKER)).toHaveCount(1, { timeout: 15_000 });
   await expect(rowsFor(page, TICKER)).toHaveCount(0, { timeout: 15_000 });
+  await logAnchorCounts(page);
 }
 
 // Guaranteed cleanup: runs even when the journey crashed before its own delete.
