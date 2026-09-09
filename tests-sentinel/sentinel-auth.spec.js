@@ -249,22 +249,47 @@ function record(diag) {
 // The desktop table only. The md:hidden mobile cards render the same trades
 // (6 delete buttons for 3 trades), and scoping here keeps them out of reach.
 //
-// ⚠️ WORD-BOUNDARY REGEX, NOT A SUBSTRING. `hasText: 'SNTNL'` is a substring
-// match, so it also matches the SNTNL1 row: `\b` sits between a word and a
-// non-word char, and L→1 is word→word, so /\bSNTNL\b/ rejects "SNTNL1" while
-// /\bSNTNL1\b/ rejects "SNTNL". Verified mutually exclusive. Without this the
-// guard in deleteRow counts 2 and the whole delete path dies the moment the
-// representativeness fixture exists — the same over-counting defect the
-// JOURNAL_TABLE comment above describes (B-146).
+// ⚠️ ATTRIBUTE ANCHOR, NEVER TEXT. Both text forms are MEASURED broken, in
+// Chromium against the real cell shape — not reasoned about:
+//
+//   locator                     SNTNL   SNTNL1   AAPL
+//   hasText: '…'  (substring)     2        1       1
+//   hasText: /\b…\b/              0        0       1
+//   has: [data-testid=…]          1        1       1
+//
+// · The substring form matches the SNTNL1 row too, so deleteRow's "exactly 1"
+//   guard sees 2 and refuses. That is why the word-boundary form replaced it.
+// · The word-boundary form matches NOTHING. TickerLogo renders a 2-letter TEXT
+//   badge when the logo 404s (TickerLogo.jsx:8-14) and sits flush against
+//   {t.ticker} (SwingEdge_App.jsx:5335), so the row Playwright reads is
+//   "SNSNTNL1…". The char before the ticker is `N`, a word char, so no boundary
+//   exists there. AAPL is the control that proves the badge is the difference
+//   and not the regex: FMP returns 200 for AAPL and 404 for both test tickers,
+//   so only the test tickers ever fall back — which is exactly why the 3 sacred
+//   trades could never have exposed this.
+//
+// ⚠️ innerText DOES carry a separator ("SN\nSNTNL1…"); hasText matches against
+// concatenated textContent and does NOT. A check written against the string the
+// author imagines cannot see that gap — the note that stood here claimed
+// "verified mutually exclusive" and was measured wrong on BOTH tickers, and the
+// first real run after it landed died 71 minutes later. B-312 / INCIDENTS#21.
+//
+// Attribute equality is exact by construction, so SNTNL and SNTNL1 cannot
+// collide by any string rule. Same remedy as JOURNAL_TABLE above (B-146), one
+// layer in.
+const tickerCell = (page, sym) => page.locator(`[data-testid="trade-ticker-${sym}"]`);
+
 function rowsFor(page, sym) {
-  return page.locator(ROWS).filter({ hasText: new RegExp(`\\b${sym}\\b`) });
+  return page.locator(ROWS).filter({ has: tickerCell(page, sym) });
 }
 function sntnlRows(page) {
   return rowsFor(page, TICKER);
 }
 // Anything this run owns, for the leftover sweep: one locator, both tickers.
 function testRows(page) {
-  return page.locator(ROWS).filter({ hasText: new RegExp(`\\b(?:${TEST_TICKERS.join('|')})\\b`) });
+  return page.locator(ROWS).filter({
+    has: page.locator(TEST_TICKERS.map((s) => `[data-testid="trade-ticker-${s}"]`).join(', ')),
+  });
 }
 
 // ─── E1 — did any error boundary open? ──────────────────────────────────────
@@ -373,8 +398,11 @@ async function deleteRow(page, sym = TICKER) {
   const n = await rows.count();
   if (n !== 1) throw new Error(`expected exactly 1 ${sym} row, found ${n}`);
   const row = rows.first();
-  const rowText = (await row.innerText()).toUpperCase();
-  if (!rowText.includes(sym)) throw new Error(`row guard failed: no ${sym} in row text`);
+  // Second guard, on the SAME anchor and never on text. The old form read
+  // innerText and would have passed here even while rowsFor matched 0 rows —
+  // two guards reading two different channels is one guard (B-312).
+  const cells = await row.locator(`[data-testid="trade-ticker-${sym}"]`).count();
+  if (cells !== 1) throw new Error(`row guard failed: ${cells} ${sym} ticker cells in row`);
   await row.locator('button[title="מחיקה"], button[title="Delete"]').first().click();
   const dialog = page.locator('[role="dialog"]');
   await dialog.waitFor({ state: 'visible', timeout: 10_000 });

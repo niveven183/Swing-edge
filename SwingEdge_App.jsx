@@ -5332,7 +5332,12 @@ export default function SwingEdge() {
                             className="w-3.5 h-3.5 rounded border border-white/20 bg-white/5 cursor-pointer accent-[var(--v3-info)]"
                           />
                         </td>
-                        <td className="p-3 font-bold text-white font-mono whitespace-nowrap"><div className="flex items-center gap-1.5"><TickerLogo ticker={t.ticker} size={16} />{t.ticker}{t.isDemo && <span className="text-xs bg-slate-700 text-slate-400 px-1 py-0.5 rounded ms-1 font-normal">DEMO</span>}<UnverifiedCcyChip trade={t} lang={lang} />{hz.stale && (
+                        {/* data-testid carries the ticker as an ATTRIBUTE VALUE, not as text.
+                            TickerLogo falls back to a 2-letter badge when the logo 404s
+                            (TickerLogo.jsx:8-14) and sits flush against {t.ticker} here, so the
+                            row's textContent is "SNSNTNL1…" — any text-based locator reads the
+                            leak. Attribute equality cannot. B-312 / INCIDENTS#21. */}
+                        <td data-testid={`trade-ticker-${t.ticker}`} className="p-3 font-bold text-white font-mono whitespace-nowrap"><div className="flex items-center gap-1.5"><TickerLogo ticker={t.ticker} size={16} />{t.ticker}{t.isDemo && <span className="text-xs bg-slate-700 text-slate-400 px-1 py-0.5 rounded ms-1 font-normal">DEMO</span>}<UnverifiedCcyChip trade={t} lang={lang} />{hz.stale && (
                             /* ⚠️ var(--warning) → --accent-amber, מודע-תמה:
                                #D97706 על לבן = 3.19:1 ✓ · #F59E0B על #0d1424 = 8.56:1 ✓.
                                ⛔ לא --v3-warn — הוא מוגדר ב-:root בלבד ואינו נדרס
