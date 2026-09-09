@@ -12,10 +12,21 @@ import fs from 'node:fs';
 // FINDING, never a hard failure. Every finding lands in browser-findings-auth.json
 // and the Sentinel `watch` job merges + classifies + de-dups + reports it.
 //
+// B-305 (09.09) — REPRESENTATIVENESS. On 07.09 the site was broken for 18h34m
+// while 6/6 sentinel runs reported success. The sentinel did not "miss" it: it
+// was asked a question about a journal that COULD NOT CONTAIN THE CASE.
+// FIXED_TRADES are 3/3 USD-denominated, so `riskInCapital` always returns
+// `identity` and `riskPct === null` was never produced — and `null.toFixed`
+// was never thrown. A green check over a population that cannot hold the
+// phenomenon is not evidence (CLAUDE.md §2). Hence RISK_TICKER below.
+//
 // GUARD RAILS:
-// · The test trade always uses ticker SNTNL — never a real symbol.
-// · Every delete interaction is scoped to a table row containing SNTNL. The
-//   three permanent QA trades (AAPL/NVDA/BTC-USD) are sacred.
+// · The test trades always use SNTNL / SNTNL1 — never a real symbol.
+// · Every delete interaction is scoped to a table row whose text matches the
+//   ticker on WORD BOUNDARIES. A bare substring 'SNTNL' also matches 'SNTNL1',
+//   which would make deleteRow's "exactly 1 row" guard see 2 and refuse — or,
+//   worse, act on the wrong row. The three permanent QA trades
+//   (AAPL/NVDA/BTC-USD) are sacred.
 // · afterAll runs a REST cleanup even if the journey crashed mid-way, so a
 //   crashed run cannot leave orphan rows behind in production.
 // · Passwords and tokens are never logged or written to findings.
@@ -33,7 +44,42 @@ const SUPA_URL = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '
 const SUPA_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 
 const TICKER = 'SNTNL';
+// The representativeness fixture (B-305). SNTNL1 carries a digit inside an
+// otherwise alphabetic string, so it falls BETWEEN instrumentCurrency.js's two
+// regexes (ALPHA_TICKER :135, NUMERIC_TICKER :134) and reaches the fallthrough:
+// AMBIGUOUS/unrecognized_ticker → !isAggregatable → riskInCapital refuses
+// `unverified_instrument` → riskDollar null → riskPct null. With a stop and
+// shares > 0 that is EXACTLY the 07.09 row.
+//
+// ⚠️ It is produced by RENAMING an existing SNTNL trade, never by creating it.
+// sizePosition refuses an unverified paper outright (positionSizing.js:54), so
+// creating SNTNL1 through the form yields shares = null → hasStop false → the
+// old guard renders "—" and nothing throws. EditTradeModal carries `shares` as
+// a raw field and never calls sizePosition, so the rename preserves 100 shares.
+// Measured both ways in scripts/sentinel-firing-probe.mjs — the create path is
+// kept there as a CONTROL arm precisely because it looks right and is not.
+const RISK_TICKER = 'SNTNL1';
+const TEST_TICKERS = [TICKER, RISK_TICKER];
 const FIXED_TRADES = ['AAPL', 'NVDA', 'BTC-USD'];
+// The five contained panels (SwingEdge_App.jsx :4253/:4737/:5004/:6109/:6812).
+// Checked SEPARATELY and never as one sweep: B-304 split the blast radius, so a
+// dead risk panel now leaves the journal rendering. A single "is the page ok"
+// assertion would be green while a panel is dead — R-4 in a costume.
+const PANELS = ['risk', 'journal', 'mentoring', 'analytics', 'watchlist'];
+// ⚠️ Each panel mounts ONLY on its own tab (the five `{tab === "…" && (` blocks
+// at :4252/:4423/:5003/:6108/:6729). Counting [data-boundary="risk"] while the
+// journal tab is open returns 0 for a panel that never rendered — a green over a
+// population that CANNOT contain the phenomenon, which is the exact defect B-305
+// exists to remove (CLAUDE.md §2). So the sweep VISITS the tab first, and when it
+// cannot, it says so in yellow instead of counting zero.
+const PANEL_TAB = {
+  risk: 'dashboard',      // SwingEdge_App.jsx:4737, inside {tab === "dashboard"}
+  journal: 'journal',     // :5004
+  mentoring: 'mentoring', // :4253 — ⚠️ the tab button itself only exists when
+                          //          myMentees.length > 0 (:4232-4234)
+  analytics: 'analytics', // :6109
+  watchlist: 'intel',     // :6812, inside {tab === "intel"}
+};
 const COMPONENT = 'דפדפן (מחובר)';
 // Scoped to the journal table's own data-testid, NOT to `table.w-full.text-xs`:
 // that class trio matches 3 tables in SwingEdge_App.jsx and 3 more in AdminPanel.jsx
@@ -202,8 +248,117 @@ function record(diag) {
 
 // The desktop table only. The md:hidden mobile cards render the same trades
 // (6 delete buttons for 3 trades), and scoping here keeps them out of reach.
+//
+// ⚠️ WORD-BOUNDARY REGEX, NOT A SUBSTRING. `hasText: 'SNTNL'` is a substring
+// match, so it also matches the SNTNL1 row: `\b` sits between a word and a
+// non-word char, and L→1 is word→word, so /\bSNTNL\b/ rejects "SNTNL1" while
+// /\bSNTNL1\b/ rejects "SNTNL". Verified mutually exclusive. Without this the
+// guard in deleteRow counts 2 and the whole delete path dies the moment the
+// representativeness fixture exists — the same over-counting defect the
+// JOURNAL_TABLE comment above describes (B-146).
+function rowsFor(page, sym) {
+  return page.locator(ROWS).filter({ hasText: new RegExp(`\\b${sym}\\b`) });
+}
 function sntnlRows(page) {
-  return page.locator(ROWS).filter({ hasText: TICKER });
+  return rowsFor(page, TICKER);
+}
+// Anything this run owns, for the leftover sweep: one locator, both tickers.
+function testRows(page) {
+  return page.locator(ROWS).filter({ hasText: new RegExp(`\\b(?:${TEST_TICKERS.join('|')})\\b`) });
+}
+
+// ─── E1 — did any error boundary open? ──────────────────────────────────────
+//
+// The third blocker, and the one nobody had measured: before this commit the
+// two sentinel specs contained ZERO assertions that an error card is absent.
+// A boundary is designed to keep the page alive, so a crashed panel produces a
+// perfectly loadable page — every other check stays green while the user looks
+// at a dead box.
+//
+// MATCHED ON MACHINE HOOKS, NEVER ON TEXT. `data-boundary` is written by
+// PanelBoundary.jsx:78 and `role="alert"`+`h1` is the RootFallback shape
+// (main.jsx:107-127). Matching the copy instead would be both fragile and
+// wrong: LandingPage.jsx:101 renders the string "משהו השתבש. נסה שוב עוד רגע."
+// as a normal waitlist error, so a text assertion reports a crash on a healthy
+// marketing page.
+//
+// ONE FINDING PER PANEL. B-304 gave each panel its own boundary, so a dead
+// risk board leaves the journal rendering; a single page-level assertion would
+// be green while a panel is dead. Per-panel fingerprints also let the watch
+// job de-dup and name which board died.
+//
+// NOT pageerror: React routes an error caught by a boundary to onCaughtError,
+// not to window.reportError, so `page.on('pageerror')` may never fire for
+// exactly the crash this check exists to catch. The DOM is the evidence.
+//
+// ⚠️ AND THE SWEEP IS ONLY EVIDENCE WHILE THE FIXTURE IS LIVE. `phase` carries
+// whether SNTNL1 actually reached the journal: five green panels over a journal
+// that holds only the 3 USD trades is precisely the 6/6 success of 07.09.
+async function gotoTab(page, id) {
+  const btn = page.locator(`[data-tour-tab="${id}"]`);
+  if (await btn.count() === 0) return 'absent';
+  await btn.first().click();
+  // The active tab is the one carrying border-emerald-400 (:4239). Waiting for
+  // the class rather than a fixed sleep is what makes "the panel rendered" a
+  // measured fact instead of an assumption.
+  await expect(btn.first()).toHaveClass(/border-emerald-400/, { timeout: 10_000 });
+  return 'active';
+}
+
+async function sweepBoundaries(page, phase) {
+  for (const name of PANELS) {
+    const tabId = PANEL_TAB[name];
+    let state = '';
+    try { state = await gotoTab(page, tabId); }
+    catch (e) { state = `error: ${e.message}`; }
+
+    if (state !== 'active') {
+      // NOT green. The mentoring tab is absent for an account with no mentees,
+      // so its boundary is structurally unmeasurable here — declared, never
+      // counted as a pass.
+      add(COMPONENT, `browser-auth|boundary-unmeasurable|${name}`, 'yellow', '🟡',
+        `גבול הפאנל "${name}" (טאב ${tabId}, ${phase})`,
+        state === 'absent' ? `הטאב "${tabId}" אינו קיים במסך הזה` : `הטאב "${tabId}" לא נפתח — ${state}`,
+        'הפאנל לא רונדר בכלל ⇒ הבדיקה ⛔ יכולה לירות — ירוק כאן אינו ראיה שהוא חי',
+        `בדוק שהטאב "${tabId}" נגיש לחשבון ה-QA; mentoring דורש myMentees.length > 0`,
+        'בדיקה בלבד — ללא סיכון');
+      continue;
+    }
+
+    let n = 0;
+    try { n = await page.locator(`[data-boundary="${name}"]`).count(); }
+    catch (e) {
+      add(COMPONENT, `browser-auth|boundary-check-failed|${name}`, 'yellow', '🟡',
+        `בדיקת גבול הפאנל "${name}" (${phase})`,
+        `${e.message}`,
+        'הבדיקה עצמה נכשלה — לא ניתן לדעת אם הפאנל קרס',
+        'ודא ש-data-boundary עדיין נכתב ב-PanelBoundary.jsx',
+        'בדיקה בלבד — ללא סיכון');
+      continue;
+    }
+    if (n > 0) {
+      add(COMPONENT, `browser-auth|panel-crashed|${name}`, 'red', '🔴',
+        `פאנל "${name}" רונדר ללא כרטיס שגיאה (${phase})`,
+        `נמצאו ${n} כרטיסי [data-boundary="${name}"] במסך`,
+        `ה-Error Boundary של "${name}" נפתח — הפאנל הזה מת אצל המשתמש בזמן ששאר המסך נראה תקין`,
+        'בדוק את ה-issue ב-Sentry (tag boundary=' + name + '); זו קריסת רינדור, לא תקלת רשת',
+        'rollback — נמוך, מחזיר מצב ידוע-תקין');
+    }
+  }
+  // The root net. It has no data- hook (main.jsx is product code and this wave
+  // does not touch it), so the anchor is structural: RootFallback is the only
+  // role="alert" that contains an <h1>. PanelBoundary's card is role="alert"
+  // too but renders a <span>, so the two cannot be confused.
+  try {
+    if (await page.locator('[role="alert"] h1').count() > 0) {
+      add(COMPONENT, 'browser-auth|root-crashed', 'red', '🔴',
+        `גבול השורש של האפליקציה (${phase})`,
+        'RootFallback מרונדר — role="alert" עם h1',
+        'כל האפליקציה קרסה, לא פאנל בודד — המשתמש רואה מסך שגיאה במקום המוצר',
+        'בדוק את ה-issue ב-Sentry (boundary=root) ואת ה-deploy האחרון',
+        'rollback — נמוך, מחזיר מצב ידוע-תקין');
+    }
+  } catch { /* ⛔ בולעים: כשל הלוקייטור עצמו כבר מדווח לכל פאנל למעלה */ }
 }
 
 async function openJournal(page) {
@@ -211,28 +366,63 @@ async function openJournal(page) {
   await page.locator(JOURNAL_TABLE).waitFor({ state: 'visible', timeout: 15_000 });
 }
 
-// Deletes the SNTNL row through the UI, exactly the way a user would.
-// Refuses to click anything unless exactly one row matches SNTNL.
-async function deleteSntnlRow(page) {
-  const rows = sntnlRows(page);
+// Deletes one test row through the UI, exactly the way a user would.
+// Refuses to click anything unless exactly one row matches the ticker.
+async function deleteRow(page, sym = TICKER) {
+  const rows = rowsFor(page, sym);
   const n = await rows.count();
-  if (n !== 1) throw new Error(`expected exactly 1 ${TICKER} row, found ${n}`);
+  if (n !== 1) throw new Error(`expected exactly 1 ${sym} row, found ${n}`);
   const row = rows.first();
   const rowText = (await row.innerText()).toUpperCase();
-  if (!rowText.includes(TICKER)) throw new Error(`row guard failed: no ${TICKER} in row text`);
+  if (!rowText.includes(sym)) throw new Error(`row guard failed: no ${sym} in row text`);
   await row.locator('button[title="מחיקה"], button[title="Delete"]').first().click();
   const dialog = page.locator('[role="dialog"]');
   await dialog.waitFor({ state: 'visible', timeout: 10_000 });
   await dialog.getByRole('button', { name: /^(מחק|Delete)$/ }).click();
-  await expect(sntnlRows(page)).toHaveCount(0, { timeout: 15_000 });
+  await expect(rowsFor(page, sym)).toHaveCount(0, { timeout: 15_000 });
+}
+
+// Renames SNTNL → SNTNL1 through the edit modal. This is the SUPPLIER of the
+// 07.09 shape; see the RISK_TICKER comment for why creating it directly cannot
+// work. The first input in the modal is the ticker field (EditTradeModal.jsx
+// :148-152), and its current value is asserted before anything is typed — the
+// same "refuse unless certain" rule deleteRow follows, because a blind fill
+// into the wrong field would silently corrupt entry, stop or shares.
+async function renameToRiskTicker(page) {
+  const rows = rowsFor(page, TICKER);
+  const n = await rows.count();
+  if (n !== 1) throw new Error(`expected exactly 1 ${TICKER} row to rename, found ${n}`);
+  await rows.first().locator('button[title="עריכה"], button[title="Edit"]').first().click();
+  const dialog = page.locator('[role="dialog"]');
+  await dialog.waitFor({ state: 'visible', timeout: 10_000 });
+  const tickerInput = dialog.locator('input').first();
+  const current = await tickerInput.inputValue();
+  if (current !== TICKER) {
+    throw new Error(`edit modal guard failed: first input holds "${current}", expected ${TICKER}`);
+  }
+  await tickerInput.fill(RISK_TICKER);
+  await dialog.getByRole('button', { name: /(שמור שינויים|Save Changes)/ }).click();
+  await dialog.waitFor({ state: 'detached', timeout: 10_000 });
+  // The row is the proof, not the toast — and shares must have survived the
+  // edit, otherwise hasStop is false and the fixture is benign again.
+  await expect(rowsFor(page, RISK_TICKER)).toHaveCount(1, { timeout: 15_000 });
+  await expect(rowsFor(page, TICKER)).toHaveCount(0, { timeout: 15_000 });
 }
 
 // Guaranteed cleanup: runs even when the journey crashed before its own delete.
-// RLS ("users own trades") limits this to the QA account's own SNTNL rows.
+// RLS ("users own trades") limits this to the QA account's own test rows.
+//
+// ⚠️ CLOSED LIST, NEVER A PATTERN. `in.(SNTNL,SNTNL1)` names both tickers this
+// spec can create; `like.SNTNL*` would have been shorter and would delete any
+// future real symbol that happens to start with those letters. The journey can
+// crash between the create and the rename, so BOTH names must be swept — a
+// cleanup that only knows the name it hoped for leaves rows in production.
+const CLEANUP_FILTER = `ticker=in.(${TEST_TICKERS.join(',')})`;
+
 async function restCleanup() {
   if (!SUPA_URL || !SUPA_KEY) {
     add(COMPONENT, 'browser-auth|cleanup-unconfigured', 'yellow', '🟡',
-      `ניקוי REST של עסקאות ${TICKER}`,
+      `ניקוי REST של עסקאות ${TEST_TICKERS.join('/')}`,
       'SUPABASE_URL/SUPABASE_ANON_KEY לא מוגדרים — ניקוי ה-REST דולג',
       'ה-secrets של Supabase חסרים ב-CI; המחיקה ב-UI רצה אך אין רשת ביטחון',
       'הוסף SUPABASE_URL + SUPABASE_ANON_KEY ל-GitHub Secrets',
@@ -252,7 +442,7 @@ async function restCleanup() {
     if (!token) throw new Error('auth response had no access_token');
   } catch (e) {
     add(COMPONENT, 'browser-auth|cleanup-failed', 'red', '🔴',
-      `הנפקת טוקן לניקוי ${TICKER} (auth/v1/token)`,
+      `הנפקת טוקן לניקוי ${TEST_TICKERS.join('/')} (auth/v1/token)`,
       `${e.message}`,
       'ה-spec לא יכול לנקות אחרי עצמו — עסקאות בדיקה יצטברו בפרודקשן כל שעה',
       'בדוק את SUPABASE_URL/ANON_KEY ואת סיסמת חשבון ה-QA; 401/403 = מפתח לא מתאים',
@@ -261,7 +451,7 @@ async function restCleanup() {
   }
 
   try {
-    const res = await fetch(`${SUPA_URL}/rest/v1/trades?ticker=eq.${TICKER}`, {
+    const res = await fetch(`${SUPA_URL}/rest/v1/trades?${CLEANUP_FILTER}`, {
       method: 'DELETE',
       headers: {
         apikey: SUPA_KEY,
@@ -273,18 +463,18 @@ async function restCleanup() {
     const rows = await res.json();
     const n = Array.isArray(rows) ? rows.length : 0;
     // eslint-disable-next-line no-console
-    console.log(`sentinel rest cleanup: removed ${n} ${TICKER} row(s)`);
+    console.log(`sentinel rest cleanup: removed ${n} ${TEST_TICKERS.join('/')} row(s)`);
     if (n > 0 && uiDeleteOk) {
       add(COMPONENT, 'browser-auth|ui-delete-incomplete', 'amber', '🟠',
         'האם המחיקה ב-UI באמת הגיעה ל-DB',
-        `המחיקה ב-UI דווחה כהצליחה אך ${n} שורות ${TICKER} עוד היו ב-DB`,
+        `המחיקה ב-UI דווחה כהצליחה אך ${n} שורות בדיקה עוד היו ב-DB`,
         'ה-UI מסיר את השורה מה-state אך המחיקה ב-Supabase לא נשמרה',
         'בדוק את handleDeleteTrade ב-SwingEdge_App.jsx ואת שגיאות ה-delete ב-console',
         'אבחון תלוי-סיבה — הערך לפני פעולה');
     }
   } catch (e) {
     add(COMPONENT, 'browser-auth|cleanup-failed', 'red', '🔴',
-      `DELETE /rest/v1/trades?ticker=eq.${TICKER}`,
+      `DELETE /rest/v1/trades?${CLEANUP_FILTER}`,
       `${e.message}`,
       'ה-spec לא יכול לנקות אחרי עצמו — עסקאות בדיקה יצטברו בפרודקשן כל שעה',
       'בדוק זמינות Supabase ואת מדיניות ה-RLS על trades; 401/403 = מפתח לא מתאים',
@@ -298,7 +488,7 @@ test.skip(!AUTH_ON, 'SENTINEL_AUTH != 1 — authenticated layer is off for this 
 // context, which would mean seven logins. The config's 60s per-test budget is
 // too small for a 7-step journey where a failing step can burn 15s, and a
 // timeout would truncate the findings.
-test('authenticated journey: login → journal → create/delete SNTNL', async ({ page }) => {
+test('authenticated journey: login → journal → SNTNL → SNTNL1 → boundaries → delete', async ({ page }) => {
   test.setTimeout(180_000);
 
   if (!QA_EMAIL || !QA_PASSWORD) {
@@ -397,18 +587,20 @@ test('authenticated journey: login → journal → create/delete SNTNL', async (
   }
 
   try {
-    if (await sntnlRows(page).count() > 0) {
+    if (await testRows(page).count() > 0) {
       add(COMPONENT, 'browser-auth|stale-testdata', 'amber', '🟠',
-        `שרידי עסקת בדיקה (${TICKER}) ביומן`,
-        'נמצאה שורת SNTNL מריצה קודמת — הניקוי הקודם לא הושלם',
+        `שרידי עסקת בדיקה (${TEST_TICKERS.join('/')}) ביומן`,
+        'נמצאה שורת בדיקה מריצה קודמת — הניקוי הקודם לא הושלם',
         'המחיקה ב-UI או ניקוי ה-REST של הריצה הקודמת נכשלו',
         'נמחקה אוטומטית בריצה זו; בדוק את לוג הריצה הקודמת ב-Actions',
         'מחיקת שורת בדיקה בלבד — ללא סיכון');
-      await deleteSntnlRow(page);
+      for (const sym of TEST_TICKERS) {
+        if (await rowsFor(page, sym).count() > 0) await deleteRow(page, sym);
+      }
     }
   } catch (e) {
     add(COMPONENT, 'browser-auth|sweep-failed', 'amber', '🟠',
-      `ניקוי שרידי ${TICKER} ב-UI`,
+      `ניקוי שרידי ${TEST_TICKERS.join('/')} ב-UI`,
       `${e.message}`,
       'שורת בדיקה ישנה נשארה ביומן — ה-REST של afterAll עוד ינסה להסיר אותה',
       'אם חוזר: בדוק את זרימת המחיקה ב-UI ואת ניקוי ה-REST',
@@ -493,14 +685,38 @@ test('authenticated journey: login → journal → create/delete SNTNL', async (
       'rollback — נמוך, מחזיר מצב ידוע-תקין');
   }
 
-  // ---- 6. tabs (3 tabs — there is no Coach tab) ----
+  // ---- 5b. B-305 — turn the trade into the 07.09 shape. ----
+  // The rename is the whole point of this wave: SNTNL is USD-derived and can
+  // never produce riskPct === null, so the journey up to here asks a question
+  // its own journal cannot answer. SNTNL1 falls through instrumentCurrency's two
+  // regexes → unverified_instrument → riskDollar null → riskPct null, WITH a stop
+  // and 100 shares. That row is measured (scripts/sentinel-firing-probe.mjs) to
+  // throw under the 51a12d2 guard and render "—" under the current one.
+  let fixtureLive = false;
+  if (created) {
+    try {
+      await renameToRiskTicker(page);
+      fixtureLive = true;
+    } catch (e) {
+      add(COMPONENT, 'browser-auth|fixture-failed', 'red', '🔴',
+        `הפיכת ${TICKER} ל-${RISK_TICKER} דרך מודל העריכה (מתקן הייצוגיות)`,
+        `${e.message}`,
+        'העריכה נשברה — וגם: בלי השורה הזו הסנטינל בודק ג\'ורנל ש⛔ יכול להכיל את תקלת 07.09, כלומר ירוק חסר-ערך',
+        'בדוק את EditTradeModal (שדה הטיקר :148-152, שמירה :402-405) ואת מסלול הכתיבה ל-trades',
+        'rollback — נמוך, מחזיר מצב ידוע-תקין');
+    }
+  }
+
+  // ---- 6. tabs + E1: did any error boundary open? ----
+  // Replaces the old 3-click tab hop. Same coverage (analytics/dashboard/journal
+  // are three of the five stops) plus intel and mentoring, and every stop is now
+  // asserted rather than merely visited.
+  await sweepBoundaries(page, fixtureLive ? `${RISK_TICKER} ביומן` : `⚠️ ${RISK_TICKER} ⛔ ביומן`);
   try {
-    await page.locator('[data-tour-tab="analytics"]').click();
-    await page.locator('[data-tour-tab="dashboard"]').click();
     await openJournal(page);
   } catch (e) {
     add(COMPONENT, 'browser-auth|tab-switch', 'red', '🔴',
-      'מעבר טאבים ניתוח ביצועים → לוח בקרה → יומן',
+      'חזרה לטאב היומן אחרי סריקת הגבולות',
       `${e.message}`,
       'טאב לא נטען — חלק מהאפליקציה לא נגיש למשתמש מחובר',
       'בדוק שגיאות JS בטאב שנפל ואת ה-deploy האחרון',
@@ -508,13 +724,15 @@ test('authenticated journey: login → journal → create/delete SNTNL', async (
   }
 
   // ---- 7. delete through the UI ----
+  // The row now carries RISK_TICKER when the rename landed; deleting the ticker
+  // that is actually on screen, never the one we hoped for.
   if (created) {
     try {
-      await deleteSntnlRow(page);
+      await deleteRow(page, fixtureLive ? RISK_TICKER : TICKER);
       uiDeleteOk = true;
     } catch (e) {
       add(COMPONENT, 'browser-auth|delete-failed', 'red', '🔴',
-        `מחיקת עסקת ${TICKER} דרך ה-UI (כולל דיאלוג האישור)`,
+        `מחיקת עסקת הבדיקה דרך ה-UI (כולל דיאלוג האישור)`,
         `${e.message}`,
         'משתמשים לא יכולים למחוק עסקה — או שדיאלוג האישור נשבר',
         'בדוק את handleDeleteTrade ואת ConfirmProvider (src/components/ToastProvider.jsx)',
