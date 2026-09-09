@@ -11,6 +11,7 @@ import WelcomeAnnouncement from "./src/components/WelcomeAnnouncement.jsx";
 import OnboardingTour from "./src/components/OnboardingTour.jsx";
 import FeedbackTab from "./src/components/FeedbackTab.jsx";
 import IOSInstallBanner from "./src/components/IOSInstallBanner.jsx";
+import PanelBoundary from "./src/components/PanelBoundary.jsx";
 // Admin-only, self-contained, and off the normal tab flow → lazy-loaded so its
 // bundle (incl. recharts) is fetched only when an admin opens the Admin tab.
 function lazyWithRetry(importFn) {
@@ -4249,6 +4250,7 @@ export default function SwingEdge() {
 
         {/* ══════════════ MENTORING (B4.3 — read-only mentee view) ══════════════ */}
         {tab === "mentoring" && (
+          <PanelBoundary name="mentoring">
           <div className="space-y-5">
             <div className="flex items-center gap-2">
               <Users size={18} className="text-[var(--v3-accent)]" />
@@ -4414,6 +4416,7 @@ export default function SwingEdge() {
               </div>
             )}
           </div>
+          </PanelBoundary>
         )}
 
         {/* ══════════════ DASHBOARD ══════════════ */}
@@ -4731,6 +4734,7 @@ export default function SwingEdge() {
             })()}
 
             {/* ══ RISK DASHBOARD ══ */}
+            <PanelBoundary name="risk">
             {(() => {
               const MAX_RISK_PCT = maxRiskPct; // % of capital — derived from per-trade risk state
               const maxRiskDollar = capital * (MAX_RISK_PCT / 100);
@@ -4990,12 +4994,14 @@ export default function SwingEdge() {
                 </div>
               );
             })()}
+            </PanelBoundary>
             </>
           </div>
         )}
 
         {/* ══════════════ JOURNAL ══════════════ */}
         {tab === "journal" && (
+          <PanelBoundary name="journal">
           <div className="space-y-4 animate-fade-in">
             <MixedCurrencyBanner stats={journalStats} t={t} />
             {/* Smart Lessons Section */}
@@ -5470,6 +5476,7 @@ export default function SwingEdge() {
             </>
             )}
           </div>
+          </PanelBoundary>
         )}
 
         {/* ══════════════ TOOLS — sub-nav ══════════════ */}
@@ -6099,6 +6106,7 @@ export default function SwingEdge() {
 
         {/* ══════════════ ANALYTICS ══════════════ */}
         {tab === "analytics" && (
+          <PanelBoundary name="analytics">
           <div className="space-y-8 animate-fade-in">
             <MixedCurrencyBanner stats={stats} t={t} />
             {/* C7 — the missing-rate marker. Silence and success look the
@@ -6714,6 +6722,7 @@ export default function SwingEdge() {
               );
             })()}
           </div>
+          </PanelBoundary>
         )}
 
         {/* ══════════════ INTEL ══════════════ */}
@@ -6800,6 +6809,7 @@ export default function SwingEdge() {
               </div>
 
               {/* Watchlist */}
+              <PanelBoundary name="watchlist">
               <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4 flex flex-col" style={{ height: 440 }}>
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">{t.watchlist}</span>
@@ -6905,6 +6915,7 @@ export default function SwingEdge() {
                   )}
                 </div>
               </div>
+              </PanelBoundary>
             </div>
 
             {/* ── MARKET OVERVIEW ── weekly change across indices, sectors & themes */}
