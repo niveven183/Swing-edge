@@ -8264,6 +8264,7 @@ export default function SwingEdge() {
 
       {/* ── EDIT TRADE MODAL ── */}
       <EditTradeModal
+        key={editingTrade?.id}
         trade={editingTrade}
         lang={lang}
         onClose={() => setEditingTrade(null)}
