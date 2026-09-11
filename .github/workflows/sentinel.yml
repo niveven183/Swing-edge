@@ -13,7 +13,11 @@ name: Sentinel
 
 on:
   schedule:
-    - cron: '20,50 * * * *'   # :20 and :50 every hour
+    # B-318: two lines, not '20,50', so github.event.schedule identifies WHICH
+    # slot fired. The gate below reads that string; it is the only slot identity
+    # that survives the scheduler's delay. Re-merging these breaks the gate loudly.
+    - cron: '20 * * * *'   # :20 — public layers only
+    - cron: '50 * * * *'   # :50 — owns the authenticated QA layer
   workflow_dispatch:           # manual runs always post one status message
     inputs:
       run_auth:
@@ -23,7 +27,12 @@ on:
 
 concurrency:
   group: sentinel
-  cancel-in-progress: true
+  # B-318 §3: this MUST stay false. A workflow-level cancel overrides the job-level
+  # `cancel-in-progress: false` on `browser` below and kills it mid-mutation on the
+  # live QA account — the exact thing that job's own comment forbids. Measured over
+  # 59 runs (03-10.09): max run 7.2 min vs min gap 87.8 min, so nothing ever queues;
+  # the group is dormant insurance, and `true` made it a hazard instead.
+  cancel-in-progress: false
 
 permissions:
   contents: read               # zero repo writes from the run
@@ -66,28 +75,42 @@ jobs:
       # the apt call, and with it this failure class, entirely.
       - name: Install Chromium (binary only — OS deps already present, see B-166)
         run: npx playwright install chromium
-      # The authenticated layer (A2) runs once an hour, not twice: it logs into the
-      # live QA account and mutates data. The :50 run owns it. The window is
-      # 45→09 and not 45-59 because the GitHub scheduler is routinely 5-15 min
-      # late and a :50 run often lands past the hour; it stops at 09 so a :20 run
-      # that is ~55 min late cannot also claim the slot and mutate twice in one hour.
+      # The authenticated layer (A2) runs once per scheduled hour, not twice: it
+      # logs into the live QA account and mutates data. The :50 slot owns it.
+      # B-318: the slot identity comes from github.event.schedule — the cron line
+      # that fired this run — and never from the execution clock. The old gate read
+      # `date -u +%M` and guessed; measured over 57 scheduled runs (03-10.09) that
+      # minute is uniform across the hour (chi2=3.11, df=5, crit=11.07), so the gate
+      # was a coin flip: it opened on 19/57 = 33.3% of runs instead of on the :50
+      # slot. Widening the window cannot fix that — only anchoring on the slot can.
+      # An unrecognised cron string exits non-zero on purpose: a gate that silently
+      # falls back to auth=0 switches the authenticated QA layer off forever and
+      # nobody finds out. Failing here costs one run and posts a Discord fault.
       - name: Decide whether the authenticated layer runs
         id: gate
         env:
           GH_EVENT: ${{ github.event_name }}
           RUN_AUTH: ${{ inputs.run_auth }}
+          SCHEDULE: ${{ github.event.schedule }}
         run: |
           set -uo pipefail
-          MIN="$((10#$(date -u +%M)))"
+          SLOT="${SCHEDULE:-}"
           auth=0
-          { [ "$MIN" -ge 45 ] || [ "$MIN" -le 9 ]; } && auth=1
           if [ "${GH_EVENT:-}" = "workflow_dispatch" ]; then
-            auth=0
             [ "${RUN_AUTH:-true}" = "true" ] && auth=1
+          else
+            case "$SLOT" in
+              '50 * * * *') auth=1 ;;
+              '20 * * * *') auth=0 ;;
+              *)
+                echo "::error::Sentinel gate (B-318): unrecognised github.event.schedule=[$SLOT] on event=${GH_EVENT:-}. The cron lines in sentinel.yml and this gate have drifted apart — fix both together."
+                exit 1
+                ;;
+            esac
           fi
           echo "SENTINEL_AUTH=$auth" >> "$GITHUB_ENV"
           echo "auth=$auth" >> "$GITHUB_OUTPUT"
-          echo "minute=$MIN event=${GH_EVENT:-} auth=$auth"
+          echo "schedule=[$SLOT] event=${GH_EVENT:-} auth=$auth"
       - name: Run Sentinel browser QA
         env:
           SENTINEL_QA_EMAIL: ${{ secrets.SENTINEL_QA_EMAIL }}
