@@ -7,6 +7,46 @@ const pkg = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf-8")
 );
 
+const BOOT_GUARD_ANCHOR = "se-main-script";
+
+// Vite re-emits the entry <script> with a hashed `src` and keeps only the
+// attributes it put there itself, so the `id` written in index.html never
+// reaches dist/. The B-164 boot-recovery guard anchors on that id, so it hit
+// `if (!el) return;` and shipped dead for its entire life (B-320): a chunk
+// pruned by a superseding deploy left the user on the spinner forever.
+//
+// This runs `post`, the only point at which the rewritten tag exists. The throw
+// is the load-bearing part — if a future Vite changes the emit shape the build
+// stops, instead of silently shipping a dead guard a second time.
+function keepBootGuardAnchor() {
+  return {
+    name: "se-keep-boot-guard-anchor",
+    apply: "build",
+    transformIndexHtml: {
+      order: "post",
+      handler(html) {
+        const tags = (html.match(/<script\b[^>]*><\/script>/g) || []).filter(
+          (t) => /\btype="module"/.test(t) && /\bsrc="/.test(t)
+        );
+        if (tags.length !== 1) {
+          throw new Error(
+            `[se-keep-boot-guard-anchor] expected exactly 1 module entry <script> ` +
+              `in the emitted HTML, found ${tags.length}. The boot-recovery guard ` +
+              `anchors on #${BOOT_GUARD_ANCHOR}; emitting without it strands users ` +
+              `behind a 404 chunk during a deploy (B-320).`
+          );
+        }
+        const [tag] = tags;
+        if (tag.includes(`id="${BOOT_GUARD_ANCHOR}"`)) return html;
+        return html.replace(
+          tag,
+          tag.replace("<script", `<script id="${BOOT_GUARD_ANCHOR}"`)
+        );
+      },
+    },
+  };
+}
+
 export default defineConfig({
   // Expose the package version to the client bundle (used by the feedback tab's
   // context auto-attach). Only the version string is injected — not all of pkg.
@@ -26,6 +66,7 @@ export default defineConfig({
       sourcemaps: { disable: true },
       release: { create: false, finalize: false },
     }),
+    keepBootGuardAnchor(),
   ],
   build: {
     rollupOptions: {

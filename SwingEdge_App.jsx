@@ -13,7 +13,12 @@ import FeedbackTab from "./src/components/FeedbackTab.jsx";
 import IOSInstallBanner from "./src/components/IOSInstallBanner.jsx";
 import PanelBoundary from "./src/components/PanelBoundary.jsx";
 // Admin-only, self-contained, and off the normal tab flow → lazy-loaded so its
-// bundle (incl. recharts) is fetched only when an admin opens the Admin tab.
+// own chunk is fetched only when an admin opens the Admin tab.
+//
+// It does NOT defer recharts: `manualChunks` gives recharts its own chunk, which
+// dist/index.html statically <link rel=modulepreload>s on every page load. Every
+// visitor downloads it (measured 2026-09-13, B-320). The retry below only covers
+// dynamic imports — a statically preloaded chunk never reaches importFn.
 function lazyWithRetry(importFn) {
   return lazy(() =>
     importFn().catch((err) => {
