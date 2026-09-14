@@ -4469,7 +4469,11 @@ export default function SwingEdge() {
               <StatCard label={t.netPnlClosed} value={fmt$(Math.round(totalPnL * 100) / 100, dispCcy)} sub={`${closedTrades.length} ${t.closedTrades}`} trend={stats.returnPct} trendText={formatReturnPct(stats.returnPct)} icon={TrendingUp} accent={totalPnL >= 0 ? "green" : "red"} />
               <StatCard label={<span className="flex items-center gap-1">{t.winRate}<TermTooltip term="winRate" lang={lang} /></span>} value={formatPct(winRate)} sub={winLossBeSub(stats)} icon={Target} accent="purple" />
               <StatCard label={<span className="flex items-center gap-1">{t.avgRMultiple}<TermTooltip term="avgR" lang={lang} /></span>} value={fmtR(avgR)} sub={rSampleSub(t, stats)} icon={Activity} accent="amber" />
-              <StatCard label={t.dailyPnl} value={fmt$(Math.round(dailyPnL), dispCcy)} sub={t.todayTrades} icon={DollarSign} accent={dailyPnL >= 0 ? "green" : "red"} />
+              {/* B-297 (ז): התווית אומרת מה המספר **מחשב** — `closedToday + openPnL.value` —
+                  ⛔ ולא «היום». החישוב ⛔ לא נגע (`B-298` נשאר פתוח); רק השם והפורמט.
+                  `Math.round(x*100)/100` כמו `:4469` — `fmt$` תמיד מדפיס `.00`, ולכן
+                  `Math.round` ערום הבטיח אגורות שאין לו (`D-068`). */}
+              <StatCard label={t.openPlusClosedToday} value={fmt$(Math.round(dailyPnL * 100) / 100, dispCcy)} sub={t.openIsCumulative} icon={DollarSign} accent={dailyPnL >= 0 ? "green" : "red"} />
               <StatCard label={t.streakCounter} value={<span className="flex items-center gap-1">{currentStreak > 0 && <Flame size={18} className="text-orange-400" />}{currentStreak}</span>} sub={`${t.bestStreak}: ${bestStreak}`} icon={Zap} accent={currentStreak >= 3 ? "green" : "amber"} />
             </div>
 
