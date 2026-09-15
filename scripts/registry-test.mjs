@@ -787,6 +787,41 @@ check("13.2", `${backlog.length - wrongWidth.length}/${backlog.length} שורו�
   wrongWidth.length === 0,
   wrongWidth.map((x) => `${x.id} (${FILES.BACKLOG}:${x.lineNo}) — ${x.n} תאים במקום ${BACKLOG_CELLS}. ⛔ \`|\` בגוף חייב להיות מוברח \`\\|\``).join("\n      "));
 
+// ── §14 · `CLAUDE.md` §7 — מניית חוליות `verify` נגזרת, ⛔ נכתבת ─────────────
+//
+// 🔴 **המספר הוזז ביד שבע פעמים** (`B-274`). הפרוזה אמרה «23» בעוד הבלוק מנה 24
+// ו-`package.json` הריץ 24; מאז `24→25→…→29`, וכל חוליה חדשה נחסמה בגלל הצורך
+// לזכור להזיז אותו. ⚠️ **התיקון ⛔ אינו עדכון המספר** — זה בדיוק מה שנעשה שבע
+// פעמים ‹R-4›. המספר נגזר מ-`package.json`, וה**שער** אומר אותו.
+//
+// ⚠️ **הכשל נשמע ⛔ ולא נבלע:** אם העוגן בפרוזה נוסח מחדש, מספר ההתאמות ≠ 1
+// והשער **אדום**. ⛔ **ולעולם לא דילוג** (`B-272`) — עוגן שנעלם בשקט מחזיר את
+// `B-274` בתחפושת, והפעם בלי שאיש יראה שהשער מת.
+console.log("\n14 · CLAUDE.md §7 — מניית חוליות verify");
+
+const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+const verifyCmd = pkg.scripts?.verify ?? "";
+// ⛔ `build` ⛔ אינו חוליה — הפרוזה אומרת «N חוליות **ואז** build».
+const links = [...verifyCmd.matchAll(/npm\s+run\s+(test:[a-z]+)/g)].map((m) => m[1]);
+const dupLinks = links.filter((l, i) => links.indexOf(l) !== i);
+check("14.1", `${links.length} חוליות \`test:*\` ב-verify · ⛔ אפס כפילות`,
+  links.length > 0 && dupLinks.length === 0,
+  links.length === 0
+    ? "⛔ `scripts.verify` ⛔ נמצא או ⛔ מכיל חוליות. ⛔ שרשרת ריקה עוברת בשקט מושלם"
+    : `כפולות: ${[...new Set(dupLinks)].join(", ")}`);
+
+const claudeMd = readFileSync("CLAUDE.md", "utf8");
+const CHAIN_ANCHOR = /(\d+)\s+חוליות\s+ואז\s+`build`/g;
+const anchors = [...claudeMd.matchAll(CHAIN_ANCHOR)];
+check("14.2", `עוגן «N חוליות ואז \`build\`» נמצא בדיוק פעם אחת ב-CLAUDE.md`,
+  anchors.length === 1,
+  `נמצאו ${anchors.length} התאמות. ⛔ כשל חילוץ הוא אדום קשה ⛔ ולא דילוג — נסח את העוגן בחזרה, ⛔ אל תרכך את השער`);
+
+const prose = anchors.length === 1 ? Number(anchors[0][1]) : null;
+check("14.3", `CLAUDE.md §7 מצהיר ${prose ?? "?"} חוליות · package.json מריץ ${links.length}`,
+  prose !== null && prose === links.length,
+  `הפרוזה אומרת «${prose}» ו-\`verify\` מריץ ${links.length} (${links.join(" · ")}). ⛔ **אל תעדכן את המספר ביד** — זו ההזזה השמינית ‹R-4›; השער אומר את המספר, והפרוזה נגזרת ממנו`);
+
 console.log("");
 if (failures.length) {
   console.error(`❌ registry: ${failures.length}/${pass + failures.length} assertion(s) failed.`);
