@@ -74,7 +74,12 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 
-const ROOTS = ["scripts", "api"];
+// ⚠️ **`tests-sentinel/` נוסף 15.09 (`B-313`) — הוא ⛔ היה בקורפוס.** הספקים
+// שנכתבו שם הוכחו ב-`node --check` **ידני בלבד**, כלומר באותו מצב בדיוק שבו היה
+// `user-analytics.mjs` ב-11.08: קוד שרץ בפרודקשן ו⛔ אף חוליה ⛔ יכולה לראותו.
+// ⛔ **הרשימה ⛔ מורחבת מעבר לשלושת השורשים** — קורפוס שגדל בלי החלטה הוא
+// דרך אחרת לאותו כשל שקט.
+const ROOTS = ["scripts", "api", "tests-sentinel"];
 const JS_EXT = /\.(mjs|cjs|js)$/;
 
 let pass = 0;
