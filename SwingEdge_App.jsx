@@ -4724,7 +4724,7 @@ export default function SwingEdge() {
                           <td className="py-2 pe-4 font-mono text-slate-300">{fmtPaperPrice(t.exit, t)}</td>
                           <td className="py-2 pe-4 font-mono text-slate-400">{t.shares}</td>
                           {/* ✅ סכום-בחשבון **מומר** (גל ג׳, 2026-08-12). אין שער ⇒ `—` + נימוק. */}
-                          <td title={acctRefusalText(t, Math.round(pnl))} className={`py-2 pe-4 font-bold font-mono ${win ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>{fmtAcct(t, Math.round(pnl))}</td>
+                          <td title={acctRefusalText(t, pnl)} className={`py-2 pe-4 font-bold font-mono ${win ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>{fmtAcct(t, pnl)}</td>
                           <td className={`py-2 pe-4 font-bold font-mono ${rMultiple == null ? "text-slate-600" : rMultiple >= 0 ? "text-cyan-400" : "text-[var(--v3-loss)]"}`}>{fmtR(rMultiple)}</td>
                           <td className="py-2 pe-4"><span className="inline-flex items-center gap-1"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">{labelFor("setup", t.setup, lang)}</span><SetupTagTip setup={t.setup} isRTL={isRTL} /></span></td>
                         </tr>
@@ -5109,11 +5109,11 @@ export default function SwingEdge() {
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{lang === "he" ? "רווח ממוצע" : "Avg Win"}<TermTooltip term="avgWin" lang={lang} /></div>
-                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-accent)]">{journalStats.avgWin == null ? "—" : fmt$(Math.round(journalStats.avgWin), dispCcy)}</div>
+                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-accent)]">{journalStats.avgWin == null ? "—" : fmt$(journalStats.avgWin, dispCcy)}</div>
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{lang === "he" ? "הפסד ממוצע" : "Avg Loss"}<TermTooltip term="avgLoss" lang={lang} /></div>
-                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-loss)]">{journalStats.avgLoss == null ? "—" : fmt$(-Math.round(journalStats.avgLoss), dispCcy)}</div>
+                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-loss)]">{journalStats.avgLoss == null ? "—" : fmt$(-journalStats.avgLoss, dispCcy)}</div>
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{t.profitFactor}<TermTooltip term="profitFactor" lang={lang} /></div>
@@ -5133,7 +5133,7 @@ export default function SwingEdge() {
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{t.maxDD}<TermTooltip term="maxDD" lang={lang} /></div>
-                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-loss)]">{fmt$(-Math.round(journalStats.maxDD), dispCcy)}</div>
+                  <div className="text-sm font-bold font-mono mt-0.5 text-[var(--v3-loss)]">{fmt$(-journalStats.maxDD, dispCcy)}</div>
                 </div>
                 <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-lg p-2.5">
                   <div className="text-[9px] uppercase tracking-widest text-slate-600 flex items-center gap-1">{lang === "he" ? "זמן החזקה" : "Avg Hold"}<TermTooltip term="avgHold" lang={lang} /></div>
@@ -6331,7 +6331,7 @@ export default function SwingEdge() {
                     {bestDayEntry ? (
                       <>
                         <div className="text-2xl font-bold text-white font-mono">{dayLabel(bestDayEntry[0], lang)}</div>
-                        <div className="text-xs text-slate-500 mt-1">{fmt$(Math.round(bestDayEntry[1].pnl), dispCcy)} · {nTrades(bestDayEntry[1].count, lang)}</div>
+                        <div className="text-xs text-slate-500 mt-1">{fmt$(bestDayEntry[1].pnl, dispCcy)} · {nTrades(bestDayEntry[1].count, lang)}</div>
                       </>
                     ) : (
                       <div className="text-sm text-slate-600">{t.logClosedForInsights}</div>
