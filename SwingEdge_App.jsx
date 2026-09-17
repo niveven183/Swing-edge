@@ -759,7 +759,15 @@ const generateSmartLessons = (closedTrades, stats, calcFn, lang = 'he', currency
 
   // Best setup — read off the hub's bySetup grouping, re-sorted by win rate then
   // sample size so this card and Analytics name the SAME strongest setup. (#3)
-  const bestSetup = [...stats.bySetup].sort((a, b) => (b.winRate - a.winRate) || (b.count - a.count))[0];
+  // "Unknown" is groupAndAnalyze's label for a setup the user never recorded
+  // (tradingStats.js: `(raw ?? "").toString().trim() || "Unknown"`). That is an
+  // absence, not a pattern, so it is dropped from the candidates BEFORE the sort
+  // — never gated after it, which would delete the card instead of the entry.
+  const namedSetups = stats.bySetup.filter(g => {
+    const name = (g?.name ?? "").toString().trim();
+    return name !== "" && name !== "Unknown";
+  });
+  const bestSetup = namedSetups.sort((a, b) => (b.winRate - a.winRate) || (b.count - a.count))[0];
 
   if (bestSetup && bestSetup.count >= 2) {
     const n = bestSetup.count;
@@ -770,13 +778,13 @@ const generateSmartLessons = (closedTrades, stats, calcFn, lang = 'he', currency
       type: "strength",
       title: `${setup} הוא הסטאפ החזק ביותר שלך`,
       detail: `${wr}% הצלחה על פני ${n} עסקאות. התמקד יותר בתבנית הזו.`,
-      action: `חפש עוד סטאפים של ${setup} והגדל את גודל הפוזיציה כשהביטחון גבוה.`,
+      action: `חפש עוד סטאפים של ${setup}.`,
     } : {
       channel: "best_setup",
       type: "strength",
       title: `${setup} is your best setup`,
       detail: `${wr}% win rate across ${n} trades. Focus more on this pattern.`,
-      action: `Look for more ${setup} setups and increase position size when confidence is high.`,
+      action: `Look for more ${setup} setups.`,
     });
   }
 
