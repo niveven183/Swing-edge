@@ -2748,7 +2748,10 @@ export default function SwingEdge() {
   // state (cards show "—", a red banner explains why, and save is blocked).
   const tradeValidity = validateTradeInputs(entryN, stopN, targetN, form.side);
   // Editable shares: `form.shares` is a manual override (raw positive-int string, "" = untouched).
-  // suggestedShares mirrors the risk-%-sized value the card shows (1 when posSizeTooSmall).
+  // suggestedShares mirrors the risk-%-sized value the card shows — `0` when the
+  // risk-%-size rounds below one share. ⚠️ ⛔ "1 when posSizeTooSmall": הרצפה
+  // ההיא הוסרה ב-`B-338` (`positionSizing.js:84` — `suggestedShares = posSize`),
+  // וההערה נשארה מאחור עד 18.09.
   // effShares drives Pos.Value / Max Risk so an override recomputes them live; R/R stays price-only.
   // Sticky by design — changing entry/stop recomputes the suggestion but leaves the override in place.
   const suggestedShares   = sizing.suggestedShares ?? 0;
@@ -5939,7 +5942,13 @@ export default function SwingEdge() {
               ticker: posCalc.ticker || f.ticker,
               entry: posCalc.entry,
               stop:  posCalc.stop,
-              shares: String(shares),
+              // ⚠️ `""` ולא `"0"` (`B-345`). `shares` הוא `posSize ?? 0`, כלומר
+              // `0` כשההון ⛔ מספיק **ו**-`0` כשאין שער — ו-`String(0)` היה חותם
+              // `"0"` על `form.shares` **בלי לעבור ב-handler**. משם `:7952` מציג
+              // `0` בעוד `sizePosition` מפילה את הדריסה ומחזירה את ההמלצה, ו-
+              // `:2926` כותב אותה ל-DB: השדה אומר `0`, הנשמר הוא `6`.
+              // `""` = «⛔ נגעתי» ⇒ השדה נופל להמלצה ושני האתרים מסכימים.
+              shares: shares > 0 ? String(shares) : "",
               tradeImage: null,
               tradeImagePreview: null,
             }));
@@ -7947,6 +7956,13 @@ export default function SwingEdge() {
                     {tradeValidity.valid && sizingOk ? (
                       <div className="flex items-center justify-center gap-1">
                         <Pencil size={10} aria-hidden className="shrink-0 text-[var(--v3-text-lo)] group-hover:text-[var(--v3-text-mid)] transition-colors pointer-events-none" />
+                        {/* ⛔ `.replace(/^0+/, "")` בולע `"0"` — וזה **מכוון**, ⛔ באג.
+                            `SHARES` הוא שדה **גודל**, ו-`0` ⛔ גודל (הכרעת ניב 18.09,
+                            `DECISIONS`). מי שיקרא «⛔ מצליח להקליד 0» כתקלה ויוסיף
+                            כאן דגל/regex — יפתח שמירה של `shares: 0`, שממנה כל מדד
+                            נגזר (P&L · סיכון · DNA) מתאפס **בשקט**. `test:instrument`
+                            בלוק 21 `K4` יורה אדום אם הדחייה מרוככת.
+                            «עסקה שלא נכנסתי אליה» היא פיצ'ר יומן ⇒ `B-346`, ⛔ כאן. */}
                         <input
                           type="text" inputMode="numeric" aria-label={t.sharesEditable}
                           value={sharesOverrideStr !== "" ? sharesOverrideStr : String(suggestedShares)}

@@ -1983,6 +1983,193 @@ console.log("  18 · G2 · סיכון במטבע ההון");
   }
 }
 
+// ── בלוק 21 · `B-345` — השדה מציג `0` בעוד השמירה כותבת `6` (18.09) ──────────
+//
+// 🔴 **ההכרעה (ניב, 18.09) היא חלופה ו׳:** `SHARES` הוא שדה **גודל**, ו-`0`
+//    ⛔ גודל. ה-handler ממשיך לדחות `"0"`, וזה **מכוון** — ⛔ באג. «עסקה שלא
+//    נכנסתי אליה» היא פיצ'ר יומן וחיה ב-`B-346`, ⛔ כאן.
+//
+// 🔴 **אבל הסתירה קיימת בכל חלופה, ולכן היא מתוקנת כאן לבדה.** `form.shares`
+//    נכתב ב-**9** אתרים (נמדד, ⛔ הוערך): `7` כותבים `""` ליטרלי, `1` הוא
+//    ה-handler שכבר מנרמל, ו-**`1/9`** — `handleCopyToForm` — כותב
+//    `String(posSize ?? 0)` **בלי לעבור ב-handler**. כש-`posSize` הוא `0`
+//    (ההון ⛔ מספיק) או `null` (⛔ נמדד שער), הוא מחתים `"0"` על השדה.
+//
+// ⚠️ **ומכאן `"0"` הוא דריסה דביקה** (`:2753`): די להעלות הון/להדק סטופ אחרי
+//    «העתק לטופס» כדי שהשדה יאמר `0` בעוד `effShares` הוא `6` — ו-`:2926`
+//    כותב `shares: effShares` ל-DB. **כתיבה שקטה שגויה**, ⛔ מספר מכוער.
+//
+// ⛔ **התיקון הוא באתר ה*כותב*, ⛔ באתר ה*מציג*.** `:7952` מניח נכון בהינתן
+//    האינווריאנטה, והביטוי שלו חי **פעמיים** (`value=` + `style.width`) ⇒
+//    תיקון שם היה מחייב שכפול, כלומר `R-6`. אתר אחד סוגר את שלושת התסמינים.
+//
+// ⚠️ **`K1`–`K4` ירוקות בשני העצים ⇒ בקרה, ⛔ ראיה לתיקון.** `K4` היא השער
+//    על ההכרעה עצמה: היא נכשלת אם מישהו «יתקן» את דחיית ה-`0` ב-handler.
+//
+// ⛔ **והבלוק הזה ⛔ מכסה רינדור** — JSX · React · דפדפן אמיתי · פרודקשן
+//    חיים ב-`C-055` **בלבד**.
+{
+  console.log("\n21 · B-345 · `0` בשדה — השדה והשמירה חייבים להסכים");
+  const app   = src("../SwingEdge_App.jsx");
+  const lines = app.split("\n");
+
+  // ── 21.0 שערי-מטא · חילוץ לפי עוגן ⇒ אדום קשה, ⛔ דילוג (`B-272`) ────────
+  console.log("  21.0 · שערי-מטא · חילוץ");
+  const only = (needle) => {
+    const hits = lines.reduce((a, l, i) => (l.includes(needle) ? a.concat(i) : a), []);
+    check(`מטא · עוגן \`${needle}\` מופיע פעם אחת בדיוק (נמדד ${hits.length})`,
+          hits.length === 1);
+    return hits.length === 1 ? hits[0] : -1;
+  };
+
+  // ⓐ ⚠️ העוגן הוא **תחילת הפונקציה**, ⛔ ביטוי ה-`shares:` עצמו — הביטוי הוא
+  //    בדיוק מה שהגל הזה משנה, ועוגן עליו היה נשבר יחד עם התיקון.
+  const copyAt = only("const handleCopyToForm = () => {");
+  let copyExprSrc = null;
+  for (let i = copyAt; copyAt >= 0 && i < copyAt + 20 && i < lines.length; i++) {
+    const m = /^\s*shares:\s*(.+),\s*$/.exec(lines[i]);
+    if (m) { copyExprSrc = m[1]; break; }
+  }
+  check("מטא · ביטוי ה-`shares:` ב-`handleCopyToForm` חולץ", copyExprSrc != null);
+
+  const valAt = only("aria-label={t.sharesEditable}");
+  const valExprSrc = valAt >= 0
+    ? (/^\s*value=\{(.+)\}\s*$/.exec(lines[valAt + 1]) || [])[1] ?? null : null;
+  check("מטא · ביטוי ה-`value` של השדה חולץ", valExprSrc != null);
+
+  const chainAt = only("const v = e.target.value.replace(");
+  const chainExprSrc = chainAt >= 0
+    ? (/^\s*const v = (.+);\s*$/.exec(lines[chainAt]) || [])[1] ?? null : null;
+  check("מטא · שרשרת הנרמול ב-handler חולצה", chainExprSrc != null);
+
+  const bal = (s) => [...s].reduce((n, c) => n + (c === "(" ? 1 : c === ")" ? -1 : 0), 0);
+  const allBalanced = [copyExprSrc, valExprSrc, chainExprSrc]
+    .every(e => e != null && bal(e) === 0);
+  check("מטא · סוגריים מאוזנים בשלושת הביטויים", allBalanced);
+
+  if (!allBalanced) {
+    // ⛔ ⛔ דילוג. חילוץ שנכשל הוא כשל של השער, ⛔ היעדר מידע.
+    check("🔴 מטא · החילוץ הצליח — כשל כאן הוא אדום קשה (`B-272`)", false);
+  } else {
+    const copyFn  = new Function("shares", `return (${copyExprSrc});`);
+    const valFn   = new Function("sharesOverrideStr", "suggestedShares",
+                                 `return (${valExprSrc});`);
+    const chainFn = new Function("e", `return (${chainExprSrc});`);
+    check("מטא · שלושת הביטויים נבנים ב-`new Function`",
+          [copyFn, valFn, chainFn].every(f => typeof f === "function"));
+
+    // הפיקסצ'ר: `NBIS` · entry 217.99 · stop 202 · 1% · rate 1
+    // ⇒ riskPerShare 15.99 ⇒ הון 10,000 נותן floor(100/15.99) = 6.
+    const size = (capital, sharesOverride = "", rate = 1) =>
+      sizePosition({ entry: "217.99", stop: "202", capital, riskPct: 1,
+                     sharesOverride, rate });
+
+    // מראה מדויקת של הקומפוננטה: `:2754-2755`.
+    const shown = (formShares, s) =>
+      valFn((formShares ?? "").toString(), s.suggestedShares ?? 0);
+
+    // ── 21.1 🔴 `A1` — «העתק לטופס» בהון שאינו מספיק, ואז ההון עולה ─────────
+    console.log("  21.1 · 🔴 A1 · posSize 0 ⇒ מה נחתם על השדה");
+    {
+      const small = size(1000);            // 10/15.99 ⇒ floor 0
+      eq("⚪ הקדם-תנאי · `posSize` הוא 0 בהון 1,000", small.posSize, 0);
+
+      const written = copyFn(small.posSize ?? 0);
+      eq("🔴 A1 · `handleCopyToForm` ⛔ חותם `0` על שדה גודל", written, "");
+
+      // ההון עולה ⇒ ההמלצה 6, בעוד הדריסה «דביקה בכוונה».
+      const big = size(10000, written);
+      eq("⚪ ההמלצה עלתה ל-6", big.suggestedShares, 6);
+      eq("🔴 A1 · השדה מציג", shown(written, big), "6");
+      eq("⚪ A1 · `effShares` — מה ש-`:2926` כותב ל-DB", big.effShares, 6);
+      check("🔴 A1 · השדה והשמירה מסכימים — ⛔ כתיבה שקטה שגויה",
+            Number(shown(written, big)) === big.effShares);
+    }
+
+    // ── 21.2 🔴 `A2` — אותו פגם דרך **סירוב השער**, ⛔ דרך ההון ─────────────
+    //
+    // ⚠️ `posSize` הוא `null` כאן, ו-`?? 0` ב-`handleCopyToForm` מקפל אותו
+    //    לאותו `"0"` בדיוק. שני מסלולים, פגם אחד.
+    console.log("  21.2 · 🔴 A2 · rate null ⇒ `posSize` null ⇒ אותו `0`");
+    {
+      const refused = size(10000, "", null);
+      eq("⚪ הקדם-תנאי · `posSize` הוא null בסירוב שער", refused.posSize, null);
+
+      const written = copyFn(refused.posSize ?? 0);
+      eq("🔴 A2 · גם מסלול הסירוב ⛔ חותם `0`", written, "");
+
+      const big = size(10000, written);
+      eq("🔴 A2 · השדה מציג", shown(written, big), "6");
+      check("🔴 A2 · השדה והשמירה מסכימים",
+            Number(shown(written, big)) === big.effShares);
+    }
+
+    // ── 21.3 ⚪ `A3` — `0` **נשאר** חסום בשמירה, וזה החוזה של ו׳ ────────────
+    //
+    // ⚠️ ירוקה בשני העצים בכוונה: היא מודדת שהתיקון ⛔ פתח שמירה של `0`.
+    //    `:2871` (`!(effShares > 0)`) הוא מה שחוסם, ו⛔ נגעה בו.
+    console.log("  21.3 · ⚪ A3 · הון שאינו מספיק ⇒ שמירה נחסמת");
+    {
+      const small = size(1000, copyFn(size(1000).posSize ?? 0));
+      eq("⚪ A3 · `effShares` הוא 0 ⇒ `:2871` חוסם", small.effShares, 0);
+      check("⚪ A3 · `0` ⛔ מגיע ל-DB", !(small.effShares > 0));
+    }
+
+    // ── 21.4 ⚪ `K1`–`K4` · בקרה — ירוקות בשני העצים ────────────────────────
+    //
+    // ⚠️ אדום כאן פירושו שנגעת מחוץ למחלקה ⇒ **עצור**.
+    console.log("  21.4 · ⚪ בקרה · K1–K4");
+    {
+      const big = size(10000);
+      eq("⚪ K1 · בקרה א׳ — שדה ריק ⇒ ההמלצה", shown("", big), "6");
+      eq("⚪ K1 · ו-`effShares` מסכים", big.effShares, 6);
+
+      const k2 = chainFn({ target: { value: "007" } });
+      eq("⚪ K2 · בקרה ב׳ — `\"007\"` מנורמל ל-", k2, "7");
+      const k2s = size(10000, k2);
+      eq("⚪ K2 · השדה מציג", shown(k2, k2s), "7");
+      eq("⚪ K2 · והשמירה כותבת", k2s.effShares, 7);
+
+      const k3 = chainFn({ target: { value: "abc" } });
+      eq("⚪ K3 · בקרה ג׳ — `\"abc\"` ⛔ מייצר ספרה", k3, "");
+      eq("⚪ K3 · ⇒ השדה ⛔ משתנה", shown(k3, big), "6");
+      eq("⚪ K3 · ו-`effShares` ⛔ זז", size(10000, k3).effShares, 6);
+
+      // 🔴 `K4` היא השער על **ההכרעה**, ⛔ על התיקון: ו׳ אומרת ש-`0` נדחה.
+      //    אדום כאן פירושו שמישהו «תיקן» את הדחייה ⇒ **עצור**.
+      eq("⚪ K4 · ה-handler עדיין דוחה `\"0\"` — ההכרעה ו׳, ⛔ באג",
+         chainFn({ target: { value: "0" } }), "");
+      eq("⚪ K4 · ו-`\"0\"` שעוקף את ה-handler ⛔ נספר כדריסה",
+         size(10000, "0").effShares, 6);
+    }
+
+    // ── 21.5 ⚪ `S1` — אוכלוסיית הכותבים היא 9, ⛔ 10 ───────────────────────
+    //
+    // ⚠️ הטענה «`1/9` מפר» שווה **אפס** בלי מכנה נאכף: כותב עשירי שייכתב מחר
+    //    בלי `""` יחזיר את הבאג בשקט, ו-`A1` ⛔ תראה אותו.
+    //
+    // 🔴 **המכנה הזה כבר נמדד שגוי פעם אחת בגל הזה** — `grep 'shares:\s*""'`
+    //    גולמי החזיר `9`, כי `analyzerForm` (`:1548` · `:3752`) הוא **state
+    //    אחר** עם שדה באותו שם. הוא ⛔ מוזן מ-`handleCopyToForm`, ⛔ נקרא ע"י
+    //    `sizePosition`, ו⛔ נכתב ל-`trades.shares`. הסינון בשם הוא התיקון;
+    //    ריכוך הציפייה ל-`9` היה `R-4`.
+    console.log("  21.5 · ⚪ S1 · מכנה הכותבים");
+    {
+      const anyLiteral = lines.filter(l => /shares:\s*""/.test(l));
+      // ⚠️ `/i` נדרש: `:1548` נושא `analyzerForm` ו-`:3752` נושא
+      //    `setAnalyzerForm` — תלוי-רישיות היה סופר `1` ומחמיץ אחד.
+      const analyzer   = anyLiteral.filter(l => /analyzerform/i.test(l)).length;
+      const literal    = anyLiteral.length - analyzer;
+      const viaH       = lines.filter(l => /shares:\s*v\s*\}/.test(l)).length;
+      eq("⚪ S1 · `analyzerForm` — state אחר, מוחרג בשם", analyzer, 2);
+      eq("⚪ S1 · כותבי `form.shares` עם `\"\"` ליטרלי", literal, 7);
+      eq("⚪ S1 · כותב אחד עובר ב-handler", viaH, 1);
+      check("⚪ S1 · ⇒ `7 + 1 + 1 = 9` כותבים, ו-`handleCopyToForm` הוא היחיד שאינו ליטרלי",
+            literal + viaH + 1 === 9);
+    }
+  }
+}
+
 // ── SUMMARY ──────────────────────────────────────────────────────────────────
 console.log("");
 if (failures) {
