@@ -683,8 +683,13 @@ const aggressionOf = (trades, capitalCurrency) =>
     // ⛔ אפס `toLocaleString()` חשוף על סכום כסף בשני האתרים שצולמו.
     check("⛔ `POS. VALUE` ⛔ אינו `toLocaleString()` חשוף",
       !/\$\{capSym\}\$\{effPosValue\.toLocaleString\(\)\}/.test(app));
+    // ⚠️ **ארגומנט המטבע זז ב-`B-339` (18.09), והאינווריאנטה ⛔ זזה.** מה
+    //    שהאסרציה הזו שומרת עליו הוא «`POS. VALUE` עובר במעצב המשותף ⇒ שתי
+    //    ספרות», ⛔ «הוא מעוצב במטבע ההון». הסמל עבר למטבע ה**נכס** בכוונה
+    //    (חלופה א׳), ולכן הדפוס עודכן ל-`/ formRate, formPaperCcy` —
+    //    ⛔ רוכך: `fmtCapitalAmount` עדיין **נדרש**. בלוק 20.
     check("`POS. VALUE` עובר ב-`fmtCapitalAmount`",
-      /fmtCapitalAmount\(effPosValue, capitalCurrency\)/.test(app));
+      /fmtCapitalAmount\(effPosValue \/ formRate, formPaperCcy\)/.test(app));
   }
 
   // ── 13.9f ILA — ניתן לאחסון, ⛔ **בלתי-כתיב** ────────────────────────────
@@ -1706,7 +1711,9 @@ console.log("  18 · G2 · סיכון במטבע ההון");
 //
 // ⛔ **והבלוק הזה ⛔ מכסה רינדור** — `sizePosition` היא פונקציה טהורה; הכרטיס
 //    על המסך · הבאנר · ה-toast · RTL · דפדפן אמיתי · פרודקשן חיים ב-`C-052`
-//    **בלבד**, ו⛔ לקרוא `452/452` כסגירה של מה שנצפה ב-11:39.
+//    **בלבד**, ו⛔ לקרוא את סך האסרציות בקובץ כסגירה של מה שנצפה ב-11:39.
+//    ⚠️ המספר כאן היה `452/452` ונסחף ל-`485` בבלוק 20 — ולכן הוא **הוסר**:
+//    מנייה שמוזזת ביד היא `B-274`, והיא ⛔ הייתה ראיה לכלום מלכתחילה.
 {
   console.log("\n19 · B-338 · המחשבון ממליץ על מה שהוא פוסל");
   const app = src("../SwingEdge_App.jsx");
@@ -1760,8 +1767,10 @@ console.log("  18 · G2 · סיכון במטבע ההון");
      fmtCapitalAmount(ov.effPotLoss, "ILS"), "₪106.41");
   check("🔴 `MAX RISK` ⛔ מחרוזת ידנית עם `Math.round(effPotLoss)`",
         !/\$\{capSym\}\$\{Math\.round\(effPotLoss\)\.toLocaleString\(\)\}/.test(app));
+  // ⚠️ אותו עדכון דפוס כמו 13.9e (`B-339`, 18.09): מה שנשמר הוא **המעצב
+  //    המשותף**, ⛔ ארגומנט המטבע. שני התאים עדיין חייבים לעבור באותו מעצב.
   check("✅ `MAX RISK` עובר ב-`fmtCapitalAmount` — אותו מעצב כמו `POS. VALUE`",
-        /fmtCapitalAmount\(effPotLoss, capitalCurrency\)/.test(app));
+        /fmtCapitalAmount\(effPotLoss \/ formRate, formPaperCcy\)/.test(app));
 
   // ── 19.4 החלפת האפס ⛔ שורדת בבייטים, והשומר בכתיבה קיים ─────────────────
   console.log("  19.4 · צורה · המצאה ⛔ בבייטים · שומר בכתיבה");
@@ -1806,6 +1815,171 @@ console.log("  18 · G2 · סיכון במטבע ההון");
     eq("C11 ⚪ ו-ok שקר", no.ok, false);
     check("C12 ⚪ «⛔ נמדד» ≠ «⛔ מספיק» — שני המצבים נבדלים",
           !Object.is(no.suggestedShares, bare.suggestedShares));
+  }
+}
+
+// ── בלוק 20 · `B-339` — כרטיס הגודל מציג סמל של מטבע אחר מהמספר (18.09) ──────
+//
+// 🔴 **מה שנצפה:** הון `₪` ונכס דולרי ⇒ הכרטיס נקב `₪54.60` · `₪667.33` על
+//    `NBIS` — מספר **נכון** (במטבע ההון) עם סמל **נכון**, ובכל זאת חסר-שימוש:
+//    המשתמש קונה ב-`$`, והמספר שמולו ⛔ ניתן להשוואה לשום דבר במסך המסחר.
+//    ההכרעה (ניב, 18.09): כל שדה שנוגע ל**עסקה בודדת** מוצג ב**מטבע הנכס**.
+//
+// 🔴 **החישוב ⛔ זז, וזה החוזה.** `sizePosition` ממשיכה להמיר **לפני** החלוקה
+//    ולהחזיר במטבע ההון — `posSize` הוא **הוראת קנייה**, ⛔ תצוגה. התיקון הוא
+//    חילוק-חזרה ב**אתר הרינדור** בלבד (חלופה א׳), ולכן `20.5` מודדת ש-`posSize`
+//    ו-`effPosValue`/`effPotLoss` ה**גולמיים** ⛔ זזו.
+//
+// ⚠️ **`effRiskPct` ⛔ נגע** — הוא חסר-ממד (`effPotLoss/capital`, **שני**
+//    האגפים במטבע ההון). `K2` היא השער: `2.193%` שזז פירושו שמישהו נגע
+//    בחישוב ו⛔ בתצוגה ⇒ **עצור**.
+//
+// ⚠️ **החילוק הוא נגזר-מנגזר** (`× rate` ואז `/ rate`) ו⛔ מובטח זהותי
+//    ב-IEEE-754. לכן האסרציות נוקבות במחרוזת ה**מעוצבת** — מה שהמשתמש רואה —
+//    ⛔ בערך הגולמי.
+//
+// ⛔ **`rate` חסר ⇒ `—`, ⛔ נפילה ל-`1`.** `sizePosition` מחזירה `ok:false`,
+//    והטרנרי באתר הרינדור חוסם **לפני** החילוק. `K3` מודדת זאת.
+//
+// ⚠️ **האסרציות מריצות את הבייטים שב-JSX**, ⛔ תבנית: הביטוי מחולץ לפי עוגן
+//    ומורץ ב-`new Function` עם תלות מוזרקת — אותה תבנית של `test:shortpct`.
+//    ⛔ **כשל חילוץ הוא אדום קשה ⛔ ולעולם לא דילוג** (`B-272`), ואוכפים זאת
+//    שערי-המטא ב-`20.0`.
+//
+// ⛔ **והבלוק הזה ⛔ מכסה רינדור** — JSX · React · דפדפן אמיתי · RTL ·
+//    פרודקשן חיים ב-`C-054` **בלבד**.
+{
+  console.log("\n20 · B-339 · מטבע הכרטיס — הנכס, ⛔ ההון");
+  const app   = src("../SwingEdge_App.jsx");
+  const lines = app.split("\n");
+
+  // ── 20.0 שערי-מטא · חילוץ לפי עוגן ⇒ אדום קשה, ⛔ דילוג (`B-272`) ────────
+  console.log("  20.0 · שערי-מטא · חילוץ");
+  const cellExpr = (label) => {
+    const hits = lines.reduce((a, l, i) => (l.includes(label) ? a.concat(i) : a), []);
+    check(`מטא · עוגן \`${label}\` מופיע פעם אחת בדיוק (נמדד ${hits.length})`, hits.length === 1);
+    if (hits.length !== 1) return null;
+    const m = /`\}>\{(.+)\}<\/div>\s*$/.exec(lines[hits[0] + 1]);
+    check(`מטא · הביטוי בתא \`${label}\` חולץ`, m != null);
+    if (!m) return null;
+    const expr = m[1];
+    const bal = [...expr].reduce((n, c) => n + (c === "(" ? 1 : c === ")" ? -1 : 0), 0);
+    check(`מטא · סוגריים מאוזנים בתא \`${label}\``, bal === 0);
+    return bal === 0 ? expr : null;
+  };
+  const posExpr  = cellExpr(">Pos. Value</div>");
+  const riskExpr = cellExpr(">Max Risk</div>");
+
+  if (posExpr == null || riskExpr == null) {
+    // ⛔ ⛔ דילוג. חילוץ שנכשל הוא כשל של השער, ⛔ היעדר מידע.
+    check("🔴 מטא · החילוץ הצליח — כשל כאן הוא אדום קשה (`B-272`)", false);
+  } else {
+    // ⚠️ החתימה מזריקה **את כל** מה שהביטוי רשאי לגעת בו. משתנה חדש שיופיע
+    //    שם יזרוק `ReferenceError` ⇒ אדום, ⛔ ירוק-בשקט.
+    const build = (expr) => new Function(
+      "tradeValidity", "sizingOk", "fmtCapitalAmount", "effPosValue", "effPotLoss",
+      "capitalCurrency", "formRate", "formPaperCcy", `return (${expr});`);
+    const posFn  = build(posExpr);
+    const riskFn = build(riskExpr);
+    check("מטא · שני הביטויים נבנים ב-`new Function`",
+          typeof posFn === "function" && typeof riskFn === "function");
+
+    // מראה מדויקת של הקומפוננטה: `?? 0` ב-`:2757-2759`, `sizingOk = sizing.ok`.
+    const screen = (s, { capitalCurrency, formRate, formPaperCcy }) => {
+      const args = [{ valid: true }, s.ok, fmtCapitalAmount, s.effPosValue ?? 0,
+                    s.effPotLoss ?? 0, capitalCurrency, formRate, formPaperCcy];
+      return { posValue: posFn(...args), maxRisk: riskFn(...args) };
+    };
+
+    const RATE = 3.0333;   // USD→ILS — אותו שער שמשחזר את הצילומים (בלוק 19)
+    const nbis = (extra = {}) =>
+      sizePosition({ entry: "220", stop: "202", riskPct: 1, ...extra });
+
+    // ── 20.1 🔴 `V1` — הון ₪ · נכס $ ⇒ **אדום היום** ────────────────────────
+    console.log("  20.1 · 🔴 V1 · הון ₪10,000 · NBIS (USD) · rate 3.0333");
+    {
+      const s = nbis({ capital: 10000, rate: RATE });
+      const v = screen(s, { capitalCurrency: "ILS", formRate: RATE, formPaperCcy: "USD" });
+      eq("קדם-תנאי · SHARES 1 — ⛔ זז", s.posSize, 1);
+      eq("⚪ הערך הגולמי נשאר נקוב בהון ⇒ ₪667.33",
+         fmtCapitalAmount(s.effPosValue, "ILS"), "₪667.33");
+      eq("⚪ ו-₪54.60", fmtCapitalAmount(s.effPotLoss, "ILS"), "₪54.60");
+      eq("🔴 `POS. VALUE` על המסך = $220.00 — ⛔ ₪667.33", v.posValue, "$220.00");
+      eq("🔴 `MAX RISK` על המסך = $18.00 — ⛔ ₪54.60", v.maxRisk, "$18.00");
+      eq("⚪ והאחוז ⛔ זז — חסר-ממד, שני האגפים בהון",
+         s.effRiskPct.toFixed(3), "0.546");
+    }
+
+    // ── 20.2 ⚪ `K1` בקרה — משתמש דולרי · `rate = 1` ⇒ זהות בשני העצים ──────
+    //
+    // ⚠️ **⛔ ראיה לתיקון.** ירוקה בשני העצים בהגדרה (`rate = 1` והסמל `$`),
+    //    והצגתה כ-`✓` היא בדיוק העיוורון של אסרציה 12 ב-`test:analytics`.
+    //    תפקידה היחיד: אדום כאן ⇒ התיקון נגע במי שלא היה אמור להיפגע.
+    console.log("  20.2 ⚪ K1 בקרה · הון $10,000 · rate 1");
+    {
+      const s = nbis({ capital: 10000, rate: 1 });
+      const v = screen(s, { capitalCurrency: "USD", formRate: 1, formPaperCcy: "USD" });
+      eq("K1 ⚪ SHARES 5", s.posSize, 5);
+      eq("K1 ⚪ `POS. VALUE` $1,100.00 — בשני העצים", v.posValue, "$1,100.00");
+      eq("K1 ⚪ `MAX RISK` $90.00 — בשני העצים", v.maxRisk, "$90.00");
+      check("K1 ⚪ `× 1` ואז `/ 1` הוא זהות מדויקת ב-IEEE-754",
+            Object.is(s.effPosValue / 1, s.effPosValue));
+    }
+
+    // ── 20.3 ⚪ `K2` — שחזור הצילום · האחוז **חייב** להישאר ─────────────────
+    console.log("  20.3 ⚪ K2 · הון ₪2,490 · דריסה 1 · האחוז ⛔ זז");
+    {
+      const s = nbis({ capital: 2490, rate: RATE, sharesOverride: "1" });
+      const v = screen(s, { capitalCurrency: "ILS", formRate: RATE, formPaperCcy: "USD" });
+      eq("K2 · הדריסה שורדת ⇒ effShares 1", s.effShares, 1);
+      eq("K2 ⚪ `posSize` עדיין 0 — `B-338` ⛔ נגע", s.posSize, 0);
+      eq("🔴 K2 · `POS. VALUE` $220.00", v.posValue, "$220.00");
+      eq("🔴 K2 · `MAX RISK` $18.00", v.maxRisk, "$18.00");
+      eq("⚪ K2 · 🔴 **האחוז ⛔ זז** — 2.193%. זז ⇒ עצור.",
+         s.effRiskPct.toFixed(3), "2.193");
+    }
+
+    // ── 20.4 `K3` ⚪ / `K4` 🔴 — סירוב ואפס · ⛔ מספר מומצא ──────────────────
+    //
+    // ⚠️ **התוכנית §4 סימנה את `K4` ⚪ — וזה נמדד כשגוי.** `₪0.00 → $0.00`
+    //    הוא **סמל שזז**, כלומר אסרציה שנצפתה **אדומה היום** ⛔ אינווריאנטה.
+    //    השארת ה-⚪ הייתה בדיוק העיוורון שהתוכנית עצמה מזהירה מפניו.
+    //    `K3` (`—` בשני העצים) הוא ה⛔יחיד מבין השניים שהוא בקרה אמיתית.
+    console.log("  20.4 · K3 ⚪ / K4 🔴 · `—` ו-`0`");
+    {
+      const s = nbis({ capital: 10000, rate: null });
+      const v = screen(s, { capitalCurrency: "ILS", formRate: null, formPaperCcy: "USD" });
+      eq("K3 ⚪ ⛔ שער ⇒ ok שקר", s.ok, false);
+      eq("K3 ⚪ `POS. VALUE` `—` — ⛔ נפילה ל-`1`", v.posValue, "—");
+      eq("K3 ⚪ `MAX RISK` `—`", v.maxRisk, "—");
+    }
+    {
+      // ההון ⛔ מספיק (אחרי `B-338`) ⇒ `0` הוא **תשובה**, ומוצג במטבע הנכס.
+      const s = nbis({ capital: 2490, rate: RATE });
+      const v = screen(s, { capitalCurrency: "ILS", formRate: RATE, formPaperCcy: "USD" });
+      eq("K4 ⚪ effShares 0", s.effShares, 0);
+      eq("🔴 K4 · `POS. VALUE` $0.00 — `0` הוא תשובה, והסמל זז", v.posValue, "$0.00");
+      eq("🔴 K4 · `MAX RISK` $0.00", v.maxRisk, "$0.00");
+    }
+
+    // ── 20.5 ⚪ הגבול · `sizePosition` ⛔ נגעה ────────────────────────────────
+    //
+    // ⚠️ ⚪ בשני העצים. אדום כאן פירושו שהתיקון זלג מהתצוגה אל **הוראת
+    //    הקנייה** ⇒ **עצור**. זו ההגנה על §1 של התוכנית.
+    console.log("  20.5 ⚪ הגבול · החישוב ⛔ זז");
+    {
+      const ps = src("../src/lib/positionSizing.js");
+      check("⚪ `positionSizing.js` ⛔ יודע על `formPaperCcy`/`formRate`",
+            !ps.includes("formPaperCcy") && !ps.includes("formRate"));
+      check("⛔ ⛔ נכנס `|| 1`/`?? 1` למסלול הגודל — שער מנוחש הוא פקודה שגויה",
+            !/rate\s*(\|\||\?\?)\s*1/.test(ps));
+      check("⚪ ההמרה עדיין קורית **לפני** החלוקה",
+            /riskPerShareCap\s*=\s*Math\.abs\(entryN\s*-\s*stopN\)\s*\*\s*rate/.test(ps));
+      const s = nbis({ capital: 10000, rate: RATE });
+      eq("⚪ `posSize` נשאר נקוב בהון ⇒ 1", s.posSize, 1);
+      eq("⚪ ו-`effPotLoss` הגולמי נשאר 54.5994",
+         Math.round(s.effPotLoss * 1e4) / 1e4, 54.5994);
+    }
   }
 }
 

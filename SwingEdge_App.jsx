@@ -7963,13 +7963,19 @@ export default function SwingEdge() {
                       <div className="text-sm font-bold font-mono text-[var(--v3-text-lo)]">—</div>
                     )}
                   </div>
+                  {/* ⚠️ חילוק-חזרה ב**תצוגה בלבד** (`B-339`): `sizePosition` ממירה
+                      לפני החלוקה ומחזירה במטבע ה**הון**, כי `posSize` הוא הוראת
+                      קנייה. אבל כסף של **עסקה בודדת** נקרא במטבע ה**נכס** — המשתמש
+                      קונה ב-$. ⛔ אין כאן שומר: `sizingOk` שקר כש-`formRate` חסר,
+                      ולכן החילוק ⛔ רץ. `|| 1` כאן היה ממציא מטבע. `test:instrument`
+                      בלוק 20. */}
                   <div className="text-center">
                     <div className="text-[10px] text-[var(--v3-text-lo)] uppercase tracking-wider mb-0.5">Pos. Value</div>
-                    <div className={`text-sm font-bold font-mono truncate ${tradeValidity.valid && sizingOk?"text-white":"text-[var(--v3-text-lo)]"}`}>{tradeValidity.valid && sizingOk?fmtCapitalAmount(effPosValue, capitalCurrency):"—"}</div>
+                    <div className={`text-sm font-bold font-mono truncate ${tradeValidity.valid && sizingOk?"text-white":"text-[var(--v3-text-lo)]"}`}>{tradeValidity.valid && sizingOk?fmtCapitalAmount(effPosValue / formRate, formPaperCcy):"—"}</div>
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-[var(--v3-text-lo)] uppercase tracking-wider mb-0.5">Max Risk</div>
-                    <div className={`text-sm font-bold font-mono truncate ${tradeValidity.valid && sizingOk?"text-[var(--v3-loss)]":"text-[var(--v3-text-lo)]"}`}>{tradeValidity.valid && sizingOk?fmtCapitalAmount(effPotLoss, capitalCurrency):"—"}</div>
+                    <div className={`text-sm font-bold font-mono truncate ${tradeValidity.valid && sizingOk?"text-[var(--v3-loss)]":"text-[var(--v3-text-lo)]"}`}>{tradeValidity.valid && sizingOk?fmtCapitalAmount(effPotLoss / formRate, formPaperCcy):"—"}</div>
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-[var(--v3-text-lo)] uppercase tracking-wider mb-0.5 flex items-center justify-center gap-1">R/R Ratio<TermTooltip term="rr" lang={lang} /></div>
