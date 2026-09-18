@@ -155,12 +155,12 @@ test('landing (/) renders in a real browser', async ({ page }) => {
     await page.goto('/', { waitUntil: 'load' });
     await page.locator('header#top').waitFor({ state: 'visible', timeout: 15_000 });
     await page.locator('header#top h1.se-serif').waitFor({ state: 'visible', timeout: 15_000 });
-  } catch {
+  } catch (e) {
     add('דפדפן', 'browser|render_landing', 'red', '🔴',
       'header#top + h1.se-serif בדף הבית',
-      'הרכיבים לא נראו תוך 15 שניות — הדף לא רונדר',
-      'הדף לא רונדר כראוי — deploy שבור או שגיאת JS חוסמת',
-      'בדוק את ה-build/deploy האחרון; ודא שה-JS נטען; גלגל אם צריך',
+      `${e.message}`,
+      'הרצף goto → header#top → h1.se-serif נקטע. השלב שנכשל הוא זה שבהודעה, והשלבים שאחריו ⛔ רצו',
+      'מועמדים: (1) / החזיר שגיאת HTTP או timeout ⇒ ⛔ היה דף להמתין לו (2) הדף נטען וה-JS ⛔ רונדר (3) העוגן header#top/h1.se-serif זז',
       'rollback — נמוך, מחזיר מצב ידוע-תקין');
   }
   await page.waitForTimeout(1_500); // settle for late console/network errors
@@ -175,12 +175,12 @@ test('/app renders the auth screen in a real browser', async ({ page }) => {
     await page.goto('/app', { waitUntil: 'load' });
     await page.locator('input[type="email"]').waitFor({ state: 'visible', timeout: 15_000 });
     await page.locator('input[autocomplete="current-password"]').waitFor({ state: 'visible', timeout: 15_000 });
-  } catch {
+  } catch (e) {
     add('דפדפן', 'browser|render_app', 'red', '🔴',
       'input[type=email] + current-password ב-/app',
-      'טופס ההתחברות לא נראה תוך 15 שניות — /app לא רונדר',
-      'מסך ה-AuthScreen לא רונדר — deploy שבור או שגיאת JS חוסמת',
-      'בדוק את ה-build/deploy האחרון; ודא שה-JS נטען; גלגל אם צריך',
+      `${e.message}`,
+      'הרצף goto → input[email] → current-password נקטע. השלב שנכשל הוא זה שבהודעה, והשלבים שאחריו ⛔ רצו',
+      'מועמדים: (1) /app החזיר שגיאת HTTP או timeout ⇒ ⛔ היה דף להמתין לו (2) AuthScreen ⛔ רונדר (3) עוגני שדות הטופס זזו',
       'rollback — נמוך, מחזיר מצב ידוע-תקין');
   }
   await page.waitForTimeout(1_500);

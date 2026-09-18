@@ -395,7 +395,7 @@ async function sweepBoundaries(page, phase) {
         `בדיקת גבול הפאנל "${name}" (${phase})`,
         `${e.message}`,
         'הבדיקה עצמה נכשלה — לא ניתן לדעת אם הפאנל קרס',
-        'ודא ש-data-boundary עדיין נכתב ב-PanelBoundary.jsx',
+        'מועמדים: (1) הקונטקסט/הדף נסגר באמצע הספירה (2) ניווט התרחש בזמן הספירה (3) data-boundary ⛔ נכתב ב-PanelBoundary.jsx',
         'בדיקה בלבד — ללא סיכון');
       continue;
     }
@@ -534,9 +534,9 @@ async function restCleanup() {
     if (n > 0 && uiDeleteOk) {
       add(COMPONENT, 'browser-auth|ui-delete-incomplete', 'amber', '🟠',
         'האם המחיקה ב-UI באמת הגיעה ל-DB',
-        `המחיקה ב-UI דווחה כהצליחה אך ${n} שורות בדיקה עוד היו ב-DB`,
-        'ה-UI מסיר את השורה מה-state אך המחיקה ב-Supabase לא נשמרה',
-        'בדוק את handleDeleteTrade ב-SwingEdge_App.jsx ואת שגיאות ה-delete ב-console',
+        `המחיקה ב-UI דווחה כהצליחה, ו-DELETE על ${CLEANUP_FILTER} עוד מצא ${n} שורות`,
+        `הניקוי סורק ${TEST_TICKERS.join('/')} ואילו המחיקה ב-UI נגעה בטיקר אחד בלבד ⇒ ⛔ נמדד כאן אם השורה שנשארה היא זו שה-UI כיוון אליה`,
+        'מועמדים: (1) מסע קודם קרס בין היצירה לשינוי-השם והשאיר את הטיקר השני (2) המחיקה ב-UI הסירה מה-state ו⛔ נחתה ב-Supabase (3) מחיקה מקבילה מריצה אחרת. ⓶ בלבד מצביע על handleDeleteTrade',
         'אבחון תלוי-סיבה — הערך לפני פעולה');
     }
   } catch (e) {
@@ -590,9 +590,9 @@ test('authenticated journey: login → journal → SNTNL → SNTNL1 → boundari
   } catch (e) {
     add(COMPONENT, 'browser-auth|login-failed', 'red', '🔴',
       'התחברות חשבון ה-QA ב-/app',
-      `סרגל הטאבים לא נראה אחרי הכניסה: ${e.message}`,
-      'אף משתמש לא מצליח להיכנס — Supabase Auth למטה, deploy שבור, או טופס ההתחברות נשבר',
-      'בדוק Supabase Auth ואת ה-deploy האחרון; זו התקלה הכי יקרה — טפל ראשון',
+      `${e.message}`,
+      'רצף הכניסה goto → email → password → submit → סרגל הטאבים נקטע. השלב שנכשל הוא זה שבהודעה, והשלבים שאחריו ⛔ רצו',
+      'מועמדים: (1) /app ⛔ נטען (2) עוגני הטופס זזו (3) Supabase Auth דחה או ⛔ ענה (4) הכניסה נחתה וסרגל הטאבים ⛔ רונדר. אם ⓷ — זו התקלה הכי יקרה',
       'rollback — נמוך, מחזיר מצב ידוע-תקין');
     record(diag);
     return;
@@ -645,21 +645,24 @@ test('authenticated journey: login → journal → SNTNL → SNTNL1 → boundari
   } catch (e) {
     add(COMPONENT, 'browser-auth|journal-open', 'red', '🔴',
       'פתיחת טאב היומן וטבלת העסקאות',
-      `הטבלה לא נראתה תוך 15 שניות: ${e.message}`,
-      'היומן לא רונדר אף שההגדרות נטענו — ייתכן שגיאת JS חוסמת בטאב',
-      'בדוק pageerror ב-Sentry ואת רינדור טבלת היומן',
+      `${e.message}`,
+      'openJournal נקטע: click על טאב היומן ואז המתנה לטבלה. השלב שנכשל הוא זה שבהודעה, והשלבים שאחריו ⛔ רצו',
+      'מועמדים: (1) העוגן data-tour-tab="journal" זז או נחסם ⇒ ⛔ הייתה המתנה (2) הטאב נפתח והטבלה ⛔ רונדרה (3) שגיאת JS חוסמת בטאב — בדוק pageerror ב-Sentry',
       'rollback — נמוך, מחזיר מצב ידוע-תקין');
     record(diag);
     return;
   }
 
   try {
-    if (await testRows(page).count() > 0) {
+    // ⚠️ הספירה מורמת ל-const כדי ש-`got` ידווח **כמה** — הסמנטיקה זהה
+    // (אותה ספירה חד-פעמית, אותו `> 0`). השער עצמו הוא מחלקת `B-334` ו⛔ נגע כאן.
+    const stale = await testRows(page).count();
+    if (stale > 0) {
       add(COMPONENT, 'browser-auth|stale-testdata', 'amber', '🟠',
         `שרידי עסקת בדיקה (${TEST_TICKERS.join('/')}) ביומן`,
-        'נמצאה שורת בדיקה מריצה קודמת — הניקוי הקודם לא הושלם',
-        'המחיקה ב-UI או ניקוי ה-REST של הריצה הקודמת נכשלו',
-        'נמחקה אוטומטית בריצה זו; בדוק את לוג הריצה הקודמת ב-Actions',
+        `נמצאו ${stale} שורות ${TEST_TICKERS.join('/')} ביומן לפני תחילת המסע`,
+        'שורות בדיקה מריצה קודמת נשארו — הניקוי של אותה ריצה ⛔ הושלם. ⚠️ מאיזו ריצה ומדוע — ⛔ נמדד כאן',
+        'מועמדים: (1) המחיקה ב-UI של הריצה הקודמת נכשלה (2) ניקוי ה-REST ב-afterAll נכשל (3) הריצה הקודמת נקטעה בטיימאאוט. נמחקות אוטומטית בריצה זו; בדוק את לוג הריצה הקודמת ב-Actions',
         'מחיקת שורת בדיקה בלבד — ללא סיכון');
       for (const sym of TEST_TICKERS) {
         if (await rowsFor(page, sym).count() > 0) await deleteRow(page, sym);
@@ -669,8 +672,8 @@ test('authenticated journey: login → journal → SNTNL → SNTNL1 → boundari
     add(COMPONENT, 'browser-auth|sweep-failed', 'amber', '🟠',
       `ניקוי שרידי ${TEST_TICKERS.join('/')} ב-UI`,
       `${e.message}`,
-      'שורת בדיקה ישנה נשארה ביומן — ה-REST של afterAll עוד ינסה להסיר אותה',
-      'אם חוזר: בדוק את זרימת המחיקה ב-UI ואת ניקוי ה-REST',
+      'ניקוי השרידים נקטע: ספירה ואז deleteRow לכל טיקר. ⚠️ האם שורה אכן נשארה ביומן — ⛔ נמדד; ה-REST ב-afterAll עוד ינסה להסיר',
+      'מועמדים: (1) הספירה עצמה זרקה ⇒ ⛔ אושרה שורה כלל (2) deleteRow נכשל על טיקר קיים (3) הדף/הקונטקסט נסגר באמצע. אם חוזר: בדוק את זרימת המחיקה ב-UI ואת ניקוי ה-REST',
       'מחיקת שורת בדיקה בלבד — ללא סיכון');
   }
 
@@ -688,8 +691,8 @@ test('authenticated journey: login → journal → SNTNL → SNTNL1 → boundari
     add(COMPONENT, 'browser-auth|journal-render', 'red', '🔴',
       'רינדור 3 עסקאות הקבע (AAPL סגורה ללא stop = בדיקת fmtR החיה)',
       `${e.message}`,
-      'טבלת היומן לא רונדרה כראוי — ייתכן ערך null שמפיל את החישוב',
-      'בדוק fmtR (src/utils.js:106) ו-calcTradeMetrics (src/utils.js:38) ואת ה-pageerror ב-Sentry',
+      'בדיקת 3 עסקאות הקבע נכשלה. ההודעה אומרת אם חסרו שורות ואילו טיקרים — ⛔ נמדד כאן אם החישוב עצמו שגוי',
+      'מועמדים: (1) הספירה רצה לפני שהטבלה התייצבה ⇒ ⛔ חסר כלום (2) שורת קבע חסרה ב-DB של חשבון ה-QA (3) שגיאת רינדור בשורה. בדוק pageerror ב-Sentry לפני שנוגעים ב-fmtR/calcTradeMetrics',
       'rollback — נמוך, מחזיר מצב ידוע-תקין');
   }
 
@@ -747,8 +750,8 @@ test('authenticated journey: login → journal → SNTNL → SNTNL1 → boundari
     add(COMPONENT, 'browser-auth|create-failed', 'red', '🔴',
       `יצירת עסקה חדשה (${TICKER}) דרך הטופס`,
       `${e.message}`,
-      'משתמשים לא יכולים לתעד עסקה — הפעולה המרכזית באפליקציה שבורה',
-      'בדוק את טופס היצירה (handleSubmit) ואת כתיבת trades ל-Supabase',
+      'רצף היצירה נקטע: FAB → 4 שדות → Log Trade → שורה בטבלה. השלב שנכשל הוא זה שבהודעה, והשלבים שאחריו ⛔ רצו',
+      'מועמדים: (1) עוגן ה-FAB או אחד מ-#log-ticker/entry/stop/target זז ⇒ הטופס ⛔ הוגש (2) הטופס הוגש ונדחה בוולידציה (3) הכתיבה ל-trades ⛔ נחתה (4) נחתה והשורה ⛔ רונדרה. ⓷ בלבד מצביע על handleSubmit/Supabase',
       'rollback — נמוך, מחזיר מצב ידוע-תקין');
   }
 
@@ -768,8 +771,8 @@ test('authenticated journey: login → journal → SNTNL → SNTNL1 → boundari
       add(COMPONENT, 'browser-auth|fixture-failed', 'red', '🔴',
         `הפיכת ${TICKER} ל-${RISK_TICKER} דרך מודל העריכה (מתקן הייצוגיות)`,
         `${e.message}`,
-        'העריכה נשברה — וגם: בלי השורה הזו הסנטינל בודק ג\'ורנל ש⛔ יכול להכיל את תקלת 07.09, כלומר ירוק חסר-ערך',
-        'בדוק את EditTradeModal (שדה הטיקר :148-152, שמירה :402-405) ואת מסלול הכתיבה ל-trades',
+        'renameToRiskTicker נקטע. השלב שנכשל הוא זה שבהודעה. וגם: בלי השורה הזו הסנטינל בודק ג\'ורנל ש⛔ יכול להכיל את תקלת 07.09, כלומר ירוק חסר-ערך',
+        'מועמדים: (1) שער הכניסה ⛔ מצא את השורה ⇒ מודל העריכה ⛔ נפתח (2) המודל נפתח ושדה הטיקר זז (3) השמירה ⛔ נחתה. ⓶/⓷ בלבד מצביעים על EditTradeModal ועל מסלול הכתיבה ל-trades',
         'rollback — נמוך, מחזיר מצב ידוע-תקין');
     }
   }
@@ -785,8 +788,8 @@ test('authenticated journey: login → journal → SNTNL → SNTNL1 → boundari
     add(COMPONENT, 'browser-auth|tab-switch', 'red', '🔴',
       'חזרה לטאב היומן אחרי סריקת הגבולות',
       `${e.message}`,
-      'טאב לא נטען — חלק מהאפליקציה לא נגיש למשתמש מחובר',
-      'בדוק שגיאות JS בטאב שנפל ואת ה-deploy האחרון',
+      'openJournal נקטע בחזרה מסריקת הגבולות: click על טאב היומן ואז המתנה לטבלה. השלב שנכשל הוא זה שבהודעה',
+      'מועמדים: (1) העוגן data-tour-tab="journal" זז או נחסם (2) הטאב נפתח והטבלה ⛔ רונדרה (3) סריקת הגבולות השאירה את הדף במצב חריג. בדוק pageerror ב-Sentry ואת ה-deploy האחרון',
       'rollback — נמוך, מחזיר מצב ידוע-תקין');
   }
 
@@ -801,8 +804,8 @@ test('authenticated journey: login → journal → SNTNL → SNTNL1 → boundari
       add(COMPONENT, 'browser-auth|delete-failed', 'red', '🔴',
         `מחיקת עסקת הבדיקה דרך ה-UI (כולל דיאלוג האישור)`,
         `${e.message}`,
-        'משתמשים לא יכולים למחוק עסקה — או שדיאלוג האישור נשבר',
-        'בדוק את handleDeleteTrade ואת ConfirmProvider (src/components/ToastProvider.jsx)',
+        'deleteRow נקטע: שער כניסה על השורה → לחיצה על «מחיקה» → אישור בדיאלוג. השלב שנכשל הוא זה שבהודעה, והשלבים שאחריו ⛔ רצו',
+        'מועמדים: (1) השורה ⛔ נמצאה ⇒ ⛔ נלחץ כפתור ו⛔ נפתח דיאלוג (2) הכפתור נלחץ והדיאלוג ⛔ נפתח (3) הדיאלוג אושר והמחיקה ⛔ נחתה. ⓶/⓷ בלבד מצביעים על handleDeleteTrade/ConfirmProvider',
         'rollback — נמוך, מחזיר מצב ידוע-תקין');
     }
   }
