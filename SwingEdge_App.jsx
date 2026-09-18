@@ -763,13 +763,18 @@ const generateSmartLessons = (closedTrades, stats, calcFn, lang = 'he', currency
   // (tradingStats.js: `(raw ?? "").toString().trim() || "Unknown"`). That is an
   // absence, not a pattern, so it is dropped from the candidates BEFORE the sort
   // — never gated after it, which would delete the card instead of the entry.
+  // ⚠️ `count >= 2` יושב **בתוך** המועמדות, ⛔ בשער שאחרי ה-`argmax` (`B-331`).
+  // שער אחרי הבחירה מוחק את ה**כרטיס** במקום את ה**מועמד**: קבוצה בת עסקה
+  // אחת ב-100% זוכה בבחירה, נופלת בשער, וסטאפ בן 5 עסקאות ב-80% שיושב
+  // מתחתיה ⛔ מוצג כלל. המשתמש ⛔ רואה «⛔ מספיק נתונים» — הוא רואה כלום.
+  // אותה הכרעה בדיוק כמו `Unknown` למעלה: מסננים מועמד, ⛔ תוצאה.
   const namedSetups = stats.bySetup.filter(g => {
     const name = (g?.name ?? "").toString().trim();
-    return name !== "" && name !== "Unknown";
+    return name !== "" && name !== "Unknown" && g.count >= 2;
   });
   const bestSetup = namedSetups.sort((a, b) => (b.winRate - a.winRate) || (b.count - a.count))[0];
 
-  if (bestSetup && bestSetup.count >= 2) {
+  if (bestSetup) {
     const n = bestSetup.count;
     const wr = Math.round(bestSetup.winRate);
     const setup = labelFor("setup", snakeToTitle(bestSetup.name), lang);
@@ -2859,6 +2864,16 @@ export default function SwingEdge() {
 
   const handleSubmit = async () => {
     if (!form.ticker || !entryN || !stopN) return;
+    // ⚠️ שומר המניות — חלק מ-`B-338`, ⛔ תוספת. משהוסרה המניה המומצאת
+    // (`positionSizing.js`), `effShares` יכול להיות `0` (ההון ⛔ מספיק) או
+    // `null` (⛔ נמדד שער). שמירה במצבים האלה הייתה כותבת `shares: 0/null`
+    // ל-DB, ומשם כל מדד נגזר — P&L · סיכון · DNA — מתאפס **בשקט**.
+    if (!(effShares > 0)) {
+      toast.error(lang === "he"
+        ? "⛔ אי-אפשר לשמור בלי גודל פוזיציה. הגדל הון, הדק את הסטופ, או הקלד מספר מניות ידנית."
+        : "Cannot save without a position size. Raise capital, tighten the stop, or type a share count.");
+      return;
+    }
     // Block geometrically invalid trades from being saved (reversed stop/target).
     const validity = validateTradeInputs(entryN, stopN, targetN, form.side);
     if (!validity.valid) {
@@ -6311,10 +6326,18 @@ export default function SwingEdge() {
                 .map(d => [d.name, { pnl: d.totalPnL, count: d.count }])[0];
 
               // Best Setup — from the hub's setup breakdown (single source).
-              // Win rate, then sample size — same deterministic tiebreak the
-              // Journal insight strip uses, so both name the same setup. (#3)
+              // Win rate, then sample size — the same deterministic tiebreak the
+              // Journal insight strip uses. "Unknown" (groupAndAnalyze's label for
+              // a setup the user never recorded) is dropped here exactly as it is
+              // there: an absence is not a pattern.
+              // ⚠️ The two are NOT interchangeable and never were after 8d631ec:
+              // the strip additionally requires count >= 2, this tile has no
+              // sample gate at all. Whoever adds one moves three tiles at once.
               const bestSetup = [...stats.bySetup]
-                .filter(s => s.count > 0)
+                .filter(s => {
+                  const name = (s?.name ?? "").toString().trim();
+                  return s.count > 0 && name !== "" && name !== "Unknown";
+                })
                 .sort((a, b) => (b.winRate - a.winRate) || (b.count - a.count))
                 .map(s => ({ setup: s.name, winRate: s.winRate, count: s.count }))[0];
 
@@ -7946,7 +7969,7 @@ export default function SwingEdge() {
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-[var(--v3-text-lo)] uppercase tracking-wider mb-0.5">Max Risk</div>
-                    <div className={`text-sm font-bold font-mono truncate ${tradeValidity.valid && sizingOk?"text-[var(--v3-loss)]":"text-[var(--v3-text-lo)]"}`}>{tradeValidity.valid && sizingOk?`${capSym}${Math.round(effPotLoss).toLocaleString()}`:"—"}</div>
+                    <div className={`text-sm font-bold font-mono truncate ${tradeValidity.valid && sizingOk?"text-[var(--v3-loss)]":"text-[var(--v3-text-lo)]"}`}>{tradeValidity.valid && sizingOk?fmtCapitalAmount(effPotLoss, capitalCurrency):"—"}</div>
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-[var(--v3-text-lo)] uppercase tracking-wider mb-0.5 flex items-center justify-center gap-1">R/R Ratio<TermTooltip term="rr" lang={lang} /></div>
@@ -7970,8 +7993,7 @@ export default function SwingEdge() {
                 </div>
               )}
 
-              {/* Position-too-small hint — explains why Shares/Value/Risk are 0 (R/R stays valid).
-                  Suppressed when the over-risk warning below already covers this trade. */}
+              {/* Position-too-small hint — explains why Shares/Value/Risk are 0 (R/R stays valid). */}
               {/* ⚠️ סירוב מוצהר — למה אין גודל פוזיציה. ⛔ "—" בלי סיבה הוא
                   כשל שקט: המשתמש רואה מקף ולא יודע אם זו תקלה או קלט חסר.
                   שתי הסיבות נבדלות, כי הפעולה הנדרשת שונה. */}
@@ -7991,9 +8013,12 @@ export default function SwingEdge() {
               {tradeValidity.valid && sizingOk && posSizeTooSmall && !isOverRisk && (
                 <div className="flex items-center gap-2 p-2.5 rounded-[var(--v3-radius-chip)] border text-xs bg-[var(--v3-warn)]/5 border-[var(--v3-warn)]/20 text-[var(--v3-warn)]">
                   <AlertTriangle size={13} />
+                  {/* ⚠️ הטקסט הקודם הבטיח «הכרטיסים מציגים מינימום של מניה
+                      אחת» — הבטחה שנעשתה שקרית ברגע שהמניה המומצאת הוסרה
+                      (`B-338`). הסכום שמוצג כעת הוא **אפס**, וזו התשובה. */}
                   <span>{lang === "he"
-                    ? `בסיכון ${riskPct}% הפוזיציה קטנה ממניה אחת — הכרטיסים מציגים מינימום של מניה אחת. הגדל הון או הדק את הסטופ. ה-R/R תקף.`
-                    : `At ${riskPct}% risk the position is under one share — cards show the 1-share minimum. Raise capital or tighten the stop. R/R is valid.`}</span>
+                    ? `בסיכון ${riskPct}% ההון ⛔ מספיק אפילו למניה אחת, ולכן הגודל הוא 0 — ⛔ נעגל כלפי מעלה. הגדל הון, הדק את הסטופ, או הקלד מספר מניות ידנית ותראה את הסיכון האמיתי. ה-R/R תקף.`
+                    : `At ${riskPct}% risk your capital does not cover even one share, so the size is 0 — we never round up. Raise capital, tighten the stop, or type a share count to see the real risk. R/R is valid.`}</span>
                 </div>
               )}
 

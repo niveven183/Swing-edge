@@ -235,7 +235,161 @@ const PHRASE_EN = "increase position size";
      `${ls.length} לקחים: ${ls.map(l => l.type).join(", ") || "(ריק)"}`);
 }
 
+/* ── בלוק 5 — `B-331` · argmax **לפני** השער ⇒ כרטיס שנמחק בשקט ───────────────
+ *
+ * 🔴 `:770` בוחר את המקסימום מכל האוכלוסייה ו**רק אז** `:771` שואל
+ *    `count >= 2`. ⇒ קבוצה בת עסקה אחת עם `WR 100%` **זוכה** בבחירה, נופלת
+ *    בשער, ומוחקת את הכרטיס — בעוד סטאפ בן 5 עסקאות ב-80% יושב מתחתיה.
+ *    המשתמש ⛔ רואה «⛔ מספיק נתונים»; הוא ⛔ רואה **כלום**.
+ *
+ * ⇒ השער עובר **לתוך** ה-`filter`, לפני ה-`sort`. אותה הכרעה בדיוק כמו
+ *   `Unknown` ב-`B-326`: שער אחרי ה-`argmax` מוחק את ה**כרטיס** במקום את
+ *   ה**מועמד**.
+ *
+ * ⚠️ הפיקסצ׳ר מוזרק ל-`bySetup` הישר (כמו `V17`) ו⛔ עובר דרך ה-hub —
+ *    ה-hub ⛔ יכול לייצר `WR 100% · n=1` לצד `WR 80% · n=5` על אותו ג'ורנל
+ *    בלי להוסיף משתנים שאינם נמדדים. הליטרל `Unknown` ⛔ מופיע כאן בכוונה:
+ *    זו שאלת **סדר הבחירה**, ⛔ שאלת החברות באוכלוסייה.
+ */
+const withSetups = (groups) =>
+  generateSmartLessons(J_REAL5, { ...hub(J_REAL5), bySetup: groups }, calcTradeMetrics, "he", "USD");
+const BREAKOUT_HE = labelFor("setup", "Breakout", "he");
+const PULLBACK_HE = labelFor("setup", "Pullback", "he");
+{
+  const fixture = [{ name: "breakout", count: 5, winRate: 80 },
+                   { name: "pullback", count: 1, winRate: 100 }];
+  const s = strengths(withSetups(fixture))[0];
+  ok("V18", "n=1·WR100 לצד n=5·WR80 ⇒ הכרטיס **כן** מופיע (היום: נמחק)",
+     !!s, s ? s.title : "⛔ אין כרטיס — ה-argmax בלע את הכרטיס");
+  ok("V19", "והוא נוקב ב-`breakout`, ⛔ ב-`pullback` בן העסקה היחידה",
+     !!s && s.title.includes(BREAKOUT_HE) && !s.title.includes(PULLBACK_HE),
+     s ? s.title : "—");
+  ok("V20", "והוא מצטט 80% על פני 5 עסקאות",
+     !!s && s.detail.includes("80%") && s.detail.includes("5"), s ? s.detail : "—");
+}
+{
+  // ⚠️ ⛔ די בכך שהכרטיס הופיע — הוא חייב להופיע גם כשהמועמד הפסול הוא
+  //    ה**ראשון** במערך. סדר הקלט ⛔ משנה.
+  const flipped = [{ name: "pullback", count: 1, winRate: 100 },
+                   { name: "breakout", count: 5, winRate: 80 }];
+  const s = strengths(withSetups(flipped))[0];
+  ok("V21", "סדר הקלט הפוך ⇒ אותה תוצאה בדיוק",
+     !!s && s.title.includes(BREAKOUT_HE), s ? s.title : "⛔ אין כרטיס");
+}
+{
+  // ⚠️ הבייטים: השער ⛔ שורד **אחרי** ה-`sort` כענף `if` נפרד.
+  const gateAfterArgmax = /bestSetup\s*&&\s*bestSetup\.count\s*>=\s*2/.test(genStmt);
+  ok("V22", "הבייטים: השער ⛔ יושב אחרי ה-argmax כענף `if` נפרד",
+     !gateAfterArgmax, gateAfterArgmax ? "`if (bestSetup && bestSetup.count >= 2)` עדיין שם" : "⛔ נמצא");
+}
+
+/* ── בלוק 6 — בקרה ג׳: השער ⛔ רוּכַּך · הבחירה ⛔ שוּנתה ────────────────────── */
+{
+  const s = strengths(withSetups([{ name: "breakout", count: 5, winRate: 80 }]))[0];
+  ok("K10", "בקרה ג׳: מועמד כשיר יחיד ⇒ כרטיס", !!s, s ? s.title : "⛔ נעלם");
+}
+{
+  // 🔴 השער ⛔ רוּכַּך: **כל** המועמדים בני עסקה אחת ⇒ ⛔ כרטיס. זו התשובה
+  //    הנכונה — «⛔ מספיק נתונים» ⛔ «הנה ניחוש».
+  const allSingles = [{ name: "breakout", count: 1, winRate: 100 },
+                      { name: "pullback", count: 1, winRate: 100 },
+                      { name: "reversal", count: 1, winRate: 0 }];
+  const ls = withSetups(allSingles);
+  ok("K11", "בקרה ג׳: כל המועמדים n=1 ⇒ ⛔ כרטיס (השער ⛔ רוּכַּך)",
+     strengths(ls).length === 0, `${strengths(ls).length} לקחי חוזק`);
+}
+{
+  // בקרה ג׳: **סדר** הבחירה בתוך האוכלוסייה הכשירה ⛔ זז — WR, ואז מדגם.
+  const s = strengths(withSetups([{ name: "breakout", count: 5, winRate: 60 },
+                                  { name: "pullback", count: 5, winRate: 90 }]))[0];
+  ok("K12", "בקרה ג׳: בין שני כשירים — WR גבוה יותר מנצח (הסדר ⛔ זז)",
+     !!s && s.title.includes(PULLBACK_HE), s ? s.title : "⛔ אין כרטיס");
+}
+{
+  // בקרה ג׳: שובר-השוויון המשני (מדגם) ⛔ זז.
+  const s = strengths(withSetups([{ name: "breakout", count: 3, winRate: 75 },
+                                  { name: "pullback", count: 9, winRate: 75 }]))[0];
+  ok("K13", "בקרה ג׳: WR שווה ⇒ המדגם הגדול מנצח (שובר-השוויון ⛔ זז)",
+     !!s && s.title.includes(PULLBACK_HE), s ? s.title : "⛔ אין כרטיס");
+}
+
+/* ── בלוק 7 — `B-336` · אותו `Unknown` באריח האנליטיקה ────────────────────────
+ *
+ * 🔴 `:6316` מסנן `s.count > 0` בלבד ⇒ `Unknown` הוא מועמד שווה-זכויות
+ *    באריח «Best Setup» של האנליטיקה, בעוד רצועת הג'ורנל כבר מסננת אותו
+ *    (`:766`). ⇒ **אותו סינון**, ⛔ סינון חדש.
+ *
+ * ⚠️ **זו ⛔ בדיקת טקסט:** הביטוי מחולץ מהבייטים לפי עוגן ומורץ ב-`new
+ *    Function` עם `stats` מוזרק — בדיוק כמו `generateSmartLessons` למעלה.
+ *    ⛔ כשל חילוץ הוא אדום קשה (`B-272`) — `M5` אוכפת.
+ *
+ * ⚠️ **⑨ נרשם ו⛔ תוקן:** לאריח הזה, ולשני אחיו (Best Day · Best Emotion),
+ *    ⛔ שער מדגם כלל — `n=1` מספיק לאריח. `L1` היא **שורת לדג׳ר**: היא
+ *    ירוקה היום ותיהפך אדומה ברגע שמישהו יוסיף שער בשקט. הזזת סף שם מזיזה
+ *    שלושה אריחים שניב רואה ⇒ **פריט נפרד**, ⛔ בגל הזה.
+ */
+const A_TILE = "const bestSetup = [...stats.bySetup]";
+const nTile = countOccurrences(src, A_TILE);
+ok("M5", "עוגן אריח האנליטיקה מופיע בדיוק פעם אחת", nTile === 1, `${nTile}`);
+if (nTile !== 1) { console.log("\n⛔ חילוץ נכשל — אדום קשה, ⛔ לא דילוג."); process.exit(1); }
+const tileStart = src.indexOf(A_TILE);
+const tileStmt = src.slice(tileStart, src.indexOf(";", src.indexOf("[0]", tileStart)) + 1);
+let analyticsBestSetup = null, tileErr = "";
+try {
+  analyticsBestSetup = new Function("stats", `${tileStmt}\nreturn bestSetup;`);
+} catch (e) { tileErr = e.message; }
+ok("M6", "הביטוי שחולץ נבנה ב-new Function ללא שגיאת תחביר",
+   typeof analyticsBestSetup === "function", tileErr || `${tileStmt.split("\n").length} שורות`);
+if (typeof analyticsBestSetup !== "function") { console.log("\n⛔ חילוץ נכשל — אדום קשה."); process.exit(1); }
+const tile = (bySetup) => analyticsBestSetup({ bySetup });
+{
+  const t = tile(hub(J_UNKNOWN).bySetup);
+  ok("V23", "ג'ורנל 16.09 (רק `Unknown`) ⇒ האריח ⛔ נוקב בסטאפ",
+     t === undefined, t ? JSON.stringify(t) : "undefined");
+}
+{
+  const mixed = [{ name: "Unknown", count: 3, winRate: 99 },
+                 { name: "breakout", count: 5, winRate: 80 }];
+  const t = tile(mixed);
+  ok("V24", "`Unknown` עם WR גבוה יותר ⇒ האריח בוחר את האמיתי",
+     !!t && t.setup === "breakout", t ? JSON.stringify(t) : "undefined");
+}
+{
+  const raw = [{ name: "Unknown", count: 9, winRate: 90 }, { name: "", count: 8, winRate: 95 },
+               { name: null, count: 7, winRate: 99 }, { name: "   ", count: 6, winRate: 98 }];
+  ok("V25", "`Unknown` · `\"\"` · `null` · רווחים — כולם מסוננים גם באריח",
+     tile(raw) === undefined, JSON.stringify(tile(raw)) || "undefined");
+}
+{
+  // ⑥ — ההערה ב-`:6317-6318` הבטיחה ששני הכרטיסים נוקבים באותו סטאפ.
+  //     `8d631ec` הוסיף סינון לרצועה ⛔ לאריח ⇒ ההבטחה נהייתה שקרית.
+  //     ⚠️ הבטחה שקרית בהערה היא `R-4` בתחפושת — היא מלמדת את הקורא הבא
+  //     ש⛔ צריך לבדוק.
+  const lie = src.includes("so both name the same setup");
+  ok("V26", "⑥ ההערה ⛔ מבטיחה «both name the same setup» בעוד הספים נבדלים",
+     !lie, lie ? "ההבטחה השקרית עדיין בבייטים" : "⛔ נמצאה");
+}
+{
+  // ⚠️ **שורת לדג׳ר — ⑨.** ירוקה היום, ואדומה ברגע שיתווסף שער מדגם בשקט.
+  //    ⛔ אינה ראיה לתיקון; היא ראיה ש**⛔ תוקן**.
+  const gated = /\.filter\(s\s*=>\s*s\.count\s*>=\s*\d/.test(tileStmt);
+  ok("L1", "⑨ לדג׳ר: לאריח ⛔ שער מדגם — נרשם, ⛔ תוקן (פריט נפרד)",
+     !gated, gated ? "🔴 נוסף שער בשקט — שלושה אריחים זזו" : "⛔ שער — כמו שנרשם");
+}
+
+/* ── בקרה ד׳: הרצועה והאריח ⛔ התפצלו במה שכן מוסכם ─────────────────────── */
+{
+  const real = [{ name: "breakout", count: 5, winRate: 80 },
+                { name: "pullback", count: 4, winRate: 60 }];
+  const t = tile(real);
+  const s = strengths(withSetups(real))[0];
+  ok("K14", "בקרה ד׳: על אוכלוסייה שכולה כשירה — הרצועה והאריח נוקבים באותו סטאפ",
+     !!t && !!s && s.title.includes(labelFor("setup", "Breakout", "he")) && t.setup === "breakout",
+     `אריח=${t ? t.setup : "—"} · רצועה=${s ? s.title : "—"}`);
+}
+
 console.log(`\n${pass} עברו · ${fail} נכשלו${fail ? ` — אדומות: ${reds.join(", ")}` : ""}`);
-console.log(`סיכום: 4 מטא · ${pass + fail - 4} אסרציות ערך · זרוע בקרה K1–K8 חייבת להישאר ירוקה (K9 כפולה: בקרה + ערך).`);
-console.log("⚠️ B-326 בלבד. `B-331` (argmax לפני שער) ⛔ נסגר ו⛔ ממוצב כאן.");
+console.log(`סיכום: 6 מטא · ${pass + fail - 6} אסרציות ערך/צורה · זרוע בקרה K1–K14 חייבת להישאר ירוקה (K9 כפולה: בקרה + ערך).`);
+console.log("⚠️ `L1` היא **לדג׳ר** (⑨) ⛔ הישג: היא מודדת ש-⛔ נוסף שער מדגם לאריחים, ⛔ שהיעדרו נכון.");
+console.log("⚠️ B-326 · B-331 · B-336. ⛔ מכסה: JSX · React · דפדפן · פרודקשן — `C-050` + `C-053` בלבד.");
 process.exit(fail ? 1 : 0);

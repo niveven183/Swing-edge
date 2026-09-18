@@ -396,9 +396,16 @@ const aggressionOf = (trades, capitalCurrency) =>
   const r2 = (n) => Math.round(n * 100) / 100;
 
   // ── 13.1 תרחיש א' — הון ₪2,500. הגודל זהה, ה**סיכון המוצג** משקר פי 3 ────
+  //
+  // ⚠️ **`sharesOverride: "1"` נוסף ב-18.09 (`B-338`) — הבלוק ⛔ רוּכַּך.**
+  //    עד אז המניה הבודדת הגיעה מ«רצפת המניה הבודדת» שב-`positionSizing.js`,
+  //    כלומר מ**המצאה**; ההמצאה הוסרה (בלוק 19), ובהון ₪2,500 התשובה הנכונה
+  //    היא `0`. ארבעת המספרים כאן מודדים את ה**המרה**, ⛔ את הרצפה — ולכן
+  //    המניה נמסרת כעת כ**בחירה מוצהרת** והערכים נשמרים byte-identical
+  //    (`6.54%` · `₪913.29` · `₪163.49`). ⛔ אף ציפייה ⛔ הוזזה.
   console.log("  13.1 · הון ₪2,500");
-  const a = sz(2500);
-  eq("1 מניה (רצפת המניה הבודדת)", a.effShares, 1);
+  const a = sz(2500, { sharesOverride: "1" });
+  eq("1 מניה — **מוצהרת**, ⛔ מומצאת", a.effShares, 1);
   eq("🔴 סיכון אמיתי 6.54% ⛔ ולא 2.18% שהמסך מראה", r2(a.effRiskPct), 6.54);
   eq("🔴 שווי פוזיציה ₪913.29 ⛔ ולא ₪304.51", r2(a.effPosValue), 913.29);
   eq("🔴 סיכון מרבי ₪163.49 ⛔ ולא ₪54.51", r2(a.effPotLoss), 163.49);
@@ -666,7 +673,9 @@ const aggressionOf = (trades, capitalCurrency) =>
     eq("✅ לא-סופי ⇒ — ⛔ לא ₪NaN", fmtCapitalAmount(NaN, "ILS"), "—");
 
     // 🔴 הערך עצמו ⛔ **לא** עוגל — זו ההוכחה שהעיגול לא זלג פנימה.
-    const p = sizePosition({ entry: "304.51", stop: "250", capital: 2500, riskPct: 1, rate: 2.9992 });
+    // ⚠️ `sharesOverride: "1"` — ראה 13.1. המניה מוצהרת, ⛔ מומצאת (`B-338`).
+    const p = sizePosition({ entry: "304.51", stop: "250", capital: 2500, riskPct: 1,
+                             rate: 2.9992, sharesOverride: "1" });
     check("⛔ `effPosValue` שומר על הדיוק המלא — העיגול ⛔ לא זלג לערך",
       !Object.is(p.effPosValue, Math.round(p.effPosValue * 100) / 100));
     eq("ובכל זאת מוצג בשתי ספרות", fmtCapitalAmount(p.effPosValue, "ILS"), "₪913.29");
@@ -1662,6 +1671,141 @@ console.log("  18 · G2 · סיכון במטבע ההון");
     eq("V6 ⚪ זהות ⇒ ok", v6.ok, true);
     eq("V6 ⚪ הערך byte-identical", Object.is(v6.value, RISK), true);
     eq("V6 ⚪ הנימוק `identity`", v6.reason, "identity");
+  }
+}
+
+// ── בלוק 19 · `B-338` — המחשבון ממליץ על מה שהוא עצמו פוסל (18.09) ───────────
+//
+// 🔴 **מה שנצפה בפרודקשן 18.09 11:39:** `NBIS` · כניסה `220.02` · סטופ
+//    `202.48` · הון `$821` · כלל `1%`. המסך הציג **בו-זמנית**
+//    `SHARES 2` · `MAX RISK ₪106` · `POS. VALUE ₪1,334.77`
+//    **ולצדם התראה**: «הפוזיציה חורגת מסיכון 1% — סיכון בפועל 4.3%».
+//
+//    כלומר: הכרטיסים נוקבים בהוראת פעולה, והבאנר שמתחתם אומר שההוראה פסולה.
+//
+// ⚠️ **השורש ⛔ בבאנר — ב-`positionSizing.js:77`.** `posSize` יצא `0`
+//    (ההון ⛔ מספיק למניה אחת), והקוד **החליף** את האפס ב-`1`:
+//    `suggestedShares = posSizeTooSmall ? 1 : posSize`. זה `‹R-2›` בצורתו
+//    הטהורה — ברירת מחדל ש**ממציאה** במקום להודות — ואז `:86` מזהיר על
+//    ההמצאה של עצמו. ⇒ `suggestedShares = posSize`; `0` הוא **תשובה**.
+//
+// ⚠️ **`0` לבדו היה יוצר כשל שקט חדש** — `handleSubmit` ⛔ נשא שום שומר על
+//    מניות (`:2861`), כלומר `shares: 0` היה נכתב ל-DB וכל מדד נגזר היה מתאפס
+//    בשקט. לכן השומר ב-`handleSubmit` הוא **חלק מאותו תיקון**, ⛔ תוספת.
+//
+// ⚠️ **ההמרה ⛔ נגעה.** `20` מניות על `100/95/10,000/1%` הוא **בקרה**
+//    (`C1`–`C4`): שם `posSize ≥ 1` ⇒ `:77` ⛔ יורה מלכתחילה, ואדום שם פירושו
+//    שהתיקון רחב מדי ⇒ **עצור**.
+//
+// ⚠️ **ארבעת מספרי המסך משוחזרים כאן במדויק** — וזה מה שמכריע את ④:
+//    `rate 3.0333` · `capital ₪2,490` (= $821 × 3.0333) ⇒
+//    `MAX RISK 106.41` · `POS. VALUE 1,334.77` · `4.27% → "4.3%"`.
+//    ⇒ **שני האגפים ב-`effRiskPct` נקובים במטבע ההון** — `106.41/2490`
+//    זהה ל-`35.08/821` (יחס חסר-ממד) ⇒ המסקנה בפרומפט **אוששה**, הפירוק
+//    לדולרים **הופרך**: האופרנדים הם `₪` ו⛔ `$`.
+//
+// ⛔ **והבלוק הזה ⛔ מכסה רינדור** — `sizePosition` היא פונקציה טהורה; הכרטיס
+//    על המסך · הבאנר · ה-toast · RTL · דפדפן אמיתי · פרודקשן חיים ב-`C-052`
+//    **בלבד**, ו⛔ לקרוא `452/452` כסגירה של מה שנצפה ב-11:39.
+{
+  console.log("\n19 · B-338 · המחשבון ממליץ על מה שהוא פוסל");
+  const app = src("../SwingEdge_App.jsx");
+  const ps  = src("../src/lib/positionSizing.js");
+  const r2  = (n) => Math.round(n * 100) / 100;
+
+  // ── 19.1 התרחיש שצולם — שחזור מלא של ארבעת המספרים ──────────────────────
+  console.log("  19.1 · NBIS 220.02/202.48 · הון ₪2,490 · 1%");
+  const RATE = 3.0333;
+  const nbis = (extra = {}) =>
+    sizePosition({ entry: "220.02", stop: "202.48", capital: 2490, riskPct: 1, rate: RATE, ...extra });
+
+  const bare = nbis();
+  eq("קדם-תנאי · ההון ⛔ מספיק למניה אחת ⇒ posSize 0", bare.posSize, 0);
+  eq("קדם-תנאי · הדגל מורם", bare.posSizeTooSmall, true);
+  eq("🔴 ההצעה היא **0**, ⛔ מניה מומצאת", bare.suggestedShares, 0);
+  eq("🔴 ⇒ effShares 0", bare.effShares, 0);
+  eq("🔴 ⇒ סיכון מרבי 0 ⛔ ₪53.20", bare.effPotLoss, 0);
+  eq("🔴 ⇒ שווי פוזיציה 0 ⛔ ₪667.39", bare.effPosValue, 0);
+  eq("🔴 ⇒ הסיכון המוצג 0% ⛔ 2.14%", bare.effRiskPct, 0);
+
+  // 🔴 **הסתירה עצמה** — ⛔ מספר בודד: ההצעה ⛔ חורגת מהכלל שהיא נמדדת מולו.
+  //    זו האסרציה היחידה שמנסחת את הבאג כפי שהמשתמש ראה אותו.
+  check("🔴 ההצעה ⛔ חורגת מכלל הסיכון — המחשבון ⛔ ממליץ על מה שהוא פוסל",
+        bare.effRiskPct <= 1 + 0.05);
+
+  // ── 19.2 דריסה ידנית — בחירה **מוצהרת**, ⛔ המצאה ⇒ שורדת בשלמותה ────────
+  console.log("  19.2 · דריסה ידנית `2` — מה שניב הקליד");
+  const ov = nbis({ sharesOverride: "2" });
+  eq("הדריסה שורדת", ov.effShares, 2);
+  eq("ומסומנת כדריסה", ov.hasSharesOverride, true);
+  eq("🔵 `MAX RISK` = ₪106.41 — המספר שצולם", r2(ov.effPotLoss), 106.41);
+  eq("🔵 `POS. VALUE` = ₪1,334.77 — המספר שצולם", r2(ov.effPosValue), 1334.77);
+  eq("🔵 `4.3%` — המספר שצולם בבאנר", ov.effRiskPct.toFixed(1), "4.3");
+  check("🔵 ④ מאושש · יחס חסר-ממד ⇒ `106.41/2490` ≡ `35.08/821`",
+        Math.abs(ov.effRiskPct - (2 * 17.54 / 821) * 100) < 0.01);
+  check("🔵 והבאנר עדיין יורה על דריסה חורגת — דריסה ⛔ מושתקת",
+        ov.effShares > 0 && ov.effRiskPct > 1 + 0.05);
+
+  // ── 19.3 ③ `MAX RISK` — שני מעצבים באותו כרטיס ───────────────────────────
+  //
+  // ⚠️ **הסיווג ל-`D-068` הופרך ונרשם:** המחלקה של `test:cents` תלויה
+  //    ב**מעצב**, ⛔ בצורה — `.toLocaleString()` חשוף יושב ב**זרוע הביקורת**
+  //    שלה (`K1`–`K6`) ו⛔ אסור להזיזו לשם. לכן האסרציה חיה כאן.
+  //    הבאג ⛔ אגורות-שנמחקו-בעיגול אלא **אי-עקביות בתוך כרטיס אחד**:
+  //    `POS. VALUE` עובר ב-`fmtCapitalAmount` (שתי ספרות), `MAX RISK` ⛔.
+  console.log("  19.3 · ③ שני מעצבים באותו כרטיס");
+  eq("🔴 הבאג שצולם · `Math.round` ⇒ ₪106 — 41 אגורות נמחקו",
+     `₪${Math.round(ov.effPotLoss).toLocaleString()}`, "₪106");
+  eq("✅ אותו ערך דרך המעצב המשותף ⇒ ₪106.41",
+     fmtCapitalAmount(ov.effPotLoss, "ILS"), "₪106.41");
+  check("🔴 `MAX RISK` ⛔ מחרוזת ידנית עם `Math.round(effPotLoss)`",
+        !/\$\{capSym\}\$\{Math\.round\(effPotLoss\)\.toLocaleString\(\)\}/.test(app));
+  check("✅ `MAX RISK` עובר ב-`fmtCapitalAmount` — אותו מעצב כמו `POS. VALUE`",
+        /fmtCapitalAmount\(effPotLoss, capitalCurrency\)/.test(app));
+
+  // ── 19.4 החלפת האפס ⛔ שורדת בבייטים, והשומר בכתיבה קיים ─────────────────
+  console.log("  19.4 · צורה · המצאה ⛔ בבייטים · שומר בכתיבה");
+  check("🔴 `positionSizing.js` ⛔ מחליף `0` ב-`1`",
+        !/posSizeTooSmall\s*\?\s*1\s*:/.test(ps));
+  check("✅ ההצעה היא `posSize` עצמו", /suggestedShares\s*=\s*posSize\s*;/.test(ps));
+  check("🔴 `handleSubmit` נושא שומר מניות — `shares: 0` ⛔ נכתב ל-DB",
+        /if\s*\(\s*!\s*\(\s*effShares\s*>\s*0\s*\)\s*\)/.test(app));
+  check("🔴 הבאנר ⛔ מבטיח «מינימום של מניה אחת» — ההבטחה ⛔ נכונה",
+        !app.includes("הכרטיסים מציגים מינימום של מניה אחת") &&
+        !app.includes("cards show the 1-share minimum"));
+
+  // ── 19.5 ⚪ בקרה — הזרוע שחייבת להישאר ירוקה ─────────────────────────────
+  //
+  // 🔴 `entry 100 · stop 95 · הון 10,000 · 1%` ⇒ `20` מניות. אדום כאן פירושו
+  //    שהתיקון נגע בחישוב עצמו ו⛔ רק בהחלפת האפס ⇒ **עצור**.
+  console.log("  19.5 ⚪ בקרה — 20 מניות");
+  {
+    const c = sizePosition({ entry: "100", stop: "95", capital: 10000, riskPct: 1, rate: 1 });
+    eq("C1 ⚪ 20 מניות", c.posSize, 20);
+    eq("C2 ⚪ ההצעה זהה לחישוב", c.suggestedShares, 20);
+    eq("C3 ⚪ effShares 20", c.effShares, 20);
+    eq("C4 ⚪ הסיכון בפועל 1% בדיוק", c.effRiskPct, 1);
+    eq("C5 ⚪ הדגל ⛔ מורם ⇒ `:77` ⛔ יורה מלכתחילה", c.posSizeTooSmall, false);
+  }
+  {
+    // ⚪ הצוק עצמו: מניה אחת **מחושבת** ⛔ מומצאת. הון 500 ⇒ בדיוק 1.
+    const edge = sizePosition({ entry: "100", stop: "95", capital: 500, riskPct: 1, rate: 1 });
+    eq("C6 ⚪ הון שמספיק בדיוק למניה ⇒ 1 — **מחושבת**", edge.suggestedShares, 1);
+    eq("C7 ⚪ והדגל ⛔ מורם", edge.posSizeTooSmall, false);
+    // 🔴 C8 ⛔ בקרה — היא הצוק עצמו, ואדומה היום. C6/C7 מימינה ⚪ ירוקות בשני
+    //    העצים, וזה מה שמוכיח שהתיקון נוגע **רק** בצד הלא-מספיק.
+    const below = sizePosition({ entry: "100", stop: "95", capital: 499, riskPct: 1, rate: 1 });
+    eq("🔴 C8 · שקל אחד מתחת ⇒ 0, ⛔ 1", below.suggestedShares, 0);
+    eq("C9 ⚪ והדגל **כן** מורם", below.posSizeTooSmall, true);
+  }
+  {
+    // ⚪ הסירוב ⛔ נגע: `null` נשאר `null` ו⛔ הפך ל-`0`. ההבחנה בין «⛔ נמדד»
+    //    ל«⛔ מספיק» היא מה שמבדיל הודאה מהוראת פעולה.
+    const no = sizePosition({ entry: "220.02", stop: "202.48", capital: 2490, riskPct: 1, rate: null });
+    eq("C10 ⚪ ⛔ שער ⇒ `null`, ⛔ `0`", no.suggestedShares, null);
+    eq("C11 ⚪ ו-ok שקר", no.ok, false);
+    check("C12 ⚪ «⛔ נמדד» ≠ «⛔ מספיק» — שני המצבים נבדלים",
+          !Object.is(no.suggestedShares, bare.suggestedShares));
   }
 }
 

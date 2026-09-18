@@ -71,10 +71,17 @@ export const sizePosition = ({
   const posValue = posSize * entryCap;
   const potLoss  = posSize * riskPerShare;
 
-  // רצפת המניה הבודדת: פוזיציה שמתעגלת מתחת ל-1 (מחיר גבוה · סטופ רחב · הון
-  // קטן) מוצגת כ-1 ולא כ-0, ואז `isOverRisk` אומר בכנות שהיא חורגת מהאחוז.
+  // ── `0` הוא תשובה, ⛔ היעדר תשובה ────────────────────────────────────────
+  //
+  // 🔴 עד 18.09 החליף כאן טרנרי את האפס במניה **מומצאת** («רצפת המניה
+  // הבודדת»). נמדד בפרודקשן: `NBIS` 220.02/202.48 · הון ₪2,490 · 1% ⇒ המסך
+  // נקב בהוראת קנייה **ומתחתיה** התרה שההוראה חורגת פי 4.3 מהכלל שלפיו היא
+  // חושבה. מחשבון שממליץ על מה שהוא פוסל מאבד את שני המשפטים בבת אחת.
+  //
+  // ⚠️ הדגל **נשאר** — הוא מבדיל «ההון ⛔ מספיק» (`0` + הסבר) מ«⛔ נמדד שער»
+  // (`null`, הסירוב למעלה). שני מצבים, שתי פעולות נדרשות שונות.
   const posSizeTooSmall = riskPerShare > 0 && posSize === 0;
-  const suggestedShares = posSizeTooSmall ? 1 : posSize;
+  const suggestedShares = posSize;
 
   const overrideStr = (sharesOverride ?? "").toString();
   const overrideN   = parseInt(overrideStr, 10);
