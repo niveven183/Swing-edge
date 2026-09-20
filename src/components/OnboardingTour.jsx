@@ -19,7 +19,7 @@ const SPOT_PAD = 8;
 const MOBILE_BP = 420; // below this the bubble docks to the bottom (sheet-style)
 const POLL_TRIES = 12; // ~1.2s at ~100ms cadence, then fall back to centered
 
-export default function OnboardingTour({ steps = [], onClose, onNavigate, t, isRTL }) {
+export default function OnboardingTour({ steps = [], onClose, onNavigate, navKeys, t, isRTL }) {
   const [i, setI] = useState(0);
   const [rect, setRect] = useState(null);
   const [vp, setVp] = useState(() => ({
@@ -55,7 +55,24 @@ export default function OnboardingTour({ steps = [], onClose, onNavigate, t, isR
   // (tab content mounts async). First hit → measure + settle after smooth scroll.
   // If it never shows within the poll window, rect stays null → centered fallback.
   useLayoutEffect(() => {
-    if (stepTab) { try { onNavigate?.(stepTab); } catch {} }
+    // B-353 — a step pointing at a tab id that no longer exists used to fail
+    // SILENTLY: onNavigate accepted any string, nothing switched, the anchor poll
+    // burned its full 12 × 100ms and the centered fallback bubble then looked
+    // deliberate. Validate first and SAY SO. ⛔ no `|| "dashboard"` — a guessed
+    // destination is R-2; the loud admission is the answer.
+    // ⚠️ An absent or empty `navKeys` disables validation on purpose (back-compat
+    // for any caller that does not pass it) — declared here so it is a choice and
+    // not an accident.
+    if (stepTab) {
+      const known = Array.isArray(navKeys) && navKeys.length > 0;
+      if (known && !navKeys.includes(stepTab)) {
+        console.error(
+          `OnboardingTour: step ${i + 1}/${total} declares tab "${stepTab}", which is not one of [${navKeys.join(", ")}]. Navigation skipped.`
+        );
+      } else {
+        try { onNavigate?.(stepTab); } catch {}
+      }
+    }
     setRect(null);
     let timer = 0;
     let tries = 0;
@@ -73,7 +90,7 @@ export default function OnboardingTour({ steps = [], onClose, onNavigate, t, isR
     };
     settle();
     return () => { if (timer) clearTimeout(timer); };
-  }, [i, anchor, stepTab, onNavigate, recompute, reduceMotion]);
+  }, [i, total, anchor, stepTab, navKeys, onNavigate, recompute, reduceMotion]);
 
   // Keep the bubble glued to the anchor while the page scrolls/resizes.
   useEffect(() => {
@@ -92,14 +109,22 @@ export default function OnboardingTour({ steps = [], onClose, onNavigate, t, isR
   const navRef = useRef({ next: () => {}, back: () => {} });
   navRef.current.next = last ? finish : goNext;
   navRef.current.back = goBack;
+  // B-352 — the keys were hardcoded (Right = next) and the effect carried `[]`, so
+  // it could never see isRTL: in Hebrew the whole tour navigated backwards. The
+  // mapping is DERIVED — "forward" is the key that points where reading goes — and
+  // isRTL joins the dependency array. ⛔ the navRef stays: it is what keeps this
+  // listener from re-trapping on every step; what changed is the KEY, not the
+  // architecture.
+  const fwdKey = isRTL ? "ArrowLeft" : "ArrowRight";
+  const backKey = isRTL ? "ArrowRight" : "ArrowLeft";
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === "ArrowRight") { e.preventDefault(); navRef.current.next(); }
-      else if (e.key === "ArrowLeft") { e.preventDefault(); navRef.current.back(); }
+      if (e.key === fwdKey) { e.preventDefault(); navRef.current.next(); }
+      else if (e.key === backKey) { e.preventDefault(); navRef.current.back(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [fwdKey, backKey]);
 
   const bubbleRef = useModalA11y({ active: true, onClose: skip });
 

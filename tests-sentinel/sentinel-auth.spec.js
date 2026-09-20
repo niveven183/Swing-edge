@@ -1,5 +1,9 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
+// The hydration gate asserts the rendered capital is NOT the default. Importing
+// the constant instead of writing `2500` here is the whole point: a literal goes
+// blind, silently, on the day the default moves — B-324's class exactly.
+import { DEFAULT_CAPITAL } from '../src/utils.js';
 
 // Sentinel S2 — Layer A2: real-browser QA of the AUTHENTICATED surface.
 // S1.5 only covers the anonymous surface, so anything that breaks after login
@@ -153,13 +157,35 @@ function redact(s) {
   return String(s).replace(/[\w.+-]+@[\w.-]+\.\w+/g, '[email]');
 }
 
+// ⚠️ 20.09 (B-335's class) — the `$`-only regex below used to hardcode the sign
+// in the OUTPUT too: an ILS display would have reported «לא נמצא סכום» while the
+// amount was right there on screen, and a shekel amount would have been printed
+// under a dollar sign. The `got` field is labelled "what came back"; prose there
+// is a lie about a measurement. Both the match and the echo now carry whichever
+// sign was actually rendered.
+const CAPITAL_RE = /([$₪])\s*([\d,]+(?:\.\d+)?)/;
+
+async function readCapitalText(locator) {
+  try { return (await locator.innerText()).replace(/\s+/g, ' ').trim(); }
+  catch { return ''; }
+}
+
+// The rendered amount as a NUMBER, or null when none was found. null is the
+// admission — ⛔ never 0, which the gate would read as a real (failing) capital.
+async function readCapitalNumber(locator) {
+  const m = (await readCapitalText(locator)).match(CAPITAL_RE);
+  if (!m) return null;
+  const n = Number(m[2].replace(/,/g, ''));
+  return Number.isFinite(n) ? n : null;
+}
+
 // The finding must carry the amount actually rendered, never an assumption about it.
 async function readCapital(locator) {
   let text = '';
   try { text = (await locator.innerText()).replace(/\s+/g, ' ').trim(); }
   catch (e) { return `אזור ההון לא ניתן לקריאה: ${e.message}`; }
-  const m = text.match(/\$\s*([\d,]+(?:\.\d+)?)/);
-  return m ? `מוצג: $${m[1]} (טקסט מלא: "${text}")` : `מוצג: "${text}" (לא נמצא סכום)`;
+  const m = text.match(CAPITAL_RE);
+  return m ? `מוצג: ${m[1]}${m[2]} (טקסט מלא: "${text}")` : `מוצג: "${text}" (לא נמצא סכום)`;
 }
 
 // Evidence for the timeout path: what the page showed instead. Redaction runs
@@ -663,38 +689,61 @@ test('authenticated journey: login → journal → SNTNL → SNTNL1 → boundari
     return;
   }
 
-  // ---- 2. hydration gate. DEFAULT_CAPITAL (2500 → "2,500") renders before
-  // the DB answers; asserting anything against defaults is a false green.
+  // ---- 2. hydration gate. DEFAULT_CAPITAL renders before the DB answers;
+  // asserting anything against defaults is a false green.
   // 25s and not 8s: the diagnosis was measured on a local Mac (1.8s/3.5s), while
   // the shared runner against Supabase is materially slower — margin is still right.
   //
-  // Selector targets the TOP KPI card (data-tour="equity", SwingEdge_App.jsx:3143),
-  // which renders immediately in the KPI row. Its `sub` span is `${startedAt} $${capital}`
-  // → "התחלה $10,000" (he) / "Started at $10,000" (en) — the DB-loaded capital.
+  // Selector targets the TOP KPI card (data-tour="equity", SwingEdge_App.jsx:4488),
+  // which renders immediately in the KPI row. Its `sub` span is
+  // `${startedAt} ${dispSym}${capital}` — the DB-loaded capital.
   // NOT the equity-curve card (SwingEdge_App.jsx:4592, "הון התחלתי"), a chart deep
   // in the page that hydrates late: the old /(הון התחלתי|starting capital)/ selector
-  // matched only that card and timed out 4/4 even though hydration had succeeded. ----
+  // matched only that card and timed out 4/4 even though hydration had succeeded.
+  //
+  // ⚠️ 20.09 — this gate used to demand the literal string '10,000' behind a `\$`
+  // filter, i.e. it assumed capitalCurrency === accountCurrency === USD. It was
+  // written 26.07, seven weeks before B-142 gave the equity base a CONVERSION.
+  // With capital=10,000 ILS and accountCurrency=USD the screen correctly renders
+  // $3,358 (10000 × 0.33575, the 2026-06-10 base-day fixing) and the gate fired
+  // red 12× in 3h against a healthy product — and its `return` below blinded the
+  // seven stages after it. See docs/audits/HYDRATION-GATE-DIAGNOSIS-2026-09-20.md.
+  //
+  // ⛔ The replacement is NOT "any number at all" — that would pass on the 2,500
+  // this block exists to catch. THREE conditions, all required:
+  //   1. a currency sign from [$₪] — both displays are legitimate
+  //   2. ≠ DEFAULT_CAPITAL — imported, never a literal (B-324's class)
+  //   3. > 0 — "$0" is a failure, not a success
+  // What is NOT asserted is the specific amount: it is a product setting Niv may
+  // change, and pinning it here is what made this gate stale in the first place. ----
   const HYDRATION_TIMEOUT = 25_000;
+  const DEFAULT_SHOWN = DEFAULT_CAPITAL.toLocaleString('en-US'); // 2500 → "2,500"
   const capital = page.locator('[data-tour="equity"]')
     .locator('span')
-    .filter({ hasText: /(התחלה|Started at)\s*\$/ })
+    .filter({ hasText: /(התחלה|Started at)\s*[$₪]/ })
     .first();
   let capitalVisible = false;
   try {
     await capital.waitFor({ state: 'visible', timeout: HYDRATION_TIMEOUT });
     capitalVisible = true;
-    await expect(capital).toContainText('10,000', { timeout: HYDRATION_TIMEOUT });
+    // Condition 1 is already carried by the filter above; re-assert it on the
+    // resolved text so the failure message names it.
+    await expect(capital).toContainText(/[$₪]\s*[\d,]/, { timeout: HYDRATION_TIMEOUT });
+    const shown = await readCapitalNumber(capital);
+    if (shown == null) throw new Error(`לא נמצא סכום בטקסט: "${await readCapitalText(capital)}"`);
+    if (shown === DEFAULT_CAPITAL) throw new Error(`ההון המוצג הוא DEFAULT_CAPITAL (${DEFAULT_SHOWN}) — ההגדרות ⛔ נטענו מה-DB`);
+    if (!(shown > 0)) throw new Error(`ההון המוצג אינו חיובי: ${shown}`);
   } catch (e) {
     if (capitalVisible) {
       add(COMPONENT, 'browser-auth|hydration-default', 'red', '🔴',
-        'הון התחלתי $10,000 — הסימן שההגדרות נטענו מה-DB',
+        `הון שאינו DEFAULT_CAPITAL (${DEFAULT_SHOWN}), חיובי, עם סימן מטבע — הסימן שההגדרות נטענו מה-DB`,
         await readCapital(capital),
-        `אזור ההון קיים ומציג ערך שאינו 10,000 גם אחרי ${HYDRATION_TIMEOUT / 1000} שניות`,
+        `אזור ההון קיים אך נכשל בשער גם אחרי ${HYDRATION_TIMEOUT / 1000} שניות: ${e.message}`,
         'בדוק זמינות Supabase, RLS על user_settings, ושגיאות fetch ב-console',
         'אבחון תלוי-סיבה — הערך לפני פעולה');
     } else {
       add(COMPONENT, 'browser-auth|hydration-timeout', 'amber', '🟠',
-        'הון התחלתי $10,000 — הסימן שההגדרות נטענו מה-DB',
+        `הון שאינו DEFAULT_CAPITAL (${DEFAULT_SHOWN}), חיובי, עם סימן מטבע — הסימן שההגדרות נטענו מה-DB`,
         await pageStateSnippet(page),
         `אזור ההון לא נמצא בדף תוך ${HYDRATION_TIMEOUT / 1000} שניות: ${e.message}`,
         'השווה את קטע הדף שנלכד למסך תקין; דף ריק מצביע על deploy/JS שנפל',
@@ -780,7 +829,7 @@ test('authenticated journey: login → journal → SNTNL → SNTNL1 → boundari
     const card = page.locator('.se-consent__card');
     if (await card.count() > 0 && await card.isVisible()) {
       const a = await card.boundingBox();
-      const b = await page.locator('[data-tour="add-trade"]').last().boundingBox();
+      const b = await page.locator('[data-tour="add-trade"]').boundingBox();
       if (a && b) {
         const clear =
           a.x + a.width <= b.x || b.x + b.width <= a.x ||
@@ -807,12 +856,16 @@ test('authenticated journey: login → journal → SNTNL → SNTNL1 → boundari
   }
 
   // ---- 5. create. Scroll to top first: the FAB gets pointer-events-none
-  // when the page is scrolled down. .last() is the global FAB (the empty-state
-  // journal renders a second element with the same data-tour). ----
+  // when the page is scrolled down.
+  // ⚠️ 20.09 — this used to read `.last()`, because the empty-state journal
+  // rendered a SECOND element carrying the same data-tour. That workaround is
+  // gone with B-351: the empty-state button is now `add-first-trade`, so
+  // `add-trade` resolves to exactly one element (the FAB) and a future duplicate
+  // makes this line throw strict-mode instead of being papered over. ----
   let created = false;
   try {
     await page.evaluate(() => window.scrollTo(0, 0));
-    await page.locator('[data-tour="add-trade"]').last().click();
+    await page.locator('[data-tour="add-trade"]').click();
     await page.locator('#log-ticker').fill(TICKER);
     await page.locator('#log-entry').fill('100');
     await page.locator('#log-stop').fill('99'); // LONG → stop < entry (validateTradeInputs)

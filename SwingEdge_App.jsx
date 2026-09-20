@@ -1064,6 +1064,13 @@ const NAV_KEYS = [
   { id: "feedback",  key: "feedback",       icon: MessageCircle },
 ];
 
+// B-353 — the set of tab ids `setTab` can legally receive, DERIVED from NAV_KEYS
+// rather than re-listed. A hand-written copy is B-324's class: the day a tab is
+// renamed here, the literal keeps validating the old id and the tour navigates
+// nowhere, silently. OnboardingTour takes this as `navKeys` and refuses — loudly —
+// any step whose `tab` is not a member.
+const TOUR_NAV_IDS = NAV_KEYS.map((n) => n.id);
+
 // ─── ONBOARDING TOUR STEPS (wave 3a; wave 9: tab-navigating) ────────────────────
 // Each step may declare `tab` — the tour switches to it (setTab), waits for render,
 // then spotlights `anchor`. Anchorless / never-rendered anchors fall back to a
@@ -1306,11 +1313,18 @@ export default function SwingEdge() {
   const [showTour, setShowTour] = useState(false);
   // done === true → finished the last step (already on Journal); false → skipped
   // early (X / Esc / "skip tour"), so return the user to the dashboard.
+  // ⚠️ B-350 — the DB write is NOT optional here. `tourDone` has no React state, so
+  // the M2b persistence effect (:1866) reads it from localStorage and its dependency
+  // array cannot contain it: finishing the tour changed nothing the effect watches,
+  // and the flag reached the DB only when some OTHER setting happened to change later.
+  // A second device therefore ran the whole tour again. "It will sync on the next
+  // change" IS the bug — so this takes the same direct route welcomeSeen uses (:1300).
   const completeTour = useCallback((done) => {
     try { localStorage.setItem("swingEdgeTourDone", "1"); } catch {}
+    if (authUser?.id) saveSettings(authUser.id, { tourDone: true }); // merge+debounce; M2b flush covers unload
     setShowTour(false);
     if (!done) setTab("dashboard");
-  }, []);
+  }, [authUser?.id]);
   const startTour = useCallback(() => {
     setTab("dashboard");
     setShowTour(true);
@@ -4060,7 +4074,7 @@ export default function SwingEdge() {
 
       {/* ── GUIDED TOUR (once, after BetaWelcome — wave 3a) ── */}
       {showTour && (
-        <OnboardingTour steps={buildTourSteps(t)} onNavigate={setTab} onClose={completeTour} t={t} isRTL={isRTL} />
+        <OnboardingTour steps={buildTourSteps(t)} navKeys={TOUR_NAV_IDS} onNavigate={setTab} onClose={completeTour} t={t} isRTL={isRTL} />
       )}
 
       {/* ── iOS INSTALL BANNER ── */}
@@ -5264,7 +5278,12 @@ export default function SwingEdge() {
                 <h3 className="se-serif text-2xl md:text-3xl text-white mb-2 tracking-tight">{t.emptyTitle}</h3>
                 <p className="text-xs text-slate-500 mb-5 max-w-sm mx-auto leading-relaxed">{t.emptyBody}</p>
                 <div className="flex flex-wrap items-center justify-center gap-2">
-                  <button data-tour="add-trade" onClick={() => { setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null }); setOcrStatus(null); setShowForm(true); trackTradeFormOpened("manual"); }}
+                  {/* B-351 — this is `add-first-trade`, NOT `add-trade`. It renders only
+                      while trades.length === 0, so sharing the FAB's anchor gave
+                      document.querySelector TWO matches and it took this one: an element
+                      that vanishes the moment a trade exists. The tour anchors on the FAB,
+                      which is always mounted. One anchor, one element. */}
+                  <button data-tour="add-first-trade" onClick={() => { setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null }); setOcrStatus(null); setShowForm(true); trackTradeFormOpened("manual"); }}
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--v3-accent)] text-black font-bold text-xs hover:opacity-90 transition">
                     <Plus size={13} /> {lang === "he" ? "עסקה ראשונה" : "Add First Trade"}
                   </button>
