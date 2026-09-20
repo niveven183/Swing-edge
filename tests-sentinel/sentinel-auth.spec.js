@@ -80,6 +80,28 @@ const PANEL_TAB = {
   analytics: 'analytics', // :6109
   watchlist: 'intel',     // :6812, inside {tab === "intel"}
 };
+// POSITIVE health anchors — content that exists only when the panel rendered.
+// `toHaveCount(0)` on the crash card is worthless (measured 19.09: it returns in
+// 12ms over a page that is about to paint the card, because `count === 0` is
+// already true), so the only way to make the absence claim capable of failing is
+// to INVERT it: prove the healthy content is there.
+//
+// ⚠️ ONLY `analytics` QUALIFIES, AND THAT IS A MEASUREMENT, NOT A CHOICE.
+// Inside the five boundary ranges there are exactly two machine hooks:
+//   analytics 6155-6779 → data-tour="setup-matrix" (:6305) and id="eqFull" (:6192)
+//   journal   5039-5519 → data-testid="journal-table" (:5315), data-tour="add-trade" (:5270)
+//   risk 4772-5032 · mentoring 4284-4450 · watchlist 6866-6972 → ZERO
+//     (no data-*, no id, no role, no aria-label — only Tailwind classNames)
+// `setup-matrix` is an unconditional child of the panel root (:6156). The journal
+// pair is NOT usable: the table only renders on the third branch of
+// :5255/:5264/:5280 and `add-trade` renders on the mutually exclusive empty one,
+// so an absent table means "empty journal" at least as often as "crashed" — a
+// false RED, which is the same defect wearing the other face.
+// ⛔ INVENTING A HOOK FOR THE OTHER FOUR IS A PRODUCT CHANGE, and a hook added to
+// pass a gate is R-4. They stay one-shot and are declared, never counted as a pass.
+const PANEL_HEALTH = {
+  analytics: '[data-tour="setup-matrix"]',
+};
 const COMPONENT = 'דפדפן (מחובר)';
 // Scoped to the journal table's own data-testid, NOT to `table.w-full.text-xs`:
 // that class trio matches 3 tables in SwingEdge_App.jsx and 3 more in AdminPanel.jsx
@@ -358,6 +380,19 @@ function testRows(page) {
 // whether SNTNL1 actually reached the journal: five green panels over a journal
 // that holds only the 3 USD trades is precisely the 6/6 success of 07.09.
 async function gotoTab(page, id) {
+  // The tab bar itself has to settle before "this tab is missing" can mean
+  // anything. A one-shot count that reads 0 because the shell has not painted
+  // is indistinguishable from the mentoring tab's LEGITIMATE absence, and the
+  // panel is then declared unmeasurable — a yellow that hides a real crash.
+  // ⛔ `toHaveCount(0)`: it passes on the first poll, so it cannot separate the
+  // two. Only a POSITIVE claim on the bar can (B-334).
+  try {
+    await expect
+      .poll(() => page.locator('[data-tour-tab]').count(), { timeout: 10_000 })
+      .toBeGreaterThan(0);
+  } catch {
+    return 'shell-absent';
+  }
   const btn = page.locator(`[data-tour-tab="${id}"]`);
   if (await btn.count() === 0) return 'absent';
   await btn.first().click();
@@ -389,7 +424,20 @@ async function sweepBoundaries(page, phase) {
     }
 
     let n = 0;
-    try { n = await page.locator(`[data-boundary="${name}"]`).count(); }
+    try {
+      // Settle barrier, and it settles in BOTH directions: healthy content OR
+      // the crash card. A slow panel is waited for; a crashed one resolves the
+      // moment the card paints, so nothing is paid for the failing case.
+      // Panels with no anchor (see PANEL_HEALTH) skip this and stay one-shot.
+      const health = PANEL_HEALTH[name];
+      if (health) {
+        await expect
+          .poll(() => page.locator(`${health}, [data-boundary="${name}"]`).count(),
+            { timeout: 10_000 })
+          .toBeGreaterThan(0);
+      }
+      n = await page.locator(`[data-boundary="${name}"]`).count();
+    }
     catch (e) {
       add(COMPONENT, `browser-auth|boundary-check-failed|${name}`, 'yellow', '🟡',
         `בדיקת גבול הפאנל "${name}" (${phase})`,
@@ -412,6 +460,19 @@ async function sweepBoundaries(page, phase) {
   // does not touch it), so the anchor is structural: RootFallback is the only
   // role="alert" that contains an <h1>. PanelBoundary's card is role="alert"
   // too but renders a <span>, so the two cannot be confused.
+  // Settle barrier before the absence claim. The shell anchor is
+  // `[data-tour-tab]` (SwingEdge_App.jsx:4268) — it sits OUTSIDE every
+  // PanelBoundary, and RootFallback replaces the whole tree, so the two are
+  // mutually exclusive: a root crash drives the bar to 0 and holds it there.
+  // Polling for EITHER settles fast in both directions and costs the failing
+  // case nothing. ⛔ `toHaveCount(0)` on the fallback — it returns on the first
+  // poll and can never wait for a crash that has not painted yet (B-334).
+  try {
+    await expect
+      .poll(() => page.locator('[data-tour-tab], [role="alert"] h1').count(),
+        { timeout: 15_000 })
+      .toBeGreaterThan(0);
+  } catch { /* neither painted — the read below runs anyway and reports what it sees */ }
   try {
     if (await page.locator('[role="alert"] h1').count() > 0) {
       add(COMPONENT, 'browser-auth|root-crashed', 'red', '🔴',
@@ -433,14 +494,17 @@ async function openJournal(page) {
 // Refuses to click anything unless exactly one row matches the ticker.
 async function deleteRow(page, sym = TICKER) {
   const rows = rowsFor(page, sym);
-  const n = await rows.count();
-  if (n !== 1) throw new Error(`expected exactly 1 ${sym} row, found ${n}`);
+  // PRESENCE claim ⇒ toHaveCount genuinely retries (measured 1801ms on a row
+  // that mounted late), unlike the absence form. The one-shot count here read 0
+  // before the table painted and threw a FALSE RED naming the wrong cause.
+  // Playwright's own message carries Expected/Received, so `got` stays MEASURED.
+  await expect(rows).toHaveCount(1, { timeout: 15_000 });
   const row = rows.first();
   // Second guard, on the SAME anchor and never on text. The old form read
   // innerText and would have passed here even while rowsFor matched 0 rows —
   // two guards reading two different channels is one guard (B-312).
-  const cells = await row.locator(`[data-testid="trade-ticker-${sym}"]`).count();
-  if (cells !== 1) throw new Error(`row guard failed: ${cells} ${sym} ticker cells in row`);
+  await expect(row.locator(`[data-testid="trade-ticker-${sym}"]`))
+    .toHaveCount(1, { timeout: 15_000 });
   await row.locator('button[title="מחיקה"], button[title="Delete"]').first().click();
   const dialog = page.locator('[role="dialog"]');
   await dialog.waitFor({ state: 'visible', timeout: 10_000 });
@@ -456,8 +520,9 @@ async function deleteRow(page, sym = TICKER) {
 // into the wrong field would silently corrupt entry, stop or shares.
 async function renameToRiskTicker(page) {
   const rows = rowsFor(page, TICKER);
-  const n = await rows.count();
-  if (n !== 1) throw new Error(`expected exactly 1 ${TICKER} row to rename, found ${n}`);
+  // PRESENCE claim — same reason as deleteRow: the one-shot count could read 0
+  // before the table painted and abort the rename with the wrong cause.
+  await expect(rows).toHaveCount(1, { timeout: 15_000 });
   await rows.first().locator('button[title="עריכה"], button[title="Edit"]').first().click();
   const dialog = page.locator('[role="dialog"]');
   await dialog.waitFor({ state: 'visible', timeout: 10_000 });
@@ -654,8 +719,12 @@ test('authenticated journey: login → journal → SNTNL → SNTNL1 → boundari
   }
 
   try {
-    // ⚠️ הספירה מורמת ל-const כדי ש-`got` ידווח **כמה** — הסמנטיקה זהה
-    // (אותה ספירה חד-פעמית, אותו `> 0`). השער עצמו הוא מחלקת `B-334` ו⛔ נגע כאן.
+    // ⚠️ הספירה מורמת ל-const כדי ש-`got` ידווח **כמה** — הסמנטיקה זהה.
+    // ⛔ **ו⛔ נותר כאן חוב `B-334`** — הפרוזה הקודמת אמרה שכן, והמדידה הפריכה:
+    // `openJournal` שמעליה ממתין ל-`journal-table` **נראה**, והטבלה מרונדרת אך
+    // ורק בענף השלישי של `:5255/:5264/:5280`, כלומר רק כש-`filteredTrades.length > 0`.
+    // ⇒ ברגע שהשורה הזו רצה, סט השורות של אותו render כבר ב-DOM; ספירה חד-פעמית
+    // כאן ⛔ יכולה לקרוא אפס-מוקדם. מחסום ההתייצבות **כבר קיים**, במעלה הזרם.
     const stale = await testRows(page).count();
     if (stale > 0) {
       add(COMPONENT, 'browser-auth|stale-testdata', 'amber', '🟠',
@@ -680,8 +749,14 @@ test('authenticated journey: login → journal → SNTNL → SNTNL1 → boundari
   // ---- 4. journal render — the live fmtR check (AAPL is closed with no stop) ----
   try {
     const rows = page.locator(ROWS);
-    const n = await rows.count();
-    if (n < FIXED_TRADES.length) throw new Error(`נמצאו ${n} שורות, מצופה ${FIXED_TRADES.length} לפחות`);
+    // `toHaveCount` cannot express ">=", so the retry comes from expect.poll.
+    // This is the settle barrier for the whole block: once it passes, the table
+    // is painted, and the per-ticker counts below are no longer one-shot reads
+    // over an empty tbody. Candidate (1) in the finding — "the count ran before
+    // the table settled ⇒ nothing was actually missing" — is what this removes.
+    await expect
+      .poll(() => rows.count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(FIXED_TRADES.length);
     const missing = [];
     for (const sym of FIXED_TRADES) {
       if (await rows.filter({ hasText: sym }).count() === 0) missing.push(sym);
