@@ -69,7 +69,7 @@ import {
   Download, FileText, Bell, Flame, Globe, LogOut, MessageCircle,
   Shield, Filter, Save, BarChart3, ChevronDown, HelpCircle, Lock,
   CreditCard, Smartphone, Wrench, Sun, Moon, Monitor, KeyRound, ExternalLink, RotateCcw, Pencil,
-  Users, GraduationCap, UserPlus, NotebookPen, CalendarCheck, Upload, Undo2
+  Users, GraduationCap, UserPlus, CalendarCheck, Upload, Undo2
 } from "lucide-react";
 import { getTranslations, LANGUAGES, isRTLLang, nTrades, labelFor, plural } from "./src/i18n.js";
 import {
@@ -124,7 +124,6 @@ import { AdaptiveLessons } from "./src/intelligence/core/AdaptiveLessons.js";
 import GrowthPredictor from "./src/components/GrowthPredictor.jsx";
 import MonthlyReportTab from "./src/components/MonthlyReportTab.jsx";
 import MonthlyReportModal from "./src/components/MonthlyReportModal.jsx";
-import NotebookTab from "./src/components/NotebookTab.jsx";
 import WeeklyReviewTab from "./src/components/WeeklyReviewTab.jsx";
 import { generateMonthlyReport, findBestMonth } from "./src/intelligence/core/MonthlyReport.js";
 // "?" beside a mapped setup tag — canonical name/definition/coach line. Returns
@@ -1058,7 +1057,6 @@ const RibbonTicker = ({ item }) => {
 const NAV_KEYS = [
   { id: "dashboard", key: "dashboard",      icon: LayoutDashboard },
   { id: "journal",   key: "journal",        icon: BookOpen },
-  { id: "notebook",  key: "notebookTab",     icon: NotebookPen },
   { id: "weeklyReview", key: "weeklyReviewTab", icon: CalendarCheck },
   { id: "tools",     key: "tools",           icon: Wrench },
   { id: "analytics", key: "analytics",      icon: BarChart2 },
@@ -1087,7 +1085,6 @@ const buildTourSteps = (t) => {
     { tab: "analytics",    anchor: '[data-tour="setup-matrix"]',  title: tk("tourMatrixTitle"),    body: tk("tourMatrixBody") },
     { tab: "tools",        anchor: '[data-tour="position-calc"]', title: tk("tourCalcTitle"),      body: tk("tourCalcBody") },
     { tab: "intel",        anchor: '[data-tour="chart-ocr"]',     title: tk("tourIntelTitle"),     body: tk("tourIntelBody") },
-    { tab: "notebook",     anchor: '[data-tour="notebook"]',      title: tk("tourNotebookTitle"),  body: tk("tourNotebookBody") },
     { tab: "weeklyReview", anchor: '[data-tour="weekly-review"]', title: tk("tourWeeklyTitle"),    body: tk("tourWeeklyBody") },
     { tab: "feedback",     anchor: '[data-tour="feedback"]',      title: tk("tourFeedbackTitle"),  body: tk("tourFeedbackBody") },
     { tab: "journal",      anchor: null,                          title: tk("tourFinishTitle"),    body: tk("tourFinishBody") },
@@ -7758,11 +7755,6 @@ export default function SwingEdge() {
             isRTL={isRTL}
             currency={dispCcy}
           />
-        )}
-
-        {/* ══════════════ NOTEBOOK (B3 — free-form trader notes) ══════════════ */}
-        {tab === "notebook" && (
-          <NotebookTab authUser={authUser} t={t} lang={lang} isRTL={isRTL} />
         )}
 
         {/* ══════════════ WEEKLY REVIEW (B3 — rolling 7-day engine summary) ══════════════ */}

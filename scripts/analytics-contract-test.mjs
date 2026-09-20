@@ -41,13 +41,14 @@ function ok(n, label, cond, detail = "") {
   else { failures.push(`${n}. ${label}${detail ? ` — ${detail}` : ""}`); console.log(`  ❌ ${n}. ${label}${detail ? ` — ${detail}` : ""}`); }
 }
 
-// The 12 screens, measured from the `tab === "…"` render branches in
+// The 11 screens, measured from the `tab === "…"` render branches in
 // SwingEdge_App.jsx plus `onboarding` (a blocking screen, not a tab).
 // `analyzer` and `position` are deliberately ABSENT: an effect rewrites them to
 // `tools` in the same tick, so reporting them would count a screen no one saw.
+// `notebook` was removed 20.09 with the tab itself.
 const EXPECTED_SCREENS = [
   "admin", "analytics", "dashboard", "feedback", "intel", "journal",
-  "mentoring", "notebook", "onboarding", "settings", "tools", "weeklyReview",
+  "mentoring", "onboarding", "settings", "tools", "weeklyReview",
 ];
 
 // The closed parameter allowlist. Every key any event may carry, ever.
@@ -131,7 +132,7 @@ ok(6, "trade_form_opened clamps source to the enum",
 
 // 7. The list is the contract.
 const actualScreens = mod.SCREEN_NAMES ? [...mod.SCREEN_NAMES].sort() : [];
-ok(7, "SCREEN_NAMES is exactly the 12 measured screens",
+ok(7, "SCREEN_NAMES is exactly the 11 measured screens",
   JSON.stringify(actualScreens) === JSON.stringify([...EXPECTED_SCREENS].sort()),
   `got ${actualScreens.length}: ${actualScreens.join(",")}`);
 

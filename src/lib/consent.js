@@ -153,7 +153,7 @@ export function trackPageView(pathname) {
 // them would report a screen the trader never saw.
 export const SCREEN_NAMES = new Set([
   "admin", "analytics", "dashboard", "feedback", "intel", "journal",
-  "mentoring", "notebook", "onboarding", "settings", "tools", "weeklyReview",
+  "mentoring", "onboarding", "settings", "tools", "weeklyReview",
 ]);
 
 export function trackScreenView(screen) {

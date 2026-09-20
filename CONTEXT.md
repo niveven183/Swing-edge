@@ -45,13 +45,18 @@ Both the **Log New Trade** form and the standalone **Trade Analyzer** run on one
 ## Track B Features
 - **B2 — Earnings Awareness** (`1d37162`): `api/earnings.js` — Finnhub `/calendar/earnings`, 6h cache (`EARN_TTL`), fail-open (stale cache or `null` on error), crypto symbols → `null`. Feeds a `timing` channel into Decision Coach; verdict clamps `GO→CAUTION` when `daysUntil≤2`.
 - **B4 — Mentorship (full)** (`6949c8a`→`92ca3dd`): `supabase/migrations/20260711120000_mentorship_schema.sql` + `20260712090000_mentor_invite_rpcs.sql`. 3 tables — `mentorships`, `mentor_invites`, `mentor_notes` — plus `is_active_mentor()` (SECURITY DEFINER). RPCs `create_mentor_invite()` (8-char Crockford base32 code) and `redeem_mentor_invite(code)` (atomic compare-and-set claim). Mentor dashboard is read-only; notes are mentor-writes / mentee-reads. Model: full transparency, invite active immediately on redemption.
-- **B3 — Notebook + Weekly Review** (`88cc6c8`): `supabase/migrations/20260712100000_journal_notes.sql`. `journal_notes` (free-form, 1–10k chars) + `weekly_reviews` (`last_reviewed_at`, rolling 7-day window). Summarizes the existing analysis engine's output — no new analysis logic added.
+- **B3 — Notebook + Weekly Review** (`88cc6c8`): `supabase/migrations/20260712100000_journal_notes.sql`. `journal_notes` (free-form, 1–10k chars) + `weekly_reviews` (`last_reviewed_at`, rolling 7-day window). Summarizes the existing analysis engine's output — no new analysis logic added. ⚠️ **The Notebook half was removed 20.09** (measured `0` rows, `0/57` users). Weekly Review is live, and the migration file creates **both** — do not delete it.
 - **B1 — Multi-Account: NOT built.** Diagnosed/audited only. Deferred decisions (recorded here so they aren't re-litigated): per-account capital, real+paper account types only, `ON DELETE RESTRICT`, mentor sees all of a mentee's accounts.
 
 ## Tabs Structure (NAV_KEYS)
-`dashboard | journal | notebook | weeklyReview | tools | analytics | intel | feedback` —
-**8 tabs**, defined at `SwingEdge_App.jsx:644`. Note `id` ≠ `key`: the i18n keys for the last four
-are `notebookTab`, `weeklyReviewTab`, `marketIntel`, `feedback`.
+`dashboard | journal | weeklyReview | tools | analytics | intel | feedback` —
+**7 tabs**, defined at `SwingEdge_App.jsx:1056`. Note `id` ≠ `key` for exactly **two** of them —
+`weeklyReview` → `weeklyReviewTab` and `intel` → `marketIntel`; the other five use `id` as the key.
+⚠️ The pre-20.09 wording said "the last four are `notebookTab`, `weeklyReviewTab`, `marketIntel`,
+`feedback`", which listed `feedback` under an `id ≠ key` heading although `feedback` **is** its own key.
+Counted in bytes 20.09, not carried over.
+⚠️ `notebook` was the 8th and was **removed 20.09** (tab + component + 44 i18n keys). The table
+`public.journal_notes` was **kept** — it survives with zero consumers and zero rows.
 
 ⚠️ The `tools` tab has a sub-nav: `'analyzer' | 'calc' | 'report'`.
 If the URL points to `/analyzer` or `/position`, a `useEffect` routes the user into the `tools` tab automatically.
@@ -395,7 +400,7 @@ Two conclusions that should shape any import work:
 3. ❌ NEVER use `t.reason` / `t.lesson` — ✅ `t.notes` / `t.lessonLearned`
 4. ❌ NEVER add a new `useState` without checking if existing state can be reused
 5. ❌ NEVER hardcode user-facing strings — ✅ `lang === 'he' ? '...' : '...'`
-6. ❌ NEVER add new tab to NAV_KEYS without consulting CONTEXT.md — current 8: `dashboard, journal, notebook, weeklyReview, tools, analytics, intel, feedback`
+6. ❌ NEVER add new tab to NAV_KEYS without consulting CONTEXT.md — current 7: `dashboard, journal, weeklyReview, tools, analytics, intel, feedback`
 7. ❌ NEVER break TradingView widget config in Market Intel
 8. ❌ NEVER force-push to main. אסור מוחלט — ראה `CLAUDE.md` §5. נאכף ב-`.githooks/pre-push`.
 9. ❌ NEVER read-modify-write localStorage in render — ✅ `useState` + `useEffect`
@@ -623,9 +628,9 @@ A pre-distribution sprint: wire the onboarding→coach pipeline, fix data-viz ho
 - **Wave 8 — audit fixes** (`819d169`): applied the audit findings —
   - **DNA cache invalidation** — cache key now sensitive to `status`/`exit` (so closing/editing a trade busts the cache) **+ mentee separation** (a mentor viewing a mentee no longer reads the mentor's own cached DNA).
   - **Coach insight dedup** — collapses duplicate/mirrored insights before display.
-  - **Guest notebook state** — notebook state handled correctly for guest (non-persisted) sessions.
+  - **Guest notebook state** — notebook state handled correctly for guest (non-persisted) sessions. *(Notebook removed 20.09.)*
   - **Dialog semantics** + **formatting consistency** across screens.
-- **Wave 9 — guided tour** (`6989c42`): 15-step **tab-navigating** product tour — `onNavigate` + **retry** + **centered fallback** when an anchor is missing; **19 `data-tour` anchors**; **`en` fallback** for untranslated steps; **restart from Settings**. Satisfies source-of-truth requirement **#4 ✅**.
+- **Wave 9 — guided tour** (`6989c42`): 15-step **tab-navigating** product tour — `onNavigate` + **retry** + **centered fallback** when an anchor is missing; **19 `data-tour` anchors**; **`en` fallback** for untranslated steps; **restart from Settings**. Satisfies source-of-truth requirement **#4 ✅**. ⚠️ **Both counts in this line are wave-9 history and neither is current.** `buildTourSteps` returns **14** since 20.09 (the Notebook step was removed with the tab). The anchor count was **already drifted before that wave** — measured at `6989c42`'s descendant `HEAD`: **10 unique / 22 occurrences**, now **9 / 20**. Neither figure was ever `19`, so it is not corrected here — correcting it would invent a number for wave 9 that nobody measured. `B-354`.
 - **Import spec** (`d0d42e1`, `docs/audits/IMPORT-SPEC-2026-07-18.md` — **the source-of-truth for the import format**), gated pre-implementation, then **Wave 10 — universal import** (`0c8f2f3`):
   - **CSV/XLSX** import under **`src/import/`** — `parseFile` / `detectColumns` / `normalizeRow` / `buildImport` / `synonyms`.
   - **Smart bilingual column mapping** (he+en synonyms) **+ content sniffing** to disambiguate ambiguous headers.
