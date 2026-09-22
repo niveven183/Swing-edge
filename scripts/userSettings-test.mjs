@@ -20,6 +20,12 @@ const check = (name, cond) => {
   }
 };
 
+// ⚠️ Mirrors DEBOUNCE_MS in src/lib/userSettings.js:15. It is NOT exported, and the
+// timer path is a DIFFERENT branch from the flush path — direction B has to gate
+// both, so one assertion has to let the real timer fire.
+const DEBOUNCE_MS = 1000;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 // ── Fakes ──────────────────────────────────────────────────────────────────
 function makeLocalStorage(seed = {}) {
   const m = new Map(Object.entries(seed));
@@ -37,7 +43,11 @@ function makeLocalStorage(seed = {}) {
 // promise carrying `{ data: null, error }` — so a bare try/catch never sees it.
 // Without this switch the whole failure class was structurally untestable, which
 // is why B-268/B-269 could ship green. (INCIDENTS#15 class.)
-function makeMockClient(initialRows = {}, { failMode = false } = {}) {
+// ⚠️ `upsertFailMode` (B-361) models the other half: a WRITE that the server
+// rejected. Direction B remembers what it sent so it can skip an unchanged blob —
+// and the one way that turns into silent data loss is remembering a write that
+// never landed. The mock could not express a failing upsert before.
+function makeMockClient(initialRows = {}, { failMode = false, upsertFailMode = false } = {}) {
   const rows = new Map(Object.entries(initialRows));
   const calls = { upsert: 0, select: 0 };
   function from() {
@@ -58,6 +68,7 @@ function makeMockClient(initialRows = {}, { failMode = false } = {}) {
       },
       upsert(obj) {
         calls.upsert++;
+        if (upsertFailMode) return Promise.resolve({ data: null, error: { message: "RLS denied" } });
         rows.set(obj.user_id, obj.settings);
         return Promise.resolve({ data: obj, error: null });
       },
@@ -228,6 +239,73 @@ console.log("test:settings — userSettings module vs mock client (no real DB)\n
     threw = true;
   }
   check("contract intact: load never throws", threw === false);
+}
+
+// 10) B-361 · direction B — an unchanged blob must NOT be written.
+//
+// 🔴 Measured 22.09: every authenticated page load sent exactly one
+// POST /rest/v1/user_settings with ⛔ no user action (5/5 contexts). The persist
+// effect fires on hydration (setUserProfile always builds a fresh object literal,
+// SwingEdge_App.jsx:1801) and saveSettings had ⛔ no way to know the row already
+// held that exact content.
+//
+// ⚠️ (1) and (3) are the PROOF — both observed RED on the pre-fix tree (1 upsert
+// each). (2*) are a CONTROL ARM: green in BOTH trees, they measure the WIDTH of
+// the skip. Reading them as evidence of the fix is exactly the blindness of
+// assertion 12 in test:analytics. A red in (2*) means the skip swallowed a real
+// change ⇒ STOP, ⛔ soften the assertion.
+{
+  console.log("10) unchanged blob is not written (B-361, direction B)");
+  global.localStorage = makeLocalStorage();
+  const { client, calls, rows } = makeMockClient({
+    u10: { capital: 49000, lang: "he", welcomeSeen: true },
+  });
+  await loadSettings("u10", client);
+  check("⚪ control — a read still never upserts", calls.upsert === 0);
+
+  // (3) flush with nothing changed ⇒ 0 upsert.               [RED before: 1]
+  await flushSettings("u10", client);
+  check("(3) flush with no change ⇒ 0 upsert", calls.upsert === 0);
+
+  // (1) the persist effect's own patch: identical values, FEWER keys (the patch
+  //     never carries welcomeSeen). mergeSettings keeps the sibling ⇒ the content
+  //     is identical ⇒ the real 1000ms timer must skip.      [RED before: 1]
+  saveSettings("u10", { capital: 49000, lang: "he" }, client);
+  await sleep(DEBOUNCE_MS + 150);
+  check("(1) debounced save with no change ⇒ 0 upsert", calls.upsert === 0);
+
+  // (2) CONTROL — a real change still writes, exactly once.
+  saveSettings("u10", { capital: 51000 }, client);
+  await flushSettings("u10", client);
+  check("(2) ⚪ control — one real change ⇒ 1 upsert", calls.upsert === 1);
+  check("(2b) ⚪ control — the new value landed", rows.get("u10")?.capital === 51000);
+  check("(2c) ⚪ control — sibling keys survived the write", rows.get("u10")?.welcomeSeen === true);
+
+  // (2d) CONTROL — the hash advanced on success, so the NEXT change is not skipped.
+  saveSettings("u10", { capital: 52000 }, client);
+  await flushSettings("u10", client);
+  check("(2d) ⚪ control — a second change ⇒ 2 upserts", calls.upsert === 2);
+
+  // (2e) ...and re-flushing that same blob is a no-op again.
+  await flushSettings("u10", client);
+  check("(2e) unchanged again ⇒ still 2 upserts", calls.upsert === 2);
+}
+
+// 11) a write that FAILED is ⛔ "sent" — it must be retried, never remembered.
+//     ⚪ Control arm: green in both trees. It guards the single way direction B
+//     could become silent data loss — recording the hash before knowing the row
+//     took it. ⛔ An unnecessary write is safe; a skipped change is not.
+{
+  console.log("11) a failed upsert is not remembered as sent");
+  global.localStorage = makeLocalStorage();
+  const { client, calls } = makeMockClient({ u11: { capital: 100 } }, { upsertFailMode: true });
+  await loadSettings("u11", client);
+  saveSettings("u11", { capital: 200 }, client);
+  await flushSettings("u11", client);
+  check("the first (failing) write was attempted", calls.upsert === 1);
+  saveSettings("u11", { capital: 200 }, client);
+  await flushSettings("u11", client);
+  check("⚪ control — identical retry after a FAILED write ⇒ 2 upserts", calls.upsert === 2);
 }
 
 console.log("");

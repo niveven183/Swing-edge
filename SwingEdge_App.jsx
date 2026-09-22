@@ -1304,7 +1304,11 @@ export default function SwingEdge() {
   const dismissWelcome = useCallback(() => {
     setShowWelcome(false);
     welcomeSeenRef.current = true; // prevents betaWelcome popping this same session
-    if (authUser?.id) saveSettings(authUser.id, { welcomeSeen: true }); // merge+debounce; M2b flush covers unload
+    // ⚠️ B-361 — `hydratedRef.current &&` is ⛔ defensive noise. This is a DIRECT write
+    // that bypasses the persist effect, so before this gate existed an account switch
+    // let it upsert `{welcomeSeen:true}` into an un-hydrated user's row, and the merge
+    // base was `{}` ⇒ the whole blob was replaced.
+    if (hydratedRef.current && authUser?.id) saveSettings(authUser.id, { welcomeSeen: true }); // merge+debounce; M2b flush covers unload
   }, [authUser?.id]);
 
   // Guided tour — runs once, right after BetaWelcome is dismissed (wave 3a).
@@ -1321,7 +1325,10 @@ export default function SwingEdge() {
   // change" IS the bug — so this takes the same direct route welcomeSeen uses (:1300).
   const completeTour = useCallback((done) => {
     try { localStorage.setItem("swingEdgeTourDone", "1"); } catch {}
-    if (authUser?.id) saveSettings(authUser.id, { tourDone: true }); // merge+debounce; M2b flush covers unload
+    // ⚠️ B-361 — same direct-write class as dismissWelcome (:1307). The localStorage
+    // write above is deliberately OUTSIDE the gate: this device must not re-run the
+    // tour even when the DB write is blocked.
+    if (hydratedRef.current && authUser?.id) saveSettings(authUser.id, { tourDone: true }); // merge+debounce; M2b flush covers unload
     setShowTour(false);
     if (!done) setTab("dashboard");
   }, [authUser?.id]);
@@ -1736,6 +1743,13 @@ export default function SwingEdge() {
   // the DB blob and selectively reconcile into existing state. Writes (setItem) are
   // untouched here (M2b). Mirrors loadTrades (guard + cancelled + [authUser?.id]).
   useEffect(() => {
+    // ⚠️ B-361 — MUST stay above the guard below. `hydratedRef` is a useRef that was
+    // never reset, and :4050 is an early RETURN, ⛔ an unmount: on logout / account
+    // switch in the same tab the component keeps its refs, so the gate stayed open and
+    // the persist effect wrote user A's capital into user B's row. Logout drives
+    // `authUser?.id` to null, which the guard swallows ⇒ a reset placed after it would
+    // never run on the one transition that matters.
+    hydratedRef.current = false;
     if (!isSupabaseConfigured || !supabase || !authUser?.id) return;
     let cancelled = false;
 

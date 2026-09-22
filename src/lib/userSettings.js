@@ -71,6 +71,40 @@ function isPlainObject(v) {
   return v != null && typeof v === "object" && !Array.isArray(v);
 }
 
+// ── B-361 / write elision ──────────────────────────────────────────────────
+// 🔴 A page load with ZERO user intent produced a POST. `setUserProfile({...})` at
+// SwingEdge_App.jsx:1801 builds a fresh object literal on every hydration, the
+// persist effect's dep array compares by `Object.is`, and the debounce then upserted
+// a blob byte-identical to the row it had just read. Remembering what we KNOW the
+// row holds turns that into a no-op.
+//
+// ⚠️ Fail-OPEN by construction: an unknown hash always writes. A wrong answer in
+// that direction costs one unnecessary write. The opposite mistake — skipping a real
+// change — is silent data loss, and that one must be impossible.
+const lastSent = new Map(); // userId -> stableStringify of the blob the DB holds
+
+// ⚠️ jsonb does ⛔ not preserve key order, and mergeSettings APPENDS new keys, so
+// `JSON.stringify` of the same CONTENT can differ by ordering alone — and a hash that
+// differs on ordering degrades to "always write", which is the bug we came to fix.
+// Sorting keys compares content, which is what the storage layer actually stores.
+// ⛔ Arrays are NOT sorted: order is semantic there (watchlist, playbook).
+function stableStringify(v) {
+  if (Array.isArray(v)) return "[" + v.map(stableStringify).join(",") + "]";
+  if (isPlainObject(v)) {
+    return "{" + Object.keys(v).sort()
+      .map((k) => JSON.stringify(k) + ":" + stableStringify(v[k])).join(",") + "}";
+  }
+  return v === undefined ? "null" : JSON.stringify(v);
+}
+
+// True only when the blob is PROVABLY identical to what the DB already holds.
+// ⛔ No `|| {}` / `?? {}` anywhere on this path — an absent entry is "we don't know",
+// and "we don't know" means write.
+function alreadySent(userId, blob) {
+  const known = lastSent.get(userId);
+  return known !== undefined && known === stableStringify(blob);
+}
+
 // Shallow-by-default merge; recurse only when BOTH sides are plain objects so
 // partial patches don't clobber sibling keys. Arrays/scalars replace wholesale.
 function mergeSettings(base, patch) {
@@ -91,15 +125,27 @@ function mergeSettings(base, patch) {
 // ⛔ The contract is unchanged: a settings write NEVER throws. The only change
 // is that a failure is now visible in the console instead of vanishing.
 async function upsertBlob(userId, blob, client) {
-  if (!client) return;
+  if (!client) return false;
+  // ⚠️ Snapshot BEFORE the await. `cache` can move while the request is in flight,
+  // and recording the NEWER blob as sent would elide a write that never happened —
+  // exactly the silent loss this whole mechanism must not be able to cause.
+  const sent = stableStringify(blob);
   try {
     const { error } = await client
       .from(TABLE)
       .upsert({ user_id: userId, settings: blob, updated_at: new Date().toISOString() });
-    if (error) console.error("userSettings: upsert rejected", error.message || error);
+    if (error) {
+      console.error("userSettings: upsert rejected", error.message || error);
+      lastSent.delete(userId); // ⛔ a write that did not land is ⛔ "what the row holds"
+      return false;
+    }
+    lastSent.set(userId, sent);
+    return true;
   } catch (e) {
     // Network-level failure only — everything else arrives via `error` above.
     console.error("userSettings: upsert threw", e);
+    lastSent.delete(userId); // the row's state is unknown ⇒ fail open, write next time
+    return false;
   }
 }
 
@@ -133,13 +179,20 @@ export async function loadSettings(userId, client = supabase) {
       if (data && data.settings) {
         cache.set(userId, data.settings);
         writable.add(userId);
+        // The blob we just READ is by definition what the row holds ⇒ re-sending it
+        // is a no-op. This is the one fact strong enough to seed the hash (B-361).
+        lastSent.set(userId, stableStringify(data.settings));
         writeMirror(data.settings);
         return { status: "ok", settings: data.settings };
       }
       // Authoritative "no row" (or a row with a null blob): writable.
+      // ⛔ The hash is NOT seeded here. There is no row, so the mirror is ⛔ "what the
+      // DB holds" — remembering it as sent would mean a brand-new user whose local
+      // mirror already equals his first patch never gets a row written at all.
       const mirror = readMirror();
       cache.set(userId, mirror);
       writable.add(userId);
+      lastSent.delete(userId);
       return { status: "empty", settings: mirror };
     } catch (e) {
       return loadFailed(userId, e);
@@ -153,7 +206,10 @@ export async function loadSettings(userId, client = supabase) {
 // the mirror here is what flushSettings later uploaded over the real row.
 function loadFailed(userId, err) {
   console.error("userSettings: load rejected", err?.message || err);
-  if (userId) writable.delete(userId);
+  if (userId) {
+    writable.delete(userId);
+    lastSent.delete(userId); // we could not read the row ⇒ we do ⛔ know what it holds
+  }
   return { status: "failed", settings: readMirror() };
 }
 
@@ -172,7 +228,9 @@ export function saveSettings(userId, partial, client = supabase) {
   const timer = setTimeout(() => {
     pending.delete(userId);
     if (!writable.has(userId)) return;
-    upsertBlob(userId, cache.get(userId) || {}, client);
+    const blob = cache.get(userId) || {};
+    if (alreadySent(userId, blob)) return; // B-361 — identical to the row, ⛔ a write
+    upsertBlob(userId, blob, client);
   }, DEBOUNCE_MS);
   if (typeof timer.unref === "function") timer.unref();
   pending.set(userId, { timer, client });
@@ -190,7 +248,11 @@ export async function flushSettings(userId, client = supabase) {
   if (existing?.timer) clearTimeout(existing.timer);
   pending.delete(userId);
   if (!writable.has(userId)) return;
-  await upsertBlob(userId, cache.get(userId) || {}, existing?.client || client);
+  const blob = cache.get(userId) || {};
+  // ⚠️ The flush path is a DIFFERENT branch from the timer — B-361 has to gate both,
+  // or closing the tab re-sends the unchanged blob the timer just declined to send.
+  if (alreadySent(userId, blob)) return;
+  await upsertBlob(userId, blob, existing?.client || client);
 }
 
 // One-shot bridge. If a Supabase row already exists → Supabase wins, do nothing.

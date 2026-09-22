@@ -82,12 +82,19 @@ const A_HYDRATE = "const hydrate = async () => {";
 const A_PERSIST = "saveSettings(authUser.id, patch);";
 const A_UNLOAD  = 'window.addEventListener("beforeunload", flush);';
 const A_EFFECT  = "useEffect(() => {";
+// A15·A16·A17 (22.09) — D-lite יושב ב**ראש ה-useEffect**, לפני שער ה-early-return,
+// ולכן גוף `hydrate` לבדו ⛔ יכול למדוד אותו: בהתנתקות (`authUser = null`) הגוף
+// ⛔ נקרא כלל. ⇒ נדרש חילוץ של האפקט **העוטף**, ⛔ עוגן חדש.
+const A_DISMISS = "const dismissWelcome = useCallback(() => {";
+const A_TOUR    = "const completeTour = useCallback((done) => {";
 
 // שער-מטא 1 — כל עוגן חייב להופיע בדיוק פעם אחת
 const counts = {
   hydrate: countOccurrences(src, A_HYDRATE),
   persist: countOccurrences(src, A_PERSIST),
   unload:  countOccurrences(src, A_UNLOAD),
+  dismiss: countOccurrences(src, A_DISMISS),
+  tour:    countOccurrences(src, A_TOUR),
 };
 for (const [k, v] of Object.entries(counts)) {
   if (v !== 1) {
@@ -110,15 +117,31 @@ function enclosingEffect(anchor) {
 }
 const persistSrc = enclosingEffect(A_PERSIST);
 const unloadSrc  = enclosingEffect(A_UNLOAD);
+// האפקט **העוטף** את hydrate — הבית של D-lite.
+const hydrateEffectSrc = enclosingEffect(A_HYDRATE);
+// שני ה-useCallback: מחלצים את **פונקציית החץ בלבד**, ⛔ את קריאת useCallback
+// (שנושאת מערך תלויות ואינה ניתנת להרצה כאן).
+function sliceCallback(anchor, prefix) {
+  return sliceFn(src, src.indexOf(anchor) + prefix.length);
+}
+const dismissSrc = sliceCallback(A_DISMISS, "const dismissWelcome = useCallback(");
+const tourSrc    = sliceCallback(A_TOUR, "const completeTour = useCallback(");
 
 // שער-מטא 3 — הזנב המחולץ חייב להיות מה שאנחנו חושבים שהוא
 const tailOk = /setHydrationDone\(true\);\s*\}$/.test(hydrateSrc);
 const persistTailOk = persistSrc.includes(A_PERSIST);
 const unloadTailOk = unloadSrc.includes("removeEventListener");
+const hydrateEffectTailOk = /return \(\) => \{ cancelled = true; \};\s*\}$/.test(hydrateEffectSrc)
+  && hydrateEffectSrc.includes(A_HYDRATE);
+const dismissTailOk = dismissSrc.includes("welcomeSeen: true");
+const tourTailOk = tourSrc.includes("tourDone: true");
 
 console.log(`extract hydrate : ${hydrateSrc.split("\n").length} lines ${tailOk ? "✓" : "✗"}`);
 console.log(`extract persist : ${persistSrc.split("\n").length} lines ${persistTailOk ? "✓" : "✗"}`);
 console.log(`extract unload  : ${unloadSrc.split("\n").length} lines ${unloadTailOk ? "✓" : "✗"}`);
+console.log(`extract hyd-eff : ${hydrateEffectSrc.split("\n").length} lines ${hydrateEffectTailOk ? "✓" : "✗"}`);
+console.log(`extract dismiss : ${dismissSrc.split("\n").length} lines ${dismissTailOk ? "✓" : "✗"}`);
+console.log(`extract tour    : ${tourSrc.split("\n").length} lines ${tourTailOk ? "✓" : "✗"}`);
 
 /* ── מוקים ────────────────────────────────────────────────────────────────
  * ⛔ אין supabase (גם לא מוק של הלקוח) — מוזרקים loadSettings/migrate עצמם.
@@ -187,14 +210,59 @@ function runHydrate({ loadStatus, mirror = MIRROR_OK, migrateReason = null, canc
   return { promise: fn(), calls, hydratedRef, welcomeSeenRef, localStorage };
 }
 
-function runPersist(hydratedRef) {
-  const calls = { save: 0 };
+function runPersist(hydratedRef, uid = "u-probe") {
+  const calls = { save: 0, args: [] };
   const names = ["authUser", "hydratedRef", "localStorage", "capital", "riskPct", "lang",
     "accountCurrency", "capitalCurrency", "watchlistItems", "priceAlerts", "playbookSetups",
     "showOnboarding", "userProfile", "saveSettings"];
-  const values = [{ id: "u-probe" }, hydratedRef, makeLocalStorage(), 49000, 2, "he", "USD",
-    "USD", [], {}, [], true, null, () => { calls.save++; }];
+  const values = [{ id: uid }, hydratedRef, makeLocalStorage(), 49000, 2, "he", "USD",
+    "USD", [], {}, [], true, null, (...a) => { calls.save++; calls.args.push(a); }];
   new Function(...names, "return (" + persistSrc + ")")(...values)();
+  return calls;
+}
+
+/** מריץ את גוף ה-useEffect ה**עוטף** של ההידרציה — הבית של D-lite.
+ *  ⚠️ `hydrate()` שבתוכו הוא async ⛔ ונקרא בלי await; האסרציות נמדדות **סינכרונית**
+ *  מיד אחרי גוף האפקט, וזה בדיוק מה ש-React עושה: הוא מריץ את אפקט ההידרציה ואת
+ *  אפקט ההתמדה באותו commit, ⛔ לא מחכה למיקרו-טאסק. ה-cleanup מוחזר ונקרא כדי
+ *  לסגור את המסלול האסינכרוני (`cancelled = true`) ⛔ ולא להזליג בין אסרציות. */
+function runHydrateEffect({ authUser, hydratedRef, storage = {} }) {
+  const calls = { load: 0, migrate: 0 };
+  const names = [
+    "isSupabaseConfigured", "supabase", "authUser", "localStorage",
+    "migrateFromLocalStorage", "console", "setHydrationFailed", "loadSettings",
+    "setCapital", "CURRENCY_SYMBOL", "setAccountCurrency", "setCapitalCurrency",
+    "setRiskPct", "setShowOnboarding", "setUserProfile", "lang", "setLang",
+    "setWatchlistItems", "setPriceAlerts", "setPlaybookSetups", "welcomeSeenRef",
+    "DEFAULT_CAPITAL", "setCapitalMaybeClobbered", "hydratedRef", "setHydrationDone",
+  ];
+  const values = [
+    true, {}, authUser, makeLocalStorage(storage),
+    async () => { calls.migrate++; return { migrated: false }; },
+    { error() {}, warn() {}, log() {} }, () => {},
+    async () => { calls.load++; return loadResult("ok", MIRROR_OK); },
+    () => {}, CURRENCY_SYMBOL, () => {}, () => {},
+    () => {}, () => {}, () => {}, "en", () => {},
+    () => {}, () => {}, () => {}, { current: false },
+    DEFAULT_CAPITAL, () => {}, hydratedRef, () => {},
+  ];
+  const cleanup = new Function(...names, "return (" + hydrateEffectSrc + ")")(...values)();
+  return { cleanup, calls };
+}
+
+/** שני ה-useCallback שכותבים ישירות ל-DB מחוץ לאפקט ההתמדה (:1307 · :1324). */
+function runWelcomeAndTourCallbacks({ authUser, hydratedRef }) {
+  const calls = { save: 0, args: [] };
+  const saveSettings = (...a) => { calls.save++; calls.args.push(a); };
+  const localStorage = makeLocalStorage();
+  const welcomeSeenRef = { current: false };
+
+  new Function("setShowWelcome", "welcomeSeenRef", "authUser", "saveSettings", "hydratedRef",
+    "return (" + dismissSrc + ")")(() => {}, welcomeSeenRef, authUser, saveSettings, hydratedRef)();
+
+  new Function("localStorage", "authUser", "saveSettings", "setShowTour", "setTab", "hydratedRef",
+    "return (" + tourSrc + ")")(localStorage, authUser, saveSettings, () => {}, () => {}, hydratedRef)(true);
+
   return calls;
 }
 
@@ -214,7 +282,7 @@ function runUnload(hydratedRef) {
 
 /* ── האסרציות ─────────────────────────────────────────────────────────────*/
 const main = async () => {
-  console.log("\n──────── מבחינות (14) ────────");
+  console.log("\n──────── מבחינות (17) ────────");
 
   // A1 · A2 · A5 · A6 — קריאה כושלת
   {
@@ -271,6 +339,33 @@ const main = async () => {
     ok("A14", "failed → +cleanup ⇒ flushSettings calls", u.calls.flush === 0, String(u.calls.flush));
   }
 
+  /* A15 · A16 · A17 — החלפת משתמש באותו טאב (B-361 · D-lite, 22.09)
+   * 🔴 `hydratedRef` הוא useRef ש⛔ אופס לעולם, וה-`return` ב-:4050 הוא early-return
+   * ⛔ ולא unmount ⇒ אחרי A→B באותו טאב הוא נשאר `true`, ושלושת מסלולי הכתיבה
+   * (אפקט ההתמדה · dismissWelcome · completeTour) יורים על B **בערכים של A**. */
+  {
+    const hydratedRef = { current: true }; // A הושלם
+    const r = runHydrateEffect({ authUser: null, hydratedRef }); // התנתקות
+    ok("A15", "logout (authUser=null) ⇒ hydratedRef.current", hydratedRef.current === false, String(hydratedRef.current));
+    r.cleanup?.();
+  }
+  {
+    const hydratedRef = { current: true }; // A הושלם
+    const r = runHydrateEffect({ authUser: { id: "u-B" }, hydratedRef });
+    const p = runPersist(hydratedRef, "u-B");
+    ok("A16", "user switch A→B ⇒ persist saveSettings calls (בערכים של A)", p.save === 0,
+      `${p.save}${p.save ? " → " + JSON.stringify(p.args[0]) : ""}`);
+    r.cleanup?.();
+  }
+  {
+    const hydratedRef = { current: true }; // A הושלם
+    const r = runHydrateEffect({ authUser: { id: "u-B" }, hydratedRef });
+    const c = runWelcomeAndTourCallbacks({ authUser: { id: "u-B" }, hydratedRef });
+    ok("A17", "user switch A→B → dismissWelcome+completeTour ⇒ saveSettings calls", c.save === 0,
+      `${c.save}${c.save ? " → " + JSON.stringify(c.args.map((a) => a[1])) : ""}`);
+    r.cleanup?.();
+  }
+
   console.log("\n──────── אינווריאנטות (5) — ⚪ ירוקות בשני העצים, ⛔ אינן מודדות את התיקון ────────");
 
   // I1 · I2 — משתמש חדש: empty הוא סמכותי וחייב להישאר בר-כתיבה
@@ -296,18 +391,19 @@ const main = async () => {
   }
 
   // I5 — שערי-מטא
-  invariant("I5", "3 עוגנים ייחודיים · סוגריים מאוזנים · זנב תואם",
-    counts.hydrate === 1 && counts.persist === 1 && counts.unload === 1 && tailOk && persistTailOk && unloadTailOk,
-    `anchors=${counts.hydrate}/${counts.persist}/${counts.unload} tail=${tailOk}/${persistTailOk}/${unloadTailOk}`);
+  invariant("I5", "5 עוגנים ייחודיים · סוגריים מאוזנים · זנב תואם",
+    Object.values(counts).every((v) => v === 1)
+      && tailOk && persistTailOk && unloadTailOk && hydrateEffectTailOk && dismissTailOk && tourTailOk,
+    `anchors=${Object.values(counts).join("/")} tail=${[tailOk, persistTailOk, unloadTailOk, hydrateEffectTailOk, dismissTailOk, tourTailOk].join("/")}`);
 
   const total = pass + inv + fail;
   console.log(`\n${APP}`);
-  console.log(`מבחינות: ${pass}/14 · אינווריאנטות: ${inv}/5 · סה"כ ${pass + inv}/${total}`);
+  console.log(`מבחינות: ${pass}/17 · אינווריאנטות: ${inv}/5 · סה"כ ${pass + inv}/${total}`);
   if (fail) {
     console.log(`🔴 אדומות (${fail}): ${reds.join(" · ")}`);
     process.exit(1);
   }
-  console.log("✅ hydration wiring: 19/19");
+  console.log("✅ hydration wiring: 22/22");
 };
 
 main().catch((e) => { console.error("🔴 harness נפל:", e); process.exit(1); });

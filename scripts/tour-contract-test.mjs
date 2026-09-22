@@ -446,7 +446,12 @@ ok("K10", "the navRef indirection survives (⛔ handlers in the dep array)", /na
 // ── P* · tourDone reaches the DB (B-350) ───────────────────────────────────
 console.log("\nP* · tour completion persists");
 
-function runCompleteTour({ authUser }, done) {
+// ⚠️ `hydrated` (22.09, B-361) is a REAL parameter of the block now, ⛔ scaffolding:
+// completeTour gained a `hydratedRef.current &&` gate because an account switch in
+// the same tab let it upsert `{tourDone:true}` into an un-hydrated user's row with an
+// empty merge base ⇒ the whole blob was replaced. P1–P7 describe a HYDRATED user, so
+// they inject `true`; the A→B case is measured in test:hydration A17.
+function runCompleteTour({ authUser, hydrated = true }, done) {
   const saved = [];
   const store = new Map();
   let deps = null;
@@ -461,6 +466,7 @@ function runCompleteTour({ authUser }, done) {
     "authUser",
     "setShowTour",
     "setTab",
+    "hydratedRef",
     `${completeBlock.text};\nreturn completeTour;`
   );
   const completeTour = f(
@@ -469,7 +475,8 @@ function runCompleteTour({ authUser }, done) {
     (id, patch) => saved.push({ id, patch }),
     authUser,
     () => {},
-    () => {}
+    () => {},
+    { current: hydrated }
   );
   completeTour(done);
   return { saved, store, deps };
