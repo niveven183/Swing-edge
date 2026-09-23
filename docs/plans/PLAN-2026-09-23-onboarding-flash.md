@@ -268,3 +268,176 @@ if (s.onboarding?.completed === true) {
 `0` קבצי קוד · `0` `src/` · `0` `api/` · `0` `scripts/` · `0` `tests-sentinel/` ·
 `0` `.github/` · `0` כתיבות DB · `0` סודות · `0` התחברויות לחשבון · `0` שינוי
 ב-`STATE`/`NEXT`/`BACKLOG`/`CHECKS`. הסקריפטים שמדדו חיים ב-`/tmp/` ו⛔ בריפו.
+
+---
+
+# תוכנית מימוש — 23.09, אחרי הכרעות ניב
+
+**סיווג §15 לגל המימוש: `T3` · תשובות `כן/כן/לא/כן/לא`.**
+① הפיכות — נוגע במסלול שכותב ל-`user_settings` ⇒ **כן** · ② אמון — הון שנדרס
+הוא מספר שגוי בלי ידיעה ⇒ **כן** · ③ אבטחה — ⛔ `auth`/RLS/`api/`/סודות ⇒ **לא** ·
+④ רוחב — `SwingEdge_App.jsx` + `scripts/hydration-wiring-test.mjs` + מסלול כתיבה
+⇒ **כן** · ⑤ ודאות — כל הנחה נמדדה היום ⇒ **לא**.
+⇒ **⛔ סגירה בלי אימות עין** (`C-059`).
+
+## M0 · מדידת דגל העסקאות (סעיף 3) — 🛑 **STOP, ⛔ המצאה**
+
+**נמדד:** `loadTrades` (`:1722-1753`) קורא `setTrades` בלבד, בשניים מארבעת מסלולי
+היציאה שלו (שומר · `error`+fallback · הצלחה · `catch`). ⛔ **אין שום דגל.**
+
+```
+grep "tradesLoaded|tradesReady|tradesSettled|loadingTrades|tradesLoading"
+  SwingEdge_App.jsx src/**  ⇒ 0 hits
+setState בתוך גוף האפקט 1722-1753 ⇒ setTrades ×2 בלבד
+```
+
+⇒ **סעיף 3 ⛔ מבוצע בגל הזה.** דגל חדש הוא *state* חדש על מסלול טעינה — החלטה,
+⛔ ריפקטור, והכלל היה «⛔ תמציא». נרשם כ-**`B-367`** ב-commit 2 עם ארבעת מסלולי
+היציאה שדגל כזה יצטרך לכסות. ⚠️ ה-`catch` ב-`:1747` ⛔ עושה fallback — הוא בולע.
+
+## M1 · `SwingEdge_App.jsx` — ששת ה-diff
+
+**① `:1184-1189` — האתחול מפסיק לנחש**
+```js
+const [showOnboarding, setShowOnboarding] = useState(() => {
+  // B-365: המפתח המקומי הוא **מטמון**, ⛔ סמכות. אחרי טאטוא החלפת-משתמש הוא
+  // נעדר אצל משתמש ותיק, ו-`!saved` רינדר שאלון מעל חשבון אמיתי — שלחיצה
+  // אחת עליו דורסת את ההון (`handleOnboardingComplete`).
+  // מפתח קיים ⇒ `false` בטוח: הוא יכול רק **להסתיר**.
+  // מפתח נעדר + יש backend ⇒ `null` = ⛔ יודעים. בלי backend אין שורה לחכות
+  // לה, המפתח המקומי **הוא** הסמכות ⇒ `true`, בדיוק כמו היום.
+  try { if (localStorage.getItem("swingEdgeOnboarding")) return false; } catch { }
+  return isSupabaseConfigured ? null : true;
+});
+```
+
+**② ליד `:1256` — `onboardingSettled` במראה של `capitalSettled`**
+```js
+// ⚠️ `hydrationFailed` **חייב** להיות כאן, מאותה סיבה בדיוק שב-:1250 — גוף
+// ההידרציה חוזר מוקדם ב-:1790 · :1797 ו⛔ מיישב את השאלון, ושער על
+// `hydrationDone` לבדו היה משאיר **שלד לנצח** על הסשן שכבר איבד את ה-DB.
+const onboardingSettled = showOnboarding !== null || hydrationFailed;
+```
+
+**③ `:1790` ו-`:1797` — כישלון ⛔ «משתמש חדש»**
+```js
+if (m.reason === "check-failed") {
+  console.error("[hydrate] settings check failed — writes stay blocked for this session");
+  setShowOnboarding(false);        // B-365 — ⛔ שאלון על כישלון
+  setHydrationFailed(true);
+  return;
+}
+const { status, settings: s } = await loadSettings(authUser.id);
+if (cancelled) return;
+if (status === "failed") {
+  console.error("[hydrate] settings read failed — writes stay blocked for this session");
+  // המראה ש-`loadFailed` מחזיר הוא **לתצוגה**: אם הוא נושא onboarding שהושלם,
+  // גם הפרופיל משוחזר ממנו. (הכרעת ניב: «אם יש mirror מקומי — השתמש בו».)
+  if (s?.onboarding?.completed === true)
+    setUserProfile({ ...s.onboarding.profile, ...(s.onboarding.answers || {}) });
+  setShowOnboarding(false);        // ⛔ שאלון לוותיק · חדש אמיתי ישלם בכניסה הבאה
+  setHydrationFailed(true);
+  return;
+}
+```
+**נימוק מוצהר:** שאלון לוותיק = דריסת הון ב-DB = **בלתי הפיך**. דילוג לחדש =
+**הפיך**, נפתר בכניסה הבאה.
+
+**④ `:1826-1830` — מהשתלטות חד-כיוונית ליישוב**
+```js
+if (s.onboarding?.completed === true) {
+  setShowOnboarding(false);
+  setUserProfile({ ...s.onboarding.profile, ...(s.onboarding.answers || {}) });
+  try { localStorage.setItem("swingEdgeOnboarding", JSON.stringify(s.onboarding)); } catch {}
+} else if (showOnboarding === null) {
+  // קריאה סמכותית (`ok` בלי onboarding · `empty` = אין שורה) ⇒ הוא באמת חדש.
+  // ⚠️ `=== null` ⛔ קישוט: הוא מיישב את ה**לא-ידוע** בלבד ו⛔ סותר `false`
+  // שהמטמון המקומי כבר קבע ⇒ משתמש עם מפתח מקומי ושורה בלי onboarding
+  // מתנהג **בדיוק** כמו היום.
+  setShowOnboarding(true);
+}
+```
+
+**⑤ `:4082` — שער הרינדור**
+```js
+// B-365: `null` = ההידרציה ⛔ דיברה. ⛔ שאלון (דורס הון אמיתי) ו⛔ דשבורד ריק
+// (נקרא כ«הנתונים שלך נעלמו»). אותו לודר של `!authReady` — ⛔ רכיב חדש.
+if (!onboardingSettled) { return (<...אותו בלוק בדיוק של :4066-4075...>); }
+if (showOnboarding === true) { return <OnboardingScreen onComplete={handleOnboardingComplete} />; }
+```
+
+**⑥ `:1486-1488` — אנליטיקס ⛔ מייחס מסך לפני שהוא ידוע**
+```js
+useEffect(() => {
+  if (!onboardingSettled) return;
+  trackScreenView(showOnboarding === true ? "onboarding" : tab);
+}, [tab, showOnboarding, onboardingSettled]);
+```
+
+**⑦ (סעיף 4) הגנה כפולה על ההון** — `dbCapitalRef` מוכרז **מעל** `:1201`,
+נדלק ב-`:1805` על `status === "ok"` בלבד, ונקרא ב-`:1207`:
+```js
+if (typeof s.capital === "number" && s.capital > 0) {
+  if (status === "ok") dbCapitalRef.current = true;   // ⛔ על `empty` — שם `s` הוא המראה
+  setCapital(s.capital); …
+}
+…
+if (cap > 0 && !dbCapitalRef.current) { setCapital(cap); localStorage.setItem("swingEdgeCapital", …); }
+```
+**⛔ שובר חדש אמיתי (מדוד ב-`A24b`):** חדש ⇒ `status === "empty"` ⇒ הדגל נשאר
+`false` ⇒ ההון מהשאלון **כן** נכתב.
+
+⚠️ **שלושת הצרכנים האחרים כבר בטוחים** — `:1307` ו-`:1899` משווים `=== false`
+מפורשות ⇒ `null` ⛔ מפעיל את ה-welcome ו⛔ כותב `onboarding` ל-DB. הסיור רוכב על
+`dismissBetaWelcome` ⇒ מגודר בשרשרת. ⇒ `test:tour` נדרש **ירוק כרגרסיה**.
+
+## M2 · `scripts/hydration-wiring-test.mjs` — שער-לפני
+
+שני עוגנים חדשים (אתחול `showOnboarding` · `handleOnboardingComplete`) + שערי-מטא
+(`≠ 1` · איזון סוגריים) — **כשל חילוץ = אדום קשה, ⛔ דילוג** (`B-272`).
+`runHydrate` יקלוט `setShowOnboarding` (היום `() => {}` ו⛔ נמדד).
+`clearUserScopedStorage` ה**אמיתי** מיובא ל-`A21`.
+
+| # | מה | אדום-לפני? |
+|---|----|------------|
+| `A20a` | localStorage ריק ⇒ האתחול ⛔ מחזיר `true` | ✅ **נצפתה** |
+| `A20b` | שער הרינדור ⛔ `if (showOnboarding)` ערום | ✅ **נצפתה** |
+| `A21` | טאטוא אמיתי ⇒ התחברות ⇒ השאלון ⛔ מרונדר לפני יישוב | ✅ **נצפתה** (מטריצת המסלולים) |
+| `A22` | `failed` ⇒ יושב ל-`false` (⛔ שאלון) | ✅ אפס קריאות היום |
+| `A23` | `empty` ⇒ יושב ל-`true` (**ביקורת**) | ⚠️ **ראו למטה** |
+| `A24a` | הון מ-`ok` ⇒ `handleOnboardingComplete` ⛔ דורס | ✅ היום דורס תמיד |
+| `A24b` | חדש (`empty`) ⇒ ההון מהשאלון **כן** נכתב (**ביקורת**) | ⛔ ירוקה בשני העצים |
+
+⚠️ **`A23` — הצהרה, ⛔ זיוף.** בקריאת **תוצאה** («המשתמש רואה שאלון») היא
+**ירוקה בשני העצים** — וזו בדיוק זרוע ביקורת תקינה (`K1`–`K6` ב-`test:cents`).
+בקריאת **יישוב מפורש** («נקראה `setShowOnboarding(true)`») היא **אדומה היום**,
+כי היום אפס קריאות. ⇒ אממש את **שתיהן**: `A23` ביקורת ירוקה-בשניהם +
+`A23b` יישוב אדום-לפני. ⛔ אציג ירוקה-בשניהם כראיה לתיקון.
+
+⚠️ **`A20a`/`A20b` אדומות גם על `3195df2`** ⇒ הן מודדות **מנגנון**, ⛔ רגרסיה.
+**`A21` היא היחידה שירוקה על העץ הישן** ⇒ היא אסרציית הרגרסיה של `95865cb`.
+
+מניית `test:hydration` תזוז `25` → `~33` בפרוזת `CLAUDE.md` §7 — **ביד** ⇒
+`B-324`, מוצהר ⛔ נסגר.
+
+## M3 · סדר ביצוע
+
+1. שער-לפני: הוספת האסרציות **בלבד** ⇒ הרצה ⇒ **הדבקת האדום**.
+2. ששת ה-diff ב-`SwingEdge_App.jsx`.
+3. `test:hydration` · `test:settings` · `test:tour` · `test:analytics` ירוקים.
+4. `npm run verify` **ערום**, `$?` נלכד ⇒ `EXIT=0`.
+5. `CLAUDE.md` §7 — מניית `test:hydration` + מסלול `userScopedStorage`.
+6. **commit 1** `fix(onboarding): tri-state gate — never decide "new user" before hydration` ⇒ push.
+7. **commit 2** רישום: `B-365` (ההבהוב) · `B-366` (`MIRROR_KEY` בטאטוא) ·
+   `B-367` (דגל העסקאות) · `C-059` (4 סעיפי אימות עין) · `STATE` · `NEXT` ·
+   §7 כאן ⇒ `test:registry` ⇒ push.
+8. אחרי דיפלוי: `SENTRY_RELEASE.id` בבאנדל הפרודקשן = `HEAD`.
+
+**מזהים נמדדו פנויים:** `B-365` · `B-366` · `B-367` · `C-059` —
+`git log --all -S` ⇒ `0` קומיטים, `0` קבצים לכל אחד.
+
+`C-059` ⓵ ותיק: התנתקות→התחברות ⇒ ⛔ שאלון אף לרגע · ⓶ PWA: סגירה→פתיחה ⇒
+⛔ שאלון · ⓷ הג'ורנל ⛔ מציג «אין עסקאות» לרגע — ⚠️ **⓷ צפוי להיכשל**: `B-367`
+לא תוקן, וזו תצפית ⛔ הבטחה · ⓸ **ביקורת** חשבון חדש ⇒ השאלון **כן** מופיע.
+
+⛔ **`MIRROR_KEY` ⛔ בגל הזה** (סעיף 6) — `B-366` בלבד.
