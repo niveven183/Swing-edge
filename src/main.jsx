@@ -1,10 +1,13 @@
-import { StrictMode, useEffect, useRef } from "react";
+import { StrictMode, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import * as Sentry from "@sentry/react";
 import "./index.css";
 import SwingEdge from "../SwingEdge_App.jsx";
 import LandingGate from "./components/LandingGate.jsx";
+import AuthScreen from "./components/AuthScreen.jsx";
+import { supabase, isSupabaseConfigured } from "./supabaseClient.js";
+import { clearUserScopedStorage } from "./lib/userScopedStorage.js";
 import { TermsPage, PrivacyPage } from "./components/LegalPages.jsx";
 import { ToastProvider, ConfirmProvider } from "./components/ToastProvider.jsx";
 import { ThemeProvider } from "./contexts/ThemeContext.jsx";
@@ -94,6 +97,80 @@ function RouteTracker() {
   return null;
 }
 
+// ── /app — the mount boundary between two accounts ──────────────────────────
+//
+// B-361 ⓶ (22.09, measured in production): two accounts in one tab. `SwingEdge`
+// gated auth with an early `return <AuthScreen/>` INSIDE itself, which is a
+// render branch and ⛔ an unmount — every `useState` kept its value and every
+// `useRef` kept its contents across the switch. Account A's capital was shown
+// to account B ($1,417 → $896 on the same screen), and A's watchlist was
+// written back into B's DB row because `hadWatchlist` (SwingEdge_App.jsx:1767)
+// reads localStorage before the DB round trip.
+//
+// The fix is structural, ⛔ another guard: `SwingEdge` mounts only when there
+// IS a uid, keyed by it. A different uid is a different mount, so every lazy
+// initializer re-runs and every ref is born empty. A guard someone forgets to
+// add is the failure mode we are leaving behind; there is nothing to forget here.
+//
+// ⚠️ `<AuthScreen/>` is rendered HERE rather than inside SwingEdge on purpose.
+// Mounting SwingEdge for a signed-out visitor would run its mount effects —
+// including `trackScreenView` (SwingEdge_App.jsx:1473), which sits above the
+// auth returns and would report screen "dashboard" while the login form is what
+// the person is actually looking at. One mount per login ⇒ one screen_view.
+//
+// ⛔ This does NOT use `useSupabaseSession` yet: that hook also calls
+// `Sentry.setUser`, which is a behaviour change /app has never had. Unifying
+// the two listeners and adding Sentry identity is B-362, deliberately not here.
+function AppRoute() {
+  const [session, setSession] = useState(null);
+  // Without Supabase there is no session to wait for — and, matching the old
+  // in-component gate, no AuthScreen either: the app runs unauthenticated.
+  const [ready, setReady] = useState(!isSupabaseConfigured);
+  const prevUid = useRef(null);
+  const uid = session?.user?.id ?? null;
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+    let cancelled = false;
+    supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
+      setSession(data?.session ?? null);
+      setReady(true);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+      setSession(s);
+      setReady(true);
+    });
+    return () => { cancelled = true; sub?.subscription?.unsubscribe(); };
+  }, []);
+
+  // Fires on any real change of occupant — A→null AND A→B directly (Supabase can
+  // deliver the second without an intervening null). ⛔ on the initial "nobody is
+  // here yet": `prevUid` starts null, so a first load cannot trigger the sweep.
+  //
+  // Ordering: this is a PARENT effect, and React runs a child's unmount cleanup
+  // before it. SwingEdge's cleanup (SwingEdge_App.jsx:1904) flushes account A's
+  // pending settings write first, so the sweep can never race it. (That flush
+  // reads an in-memory Map, not localStorage, so it is immune either way — but
+  // the ordering is the part that has to stay true.)
+  useEffect(() => {
+    if (prevUid.current && prevUid.current !== uid) clearUserScopedStorage();
+    prevUid.current = uid;
+  }, [uid]);
+
+  if (!isSupabaseConfigured) return <SwingEdge />;
+  if (!ready) {
+    return (
+      <div
+        className="min-h-screen bg-[var(--bg-primary)] dark:bg-[#0a0f1e] flex items-center justify-center"
+        aria-busy="true"
+      />
+    );
+  }
+  if (!uid) return <AuthScreen />;
+  return <SwingEdge key={uid} />;
+}
+
 // The last net. PanelBoundary contains a panel; this catches what happens
 // outside every panel (providers, router, the shell itself).
 //
@@ -166,7 +243,7 @@ createRoot(document.getElementById("root")).render(
               <RouteTracker />
               <Routes>
                 <Route path="/" element={<LandingGate />} />
-                <Route path="/app" element={<SwingEdge />} />
+                <Route path="/app" element={<AppRoute />} />
                 <Route path="/terms" element={<TermsPage />} />
                 <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />

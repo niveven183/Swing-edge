@@ -16,6 +16,8 @@
  * שימוש:  node scripts/hydration-wiring-test.mjs [--app <path>]
  */
 import { readFileSync } from "node:fs";
+// ⛔ מוק — המודול האמיתי. סטאב כאן היה מודד את הסטאב.
+import { clearUserScopedStorage, DEVICE_KEYS } from "../src/lib/userScopedStorage.js";
 
 const argv = process.argv.slice(2);
 const appIdx = argv.indexOf("--app");
@@ -149,10 +151,21 @@ console.log(`extract tour    : ${tourSrc.split("\n").length} lines ${tourTailOk 
  */
 const CURRENCY_SYMBOL = { USD: "$", ILS: "₪", EUR: "€" };
 
+/** ⚠️ `length` + `key(i)` ⛔ נוחות — הם החוזה ש-`clearUserScopedStorage` סורק בו.
+ *  מוק בלי הימנון היה מריץ סחיפה על אוסף ריק ומחזיר ירוק כוזב. */
 function makeLocalStorage(seed = {}) {
   const m = new Map(Object.entries(seed));
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), _map: m };
+  return {
+    getItem: (k) => (m.has(k) ? m.get(k) : null),
+    setItem: (k, v) => m.set(k, String(v)),
+    removeItem: (k) => m.delete(k),
+    key: (i) => [...m.keys()][i] ?? null,
+    get length() { return m.size; },
+    _map: m,
+  };
 }
+
+const tick = () => new Promise((res) => setTimeout(res, 0));
 
 /** מראה ההגדרות — **בדיוק** החוזה החדש: {status, settings}, ⛔ בלי מפתחות ברמה
  *  העליונה. זו הצורה שהמודול באמת מחזיר (src/lib/userSettings.js · loadSettings).
@@ -210,13 +223,13 @@ function runHydrate({ loadStatus, mirror = MIRROR_OK, migrateReason = null, canc
   return { promise: fn(), calls, hydratedRef, welcomeSeenRef, localStorage };
 }
 
-function runPersist(hydratedRef, uid = "u-probe") {
+function runPersist(hydratedRef, uid = "u-probe", { watchlistItems = [] } = {}) {
   const calls = { save: 0, args: [] };
   const names = ["authUser", "hydratedRef", "localStorage", "capital", "riskPct", "lang",
     "accountCurrency", "capitalCurrency", "watchlistItems", "priceAlerts", "playbookSetups",
     "showOnboarding", "userProfile", "saveSettings"];
   const values = [{ id: uid }, hydratedRef, makeLocalStorage(), 49000, 2, "he", "USD",
-    "USD", [], {}, [], true, null, (...a) => { calls.save++; calls.args.push(a); }];
+    "USD", watchlistItems, {}, [], true, null, (...a) => { calls.save++; calls.args.push(a); }];
   new Function(...names, "return (" + persistSrc + ")")(...values)();
   return calls;
 }
@@ -226,8 +239,11 @@ function runPersist(hydratedRef, uid = "u-probe") {
  *  מיד אחרי גוף האפקט, וזה בדיוק מה ש-React עושה: הוא מריץ את אפקט ההידרציה ואת
  *  אפקט ההתמדה באותו commit, ⛔ לא מחכה למיקרו-טאסק. ה-cleanup מוחזר ונקרא כדי
  *  לסגור את המסלול האסינכרוני (`cancelled = true`) ⛔ ולא להזליג בין אסרציות. */
-function runHydrateEffect({ authUser, hydratedRef, storage = {} }) {
-  const calls = { load: 0, migrate: 0 };
+function runHydrateEffect({ authUser, hydratedRef, storage = {}, mirror = MIRROR_OK }) {
+  const calls = { load: 0, migrate: 0, watchlist: [] };
+  // ⚠️ `storage` הוא **או** זרע **או** מופע חי — A18 חייב את המופע שעליו רצה
+  // הסחיפה, אחרת הוא מודד אחסון אחר מזה שנוקה.
+  const store = typeof storage?.getItem === "function" ? storage : makeLocalStorage(storage);
   const names = [
     "isSupabaseConfigured", "supabase", "authUser", "localStorage",
     "migrateFromLocalStorage", "console", "setHydrationFailed", "loadSettings",
@@ -237,17 +253,17 @@ function runHydrateEffect({ authUser, hydratedRef, storage = {} }) {
     "DEFAULT_CAPITAL", "setCapitalMaybeClobbered", "hydratedRef", "setHydrationDone",
   ];
   const values = [
-    true, {}, authUser, makeLocalStorage(storage),
+    true, {}, authUser, store,
     async () => { calls.migrate++; return { migrated: false }; },
     { error() {}, warn() {}, log() {} }, () => {},
-    async () => { calls.load++; return loadResult("ok", MIRROR_OK); },
+    async () => { calls.load++; return loadResult("ok", mirror); },
     () => {}, CURRENCY_SYMBOL, () => {}, () => {},
     () => {}, () => {}, () => {}, "en", () => {},
-    () => {}, () => {}, () => {}, { current: false },
+    (v) => calls.watchlist.push(v), () => {}, () => {}, { current: false },
     DEFAULT_CAPITAL, () => {}, hydratedRef, () => {},
   ];
   const cleanup = new Function(...names, "return (" + hydrateEffectSrc + ")")(...values)();
-  return { cleanup, calls };
+  return { cleanup, calls, store };
 }
 
 /** שני ה-useCallback שכותבים ישירות ל-DB מחוץ לאפקט ההתמדה (:1307 · :1324). */
@@ -282,7 +298,7 @@ function runUnload(hydratedRef) {
 
 /* ── האסרציות ─────────────────────────────────────────────────────────────*/
 const main = async () => {
-  console.log("\n──────── מבחינות (17) ────────");
+  console.log("\n──────── מבחינות (19) ────────");
 
   // A1 · A2 · A5 · A6 — קריאה כושלת
   {
@@ -366,7 +382,55 @@ const main = async () => {
     r.cleanup?.();
   }
 
-  console.log("\n──────── אינווריאנטות (5) — ⚪ ירוקות בשני העצים, ⛔ אינן מודדות את התיקון ────────");
+  /* A18 · A19 — דליפת רשימת-המעקב בין חשבונות (B-361 ⓶, 23.09)
+   * 🔴 זה ה**שרת**, ⛔ המסך. `hadWatchlist` (:1767) נמדד מ-localStorage **לפני**
+   * כל await ⇒ הרשימה של A, ששרדה את ההתנתקות, **מדכאת** את טעינת הרשימה של B,
+   * ואפקט ההתמדה כותב אותה בחזרה לשורה של B ב-DB. ⛔ הצגה — כתיבה.
+   *
+   * ⚠️ הסחיפה רצה על **מופע** אחסון אחד, והוא זה שמוזרק להידרציה — סחיפה על
+   * עותק היתה מודדת ניקיון של אובייקט שאיש ⛔ קורא.
+   * ⚠️ `initialWatchlist` ⛔ קישוט: זה בדיוק מה ש-useState עושה ב-:1685 אחרי
+   * remount — הוא קורא את האחסון שנוקה. מי שמדלג עליו מניח את מה שנמדד. */
+  {
+    const store = makeLocalStorage({
+      swingEdgeWatchlist: JSON.stringify([{ ticker: "ZZZA", setup: "A-only" }]),
+      swingEdgeCapital: "49000",
+      swingEdgeConsent: '{"v":1,"analytics":"granted"}',
+    });
+
+    clearUserScopedStorage(store); // ← uid A → null, מה שה-wrapper מריץ
+
+    // ⚠️ תצלום **מיד** אחרי הסחיפה, ⛔ בסוף הבלוק: ההידרציה כותבת בחזרה
+    // `swingEdgeCapital` (:1759) בערך של B ⇒ בדיקה בסוף הייתה מודדת את הכתיבה
+    // החוזרת ומדווחת «⛔ נמחק» על מפתח שכן נמחק. נמדד — A19 ירתה אדום כוזב.
+    const afterSweep = { consent: store.getItem("swingEdgeConsent"), capital: store.getItem("swingEdgeCapital") };
+
+    const initialWatchlist = JSON.parse(store.getItem("swingEdgeWatchlist") || "[]");
+    const hydratedRef = { current: false };
+    const r = runHydrateEffect({
+      authUser: { id: "u-B" },
+      hydratedRef,
+      storage: store,
+      mirror: { ...MIRROR_OK, watchlist: [{ ticker: "BBBB", setup: "B-only" }] },
+    });
+    await tick(); await tick(); await tick();
+    const watchlistItems = r.calls.watchlist.length ? r.calls.watchlist.at(-1) : initialWatchlist;
+    const p = runPersist({ current: true }, "u-B", { watchlistItems });
+    const patch = p.args[0]?.[1];
+    const zz = (patch?.watchlist || []).filter((x) => x.ticker === "ZZZA").length;
+    ok("A18", "A→B אחרי סחיפה ⇒ פריטי ZZZA ב-patch של B",
+      p.save === 1 && p.args[0][0] === "u-B" && zz === 0,
+      `save=${p.save} uid=${p.args[0]?.[0]} zzza=${zz} watchlist=${JSON.stringify(patch?.watchlist)}`);
+    r.cleanup?.();
+
+    // ⚠️ זרוע ביקורת. בלעדיה «0 דליפות» מתקבל גם ממחיקת **הכל** — כולל ההסכמה
+    // ל-GDPR, שהיא הצהרה על הדפדפן ⛔ על האדם.
+    ok("A19", "סחיפה ⇒ מפתח רמת-מכשיר שורד · מפתח רמת-משתמש נמחק",
+      afterSweep.consent !== null && afterSweep.capital === null,
+      `consent=${afterSweep.consent === null ? "null" : "שרד"} capital=${afterSweep.capital}`);
+  }
+
+  console.log("\n──────── אינווריאנטות (6) — ⚪ ירוקות בשני העצים, ⛔ אינן מודדות את התיקון ────────");
 
   // I1 · I2 — משתמש חדש: empty הוא סמכותי וחייב להישאר בר-כתיבה
   {
@@ -396,14 +460,20 @@ const main = async () => {
       && tailOk && persistTailOk && unloadTailOk && hydrateEffectTailOk && dismissTailOk && tourTailOk,
     `anchors=${Object.values(counts).join("/")} tail=${[tailOk, persistTailOk, unloadTailOk, hydrateEffectTailOk, dismissTailOk, tourTailOk].join("/")}`);
 
+  // I6 — רשימת ה-KEEP קפואה. ⚠️ ⛔ מקבעת **תוכן** אלא **סגירוּת**: תוספת
+  // מפתח לרשימה היא הרחבת מה ששורד התנתקות ⇒ הכרעה, ⛔ ריפקטור.
+  invariant("I6", "DEVICE_KEYS — קפואה ובגודל 5",
+    Object.isFrozen(DEVICE_KEYS) && DEVICE_KEYS.length === 5,
+    `frozen=${Object.isFrozen(DEVICE_KEYS)} n=${DEVICE_KEYS.length}`);
+
   const total = pass + inv + fail;
   console.log(`\n${APP}`);
-  console.log(`מבחינות: ${pass}/17 · אינווריאנטות: ${inv}/5 · סה"כ ${pass + inv}/${total}`);
+  console.log(`מבחינות: ${pass}/19 · אינווריאנטות: ${inv}/6 · סה"כ ${pass + inv}/${total}`);
   if (fail) {
     console.log(`🔴 אדומות (${fail}): ${reds.join(" · ")}`);
     process.exit(1);
   }
-  console.log("✅ hydration wiring: 22/22");
+  console.log("✅ hydration wiring: 25/25");
 };
 
 main().catch((e) => { console.error("🔴 harness נפל:", e); process.exit(1); });

@@ -1241,6 +1241,19 @@ export default function SwingEdge() {
   // B-268: a FAILED read is not "no row". It leaves hydratedRef false — every DB
   // write stays blocked for the session — and feeds the banner below.
   const [hydrationFailed, setHydrationFailed] = useState(false);
+  // Is the capital on screen the user's capital, or is it still the local seed?
+  // Between mount and the end of hydration, `capital` is whatever the lazy
+  // initializer (:1349) found in localStorage — after a logout sweep that is
+  // DEFAULT_CAPITAL, i.e. a number the user never chose, rendered in his own
+  // currency and indistinguishable from the real one. ⛔ We show it and hope.
+  //
+  // ⚠️ `hydrationFailed` MUST be in this disjunction. The hydrate body returns
+  // early on failure (:1780 · :1787) and never reaches `setHydrationDone(true)`,
+  // so a gate on `hydrationDone` alone leaves a PERMANENT skeleton — a screen
+  // that never resolves, on exactly the session that already lost the DB. On
+  // failure we fall back to the local number, which the :4100 banner already
+  // announces as local-only and unsaved.
+  const capitalSettled = hydrationDone || hydrationFailed || !isSupabaseConfigured;
   // B-268 banner: the row we read carries exactly DEFAULT_CAPITAL, which is what a
   // clobber looks like. ⛔ Read-only — dismissal is localStorage, ⛔ never a DB write.
   const [capitalMaybeClobbered, setCapitalMaybeClobbered] = useState(false);
@@ -4190,7 +4203,20 @@ export default function SwingEdge() {
               >
                 {/* HEADER */}
                 <div className="px-4 py-3 border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-gradient-to-r from-cyan-500/5 to-violet-500/5">
-                  <p className="text-sm font-bold text-white truncate">{userProfile?.profileName || authUser?.user_metadata?.full_name || "Trader"}</p>
+                  {/* ⚠️ Measured deviation from the plan, stated rather than done
+                      silently: the profile needs NO blanket skeleton. After the
+                      logout sweep `swingEdgeOnboarding` is gone, so `userProfile`
+                      is null on B's first frame and this falls through to B's OWN
+                      auth metadata — correct, ⛔ stale. Covering a correct value
+                      with a placeholder would be a downgrade.
+                      What IS invented is the literal "Trader": a label nobody
+                      chose, shown as a name while the real one is still loading.
+                      That, and only that, becomes a skeleton. */}
+                  {!userProfile && !authUser?.user_metadata?.full_name && !capitalSettled ? (
+                    <span className="inline-block h-4 w-28 rounded bg-white/10 animate-pulse" aria-hidden="true" />
+                  ) : (
+                    <p className="text-sm font-bold text-white truncate">{userProfile?.profileName || authUser?.user_metadata?.full_name || "Trader"}</p>
+                  )}
                   {authUser?.email && (
                     <p className="text-[11px] text-slate-400 mt-0.5 font-mono truncate">{authUser.email}</p>
                   )}
@@ -7365,7 +7391,7 @@ export default function SwingEdge() {
                     type="number"
                     value={capitalInput}
                     onChange={e => setCapitalInput(e.target.value)}
-                    placeholder={`${capital.toLocaleString()}`}
+                    placeholder={capitalSettled ? `${capital.toLocaleString()}` : "···"}
                     className="flex-1 bg-white/5 border border-[var(--border-subtle)] dark:border-white/[0.10] rounded-lg px-3 py-2 text-sm text-white placeholder-[var(--v3-text-lo)] focus:border-[var(--v3-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--v3-accent-glow)] transition font-mono"
                   />
                   <button
@@ -7382,7 +7408,14 @@ export default function SwingEdge() {
                   </button>
                 </div>
                 <p className="text-[10px] text-[var(--v3-text-lo)] mt-2">
-                  {t.currentCapital}: <span className="text-[var(--v3-accent)] font-mono font-bold">{fmtBalance(capital, capitalCurrency)}</span>
+                  {t.currentCapital}:{" "}
+                  {capitalSettled ? (
+                    <span className="text-[var(--v3-accent)] font-mono font-bold">{fmtBalance(capital, capitalCurrency)}</span>
+                  ) : (
+                    // ⛔ a number here. A skeleton says "not yet"; a stale number
+                    // says "this is yours", and the user sizes a position on it.
+                    <span className="inline-block align-middle h-3 w-20 rounded bg-white/10 animate-pulse" aria-hidden="true" />
+                  )}
                 </p>
 
                 {/* What the capital NUMBER is denominated in. Separate from the
