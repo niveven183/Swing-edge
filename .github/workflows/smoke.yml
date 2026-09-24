@@ -127,6 +127,13 @@ jobs:
       - name: Run smoke tests
         env:
           TEST_URL: ${{ vars.TEST_URL || 'https://swing-edge.com' }}
+          # `tests/eye.spec.js` authenticates as the QA account. These two secrets
+          # ALREADY EXIST (the sentinel workflow reads them); this is a reference,
+          # ⛔ a new secret, and ⛔ a value (CLAUDE.md §12 — Code never runs
+          # `gh secret set`). Missing here ⇒ the suite goes RED on purpose
+          # (`eye.spec.js:35`), because a skipped auth suite reads as ✅.
+          SENTINEL_QA_EMAIL: ${{ secrets.SENTINEL_QA_EMAIL }}
+          SENTINEL_QA_PASSWORD: ${{ secrets.SENTINEL_QA_PASSWORD }}
         run: npx playwright test
       - name: Upload report + traces
         if: ${{ failure() }}

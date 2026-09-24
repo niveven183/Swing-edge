@@ -42,6 +42,7 @@
     "probe:boundary": "node scripts/boundary-render-probe.mjs",
     "probe:dailypnl": "node scripts/daily-pnl-label-test.mjs",
     "probe:deploychunk": "node scripts/deploy-chunk-probe.mjs",
+    "probe:eye": "node scripts/eye-probe.mjs",
     "probe:firing": "node scripts/sentinel-firing-probe.mjs",
     "probe:count": "node scripts/sentinel-count-probe.mjs",
     "verify": "npm run test:coach && npm run test:import && npm run test:write && npm run test:settings && npm run test:hydration && npm run test:datachain && npm run test:rcontract && npm run test:format && npm run test:fx && npm run test:tradingstats && npm run test:ocr && npm run test:engine && npm run test:feedback && npm run test:notify && npm run test:landing && npm run test:digest && npm run test:capability && npm run test:analytics && npm run test:arch && npm run test:copy && npm run test:horizon && npm run test:syntax && npm run test:instrument && npm run test:registry && npm run test:dna && npm run test:shortpct && npm run test:watchlist && npm run test:equitystate && npm run test:boundary && npm run test:cents && npm run test:lessons && npm run test:diagnosis && npm run test:tour && npm run build",
