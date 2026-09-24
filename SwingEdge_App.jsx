@@ -1181,11 +1181,19 @@ const SectorThemeCard = memo(({ item, t, maxAbs }) => {
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function SwingEdge() {
+  // B-365 — tri-state: `false` hide · `true` show · `null` we do NOT know yet.
+  // The local key is a CACHE, not an authority. The user-switch sweep
+  // (userScopedStorage) deletes it on purpose — it describes a person — so a
+  // returning user arrives here with no key, and the old `!saved` rendered the
+  // questionnaire over a real account. One click on it overwrites capital in the
+  // DB via handleOnboardingComplete ⇒ irreversible.
+  // Key present ⇒ `false` is safe: the cache can only ever HIDE.
+  // Key absent + backend ⇒ `null` = an admission, ⛔ a guess (R-2). With no
+  // backend there is no row to wait for, the local key IS the authority ⇒ `true`,
+  // exactly as today.
   const [showOnboarding, setShowOnboarding] = useState(() => {
-    try {
-      const saved = localStorage.getItem("swingEdgeOnboarding");
-      return !saved;
-    } catch { return true; }
+    try { if (localStorage.getItem("swingEdgeOnboarding")) return false; } catch { }
+    return isSupabaseConfigured ? null : true;
   });
   const [userProfile, setUserProfile] = useState(() => {
     try {
@@ -1198,13 +1206,23 @@ export default function SwingEdge() {
     } catch { return null; }
   });
 
+  // B-365 — "hydration handed us a capital figure from an authoritative row".
+  // A ref, ⛔ state: it is read inside an event handler and must never trigger a
+  // render of its own. Set ONLY on `status === "ok"` (see hydrate) — on `empty`
+  // the object is the mirror, not a row, and a new user must stay writable.
+  const dbCapitalRef = useRef(false);
+
   const handleOnboardingComplete = (profile) => {
     // Re-read the just-written answers so userProfile carries them from first load.
     let answers = {};
     try { answers = JSON.parse(localStorage.getItem("swingEdgeOnboarding") || "{}").answers || {}; } catch {}
     setUserProfile({ ...profile, ...answers });
     const cap = Number(profile?.defaults?.capital);
-    if (cap > 0) {
+    // B-365 (double protection): if hydration already delivered capital from an
+    // AUTHORITATIVE row (`status === "ok"`), the onboarding number must ⛔ win.
+    // A genuinely new user is `status === "empty"` ⇒ the flag stays false ⇒ his
+    // capital IS written. Measured both ways (A24a red-before · A24b control).
+    if (cap > 0 && !dbCapitalRef.current) {
       setCapital(cap);
       try { localStorage.setItem("swingEdgeCapital", String(cap)); } catch {}
     }
@@ -1254,6 +1272,16 @@ export default function SwingEdge() {
   // failure we fall back to the local number, which the :4100 banner already
   // announces as local-only and unsaved.
   const capitalSettled = hydrationDone || hydrationFailed || !isSupabaseConfigured;
+  // B-365 — the same shape, for the same reason. `showOnboarding === null` means
+  // hydration has not spoken yet; until it does we render a skeleton, ⛔ the
+  // questionnaire (which overwrites real capital) and ⛔ an empty dashboard
+  // (which reads as "your data is gone").
+  // ⚠️ `hydrationFailed` MUST be in this disjunction for EXACTLY the reason
+  // spelled out above :1274 — the hydrate body returns early on failure, and a
+  // gate on the tri-state alone would leave a PERMANENT skeleton on the session
+  // that already lost the DB. The failure paths do settle it to `false`, but
+  // this keeps the gate true even if that ever stops being the case.
+  const onboardingSettled = showOnboarding !== null || hydrationFailed;
   // B-268 banner: the row we read carries exactly DEFAULT_CAPITAL, which is what a
   // clobber looks like. ⛔ Read-only — dismissal is localStorage, ⛔ never a DB write.
   const [capitalMaybeClobbered, setCapitalMaybeClobbered] = useState(false);
@@ -1484,8 +1512,12 @@ export default function SwingEdge() {
   // onboarding would report "dashboard", which is precisely the confusion the
   // wave exists to end.
   useEffect(() => {
-    trackScreenView(showOnboarding ? "onboarding" : tab);
-  }, [tab, showOnboarding]);
+    // B-365 — ⛔ attribute a screen before we know which screen it is. `null`
+    // would have been reported as `tab` (the dashboard) while a skeleton is on
+    // screen — a screen-view event for a screen nobody saw.
+    if (!onboardingSettled) return;
+    trackScreenView(showOnboarding === true ? "onboarding" : tab);
+  }, [tab, showOnboarding, onboardingSettled]);
 
   useEffect(() => {
     try { localStorage.removeItem("swingEdgeDashboardVariant"); } catch {}
@@ -1789,6 +1821,7 @@ export default function SwingEdge() {
       if (cancelled) return;
       if (m.reason === "check-failed") {
         console.error("[hydrate] settings check failed — writes stay blocked for this session");
+        setShowOnboarding(false); // B-365 — a failed read is ⛔ "this user is new"
         setHydrationFailed(true);
         return; // ⛔ hydratedRef stays false
       }
@@ -1796,6 +1829,16 @@ export default function SwingEdge() {
       if (cancelled) return;
       if (status === "failed") {
         console.error("[hydrate] settings read failed — writes stay blocked for this session");
+        // B-365 — the mirror `loadFailed` hands back is FOR DISPLAY. If it carries
+        // a completed onboarding, restore the profile from it too, so the coach
+        // and the header are not blank on a session that merely lost the network.
+        if (s?.onboarding?.completed === true) {
+          setUserProfile({ ...s.onboarding.profile, ...(s.onboarding.answers || {}) });
+        }
+        // Showing the questionnaire to a returning user overwrites his capital in
+        // the DB — IRREVERSIBLE. Skipping it for a genuinely new user costs him
+        // one sign-in — REVERSIBLE. The asymmetry decides.
+        setShowOnboarding(false);
         setHydrationFailed(true);
         return; // ⛔ hydratedRef stays false
       }
@@ -1803,6 +1846,9 @@ export default function SwingEdge() {
       // mark hydrated — a brand-new user must be able to write his first row.
 
       if (typeof s.capital === "number" && s.capital > 0) {
+        // B-365 — ONLY on "ok". On "empty" this object is the local mirror, not a
+        // row: a brand-new user must stay free to write his onboarding capital.
+        if (status === "ok") dbCapitalRef.current = true;
         setCapital(s.capital);
         try { localStorage.setItem("swingEdgeCapital", String(s.capital)); } catch {}
       }
@@ -1827,6 +1873,13 @@ export default function SwingEdge() {
         setShowOnboarding(false);
         setUserProfile({ ...s.onboarding.profile, ...(s.onboarding.answers || {}) });
         try { localStorage.setItem("swingEdgeOnboarding", JSON.stringify(s.onboarding)); } catch {}
+      } else if (showOnboarding === null) {
+        // B-365 — an AUTHORITATIVE read ("ok" with no onboarding, or "empty" = no
+        // row at all) means he really is new. ⚠️ `=== null` is ⛔ decoration: it
+        // settles only the UNKNOWN and ⛔ contradicts a `false` the local cache
+        // already decided, so a user with a local key and a row carrying no
+        // onboarding behaves EXACTLY as he does today.
+        setShowOnboarding(true);
       }
       if (s.lang && s.lang !== lang) {
         setLang(s.lang);
@@ -1871,6 +1924,11 @@ export default function SwingEdge() {
       setHydrationDone(true);
     };
 
+    // ⚠️ `showOnboarding` is read inside (B-365) but is deliberately ⛔ a dep: the
+    // value we want is the one captured AT MOUNT — "did the local cache know?".
+    // Adding it would re-run the whole hydration every time the gate settles.
+    // ⛔ Nothing may sit between the cleanup `return` and the closing brace —
+    // `test:hydration`'s tail meta-gate anchors on it (B-272).
     hydrate();
     return () => { cancelled = true; };
   }, [authUser?.id]);
@@ -4079,7 +4137,24 @@ export default function SwingEdge() {
     return <AuthScreen />;
   }
 
-  if (showOnboarding) {
+  // B-365 — `null` means hydration has ⛔ spoken. Neither answer is safe to guess:
+  // the questionnaire overwrites real capital, and an empty dashboard reads as
+  // "your data is gone". Same loader as the !authReady gate above — ⛔ a new
+  // component, ⛔ a new string.
+  if (!onboardingSettled) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-primary)] dark:bg-[#0a0f1e] text-slate-300 flex items-center justify-center" style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
+        <div className="flex flex-col items-center gap-3">
+          <div className="animate-pulse">
+            <Logo size={40} showText={false} />
+          </div>
+          <span className="text-xs tracking-widest uppercase text-slate-500">{t.loadingSwingEdge}</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (showOnboarding === true) {
     return <OnboardingScreen onComplete={handleOnboardingComplete} />;
   }
 

@@ -89,6 +89,11 @@ const A_EFFECT  = "useEffect(() => {";
 // ⛔ נקרא כלל. ⇒ נדרש חילוץ של האפקט **העוטף**, ⛔ עוגן חדש.
 const A_DISMISS = "const dismissWelcome = useCallback(() => {";
 const A_TOUR    = "const completeTour = useCallback((done) => {";
+// A20 · A21 · A23 · A24 (23.09, B-365) — ההבהוב חי ב**אתחול**, ⛔ בגוף ההידרציה:
+// המשתמש רואה את השאלון לפני שההידרציה בכלל התחילה. ⇒ נדרש חילוץ של
+// ה-initializer העצל עצמו, ושל המטפל שלחיצה עליו דורסת את ההון.
+const A_INIT    = "const [showOnboarding, setShowOnboarding] = useState(() => {";
+const A_ONBDONE = "const handleOnboardingComplete = (profile) => {";
 
 // שער-מטא 1 — כל עוגן חייב להופיע בדיוק פעם אחת
 const counts = {
@@ -97,6 +102,8 @@ const counts = {
   unload:  countOccurrences(src, A_UNLOAD),
   dismiss: countOccurrences(src, A_DISMISS),
   tour:    countOccurrences(src, A_TOUR),
+  init:    countOccurrences(src, A_INIT),
+  onbdone: countOccurrences(src, A_ONBDONE),
 };
 for (const [k, v] of Object.entries(counts)) {
   if (v !== 1) {
@@ -128,6 +135,9 @@ function sliceCallback(anchor, prefix) {
 }
 const dismissSrc = sliceCallback(A_DISMISS, "const dismissWelcome = useCallback(");
 const tourSrc    = sliceCallback(A_TOUR, "const completeTour = useCallback(");
+// ה-initializer העצל של showOnboarding — `() => { … }` בלבד, ⛔ קריאת useState.
+const initSrc    = sliceCallback(A_INIT, "const [showOnboarding, setShowOnboarding] = useState(");
+const onbDoneSrc = sliceCallback(A_ONBDONE, "const handleOnboardingComplete = ");
 
 // שער-מטא 3 — הזנב המחולץ חייב להיות מה שאנחנו חושבים שהוא
 const tailOk = /setHydrationDone\(true\);\s*\}$/.test(hydrateSrc);
@@ -137,6 +147,8 @@ const hydrateEffectTailOk = /return \(\) => \{ cancelled = true; \};\s*\}$/.test
   && hydrateEffectSrc.includes(A_HYDRATE);
 const dismissTailOk = dismissSrc.includes("welcomeSeen: true");
 const tourTailOk = tourSrc.includes("tourDone: true");
+const initTailOk = initSrc.includes("swingEdgeOnboarding") && /^\(\)\s*=>\s*\{/.test(initSrc);
+const onbDoneTailOk = onbDoneSrc.includes("trackOnboardingCompleted()");
 
 console.log(`extract hydrate : ${hydrateSrc.split("\n").length} lines ${tailOk ? "✓" : "✗"}`);
 console.log(`extract persist : ${persistSrc.split("\n").length} lines ${persistTailOk ? "✓" : "✗"}`);
@@ -144,6 +156,28 @@ console.log(`extract unload  : ${unloadSrc.split("\n").length} lines ${unloadTai
 console.log(`extract hyd-eff : ${hydrateEffectSrc.split("\n").length} lines ${hydrateEffectTailOk ? "✓" : "✗"}`);
 console.log(`extract dismiss : ${dismissSrc.split("\n").length} lines ${dismissTailOk ? "✓" : "✗"}`);
 console.log(`extract tour    : ${tourSrc.split("\n").length} lines ${tourTailOk ? "✓" : "✗"}`);
+console.log(`extract init    : ${initSrc.split("\n").length} lines ${initTailOk ? "✓" : "✗"}`);
+console.log(`extract onb-done: ${onbDoneSrc.split("\n").length} lines ${onbDoneTailOk ? "✓" : "✗"}`);
+
+/** מריץ את ה-initializer העצל **האמיתי** של showOnboarding על אחסון נתון.
+ *  ⚠️ `isSupabaseConfigured` מוזרק כפרמטר — בעץ הנוכחי הוא ⛔ נצרך שם, וזה בסדר:
+ *  פרמטר שאינו בשימוש הוא no-op, והאסרציה מודדת את מה שהקוד **מחזיר**. */
+function runInit(storage = {}, { isSupabaseConfigured = true } = {}) {
+  const ls = storage.getItem ? storage : makeLocalStorage(storage);
+  return new Function("localStorage", "isSupabaseConfigured", "return (" + initSrc + ")")(ls, isSupabaseConfigured)();
+}
+
+/** מריץ את handleOnboardingComplete האמיתי. `dbCapitalRef` מוזרק בשני העצים —
+ *  בעץ הנוכחי הוא פשוט ⛔ נקרא, ולכן setCapital נקרא **תמיד** (וזה האדום). */
+function runOnboardingComplete(profile, { dbCapitalRef = { current: false }, storage = {} } = {}) {
+  const calls = { capital: [], riskPct: [], onboarding: [], profile: [] };
+  const names = ["localStorage", "setUserProfile", "setCapital", "setRiskPct", "setCapitalCurrency",
+    "setShowOnboarding", "trackOnboardingCompleted", "dbCapitalRef"];
+  const values = [makeLocalStorage(storage), (v) => calls.profile.push(v), (v) => calls.capital.push(v),
+    (v) => calls.riskPct.push(v), () => {}, (v) => calls.onboarding.push(v), () => {}, dbCapitalRef];
+  new Function(...names, "return (" + onbDoneSrc + ")")(...values)(profile);
+  return calls;
+}
 
 /* ── מוקים ────────────────────────────────────────────────────────────────
  * ⛔ אין supabase (גם לא מוק של הלקוח) — מוזרקים loadSettings/migrate עצמם.
@@ -185,13 +219,19 @@ function loadResult(status, mirror) {
 
 const MIRROR_OK = { capital: 49000, riskPct: 2, lang: "he", accountCurrency: "USD", welcomeSeen: true };
 const MIRROR_2500 = { capital: DEFAULT_CAPITAL, lang: "he", welcomeSeen: false };
+// הצורה ש-OnboardingScreen מוסר בפועל — `profile.defaults.*` (:1206 · :1211 · :1221).
+const ONB_PROFILE = { defaults: { capital: 1000, riskPct: 1, capitalCurrency: "USD" } };
 
-function runHydrate({ loadStatus, mirror = MIRROR_OK, migrateReason = null, cancelled = false, storage = {}, uid = "u-probe" }) {
-  const calls = { load: 0, hydrationFailed: [], hydrationDone: 0, capital: [], lang: [], clobber: [], errors: [] };
+function runHydrate({ loadStatus, mirror = MIRROR_OK, migrateReason = null, cancelled = false, storage = {}, uid = "u-probe",
+                     showOnboarding = null, dbCapitalRef = { current: false } }) {
+  const calls = { load: 0, hydrationFailed: [], hydrationDone: 0, capital: [], lang: [], clobber: [], errors: [], onboarding: [], profile: [] };
   const hydratedRef = { current: false };
   const welcomeSeenRef = { current: false };
   const localStorage = makeLocalStorage(storage);
 
+  // ⚠️ `showOnboarding` · `dbCapitalRef` מוזרקים בשני העצים. בעץ הנוכחי גוף
+  // ההידרציה ⛔ קורא אותם ⇒ פרמטר שאינו בשימוש הוא no-op, והאסרציה מודדת את
+  // מה שהקוד **עושה**. אותו idiom בדיוק כמו `isSupabaseConfigured` ב-runInit.
   const names = [
     "cancelled", "migrateFromLocalStorage", "authUser", "console", "setHydrationFailed",
     "loadSettings", "setCapital", "localStorage", "CURRENCY_SYMBOL", "setAccountCurrency",
@@ -199,6 +239,7 @@ function runHydrate({ loadStatus, mirror = MIRROR_OK, migrateReason = null, canc
     "setLang", "setWatchlistItems", "hadWatchlist", "setPriceAlerts", "hadAlerts",
     "setPlaybookSetups", "hadPlaybook", "welcomeSeenRef", "DEFAULT_CAPITAL",
     "setCapitalMaybeClobbered", "hydratedRef", "setHydrationDone",
+    "showOnboarding", "dbCapitalRef",
   ];
   const values = [
     cancelled,
@@ -209,7 +250,9 @@ function runHydrate({ loadStatus, mirror = MIRROR_OK, migrateReason = null, canc
     async () => { calls.load++; return loadResult(loadStatus, mirror); },
     (v) => calls.capital.push(v),
     localStorage, CURRENCY_SYMBOL,
-    () => {}, () => {}, () => {}, () => {}, () => {},
+    // setAccountCurrency · setCapitalCurrency · setRiskPct · setShowOnboarding · setUserProfile
+    // ⚠️ setShowOnboarding היה `() => {}` ו⛔ נמדד — בדיוק המסך שההבהוב חי בו (B-365).
+    () => {}, () => {}, () => {}, (v) => calls.onboarding.push(v), (v) => calls.profile.push(v),
     "en",
     (v) => calls.lang.push(v),
     () => {}, false, () => {}, false, () => {}, false,
@@ -217,6 +260,7 @@ function runHydrate({ loadStatus, mirror = MIRROR_OK, migrateReason = null, canc
     (v) => calls.clobber.push(v),
     hydratedRef,
     () => { calls.hydrationDone++; },
+    showOnboarding, dbCapitalRef,
   ];
 
   const fn = new Function(...names, "return (" + hydrateSrc + ")")(...values);
@@ -251,6 +295,7 @@ function runHydrateEffect({ authUser, hydratedRef, storage = {}, mirror = MIRROR
     "setRiskPct", "setShowOnboarding", "setUserProfile", "lang", "setLang",
     "setWatchlistItems", "setPriceAlerts", "setPlaybookSetups", "welcomeSeenRef",
     "DEFAULT_CAPITAL", "setCapitalMaybeClobbered", "hydratedRef", "setHydrationDone",
+    "showOnboarding", "dbCapitalRef",
   ];
   const values = [
     true, {}, authUser, store,
@@ -261,6 +306,7 @@ function runHydrateEffect({ authUser, hydratedRef, storage = {}, mirror = MIRROR
     () => {}, () => {}, () => {}, "en", () => {},
     (v) => calls.watchlist.push(v), () => {}, () => {}, { current: false },
     DEFAULT_CAPITAL, () => {}, hydratedRef, () => {},
+    null, { current: false },
   ];
   const cleanup = new Function(...names, "return (" + hydrateEffectSrc + ")")(...values)();
   return { cleanup, calls, store };
@@ -298,7 +344,7 @@ function runUnload(hydratedRef) {
 
 /* ── האסרציות ─────────────────────────────────────────────────────────────*/
 const main = async () => {
-  console.log("\n──────── מבחינות (19) ────────");
+  console.log("\n──────── מבחינות (25) ────────");
 
   // A1 · A2 · A5 · A6 — קריאה כושלת
   {
@@ -430,7 +476,84 @@ const main = async () => {
       `consent=${afterSweep.consent === null ? "null" : "שרד"} capital=${afterSweep.capital}`);
   }
 
-  console.log("\n──────── אינווריאנטות (6) — ⚪ ירוקות בשני העצים, ⛔ אינן מודדות את התיקון ────────");
+  /* A20a · A20b · A21 · A22 · A23b · A24a — שער השאלון התלת-מצבי (B-365, 23.09)
+   * 🔴 `useState(() => !localStorage.getItem("swingEdgeOnboarding"))` מכריז
+   * «משתמש חדש» מ**היעדר מפתח מקומי** — מצב ש**טאטוא החלפת-המשתמש יוצר בעצמו**
+   * אצל ותיק. השאלון מרונדר מעל חשבון אמיתי, ולחיצה אחת עליו דורסת את ההון
+   * ב-DB דרך `handleOnboardingComplete` ⇒ **בלתי הפיך**.
+   * ⚠️ `null` = «ההידרציה ⛔ דיברה» — הודאה, ⛔ המצאה (R-2). */
+
+  // A20a — המנגנון. ⚠️ שתי רגליים, ומוצהר: רגל ה«מפתח קיים ⇒ false» **ירוקה
+  // בשני העצים** (היום `!saved` נותן false) ו⛔ ראיה לתיקון; האדום-לפני הוא
+  // רגל ה«אחסון ריק». שתיהן מודפסות כדי שכשל יהיה ניתן לשיוך.
+  {
+    const emptyStore = runInit({});
+    const withKey = runInit({ swingEdgeOnboarding: JSON.stringify({ completed: true }) });
+    ok("A20a", "אחסון ריק ⇒ initializer מחזיר null (⛔ true) · מפתח קיים ⇒ false",
+      emptyStore === null && withKey === false,
+      `empty=${JSON.stringify(emptyStore)} withKey=${JSON.stringify(withKey)}`);
+  }
+
+  // A20b — שער הרינדור. ⚠️ זו אסרציית **צורה** על הבייטים של ה-JSX: היא מוכיחה
+  // שהשער ⛔ ערום ושקיים ענף שלד, ⛔ שהשלד נראה על המסך (זה C-059).
+  {
+    const bare = countOccurrences(src, "if (showOnboarding) {");
+    const strict = countOccurrences(src, "if (showOnboarding === true) {");
+    const settledGate = countOccurrences(src, "if (!onboardingSettled)");
+    ok("A20b", "שער הרינדור ⛔ `if (showOnboarding)` ערום · יש ענף שלד",
+      bare === 0 && strict === 1 && settledGate >= 1,
+      `bare=${bare} strict=${strict} settledGate=${settledGate}`);
+  }
+
+  /* A21 — **אסרציית הרגרסיה של 95865cb.** היא היחידה כאן שירוקה על העץ שלפני
+   * הטאטוא: שם המפתח שרד את ההתנתקות, ולכן ותיק ⛔ ראה שאלון. הטאטוא מוחק אותו
+   * (ובצדק — הוא מתאר אדם), וה-initializer קרא את ההיעדר כ«חדש».
+   * ⚠️ `clearUserScopedStorage` כאן הוא ה**אמיתי** — סטאב היה מודד את הסטאב. */
+  {
+    const store = makeLocalStorage({
+      swingEdgeOnboarding: JSON.stringify({ completed: true, profile: { name: "ותיק" } }),
+      swingEdgeCapital: "49000",
+      swingEdgeConsent: '{"v":1,"analytics":"granted"}',
+    });
+    clearUserScopedStorage(store);
+    const swept = store.getItem("swingEdgeOnboarding") === null;
+    const v = runInit(store);
+    ok("A21", "טאטוא אמיתי ⇒ התחברות ⇒ השאלון ⛔ מוכרע לפני יישוב",
+      swept && v === null,
+      `onboardingKeySwept=${swept} init=${JSON.stringify(v)}`);
+  }
+
+  /* A22 — כישלון ⛔ «משתמש חדש». שני מסלולי היציאה הכושלים נמדדים יחד, כי
+   * שניהם מחזירים מוקדם מאותו גוף ושניהם מגיעים למשתמש כאותו מסך.
+   * **הנימוק מוצהר:** שאלון לוותיק = דריסת הון ב-DB = בלתי הפיך; דילוג לחדש =
+   * הפיך, נפתר בכניסה הבאה. */
+  {
+    const a = runHydrate({ loadStatus: "failed" });
+    await a.promise;
+    const b = runHydrate({ loadStatus: "ok", migrateReason: "check-failed" });
+    await b.promise;
+    ok("A22", "failed · check-failed ⇒ setShowOnboarding(false) (⛔ שאלון)",
+      JSON.stringify(a.calls.onboarding) === "[false]" && JSON.stringify(b.calls.onboarding) === "[false]",
+      `read-failed=${JSON.stringify(a.calls.onboarding)} check-failed=${JSON.stringify(b.calls.onboarding)}`);
+  }
+
+  // A23b — יישוב **מפורש** של המשתמש החדש. היום אפס קריאות ⇒ אדומה.
+  {
+    const r = runHydrate({ loadStatus: "empty", mirror: {}, showOnboarding: null });
+    await r.promise;
+    ok("A23b", "empty + showOnboarding===null ⇒ setShowOnboarding(true) מפורש",
+      JSON.stringify(r.calls.onboarding) === "[true]", JSON.stringify(r.calls.onboarding));
+  }
+
+  /* A24a — הגנה כפולה על ההון (הכרעת ניב, סעיף 4). ההידרציה כבר מסרה הון
+   * מהשורה ⇒ `handleOnboardingComplete` ⛔ רשאי לדרוס אותו. היום הוא דורס תמיד. */
+  {
+    const c = runOnboardingComplete(ONB_PROFILE, { dbCapitalRef: { current: true } });
+    ok("A24a", "הון מ-ok בהידרציה ⇒ handleOnboardingComplete ⛔ דורס",
+      c.capital.length === 0, `setCapital=${JSON.stringify(c.capital)} setRiskPct=${JSON.stringify(c.riskPct)}`);
+  }
+
+  console.log("\n──────── אינווריאנטות (8) — ⚪ ירוקות בשני העצים, ⛔ אינן מודדות את התיקון ────────");
 
   // I1 · I2 — משתמש חדש: empty הוא סמכותי וחייב להישאר בר-כתיבה
   {
@@ -454,11 +577,31 @@ const main = async () => {
     invariant("I4", "empty+2500 ⇒ clobber calls", r.calls.clobber.length === 0, String(r.calls.clobber.length));
   }
 
+  /* A23 · A24b — ⚪ **זרוע ביקורת** (תבנית K1–K6 של test:cents): ירוקות בשני
+   * העצים, ולכן ⛔ ראיה לתיקון. הן מודדות את **רוחב** השינוי: אדום כאן פירושו
+   * שהשער התלת-מצבי דרס משתמש חדש אמיתי ⇒ **עצור**. */
+  {
+    // ⚠️ קריאת **תוצאה**: מה המשתמש בסוף רואה. בעץ הישן ה-initializer מחזיר
+    // `true` וההידרציה ⛔ קוראת; בעץ החדש הוא מחזיר `null` וההידרציה מיישבת
+    // ל-`true`. אותה תוצאה בדיוק — ולכן זו ביקורת ו⛔ הישג.
+    const seed = runInit({});
+    const r = runHydrate({ loadStatus: "empty", mirror: {}, showOnboarding: seed });
+    await r.promise;
+    const effective = r.calls.onboarding.length ? r.calls.onboarding.at(-1) : seed;
+    invariant("A23", "חדש אמיתי (empty) ⇒ השאלון **כן** מוצג (תוצאה)",
+      effective === true, `effective=${JSON.stringify(effective)} seed=${JSON.stringify(seed)} calls=${JSON.stringify(r.calls.onboarding)}`);
+  }
+  {
+    const c = runOnboardingComplete(ONB_PROFILE, { dbCapitalRef: { current: false } });
+    invariant("A24b", "חדש (⛔ הון מה-DB) ⇒ ההון מהשאלון **כן** נכתב",
+      c.capital.length === 1 && c.capital[0] === 1000, `setCapital=${JSON.stringify(c.capital)}`);
+  }
+
   // I5 — שערי-מטא
-  invariant("I5", "5 עוגנים ייחודיים · סוגריים מאוזנים · זנב תואם",
-    Object.values(counts).every((v) => v === 1)
-      && tailOk && persistTailOk && unloadTailOk && hydrateEffectTailOk && dismissTailOk && tourTailOk,
-    `anchors=${Object.values(counts).join("/")} tail=${[tailOk, persistTailOk, unloadTailOk, hydrateEffectTailOk, dismissTailOk, tourTailOk].join("/")}`);
+  const tails = [tailOk, persistTailOk, unloadTailOk, hydrateEffectTailOk, dismissTailOk, tourTailOk, initTailOk, onbDoneTailOk];
+  invariant("I5", "7 עוגנים ייחודיים · סוגריים מאוזנים · 8 זנבות תואמים",
+    Object.values(counts).every((v) => v === 1) && tails.every(Boolean),
+    `anchors=${Object.values(counts).join("/")} tails=${tails.join("/")}`);
 
   // I6 — רשימת ה-KEEP קפואה. ⚠️ ⛔ מקבעת **תוכן** אלא **סגירוּת**: תוספת
   // מפתח לרשימה היא הרחבת מה ששורד התנתקות ⇒ הכרעה, ⛔ ריפקטור.
@@ -468,12 +611,12 @@ const main = async () => {
 
   const total = pass + inv + fail;
   console.log(`\n${APP}`);
-  console.log(`מבחינות: ${pass}/19 · אינווריאנטות: ${inv}/6 · סה"כ ${pass + inv}/${total}`);
+  console.log(`מבחינות: ${pass}/25 · אינווריאנטות: ${inv}/8 · סה"כ ${pass + inv}/${total}`);
   if (fail) {
     console.log(`🔴 אדומות (${fail}): ${reds.join(" · ")}`);
     process.exit(1);
   }
-  console.log("✅ hydration wiring: 25/25");
+  console.log("✅ hydration wiring: 33/33");
 };
 
 main().catch((e) => { console.error("🔴 harness נפל:", e); process.exit(1); });
