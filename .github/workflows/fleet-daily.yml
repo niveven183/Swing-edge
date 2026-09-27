@@ -27,6 +27,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      # checkout/setup-node serve the Slot starvation audit step (B-357) only.
+      # They are FIRST on purpose: actions/checkout defaults to clean:true
+      # (`git clean -ffdx`), so placing it after any step would delete the
+      # untracked *-embed.json files the later steps write. Measured hazard.
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
       - name: Restore day-over-day state
         uses: actions/cache/restore@v6
         with:
@@ -368,6 +377,22 @@ jobs:
           jq -n --argjson c "$color" --arg d "$desc" '{color:$c,description:$d}' > alertcorr-embed.json
           echo "alertcorr-embed:"; cat alertcorr-embed.json
 
+      # B-357 · "האם השרשרת המתוזמנת רעבה?" — ⛔ "האם היא מתה?".
+      # Watchdog liveness (above) measures the AGE of the last success and
+      # Alert correlation counts runs that FAILED. Both are structurally blind
+      # to a run that was never created at all — which is B-275, measured at
+      # ~23% slot execution. This step is the only thing that can see it.
+      # ⛔ hosted in sentinel.yml: a dropped slot cannot report its own absence.
+      - name: Slot starvation audit
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+          node scripts/slot-audit.mjs --workflow sentinel.yml --out slot-embed.json || true
+          echo "slot-embed:"; cat slot-embed.json || echo "::warning::slot-embed.json missing"
+
       - name: Report to Discord
         env:
           DISCORD_WEBHOOK: ${{ secrets.SENTINEL_DISCORD_WEBHOOK }}
@@ -396,6 +421,7 @@ jobs:
           post growth-embed.json
           post watchdog-embed.json
           post alertcorr-embed.json
+          post slot-embed.json
 
       - name: Save day-over-day state
         if: always()
