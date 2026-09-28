@@ -5,7 +5,7 @@ import fs from 'node:fs';
 // blind, silently, on the day the default moves — B-324's class exactly.
 import { DEFAULT_CAPITAL } from '../src/utils.js';
 // B-375 — openable evidence for red findings (why not trace: see the file header).
-import { createEvidence, recordEvidence } from './evidence.js';
+import { createEvidence, recordEvidence, measure, UNMEASURED } from './evidence.js';
 
 // Sentinel S2 — Layer A2: real-browser QA of the AUTHENTICATED surface.
 // S1.5 only covers the anonymous surface, so anything that breaks after login
@@ -757,6 +757,9 @@ async function journey(page) {
     .filter({ hasText: /(התחלה|Started at)\s*[$₪]/ })
     .first();
   let capitalVisible = false;
+  // B-375: when (and at what amount) the settings were proven loaded — the
+  // pre-submit crumb reports it, so a later effShares=0 can be read against it.
+  let hydrationPass = null;
   try {
     await capital.waitFor({ state: 'visible', timeout: HYDRATION_TIMEOUT });
     capitalVisible = true;
@@ -767,6 +770,7 @@ async function journey(page) {
     if (shown == null) throw new Error(`לא נמצא סכום בטקסט: "${await readCapitalText(capital)}"`);
     if (shown === DEFAULT_CAPITAL) throw new Error(`ההון המוצג הוא DEFAULT_CAPITAL (${DEFAULT_SHOWN}) — ההגדרות ⛔ נטענו מה-DB`);
     if (!(shown > 0)) throw new Error(`ההון המוצג אינו חיובי: ${shown}`);
+    hydrationPass = { at: Date.now(), shown };
   } catch (e) {
     if (capitalVisible) {
       add(COMPONENT, 'browser-auth|hydration-default', 'red', '🔴',
@@ -905,12 +909,28 @@ async function journey(page) {
     // LONG → stop < entry (validateTradeInputs). The drill inverts it on purpose (B-375).
     await page.locator('#log-stop').fill(DRILL === 'invalid-stop' ? '101' : '99');
     await page.locator('#log-target').fill('102');
-    // B-375/B-376: what the screen said at the moment of the click. The SHARES
-    // field shows String(suggestedShares) ⇒ "0" there IS effShares=0 on screen.
+    // B-375/B-376: what the screen said at the moment of the click. Every field is
+    // what was on screen — "—" included, that IS a measurement — or an explicit
+    // "לא נמדד: <reason>" from measure(). ⛔ '' (run 36399653545 read capital as ""
+    // from [data-tour="equity"], which is not rendered on the journal tab).
     ev.crumb('pre-submit', {
-      capital: await readCapitalText(page.locator('[data-tour="equity"]')),
-      shares: await page.locator('[role="dialog"] input[aria-label="Shares (editable)"], [role="dialog"] input[aria-label="מספר מניות (ניתן לעריכה)"]')
-        .first().inputValue({ timeout: 2_000 }).catch((e) => `⛔ נקרא: ${e.message}`),
+      // The header is on every tab; its value div carries equityFig.label.
+      capital: await measure(() => page.locator('header[dir="ltr"] .text-end')
+        .filter({ hasText: /חשבון|Account/ }).first()
+        .evaluate((el) => {
+          const label = el.lastElementChild?.getAttribute('aria-label');
+          return `${el.innerText.replace(/\s+/g, ' ').trim()}${label ? ` (${label})` : ''}`;
+        }, null, { timeout: 2_000 })),
+      // The SHARES cell: an input when sizing is valid, a "—" div otherwise.
+      shares: await measure(() => page.locator('[role="dialog"] div.text-center.group')
+        .filter({ hasText: /Shares/i }).first()
+        .evaluate((el) => {
+          const input = el.querySelector('input');
+          return input ? input.value : (el.lastElementChild?.textContent ?? '');
+        }, null, { timeout: 2_000 })),
+      settingsHydration: hydrationPass
+        ? `עבר — הון ${hydrationPass.shown} ≠ DEFAULT_CAPITAL (${DEFAULT_CAPITAL}), ${Date.now() - hydrationPass.at}ms לפני הלחיצה`
+        : `${UNMEASURED}שער ההידרציה (שלב 2) ⛔ עבר`,
       drill: DRILL || null,
     });
     await page.getByRole('button', { name: /Log Trade/ }).click();
@@ -924,6 +944,31 @@ async function journey(page) {
       'רצף היצירה נקטע: FAB → 4 שדות → Log Trade → שורה בטבלה. השלב שנכשל הוא זה שבהודעה, והשלבים שאחריו ⛔ רצו',
       'מועמדים: (1) עוגן ה-FAB או אחד מ-#log-ticker/entry/stop/target זז ⇒ הטופס ⛔ הוגש (2) הטופס הוגש ונדחה בוולידציה (3) הכתיבה ל-trades ⛔ נחתה (4) נחתה והשורה ⛔ רונדרה. ⓷ בלבד מצביע על handleSubmit/Supabase',
       'rollback — נמוך, מחזיר מצב ידוע-תקין');
+  }
+
+  // ---- 5a. B-375: a failed create leaves the Log Trade modal OPEN — handleSubmit
+  // returns early and never closes it. Measured in drill run 36399653545: the open
+  // modal then blocked the journal tab and fired a SECOND red (tab-switch) that
+  // blamed openJournal for create's failure — B-335's class. ORDER MATTERS: the
+  // create-failed evidence must photograph the open modal BEFORE it is closed, and
+  // a modal that does not close is its own finding, ⛔ swallowed. ----
+  if (!created) {
+    const dialogs = page.locator('[role="dialog"]');
+    try {
+      await ev.drain();
+      if (await dialogs.count() > 0) {
+        await dialogs.last().press('Escape');
+        await expect(dialogs).toHaveCount(0, { timeout: 5_000 });
+      }
+    } catch (e) {
+      const stillOpen = await measure(() => dialogs.count());
+      add(COMPONENT, 'browser-auth|modal-stuck-after-escape', 'red', '🔴',
+        'סגירת מודאל «Log Trade» ב-Escape אחרי יצירה שנכשלה',
+        `${stillOpen} דיאלוגים פתוחים אחרי Escape: ${e.message}`,
+        'המודאל נשאר פתוח ⇒ כל שלב אחריו (טאבים · יומן · מחיקה) נחסם מאחוריו. ⚠️ כשל tab-switch/delete שאחרי הממצא הזה הוא תוצאה שלו, ⛔ ממצא עצמאי',
+        'מועמדים: (1) useModalA11y ⛔ קיבל את ה-keydown — הפוקוס מחוץ למודאל (2) onClose ⛔ מחובר (3) מודאל נוסף נפתח. הראיה מצורפת לממצא',
+        'אבחון בלבד — ללא סיכון');
+    }
   }
 
   // ---- 5b. B-305 — turn the trade into the 07.09 shape. ----
