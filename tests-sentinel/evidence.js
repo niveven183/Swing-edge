@@ -47,6 +47,22 @@ export function redactText(input, secrets = []) {
     .replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, '[email]');
 }
 
+// A crumb value is either what the screen showed — "—" included, that IS a
+// measurement — or an explicit admission. ⛔ '' and ⛔ a swallowed error: the
+// first crumb (28.09, run 36399653545) read capital as "" and nobody could tell
+// "empty on screen" from "never read".
+export const UNMEASURED = 'לא נמדד: ';
+export async function measure(fn) {
+  try {
+    const v = await fn();
+    if (v == null) return `${UNMEASURED}הערך חסר (null)`;
+    const text = String(v).replace(/\s+/g, ' ').trim();
+    return text === '' ? `${UNMEASURED}הטקסט על המסך ריק` : text;
+  } catch (e) {
+    return `${UNMEASURED}${String(e?.message ?? e).split('\n')[0]}`;
+  }
+}
+
 function cleanUrl(u) {
   try { const x = new URL(u); return `${x.origin}${x.pathname}`; }
   catch { return String(u).split('?')[0].split('#')[0]; }
@@ -226,6 +242,11 @@ export async function createEvidence(page, { label, secrets = [] }) {
         .then((r) => { st.rows.push({ fp: finding.fp, status: statusText(r) }); settle(finding, r); });
       st.queue = job;
       st.pending.push(job);
+    },
+    // Wait for every capture queued so far — used before an action that would
+    // change what the capture must see (e.g. closing the modal).
+    async drain() {
+      await Promise.all(st.pending);
     },
     async flush() {
       await Promise.all(st.pending);

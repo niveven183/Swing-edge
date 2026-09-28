@@ -100,8 +100,10 @@ if (authCalls === null || publicCalls === null) {
   process.exit(1);
 }
 
-check('M4', 'האוכלוסייה `33` אתרי `add()` — `27` auth + `6` public',
-  authCalls.length === 27 && publicCalls.length === 6,
+// 28.09 (B-375 follow-up): `27 → 28` — ONE new site, `modal-stuck-after-escape`,
+// measured by this very gate before the constant moved. create-failed stays 1.
+check('M4', 'האוכלוסייה `34` אתרי `add()` — `28` auth + `6` public',
+  authCalls.length === 28 && publicCalls.length === 6,
   `נמדד auth=${authCalls.length} · public=${publicCalls.length}. מכנה שזז פירושו שהמנייה של B-335 כבר ⛔ תקפה`);
 
 const all = [
@@ -283,6 +285,40 @@ const onBlock = (drill.match(/\non:\n([\s\S]*?)\n\S/) || [])[1] || '';
 check('E13', 'workflow התרגיל: `workflow_dispatch` בלבד · ⛔ job `watch` · ⛔ דיסקורד (החלטה 2)',
   onBlock.trim() === 'workflow_dispatch:' && !/^\s{2}watch:/m.test(drill) && !/discord/i.test(drill.replace(/^\s*#.*$/gm, '')),
   `on=«${onBlock.trim()}»`);
+
+// ── CRUMB + MODAL (B-375 follow-up, 28.09) ───────────────────────────────────
+// Drill run 36399653545 measured two defects in the first cut: the pre-submit
+// crumb read capital as "" (a swallowed error on [data-tour="equity"], absent on
+// the journal tab) and SHARES as a timeout (no input when sizing is invalid); and
+// the modal a failed create leaves open fired a second red, tab-switch.
+console.log('\n── CRUMB + MODAL — `4` אסרציות (B-375 המשך) ──');
+// A missing export is a RED line, ⛔ a crash that hides E15–E17 (B-272).
+const measured = typeof EV.measure === 'function' ? await Promise.all([
+  EV.measure(async () => '—'),
+  EV.measure(async () => ''),
+  EV.measure(async () => { throw new Error('Timeout 2000ms exceeded.\nCall log: …'); }),
+]) : ['`measure` ⛔ מיוצא', '', ''];
+check('E14', '`measure()`: «—» נמדד · ריק ⇒ «לא נמדד: …» · שגיאה ⇒ «לא נמדד: <שורה ראשונה>»',
+  Boolean(EV.UNMEASURED) && measured[0] === '—' && measured[1].startsWith(EV.UNMEASURED) && measured[2] === `${EV.UNMEASURED}Timeout 2000ms exceeded.`,
+  JSON.stringify(measured));
+const crumbSrc = (authSrc.match(/ev\.crumb\('pre-submit', \{[\s\S]*?\n    \}\);/) || [''])[0];
+check('E15', 'crumb `pre-submit`: הון מכותרת המסך ו-SHARES מהתא — דרך `measure()`, ⛔ `[data-tour="equity"]` · ⛔ `.catch` שבולע',
+  crumbSrc.length > 0
+    && /capital: await measure\(\(\) => page\.locator\('header\[dir="ltr"\]/.test(crumbSrc)
+    && /shares: await measure\(/.test(crumbSrc)
+    && !crumbSrc.includes('data-tour="equity"') && !/\.catch\(/.test(crumbSrc),
+  crumbSrc ? `crumb=${crumbSrc.length}b` : 'ה-crumb ⛔ נמצא ⇒ אדום קשה');
+check('E16', 'crumb `pre-submit` נושא `settingsHydration` (שער שלב 2 · ⛔ ריק)',
+  /settingsHydration: hydrationPass\s*\?/.test(crumbSrc) && /hydrationPass = \{ at: Date\.now\(\), shown \};/.test(authSrc),
+  'בלי השדה, effShares=0 ⛔ נקרא מול ההידרציה');
+const iCatch = authSrc.indexOf("'browser-auth|create-failed'");
+const iDrain = authSrc.indexOf('await ev.drain();', iCatch);
+const iEsc = authSrc.indexOf(".press('Escape')", iCatch);
+const iGone = authSrc.indexOf('toHaveCount(0', iEsc);
+const iStuck = authSrc.indexOf("'browser-auth|modal-stuck-after-escape'");
+check('E17', 'אחרי create-failed: ראיה (`drain`) ⇒ Escape ⇒ אסרציה שנסגר ⇒ אחרת ממצא `modal-stuck-after-escape`',
+  iCatch > 0 && iCatch < iDrain && iDrain < iEsc && iEsc < iGone && iGone < iStuck,
+  `create-failed@${iCatch} · drain@${iDrain} · Escape@${iEsc} · toHaveCount(0)@${iGone} · stuck@${iStuck}`);
 
 // ── SUMMARY ──────────────────────────────────────────────────────────────────
 console.log('\n' + '─'.repeat(72));
