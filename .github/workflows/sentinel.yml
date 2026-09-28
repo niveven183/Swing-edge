@@ -127,6 +127,18 @@ jobs:
             browser-findings.json
             browser-findings-auth.json
           if-no-files-found: warn
+      # B-375: evidence for RED findings only (tests-sentinel/evidence.js). A green
+      # run writes no directory ⇒ no artifact. ⛔ trace (decision 1): the repo is
+      # public and a trace carries the QA session's refresh_token. 7 days is an
+      # investigation window, not an archive (decision 5).
+      - name: Upload red-finding evidence (B-375)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: sentinel-evidence
+          path: sentinel-evidence/
+          if-no-files-found: ignore
+          retention-days: 7
 
   watch:
     needs: browser

@@ -226,6 +226,64 @@ for (const [id, src, sentence, n, why] of CONTROL) {
     `מצופה ${n} מופעים, נמדד ${found}. ⚠️ אדום כאן = נגעת מחוץ למחלקה`);
 }
 
+// ── EVIDENCE (B-375, 28.09) ──────────────────────────────────────────────────
+// Hosted here (⛔ a new chain link — same call as 18.09 «ב»): the evidence rides
+// on the same add() this harness already fences. VALUE assertions run the REAL
+// redactText/recordEvidence from tests-sentinel/evidence.js on synthetic input.
+// ⚠️ It measures the SCRUBBER and the WIRING, ⛔ that a real artifact is clean —
+// that is the grep on the downloaded artifact of a drill run.
+console.log('\n── EVIDENCE — `13` אסרציות · ראיה לממצא אדום (B-375) ──');
+const EV = await import(path.join(ROOT, 'tests-sentinel/evidence.js'));
+const JWT = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJxYSJ9.c2lnbmF0dXJlLXg';
+const SAMPLE = [
+  'qa.person@swing-edge.com',
+  JWT,
+  '{"access_token":"at-123","refresh_token":"rt-456"}',
+  'sb-abcdefgh-auth-token',
+  'Authorization: Bearer abc.def.ghi',
+  'pw=Sup3rSecret!',
+].join(' | ');
+const out = EV.redactText(SAMPLE, ['Sup3rSecret!']);
+check('E1', 'אימייל ⇒ `[email]`', !out.includes('qa.person@') && out.includes('[email]'), out);
+check('E2', 'JWT ⇒ `[jwt]`', !out.includes('eyJhbGci') && out.includes('[jwt]'), out);
+check('E3', 'ערכי `access_token`/`refresh_token` ב-JSON ⇒ `[redacted]`',
+  !out.includes('at-123') && !out.includes('rt-456'), out);
+check('E4', 'מפתח `sb-*-auth-token` ⇒ `[sb-auth-key]`', !/sb-[a-z0-9]+-auth-token/.test(out), out);
+check('E5', '`Bearer <token>` ⇒ `Bearer [redacted]`', !out.includes('abc.def.ghi'), out);
+check('E6', 'סוד מפורש (הסיסמה) ⇒ `[secret]`', !out.includes('Sup3rSecret!') && out.includes('[secret]'), out);
+const BENIGN = 'Log Trade → SHARES 0 · הון $3,358 · /rest/v1/trades 201';
+check('E7', 'ביקורת: טקסט תמים עובר byte-identical', EV.redactText(BENIGN) === BENIGN, EV.redactText(BENIGN));
+// The control arm: the spec's pre-B-375 redact() (email only) must LEAVE the JWT
+// in — otherwise E2 proves nothing about the scrubber that replaced it.
+const legacy = (s) => String(s).replace(/[\w.+-]+@[\w.-]+\.\w+/g, '[email]');
+check('E8', 'ביקורת: המסנן הישן (אימייל בלבד) משאיר JWT ⇒ E2 יכולה לירות', legacy(SAMPLE).includes('eyJhbGci'),
+  'אם הישן כבר מסיר JWT, E2 ⛔ מבדילה דבר');
+// Decision 4: the failure rides ON the red finding — ⛔ a new finding.
+const pop = [];
+const f = { fp: 'x|y', severity: 'red', got: 'measured' };
+pop.push(f);
+EV.recordEvidence(null, f);
+check('E9', 'ראיה שנכשלה ⇒ `evidence` ⛔ + סיומת על `got` · האוכלוסייה ⛔ זזה (החלטה 4)',
+  pop.length === 1 && /^⛔ נשמרה — /.test(f.evidence || '') && f.got.startsWith('measured · ראיה: ⛔'),
+  `evidence=${f.evidence} · got=${f.got} · n=${pop.length}`);
+const wired = (src) => /if \(severity === 'red'\) recordEvidence\(ev, finding\);/.test(src);
+check('E10', 'שני ה-specs מנתבים כל אדום מ-`add()` ל-`recordEvidence`', wired(authSrc) && wired(publicSrc),
+  `auth=${wired(authSrc)} · public=${wired(publicSrc)}`);
+const pwCfg = fs.readFileSync(path.join(ROOT, 'playwright.sentinel.config.js'), 'utf8');
+check('E11', '`trace: \'off\'` בקונפיג הסנטינל (החלטה 1 — ⛔ trace)',
+  /trace:\s*'off'/.test(pwCfg) && !/trace:\s*'(on|retain|retain-on-failure|on-first-retry)/.test(pwCfg),
+  'trace נפתח ⇒ refresh_token של חשבון ה-QA ב-artifact ציבורי');
+const yml = fs.readFileSync(path.join(ROOT, '.github/workflows/sentinel.yml'), 'utf8');
+const evStep = yml.split('name: sentinel-evidence').length - 1;
+check('E12', '`sentinel.yml` מעלה `sentinel-evidence` פעם אחת · `retention-days: 7`',
+  evStep === 1 && /name: sentinel-evidence\n\s+path: sentinel-evidence\/\n\s+if-no-files-found: ignore\n\s+retention-days: 7\n/.test(yml),
+  `צעדים=${evStep}`);
+const drill = fs.readFileSync(path.join(ROOT, '.github/workflows/sentinel-evidence-drill.yml'), 'utf8');
+const onBlock = (drill.match(/\non:\n([\s\S]*?)\n\S/) || [])[1] || '';
+check('E13', 'workflow התרגיל: `workflow_dispatch` בלבד · ⛔ job `watch` · ⛔ דיסקורד (החלטה 2)',
+  onBlock.trim() === 'workflow_dispatch:' && !/^\s{2}watch:/m.test(drill) && !/discord/i.test(drill.replace(/^\s*#.*$/gm, '')),
+  `on=«${onBlock.trim()}»`);
+
 // ── SUMMARY ──────────────────────────────────────────────────────────────────
 console.log('\n' + '─'.repeat(72));
 console.log(`LEDGER: ${welded}/13 אתרים עדיין נושאים משפט מרותך  (יעד: 0/13)`);
