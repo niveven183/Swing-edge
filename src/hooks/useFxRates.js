@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadRateTable, convert } from "../lib/fx.js";
 import { realizedDayKey, calcTradeMetrics } from "../utils.js";
 // ⚠️ `instrumentCurrency.js` אינו מייבא דבר — אין מעגל ייבוא דרך `utils.js`.
@@ -53,8 +53,19 @@ export const fxPairPlan = (paperBase, capitalCurrency, accountCurrency) => {
  *   "ready"     — a usable table
  *   "unavailable" — no rate. Callers must show the ORIGINAL currency with a
  *                   marker. This is a real answer, not an error to swallow.
+ *
+ * `B-376` (28.09) — two additions; a caller that passes neither behaves exactly as before:
+ *   • `retry()` re-runs the fetch (F2: «נסה לטעון שער שוב»). ⛔ Without it an
+ *     `unavailable` answer was final for the whole session.
+ *   • `opts.timeoutMs` — measured 28.09: `loadRateTable` carries NO client
+ *     timeout (the only one is api/fx.js's 8s on the UPSTREAM hop), so a hung
+ *     request left `loading` forever — and a `Log Trade` button disabled on
+ *     `loading` would stay disabled forever. After `timeoutMs` the status is
+ *     `unavailable`; ⚠️ the request is ⛔ aborted, so a late answer still lands
+ *     as `ready` (self-heal, same reqId guard as below).
  */
-export function useFxRates(base, quote, dayKeys) {
+export function useFxRates(base, quote, dayKeys, opts = {}) {
+  const timeoutMs = opts.timeoutMs;
   const [state, setState] = useState(() =>
     base === quote ? { table: null, status: "identity" } : { table: null, status: "loading" }
   );
@@ -69,6 +80,8 @@ export function useFxRates(base, quote, dayKeys) {
   // Guards against a slow first response overwriting a fast second one when the
   // user flips the currency twice — the classic out-of-order-await bug.
   const reqIdRef = useRef(0);
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
   useEffect(() => {
     if (base === quote) {
@@ -79,14 +92,25 @@ export function useFxRates(base, quote, dayKeys) {
     let cancelled = false;
     setState((s) => (s.status === "ready" ? s : { table: null, status: "loading" }));
 
+    // ⛔ `|| 8000` here: a caller that passed no timeout keeps today's behaviour.
+    const timer = Number.isFinite(timeoutMs) && timeoutMs > 0
+      ? setTimeout(() => {
+          if (cancelled || myReq !== reqIdRef.current) return;
+          console.warn(`[fx] ${base}/${quote} still loading after ${timeoutMs}ms — treating as unavailable`);
+          setState((s) => (s.status === "loading" ? { table: null, status: "unavailable" } : s));
+        }, timeoutMs)
+      : null;
+
     loadRateTable(base, quote, daysKey ? daysKey.split(",") : [])
       .then((table) => {
+        if (timer) clearTimeout(timer);
         if (cancelled || myReq !== reqIdRef.current) return;
         setState(
           table ? { table, status: "ready" } : { table: null, status: "unavailable" }
         );
       })
       .catch((err) => {
+        if (timer) clearTimeout(timer);
         if (cancelled || myReq !== reqIdRef.current) return;
         // Loud, then honest: the UI falls back to original currencies rather
         // than showing a number converted at a rate we do not have.
@@ -94,10 +118,10 @@ export function useFxRates(base, quote, dayKeys) {
         setState({ table: null, status: "unavailable" });
       });
 
-    return () => { cancelled = true; };
-  }, [base, quote, daysKey]);
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, [base, quote, daysKey, attempt, timeoutMs]);
 
-  return state;
+  return { ...state, retry };
 }
 
 /**

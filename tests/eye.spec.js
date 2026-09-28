@@ -17,6 +17,7 @@ import {
   readFlashes,
   recordNetwork,
   interceptUserSettings,
+  interceptFx,
   blockAllRestWrites,
   login,
   freshUserState,
@@ -266,5 +267,227 @@ test.describe("eye→CI · onboarding + hydration", () => {
     } finally {
       await ctx.close();
     }
+  });
+
+  // ───────────────────────────────────────────────────────────────────────
+  // C-061 · B-376 — the "fast user": Log Trade while the paper→capital rate is
+  // still in flight. Reproduced ON COMMAND by holding /api/fx (`interceptFx`),
+  // ⛔ by racing a clock.
+  //
+  // Found by the sentinel (`create-failed`, 27.09): the QA account's capital is
+  // ILS and SNTNL is a USD paper, so sizing needs USD→ILS. While that request was
+  // in flight the form said «אין כרגע שער» and Log Trade answered «הגדל הון…» —
+  // advice that fixes nothing (B-335's class). Decisions (Niv, 28.09): loading ⇒
+  // Log Trade DISABLED «טוען שער…» (א) · failed ⇒ blocked + «נסה לטעון שער שוב»
+  // (F2) · 8s ceiling ⇒ failed.
+  //
+  // ⛔ No trade is ever created: ⓐ/ⓒ never press Log Trade, ⓑ presses it only
+  // while sizing is refused (the guard returns before any write), and every
+  // write is blocked + counted regardless (`assertAccountUntouched`).
+  // ───────────────────────────────────────────────────────────────────────
+  const dialog = (page) => page.locator('[role="dialog"]').first();
+  const submitBtn = (page) => dialog(page).getByRole("button", { name: /Log Trade|טוען שער|Loading rate|טוען הון|Loading capital|אין הון|No capital/ });
+  const sharesInput = (page) => dialog(page).locator("div.text-center.group").filter({ hasText: /Shares/i }).first().locator("input");
+  async function openFilledForm(page) {
+    await page.goto("/app", { waitUntil: "load" });
+    await page.locator('[data-tour-tab="dashboard"]').waitFor({ state: "visible", timeout: 25_000 });
+    // The consent banner sits over the FAB on a fresh device (sentinel step 4
+    // declines it the same way). Declining writes localStorage only.
+    const decline = page.locator('[data-testid="consent-decline"]');
+    if (await decline.count()) await decline.click();
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.locator('[data-tour="add-trade"]').click();
+    await page.locator("#log-ticker").fill("SNTNL");
+    await page.locator("#log-entry").fill("100");
+    await page.locator("#log-stop").fill("99");
+    await page.locator("#log-target").fill("102");
+  }
+  const LOADING_BANNER = /טוען שער USD→|Loading the USD→/;
+  const NO_RATE_BANNER = /אין כרגע שער USD→|No USD→\w+ rate right now/;
+  const WRONG_ADVICE = /הגדל הון, הדק את הסטופ|Raise capital, tighten the stop/;
+
+  test("C-061ⓐ — rate in flight ⇒ Log Trade disabled «טוען שער…», ⛔ «אין שער»; rate lands ⇒ a size", async ({ browser }) => {
+    const ctx = await browser.newContext({ baseURL: BASE_URL, storageState: STATE });
+    const page = await ctx.newPage();
+    try {
+      const net = recordNetwork(page);
+      const blocker = await blockAllRestWrites(page);
+      const fx = await interceptFx(page, "hold");
+      await openFilledForm(page);
+
+      await expect(submitBtn(page), "while the rate is in flight Log Trade must read «טוען שער…» — it read something else").toHaveText(/טוען שער…|Loading rate…/);
+      await expect(submitBtn(page)).toBeDisabled();
+      await expect(dialog(page)).toContainText(LOADING_BANNER);
+      await expect(dialog(page), "a rate that is still LOADING was announced as ABSENT").not.toContainText(NO_RATE_BANNER);
+
+      fx.release();
+      await expect(submitBtn(page)).toHaveText(/Log Trade/);
+      await expect(submitBtn(page)).toBeEnabled();
+      await expect(sharesInput(page)).toHaveValue(/^[1-9]\d*$/);
+      await expect(dialog(page)).not.toContainText(LOADING_BANNER);
+
+      fx.assertMatched();
+      assertAccountUntouched(net, blocker);
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  test("C-061ⓑ — rate fails ⇒ «אין שער» + retry, toast ⛔ «הגדל הון»; retry ⇒ a size", async ({ browser }) => {
+    const ctx = await browser.newContext({ baseURL: BASE_URL, storageState: STATE });
+    const page = await ctx.newPage();
+    try {
+      const net = recordNetwork(page);
+      const blocker = await blockAllRestWrites(page);
+      const fx = await interceptFx(page, "error");
+      await openFilledForm(page);
+
+      await expect(dialog(page)).toContainText(NO_RATE_BANNER);
+      await expect(submitBtn(page)).toBeEnabled();
+      await submitBtn(page).click(); // sizing is refused ⇒ the guard returns before any write
+      await expect(page.getByText(/אי-אפשר לחשב גודל פוזיציה ולשמור|cannot be sized or saved/).first()).toBeVisible();
+      await expect(page.getByText(WRONG_ADVICE), "the toast gave capital advice for a missing RATE (B-335's class)").toHaveCount(0);
+
+      const retry = page.locator('[data-testid="fx-retry"]');
+      await expect(retry, "F2: a failed rate must offer «נסה לטעון שער שוב» — otherwise the form is a dead end").toBeVisible();
+      fx.restore();
+      await retry.click();
+      await expect(sharesInput(page)).toHaveValue(/^[1-9]\d*$/);
+      await expect(dialog(page)).not.toContainText(NO_RATE_BANNER);
+
+      fx.assertMatched();
+      assertAccountUntouched(net, blocker);
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  test("C-061ⓒ — rate never answers ⇒ after 8s «אין שער» + retry (⛔ «טוען» forever)", async ({ browser }) => {
+    const ctx = await browser.newContext({ baseURL: BASE_URL, storageState: STATE });
+    const page = await ctx.newPage();
+    try {
+      const net = recordNetwork(page);
+      const blocker = await blockAllRestWrites(page);
+      const fx = await interceptFx(page, "hang");
+      await openFilledForm(page);
+
+      await expect(submitBtn(page)).toHaveText(/טוען שער…|Loading rate…/);
+      // FX_SETTLE_MS is 8s from the request's start; 15s is the ceiling for the
+      // whole window including the time the form took to fill.
+      await expect(page.locator('[data-testid="fx-retry"]'), "a rate that never answers kept the form in «טוען» — the 8s ceiling did not fire").toBeVisible({ timeout: 15_000 });
+      await expect(submitBtn(page)).toHaveText(/Log Trade/);
+      await expect(dialog(page)).toContainText(NO_RATE_BANNER);
+
+      fx.restore();
+      await page.locator('[data-testid="fx-retry"]').click();
+      await expect(sharesInput(page)).toHaveValue(/^[1-9]\d*$/);
+
+      fx.assertMatched();
+      assertAccountUntouched(net, blocker);
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  // ───────────────────────────────────────────────────────────────────────
+  // C-061ⓓ · B-386 — a RETURNING device reaches the form before the DB answers.
+  //
+  // 🔴 This began as the ⚪ control arm of the B-376 plan ("the form is not
+  // reachable before capital settles") and fired RED on both trees (28.09):
+  // `swingEdgeOnboarding` in localStorage seeds `showOnboarding=false`, so the
+  // render gate does not wait, and `capital` is seeded from the device's mirror.
+  // Measured locally: DB 10000, mirror 5000 ⇒ the form offered 13 shares until
+  // the row landed (27). Decision (Niv, 28.09): option 1 — Log Trade DISABLED
+  // «טוען הון…» until the capital is settled. So the arm became this test.
+  //
+  // The mirror is made STALE on purpose (half the real capital): a mirror equal
+  // to the row would make "sized from the mirror" and "sized from the DB" the
+  // same number, and the test could not tell them apart.
+  // ───────────────────────────────────────────────────────────────────────
+  test("C-061ⓓ — returning device, stale mirror ⇒ Log Trade ⛔ active before the DB answers; the size comes from the DB", async ({ browser }) => {
+    const mirror = (STATE.origins || []).flatMap((o) => o.localStorage || []);
+    const realMirror = parseFloat(mirror.find((kv) => kv.name === "swingEdgeCapital")?.value);
+    expect(Number.isFinite(realMirror) && realMirror > 0, "the QA session carries no swingEdgeCapital mirror — this is not a returning device, the test would measure nothing").toBe(true);
+    const staleCapital = Math.round(realMirror / 2);
+    const staleState = {
+      ...STATE,
+      origins: (STATE.origins || []).map((o) => ({
+        ...o,
+        localStorage: (o.localStorage || []).map((kv) => kv.name === "swingEdgeCapital" ? { ...kv, value: String(staleCapital) } : kv),
+      })),
+    };
+    const ctx = await browser.newContext({ baseURL: BASE_URL, storageState: staleState });
+    const page = await ctx.newPage();
+    try {
+      const net = recordNetwork(page);
+      const blocker = await blockAllRestWrites(page);
+      const iv = await interceptUserSettings(page, "delay");
+      await openFilledForm(page);
+
+      await expect(submitBtn(page), "Log Trade must wait for the DB capital — it offered to save a size computed from the device's (stale) mirror").toHaveText(/טוען הון…|Loading capital…/);
+      await expect(submitBtn(page)).toBeDisabled();
+      await expect(sharesInput(page), "a share count was offered while capital was unsettled").toHaveCount(0);
+
+      iv.release();
+      await expect(submitBtn(page)).toHaveText(/Log Trade/, { timeout: 20_000 });
+      const row = iv.row();
+      const riskPct = row.riskPct >= 0.1 && row.riskPct <= 10 ? row.riskPct : 1;
+      const ccy = row.capitalCurrency || row.accountCurrency || "USD";
+      const rate = ccy === "USD" ? 1 : await page.evaluate(async (c) => {
+        const r = await fetch(`/api/fx?base=USD&symbols=${c}`);
+        return (await r.json())?.rates?.[c] ?? null;
+      }, ccy);
+      expect(rate, `no USD→${ccy} rate to compute the expected size`).toBeGreaterThan(0);
+      const sizeFrom = (cap) => Math.floor((cap * (riskPct / 100)) / (1 * rate)); // entry 100 · stop 99
+      const expected = sizeFrom(row.capital);
+      const fromStale = sizeFrom(staleCapital);
+      expect(expected, "the stale mirror and the DB give the same size — the test cannot tell them apart").not.toBe(fromStale);
+      await expect(sharesInput(page), `after the row landed the size must come from the DB (${row.capital} ${ccy} ⇒ ${expected}), ⛔ from the mirror (${staleCapital} ⇒ ${fromStale})`).toHaveValue(String(expected));
+
+      iv.assertMatched();
+      assertAccountUntouched(net, blocker);
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  // ───────────────────────────────────────────────────────────────────────
+  // C-061ⓔ · B-386 — a FAILED settings read is ⛔ stuck forever, and ⛔ silent.
+  // `capitalSettled` is TRUE on failure (it includes hydrationFailed, :1274), so
+  // it cannot tell "the device's copy" from "DEFAULT_CAPITAL, invented" — a
+  // logout sweep removes `swingEdgeCapital`. Two phases, two answers:
+  //   local — returning device (mirror present): Log Trade ACTIVE, and the form
+  //           SAYS the capital is the device's copy and may be out of date.
+  //   none  — no mirror (`freshUserState`): ⛔ size on 2,500 nobody chose ⇒
+  //           Log Trade «אין הון», disabled, with «טען מחדש» as the way out.
+  // ───────────────────────────────────────────────────────────────────────
+  test("C-061ⓔ — failed settings read ⇒ local copy is SAID (active); no copy ⇒ «אין הון» + reload", async ({ browser }) => {
+    async function phase(label, state) {
+      const ctx = await browser.newContext({ baseURL: BASE_URL, storageState: state });
+      const page = await ctx.newPage();
+      try {
+        const net = recordNetwork(page);
+        const blocker = await blockAllRestWrites(page);
+        const iv = await interceptUserSettings(page, "error");
+        await openFilledForm(page);
+        if (label === "local") {
+          await expect(dialog(page).locator('[data-testid="capital-local-notice"]'), "the form sized from the device's copy WITHOUT saying so").toContainText(/הון מהעותק המקומי במכשיר|local copy/);
+          await expect(dialog(page).locator('[data-testid="capital-local-notice"]')).toContainText(/ייתכן שאינו מעודכן|possibly out of date/);
+          await expect(submitBtn(page)).toHaveText(/Log Trade/);
+          await expect(submitBtn(page)).toBeEnabled();
+        } else {
+          await expect(submitBtn(page), "no device copy ⇒ the capital is DEFAULT_CAPITAL; sizing on it is an invention").toHaveText(/אין הון|No capital/);
+          await expect(submitBtn(page)).toBeDisabled();
+          await expect(page.locator('[data-testid="capital-reload"]'), "«אין הון» with no way out is the stuck-forever state").toBeVisible();
+          await expect(sharesInput(page)).toHaveCount(0);
+        }
+        iv.assertMatched();
+        assertAccountUntouched(net, blocker);
+      } finally {
+        await ctx.close();
+      }
+    }
+    await phase("local", STATE);
+    await phase("none", freshUserState(STATE));
   });
 });

@@ -99,3 +99,103 @@ export const sizePosition = ({
     effPosValue, effPotLoss, effRiskPct,
   };
 };
+
+// ─── `B-376` — למה אין גודל פוזיציה, ומה אומרים למשתמש ────────────────────────
+//
+// 🔴 נצפה 27.09 (סנטינל, `create-failed`) ושוחזר 28.09 על `dist` מקומי: בזמן
+// שהשער נייר→הון עוד **נטען**, הסירוב סווג «אין שער», וה-toast ב-`handleSubmit`
+// יעץ «הגדל הון, הדק את הסטופ, או הקלד מספר מניות» — שלוש עצות ש⛔ אף אחת מהן
+// פותרת טעינה. הודעה שמאשימה מה שלא רץ היא מחלקת `B-335`.
+//
+// ⇒ שלושה מצבים, שלוש פעולות נדרשות שונות, ⛔ הודעה אחת:
+//   loading             — ⛔ לעשות דבר; לחכות (הכפתור מושבת, «טוען שער…»)
+//   no_rate             — אין שער ⇒ «נסה לטעון שער שוב» (F2, הכרעת ניב 28.09)
+//   unverified_currency — מטבע הנייר ⛔ אומת ⇒ ⛔ עצת הון
+// ורק `too_small` — ההון ⛔ מספיק למניה אחת — מקבל את העצה הישנה, שם היא **נכונה**.
+
+/** תקרת זמן לטעינת שער נייר→הון. אחריה ⇒ `unavailable` (הכרעת ניב 28.09). */
+export const FX_SETTLE_MS = 8000;
+
+/**
+ * מאיפה ההון שעל המסך — `B-386` (הכרעת ניב 28.09: כיוון א׳ מורחב להון).
+ *
+ * 🔴 נמדד 28.09: במכשיר חוזר `showOnboarding` נזרע מ-`localStorage` ⇒ שער הרינדור
+ * ⛔ ממתין לקריאת ה-DB, ו-`capital` נזרע מהמראה. DB `10000`, מראה `5000` ⇒ הטופס
+ * הציע `13` מניות עד ש-DB ענה (`27`). ⇒ ⛔ מחליטים גודל על הון שלא הוכרע.
+ *
+ *   loading — ⛔ הוכרע עדיין ⇒ `Log Trade` מושבת «טוען הון…»
+ *   ready   — נקרא מה-DB (או ⛔ Supabase מוגדר ⇒ המקומי **הוא** המקור)
+ *   local   — הקריאה נכשלה, וההון הוא **העותק במכשיר** ⇒ מותר, ⛔ בשקט: ההודעה אומרת זאת
+ *   none    — הקריאה נכשלה ו⛔ עותק במכשיר ⇒ `capital` הוא `DEFAULT_CAPITAL` ממוצא ⇒
+ *             ⛔ גודל פוזיציה; מוצא: טעינה מחדש (⛔ «תקוע לנצח»)
+ *
+ * @param {{ hydrationDone: boolean, hydrationFailed: boolean, supabaseConfigured: boolean, hasLocalCapital: boolean }} p
+ */
+export const capitalGate = ({ hydrationDone, hydrationFailed, supabaseConfigured, hasLocalCapital }) =>
+  !supabaseConfigured || hydrationDone ? "ready"
+  : hydrationFailed ? (hasLocalCapital ? "local" : "none")
+  : "loading";
+
+/**
+ * @param {string|null} paperCcy  מטבע הנייר; `null` = ⛔ אומת
+ * @param {string}      fxStatus  סטטוס `useFxRates` של הצמד נייר→הון
+ * @param {string}      [capGate] `capitalGate(...)`; חסר ⇒ `"ready"` (קוראים ישנים)
+ */
+export const sizingRefusalReason = (paperCcy, fxStatus, capGate = "ready") =>
+  paperCcy == null ? "unverified_currency"
+  : capGate === "loading" ? "capital_loading"
+  : capGate === "none" ? "no_capital"
+  : fxStatus === "loading" ? "loading"
+  : "no_rate";
+
+/**
+ * כפתור `Log Trade` — מושבת רק בהמתנה להכרעה (הון/שער) או כשאין הון כלל.
+ * `no_rate`/`unverified_currency` ⛔ משביתים: ה-toast מסביר, והבאנר נושא את המוצא.
+ * @returns {{ disabled: boolean, label: "capital_loading"|"loading"|"no_capital"|null }}
+ */
+export const submitGate = (sizing) => {
+  const r = sizing && !sizing.ok ? sizing.reason : null;
+  return ["capital_loading", "loading", "no_capital"].includes(r)
+    ? { disabled: true, label: r }
+    : { disabled: false, label: null };
+};
+
+/**
+ * ההודעה כשהשמירה נחסמת על גודל פוזיציה. ⚠️ `lang === "he"` בינארי ⇒ `es`/`pt`/`ar`
+ * מקבלות את האנגלית — כמו כל מחרוזת הטופס; ⛔ שפה שנופלת ל«Raise capital».
+ *
+ * @param {{ reason: string, lang: string, paperBase: string, capitalCurrency: string }} p
+ *        `reason`: סיבת `sizePosition`, או `"too_small"` כשהגודל הוא 0 מסיבת הון.
+ */
+export const saveBlockMessage = ({ reason, lang, paperBase, capitalCurrency }) => {
+  const pair = `${paperBase}→${capitalCurrency}`;
+  const isHe = lang === "he";
+  if (reason === "loading") {
+    return isHe
+      ? `⛔ השער ${pair} עדיין נטען — גודל הפוזיציה יחושב כשיגיע. נסה שוב בעוד רגע.`
+      : `The ${pair} rate is still loading — the position size will be computed when it arrives. Try again in a moment.`;
+  }
+  if (reason === "no_rate") {
+    return isHe
+      ? `⛔ אין כרגע שער ${pair}, ולכן אי-אפשר לחשב גודל פוזיציה ולשמור. לחץ «נסה לטעון שער שוב» בטופס.`
+      : `No ${pair} rate right now, so the position cannot be sized or saved. Press "Retry loading the rate" in the form.`;
+  }
+  if (reason === "capital_loading") {
+    return isHe
+      ? "⛔ ההון שלך עדיין נטען מהשרת — גודל הפוזיציה יחושב כשיגיע. נסה שוב בעוד רגע."
+      : "Your capital is still loading from the server — the position size will be computed when it arrives. Try again in a moment.";
+  }
+  if (reason === "no_capital") {
+    return isHe
+      ? "⛔ ההגדרות לא נקראו מהשרת ואין עותק שלהן במכשיר, ולכן אין הון לחשב ממנו גודל פוזיציה. טען את הדף מחדש."
+      : "Your settings could not be read and this device holds no copy, so there is no capital to size from. Reload the page.";
+  }
+  if (reason === "unverified_currency") {
+    return isHe
+      ? "⛔ מטבע המסחר של הנייר לא אומת, ולכן אי-אפשר לחשב גודל פוזיציה ולשמור."
+      : "The instrument's trading currency is unverified, so the position cannot be sized or saved.";
+  }
+  return isHe
+    ? "⛔ אי-אפשר לשמור בלי גודל פוזיציה. הגדל הון, הדק את הסטופ, או הקלד מספר מניות ידנית."
+    : "Cannot save without a position size. Raise capital, tighten the stop, or type a share count.";
+};
