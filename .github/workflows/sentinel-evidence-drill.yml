@@ -72,3 +72,13 @@ jobs:
           path: sentinel-evidence/
           if-no-files-found: ignore
           retention-days: 7
+      # B-375 / C-062 — verify the evidence WHERE it is produced. The artifact's
+      # blob host is unreachable from the cloud dev environment, so the proof is
+      # this step's log, read through the Actions API. It prints structured fields
+      # and per-pattern COUNTS only (⛔ matching lines, ⛔ the password) and exits 1
+      # on any leak hit, unreadable evidence, or an empty crumb value.
+      - name: Verify evidence (structured fields · leak counts)
+        if: always()
+        env:
+          SENTINEL_QA_PASSWORD: ${{ secrets.SENTINEL_QA_PASSWORD }}
+        run: node scripts/verify-evidence.mjs sentinel-evidence browser-findings-auth.json

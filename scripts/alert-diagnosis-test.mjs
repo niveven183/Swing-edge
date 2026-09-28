@@ -320,6 +320,38 @@ check('E17', 'אחרי create-failed: ראיה (`drain`) ⇒ Escape ⇒ אסרצ
   iCatch > 0 && iCatch < iDrain && iDrain < iEsc && iEsc < iGone && iGone < iStuck,
   `create-failed@${iCatch} · drain@${iDrain} · Escape@${iEsc} · toHaveCount(0)@${iGone} · stuck@${iStuck}`);
 
+// ── VERIFY-EVIDENCE (B-375 / C-062, 28.09) ───────────────────────────────────
+// The drill verifies its own evidence in-run (the artifact host is unreachable
+// from the dev environment). VALUE: the real script on planted trees.
+console.log('\n── VERIFY-EVIDENCE — `3` אסרציות (B-375 / C-062) ──');
+const { spawnSync } = await import('node:child_process');
+const os = await import('node:os');
+function plant(extra) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 've-'));
+  const d = path.join(root, 'ev', 'auth-01-browser-auth_create-failed');
+  fs.mkdirSync(d, { recursive: true });
+  fs.writeFileSync(path.join(d, 'log.json'), JSON.stringify({
+    crumbs: [{ name: 'pre-submit', dtMs: -20100, data: { capital: 'חשבון ₪5,000.00', shares: '—', settingsHydration: 'עבר' } }],
+    transient: [{ dtMs: -20010, livedMs: 3001, text: `קלט לא תקין${extra}` }],
+  }));
+  fs.writeFileSync(path.join(root, 'f.json'), JSON.stringify([{ fp: 'browser-auth|create-failed', severity: 'red' }]));
+  return root;
+}
+const runVE = (root) => spawnSync(process.execPath, [path.join(ROOT, 'scripts/verify-evidence.mjs'), path.join(root, 'ev'), path.join(root, 'f.json')],
+  { env: { ...process.env, SENTINEL_QA_PASSWORD: 'Pl4ntedPw!' }, encoding: 'utf8' });
+const dirty = runVE(plant(' eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJxYSJ9.c2lnbmF0dXJl Pl4ntedPw!'));
+check('E18', 'verify-evidence: JWT + סיסמה שהוזרעו ⇒ exit 1', dirty.status === 1, `exit=${dirty.status}`);
+check('E19', 'verify-evidence: ⛔ מדפיס את מה שהוזרע ללוג (ספירות בלבד)',
+  !/eyJhbGci|Pl4ntedPw!/.test(`${dirty.stdout}${dirty.stderr}`), 'הסוד שהוזרע הופיע בפלט ⇒ הלוג עצמו דולף');
+const clean = runVE(plant(''));
+const drillYml = fs.readFileSync(path.join(ROOT, '.github/workflows/sentinel-evidence-drill.yml'), 'utf8');
+const iUp = drillYml.indexOf('name: sentinel-evidence');
+const iVE = drillYml.indexOf('node scripts/verify-evidence.mjs');
+check('E20', 'עץ נקי ⇒ exit 0 · והצעד רץ ב-workflow התרגיל **אחרי** ההעלאה, `if: always()`, עם הסוד',
+  clean.status === 0 && iUp > 0 && iVE > iUp
+    && /- name: Verify evidence[^\n]*\n\s+if: always\(\)\n\s+env:\n\s+SENTINEL_QA_PASSWORD: \$\{\{ secrets\.SENTINEL_QA_PASSWORD \}\}/.test(drillYml),
+  `clean exit=${clean.status} · upload@${iUp} · verify@${iVE}`);
+
 // ── SUMMARY ──────────────────────────────────────────────────────────────────
 console.log('\n' + '─'.repeat(72));
 console.log(`LEDGER: ${welded}/13 אתרים עדיין נושאים משפט מרותך  (יעד: 0/13)`);
