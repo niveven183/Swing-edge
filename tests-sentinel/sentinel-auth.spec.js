@@ -909,6 +909,14 @@ async function journey(page) {
     // LONG → stop < entry (validateTradeInputs). The drill inverts it on purpose (B-375).
     await page.locator('#log-stop').fill(DRILL === 'invalid-stop' ? '101' : '99');
     await page.locator('#log-target').fill('102');
+    // B-376/B-386 — Log Trade is DISABLED while the capital («טוען הון…») or the
+    // USD→capital rate («טוען שער…») is unsettled; the rate has an 8s ceiling
+    // (FX_SETTLE_MS), after which the button is enabled again with «אין שער».
+    // So: wait for the settle, ⛔ a blind sleep. The outcome is a crumb field —
+    // "הוכרע" or the measured reason it did not — so a later create-failed says
+    // WHICH of capital / rate / neither was pending at the click.
+    const settled = await measure(() => expect(page.getByRole('button', { name: /Log Trade/ }))
+      .toBeEnabled({ timeout: 20_000 }).then(() => 'הוכרע'));
     // B-375/B-376: what the screen said at the moment of the click. Every field is
     // what was on screen — "—" included, that IS a measurement — or an explicit
     // "לא נמדד: <reason>" from measure(). ⛔ '' (run 36399653545 read capital as ""
@@ -928,6 +936,17 @@ async function journey(page) {
           const input = el.querySelector('input');
           return input ? input.value : (el.lastElementChild?.textContent ?? '');
         }, null, { timeout: 2_000 })),
+      // B-376: the submit button's own label and the form's sizing banner — «טוען
+      // הון…» / «טוען שער…» / «אין כרגע שער…» / none. The toast that answers the
+      // click is gone before the finding is filed; this is what the screen said BEFORE it.
+      settle: settled,
+      submitLabel: await measure(() => page.locator('[role="dialog"] button')
+        .filter({ hasText: /Log Trade|טוען הון|טוען שער|אין הון|Loading capital|Loading rate|No capital/ }).first()
+        .innerText({ timeout: 2_000 })),
+      sizingBanner: await measure(async () => {
+        const b = page.locator('[role="dialog"] div').filter({ hasText: /^(טוען הון|טוען שער|אין כרגע שער|ההגדרות לא נקראו|הון מהעותק המקומי|Capital from this device|Loading capital|Loading the|No \w+→\w+ rate|Your settings could not)/ });
+        return (await b.count()) ? b.first().innerText({ timeout: 2_000 }) : 'אין באנר סירוב';
+      }),
       settingsHydration: hydrationPass
         ? `עבר — הון ${hydrationPass.shown} ≠ DEFAULT_CAPITAL (${DEFAULT_CAPITAL}), ${Date.now() - hydrationPass.at}ms לפני הלחיצה`
         : `${UNMEASURED}שער ההידרציה (שלב 2) ⛔ עבר`,

@@ -352,6 +352,28 @@ check('E20', 'עץ נקי ⇒ exit 0 · והצעד רץ ב-workflow התרגיל
     && /- name: Verify evidence[^\n]*\n\s+if: always\(\)\n\s+env:\n\s+SENTINEL_QA_PASSWORD: \$\{\{ secrets\.SENTINEL_QA_PASSWORD \}\}/.test(drillYml),
   `clean exit=${clean.status} · upload@${iUp} · verify@${iVE}`);
 
+// ── SETTLE BEFORE LOG TRADE (B-376 / B-386, 28.09) ──────────────────────────
+// The sentinel's create-failed of 27.09 clicked Log Trade while the USD→capital
+// rate was in flight. Log Trade is now DISABLED while capital or rate is
+// unsettled, so the journey must WAIT for it — and the crumb must say which one
+// was pending if it never settled. ⛔ A blind sleep: it would pass while proving
+// nothing, and flake the day the rate takes longer.
+console.log('\n── SETTLE — `3` אסרציות (B-376 / B-386) ──');
+const iFillTarget = authSrc.indexOf("await page.locator('#log-target').fill('102');");
+const iSettle = authSrc.indexOf(".toBeEnabled({ timeout: 20_000 })", iFillTarget);
+const iClick = authSrc.indexOf("await page.getByRole('button', { name: /Log Trade/ }).click();", iFillTarget);
+check('E21', 'לפני `Log Trade` — המתנה ש**הכפתור** פעיל (הון + שער הוכרעו), בתוך `measure()`, ⛔ `waitForTimeout`',
+  iFillTarget > 0 && iSettle > iFillTarget && iClick > iSettle
+    && /const settled = await measure\(\(\) => expect\(page\.getByRole\('button', \{ name: \/Log Trade\/ \}\)\)/.test(authSrc)
+    && !/waitForTimeout/.test(authSrc.slice(iFillTarget, iClick)),
+  `fill@${iFillTarget} · settle@${iSettle} · click@${iClick}`);
+check('E22', 'crumb `pre-submit` נושא `settle` · `submitLabel` · `sizingBanner` — כולם דרך `measure()`',
+  /settle: settled,/.test(crumbSrc) && /submitLabel: await measure\(/.test(crumbSrc) && /sizingBanner: await measure\(/.test(crumbSrc),
+  'בלי השדות, create-failed ⛔ יבדיל «טוען הון» מ«טוען שער» מ«אין שער»');
+check('E23', '`submitLabel` מזהה את **כל** תוויות ההמתנה (הון · שער · אין הון), ⛔ רק «Log Trade»',
+  /Log Trade\|טוען הון\|טוען שער\|אין הון/.test(crumbSrc),
+  'תווית שאינה מזוהה ⇒ «לא נמדד» בדיוק ברגע שהיא נחוצה');
+
 // ── SUMMARY ──────────────────────────────────────────────────────────────────
 console.log('\n' + '─'.repeat(72));
 console.log(`LEDGER: ${welded}/13 אתרים עדיין נושאים משפט מרותך  (יעד: 0/13)`);

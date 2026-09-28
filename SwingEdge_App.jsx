@@ -106,7 +106,7 @@ import { resolveEquityBase } from "./src/lib/equityBase.js";
 import { deriveEquityState, equityFigure, deriveRiskState, riskFigure } from "./src/lib/equityState.js";
 import { horizonState, horizonLabel } from "./src/lib/tradeHorizon.js";
 import { deriveInstrumentCurrency, matchesCapital, isUnverified, INSTRUMENT_STATE, PAPER_BASE, CURRENCY_SOURCE } from "./src/lib/instrumentCurrency.js";
-import { sizePosition, sizingRefusalReason, saveBlockMessage, FX_SETTLE_MS } from "./src/lib/positionSizing.js";
+import { sizePosition, sizingRefusalReason, saveBlockMessage, FX_SETTLE_MS, capitalGate, submitGate } from "./src/lib/positionSizing.js";
 
 // ⚠️ קבוע מודול, ⛔ לא `[]` inline: מערך טרי בכל רינדור הוא תלות טרייה ב-
 // `useFxRates`, וזה לולאת fetch אינסופית.
@@ -1272,6 +1272,15 @@ export default function SwingEdge() {
   // failure we fall back to the local number, which the :4100 banner already
   // announces as local-only and unsaved.
   const capitalSettled = hydrationDone || hydrationFailed || !isSupabaseConfigured;
+  // `B-386` — did THIS device hold a capital of its own at mount? On a failed read
+  // `capital` stays whatever the lazy initializer found: the device's copy when
+  // there is one, and `DEFAULT_CAPITAL` — a number nobody chose — when there is
+  // not (a logout sweep removes `swingEdgeCapital`). `capitalSettled` is TRUE in
+  // both cases, so it cannot tell them apart; this can. Mount-time on purpose:
+  // it is the value the failed session keeps showing.
+  const [hasLocalCapital] = useState(() => {
+    try { const n = parseFloat(localStorage.getItem("swingEdgeCapital")); return Number.isFinite(n) && n > 0; } catch { return false; }
+  });
   // B-365 — the same shape, for the same reason. `showOnboarding === null` means
   // hydration has not spoken yet; until it does we render a skeleton, ⛔ the
   // questionnaire (which overwrites real capital) and ⛔ an empty dashboard
@@ -2822,13 +2831,16 @@ export default function SwingEdge() {
   // ⚠️ טיקר ריק ⇒ אין נייר ⇒ אין מה לסתור, ולכן משתמשים בשער ההון (זהות
   // למשתמש דולרי). ⛔ סירוב כאן היה מציג "—" לכל מי שמקליד מחיר לפני טיקר.
   const formPaperCcy = form.ticker.trim() ? paperCurrencyOf({ ticker: form.ticker }) : capitalCurrency;
+  // `B-386` — הון שלא הוכרע (`loading`) או ממוצא (`none`) ⇒ ⛔ שער ⇒ סירוב מוצהר.
+  const capGate = capitalGate({ hydrationDone, hydrationFailed, supabaseConfigured: isSupabaseConfigured, hasLocalCapital });
   const formRate = formPaperCcy == null
     ? null                                    // נייר לא-מאומת ⇒ סירוב מוצהר
+    : capGate === "loading" || capGate === "none" ? null
     : formPaperCcy === capitalCurrency ? 1     // זהות מדויקת, ⛔ לא שער
     : paperToCapitalRate;                      // שער spot, או null כשאין
   // ⚠️ `B-376` — שלושה ערכים, ⛔ שניים: `loading` היה מסווג כאן «אין שער», והמשתמש
   // קיבל באנר «אין כרגע שער» ו-toast «הגדל הון» בזמן שהשער פשוט עוד נטען.
-  const formRefusal = sizingRefusalReason(formPaperCcy, paperCapStatus);
+  const formRefusal = sizingRefusalReason(formPaperCcy, paperCapStatus, capGate);
 
   const sizing = sizePosition({
     entry: form.entry, stop: form.stop, capital, riskPct,
@@ -2837,10 +2849,11 @@ export default function SwingEdge() {
   });
   // ⚠️ `sizingOk` שקר ⇒ המסך מציג `—` + סיבה. ⛔ אין נפילה למספר.
   const sizingOk = sizing.ok;
-  // `B-376` (כיוון א׳, הכרעת ניב 28.09) — ⛔ מחליטים גודל פוזיציה לפי שער שלא הוכרע:
-  // בזמן הטעינה `Log Trade` מושבת עם «טוען שער…». `unavailable` ⛔ מושבת — ה-toast
-  // וכפתור «נסה לטעון שער שוב» בבאנר הם המוצא (F2).
-  const awaitingRate = !sizing.ok && sizing.reason === "loading";
+  // `B-376`/`B-386` (כיוון א׳ מורחב, הכרעת ניב 28.09) — ⛔ מחליטים גודל פוזיציה לפי
+  // הון או שער שלא הוכרעו: `Log Trade` מושבת עם «טוען הון…»/«טוען שער…», ועם «אין
+  // הון» כשההון ממוצא. `unavailable` ⛔ מושבת — ה-toast וכפתור «נסה לטעון שער שוב»
+  // בבאנר הם המוצא (F2).
+  const submitState = submitGate(sizing);
 
   const riskPerShare   = sizing.riskPerShare ?? 0;
   const posSize        = sizing.posSize ?? 0;
@@ -8172,6 +8185,14 @@ export default function SwingEdge() {
                     ? (lang === "he"
                         ? `מטבע המסחר של ${form.ticker.trim().toUpperCase()} לא אומת, ולכן אי-אפשר לתמחר פוזיציה מול הון ${capSym}. מספר כאן היה יוצא שגוי, ולכן איננו מציגים אותו. ה-R/R תקף.`
                         : `The trading currency of ${form.ticker.trim().toUpperCase()} is unverified, so the position cannot be priced against ${capSym} capital. A number here would be wrong, so we show none. R/R is still valid.`)
+                    : sizing.reason === "capital_loading"
+                    ? (lang === "he"
+                        ? "טוען הון… ההון שלך עוד לא נקרא מהשרת, וגודל הפוזיציה יחושב כשיגיע. ה-R/R תקף."
+                        : "Loading capital… your capital has not been read from the server yet; the position size will be computed when it arrives. R/R is still valid.")
+                    : sizing.reason === "no_capital"
+                    ? (lang === "he"
+                        ? "ההגדרות לא נקראו מהשרת ואין עותק שלהן במכשיר — אין הון לחשב ממנו גודל פוזיציה. ⛔ נחשב על ברירת מחדל. טען את הדף מחדש."
+                        : "Your settings could not be read and this device holds no copy — there is no capital to size from. We never size on a default. Reload the page.")
                     : sizing.reason === "loading"
                     ? (lang === "he"
                         ? `טוען שער ${PAPER_BASE}→${capitalCurrency}… גודל הפוזיציה יחושב כשהשער יגיע. ה-R/R תקף.`
@@ -8180,12 +8201,28 @@ export default function SwingEdge() {
                         ? `אין כרגע שער ${PAPER_BASE}→${capitalCurrency}, ולכן אי-אפשר לתמחר את הפוזיציה. ⛔ איננו מנחשים שער. ה-R/R תקף.`
                         : `No ${PAPER_BASE}→${capitalCurrency} rate right now, so the position cannot be priced. We never guess a rate. R/R is still valid.`)}</span>
                   {/* F2 (הכרעת ניב 28.09) — המוצא ממצב «אין שער». ⛔ שמירה בלי שער (F1 חי ב-`B-385`). */}
+                  {sizing.reason === "no_capital" && (
+                    <button type="button" data-testid="capital-reload" onClick={() => window.location.reload()}
+                      className="shrink-0 px-2 py-1 rounded-[var(--v3-radius-chip)] border border-[var(--v3-warn)]/40 text-[var(--v3-warn)] hover:bg-[var(--v3-warn)]/10 transition font-bold">
+                      {lang === "he" ? "טען מחדש" : "Reload"}
+                    </button>
+                  )}
                   {sizing.reason === "no_rate" && (
                     <button type="button" data-testid="fx-retry" onClick={paperCapRetry}
                       className="shrink-0 px-2 py-1 rounded-[var(--v3-radius-chip)] border border-[var(--v3-warn)]/40 text-[var(--v3-warn)] hover:bg-[var(--v3-warn)]/10 transition font-bold">
                       {lang === "he" ? "נסה לטעון שער שוב" : "Retry loading the rate"}
                     </button>
                   )}
+                </div>
+              )}
+
+              {/* `B-386` — הקריאה נכשלה וההון הוא **העותק במכשיר**. מותר לשמור, ⛔ בשקט. */}
+              {capGate === "local" && (
+                <div data-testid="capital-local-notice" className="flex items-center gap-2 p-2.5 rounded-[var(--v3-radius-chip)] border text-xs bg-[var(--v3-warn)]/5 border-[var(--v3-warn)]/20 text-[var(--v3-warn)]">
+                  <AlertTriangle size={13} />
+                  <span>{lang === "he"
+                    ? `הון מהעותק המקומי במכשיר (${fmtCapitalAmount(capital, capitalCurrency)}), ייתכן שאינו מעודכן — ההגדרות לא נקראו מהשרת. גודל הפוזיציה מחושב ממנו.`
+                    : `Capital from this device's local copy (${fmtCapitalAmount(capital, capitalCurrency)}), possibly out of date — your settings could not be read from the server. The position size is computed from it.`}</span>
                 </div>
               )}
 
@@ -8366,9 +8403,12 @@ export default function SwingEdge() {
               {/* Actions */}
               <div className="flex gap-2 pt-1">
                 <button onClick={handleSubmit}
-                  disabled={!form.ticker || !entryN || !stopN || awaitingRate}
+                  disabled={!form.ticker || !entryN || !stopN || submitState.disabled}
                   className="flex-1 py-2.5 rounded-[var(--v3-radius-chip)] bg-gradient-to-r from-[var(--v3-accent)] to-[var(--v3-purple)] text-white text-sm font-bold hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:opacity-40">
-                  {awaitingRate ? (lang === "he" ? "טוען שער…" : "Loading rate…") : "Log Trade →"}
+                  {submitState.label === "capital_loading" ? (lang === "he" ? "טוען הון…" : "Loading capital…")
+                    : submitState.label === "loading" ? (lang === "he" ? "טוען שער…" : "Loading rate…")
+                    : submitState.label === "no_capital" ? (lang === "he" ? "אין הון" : "No capital")
+                    : "Log Trade →"}
                 </button>
                 <button onClick={() => {
                     setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null });

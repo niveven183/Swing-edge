@@ -316,16 +316,20 @@ const USER_SETTINGS_RE = /\/rest\/v1\/user_settings/;
 //                 The only way to reach `loadSettings`'s failure branch, and a real
 //                 outage shape: a transient failure between two requests issued
 //                 milliseconds apart.
-//   delay       — `B-376` control arm (Niv, 28.09): every read is held
-//                 `DELAY_MS` and then answered from the REAL row (`route.fetch`).
-//                 `lastFulfilledAt()` is when the app could first have the row —
-//                 the form must not be reachable before it (render gate :4144).
-export const SETTINGS_DELAY_MS = 3_000;
+//   delay       — `B-386` (Niv, 28.09): every read is HELD until `release()` and
+//                 then answered from the REAL row (`route.fetch`). A returning
+//                 device renders from its local mirror meanwhile — that window
+//                 is what the test measures. `row()` is the blob the DB returned.
+//                 ⚠️ `SETTINGS_HOLD_CEILING_MS` only stops a forgotten release from
+//                 hanging the suite; a test that relies on it has measured nothing.
+export const SETTINGS_HOLD_CEILING_MS = 20_000;
 export async function interceptUserSettings(page, mode) {
   if (!["empty", "error", "error-blob", "delay"].includes(mode)) {
     throw new Error(`[eyeTools] interceptUserSettings: unknown mode ${JSON.stringify(mode)}`);
   }
-  const state = { matched: 0, existence: 0, blob: 0, lastFulfilledAt: null };
+  const state = { matched: 0, existence: 0, blob: 0, lastFulfilledAt: null, row: null };
+  let openGate;
+  const gate = new Promise((r) => { openGate = r; });
   await page.route(USER_SETTINGS_RE, async (route) => {
     const req = route.request();
     if (req.method() !== "GET") return route.fallback(); // writes are handled by blockAllRestWrites
@@ -347,10 +351,15 @@ export async function interceptUserSettings(page, mode) {
     if (mode === "error") return fail();
 
     if (mode === "delay") {
-      await new Promise((r) => setTimeout(r, SETTINGS_DELAY_MS));
+      await Promise.race([gate, new Promise((r) => setTimeout(r, SETTINGS_HOLD_CEILING_MS))]);
       // ⛔ `route.fallback()`: it would hand the request to the network with no
-      // way to know when the answer reached the page. fetch+fulfill does.
+      // way to read what the row said. fetch+fulfill does.
       const response = await route.fetch();
+      if (!isExistence) {
+        const body = await response.json().catch(() => null);
+        const rec = Array.isArray(body) ? body[0] : body;
+        if (rec?.settings) state.row = rec.settings;
+      }
       await route.fulfill({ response });
       state.lastFulfilledAt = Date.now();
       return;
@@ -379,6 +388,13 @@ export async function interceptUserSettings(page, mode) {
         throw new Error(`[eyeTools] user_settings interceptor (mode=${mode}) matched ZERO GET requests. The test proved nothing about ${mode}. Hard failure.`);
       }
       return state.matched;
+    },
+    release: () => openGate(),
+    row: () => {
+      if (!state.row) {
+        throw new Error(`[eyeTools] interceptUserSettings(${mode}): the blob read returned no settings row — there is no DB capital to compare against. Hard failure.`);
+      }
+      return state.row;
     },
     lastFulfilledAt: () => {
       if (state.lastFulfilledAt == null) {

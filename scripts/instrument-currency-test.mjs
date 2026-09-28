@@ -2223,24 +2223,32 @@ console.log("  18 · G2 · סיכון במטבע ההון");
   }
   check("מטא · שומר המניות ב-`handleSubmit` חולץ וסוגריו המסולסלים מאוזנים", guardSrc != null);
 
-  const awaitAt = only("const awaitingRate =");
-  const awaitExpr = awaitAt >= 0 ? (/const awaitingRate = (.+);\s*$/.exec(lines[awaitAt]) || [])[1] ?? null : null;
-  check("מטא · ביטוי `awaitingRate` חולץ ומאוזן", awaitExpr != null && bal(awaitExpr) === 0);
+  const awaitAt = only("const submitState =");
+  const awaitExpr = awaitAt >= 0 ? (/const submitState = (.+);\s*$/.exec(lines[awaitAt]) || [])[1] ?? null : null;
+  check("מטא · ביטוי `submitState` חולץ ומאוזן", awaitExpr != null && bal(awaitExpr) === 0);
+  const gateAt = only("const capGate =");
+  const gateExpr = gateAt >= 0 ? (/const capGate = (.+);\s*$/.exec(lines[gateAt]) || [])[1] ?? null : null;
+  check("מטא · ביטוי `capGate` חולץ ומאוזן", gateExpr != null && bal(gateExpr) === 0 && bal(gateExpr, "{", "}") === 0);
 
   const INJ = ["effShares", "sizing", "sizingOk", "posSizeTooSmall", "lang", "toast",
                "PAPER_BASE", "capitalCurrency", "form", "saveBlockMessage"];
-  let refFn = null, guardFn = null, awaitFn = null;
-  try { refFn = new Function("formPaperCcy", "paperCapStatus", "sizingRefusalReason", `return (${refExpr});`); } catch {}
+  let refFn = null, guardFn = null, awaitFn = null, gateFn = null;
+  try { refFn = new Function("formPaperCcy", "paperCapStatus", "capGate", "sizingRefusalReason", `return (${refExpr});`); } catch {}
+  try { gateFn = new Function("hydrationDone", "hydrationFailed", "isSupabaseConfigured", "hasLocalCapital", "capitalGate", `return (${gateExpr});`); } catch {}
   try { guardFn = new Function(...INJ, `${guardSrc}\nreturn "PASSED";`); } catch {}
-  try { awaitFn = new Function("sizing", `return (${awaitExpr});`); } catch {}
-  check("מטא · שלושת החילוצים נבנים ב-`new Function`", [refFn, guardFn, awaitFn].every(f => typeof f === "function"));
+  try { awaitFn = new Function("sizing", "submitGate", `return (${awaitExpr});`); } catch {}
+  check("מטא · ארבעת החילוצים נבנים ב-`new Function`", [refFn, guardFn, awaitFn, gateFn].every(f => typeof f === "function"));
 
   // ── 22.1 🔴 `V1` — `formRefusal` מבדיל «נטען» מ«אין שער» ────────────────────
   console.log("  22.1 · 🔴 V1 · formRefusal");
-  const ref = (ccy, st) => refFn ? refFn(ccy, st, PS.sizingRefusalReason) : "(חילוץ נכשל)";
+  const ref = (ccy, st, cg = "ready") => refFn ? refFn(ccy, st, cg, PS.sizingRefusalReason) : "(חילוץ נכשל)";
   eq("🔴 V1 · נייר USD · השער `loading` ⇒", ref("USD", "loading"), "loading");
   eq("⚪ V1 · נייר USD · השער `unavailable` ⇒", ref("USD", "unavailable"), "no_rate");
   eq("⚪ V1 · נייר ⛔ מאומת ⇒", ref(null, "loading"), "unverified_currency");
+  // `B-386` — ההון לפני השער: הון שלא הוכרע הוא הסיבה, גם כשהשער מוכן.
+  eq("🔴 V1 · הון `loading` · השער `ready` ⇒", ref("USD", "ready", "loading"), "capital_loading");
+  eq("🔴 V1 · הון `none` (כשל + ⛔ עותק) ⇒", ref("USD", "ready", "none"), "no_capital");
+  eq("🔴 V1 · הון `local` (כשל + עותק) · השער `loading` ⇒ השער", ref("USD", "loading", "local"), "loading");
 
   // ── 22.2 ⚪ `V2` — `sizePosition` מעביר את הסיבה כמות-שהיא ─────────────────
   console.log("  22.2 · ⚪ V2 · sizePosition pass-through");
@@ -2275,6 +2283,8 @@ console.log("  18 · G2 · סיכון במטבע ההון");
     check(`🔴 V3 · \`no_rate\` ⇒ ההודעה מפנה ל«נסה לטעון שער שוב» (got ${JSON.stringify(b.msg)})`, /נסה לטעון שער שוב/.test(b.msg) && /USD→ILS/.test(b.msg));
     const u = submit(unverS);
     check(`🔴 V3 · \`unverified_currency\` ⇒ ⛔ «הגדל הון» (got ${JSON.stringify(u.msg)})`, u.msg !== "" && !/הגדל הון/.test(u.msg));
+    const cl = submit(sizePosition({ entry: "100", stop: "99", capital: 5000, riskPct: 1, rate: null, refusalReason: "capital_loading" }));
+    check(`🔴 V3 · \`capital_loading\` ⇒ ההודעה אומרת שההון נטען, ⛔ «הגדל הון» (got ${JSON.stringify(cl.msg)})`, /ההון שלך עדיין נטען/.test(cl.msg) && !/הגדל הון/.test(cl.msg));
     const en = submit(loadingS, "en");
     check(`🔴 V3 · en · \`loading\` ⇒ ⛔ «Raise capital» (got ${JSON.stringify(en.msg)})`, en.msg !== "" && !/Raise capital/i.test(en.msg));
     // ⚪ בקרה — הסיבה שבה העצה **נכונה**: ההון ⛔ מספיק למניה אחת.
@@ -2286,11 +2296,28 @@ console.log("  18 · G2 · סיכון במטבע ההון");
   }
 
   // ── 22.4 🔴 `V4` — `Log Trade` מושבת **רק** בזמן טעינת השער ─────────────────
-  console.log("  22.4 · 🔴 V4 · awaitingRate");
-  const aw = (s) => awaitFn ? awaitFn(s) : "(חילוץ נכשל)";
-  eq("🔴 V4 · `loading` ⇒ מושבת", aw(loadingS), true);
+  console.log("  22.4 · 🔴 V4 · submitState — מתי `Log Trade` מושבת");
+  const aw = (s) => { try { return awaitFn(s, PS.submitGate).disabled; } catch { return "(חילוץ נכשל)"; } };
+  const capLoadS = sizePosition({ entry: "100", stop: "99", capital: 5000, riskPct: 1, rate: null, refusalReason: "capital_loading" });
+  const noCapS   = sizePosition({ entry: "100", stop: "99", capital: 2500, riskPct: 1, rate: null, refusalReason: "no_capital" });
+  eq("🔴 V4 · השער `loading` ⇒ מושבת", aw(loadingS), true);
+  eq("🔴 V4 · ההון `capital_loading` ⇒ מושבת", aw(capLoadS), true);
+  eq("🔴 V4 · `no_capital` ⇒ מושבת", aw(noCapS), true);
   eq("⚪ V4 · `no_rate` ⇒ ⛔ מושבת (F2: הכפתור פעיל, ה-toast מסביר)", aw(noRateS), false);
   eq("⚪ V4 · sizing תקין ⇒ ⛔ מושבת", aw(smallS), false);
+
+  // ── 22.4b 🔴 `V6` — `capGate` מהבייטים: מה ההון שעל המסך ─────────────────
+  //
+  // ⚠️ `capitalSettled` (`:1274`) הוא **אמת** גם בכשל — ולכן ⛔ יכול להבדיל «עותק
+  //    במכשיר» מ«ברירת מחדל ממוצאת». `hasLocalCapital` הוא ההבדל, והמצב `none` ⛔ נתקע:
+  //    מוצאו «טען מחדש».
+  console.log("  22.4b · 🔴 V6 · capGate");
+  const cg = (d, f, sb, l) => { try { return gateFn(d, f, sb, l, PS.capitalGate); } catch { return "(חילוץ נכשל)"; } };
+  eq("🔴 V6 · לפני ש-DB ענה (מכשיר חוזר) ⇒", cg(false, false, true, true), "loading");
+  eq("🔴 V6 · DB ענה ⇒", cg(true, false, true, true), "ready");
+  eq("🔴 V6 · הקריאה נכשלה + עותק במכשיר ⇒", cg(false, true, true, true), "local");
+  eq("🔴 V6 · הקריאה נכשלה + ⛔ עותק (ההון = DEFAULT_CAPITAL ממוצא) ⇒", cg(false, true, true, false), "none");
+  eq("⚪ V6 · ⛔ Supabase מוגדר ⇒ המקומי הוא המקור ⇒", cg(false, false, false, false), "ready");
 
   // ── 22.5 🔴 `S*` — צורה: החיווט שהמסך צורך ────────────────────────────────
   //
@@ -2298,17 +2325,32 @@ console.log("  18 · G2 · סיכון במטבע ההון");
   console.log("  22.5 · 🔴 S1–S5 · חיווט");
   {
     const btnAt = lines.findIndex(l => l.includes("<button onClick={handleSubmit}"));
-    const btn = btnAt >= 0 ? lines.slice(btnAt, btnAt + 8).join("\n") : "";
-    check("🔴 S1 · כפתור `Log Trade` מושבת גם על `awaitingRate`", /disabled=\{[^}]*awaitingRate/.test(btn));
-    check("🔴 S1 · ותוויתו בזמן ההמתנה היא «טוען שער…»", /awaitingRate[\s\S]*טוען שער…/.test(btn));
+    const btn = btnAt >= 0 ? lines.slice(btnAt, btnAt + 10).join("\n") : "";
+    check("🔴 S1 · כפתור `Log Trade` מושבת גם על `submitState.disabled`", /disabled=\{[^}]*submitState\.disabled/.test(btn));
+    check("🔴 S1 · ותוויותיו: «טוען הון…» · «טוען שער…» · «אין הון»",
+          /"capital_loading"[\s\S]*טוען הון…/.test(btn) && /"loading"[\s\S]*טוען שער…/.test(btn) && /"no_capital"[\s\S]*אין הון/.test(btn));
     const bannerAt = lines.findIndex(l => l.includes("{tradeValidity.valid && !sizingOk && ("));
-    const banner = bannerAt >= 0 ? lines.slice(bannerAt, bannerAt + 30).join("\n") : "";
+    const banner = bannerAt >= 0 ? lines.slice(bannerAt, bannerAt + 50).join("\n") : "";
+    check("🔴 S6 · באנר הסירוב מבדיל `capital_loading` (טקסט «טוען הון…») ו-`no_capital` (כפתור «טען מחדש»)",
+          /sizing\.reason === "capital_loading"/.test(banner) && /טוען הון…/.test(banner)
+          && /sizing\.reason === "no_capital"/.test(banner) && /data-testid="capital-reload"/.test(banner));
+    const noticeAt = lines.findIndex(l => l.includes('{capGate === "local" && ('));
+    const notice = noticeAt >= 0 ? lines.slice(noticeAt, noticeAt + 8).join("\n") : "";
+    check("🔴 S7 · כשל + עותק במכשיר ⇒ הטופס **אומר** «הון מהעותק המקומי… ייתכן שאינו מעודכן» (⛔ בשקט)",
+          /data-testid="capital-local-notice"/.test(notice) && /הון מהעותק המקומי במכשיר/.test(notice) && /ייתכן שאינו מעודכן/.test(notice));
     check("🔴 S2 · באנר הסירוב מבדיל `loading` (טקסט «טוען שער»)", /sizing\.reason === "loading"/.test(banner) && /טוען שער/.test(banner));
     check("🔴 S3 · באנר «אין שער» נושא כפתור «נסה לטעון שער שוב» שמחובר ל-`paperCapRetry`",
           /onClick=\{paperCapRetry\}/.test(banner) && /נסה לטעון שער שוב/.test(banner) && /data-testid="fx-retry"/.test(banner));
+    const rateAt = lines.findIndex(l => l.includes("const formRate = formPaperCcy == null"));
+    const rateSrc = rateAt >= 0 ? lines.slice(rateAt, rateAt + 6).join("\n") : "";
+    check("🔴 S8 · `formRate` מסרב (`null`) כשההון `loading`/`none` — ⛔ מחשבים מהמראה",
+          /capGate === "loading" \|\| capGate === "none" \? null/.test(rateSrc));
     const fx = src("../src/hooks/useFxRates.js");
-    check("🔴 S4 · `useFxRates` מקבל `timeoutMs` ומסמן `unavailable` כשהוא חולף",
-          /timeoutMs/.test(fx) && /setTimeout\([\s\S]{0,300}status:\s*"unavailable"/.test(fx));
+    // ⚠️ גוף ה-callback **בלבד** — חלון תווים פתוח תפס את `"unavailable"` של `.then`
+    //    שמתחת, ומוטנט שרוקן את הטיימר **שרד** (נמדד 28.09, M28).
+    const tBody = (/setTimeout\(\(\) => \{([\s\S]*?)\}, timeoutMs\)/.exec(fx) || [])[1] ?? "";
+    check("🔴 S4 · `useFxRates` מקבל `timeoutMs`, וה-callback שלו מסמן `unavailable` רק מתוך `loading`",
+          /opts\.timeoutMs/.test(fx) && /s\.status === "loading" \? \{ table: null, status: "unavailable" \}/.test(tBody));
     check("🔴 S4 · ו-`retry` מוחזר מה-hook", /retry/.test(fx) && /return\s*\{[^}]*retry/.test(fx));
     const calls = lines.filter(l => /useFxRates\(PAPER_BASE,/.test(l));
     check(`🔴 S5 · שני ה-hooks שמזינים את \`paperCapStatus\` מקבלים \`FX_SETTLE_MS\` (נמדד ${calls.filter(l => /FX_SETTLE_MS/.test(l)).length}/${calls.length})`,
@@ -2322,8 +2364,11 @@ console.log("  18 · G2 · סיכון במטבע ההון");
     const m = (reason, langCode, extra = {}) => typeof PS.saveBlockMessage === "function"
       ? PS.saveBlockMessage({ reason, lang: langCode, paperBase: "USD", capitalCurrency: "ILS", ...extra }) : "(חסר)";
     const langs = ["he", "en", "es", "pt", "ar"];
-    const bad = langs.filter(l => ["loading", "no_rate", "unverified_currency"].some(r => /הגדל הון|Raise capital/i.test(he(m(r, l)))));
-    check(`🔴 V5 · ${langs.length} שפות × 3 סיבות-שער ⇒ ⛔ «הגדל הון»/«Raise capital» (נמדד ${bad.length} שפות מפרות)`, bad.length === 0 && typeof PS.saveBlockMessage === "function");
+    const REASONS = ["loading", "no_rate", "unverified_currency", "capital_loading", "no_capital"];
+    const bad = langs.filter(l => REASONS.some(r => /הגדל הון|Raise capital/i.test(he(m(r, l)))));
+    check(`🔴 V5 · ${langs.length} שפות × ${REASONS.length} סיבות ⛔-הון-קטן ⇒ ⛔ «הגדל הון»/«Raise capital» (נמדד ${bad.length} שפות מפרות)`, bad.length === 0 && typeof PS.saveBlockMessage === "function");
+    check("🔴 V5 · `capital_loading` ⇒ ההודעה אומרת שההון נטען", /ההון שלך עדיין נטען/.test(he(m("capital_loading", "he"))));
+    check("🔴 V5 · `no_capital` ⇒ ההודעה מפנה לטעינה מחדש", /טען את הדף מחדש/.test(he(m("no_capital", "he"))));
     check("🔴 V5 · `too_small` ⇒ העצה נשארת (בקרה על המודול)", /הגדל הון/.test(he(m("too_small", "he"))));
   }
 }
