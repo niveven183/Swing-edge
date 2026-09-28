@@ -106,7 +106,7 @@ import { resolveEquityBase } from "./src/lib/equityBase.js";
 import { deriveEquityState, equityFigure, deriveRiskState, riskFigure } from "./src/lib/equityState.js";
 import { horizonState, horizonLabel } from "./src/lib/tradeHorizon.js";
 import { deriveInstrumentCurrency, matchesCapital, isUnverified, INSTRUMENT_STATE, PAPER_BASE, CURRENCY_SOURCE } from "./src/lib/instrumentCurrency.js";
-import { sizePosition } from "./src/lib/positionSizing.js";
+import { sizePosition, sizingRefusalReason, saveBlockMessage, FX_SETTLE_MS } from "./src/lib/positionSizing.js";
 
 // ⚠️ קבוע מודול, ⛔ לא `[]` inline: מערך טרי בכל רינדור הוא תלות טרייה ב-
 // `useFxRates`, וזה לולאת fetch אינסופית.
@@ -2260,17 +2260,23 @@ export default function SwingEdge() {
   // עלות רשת: ⛔ **אינה נאמרת כאן** — היא נגזרת מ-`fxPairPlan`, פונקציה טהורה
   // שהטסט קורא לה. הכלל הזה ישב כאן inline ⇒ ⛔ לא היה ניתן לאסרציית **ערך**;
   // עכשיו `plan.network` הוא המספר שהטסט מודד, ⛔ לא הערה שמישהו יסתמך עליה.
-  const paperAcctFx = useFxRates(PAPER_BASE, accountCurrency, fxDayKeys);
+  // ⚠️ `B-376` — `paperCapSamePair` מחושב **לפני** שני ה-hooks, כי כשהון = חשבון
+  // הטבלה הזו היא גם זו שמתמחרת פוזיציה, ולכן גם היא נושאת את תקרת הזמן.
+  const paperCapSamePair = fxPairPlan(PAPER_BASE, capitalCurrency, accountCurrency).reusesAccountTable;
+  const paperAcctFx = useFxRates(PAPER_BASE, accountCurrency, fxDayKeys, { timeoutMs: paperCapSamePair ? FX_SETTLE_MS : undefined });
   // 🔴 מקור-אמת-אחד. `paperCapSamePair` היה כאן העתקה מקבילה של אותו תנאי —
   // בדיוק המבנה שבו התיקון נוחת באחת מהשתיים. הון = חשבון (המקרה הרווח) ⇒
   // אותו זוג בדיוק ⇒ קוראים ל-Hook עם `PAPER_BASE→PAPER_BASE` (`identity`,
   // עלות אפס) ומשתמשים מחדש בטבלה שכבר נטענה, ⛔ במקום לשלם פעמיים.
-  const paperCapSamePair = fxPairPlan(PAPER_BASE, capitalCurrency, accountCurrency).reusesAccountTable;
-  const paperCapOwnFx = useFxRates(PAPER_BASE, paperCapSamePair ? PAPER_BASE : capitalCurrency, EMPTY_DAYS);
+  // ⚠️ `B-376` — תקרת `FX_SETTLE_MS` (8s, הכרעת ניב 28.09): `loadRateTable` ⛔ נושא
+  // timeout בצד הלקוח (נמדד), ובלי תקרה `loading` תקוע היה משאיר את `Log Trade`
+  // מושבת לנצח. אחריה ⇒ `unavailable` ⇒ באנר «אין שער» + «נסה לטעון שער שוב».
+  const paperCapOwnFx = useFxRates(PAPER_BASE, paperCapSamePair ? PAPER_BASE : capitalCurrency, EMPTY_DAYS, { timeoutMs: FX_SETTLE_MS });
   const paperAcctTable  = paperAcctFx.table;
   const paperAcctStatus = paperAcctFx.status;
   const paperCapTable  = paperCapSamePair ? paperAcctFx.table  : paperCapOwnFx.table;
   const paperCapStatus = paperCapSamePair ? paperAcctFx.status : paperCapOwnFx.status;
+  const paperCapRetry  = paperCapSamePair ? paperAcctFx.retry  : paperCapOwnFx.retry;
 
   // השער נייר→הון ל**ערכי הווה** (תמחור פוזיציה, סיכון). `null` = סירוב.
   // ⛔ אין כאן `|| 1`: ברירת מחדל כאן היא פקודת קנייה בגודל שגוי.
@@ -2820,7 +2826,9 @@ export default function SwingEdge() {
     ? null                                    // נייר לא-מאומת ⇒ סירוב מוצהר
     : formPaperCcy === capitalCurrency ? 1     // זהות מדויקת, ⛔ לא שער
     : paperToCapitalRate;                      // שער spot, או null כשאין
-  const formRefusal = formPaperCcy == null ? "unverified_currency" : "no_rate";
+  // ⚠️ `B-376` — שלושה ערכים, ⛔ שניים: `loading` היה מסווג כאן «אין שער», והמשתמש
+  // קיבל באנר «אין כרגע שער» ו-toast «הגדל הון» בזמן שהשער פשוט עוד נטען.
+  const formRefusal = sizingRefusalReason(formPaperCcy, paperCapStatus);
 
   const sizing = sizePosition({
     entry: form.entry, stop: form.stop, capital, riskPct,
@@ -2829,6 +2837,10 @@ export default function SwingEdge() {
   });
   // ⚠️ `sizingOk` שקר ⇒ המסך מציג `—` + סיבה. ⛔ אין נפילה למספר.
   const sizingOk = sizing.ok;
+  // `B-376` (כיוון א׳, הכרעת ניב 28.09) — ⛔ מחליטים גודל פוזיציה לפי שער שלא הוכרע:
+  // בזמן הטעינה `Log Trade` מושבת עם «טוען שער…». `unavailable` ⛔ מושבת — ה-toast
+  // וכפתור «נסה לטעון שער שוב» בבאנר הם המוצא (F2).
+  const awaitingRate = !sizing.ok && sizing.reason === "loading";
 
   const riskPerShare   = sizing.riskPerShare ?? 0;
   const posSize        = sizing.posSize ?? 0;
@@ -2967,10 +2979,10 @@ export default function SwingEdge() {
     // (`positionSizing.js`), `effShares` יכול להיות `0` (ההון ⛔ מספיק) או
     // `null` (⛔ נמדד שער). שמירה במצבים האלה הייתה כותבת `shares: 0/null`
     // ל-DB, ומשם כל מדד נגזר — P&L · סיכון · DNA — מתאפס **בשקט**.
+    // ⚠️ `B-376` — ההודעה נגזרת מ**הסיבה**: «הגדל הון» נכונה רק כשההון ⛔ מספיק
+    // (`sizingOk`, גודל 0). לסיבת שער היא עצה שגויה (מחלקת `B-335`).
     if (!(effShares > 0)) {
-      toast.error(lang === "he"
-        ? "⛔ אי-אפשר לשמור בלי גודל פוזיציה. הגדל הון, הדק את הסטופ, או הקלד מספר מניות ידנית."
-        : "Cannot save without a position size. Raise capital, tighten the stop, or type a share count.");
+      toast.error(saveBlockMessage({ reason: sizingOk ? "too_small" : sizing.reason, lang, paperBase: PAPER_BASE, capitalCurrency }));
       return;
     }
     // Block geometrically invalid trades from being saved (reversed stop/target).
@@ -8155,13 +8167,25 @@ export default function SwingEdge() {
               {tradeValidity.valid && !sizingOk && (
                 <div className="flex items-center gap-2 p-2.5 rounded-[var(--v3-radius-chip)] border text-xs bg-[var(--v3-warn)]/5 border-[var(--v3-warn)]/20 text-[var(--v3-warn)]">
                   <AlertTriangle size={13} />
-                  <span>{sizing.reason === "unverified_currency"
+                  {/* `B-376` — שלוש סיבות, ⛔ שתיים: `loading` אמר כאן «אין כרגע שער». */}
+                  <span className="flex-1">{sizing.reason === "unverified_currency"
                     ? (lang === "he"
                         ? `מטבע המסחר של ${form.ticker.trim().toUpperCase()} לא אומת, ולכן אי-אפשר לתמחר פוזיציה מול הון ${capSym}. מספר כאן היה יוצא שגוי, ולכן איננו מציגים אותו. ה-R/R תקף.`
                         : `The trading currency of ${form.ticker.trim().toUpperCase()} is unverified, so the position cannot be priced against ${capSym} capital. A number here would be wrong, so we show none. R/R is still valid.`)
+                    : sizing.reason === "loading"
+                    ? (lang === "he"
+                        ? `טוען שער ${PAPER_BASE}→${capitalCurrency}… גודל הפוזיציה יחושב כשהשער יגיע. ה-R/R תקף.`
+                        : `Loading the ${PAPER_BASE}→${capitalCurrency} rate… the position size will be computed when it arrives. R/R is still valid.`)
                     : (lang === "he"
                         ? `אין כרגע שער ${PAPER_BASE}→${capitalCurrency}, ולכן אי-אפשר לתמחר את הפוזיציה. ⛔ איננו מנחשים שער. ה-R/R תקף.`
                         : `No ${PAPER_BASE}→${capitalCurrency} rate right now, so the position cannot be priced. We never guess a rate. R/R is still valid.`)}</span>
+                  {/* F2 (הכרעת ניב 28.09) — המוצא ממצב «אין שער». ⛔ שמירה בלי שער (F1 חי ב-`B-385`). */}
+                  {sizing.reason === "no_rate" && (
+                    <button type="button" data-testid="fx-retry" onClick={paperCapRetry}
+                      className="shrink-0 px-2 py-1 rounded-[var(--v3-radius-chip)] border border-[var(--v3-warn)]/40 text-[var(--v3-warn)] hover:bg-[var(--v3-warn)]/10 transition font-bold">
+                      {lang === "he" ? "נסה לטעון שער שוב" : "Retry loading the rate"}
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -8342,9 +8366,9 @@ export default function SwingEdge() {
               {/* Actions */}
               <div className="flex gap-2 pt-1">
                 <button onClick={handleSubmit}
-                  disabled={!form.ticker || !entryN || !stopN}
+                  disabled={!form.ticker || !entryN || !stopN || awaitingRate}
                   className="flex-1 py-2.5 rounded-[var(--v3-radius-chip)] bg-gradient-to-r from-[var(--v3-accent)] to-[var(--v3-purple)] text-white text-sm font-bold hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:opacity-40">
-                  Log Trade →
+                  {awaitingRate ? (lang === "he" ? "טוען שער…" : "Loading rate…") : "Log Trade →"}
                 </button>
                 <button onClick={() => {
                     setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null });

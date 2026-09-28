@@ -316,11 +316,16 @@ const USER_SETTINGS_RE = /\/rest\/v1\/user_settings/;
 //                 The only way to reach `loadSettings`'s failure branch, and a real
 //                 outage shape: a transient failure between two requests issued
 //                 milliseconds apart.
+//   delay       — `B-376` control arm (Niv, 28.09): every read is held
+//                 `DELAY_MS` and then answered from the REAL row (`route.fetch`).
+//                 `lastFulfilledAt()` is when the app could first have the row —
+//                 the form must not be reachable before it (render gate :4144).
+export const SETTINGS_DELAY_MS = 3_000;
 export async function interceptUserSettings(page, mode) {
-  if (!["empty", "error", "error-blob"].includes(mode)) {
+  if (!["empty", "error", "error-blob", "delay"].includes(mode)) {
     throw new Error(`[eyeTools] interceptUserSettings: unknown mode ${JSON.stringify(mode)}`);
   }
-  const state = { matched: 0, existence: 0, blob: 0 };
+  const state = { matched: 0, existence: 0, blob: 0, lastFulfilledAt: null };
   await page.route(USER_SETTINGS_RE, async (route) => {
     const req = route.request();
     if (req.method() !== "GET") return route.fallback(); // writes are handled by blockAllRestWrites
@@ -340,6 +345,16 @@ export async function interceptUserSettings(page, mode) {
       return route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
     }
     if (mode === "error") return fail();
+
+    if (mode === "delay") {
+      await new Promise((r) => setTimeout(r, SETTINGS_DELAY_MS));
+      // ⛔ `route.fallback()`: it would hand the request to the network with no
+      // way to know when the answer reached the page. fetch+fulfill does.
+      const response = await route.fetch();
+      await route.fulfill({ response });
+      state.lastFulfilledAt = Date.now();
+      return;
+    }
 
     // ── error-blob ──
     if (!isExistence) return fail();
@@ -365,6 +380,12 @@ export async function interceptUserSettings(page, mode) {
       }
       return state.matched;
     },
+    lastFulfilledAt: () => {
+      if (state.lastFulfilledAt == null) {
+        throw new Error(`[eyeTools] interceptUserSettings(${mode}): no read was fulfilled — there is no settle time to compare against. Hard failure.`);
+      }
+      return state.lastFulfilledAt;
+    },
     // ⚠️ `error-blob` is worthless unless the BLOB read actually happened: if the
     // existence check had failed, the app would have returned at `:1822` and the
     // branch under test would never have run. Counting the shapes is the only way
@@ -377,6 +398,64 @@ export async function interceptUserSettings(page, mode) {
         throw new Error(`[eyeTools] interceptUserSettings(${mode}): the blob read (select=settings) never fired — the app returned at the migrate check (:1822) instead. The loadSettings failure branch was NOT exercised; a green here would be vacuous. Hard failure.`);
       }
       return { existence: state.existence, blob: state.blob };
+    },
+  };
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// `B-376` · interceptFx — the FX rate on command (Niv, 28.09).
+//
+// The race behind the sentinel's `create-failed` (27.09) is a WINDOW: the paper→
+// capital rate (`/api/fx`) is still in flight while the user presses Log Trade.
+// A timing-based reproduction is a coin toss; holding the request is not.
+//
+//   hold  — every /api/fx request waits until `release()`, then goes to the network
+//   error — every /api/fx request answers 500 until `restore()`  ⇒ `unavailable`
+//   hang  — every /api/fx request is NEVER answered until `restore()` ⇒ only the
+//           app's own timeout (FX_SETTLE_MS) can end `loading`
+//
+// ⚠️ Playwright disables the HTTP cache while routing is on, and `fx.js` caches
+// only PAST days in localStorage (⛔ spot) — so the spot request does go out. The
+// liveness gate proves it did.
+// ───────────────────────────────────────────────────────────────────────────
+const FX_RE = /\/api\/fx(\?|$)/;
+export async function interceptFx(page, mode) {
+  if (!["hold", "error", "hang"].includes(mode)) {
+    throw new Error(`[eyeTools] interceptFx: unknown mode ${JSON.stringify(mode)}`);
+  }
+  const state = { mode, matched: 0 };
+  let open;
+  const gate = new Promise((r) => { open = r; });
+  const hung = [];
+  await page.route(FX_RE, async (route) => {
+    state.matched += 1;
+    if (state.mode === "pass") return route.fallback();
+    if (state.mode === "hold") { await gate; return route.fallback(); }
+    if (state.mode === "hang") { hung.push(route); return; } // ⛔ answered — on purpose
+    return route.fulfill({
+      status: 500,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "eyeTools: synthetic fx failure" }),
+    });
+  });
+  const restore = () => {
+    state.mode = "pass";
+    open();
+    // A hung request the app already gave up on (timeout) must not stay pending
+    // forever; aborting it reaches a reqId the app has since superseded.
+    for (const r of hung.splice(0)) r.abort().catch(() => {});
+  };
+  return {
+    release: restore,
+    restore,
+    // LIVENESS GATE (`INCIDENTS#13`): an interceptor that caught nothing means the
+    // test measured the unmodified app — e.g. a QA account whose capital is in USD,
+    // where the paper→capital pair is identity and no rate is ever requested.
+    assertMatched: () => {
+      if (state.matched === 0) {
+        throw new Error(`[eyeTools] interceptFx(${mode}) matched ZERO /api/fx requests. The test proved nothing about the rate window. Hard failure.`);
+      }
+      return state.matched;
     },
   };
 }

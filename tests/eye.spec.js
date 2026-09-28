@@ -17,6 +17,7 @@ import {
   readFlashes,
   recordNetwork,
   interceptUserSettings,
+  interceptFx,
   blockAllRestWrites,
   login,
   freshUserState,
@@ -262,6 +263,152 @@ test.describe("eye→CI · onboarding + hydration", () => {
       // 8s is comfortably past both without being a budget item.
       await page.waitForTimeout(8_000);
 
+      assertAccountUntouched(net, blocker);
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  // ───────────────────────────────────────────────────────────────────────
+  // C-061 · B-376 — the "fast user": Log Trade while the paper→capital rate is
+  // still in flight. Reproduced ON COMMAND by holding /api/fx (`interceptFx`),
+  // ⛔ by racing a clock.
+  //
+  // Found by the sentinel (`create-failed`, 27.09): the QA account's capital is
+  // ILS and SNTNL is a USD paper, so sizing needs USD→ILS. While that request was
+  // in flight the form said «אין כרגע שער» and Log Trade answered «הגדל הון…» —
+  // advice that fixes nothing (B-335's class). Decisions (Niv, 28.09): loading ⇒
+  // Log Trade DISABLED «טוען שער…» (א) · failed ⇒ blocked + «נסה לטעון שער שוב»
+  // (F2) · 8s ceiling ⇒ failed.
+  //
+  // ⛔ No trade is ever created: ⓐ/ⓒ never press Log Trade, ⓑ presses it only
+  // while sizing is refused (the guard returns before any write), and every
+  // write is blocked + counted regardless (`assertAccountUntouched`).
+  // ───────────────────────────────────────────────────────────────────────
+  const dialog = (page) => page.locator('[role="dialog"]').first();
+  const submitBtn = (page) => dialog(page).getByRole("button", { name: /Log Trade|טוען שער|Loading rate/ });
+  const sharesInput = (page) => dialog(page).locator("div.text-center.group").filter({ hasText: /Shares/i }).first().locator("input");
+  async function openFilledForm(page) {
+    await page.goto("/app", { waitUntil: "load" });
+    await page.locator('[data-tour-tab="dashboard"]').waitFor({ state: "visible", timeout: 25_000 });
+    // The consent banner sits over the FAB on a fresh device (sentinel step 4
+    // declines it the same way). Declining writes localStorage only.
+    const decline = page.locator('[data-testid="consent-decline"]');
+    if (await decline.count()) await decline.click();
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.locator('[data-tour="add-trade"]').click();
+    await page.locator("#log-ticker").fill("SNTNL");
+    await page.locator("#log-entry").fill("100");
+    await page.locator("#log-stop").fill("99");
+    await page.locator("#log-target").fill("102");
+  }
+  const LOADING_BANNER = /טוען שער USD→|Loading the USD→/;
+  const NO_RATE_BANNER = /אין כרגע שער USD→|No USD→\w+ rate right now/;
+  const WRONG_ADVICE = /הגדל הון, הדק את הסטופ|Raise capital, tighten the stop/;
+
+  test("C-061ⓐ — rate in flight ⇒ Log Trade disabled «טוען שער…», ⛔ «אין שער»; rate lands ⇒ a size", async ({ browser }) => {
+    const ctx = await browser.newContext({ baseURL: BASE_URL, storageState: STATE });
+    const page = await ctx.newPage();
+    try {
+      const net = recordNetwork(page);
+      const blocker = await blockAllRestWrites(page);
+      const fx = await interceptFx(page, "hold");
+      await openFilledForm(page);
+
+      await expect(submitBtn(page), "while the rate is in flight Log Trade must read «טוען שער…» — it read something else").toHaveText(/טוען שער…|Loading rate…/);
+      await expect(submitBtn(page)).toBeDisabled();
+      await expect(dialog(page)).toContainText(LOADING_BANNER);
+      await expect(dialog(page), "a rate that is still LOADING was announced as ABSENT").not.toContainText(NO_RATE_BANNER);
+
+      fx.release();
+      await expect(submitBtn(page)).toHaveText(/Log Trade/);
+      await expect(submitBtn(page)).toBeEnabled();
+      await expect(sharesInput(page)).toHaveValue(/^[1-9]\d*$/);
+      await expect(dialog(page)).not.toContainText(LOADING_BANNER);
+
+      fx.assertMatched();
+      assertAccountUntouched(net, blocker);
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  test("C-061ⓑ — rate fails ⇒ «אין שער» + retry, toast ⛔ «הגדל הון»; retry ⇒ a size", async ({ browser }) => {
+    const ctx = await browser.newContext({ baseURL: BASE_URL, storageState: STATE });
+    const page = await ctx.newPage();
+    try {
+      const net = recordNetwork(page);
+      const blocker = await blockAllRestWrites(page);
+      const fx = await interceptFx(page, "error");
+      await openFilledForm(page);
+
+      await expect(dialog(page)).toContainText(NO_RATE_BANNER);
+      await expect(submitBtn(page)).toBeEnabled();
+      await submitBtn(page).click(); // sizing is refused ⇒ the guard returns before any write
+      await expect(page.getByText(/אי-אפשר לחשב גודל פוזיציה ולשמור|cannot be sized or saved/).first()).toBeVisible();
+      await expect(page.getByText(WRONG_ADVICE), "the toast gave capital advice for a missing RATE (B-335's class)").toHaveCount(0);
+
+      const retry = page.locator('[data-testid="fx-retry"]');
+      await expect(retry, "F2: a failed rate must offer «נסה לטעון שער שוב» — otherwise the form is a dead end").toBeVisible();
+      fx.restore();
+      await retry.click();
+      await expect(sharesInput(page)).toHaveValue(/^[1-9]\d*$/);
+      await expect(dialog(page)).not.toContainText(NO_RATE_BANNER);
+
+      fx.assertMatched();
+      assertAccountUntouched(net, blocker);
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  test("C-061ⓒ — rate never answers ⇒ after 8s «אין שער» + retry (⛔ «טוען» forever)", async ({ browser }) => {
+    const ctx = await browser.newContext({ baseURL: BASE_URL, storageState: STATE });
+    const page = await ctx.newPage();
+    try {
+      const net = recordNetwork(page);
+      const blocker = await blockAllRestWrites(page);
+      const fx = await interceptFx(page, "hang");
+      await openFilledForm(page);
+
+      await expect(submitBtn(page)).toHaveText(/טוען שער…|Loading rate…/);
+      // FX_SETTLE_MS is 8s from the request's start; 15s is the ceiling for the
+      // whole window including the time the form took to fill.
+      await expect(page.locator('[data-testid="fx-retry"]'), "a rate that never answers kept the form in «טוען» — the 8s ceiling did not fire").toBeVisible({ timeout: 15_000 });
+      await expect(submitBtn(page)).toHaveText(/Log Trade/);
+      await expect(dialog(page)).toContainText(NO_RATE_BANNER);
+
+      fx.restore();
+      await page.locator('[data-testid="fx-retry"]').click();
+      await expect(sharesInput(page)).toHaveValue(/^[1-9]\d*$/);
+
+      fx.assertMatched();
+      assertAccountUntouched(net, blocker);
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  // ⚪ CONTROL ARM (Niv, 28.09) — green on BOTH trees by design. The plan's §1.2
+  // says capital is settled before the form is reachable (render gate :4144 waits
+  // for onboardingSettled, set in the same block as setCapital). This holds the
+  // settings read 3s and measures that the app shell appeared only AFTER the row
+  // reached the page. 🔴 Red here means §1.2 is wrong ⇒ STOP, the fix aimed at
+  // the wrong window.
+  test("C-061 ⚪ control — settings read delayed ⇒ the form is not reachable before capital settles", async ({ browser }) => {
+    const ctx = await browser.newContext({ baseURL: BASE_URL, storageState: STATE });
+    const page = await ctx.newPage();
+    try {
+      const net = recordNetwork(page);
+      const blocker = await blockAllRestWrites(page);
+      const iv = await interceptUserSettings(page, "delay");
+      await page.goto("/app", { waitUntil: "load" });
+      await page.locator('[data-tour="add-trade"]').waitFor({ state: "visible", timeout: 25_000 });
+      const fabAt = Date.now();
+      const settledAt = iv.lastFulfilledAt();
+      expect(fabAt, `the Log Trade FAB was reachable ${settledAt - fabAt}ms BEFORE the settings row reached the page`).toBeGreaterThanOrEqual(settledAt);
+
+      iv.assertMatched();
       assertAccountUntouched(net, blocker);
     } finally {
       await ctx.close();
