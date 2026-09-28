@@ -1,0 +1,74 @@
+name: Sentinel Evidence Drill
+
+# B-375 — a CONTROLLED red finding, so "does a red finding leave evidence we can
+# open?" is answered without waiting weeks for a real outage.
+#
+# SENTINEL_DRILL=invalid-stop makes the authenticated journey type a LONG stop
+# ABOVE entry. handleSubmit returns early with a 3-second toast and no row is
+# written ⇒ the REAL `browser-auth|create-failed` fires through the REAL add(),
+# ~20s after the toast is gone. That is exactly B-376's shape, so this drill
+# proves the evidence buffer catches a toast a screenshot at add() time cannot.
+# No trade is created ⇒ rename/delete never run; restCleanup still runs.
+#
+# ⛔ DELIBERATELY NOT sentinel.yml (Niv, 28.09 — decision 2):
+#   · no `watch` job ⇒ no Discord post, no incident cache, no fault-state/count
+#     pollution, no "recovered" message on the next real run.
+#   · workflow_dispatch ONLY. The spec itself refuses the flag on any other event
+#     (it throws at load), so a drill can never ride a scheduled run.
+# ⚠️ The browser steps below mirror sentinel.yml's `browser` job by hand — a copy
+# that can drift (R-6). Tracked as a BACKLOG item, not papered over.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read               # zero repo writes from the run
+
+jobs:
+  drill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    # Same group as sentinel.yml's `browser` job: both mutate the live QA account,
+    # so a drill must never overlap a real authenticated run.
+    concurrency:
+      group: sentinel-auth
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Install Chromium (binary only — OS deps already present, see B-166)
+        run: npx playwright install chromium
+      - name: Run the authenticated journey with the drill flag
+        env:
+          SENTINEL_AUTH: '1'
+          SENTINEL_DRILL: invalid-stop
+          SENTINEL_QA_EMAIL: ${{ secrets.SENTINEL_QA_EMAIL }}
+          SENTINEL_QA_PASSWORD: ${{ secrets.SENTINEL_QA_PASSWORD }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: npx playwright test --config playwright.sentinel.config.js tests-sentinel/sentinel-auth.spec.js
+      - name: Upload drill findings
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: drill-findings
+          path: browser-findings-auth.json
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Upload red-finding evidence (B-375)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: sentinel-evidence
+          path: sentinel-evidence/
+          if-no-files-found: ignore
+          retention-days: 7

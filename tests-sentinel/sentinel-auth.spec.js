@@ -47,6 +47,19 @@ const QA_PASSWORD = process.env.SENTINEL_QA_PASSWORD || '';
 const SUPA_URL = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\/+$/, '');
 const SUPA_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 
+// B-375 — the evidence drill (.github/workflows/sentinel-evidence-drill.yml).
+// `invalid-stop` types a LONG stop ABOVE entry in step 5, so handleSubmit refuses
+// with a 3-second toast and writes no row ⇒ the real `create-failed` fires ~20s
+// later. Honoured ONLY under workflow_dispatch (Niv, 28.09): anywhere else the
+// flag THROWS at load — loud, never a silently-ignored or silently-obeyed drill.
+const DRILL = process.env.SENTINEL_DRILL || '';
+if (DRILL && process.env.GITHUB_EVENT_NAME !== 'workflow_dispatch') {
+  throw new Error(`SENTINEL_DRILL=${DRILL} refused: event=${process.env.GITHUB_EVENT_NAME || '(none)'} — drills run only under workflow_dispatch`);
+}
+if (DRILL && DRILL !== 'invalid-stop') {
+  throw new Error(`SENTINEL_DRILL=${DRILL} refused: unknown drill (known: invalid-stop)`);
+}
+
 const TICKER = 'SNTNL';
 // The representativeness fixture (B-305). SNTNL1 carries a digit inside an
 // otherwise alphabetic string, so it falls BETWEEN instrumentCurrency.js's two
@@ -868,7 +881,8 @@ test('authenticated journey: login → journal → SNTNL → SNTNL1 → boundari
     await page.locator('[data-tour="add-trade"]').click();
     await page.locator('#log-ticker').fill(TICKER);
     await page.locator('#log-entry').fill('100');
-    await page.locator('#log-stop').fill('99'); // LONG → stop < entry (validateTradeInputs)
+    // LONG → stop < entry (validateTradeInputs). The drill inverts it on purpose (B-375).
+    await page.locator('#log-stop').fill(DRILL === 'invalid-stop' ? '101' : '99');
     await page.locator('#log-target').fill('102');
     await page.getByRole('button', { name: /Log Trade/ }).click();
     // The toast disappears — the row in the table is the real proof.
