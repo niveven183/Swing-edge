@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
+// B-375 — openable evidence for red findings (why not trace: see the file header).
+import { createEvidence, recordEvidence } from './evidence.js';
 
 // Sentinel S1.5 — Layer A: real-browser QA of the PUBLIC (anon) surface.
 // Loads the landing page (/) and the app entry (/app → AuthScreen) in real
@@ -48,8 +50,14 @@ async function blockAnalytics(page) {
 
 const findings = [];
 
+// The evidence recorder of the current test's page; null outside a test.
+let ev = null;
+
 function add(component, fp, severity, emoji, checked, got, reason, fix, risk) {
-  findings.push({ component, fp, severity, emoji, checked, got, reason, fix, risk });
+  const finding = { component, fp, severity, emoji, checked, got, reason, fix, risk };
+  findings.push(finding);
+  // B-375: a red finding carries its own evidence status — ⛔ a separate finding.
+  if (severity === 'red') recordEvidence(ev, finding);
 }
 
 // Strip query params + hash for privacy hygiene before anything is logged.
@@ -150,6 +158,7 @@ function record(label, pageKey, diag) {
 
 test('landing (/) renders in a real browser', async ({ page }) => {
   await blockAnalytics(page);
+  ev = await createEvidence(page, { label: 'public' });
   const diag = watch(page);
   try {
     await page.goto('/', { waitUntil: 'load' });
@@ -165,11 +174,14 @@ test('landing (/) renders in a real browser', async ({ page }) => {
   }
   await page.waitForTimeout(1_500); // settle for late console/network errors
   record('דף הבית', 'landing', diag);
+  await ev.flush();
+  ev.close();
   expect(true).toBe(true); // never hard-fail: findings drive the report
 });
 
 test('/app renders the auth screen in a real browser', async ({ page }) => {
   await blockAnalytics(page);
+  ev = await createEvidence(page, { label: 'public' });
   const diag = watch(page);
   try {
     await page.goto('/app', { waitUntil: 'load' });
@@ -185,6 +197,8 @@ test('/app renders the auth screen in a real browser', async ({ page }) => {
   }
   await page.waitForTimeout(1_500);
   record('/app', 'app', diag);
+  await ev.flush();
+  ev.close();
   expect(true).toBe(true);
 });
 

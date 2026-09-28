@@ -4,6 +4,8 @@ import fs from 'node:fs';
 // the constant instead of writing `2500` here is the whole point: a literal goes
 // blind, silently, on the day the default moves — B-324's class exactly.
 import { DEFAULT_CAPITAL } from '../src/utils.js';
+// B-375 — openable evidence for red findings (why not trace: see the file header).
+import { createEvidence, recordEvidence } from './evidence.js';
 
 // Sentinel S2 — Layer A2: real-browser QA of the AUTHENTICATED surface.
 // S1.5 only covers the anonymous surface, so anything that breaks after login
@@ -46,6 +48,19 @@ const QA_PASSWORD = process.env.SENTINEL_QA_PASSWORD || '';
 // Same fallback order as api/health.js / api/send-invites.js.
 const SUPA_URL = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\/+$/, '');
 const SUPA_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+
+// B-375 — the evidence drill (.github/workflows/sentinel-evidence-drill.yml).
+// `invalid-stop` types a LONG stop ABOVE entry in step 5, so handleSubmit refuses
+// with a 3-second toast and writes no row ⇒ the real `create-failed` fires ~20s
+// later. Honoured ONLY under workflow_dispatch (Niv, 28.09): anywhere else the
+// flag THROWS at load — loud, never a silently-ignored or silently-obeyed drill.
+const DRILL = process.env.SENTINEL_DRILL || '';
+if (DRILL && process.env.GITHUB_EVENT_NAME !== 'workflow_dispatch') {
+  throw new Error(`SENTINEL_DRILL=${DRILL} refused: event=${process.env.GITHUB_EVENT_NAME || '(none)'} — drills run only under workflow_dispatch`);
+}
+if (DRILL && DRILL !== 'invalid-stop') {
+  throw new Error(`SENTINEL_DRILL=${DRILL} refused: unknown drill (known: invalid-stop)`);
+}
 
 const TICKER = 'SNTNL';
 // The representativeness fixture (B-305). SNTNL1 carries a digit inside an
@@ -137,8 +152,14 @@ const IGNORE_SOURCE = ['assets/sentry-', 'financialmodelingprep.com'];
 const findings = [];
 let uiDeleteOk = false;
 
+// The evidence recorder of the live journey page; null outside it.
+let ev = null;
+
 function add(component, fp, severity, emoji, checked, got, reason, fix, risk) {
-  findings.push({ component, fp, severity, emoji, checked, got, reason, fix, risk });
+  const finding = { component, fp, severity, emoji, checked, got, reason, fix, risk };
+  findings.push(finding);
+  // B-375: a red finding carries its own evidence status — ⛔ a separate finding.
+  if (severity === 'red') recordEvidence(ev, finding);
 }
 
 function cleanUrl(u) {
@@ -648,6 +669,19 @@ test.skip(!AUTH_ON, 'SENTINEL_AUTH != 1 — authenticated layer is off for this 
 // timeout would truncate the findings.
 test('authenticated journey: login → journal → SNTNL → SNTNL1 → boundaries → delete', async ({ page }) => {
   test.setTimeout(180_000);
+  ev = await createEvidence(page, { label: 'auth', secrets: [QA_EMAIL, QA_PASSWORD] });
+  try {
+    await journey(page);
+  } finally {
+    // Captures run beside the journey; they must finish while the page is alive.
+    await ev.flush();
+    ev.close();
+  }
+});
+
+// The journey body. A function so its early `return`s still pass through the
+// evidence flush above.
+async function journey(page) {
 
   if (!QA_EMAIL || !QA_PASSWORD) {
     add(COMPONENT, 'browser-auth|secrets-missing', 'yellow', '🟡',
@@ -868,8 +902,17 @@ test('authenticated journey: login → journal → SNTNL → SNTNL1 → boundari
     await page.locator('[data-tour="add-trade"]').click();
     await page.locator('#log-ticker').fill(TICKER);
     await page.locator('#log-entry').fill('100');
-    await page.locator('#log-stop').fill('99'); // LONG → stop < entry (validateTradeInputs)
+    // LONG → stop < entry (validateTradeInputs). The drill inverts it on purpose (B-375).
+    await page.locator('#log-stop').fill(DRILL === 'invalid-stop' ? '101' : '99');
     await page.locator('#log-target').fill('102');
+    // B-375/B-376: what the screen said at the moment of the click. The SHARES
+    // field shows String(suggestedShares) ⇒ "0" there IS effShares=0 on screen.
+    ev.crumb('pre-submit', {
+      capital: await readCapitalText(page.locator('[data-tour="equity"]')),
+      shares: await page.locator('[role="dialog"] input[aria-label="Shares (editable)"], [role="dialog"] input[aria-label="מספר מניות (ניתן לעריכה)"]')
+        .first().inputValue({ timeout: 2_000 }).catch((e) => `⛔ נקרא: ${e.message}`),
+      drill: DRILL || null,
+    });
     await page.getByRole('button', { name: /Log Trade/ }).click();
     // The toast disappears — the row in the table is the real proof.
     await expect(sntnlRows(page)).toHaveCount(1, { timeout: 20_000 });
@@ -941,11 +984,13 @@ test('authenticated journey: login → journal → SNTNL → SNTNL1 → boundari
   await page.waitForTimeout(1_500); // settle for late console/network errors
   record(diag);
   expect(true).toBe(true); // never hard-fail: findings drive the report
-});
+}
 
 test.afterAll(async () => {
   if (!AUTH_ON) return; // public-only run: no output file at all
   await restCleanup();
+  // Late reds (cleanup-failed) were settled when recorded; this rewrites the manifest.
+  if (ev) await ev.flush();
   fs.writeFileSync(OUTPUT, JSON.stringify(findings, null, 2));
   // eslint-disable-next-line no-console
   console.log(`sentinel auth findings: ${findings.length} → ${OUTPUT}`);
