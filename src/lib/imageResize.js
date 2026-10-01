@@ -108,3 +108,71 @@ export function fileToResizedDataURL(file) {
     reader.readAsDataURL(file);
   });
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STORED IMAGES — an image that is KEPT (localStorage mirror + settings blob), not SENT.
+//
+// WHY A SECOND PROFILE. `fileToResizedDataURL` above is sized for /api/ocr (6MB). A kept
+// image lands in localStorage, whose quota is ~5.2M characters PER ORIGIN and is shared
+// with the trades cache — and the playbook is written there TWICE (swingEdgePlaybook +
+// the swingEdgeSettings mirror). Measured 01.10 (B-015): a 3.9MB screenshot still came out
+// of the OCR profile at 1.0MB, so five setups filled the origin and the sixth vanished on
+// reload with no message. The decision (Niv, 01.10, D3): 1400px · q.7 · cap 200KB ·
+// fallback 1000px/.55 · ABOVE THE CAP = REJECT. Rejecting is deliberate: a fallback to
+// the raw file is the very bug this profile removes.
+export const STORED_MAX_EDGE_PX = 1400;
+export const STORED_Q_PRIMARY = 0.7;
+export const STORED_FALLBACK_EDGE_PX = 1000;
+export const STORED_Q_FALLBACK = 0.55;
+export const STORED_CAP_BYTES = 200 * 1024;
+
+export const STORED_LADDER = [
+  { edge: STORED_MAX_EDGE_PX, quality: STORED_Q_PRIMARY },
+  { edge: STORED_FALLBACK_EDGE_PX, quality: STORED_Q_FALLBACK },
+];
+
+/**
+ * Walk the ladder and return the first encoding under STORED_CAP_BYTES; throw when none fits.
+ * `encode(edge, quality)` is injected so the DECISION is runnable in node (no canvas there) —
+ * the same split as fitDimensions/exceedsCap above.
+ */
+export function chooseStoredEncoding(encode) {
+  for (const { edge, quality } of STORED_LADDER) {
+    const url = encode(edge, quality);
+    if (typeof url === "string" && !exceedsCap(url.length, STORED_CAP_BYTES)) return url;
+  }
+  throw new Error("image_too_large_for_storage");
+}
+
+/** Read a File and return a JPEG data-URL ≤ STORED_CAP_BYTES, or REJECT (never the raw file). */
+export function fileToStoredDataURL(file) {
+  return new Promise((resolve, reject) => {
+    if (!file) { reject(new Error("no_file")); return; }
+    if (typeof FileReader === "undefined" || typeof document === "undefined") {
+      reject(new Error("unsupported_environment"));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("read_failed"));
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("decode_failed"));
+      img.onload = () => {
+        try {
+          resolve(chooseStoredEncoding((edge, quality) => {
+            const { w, h } = fitDimensions(img.naturalWidth, img.naturalHeight, edge);
+            const canvas = document.createElement("canvas");
+            canvas.width = w;
+            canvas.height = h;
+            canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+            return canvas.toDataURL("image/jpeg", quality);
+          }));
+        } catch (e) {
+          reject(e instanceof Error ? e : new Error("resize_failed"));
+        }
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}

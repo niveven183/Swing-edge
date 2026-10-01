@@ -32,7 +32,9 @@ export function ToastProvider({ children }) {
   return (
     <ToastCtx.Provider value={api}>
       {children}
-      <div className="fixed top-16 right-4 rtl:right-auto rtl:left-4 z-[100] flex flex-col gap-2 max-w-sm pointer-events-none">
+      {/* B-388 — a live region that EXISTS before its content arrives, so a screen reader announces
+          what is added to it. `role="status"` also gives tests a handle (getByRole). */}
+      <div role="status" aria-live="polite" className="fixed top-16 right-4 rtl:right-auto rtl:left-4 z-[100] flex flex-col gap-2 max-w-sm pointer-events-none">
         {toasts.map((t) => (
           <Toast key={t.id} toast={t} onClose={() => remove(t.id)} />
         ))}
@@ -51,7 +53,7 @@ function Toast({ toast, onClose }) {
   const s = styles[kind] || styles.info;
   const Icon = s.Icon;
   return (
-    <div className={`pointer-events-auto flex items-start gap-2 rounded-xl ${s.bg} border ${s.border} ${s.text} px-4 py-3 shadow-2xl backdrop-blur-md animate-fade-in`}>
+    <div role={kind === "error" ? "alert" : undefined} className={`pointer-events-auto flex items-start gap-2 rounded-xl ${s.bg} border ${s.border} ${s.text} px-4 py-3 shadow-2xl backdrop-blur-md animate-fade-in`}>
       <Icon size={16} className={`${s.iconColor} shrink-0 mt-0.5`} />
       <span className="flex-1 text-xs leading-relaxed">{message}</span>
       <button onClick={onClose}

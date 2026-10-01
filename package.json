@@ -43,6 +43,8 @@
     "probe:dailypnl": "node scripts/daily-pnl-label-test.mjs",
     "probe:deploychunk": "node scripts/deploy-chunk-probe.mjs",
     "probe:eye": "node scripts/eye-probe.mjs",
+    "probe:image": "node scripts/image-store-probe.mjs",
+    "probe:image:mutants": "node scripts/image-store-probe.mjs --mutants",
     "probe:firing": "node scripts/sentinel-firing-probe.mjs",
     "probe:count": "node scripts/sentinel-count-probe.mjs",
     "probe:slot": "node scripts/slot-audit-probe.mjs",

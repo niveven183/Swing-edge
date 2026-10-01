@@ -111,7 +111,8 @@ import { sizePosition, sizingRefusalReason, saveBlockMessage, FX_SETTLE_MS, capi
 // ⚠️ קבוע מודול, ⛔ לא `[]` inline: מערך טרי בכל רינדור הוא תלות טרייה ב-
 // `useFxRates`, וזה לולאת fetch אינסופית.
 const EMPTY_DAYS = [];
-import { fileToResizedDataURL, exceedsCap, MAX_EDGE_PX, Q_PRIMARY, Q_FALLBACK } from "./src/lib/imageResize.js";
+import { fileToResizedDataURL, fileToStoredDataURL, exceedsCap, MAX_EDGE_PX, Q_PRIMARY, Q_FALLBACK } from "./src/lib/imageResize.js";
+import { persistPlaybookSafely } from "./src/lib/playbookStore.js";
 import InfoTooltip from "./src/components/ui/InfoTooltip.jsx";
 import TermTooltip from "./src/components/ui/TermTooltip.jsx";
 import SmartSelect from "./src/components/ui/SmartSelect.jsx";
@@ -1989,8 +1990,17 @@ export default function SwingEdge() {
   }, [authUser?.id]);
 
   // Persist trades to localStorage
+  const tradesPersistWarnedRef = useRef(false);
   useEffect(() => {
-    try { localStorage.setItem("swingEdgeTrades", JSON.stringify(trades)); } catch (err) { console.error("[persist] trades → localStorage failed. ALL local persistence is now dead, including the fallback that holds trades when Supabase is unreachable: this session survives in memory only and is lost on reload.", err); }
+    try { localStorage.setItem("swingEdgeTrades", JSON.stringify(trades)); } catch (err) {
+      console.error("[persist] trades → localStorage failed. ALL local persistence is now dead, including the fallback that holds trades when Supabase is unreachable: this session survives in memory only and is lost on reload.", err);
+      // B-038 — the console line above was the only trace. Once per session: this effect runs on
+      // every trades change and a toast per keystroke-sized edit would be noise.
+      if (!tradesPersistWarnedRef.current) {
+        tradesPersistWarnedRef.current = true;
+        toast.error(t.tradesStorageFull, 8000);
+      }
+    }
   }, [trades]);
 
   // Persist watchlist to localStorage
@@ -3056,7 +3066,11 @@ export default function SwingEdge() {
       // "לפי הסגנון המוצהר שלי") חייבת להישמר כ-null ולא כ-"", אחרת
       // horizonThresholdDays היה מקבל ערך שאינו במפה ומשתיק את הסימן לצמיתות.
       horizon: form.horizon || null,
-      tradeImage: form.tradeImagePreview,
+      // D1 (Niv, 01.10) — `tradeImage` is ⛔ written to the trade any more. Nothing reads it,
+      // LOCAL_ONLY strips it before every DB write and the load is REPLACE-from-DB, so for a signed-in
+      // user it was lost anyway — while costing ~1MB per trade inside `swingEdgeTrades`, the cache
+      // whose death kills ALL local persistence. The form preview + OCR upload are unchanged; trades
+      // that already carry the field keep it (nothing is deleted from localStorage).
       exitReason: null, followedPlan: null, lessonLearned: null, maxFavorable: null, maxAdverse: null,
       _capitalAtEntry: capital,
       _prediction: predictionSnapshot,
@@ -7218,31 +7232,54 @@ export default function SwingEdge() {
             return { rate: Math.round(g.winRate), count: g.count };
           };
 
-          const savePlaybook = (updated) => {
-            setPlaybookSetups(updated);
-            try { localStorage.setItem("swingEdgePlaybook", JSON.stringify(updated)); } catch {}
+          // B-015 — the write used to be `try { localStorage.setItem(…) } catch {}`: a full quota
+          // threw, the catch ate it, state kept the new setup, and a refresh brought back the OLD
+          // list with no message. persistPlaybookSafely never throws and never claims a save it did
+          // not get; the state takes the list it actually stored (`res.list`), and BOTH non-ok
+          // outcomes reach the user. `targetId` names the setup allowed to lose its image.
+          const savePlaybook = (updated, targetId = null) => {
+            const res = persistPlaybookSafely(() => localStorage, updated, targetId);
+            setPlaybookSetups(res.list);
+            if (res.status === "image_dropped") {
+              console.error("[playbook] image not stored — localStorage full", res.error);
+              toast.error(t.playbookImageNotSaved, 7000);
+            } else if (res.status === "failed") {
+              console.error("[playbook] write failed — localStorage full", res.error);
+              toast.error(t.playbookNotSaved, 7000);
+            }
           };
 
           const handlePlaybookSubmit = () => {
             if (!playbookForm.name.trim()) return;
             if (editingSetupId !== null) {
               const updated = playbookSetups.map(s => s.id === editingSetupId ? { ...s, name: playbookForm.name, description: playbookForm.description, imagePreview: playbookForm.imagePreview } : s);
-              savePlaybook(updated);
+              savePlaybook(updated, editingSetupId);
             } else {
               const newSetup = { id: Date.now(), name: playbookForm.name, description: playbookForm.description, imagePreview: playbookForm.imagePreview };
-              savePlaybook([...playbookSetups, newSetup]);
+              savePlaybook([...playbookSetups, newSetup], newSetup.id);
             }
             setPlaybookForm({ name: "", description: "", imagePreview: null });
             setShowPlaybookForm(false);
             setEditingSetupId(null);
           };
 
-          const handlePlaybookImageUpload = (e) => {
-            const file = e.target.files[0];
+          // B-015 — a KEPT image is resized to the stored profile (≤200KB) before it enters state.
+          // The old FileReader path kept the raw data-URL (a phone screenshot ≈ 4M chars), which
+          // filled the localStorage quota twice over (playbook key + settings mirror). A rejected
+          // image is announced and attached as nothing — ⛔ never as the raw file.
+          const handlePlaybookImageUpload = async (e) => {
+            const input = e.target;
+            const file = input.files[0];
             if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (ev) => setPlaybookForm(f => ({ ...f, imagePreview: ev.target.result }));
-            reader.readAsDataURL(file);
+            try {
+              const dataURL = await fileToStoredDataURL(file);
+              setPlaybookForm(f => ({ ...f, imagePreview: dataURL }));
+            } catch (err) {
+              console.error("[playbook] image rejected", err);
+              toast.error(t.playbookImageFailed, 7000);
+            } finally {
+              input.value = ""; // the same file can be picked again after a rejection
+            }
           };
 
           const startEdit = (setup) => {
