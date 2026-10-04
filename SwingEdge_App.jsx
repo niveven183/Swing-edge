@@ -4198,7 +4198,7 @@ export default function SwingEdge() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] dark:bg-[#0a0f1e] text-slate-200 font-sans flex flex-col" dir={isRTL ? "rtl" : "ltr"} style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
+    <div className="min-h-screen bg-[var(--bg-primary)] dark:bg-[#0a0f1e] text-slate-200 font-sans flex flex-col" dir={isRTL ? "rtl" : "ltr"} style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif", paddingBottom: "var(--se-bottom-overlay, 0px)" /* B-404/B-405 — scroll room above a bottom banner (src/lib/bottomOverlay.js) */ }}>
 
       {/* ── WELCOME ANNOUNCEMENT (one-time, all users, cross-device) ── */}
       {showWelcome && (
@@ -4219,7 +4219,8 @@ export default function SwingEdge() {
       )}
 
       {/* ── iOS INSTALL BANNER ── */}
-      <IOSInstallBanner />
+      {/* B-405 — only after a first real action (a logged trade), never during onboarding/tour. */}
+      <IOSInstallBanner ready={realTrades.length > 0 && !showTour && !showOnboarding} />
 
       {/* ── B-268 · SETTINGS READ FAILED — writes are blocked, and the user is told ──
           ⛔ Not a toast: a toast that scrolls away turns a blocked session into a
@@ -8004,8 +8005,11 @@ export default function SwingEdge() {
 
       {/* ── TRADE ENTRY MODAL ── */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div ref={logModalRef} role="dialog" aria-modal="true" aria-labelledby={logTitleId} tabIndex={-1} className="w-full max-w-2xl bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-[var(--v3-line)] rounded-[var(--v3-radius-card)] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col focus:outline-none">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          // B-404 — the modal's fixed footer (Log Trade) sat under the consent card on short
+          // phones; the overlay inset keeps the whole dialog above any bottom banner.
+          style={{ paddingBottom: "calc(1rem + var(--se-bottom-overlay, 0px))" }}>
+          <div ref={logModalRef} role="dialog" aria-modal="true" aria-labelledby={logTitleId} tabIndex={-1} className="w-full max-w-2xl bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-[var(--v3-line)] rounded-[var(--v3-radius-card)] shadow-2xl overflow-hidden max-h-[calc(90vh-var(--se-bottom-overlay,0px))] flex flex-col focus:outline-none">
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-subtle)] dark:border-[var(--v3-line)] bg-gradient-to-r from-[var(--v3-accent-glow)] to-[var(--v3-purple-glow)]">
               <div className="flex items-center gap-2">
@@ -8640,7 +8644,8 @@ export default function SwingEdge() {
         data-tour="add-trade"
         onClick={() => { setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null }); setOcrStatus(null); setShowForm(true); trackTradeFormOpened("manual"); }}
         className={`fixed bottom-6 right-6 rtl:right-auto rtl:left-6 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-violet-500 text-white shadow-2xl shadow-cyan-500/25 flex items-center justify-center hover:scale-110 active:scale-95 transition-transform motion-reduce:transition-none ${fabVisible ? "translate-y-0 opacity-100" : "translate-y-24 opacity-0 pointer-events-none"}`}
-        style={{ bottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
+        // B-404/B-405 — lifted above any bottom banner (--se-bottom-overlay, src/lib/bottomOverlay.js).
+        style={{ bottom: "calc(1.5rem + env(safe-area-inset-bottom) + var(--se-bottom-overlay, 0px))" }}
         aria-label={t.newTrade}
         title={t.newTrade}
       >

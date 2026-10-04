@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Share, Plus, X, Smartphone } from "lucide-react";
 import { readConsent, subscribeConsent } from "../lib/consent.js";
+import { useBottomOverlay } from "../hooks/useBottomOverlay.js";
 
 const DISMISS_KEY = "swingEdgeIosInstallDismissed";
 
@@ -22,8 +23,28 @@ const isStandalone = () => {
   );
 };
 
-export default function IOSInstallBanner() {
+// A modal is open somewhere in the document (Log Trade, close-trade, confirm …).
+const modalOpen = () =>
+  typeof document !== "undefined" && document.querySelector('[aria-modal="true"]') !== null;
+
+// B-405 — `ready` comes from the app: the user has done a first real thing (logged a trade)
+// and is not inside onboarding or the tour. Measured 04.10: shown 1.5s after the consent
+// choice, the banner covered the FAB and Log Trade on every iPhone — on the very screens a new
+// user needs first. ⛔ It also never sits over an open modal.
+export default function IOSInstallBanner({ ready }) {
   const [visible, setVisible] = useState(false);
+  const [modal, setModal] = useState(modalOpen);
+  const cardRef = useRef(null);
+
+  useEffect(() => {
+    if (typeof MutationObserver === "undefined") return undefined;
+    const mo = new MutationObserver(() => setModal(modalOpen()));
+    mo.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["aria-modal"] });
+    return () => mo.disconnect();
+  }, []);
+
+  const shown = visible && ready === true && !modal;
+  useBottomOverlay("ios", cardRef, shown);
 
   useEffect(() => {
     try {
@@ -53,10 +74,11 @@ export default function IOSInstallBanner() {
     setVisible(false);
   };
 
-  if (!visible) return null;
+  if (!shown) return null;
 
   return (
     <div
+      ref={cardRef}
       dir="rtl"
       className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[90] w-[min(92vw,460px)] rounded-2xl border border-cyan-500/30 bg-[var(--bg-elevated)] dark:bg-[#0d1424]/95 backdrop-blur-md shadow-2xl shadow-black/50 p-4"
       style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}

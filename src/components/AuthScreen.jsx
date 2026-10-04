@@ -157,7 +157,9 @@ export default function AuthScreen() {
   return (
     <div
       dir={isRTL ? "rtl" : "ltr"}
-      style={{ ...background, fontFamily: "'Inter', 'Heebo', 'Segoe UI', sans-serif" }}
+      // B-404 — paddingBottom reserves the consent banner's height (--se-bottom-overlay,
+      // src/lib/bottomOverlay.js) so the submit can always scroll clear of it. 2.5rem = py-10.
+      style={{ ...background, fontFamily: "'Inter', 'Heebo', 'Segoe UI', sans-serif", paddingBottom: "calc(2.5rem + var(--se-bottom-overlay, 0px))" }}
       className="w-full flex items-center justify-center px-5 py-10"
     >
       <div className="w-full max-w-[440px]">

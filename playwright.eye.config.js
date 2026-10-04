@@ -33,5 +33,11 @@ export default defineConfig({
   projects: [
     { name: "pixel7", use: { ...devices["Pixel 7"], launchOptions: chromiumLaunch } },
     { name: "iphone14", use: { ...devices["iPhone 14"] } },
+    // B-404 · B-405 — the overlay matrix needs the short and the narrow screens too
+    // (measured 04.10: iPhone SE 568 · Galaxy S8 360 wide · 14 Pro Max 740). The playbook
+    // suite stays on the two devices above; these run tests-eye/overlay.spec.js only.
+    { name: "iphoneSE", testMatch: /overlay\.spec\.js/, use: { ...devices["iPhone SE"] } },
+    { name: "iphone14promax", testMatch: /overlay\.spec\.js/, use: { ...devices["iPhone 14 Pro Max"] } },
+    { name: "galaxyS8", testMatch: /overlay\.spec\.js/, use: { ...devices["Galaxy S8"], launchOptions: chromiumLaunch } },
   ],
 });
