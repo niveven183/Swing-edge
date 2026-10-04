@@ -86,7 +86,12 @@ test.describe("B-404 · B-405 — bottom banners never cover a core CTA", () => 
 
   async function clear(app, label, locator) {
     const { page, results, shot } = app;
-    await locator.waitFor({ state: "visible", timeout: 20_000 });
+    // A target that never appears is red WITH a screenshot — run 37212157125 failed here with
+    // none, and the cause had to be inferred.
+    await locator.waitFor({ state: "visible", timeout: 20_000 }).catch(async (e) => {
+      await shot(`${label}-NOT-VISIBLE`);
+      throw e;
+    });
     await locator.scrollIntoViewIfNeeded();
     await page.waitForTimeout(250); // let a smooth scroll and a banner's entry animation settle
     // Like a user: if the centre is covered, keep scrolling the element's scroll container in
@@ -136,6 +141,39 @@ test.describe("B-404 · B-405 — bottom banners never cover a core CTA", () => 
     await page.getByRole("button", { name: exactRx("settings") }).click();
   }
 
+  // Open the Add-Setup form. "Add Setup" is navigation here, ⛔ a measured CTA (Save Setup is).
+  // Prod 04.10 (run 37212157125, iOS · he on iphone14 + iphone14promax, WebKit): the click
+  // resolved and the form never opened. Playwright scrolled the button to the bottom edge
+  // (under the iOS banner), retried with other alignments — a scroll UP re-shows the FAB
+  // (`fabVisible`), which slides in with a transition at bottom-left in RTL, the side the
+  // button sits on — so the hit-check can pass a moment before the FAB arrives under the
+  // pointer. The button is therefore placed at 35% of the viewport (below the header, above
+  // the FAB and any bottom banner on every device in the matrix) BEFORE the click, and a form
+  // that does not open is red with the reason: a modal that opened instead names the FAB.
+  async function openSetupForm(app, label) {
+    const { page, shot } = app;
+    const add = page.getByRole("button", { name: exactRx("addSetup") });
+    await add.waitFor({ state: "visible", timeout: 20_000 });
+    await add.evaluate(async (el) => {
+      let sc = el.parentElement;
+      while (sc && !(sc.scrollHeight > sc.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement;
+      const scroller = sc || document.scrollingElement;
+      const dy = el.getBoundingClientRect().top - innerHeight * 0.35;
+      scroller.scrollTo({ top: scroller.scrollTop + dy, behavior: "instant" });
+      await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
+    });
+    await page.waitForTimeout(400); // the FAB's show/hide transition settles
+    await add.click();
+    const save = page.getByRole("button", { name: exactRx("saveSetup") });
+    try {
+      await save.waitFor({ state: "visible", timeout: 10_000 });
+    } catch {
+      const modal = await page.locator('[aria-modal="true"]').count();
+      await shot(`${label}-FORM-NOT-OPEN`);
+      throw new Error(`${label}: "Add Setup" was clicked and the form did not open — ${modal ? `a modal opened instead (${modal}) ⇒ the click landed on the FAB` : "no modal opened either"}`);
+    }
+  }
+
   const finish = async (app, info, scenario, lang) => {
     writeFileSync(join(app.dir, `${scenario}-${lang}.json`), JSON.stringify(app.results, null, 2));
     await app.ctx.close();
@@ -161,7 +199,7 @@ test.describe("B-404 · B-405 — bottom banners never cover a core CTA", () => 
         await page.keyboard.press("Escape");
         await expect(page.locator('[aria-modal="true"]')).toHaveCount(0);
         await openSettings(page);
-        await page.getByRole("button", { name: exactRx("addSetup") }).click();
+        await openSetupForm(app, `${lang}-add-setup`);
         await clear(app, `${lang}-save-setup`, page.getByRole("button", { name: exactRx("saveSetup") }));
       } finally {
         await finish(app, info, "consent", lang);
@@ -216,7 +254,7 @@ test.describe("B-404 · B-405 — bottom banners never cover a core CTA", () => 
         await page.keyboard.press("Escape");
         await expect(banner, "the banner comes back once the modal is closed").toBeVisible({ timeout: 5_000 });
         await openSettings(page);
-        await page.getByRole("button", { name: exactRx("addSetup") }).click();
+        await openSetupForm(app, `${lang}-ios-add-setup`);
         await clear(app, `${lang}-ios-save-setup`, page.getByRole("button", { name: exactRx("saveSetup") }));
       } finally {
         await finish(app, info, "ios", lang);
