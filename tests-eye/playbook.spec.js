@@ -16,7 +16,7 @@
 
 import { test, expect } from "@playwright/test";
 import { createHash } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { login, redact, installFlashRecorder, readFlashes } from "../tests/lib/eyeTools.js";
 import { exactRx, containsRx, TOAST_TEXTS } from "./labels.js";
@@ -55,7 +55,22 @@ test("C-064 · QA credentials and REST cleanup are wired (CI only)", async () =>
 //     the consent choice, `fixed bottom-4 z-[90]`. Its copy is hard-coded Hebrew there, so it is
 //     anchored on that copy; a reword stops the handler and turns every iPhone step RED with
 //     Playwright's "intercepts pointer events" — loud, ⛔ silent.
+//   ⚠️ CI 04.10 (run 37199864386): in WebKit the handler's click on the banner's X landed while
+//   the banner was still animating in ("element is not stable") — the handler "finished" and the
+//   banner stayed, 2/5 iPhone steps red. So the device starts in the state of an iPhone user who
+//   dismissed it ONCE before: the dismissal key is a DEVICE key (userScopedStorage DEVICE_KEYS —
+//   it survives login), read from the component's own source, exactly-once or hard red (B-272).
+//   The handler stays as the net if the key is ever renamed.
+const IOS_DISMISS_KEY = (() => {
+  const src = readFileSync(join(process.cwd(), "src", "components", "IOSInstallBanner.jsx"), "utf8");
+  const m = [...src.matchAll(/const DISMISS_KEY = "([^"]+)";/g)];
+  if (m.length !== 1) throw new Error(`[eye] IOSInstallBanner DISMISS_KEY matched ${m.length}× (must be 1) — refusing to guess the key (B-272)`);
+  return m[0][1];
+})();
+
 async function installOverlayHandlers(page) {
+  // http(s) only: init scripts also run on about:blank, whose opaque origin has no localStorage.
+  await page.addInitScript((k) => { if (location.protocol.startsWith("http")) localStorage.setItem(k, "1"); }, IOS_DISMISS_KEY);
   await page.addLocatorHandler(page.locator('[data-testid="consent-decline"]'), (btn) => btn.click());
   const iosBanner = page.locator("div.fixed").filter({ hasText: "התקן את SwingEdge" });
   await page.addLocatorHandler(iosBanner, (b) => b.getByRole("button", { name: "סגור" }).click());
