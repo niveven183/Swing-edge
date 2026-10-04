@@ -168,7 +168,12 @@ jobs:
           SENTINEL_QA_PASSWORD: ${{ secrets.SENTINEL_QA_PASSWORD }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-        run: npx playwright test -c playwright.eye.config.js
+          # A PR's code is NOT on production yet: overlay.spec measures the deployed app, so on
+          # a pull_request it would only re-measure the bug (run 37209074890: 16/16 overlay red
+          # on prod, 12/12 playbook green — the live red-before). It runs on push to main after
+          # the deploy wait (the D-114 closing run), and on dispatch / schedule.
+          SPECS: ${{ github.event_name == 'pull_request' && 'tests-eye/playbook.spec.js' || '' }}
+        run: npx playwright test -c playwright.eye.config.js $SPECS
       # The artifact is world-readable: it is uploaded ONLY if the leak scan is clean.
       - name: Leak scan (counts only)
         id: scan
