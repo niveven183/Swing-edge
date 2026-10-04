@@ -24,18 +24,17 @@
 // It also MEASURES (report only, ⛔ a gate, ⛔ a product change — Niv 04.10) an alternative
 // stored profile at a 2000px edge: bytes and OCR on F2 / F2s / F2b, next to the current one.
 
-import { createServer } from "node:http";
-import { readFile, writeFile, mkdtemp, rm, readdir } from "node:fs/promises";
-import { readFileSync, existsSync } from "node:fs";
-import { execFileSync, spawn } from "node:child_process";
-import { join, extname, dirname, resolve } from "node:path";
+import { writeFile, mkdtemp, rm } from "node:fs/promises";
+import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { chromium } from "playwright";
 import { fitDimensions, STORED_CAP_BYTES } from "../src/lib/imageResize.js";
 import { readManifest, fileFor } from "../tests-eye/fixtures.js";
 import { readPrices, closeOcr } from "../tests-eye/ocr.js";
-import { SB_HOST } from "../tests-eye/hermetic.js";
+import { makeOnce, assertCleanTargets, buildTree, serve, runSpec, readResults } from "./lib/eyeBuild.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const APP = join(ROOT, "SwingEdge_App.jsx");
@@ -52,22 +51,8 @@ const ok = (id, cond, label, detail = "") => {
 const die = (msg) => { console.log(`\n❌ eye-playbook-probe: ${msg}`); process.exit(1); };
 
 // ═══ META ═══════════════════════════════════════════════════════════════════
-const once = (src, find, label) => {
-  const n = typeof find === "string" ? src.split(find).length - 1 : (src.match(find) || []).length;
-  if (n !== 1) die(`${label}: anchor matched ${n}× (must be exactly 1 — a no-op mutant is a blind test, B-272)`);
-};
-// Two different failures, and they must not read the same (B-335): git unable to read the
-// repository at all (measured in CI 04.10 — a HOME override hid `safe.directory`, and `git diff`
-// fell back to --no-index usage) is ⛔ "the file has uncommitted changes".
-for (const f of [APP, RESIZE]) {
-  let dirty;
-  try {
-    dirty = execFileSync("git", ["status", "--porcelain", "--", f], { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-  } catch (e) {
-    die(`git cannot read the repository (${String(e.stderr || e.message).split("\n")[0]}) — the restore check is impossible`);
-  }
-  if (dirty.trim()) die(`${f.replace(ROOT + "/", "")} has uncommitted changes — the restore check would be meaningless`);
-}
+const once = makeOnce(die);
+assertCleanTargets(ROOT, [APP, RESIZE], die);
 
 const appSrc = readFileSync(APP, "utf8");
 const legacyApp = execFileSync("git", ["show", `${LEGACY_REF}:SwingEdge_App.jsx`], { cwd: ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
@@ -98,76 +83,11 @@ ok("META", true, `all mutation anchors match exactly once · targets clean in gi
 
 // ═══ BUILD + SERVE ══════════════════════════════════════════════════════════
 const WORK = await mkdtemp(join(tmpdir(), "eye-playbook-"));
-async function build(arm) {
-  const outDir = join(WORK, `dist-${arm}`);
-  const originals = new Map();
-  try {
-    for (const [f, find, repl] of ARMS[arm]) {
-      if (!originals.has(f)) originals.set(f, await readFile(f, "utf8"));
-      const cur = await readFile(f, "utf8");
-      once(cur, find, `${arm} (live bytes)`);
-      await writeFile(f, typeof find === "string" ? cur.replace(find, repl()) : cur.replace(find, repl), "utf8");
-    }
-    execFileSync("npx", ["vite", "build", "--outDir", outDir, "--emptyOutDir", "--logLevel", "error"], {
-      cwd: ROOT, stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, VITE_SUPABASE_URL: `https://${SB_HOST}`, VITE_SUPABASE_ANON_KEY: "eye-playbook-anon-not-a-secret", VITE_SENTRY_DSN: "" },
-    });
-  } finally {
-    for (const [f, src] of originals) await writeFile(f, src, "utf8");
-    for (const f of originals.keys()) {
-      try { execFileSync("git", ["diff", "--exit-code", "--quiet", "--", f], { cwd: ROOT }); }
-      catch { die(`${arm}: ${f} was NOT restored byte-identically — git checkout -- ${f}`); }
-    }
-  }
-  // The bundle must talk to the synthetic origin only — a real project host here means the
-  // hermetic claim is false.
-  const assets = join(outDir, "assets");
-  const hosts = new Set();
-  for (const n of await readdir(assets)) if (n.endsWith(".js")) for (const m of (await readFile(join(assets, n), "utf8")).matchAll(/[a-z0-9-]+\.supabase\.co/g)) hosts.add(m[0]);
-  if ([...hosts].some((h) => h !== SB_HOST)) die(`${arm}: bundle references a non-synthetic Supabase host (${[...hosts].join(",")})`);
-  return outDir;
-}
-
-const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp", ".ico": "image/x-icon", ".woff2": "font/woff2", ".webmanifest": "application/manifest+json" };
-async function serve(dir) {
-  const server = createServer(async (req, res) => {
-    const rel = req.url.split("?")[0].replace(/^\//, "") || "index.html";
-    try {
-      const buf = await readFile(join(dir, rel));
-      res.writeHead(200, { "content-type": TYPES[extname(rel)] || "application/octet-stream" });
-      return res.end(buf);
-    } catch {
-      if (!extname(rel)) { res.writeHead(200, { "content-type": "text/html" }); return res.end(await readFile(join(dir, "index.html"))); }
-      res.writeHead(404); res.end("Not Found");
-    }
-  });
-  await new Promise((r) => server.listen(0, "127.0.0.1", r));
-  return { server, port: server.address().port };
-}
+const build = (arm) => buildTree({ root: ROOT, arm, outDir: join(WORK, `dist-${arm}`), mutations: ARMS[arm], once, die });
 
 // ═══ RUN THE SPEC PER ARM ═══════════════════════════════════════════════════
 const STEP = (title) => (/(?:^|›\s*)([a-e]) · /.exec(title) || [])[1];
-function results(jsonPath) {
-  const r = JSON.parse(readFileSync(jsonPath, "utf8"));
-  const out = {};
-  const walk = (suite) => {
-    for (const s of suite.suites || []) walk(s);
-    for (const spec of suite.specs || []) for (const t of spec.tests || []) {
-      const step = STEP(spec.title);
-      if (!step) continue;
-      const res = t.results?.[t.results.length - 1];
-      // The first line names the failed call; the "waiting for" / "intercepts pointer events"
-      // lines name WHAT it waited on — without them a CI red is undiagnosable from the log.
-      const msg = (res?.errors || []).map((e) => {
-        const lines = (e.message || "").replace(/\u001b\[[0-9;]*m/g, "").split("\n");
-        return [lines[0], ...lines.filter((l) => /waiting for|intercepts pointer|resolved to|not visible|not stable/.test(l)).slice(-3)].join(" ⟶ ");
-      }).join(" | ");
-      out[`${t.projectName}:${step}`] = { status: res?.status || t.status, msg };
-    }
-  };
-  for (const s of r.suites || []) walk(s);
-  return out;
-}
+const results = (json) => readResults(json, STEP);
 
 const verdicts = {};
 for (const arm of Object.keys(ARMS)) {
@@ -175,21 +95,9 @@ for (const arm of Object.keys(ARMS)) {
   const dist = await build(arm);
   const { server, port } = await serve(dist);
   const json = join(OUT, `${arm}.json`);
-  // ⚠️ ASYNC, ⛔ spawnSync: the static server lives in THIS process — a synchronous child
-  // blocks the event loop, the server never answers, and every step times out on page.goto
-  // (measured 04.10: HEAD went 5/5 red for exactly that reason).
-  const run = await new Promise((done) => {
-    let out = "";
-    const child = spawn("npx", ["playwright", "test", "-c", "playwright.eye.config.js", ...PROJECTS.map((p) => `--project=${p}`)], {
-      cwd: ROOT,
-      env: { ...process.env, EYE_HERMETIC: "1", TEST_URL: `http://127.0.0.1:${port}`, EYE_JSON: json, EYE_EVIDENCE_DIR: join(OUT, arm), CI: "" },
-    });
-    child.stdout.on("data", (d) => { out += d; });
-    child.stderr.on("data", (d) => { out += d; });
-    child.on("close", (status) => done({ status, out }));
-  });
+  const run = await runSpec({ root: ROOT, spec: "tests-eye/playbook.spec.js", projects: PROJECTS, port, json, evidenceDir: join(OUT, arm) });
   server.close();
-  if (!existsSync(json)) die(`${arm}: the spec produced no JSON report (exit ${run.status})\n${run.out.slice(-3000)}`);
+  if (!run.ok) die(`${arm}: the spec produced no JSON report (exit ${run.status})\n${run.out.slice(-3000)}`);
   verdicts[arm] = results(json);
   for (const [k, v] of Object.entries(verdicts[arm]).sort()) console.log(`   ${k.padEnd(12)} ${v.status}${v.status !== "passed" ? `  — ${v.msg.slice(0, 600)}` : ""}`);
 }

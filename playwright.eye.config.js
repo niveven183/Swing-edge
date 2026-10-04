@@ -12,6 +12,14 @@ import { defineConfig, devices } from "@playwright/test";
 const BASE_URL = process.env.TEST_URL || "https://swing-edge.com";
 const chromiumLaunch = process.env.EYE_CHROMIUM ? { executablePath: process.env.EYE_CHROMIUM } : {};
 
+// EYE_FORCE_CHROMIUM=1 — LOCAL ONLY, where WebKit is not installed: every project keeps its
+// device (UA · viewport · touch) but runs on the Chromium engine. ⛔ Set in CI: there the
+// iPhone projects must run real WebKit, and a Chromium "iPhone" would be a false green.
+const forceChromium = (projects) =>
+  process.env.EYE_FORCE_CHROMIUM === "1"
+    ? projects.map((p) => ({ ...p, use: { ...p.use, defaultBrowserType: "chromium", browserName: "chromium", launchOptions: chromiumLaunch } }))
+    : projects;
+
 export default defineConfig({
   testDir: "./tests-eye",
   globalSetup: "./tests-eye/global-setup.js",
@@ -30,8 +38,14 @@ export default defineConfig({
     actionTimeout: 20_000,
     navigationTimeout: 45_000,
   },
-  projects: [
+  projects: forceChromium([
     { name: "pixel7", use: { ...devices["Pixel 7"], launchOptions: chromiumLaunch } },
     { name: "iphone14", use: { ...devices["iPhone 14"] } },
-  ],
+    // B-404 · B-405 — the overlay matrix needs the short and the narrow screens too
+    // (measured 04.10: iPhone SE 568 · Galaxy S8 360 wide · 14 Pro Max 740). The playbook
+    // suite stays on the two devices above; these run tests-eye/overlay.spec.js only.
+    { name: "iphoneSE", testMatch: /overlay\.spec\.js/, use: { ...devices["iPhone SE"] } },
+    { name: "iphone14promax", testMatch: /overlay\.spec\.js/, use: { ...devices["iPhone 14 Pro Max"] } },
+    { name: "galaxyS8", testMatch: /overlay\.spec\.js/, use: { ...devices["Galaxy S8"], launchOptions: chromiumLaunch } },
+  ]),
 });
