@@ -56,9 +56,17 @@ const once = (src, find, label) => {
   const n = typeof find === "string" ? src.split(find).length - 1 : (src.match(find) || []).length;
   if (n !== 1) die(`${label}: anchor matched ${n}× (must be exactly 1 — a no-op mutant is a blind test, B-272)`);
 };
+// Two different failures, and they must not read the same (B-335): git unable to read the
+// repository at all (measured in CI 04.10 — a HOME override hid `safe.directory`, and `git diff`
+// fell back to --no-index usage) is ⛔ "the file has uncommitted changes".
 for (const f of [APP, RESIZE]) {
-  try { execFileSync("git", ["diff", "--quiet", "--", f], { cwd: ROOT }); }
-  catch { die(`${f.replace(ROOT + "/", "")} has uncommitted changes — the restore check would be meaningless`); }
+  let dirty;
+  try {
+    dirty = execFileSync("git", ["status", "--porcelain", "--", f], { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  } catch (e) {
+    die(`git cannot read the repository (${String(e.stderr || e.message).split("\n")[0]}) — the restore check is impossible`);
+  }
+  if (dirty.trim()) die(`${f.replace(ROOT + "/", "")} has uncommitted changes — the restore check would be meaningless`);
 }
 
 const appSrc = readFileSync(APP, "utf8");

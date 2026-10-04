@@ -65,7 +65,6 @@ jobs:
       - name: Red-before probe (both devices)
         env:
           EYE_PROJECTS: pixel7,iphone14
-          HOME: /root
         run: npm run probe:eye:playbook
       # Hermetic evidence: synthetic origin, dummy account, no secret exists in this job.
       - name: Upload probe evidence
@@ -116,7 +115,6 @@ jobs:
       - run: npm ci
       - name: C-064 against production (QA account)
         env:
-          HOME: /root
           CI: 'true'
           TEST_URL: ${{ vars.TEST_URL || 'https://swing-edge.com' }}
           EYE_JSON: eye-results.json   # outside eye-evidence/: never uploaded
