@@ -17,7 +17,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { redactText } from '../tests-sentinel/evidence.js';
+import { redactText, LEAK_PATTERNS } from '../tests-sentinel/evidence.js';
 
 const [dir = 'sentinel-evidence', findingsPath = 'browser-findings-auth.json'] = process.argv.slice(2);
 const secret = process.env.SENTINEL_QA_PASSWORD || '';
@@ -117,15 +117,7 @@ if (!fs.existsSync(dir)) {
   // the codec, not a leak. That exclusion is printed, never silent.
   say(`\n── 6. סריקת דליפה — ${files.length} קבצים · ספירות בלבד ──`);
   if (!secret) problems.push('SENTINEL_QA_PASSWORD חסר ⇒ סריקת הסיסמה ⛔ רצה');
-  const PATTERNS = [
-    ['@', /@/g, 'text-only'],
-    ['eyJ', /eyJ/g],
-    ['Bearer', /Bearer/g],
-    ['refresh_token', /refresh_token/g],
-    ['access_token', /access_token/g],
-    ['apikey', /apikey/gi],
-    ['sb-*-auth-token', /sb-[a-z0-9]+-auth-token/gi],
-  ];
+  const PATTERNS = LEAK_PATTERNS;
   const isText = (f) => /\.(json|html|txt)$/i.test(f);
   const binaryEyJ = [];
   let total = 0;

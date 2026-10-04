@@ -14,3 +14,5 @@ sentinel-evidence/
 # per-user counts — must never land in a public repo.
 analytics-report.txt
 .analytics-state/
+# C-064 eye suite — fixtures, screenshots, stored images (uploaded as a CI artifact)
+eye-evidence/

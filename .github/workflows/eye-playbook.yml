@@ -1,0 +1,146 @@
+name: Eye · Playbook images (C-064)
+
+# C-064 closed by a machine (Niv, 04.10). Plan: docs/plans/PLAN-2026-10-04-c064-eye-auto.md
+#
+#   probe — hermetic red-before: four builds (HEAD · LEGACY · MUT-D · MUT-E) × two devices,
+#           against a synthetic Supabase. Zero secrets. Proves every step CAN go red.
+#   prod  — the same spec against https://swing-edge.com with the QA account. Writes
+#           e2e-c064-* setups and one EYEPB trade, then sweeps them and proves 0 residue.
+#
+# ⚠️ Emulation, ⛔ a physical iPhone: `iPhone 14` is WebKit with an iPhone UA/viewport/touch.
+# Readability is OCR as a PROXY for the eye. Both gaps are registered (DECISIONS 04.10).
+
+on:
+  workflow_dispatch:
+  # Weekly. ⛔ minutes :20/:50 — the sentinel's hourly slots on the SAME QA account
+  # (Niv, 04.10, fix ②). Monday 05:37 UTC: clear of the sentinel and of smoke (04:00).
+  schedule:
+    - cron: '37 5 * * 1'
+  push:
+    branches: [main]
+    paths:
+      - 'src/lib/imageResize.js'
+      - 'src/lib/playbookStore.js'
+      - 'src/components/ToastProvider.jsx'
+      - 'tests-eye/**'
+      - 'playwright.eye.config.js'
+      - 'scripts/eye-playbook-probe.mjs'
+      - 'scripts/eye-evidence-scan.mjs'
+      - '.github/workflows/eye-playbook.yml'
+  pull_request:
+    paths:   # same list as push
+      - 'src/lib/imageResize.js'
+      - 'src/lib/playbookStore.js'
+      - 'src/components/ToastProvider.jsx'
+      - 'tests-eye/**'
+      - 'playwright.eye.config.js'
+      - 'scripts/eye-playbook-probe.mjs'
+      - 'scripts/eye-evidence-scan.mjs'
+      - '.github/workflows/eye-playbook.yml'
+
+# One run at a time on the QA row; ⛔ cancel (a cancelled run skips its own sweep).
+# ⛔ the `sentinel` group: a new pending run replaces a pending one, which would drop a
+# pending sentinel run.
+concurrency:
+  group: eye-playbook
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  deployments: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    # The playwright image carries WebKit's system libraries; `--with-deps` was removed from
+    # smoke.yml as unbounded. Pinned to the lockfile's @playwright/test.
+    container: mcr.microsoft.com/playwright:v1.61.1-noble
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # LEGACY reads SwingEdge_App.jsx from 3d24c23
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - run: npm ci
+      - name: Red-before probe (both devices)
+        env:
+          EYE_PROJECTS: pixel7,iphone14
+          HOME: /root
+        run: npm run probe:eye:playbook
+      # Hermetic evidence: synthetic origin, dummy account, no secret exists in this job.
+      - name: Upload probe evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: eye-playbook-probe-${{ github.run_id }}
+          path: eye-evidence/probe/
+          retention-days: 14
+          if-no-files-found: warn
+
+  # `gh` is not in the playwright image — the deploy wait runs on the plain runner.
+  wait-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Wait for this commit's deploy to be live (push only)
+        if: ${{ github.event_name == 'push' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -uo pipefail
+          # Same contract as smoke.yml: testing whatever is live would be a false ✅.
+          deadline=$(( SECONDS + 180 ))
+          while :; do
+            ids=$(gh api "repos/${GITHUB_REPOSITORY}/deployments?sha=${SHA}&environment=Production" --jq '.[].id' 2>/dev/null | grep -E '^[0-9]+$' || true)
+            states=""
+            for id in $ids; do states="$states $(gh api "repos/${GITHUB_REPOSITORY}/deployments/${id}/statuses" --jq '.[].state' 2>/dev/null | tr '\n' ' ')"; done
+            echo "t=${SECONDS}s sha=${SHA:0:7} states=[${states} ]"
+            case " $states " in
+              *" success "*) echo "✅ ${SHA:0:7} is live"; exit 0 ;;
+              *" failure "*|*" error "*) echo "::error::deploy for ${SHA:0:7} failed"; exit 1 ;;
+            esac
+            if (( SECONDS >= deadline )); then echo "::error::no successful Production deploy for ${SHA:0:7} in 180s"; exit 1; fi
+            sleep 10
+          done
+      - run: echo "not a push — production is whatever main last deployed (${{ github.event_name }})"
+        if: ${{ github.event_name != 'push' }}
+
+  prod:
+    needs: [probe, wait-deploy]
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.61.1-noble
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - run: npm ci
+      - name: C-064 against production (QA account)
+        env:
+          HOME: /root
+          CI: 'true'
+          TEST_URL: ${{ vars.TEST_URL || 'https://swing-edge.com' }}
+          EYE_JSON: eye-results.json   # outside eye-evidence/: never uploaded
+          # Existing secrets only (the sentinel reads them) — ⛔ a new secret, ⛔ a value.
+          SENTINEL_QA_EMAIL: ${{ secrets.SENTINEL_QA_EMAIL }}
+          SENTINEL_QA_PASSWORD: ${{ secrets.SENTINEL_QA_PASSWORD }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: npx playwright test -c playwright.eye.config.js
+      # The artifact is world-readable: it is uploaded ONLY if the leak scan is clean.
+      - name: Leak scan (counts only)
+        id: scan
+        if: ${{ always() }}
+        env:
+          SENTINEL_QA_EMAIL: ${{ secrets.SENTINEL_QA_EMAIL }}
+          SENTINEL_QA_PASSWORD: ${{ secrets.SENTINEL_QA_PASSWORD }}
+        run: node scripts/eye-evidence-scan.mjs eye-evidence
+      - name: Upload evidence (screenshots · stored images · ocr.json · cleanup.json)
+        if: ${{ always() && steps.scan.outcome == 'success' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: eye-playbook-prod-${{ github.run_id }}
+          path: |
+            eye-evidence/
+            !eye-evidence/probe/
+          retention-days: 14
+          if-no-files-found: warn
