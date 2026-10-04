@@ -37,7 +37,9 @@ export default function IOSInstallBanner({ ready }) {
   const cardRef = useRef(null);
 
   useEffect(() => {
-    if (typeof MutationObserver === "undefined") return undefined;
+    // Only where the banner can exist at all: every DOM mutation runs the callback, so
+    // Android/desktop (and an installed PWA) never pay for it.
+    if (typeof MutationObserver === "undefined" || !isIOS() || isStandalone()) return undefined;
     const mo = new MutationObserver(() => setModal(modalOpen()));
     mo.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["aria-modal"] });
     return () => mo.disconnect();
