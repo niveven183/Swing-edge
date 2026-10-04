@@ -156,7 +156,12 @@ function results(jsonPath) {
       const step = STEP(spec.title);
       if (!step) continue;
       const res = t.results?.[t.results.length - 1];
-      const msg = (res?.errors || []).map((e) => e.message || "").join(" | ").replace(/\u001b\[[0-9;]*m/g, "");
+      // The first line names the failed call; the "waiting for" / "intercepts pointer events"
+      // lines name WHAT it waited on — without them a CI red is undiagnosable from the log.
+      const msg = (res?.errors || []).map((e) => {
+        const lines = (e.message || "").replace(/\u001b\[[0-9;]*m/g, "").split("\n");
+        return [lines[0], ...lines.filter((l) => /waiting for|intercepts pointer|resolved to|not visible|not stable/.test(l)).slice(-3)].join(" ⟶ ");
+      }).join(" | ");
       out[`${t.projectName}:${step}`] = { status: res?.status || t.status, msg };
     }
   };
@@ -186,7 +191,7 @@ for (const arm of Object.keys(ARMS)) {
   server.close();
   if (!existsSync(json)) die(`${arm}: the spec produced no JSON report (exit ${run.status})\n${run.out.slice(-3000)}`);
   verdicts[arm] = results(json);
-  for (const [k, v] of Object.entries(verdicts[arm]).sort()) console.log(`   ${k.padEnd(12)} ${v.status}${v.status !== "passed" ? `  — ${v.msg.split("\n")[0].slice(0, 160)}` : ""}`);
+  for (const [k, v] of Object.entries(verdicts[arm]).sort()) console.log(`   ${k.padEnd(12)} ${v.status}${v.status !== "passed" ? `  — ${v.msg.slice(0, 600)}` : ""}`);
 }
 
 console.log("\n── verdicts ──");

@@ -45,6 +45,22 @@ test("C-064 · QA credentials and REST cleanup are wired (CI only)", async () =>
   expect(!!(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY), "SUPABASE_URL / SUPABASE_ANON_KEY missing — the cleanup net could not run").toBe(true);
 });
 
+// Two bottom overlays a real phone user dismisses before anything else — handled the way the
+// user does, whenever they appear (`addLocatorHandler`), ⛔ hidden by CSS. Installed BEFORE the
+// first navigation: measured in CI 04.10 (run 37198734958) and reproduced locally — on the short
+// iPhone 14 viewport (664px) the consent banner covers the LOGIN submit button, so every
+// iPhone step died on a click timeout while Pixel 7 (915px) was green.
+//   · consent banner — declined (the privacy-preserving answer; the sentinel's choice).
+//   · iOS install banner (src/components/IOSInstallBanner.jsx) — iOS UA only, armed 1.5s after
+//     the consent choice, `fixed bottom-4 z-[90]`. Its copy is hard-coded Hebrew there, so it is
+//     anchored on that copy; a reword stops the handler and turns every iPhone step RED with
+//     Playwright's "intercepts pointer events" — loud, ⛔ silent.
+async function installOverlayHandlers(page) {
+  await page.addLocatorHandler(page.locator('[data-testid="consent-decline"]'), (btn) => btn.click());
+  const iosBanner = page.locator("div.fixed").filter({ hasText: "התקן את SwingEdge" });
+  await page.addLocatorHandler(iosBanner, (b) => b.getByRole("button", { name: "סגור" }).click());
+}
+
 test.describe("C-064 · Playbook images (B-015 · B-038)", () => {
   test.skip(!HAVE_CREDS, "no QA credentials (local run) — use the hermetic probe");
 
@@ -67,6 +83,7 @@ test.describe("C-064 · Playbook images (B-015 · B-038)", () => {
       console.log(`[C-064] pre-sweep: trades ${cleanup.pre.trades.found} · setups ${cleanup.pre.playbook.found}`);
       const ctx = await browser.newContext({ ...ctxOpts(info), baseURL: info.project.use.baseURL });
       const page = await ctx.newPage();
+      await installOverlayHandlers(page);
       await login(page, QA_EMAIL, QA_PASSWORD);
       STATE = await ctx.storageState();
       await ctx.close();
@@ -90,6 +107,7 @@ test.describe("C-064 · Playbook images (B-015 · B-038)", () => {
     const store = HERMETIC ? newStore() : null;
     if (HERMETIC) await installHermetic(ctx, store);
     const page = await ctx.newPage();
+    await installOverlayHandlers(page);
     await installFlashRecorder(page, TOAST_TEXTS);
     // Console errors are evidence for a red step (redacted — the artifact is public).
     const consoleErrors = [];
@@ -102,10 +120,6 @@ test.describe("C-064 · Playbook images (B-015 · B-038)", () => {
       await page.goto("/app", { waitUntil: "load" });
       await page.locator('[data-tour-tab="dashboard"]').waitFor({ state: "visible", timeout: 30_000 });
     }
-    // The consent banner sits over the lower third of a phone screen. Declining is the
-    // privacy-preserving answer and the one the sentinel gives (data-testid, ⛔ copy).
-    const decline = page.locator('[data-testid="consent-decline"]');
-    if (await decline.isVisible().catch(() => false)) await decline.click();
     const prefix = `${PREFIX_ROOT}${RUN}-${info.project.name}-`;
     const dir = join(EVIDENCE, info.project.name);
     mkdirSync(dir, { recursive: true });
