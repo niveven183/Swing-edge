@@ -51,6 +51,21 @@ export function redactText(input, secrets = []) {
 // measurement — or an explicit admission. ⛔ '' and ⛔ a swallowed error: the
 // first crumb (28.09, run 36399653545) read capital as "" and nobody could tell
 // "empty on screen" from "never read".
+// Leak patterns for evidence that leaves the runner (public repo ⇒ world-readable artifacts).
+// ONE list, consumed by scripts/verify-evidence.mjs (sentinel) and
+// scripts/eye-evidence-scan.mjs (C-064 eye suite) — two copies would drift (R-6).
+// `text-only`: '@' is an ordinary byte in compressed image data, so in a binary file a hit
+// measures the codec, not a leak; the exclusion is printed by every consumer, never silent.
+export const LEAK_PATTERNS = [
+  ['@', /@/g, 'text-only'],
+  ['eyJ', /eyJ/g],
+  ['Bearer', /Bearer/g],
+  ['refresh_token', /refresh_token/g],
+  ['access_token', /access_token/g],
+  ['apikey', /apikey/gi],
+  ['sb-*-auth-token', /sb-[a-z0-9]+-auth-token/gi],
+];
+
 export const UNMEASURED = 'לא נמדד: ';
 export async function measure(fn) {
   try {
