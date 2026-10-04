@@ -83,8 +83,15 @@ for (const p of PROJECTS) {
   const kinds = IOS.has(p) ? ["consent", "ios"] : ["consent"];
   const head = kinds.flatMap((k) => cells("HEAD", p, k));
   ok(`HEAD/${p}`, head.every((r) => r.status === "passed"), `all ${head.length} cells green`, head.filter((r) => r.status !== "passed").map((r) => `${r.status} ${r.msg}`).join(" | "));
-  const before = cells("BEFORE", p, "consent");
-  ok(`BEFORE/${p}`, before.every((r) => r.status === "failed" && /covered by/.test(r.msg)), `consent cells red-before: ${before.map((r) => r.status).join(" · ")}`, "the pre-fix tree passes — the spec is BLIND to B-404");
+  // Red-before is required PER DEVICE, in at least one scenario — ⛔ in every scenario. Measured
+  // in CI 04.10 (run 37207954098): on real WebKit the consent card does NOT cover any iPhone SE
+  // CTA even before the fix (Chromium with the SE UA did — engine-dependent), while the iOS
+  // banner does. Demanding a red where the defect does not exist would be a false gate; a
+  // device with NO red anywhere is a blind spec. The non-reproducing scenarios are printed.
+  const before = kinds.flatMap((k) => cells("BEFORE", p, k).map((r) => ({ ...r, k })));
+  const reds = before.filter((r) => r.status === "failed" && /covered by|B-405/.test(r.msg));
+  const quiet = [...new Set(before.filter((r) => r.status === "passed").map((r) => r.k))];
+  ok(`BEFORE/${p}`, reds.length > 0, `red-before on this device: ${reds.length}/${before.length} cells${quiet.length ? ` · ⚠️ not reproduced here: ${quiet.join(",")}` : ""}`, "no cell red on the pre-fix tree — the spec is BLIND on this device");
   const pad = cells("MUT-PAD", p, "consent");
   ok(`MUT-PAD/${p}`, pad.some((r) => r.status === "failed" && /covered by/.test(r.msg)), `reserve off ⇒ ${pad.map((r) => r.status).join(" · ")}`, "mutant SURVIVED — the spec cannot see the reserve being removed");
   if (IOS.has(p)) {
