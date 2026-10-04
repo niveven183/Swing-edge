@@ -4,8 +4,11 @@ name: Eye · Playbook images (C-064)
 #
 #   probe — hermetic red-before: four builds (HEAD · LEGACY · MUT-D · MUT-E) × two devices,
 #           against a synthetic Supabase. Zero secrets. Proves every step CAN go red.
-#   prod  — the same spec against https://swing-edge.com with the QA account. Writes
-#           e2e-c064-* setups and one EYEPB trade, then sweeps them and proves 0 residue.
+#   probe-overlay — B-404 · B-405 (04.10): hermetic red-before for tests-eye/overlay.spec.js
+#           (HEAD · BEFORE · MUT-PAD · MUT-IOS) × five devices. No banner is ever closed.
+#   prod  — both specs against https://swing-edge.com with the QA account. playbook writes
+#           e2e-c064-* setups and one EYEPB trade, then sweeps them and proves 0 residue;
+#           overlay blocks every REST write and only reads.
 #
 # ⚠️ Emulation, ⛔ a physical iPhone: `iPhone 14` is WebKit with an iPhone UA/viewport/touch.
 # Readability is OCR as a PROXY for the eye. Both gaps are registered (DECISIONS 04.10).
@@ -26,6 +29,14 @@ on:
       - 'playwright.eye.config.js'
       - 'scripts/eye-playbook-probe.mjs'
       - 'scripts/eye-evidence-scan.mjs'
+      - 'src/components/ConsentBanner.jsx'
+      - 'src/components/ConsentBanner.css'
+      - 'src/components/IOSInstallBanner.jsx'
+      - 'src/components/AuthScreen.jsx'
+      - 'src/lib/bottomOverlay.js'
+      - 'src/hooks/useBottomOverlay.js'
+      - 'scripts/eye-overlay-probe.mjs'
+      - 'scripts/lib/eyeBuild.mjs'
       - '.github/workflows/eye-playbook.yml'
   pull_request:
     paths:   # same list as push
@@ -36,6 +47,14 @@ on:
       - 'playwright.eye.config.js'
       - 'scripts/eye-playbook-probe.mjs'
       - 'scripts/eye-evidence-scan.mjs'
+      - 'src/components/ConsentBanner.jsx'
+      - 'src/components/ConsentBanner.css'
+      - 'src/components/IOSInstallBanner.jsx'
+      - 'src/components/AuthScreen.jsx'
+      - 'src/lib/bottomOverlay.js'
+      - 'src/hooks/useBottomOverlay.js'
+      - 'scripts/eye-overlay-probe.mjs'
+      - 'scripts/lib/eyeBuild.mjs'
       - '.github/workflows/eye-playbook.yml'
 
 # One run at a time on the QA row; ⛔ cancel (a cancelled run skips its own sweep).
@@ -76,6 +95,32 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
+  # B-404 · B-405 — separate job so it runs in parallel with the playbook probe (each is
+  # four builds; together they would not fit one job's budget).
+  probe-overlay:
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.61.1-noble
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # BEFORE reads the pre-fix files from d1e05e1
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - run: npm ci
+      - name: Red-before probe — overlay (five devices)
+        env:
+          EYE_PROJECTS: pixel7,iphone14,iphoneSE,iphone14promax,galaxyS8
+        run: npm run probe:eye:overlay
+      # Hermetic evidence: synthetic origin, dummy account, no secret exists in this job.
+      - name: Upload overlay probe evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: eye-overlay-probe-${{ github.run_id }}
+          path: eye-evidence/probe-overlay/
+          retention-days: 14
+          if-no-files-found: warn
+
   # `gh` is not in the playwright image — the deploy wait runs on the plain runner.
   wait-deploy:
     runs-on: ubuntu-latest
@@ -106,10 +151,10 @@ jobs:
         if: ${{ github.event_name != 'push' }}
 
   prod:
-    needs: [probe, wait-deploy]
+    needs: [probe, probe-overlay, wait-deploy]
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.61.1-noble
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
       - run: npm ci
@@ -140,5 +185,6 @@ jobs:
           path: |
             eye-evidence/
             !eye-evidence/probe/
+            !eye-evidence/probe-overlay/
           retention-days: 14
           if-no-files-found: warn

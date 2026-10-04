@@ -105,7 +105,10 @@ test.describe("B-404 · B-405 — bottom banners never cover a core CTA", () => 
       const scroller = sc || document.scrollingElement;
       let res = centre();
       let scrolled = 0;
-      while (!res.ok && scrolled < 1200) {
+      // A `fixed` CTA (the FAB) does not move with the page — and the FAB HIDES while the page
+      // scrolls — so scrolling it would only turn "covered" into "off-screen". Judged in place.
+      const fixed = getComputedStyle(el).position === "fixed";
+      while (!fixed && !res.ok && scrolled < 1200) {
         const before = scroller.scrollTop;
         // `instant`: the app sets `scroll-behavior: smooth`, under which scrollTop moves later.
         scroller.scrollTo({ top: before + 40, behavior: "instant" });
@@ -151,7 +154,7 @@ test.describe("B-404 · B-405 — bottom banners never cover a core CTA", () => 
         await page.locator("div.flex.bg-slate-100 > button").nth(0).click(); // back to sign-in
         await login(page);
         await expect(page.locator(".se-consent__card"), "consent was never chosen — the banner must still be up").toBeVisible();
-        await page.evaluate(() => window.scrollTo(0, 0)); // the FAB hides while scrolled down
+        await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" })); // the FAB hides while scrolled down
         await clear(app, `${lang}-fab`, page.locator('[data-tour="add-trade"]'));
         await page.locator('[data-tour="add-trade"]').click();
         await clear(app, `${lang}-log-trade`, page.getByRole("button", { name: /Log Trade/ }));
@@ -183,7 +186,7 @@ test.describe("B-404 · B-405 — bottom banners never cover a core CTA", () => 
           await expect(banner, "B-405: the iOS banner showed before the user's first trade").toBeHidden();
           if (HERMETIC) {
             // First real action: log a trade through the form.
-            await page.evaluate(() => window.scrollTo(0, 0));
+            await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
             await page.locator('[data-tour="add-trade"]').click();
             await page.locator("#log-ticker").fill("EYEPB");
             await page.locator("#log-entry").fill("100");
@@ -205,7 +208,7 @@ test.describe("B-404 · B-405 — bottom banners never cover a core CTA", () => 
           return;
         }
         await expect(banner, "after a first trade the iOS banner should arm (it is the feature)").toBeVisible({ timeout: 5_000 });
-        await page.evaluate(() => window.scrollTo(0, 0));
+        await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
         await clear(app, `${lang}-ios-fab`, page.locator('[data-tour="add-trade"]'));
         await page.locator('[data-tour="add-trade"]').click();
         await expect(banner, "B-405: the iOS banner sat over an open modal").toBeHidden();
