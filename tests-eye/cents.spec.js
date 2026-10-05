@@ -220,38 +220,33 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
       const n = await bars.count();
       expect(n, "the per-trade chart has no bars").toBeGreaterThan(0);
       let tip = null;
-      // By coordinates, ⛔ `locator.hover()`: recharts re-mounts the bar paths while the entry
-      // animation runs, so a held element handle detaches (measured locally). Three more traps,
-      // each measured: ⓐ the tooltip wrapper EXISTS while empty, so a one-shot read returns ""
-      // (CI 05.10, run 37361308589, pixel7 red) ⇒ poll; ⓑ the bar grows during the animation ⇒
-      // wait for a stable box; ⓒ on the 664px iPhone 14 viewport the close toast sits over the
-      // chart (elementFromPoint = the toast's `div.whitespace-pre-line`) ⇒ centre the bar and
-      // wait until the point under the pointer belongs to THIS chart, ⛔ hide the toast.
-      const secHandle = await sec.elementHandle();
-      const pointInChart = ([x, y, root]) => { const e = document.elementFromPoint(x, y); return !!e && root.contains(e); };
-      const settle = async (loc) => {
-        let prev = null;
-        for (let k = 0; k < 100; k++) {
-          await loc.evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
-          const b = await loc.boundingBox();
-          const steady = b && prev && Math.abs(b.y - prev.y) < 0.5 && Math.abs(b.height - prev.height) < 0.5;
-          if (steady && await page.evaluate(pointInChart, [b.x + b.width / 2, b.y + Math.max(1, b.height / 2), secHandle])) return b;
-          prev = b;
-          await page.waitForTimeout(150);
-        }
-        return null; // 15s without a free, steady bar ⇒ the expect below goes red, ⛔ a skip
-      };
+      // `locator.hover()` with retries. Its actionability check waits until the bar is stable AND
+      // receives the pointer — which covers the close toast lying over the chart on the 664px
+      // iPhone 14 viewport (measured: elementFromPoint = the toast's div). A detach while recharts
+      // re-mounts the paths during its entry animation is caught and retried. The tooltip wrapper
+      // EXISTS while empty, so its text is polled (CI 37361308589 went red on a one-shot read).
+      // ⚠️ Raw coordinates (`page.mouse.move`) were tried and went red on WebKit in CI
+      // (run 37362747806) while green on Chromium — ⛔ go back to them.
+      const trail = [];
       for (let i = n - 1; i >= 0 && !tip; i--) {
-        const box = await settle(bars.nth(i));
-        if (!box) continue;
-        const cx = box.x + box.width / 2, cy = box.y + Math.max(1, box.height / 2);
-        for (let k = 0; k < 20 && !tip; k++) {
-          await page.mouse.move(cx + (k % 2), cy);
-          const text = await sec.locator(".recharts-tooltip-wrapper").innerText().catch(() => "");
-          if (text.includes(TRADE_TICKER)) tip = text;
-          else await page.waitForTimeout(150);
+        for (let k = 0; k < 8 && !tip; k++) {
+          try {
+            await bars.nth(i).scrollIntoViewIfNeeded({ timeout: 3_000 });
+            await bars.nth(i).hover({ timeout: 4_000 });
+          } catch (e) {
+            trail.push(`bar ${i} try ${k}: ${String(e.message).split("\n")[0].slice(0, 120)}`);
+            await page.waitForTimeout(500);
+            continue;
+          }
+          for (let j = 0; j < 10 && !tip; j++) {
+            const text = await sec.locator(".recharts-tooltip-wrapper").innerText().catch(() => "");
+            if (text.includes(TRADE_TICKER)) tip = text;
+            else await page.waitForTimeout(150);
+          }
+          if (!tip) trail.push(`bar ${i} try ${k}: hovered, tooltip never named ${TRADE_TICKER}`);
         }
       }
+      if (!tip) console.log(`[K2 a] ${info.project.name}: B3 hover trail —\n  ${trail.join("\n  ")}`);
       expect(tip, "no bar of the per-trade chart named EYEPB on hover").not.toBeNull();
       expect(tip, `B3 tooltip should show ${r.shown}`).toContain(r.shown);
       await shot("a-analytics");
