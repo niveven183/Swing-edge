@@ -2,7 +2,7 @@ name: Eye · Playbook images (C-064)
 
 # C-064 closed by a machine (Niv, 04.10). Plan: docs/plans/PLAN-2026-10-04-c064-eye-auto.md
 #
-#   probe — hermetic red-before: four builds (HEAD · LEGACY · MUT-D · MUT-E) × two devices,
+#   probe — hermetic red-before: five builds (HEAD · LEGACY · MUT-D · MUT-E · MUT-B402) × two devices,
 #           against a synthetic Supabase. Zero secrets. Proves every step CAN go red.
 #   probe-overlay — B-404 · B-405 (04.10): hermetic red-before for tests-eye/overlay.spec.js
 #           (HEAD · BEFORE · MUT-PAD · MUT-IOS) × five devices. No banner is ever closed.
@@ -212,6 +212,8 @@ jobs:
           # the deploy wait (the D-114 closing run), and on dispatch / schedule.
           # Step f of playbook.spec (`@deployed`, B-406) needs the fix ON production — same reason.
           SPECS: ${{ github.event_name == 'pull_request' && 'tests-eye/playbook.spec.js --grep-invert @deployed' || '' }}
+          # B-402: the F2b gate in step d needs the 2000px profile ON production — same reason.
+          EYE_PRE_DEPLOY: ${{ github.event_name == 'pull_request' && '1' || '' }}
         run: npx playwright test -c playwright.eye.config.js $SPECS
       # The artifact is world-readable: it is uploaded ONLY if the leak scan is clean.
       - name: Leak scan (counts only)

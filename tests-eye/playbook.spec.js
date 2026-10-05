@@ -31,6 +31,12 @@ const QA_PASSWORD = HERMETIC ? DUMMY_PASSWORD : process.env.SENTINEL_QA_PASSWORD
 const HAVE_CREDS = !!(QA_EMAIL && QA_PASSWORD);
 const STORED_CAP = 200 * 1024; // src/lib/imageResize.js STORED_CAP_BYTES — the claim under test
 const GATE = 7; // ≥7/8 axis prices read exactly (prompt §4d)
+// B-402 (05.10): the F2b gate measures the 2000px profile, which a pull_request's prod run does
+// not have yet (production = whatever main last deployed). eye-playbook.yml sets EYE_PRE_DEPLOY
+// on pull_request ONLY — the same reason step f is `@deployed`. There F2b is measured and
+// logged, ⛔ gated; the hermetic probe (MUT-B402) and the push-to-main prod run gate it.
+const PRE_DEPLOY = process.env.EYE_PRE_DEPLOY === "1";
+const DEPLOYED_GATES = new Set(["F2b"]);
 const RUN = process.env.GITHUB_RUN_ID || `local${Date.now().toString(36)}`;
 const EVIDENCE = process.env.EYE_EVIDENCE_DIR || join(process.cwd(), "eye-evidence");
 
@@ -340,6 +346,11 @@ test.describe("C-064 · Playbook images (B-015 · B-038)", () => {
       expect(gated, "the gated fixtures changed — the probe verdicts depend on F2 then F2b").toEqual(["F2", "F2b"]);
       for (const f of gated) {
         const g = report[f];
+        if (PRE_DEPLOY && DEPLOYED_GATES.has(f)) {
+          console.log(`[C-064 d] ${info.project.name} ${f}: ${g.stored} — pre-deploy run, measured ⛔ gated (B-402)`);
+          test.info().annotations.push({ type: "pre-deploy", description: `${f} ${g.stored} not gated` });
+          continue;
+        }
         expect(Number(g.stored.split("/")[0]), `${f} (${g.font}px): stored image read ${g.stored}, missing ${g.missing.join(",")}`).toBeGreaterThanOrEqual(GATE);
       }
     });
