@@ -309,7 +309,7 @@ test.describe("C-064 · Playbook images (B-015 · B-038)", () => {
   });
 
   // ── d ────────────────────────────────────────────────────────────────────
-  test("d · chart axis prices are still readable after the stored profile (OCR ≥7/8)", async ({ browser }, info) => {
+  test("d · chart axis prices are still readable after the stored profile (OCR ≥7/8 on F2 + F2b)", async ({ browser }, info) => {
     const app = await openApp(browser, info);
     const { page, prefix, shot, dir } = app;
     const report = {};
@@ -334,8 +334,14 @@ test.describe("C-064 · Playbook images (B-015 · B-038)", () => {
       }
       writeFileSync(join(dir, "ocr.json"), JSON.stringify(report, null, 2));
       test.info().annotations.push({ type: "ocr", description: JSON.stringify(Object.fromEntries(Object.entries(report).map(([k, v]) => [k, v.stored]))) });
-      const g = report.F2;
-      expect(Number(g.stored.split("/")[0]), `F2 (33px): stored image read ${g.stored}, missing ${g.missing.join(",")}`).toBeGreaterThanOrEqual(GATE);
+      // Gates in a FIXED order — F2 first, so MUT-D (a degraded profile) keeps failing on the
+      // F2 message and MUT-B402 (the old 1400px edge) fails on the F2b one (B-402, 05.10).
+      const gated = Object.keys(report).filter((k) => report[k].gate);
+      expect(gated, "the gated fixtures changed — the probe verdicts depend on F2 then F2b").toEqual(["F2", "F2b"]);
+      for (const f of gated) {
+        const g = report[f];
+        expect(Number(g.stored.split("/")[0]), `${f} (${g.font}px): stored image read ${g.stored}, missing ${g.missing.join(",")}`).toBeGreaterThanOrEqual(GATE);
+      }
     });
   });
 

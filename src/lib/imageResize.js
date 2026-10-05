@@ -120,14 +120,26 @@ export function fileToResizedDataURL(file) {
 // reload with no message. The decision (Niv, 01.10, D3): 1400px · q.7 · cap 200KB ·
 // fallback 1000px/.55 · ABOVE THE CAP = REJECT. Rejecting is deliberate: a fallback to
 // the raw file is the very bug this profile removes.
-export const STORED_MAX_EDGE_PX = 1400;
-export const STORED_Q_PRIMARY = 0.7;
+//
+// 05.10 (B-402, D-116): a 2000px · q.5 rung went IN FRONT. The 1400px edge shrank a
+// 1920×1080 desktop screenshot, and with it a 12px axis label to ~8.7px: OCR 6/8 on Pixel 7
+// (M-022). At 2000px that screenshot is not downscaled at all, only re-encoded — 8/8 at
+// 37,574 B. Measured (Chromium, docs/plans/PLAN-2026-10-05-b402-stored-profile.md):
+// 4032×3024 photo 44KB (was 43KB) · 33px phone chart 8/8 (unchanged). The old 1400/.7 rung
+// stays as the MIDDLE rung on purpose: a two-rung [2000/.5, 1000/.55] ladder sent a
+// detail-heavy image straight to 1000px — WORSE than before. With it, anything the old
+// ladder accepted is still accepted at ≥ the old quality, and the cap does not move.
+export const STORED_MAX_EDGE_PX = 2000;
+export const STORED_Q_PRIMARY = 0.5;
+export const STORED_MID_EDGE_PX = 1400;
+export const STORED_Q_MID = 0.7;
 export const STORED_FALLBACK_EDGE_PX = 1000;
 export const STORED_Q_FALLBACK = 0.55;
 export const STORED_CAP_BYTES = 200 * 1024;
 
 export const STORED_LADDER = [
   { edge: STORED_MAX_EDGE_PX, quality: STORED_Q_PRIMARY },
+  { edge: STORED_MID_EDGE_PX, quality: STORED_Q_MID },
   { edge: STORED_FALLBACK_EDGE_PX, quality: STORED_Q_FALLBACK },
 ];
 

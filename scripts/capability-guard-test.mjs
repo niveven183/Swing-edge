@@ -46,6 +46,8 @@ import {
   Q_FALLBACK,
   STORED_MAX_EDGE_PX,
   STORED_Q_PRIMARY,
+  STORED_MID_EDGE_PX,
+  STORED_Q_MID,
   STORED_FALLBACK_EDGE_PX,
   STORED_Q_FALLBACK,
   STORED_CAP_BYTES,
@@ -239,11 +241,19 @@ const stripC = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*
 const EMPTY_CATCH = /catch\s*(\([^)]*\))?\s*\{\s*\}/;
 
 {
-  const ok = STORED_MAX_EDGE_PX === 1400 && STORED_Q_PRIMARY === 0.7 && STORED_FALLBACK_EDGE_PX === 1000 &&
-    STORED_Q_FALLBACK === 0.55 && STORED_CAP_BYTES === 200 * 1024 && STORED_LADDER.length === 2 &&
-    STORED_LADDER[0].edge === 1400 && STORED_LADDER[1].edge === 1000;
-  check("12", "stored-image profile frozen at the D3 decision (1400/.7 · 1000/.55 · cap 200KB)", ok,
-    `edge=${STORED_MAX_EDGE_PX} q=${STORED_Q_PRIMARY} fb=${STORED_FALLBACK_EDGE_PX}/${STORED_Q_FALLBACK} cap=${STORED_CAP_BYTES}`);
+  // B-402 (05.10, D-116): 2000/.5 in front of the D3 ladder. The D3 rungs [1400/.7, 1000/.55]
+  // must stay the TAIL, in order — that is what makes "accepted before ⇒ accepted now, at ≥ the
+  // old quality" structural rather than measured. Edges never grow down the ladder.
+  const L = STORED_LADDER.map(({ edge, quality }) => `${edge}/${quality}`).join(" → ");
+  const tail = STORED_LADDER.slice(-2);
+  const ok = STORED_MAX_EDGE_PX === 2000 && STORED_Q_PRIMARY === 0.5 &&
+    STORED_MID_EDGE_PX === 1400 && STORED_Q_MID === 0.7 && STORED_FALLBACK_EDGE_PX === 1000 &&
+    STORED_Q_FALLBACK === 0.55 && STORED_CAP_BYTES === 200 * 1024 && STORED_LADDER.length === 3 &&
+    L === "2000/0.5 → 1400/0.7 → 1000/0.55" &&
+    tail[0].edge === 1400 && tail[0].quality === 0.7 && tail[1].edge === 1000 && tail[1].quality === 0.55 &&
+    STORED_LADDER.every((r, i, a) => i === 0 || r.edge <= a[i - 1].edge);
+  check("12", "stored-image profile frozen (2000/.5 → 1400/.7 → 1000/.55 · cap 200KB · D3 ladder kept as the tail)", ok,
+    `ladder=${L} cap=${STORED_CAP_BYTES}`);
 }
 
 {
@@ -251,13 +261,16 @@ const EMPTY_CATCH = /catch\s*(\([^)]*\))?\s*\{\s*\}/;
   const big = "x".repeat(Math.floor((STORED_CAP_BYTES / 0.75)) + 1000);
   const calls = [];
   const r1 = chooseStoredEncoding((e, q) => { calls.push([e, q]); return small; });
-  const r2 = chooseStoredEncoding((e, q) => { calls.push([e, q]); return e === 1400 ? big : small; });
+  const r2 = chooseStoredEncoding((e, q) => { calls.push([e, q]); return e === 1000 ? small : big; });
+  const all = [];
   let threw = null;
-  try { chooseStoredEncoding(() => big); } catch (e) { threw = e.message; }
-  const ok = r1 === small && calls[0][0] === 1400 && calls.length === 3 && r2 === small &&
-    calls[2][0] === 1000 && calls[2][1] === 0.55 && threw === "image_too_large_for_storage";
+  try { chooseStoredEncoding((e, q) => { all.push([e, q]); return big; }); } catch (e) { threw = e.message; }
+  // r1: 1 call (first rung fits) · r2: walks all 3 rungs and lands on the last · all-big: 3 tries, then REJECT.
+  const ok = r1 === small && calls[0][0] === 2000 && calls[0][1] === 0.5 && calls.length === 4 && r2 === small &&
+    calls[2][0] === 1400 && calls[2][1] === 0.7 && calls[3][0] === 1000 && calls[3][1] === 0.55 &&
+    all.length === 3 && threw === "image_too_large_for_storage";
   check("13", "chooseStoredEncoding — first fit wins, ladder falls back, above the cap REJECTS", ok,
-    `calls=${JSON.stringify(calls)} threw=${threw}`);
+    `calls=${JSON.stringify(calls)} all=${JSON.stringify(all)} threw=${threw}`);
 }
 
 function quotaStorage(limitChars, state = {}) {

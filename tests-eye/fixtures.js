@@ -14,7 +14,10 @@
 //     REJECTED by design. A "photo" made of pure noise would turn step a red because of
 //     the fixture, ⛔ the product; it is used in step c as the rejection path instead.
 //   · F2 axis labels at 33px = an ~11pt label on a 3× phone (Niv, 04.10). 13px (F2s)
-//     is the stress row, F2b is a 1920×1080 desktop screenshot with 12px labels.
+//     is the stress row (B-403), F2b is a 1920×1080 desktop screenshot with 12px labels.
+//   · F2b became a GATE on 05.10 (B-402): under the 1400px profile it read 6/8 on Pixel 7
+//     (M-022) because 1920→1400 shrinks a 12px label to ~8.7px. Under the 2000px profile it
+//     is not downscaled at all (1920 ≤ 2000) — only re-encoded — and reads 8/8.
 
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
@@ -32,7 +35,7 @@ export const PRICES_B = ["412.35", "415.80", "419.15", "422.60", "426.05", "429.
 const CHARTS = {
   F2: { w: 1170, h: 2532, font: 33, prices: PRICES, gate: true },
   F2s: { w: 1170, h: 2532, font: 13, prices: PRICES, gate: false },
-  F2b: { w: 1920, h: 1080, font: 12, prices: PRICES_B, gate: false },
+  F2b: { w: 1920, h: 1080, font: 12, prices: PRICES_B, gate: true },
 };
 
 /** The price-axis strip of a chart, in SOURCE pixels. OCR crops it relative to the source size. */
