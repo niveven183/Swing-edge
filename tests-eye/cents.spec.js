@@ -221,23 +221,28 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
       expect(n, "the per-trade chart has no bars").toBeGreaterThan(0);
       let tip = null;
       // By coordinates, ⛔ `locator.hover()`: recharts re-mounts the bar paths while the entry
-      // animation runs, so a held element handle detaches (measured locally). And the tooltip
-      // wrapper EXISTS while empty, so a one-shot read returns "" with no wait — CI 05.10 (run
-      // 37361308589, pixel7) went red on exactly that. ⇒ wait for the bar to stop growing, then
-      // poll the tooltip text (nudging the pointer) until it names the ticker.
-      await sec.scrollIntoViewIfNeeded();
-      const stableBox = async (loc) => {
+      // animation runs, so a held element handle detaches (measured locally). Three more traps,
+      // each measured: ⓐ the tooltip wrapper EXISTS while empty, so a one-shot read returns ""
+      // (CI 05.10, run 37361308589, pixel7 red) ⇒ poll; ⓑ the bar grows during the animation ⇒
+      // wait for a stable box; ⓒ on the 664px iPhone 14 viewport the close toast sits over the
+      // chart (elementFromPoint = the toast's `div.whitespace-pre-line`) ⇒ centre the bar and
+      // wait until the point under the pointer belongs to THIS chart, ⛔ hide the toast.
+      const secHandle = await sec.elementHandle();
+      const pointInChart = ([x, y, root]) => { const e = document.elementFromPoint(x, y); return !!e && root.contains(e); };
+      const settle = async (loc) => {
         let prev = null;
-        for (let k = 0; k < 40; k++) {
+        for (let k = 0; k < 100; k++) {
+          await loc.evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
           const b = await loc.boundingBox();
-          if (b && prev && Math.abs(b.y - prev.y) < 0.5 && Math.abs(b.height - prev.height) < 0.5) return b;
+          const steady = b && prev && Math.abs(b.y - prev.y) < 0.5 && Math.abs(b.height - prev.height) < 0.5;
+          if (steady && await page.evaluate(pointInChart, [b.x + b.width / 2, b.y + Math.max(1, b.height / 2), secHandle])) return b;
           prev = b;
-          await page.waitForTimeout(100);
+          await page.waitForTimeout(150);
         }
-        return prev;
+        return null; // 15s without a free, steady bar ⇒ the expect below goes red, ⛔ a skip
       };
       for (let i = n - 1; i >= 0 && !tip; i--) {
-        const box = await stableBox(bars.nth(i));
+        const box = await settle(bars.nth(i));
         if (!box) continue;
         const cx = box.x + box.width / 2, cy = box.y + Math.max(1, box.height / 2);
         for (let k = 0; k < 20 && !tip; k++) {
