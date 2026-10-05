@@ -221,13 +221,31 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
       expect(n, "the per-trade chart has no bars").toBeGreaterThan(0);
       let tip = null;
       // By coordinates, ⛔ `locator.hover()`: recharts re-mounts the bar paths while the entry
-      // animation runs, so a held element handle detaches (measured locally).
+      // animation runs, so a held element handle detaches (measured locally). And the tooltip
+      // wrapper EXISTS while empty, so a one-shot read returns "" with no wait — CI 05.10 (run
+      // 37361308589, pixel7) went red on exactly that. ⇒ wait for the bar to stop growing, then
+      // poll the tooltip text (nudging the pointer) until it names the ticker.
       await sec.scrollIntoViewIfNeeded();
+      const stableBox = async (loc) => {
+        let prev = null;
+        for (let k = 0; k < 40; k++) {
+          const b = await loc.boundingBox();
+          if (b && prev && Math.abs(b.y - prev.y) < 0.5 && Math.abs(b.height - prev.height) < 0.5) return b;
+          prev = b;
+          await page.waitForTimeout(100);
+        }
+        return prev;
+      };
       for (let i = n - 1; i >= 0 && !tip; i--) {
-        const box = await expect.poll(async () => bars.nth(i).boundingBox(), { timeout: 5_000 }).not.toBeNull().then(() => bars.nth(i).boundingBox());
-        await page.mouse.move(box.x + box.width / 2, box.y + Math.max(1, box.height / 2));
-        const text = await sec.locator(".recharts-tooltip-wrapper").innerText({ timeout: 3_000 }).catch(() => "");
-        if (text.includes(TRADE_TICKER)) tip = text;
+        const box = await stableBox(bars.nth(i));
+        if (!box) continue;
+        const cx = box.x + box.width / 2, cy = box.y + Math.max(1, box.height / 2);
+        for (let k = 0; k < 20 && !tip; k++) {
+          await page.mouse.move(cx + (k % 2), cy);
+          const text = await sec.locator(".recharts-tooltip-wrapper").innerText().catch(() => "");
+          if (text.includes(TRADE_TICKER)) tip = text;
+          else await page.waitForTimeout(150);
+        }
       }
       expect(tip, "no bar of the per-trade chart named EYEPB on hover").not.toBeNull();
       expect(tip, `B3 tooltip should show ${r.shown}`).toContain(r.shown);
