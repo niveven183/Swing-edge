@@ -115,6 +115,25 @@ function mergeSettings(base, patch) {
   return out;
 }
 
+// B-406 (05.10) — who wants to know that the row PROVABLY holds a blob: the delta journal
+// (src/lib/settingsDelta.js) clears an op only then. Called after a confirmed upsert AND on a
+// skip proven identical to the row (Niv 05.10, fix ②) — without the skip path an op whose
+// result the row already holds would stay forever. ⛔ It changes no write: no call is added,
+// none is removed, `alreadySent` is untouched.
+const syncedListeners = new Set();
+export function onSettingsSynced(cb) {
+  syncedListeners.add(cb);
+  return () => syncedListeners.delete(cb);
+}
+function notifySynced(userId, blob) {
+  for (const cb of syncedListeners) {
+    try { cb(userId, blob); } catch (e) {
+      // A listener's bug must not fail the write that already landed — and it is said.
+      console.error("userSettings: onSettingsSynced listener threw", e);
+    }
+  }
+}
+
 // ⚠️ supabase-js RETURNS errors, it does not throw them. An RLS denial or a
 // constraint violation arrives as `{ error }` with the promise resolved, so a
 // bare `await` inside try/catch sees only network-level exceptions — and the
@@ -140,6 +159,7 @@ async function upsertBlob(userId, blob, client) {
       return false;
     }
     lastSent.set(userId, sent);
+    notifySynced(userId, blob);
     return true;
   } catch (e) {
     // Network-level failure only — everything else arrives via `error` above.
@@ -229,7 +249,9 @@ export function saveSettings(userId, partial, client = supabase) {
     pending.delete(userId);
     if (!writable.has(userId)) return;
     const blob = cache.get(userId) || {};
-    if (alreadySent(userId, blob)) return; // B-361 — identical to the row, ⛔ a write
+    // B-361 — identical to the row, ⛔ a write. B-406 — and that identity IS the confirmation
+    // the delta journal waits for (lastSent is set only from a confirmed read or write).
+    if (alreadySent(userId, blob)) { notifySynced(userId, blob); return; }
     upsertBlob(userId, blob, client);
   }, DEBOUNCE_MS);
   if (typeof timer.unref === "function") timer.unref();
@@ -251,7 +273,7 @@ export async function flushSettings(userId, client = supabase) {
   const blob = cache.get(userId) || {};
   // ⚠️ The flush path is a DIFFERENT branch from the timer — B-361 has to gate both,
   // or closing the tab re-sends the unchanged blob the timer just declined to send.
-  if (alreadySent(userId, blob)) return;
+  if (alreadySent(userId, blob)) { notifySynced(userId, blob); return; }
   await upsertBlob(userId, blob, existing?.client || client);
 }
 

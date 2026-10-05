@@ -51,7 +51,7 @@ import { useToast, useConfirm } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured, tradeForSupabase, tradeFromSupabase } from "./src/supabaseClient.js";
 import { cleanTrades, purgeInvalidTrades } from "./src/lib/cleanTrades.js";
 import { deleteTradeVerified, restoreAt, createPendingWrites, insertTradeRow, updateTradeRow, insertTradeRows, deleteTradeRows } from "./src/lib/tradeWrite.js";
-import { loadSettings, saveSettings, flushSettings, migrateFromLocalStorage } from "./src/lib/userSettings.js";
+import { loadSettings, saveSettings, flushSettings, migrateFromLocalStorage, onSettingsSynced } from "./src/lib/userSettings.js";
 import { calcTradeMetrics, fmt$, fmt$0, fmtR, fmtNum, fmtPrice, fmtBalance, numOrNull, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays, localDayKey, todayKey, realizedAt, realizedDayKey, currencyOf, fmtPaperPrice, paperCurrencyOf, CURRENCY_SYMBOL, fmtAccountAmount, fmtCapitalAmount } from "./src/utils.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -113,6 +113,7 @@ import { sizePosition, sizingRefusalReason, saveBlockMessage, FX_SETTLE_MS, capi
 const EMPTY_DAYS = [];
 import { fileToResizedDataURL, fileToStoredDataURL, exceedsCap, MAX_EDGE_PX, Q_PRIMARY, Q_FALLBACK } from "./src/lib/imageResize.js";
 import { persistPlaybookSafely } from "./src/lib/playbookStore.js";
+import { hydrateCollections, readOps, recordOp, settleOps } from "./src/lib/settingsDelta.js";
 import InfoTooltip from "./src/components/ui/InfoTooltip.jsx";
 import TermTooltip from "./src/components/ui/TermTooltip.jsx";
 import SmartSelect from "./src/components/ui/SmartSelect.jsx";
@@ -1794,6 +1795,35 @@ export default function SwingEdge() {
     return () => { cancelled = true; };
   }, [authUser?.id]);
 
+  // ── B-406 (05.10) — the settings delta journal (src/lib/settingsDelta.js) reports here.
+  // ⛔ a silent path: a journal that cannot hold an op, or folds a collection past its cap,
+  // means this device's changes may not reach the DB yet. Once per session — a toast per
+  // keystroke-sized change would be noise — with role="alert" (ToastProvider, error kind).
+  const deltaWarnedRef = useRef(false);
+  const deltaReportRef = useRef(null);
+  deltaReportRef.current = (reason, err) => {
+    console.error(`[settingsDelta] ${reason} — this device's changes may not be synced yet`, err);
+    if (deltaWarnedRef.current) return;
+    deltaWarnedRef.current = true;
+    toast.error(t.settingsSyncPending, 9000);
+  };
+  // Stable identity (handleSymbolPick is a useCallback with [] deps) that always speaks the
+  // CURRENT language.
+  const reportDeltaFailure = useCallback((reason, err) => deltaReportRef.current(reason, err), []);
+  const recordSettingsOp = useCallback((coll, key, op) => {
+    recordOp(localStorage, coll, key, op, { onFailure: reportDeltaFailure });
+  }, [reportDeltaFailure]);
+  // An op leaves the journal only when a write is CONFIRMED to hold its result: a landed
+  // upsert, or a skip proven identical to the row (userSettings.onSettingsSynced).
+  useEffect(() => {
+    if (!authUser?.id) return undefined;
+    const uid = authUser.id;
+    return onSettingsSynced((syncedUid, blob) => {
+      if (syncedUid !== uid) return;
+      settleOps(localStorage, blob, { onFailure: reportDeltaFailure });
+    });
+  }, [authUser?.id, reportDeltaFailure]);
+
   // ── Hydrate user settings: one-shot localStorage→DB migration bridge, then load
   // the DB blob and selectively reconcile into existing state. Writes (setItem) are
   // untouched here (M2b). Mirrors loadTrades (guard + cancelled + [authUser?.id]).
@@ -1808,20 +1838,11 @@ export default function SwingEdge() {
     if (!isSupabaseConfigured || !supabase || !authUser?.id) return;
     let cancelled = false;
 
-    // Snapshot presence of locally-saved collections BEFORE any await: the
-    // watchlist/alerts persist effects (defined below) write defaults on mount and
-    // would otherwise mask "the user had nothing local".
-    const had = (k) => {
-      try {
-        const raw = localStorage.getItem(k);
-        if (!raw) return false;
-        const t = raw.trim();
-        return t !== "" && t !== "{}" && t !== "[]";
-      } catch { return false; }
-    };
-    const hadWatchlist = had("swingEdgeWatchlist");
-    const hadAlerts = had("swingEdgePriceAlerts");
-    const hadPlaybook = had("swingEdgePlaybook");
+    // ⚠️ B-406 (05.10) — ⛔ snapshot of the local collections here. One used to be taken
+    // BEFORE the awaits below ("had anything local?"), and everything the user did while the
+    // read was in flight was then overwritten by the DB; a non-empty local copy hid the DB
+    // instead (B-397), and on a fresh browser the DEFAULT watchlist hid the user's (B-407).
+    // The collections are merged AFTER the read, from the journal (src/lib/settingsDelta.js).
 
     const hydrate = async () => {
       // B-268: a check we could not complete means the DB is unreachable — ⛔ not
@@ -1895,17 +1916,24 @@ export default function SwingEdge() {
         setLang(s.lang);
         try { localStorage.setItem("swingEdgeLang", s.lang); } catch {}
       }
-      if (Array.isArray(s.watchlist) && !hadWatchlist) {
-        setWatchlistItems(s.watchlist);
-        try { localStorage.setItem("swingEdgeWatchlist", JSON.stringify(s.watchlist)); } catch {}
-      }
-      if (s.priceAlerts && typeof s.priceAlerts === "object" && !hadAlerts) {
-        setPriceAlerts(s.priceAlerts);
-        try { localStorage.setItem("swingEdgePriceAlerts", JSON.stringify(s.priceAlerts)); } catch {}
-      }
-      if (Array.isArray(s.playbook) && !hadPlaybook) {
-        setPlaybookSetups(s.playbook);
-        try { localStorage.setItem("swingEdgePlaybook", JSON.stringify(s.playbook)); } catch {}
+      // B-406 · B-397 · B-407 — the DB row is the base; what THIS device changed (the journal,
+      // read NOW, after the awaits — so a change made while the read was in flight counts) is
+      // applied on top. Only on "ok": an "empty" status hands back the local mirror, ⛔ a row,
+      // so there is no base to merge onto and the persist effect writes the local copy.
+      // The watchlist/alerts persist effects write localStorage on the state change; the
+      // Playbook has no such effect, so its merged list is stored here — loudly on failure.
+      if (status === "ok") {
+        const merged = hydrateCollections(localStorage, s, {
+          ops: readOps(localStorage, { onFailure: reportDeltaFailure }),
+          defaultWatchlist: DEFAULT_WATCHLIST, onFailure: reportDeltaFailure,
+        });
+        if (merged.watchlist) setWatchlistItems(merged.watchlist);
+        if (merged.priceAlerts) setPriceAlerts(merged.priceAlerts);
+        if (merged.playbook) {
+          setPlaybookSetups(merged.playbook);
+          const stored = persistPlaybookSafely(() => localStorage, merged.playbook);
+          if (stored.status !== "ok") reportDeltaFailure("local", stored.error);
+        }
       }
       if (s.tourDone === true) {
         try { localStorage.setItem("swingEdgeTourDone", "1"); } catch {}
@@ -2134,6 +2162,7 @@ export default function SwingEdge() {
             if (current >= targetPrice) {
               setAlertNotification({ ticker, price: current, target: targetPrice });
               setPriceAlerts(prev => { const next = { ...prev }; delete next[ticker]; return next; });
+              recordSettingsOp("priceAlerts", ticker, "del");
               setTimeout(() => setAlertNotification(null), 8000);
             }
           }
@@ -3670,13 +3699,15 @@ export default function SwingEdge() {
       try { localStorage.setItem("swingEdgeWatchlist", JSON.stringify(updated)); } catch {}
       return updated;
     });
+    recordSettingsOp("watchlist", tickerKey, "put");
     setChartSymbol(tvSym);
-  }, []);
+  }, [recordSettingsOp]);
 
   const handleDeleteWatchlistTicker = (ticker) => {
     const updated = watchlistItems.filter(i => i.ticker !== ticker);
     setWatchlistItems(updated);
     try { localStorage.setItem("swingEdgeWatchlist", JSON.stringify(updated)); } catch {}
+    recordSettingsOp("watchlist", ticker, "del");
   };
 
   // POST an image to the OCR endpoint with the caller's Supabase JWT attached.
@@ -4847,7 +4878,7 @@ export default function SwingEdge() {
                           <div className="mt-1.5 flex gap-1">
                             <input type="number" step="0.01" value={alertInputValue} onChange={e => setAlertInputValue(e.target.value)}
                               placeholder={t.setTargetPrice} className="flex-1 bg-white/5 border border-amber-500/20 rounded px-2 py-0.5 text-[10px] text-white font-mono focus:outline-none" />
-                            <button onClick={() => { const v = parseFloat(alertInputValue); if (v > 0) { setPriceAlerts(prev => ({...prev, [tr.ticker]: v})); setShowAlertInput(null); } }}
+                            <button onClick={() => { const v = parseFloat(alertInputValue); if (v > 0) { setPriceAlerts(prev => ({...prev, [tr.ticker]: v})); recordSettingsOp("priceAlerts", tr.ticker, "put"); setShowAlertInput(null); } }}
                               className="text-[9px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30">OK</button>
                           </div>
                         )}
@@ -7255,9 +7286,11 @@ export default function SwingEdge() {
             if (editingSetupId !== null) {
               const updated = playbookSetups.map(s => s.id === editingSetupId ? { ...s, name: playbookForm.name, description: playbookForm.description, imagePreview: playbookForm.imagePreview } : s);
               savePlaybook(updated, editingSetupId);
+              recordSettingsOp("playbook", editingSetupId, "put");
             } else {
               const newSetup = { id: Date.now(), name: playbookForm.name, description: playbookForm.description, imagePreview: playbookForm.imagePreview };
               savePlaybook([...playbookSetups, newSetup], newSetup.id);
+              recordSettingsOp("playbook", newSetup.id, "put");
             }
             setPlaybookForm({ name: "", description: "", imagePreview: null });
             setShowPlaybookForm(false);
@@ -7291,6 +7324,7 @@ export default function SwingEdge() {
 
           const deleteSetup = (id) => {
             savePlaybook(playbookSetups.filter(s => s.id !== id));
+            recordSettingsOp("playbook", id, "del");
           };
 
           return (

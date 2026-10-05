@@ -14,6 +14,8 @@
 //           every green below proves nothing (the boundary-probe C1–C4 rule).
 //   G1      the REAL fileToStoredDataURL + persistPlaybookSafely: a 3.9MB screenshot comes out
 //           ≤200KB and five setups with images all survive a refresh, mirror copy included.
+//   G1J     G1 + a sixth setup with the B-406 delta journal recording: green only if the journal
+//           holds KEYS (a journal with values eats the room the sixth setup needs — measured).
 //   G2      quota too small for the image but not for the setup ⇒ "image_dropped": the setup
 //           survives, the existing setup's image is untouched.
 //   G3      nothing fits ⇒ "failed", reported, nothing stored.
@@ -90,11 +92,13 @@ const app = readFileSync(ROOT + "SwingEdge_App.jsx", "utf8");
 const legacyApp = execFileSync("git", ["show", `${LEGACY_REF}:SwingEdge_App.jsx`], { cwd: ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 const once = (src, re, name) => { const m = [...src.matchAll(re)]; if (m.length !== 1) { console.error(`❌ extraction ${name} matched ${m.length}× — hard red (B-272)`); process.exit(2); } return m[0][0]; };
 const legacySave = once(legacyApp, /const savePlaybook = \(updated\) => \{[\s\S]*?\n          \};/g, "legacy savePlaybook");
-const hadSrc = once(app, /const had = \(k\) => \{[\s\S]*?\n    \};/g, "had");
+// The pre-fix hydration gate, read from the SAME frozen tree as the legacy savePlaybook: the
+// current app ⛔ has it any more (B-406, 05.10 — the collections merge from the delta journal).
+const hadSrc = once(legacyApp, /const had = \(k\) => \{[\s\S]*?\n    \};/g, "had");
 const initSrc = once(app, /useState\(\(\) => \{\n    try \{\n      const saved = localStorage\.getItem\("swingEdgePlaybook"\)[\s\S]*?\n  \}\);/g, "playbook init").replace(/^useState/, "");
 
 const bundle = await build({
-  stdin: { contents: 'export * from "./src/lib/imageResize.js"; export * from "./src/lib/playbookStore.js";', resolveDir: ROOT, loader: "js" },
+  stdin: { contents: 'export * from "./src/lib/imageResize.js"; export * from "./src/lib/playbookStore.js"; export * from "./src/lib/settingsDelta.js";', resolveDir: ROOT, loader: "js" },
   bundle: true, write: false, format: "iife", globalName: "Lib", platform: "browser",
 });
 const libJs = bundle.outputFiles[0].text;
@@ -142,6 +146,25 @@ const R = await page.evaluate(async ({ legacySave, hadSrc, initSrc }) => {
   const back = readInit();
   out.g1 = { statuses, afterRefresh: back.length, imagesIntact: back.every((s) => s.imagePreview === stored) };
 
+  // G1J — the same five plus a SIXTH, with the delta journal (B-406) recording every add.
+  // Measured 05.10: after G1 the origin has 1,438,733 chars left; a journal carrying VALUES
+  // takes 1,152,316 of them and the sixth setup (≈460K: list + mirror) no longer fits. A
+  // keys-only journal is ~50 chars an op. ⇒ this arm is green only if the journal holds keys.
+  localStorage.clear();
+  localStorage.setItem("swingEdgeTrades", "t".repeat(1500000));
+  let jlist = [], jstat = [], jrec = [], jfail = [];
+  for (let i = 1; i <= 6; i++) {
+    jlist = [...jlist, { id: i, name: "J" + i, description: "d", imagePreview: stored }];
+    const r = Lib.persistPlaybookSafely(() => localStorage, jlist, i);
+    jstat.push(r.status);
+    jrec.push(Lib.recordOp(localStorage, "playbook", i, "put", { onFailure: (reason) => jfail.push(reason) }));
+    try { localStorage.setItem("swingEdgeSettings", JSON.stringify({ playbook: jlist })); } catch { jstat.push("mirror-failed"); }
+  }
+  const jback = readInit();
+  const journal = localStorage.getItem(Lib.DELTA_KEY) || "";
+  out.g1j = { statuses: jstat, recorded: jrec, failures: jfail, afterRefresh: jback.length,
+    imagesIntact: jback.every((s) => s.imagePreview === stored), journalChars: journal.length, journalHasData: journal.includes("data:") };
+
   // G2 — room for the setup, not for its image
   localStorage.clear();
   const base = [{ id: 1, name: "Keep", description: "d", imagePreview: stored }];
@@ -175,6 +198,10 @@ else bad("LEGACY", "the pre-fix bug NO LONGER reproduces — this probe is blind
 (R.g1.statuses.length === 5 && R.g1.statuses.every((s) => s === "ok") && R.g1.afterRefresh === 5 && R.g1.imagesIntact)
   ? ok("G1b", "5/5 setups with images stored (+ mirror copy), 5/5 survive a refresh, images byte-identical")
   : bad("G1b", "five setups did not all survive", JSON.stringify(R.g1));
+(R.g1j.statuses.length === 6 && R.g1j.statuses.every((s) => s === "ok") && R.g1j.recorded.every(Boolean) && !R.g1j.failures.length
+  && R.g1j.afterRefresh === 6 && R.g1j.imagesIntact && !R.g1j.journalHasData)
+  ? ok("G1J", `6/6 setups with images + the delta journal (${R.g1j.journalChars} chars, ⛔ data:) survive a refresh`)
+  : bad("G1J", "six setups with the delta journal did not all survive — or the journal carries values", JSON.stringify(R.g1j));
 (R.g2.status === "image_dropped" && R.g2.afterRefresh.join() === "Keep,New" && R.g2.newImage === null && R.g2.keptImageIntact)
   ? ok("G2", "quota too small for the image ⇒ image_dropped · both setups survive · the OTHER setup's image intact")
   : bad("G2", "image_dropped arm", JSON.stringify(R.g2));
@@ -182,5 +209,5 @@ else bad("LEGACY", "the pre-fix bug NO LONGER reproduces — this probe is blind
   ? ok("G3", "nothing fits ⇒ failed + error, stored value untouched")
   : bad("G3", "failed arm", JSON.stringify(R.g3));
 
-console.log(failed ? `\n❌ ${failed} arm(s) failed` : "\n✅ probe:image — LEGACY red · G1/G2/G3 green");
+console.log(failed ? `\n❌ ${failed} arm(s) failed` : "\n✅ probe:image — LEGACY red · G1/G1J/G2/G3 green");
 process.exit(failed ? 1 : 0);

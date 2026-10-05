@@ -18,6 +18,16 @@
 import { readFileSync } from "node:fs";
 // ⛔ מוק — המודול האמיתי. סטאב כאן היה מודד את הסטאב.
 import { clearUserScopedStorage, DEVICE_KEYS } from "../src/lib/userScopedStorage.js";
+import { persistPlaybookSafely } from "../src/lib/playbookStore.js";
+// B-406 (05.10) — the REAL delta module and the REAL settings module. Dynamic: on a tree that
+// predates the module the import fails and every assertion that needs it is RED by name,
+// ⛔ the harness crashing before the rest of the block can speak.
+let Delta = null, Settings = null;
+try { Delta = await import("../src/lib/settingsDelta.js"); } catch (e) { console.log(`⚠️ settingsDelta.js: ${e.message.split("\n")[0]}`); }
+try { Settings = await import("../src/lib/userSettings.js"); } catch (e) { console.log(`⚠️ userSettings.js: ${e.message.split("\n")[0]}`); }
+// The default list as SwingEdge_App.jsx builds it — only its tickers and order matter here.
+const DEFAULT_WATCHLIST_PROBE = ["NVDA", "PLTR", "AVGO", "META", "AMD", "MSTR", "SMCI", "TSLA", "BTC", "ETH"]
+  .map((ticker) => ({ ticker, setup: "x", chartSym: `X:${ticker}` }));
 
 const argv = process.argv.slice(2);
 const appIdx = argv.indexOf("--app");
@@ -223,8 +233,10 @@ const MIRROR_2500 = { capital: DEFAULT_CAPITAL, lang: "he", welcomeSeen: false }
 const ONB_PROFILE = { defaults: { capital: 1000, riskPct: 1, capitalCurrency: "USD" } };
 
 function runHydrate({ loadStatus, mirror = MIRROR_OK, migrateReason = null, cancelled = false, storage = {}, uid = "u-probe",
-                     showOnboarding = null, dbCapitalRef = { current: false } }) {
-  const calls = { load: 0, hydrationFailed: [], hydrationDone: 0, capital: [], lang: [], clobber: [], errors: [], onboarding: [], profile: [] };
+                     showOnboarding = null, dbCapitalRef = { current: false },
+                     had = { watchlist: false, alerts: false, playbook: false }, deltaFailures = [] }) {
+  const calls = { load: 0, hydrationFailed: [], hydrationDone: 0, capital: [], lang: [], clobber: [], errors: [], onboarding: [], profile: [],
+                  watchlist: [], alerts: [], playbook: [] };
   const hydratedRef = { current: false };
   const welcomeSeenRef = { current: false };
   const localStorage = makeLocalStorage(storage);
@@ -240,6 +252,9 @@ function runHydrate({ loadStatus, mirror = MIRROR_OK, migrateReason = null, canc
     "setPlaybookSetups", "hadPlaybook", "welcomeSeenRef", "DEFAULT_CAPITAL",
     "setCapitalMaybeClobbered", "hydratedRef", "setHydrationDone",
     "showOnboarding", "dbCapitalRef",
+    // B-406 (05.10) — the delta merge. Injected in BOTH trees: the pre-fix body ⛔ reads them
+    // (an unused parameter is a no-op), the fixed body ⛔ reads `had*` any more.
+    "hydrateCollections", "DEFAULT_WATCHLIST", "reportDeltaFailure", "persistPlaybookSafely", "readOps",
   ];
   const values = [
     cancelled,
@@ -255,12 +270,14 @@ function runHydrate({ loadStatus, mirror = MIRROR_OK, migrateReason = null, canc
     () => {}, () => {}, () => {}, (v) => calls.onboarding.push(v), (v) => calls.profile.push(v),
     "en",
     (v) => calls.lang.push(v),
-    () => {}, false, () => {}, false, () => {}, false,
+    (v) => calls.watchlist.push(v), had.watchlist, (v) => calls.alerts.push(v), had.alerts,
+    (v) => calls.playbook.push(v), had.playbook,
     welcomeSeenRef, DEFAULT_CAPITAL,
     (v) => calls.clobber.push(v),
     hydratedRef,
     () => { calls.hydrationDone++; },
     showOnboarding, dbCapitalRef,
+    Delta ? Delta.hydrateCollections : undefined, DEFAULT_WATCHLIST_PROBE, (reason) => deltaFailures.push(reason), persistPlaybookSafely, Delta ? Delta.readOps : undefined,
   ];
 
   const fn = new Function(...names, "return (" + hydrateSrc + ")")(...values);
@@ -296,6 +313,7 @@ function runHydrateEffect({ authUser, hydratedRef, storage = {}, mirror = MIRROR
     "setWatchlistItems", "setPriceAlerts", "setPlaybookSetups", "welcomeSeenRef",
     "DEFAULT_CAPITAL", "setCapitalMaybeClobbered", "hydratedRef", "setHydrationDone",
     "showOnboarding", "dbCapitalRef",
+    "hydrateCollections", "DEFAULT_WATCHLIST", "reportDeltaFailure", "persistPlaybookSafely", "readOps",
   ];
   const values = [
     true, {}, authUser, store,
@@ -307,6 +325,7 @@ function runHydrateEffect({ authUser, hydratedRef, storage = {}, mirror = MIRROR
     (v) => calls.watchlist.push(v), () => {}, () => {}, { current: false },
     DEFAULT_CAPITAL, () => {}, hydratedRef, () => {},
     null, { current: false },
+    Delta ? Delta.hydrateCollections : undefined, DEFAULT_WATCHLIST_PROBE, () => {}, persistPlaybookSafely, Delta ? Delta.readOps : undefined,
   ];
   const cleanup = new Function(...names, "return (" + hydrateEffectSrc + ")")(...values)();
   return { cleanup, calls, store };
@@ -597,6 +616,167 @@ const main = async () => {
       c.capital.length === 1 && c.capital[0] === 1000, `setCapital=${JSON.stringify(c.capital)}`);
   }
 
+  /* ── B-406 · B-397 · B-407 (05.10) — the delta merge ────────────────────────────────
+   * W* run the REAL hydrate body. The scene is the one measured in the browser
+   * (docs/audits/B406-HYDRATION-DIAGNOSIS-2026-10-05.md): the snapshot `had*` was taken
+   * BEFORE the awaits, and by the time `loadSettings` answers, localStorage already holds what
+   * the user did in the window — the list AND the journal op that the fixed app records.
+   * D* / S* run the REAL modules (src/lib/settingsDelta.js · src/lib/userSettings.js); they are
+   * proven by the node mutants in scripts/eye-sync-probe.mjs, ⛔ by the pre-fix App. */
+  console.log("\n──────── B-406 · B-397 · B-407 — מיזוג דלתא ────────");
+  const DK = "swingEdgeSettingsDelta", V1 = "swingEdgeSettingsDeltaV1";
+  const setupW = { id: 101, name: "WINDOW-SETUP", description: "", imagePreview: null };
+  const S1 = { id: 1, name: "S1", description: "", imagePreview: null };
+  const S2 = { id: 2, name: "S2-OTHER-DEVICE", description: "", imagePreview: null };
+  const finalOf = (r, coll, key) => (r.calls[coll].length ? r.calls[coll][r.calls[coll].length - 1] : JSON.parse(r.localStorage.getItem(key) || "null"));
+  const names = (l) => JSON.stringify((l || []).map((x) => x.name ?? x.ticker));
+  {
+    // W1 — B-406: a setup added in the window (local list + journal op) survives the DB's [].
+    const r = runHydrate({ loadStatus: "ok", mirror: { ...MIRROR_OK, playbook: [] }, had: { playbook: false },
+      storage: { [V1]: "1", swingEdgePlaybook: JSON.stringify([setupW]), [DK]: JSON.stringify([{ coll: "playbook", key: "101", op: "put", seq: 1 }]) } });
+    await r.promise;
+    const f = finalOf(r, "playbook", "swingEdgePlaybook");
+    ok("W1", "B-406: סטאפ שנוסף בחלון שורד את `[]` מה-DB", (f || []).some((x) => x.name === "WINDOW-SETUP"), names(f));
+  }
+  {
+    // W2 — B-397: another device wrote S2; this device's stale [S1] must not hide it.
+    const r = runHydrate({ loadStatus: "ok", mirror: { ...MIRROR_OK, playbook: [S1, S2] }, had: { playbook: true },
+      storage: { [V1]: "1", swingEdgePlaybook: JSON.stringify([S1]) } });
+    await r.promise;
+    const f = finalOf(r, "playbook", "swingEdgePlaybook");
+    ok("W2", "B-397: S2 ממכשיר אחר מופיע (⛔ נבלע ע\"י [S1] המקומי)", (f || []).some((x) => x.name === "S2-OTHER-DEVICE"), names(f));
+  }
+  {
+    // W3 — the tombstone: S2 deleted HERE (op del) ⛔ comes back from the DB.
+    const r = runHydrate({ loadStatus: "ok", mirror: { ...MIRROR_OK, playbook: [S1, S2] }, had: { playbook: true },
+      storage: { [V1]: "1", swingEdgePlaybook: JSON.stringify([S1]), [DK]: JSON.stringify([{ coll: "playbook", key: "2", op: "del", seq: 1 }]) } });
+    await r.promise;
+    const f = finalOf(r, "playbook", "swingEdgePlaybook");
+    invariant("W3", "מחיקה מקומית ⛔ חוזרת מה-DB (ירוק גם בעץ הישן — local-wins; MUT-RESURRECT בדפדפן הוא הראיה)",
+      Array.isArray(f) && !f.some((x) => x.id === 2) && f.some((x) => x.id === 1), names(f));
+  }
+  {
+    // W4 — B-407: a fresh browser persisted the DEFAULT watchlist on the login screen.
+    const r = runHydrate({ loadStatus: "ok", mirror: { ...MIRROR_OK, watchlist: [{ ticker: "AAPL", setup: "Custom", chartSym: "NASDAQ:AAPL" }, { ticker: "KO", setup: "Custom", chartSym: "NYSE:KO" }] },
+      had: { watchlist: true }, storage: { swingEdgeWatchlist: JSON.stringify(DEFAULT_WATCHLIST_PROBE) } });
+    await r.promise;
+    const f = finalOf(r, "watchlist", "swingEdgeWatchlist");
+    ok("W4", "B-407: דפדפן חדש מקבל את ה-watchlist מה-DB (⛔ ברירות המחדל)", names(f) === JSON.stringify(["AAPL", "KO"]), names(f));
+  }
+  {
+    // W5 — B-406 on the alerts map.
+    const r = runHydrate({ loadStatus: "ok", mirror: { ...MIRROR_OK, priceAlerts: {} }, had: { alerts: false },
+      storage: { [V1]: "1", swingEdgePriceAlerts: JSON.stringify({ EYEPB: 105 }), [DK]: JSON.stringify([{ coll: "priceAlerts", key: "EYEPB", op: "put", seq: 1 }]) } });
+    await r.promise;
+    const f = finalOf(r, "alerts", "swingEdgePriceAlerts");
+    ok("W5", "B-406: התראה שנוספה בחלון שורדת את `{}` מה-DB", f && f.EYEPB === 105, JSON.stringify(f));
+  }
+  {
+    // W6 — the one-time union for a device that predates the journal: nothing local is lost,
+    // nothing remote is hidden.
+    const L1 = { id: 7, name: "L1-UNSYNCED", description: "", imagePreview: null };
+    const R1 = { id: 8, name: "R1-REMOTE", description: "", imagePreview: null };
+    const r = runHydrate({ loadStatus: "ok", mirror: { ...MIRROR_OK, playbook: [R1] }, had: { playbook: true },
+      storage: { swingEdgePlaybook: JSON.stringify([L1]) } });
+    await r.promise;
+    const f = finalOf(r, "playbook", "swingEdgePlaybook");
+    ok("W6", "מעבר חד-פעמי: מקומי ∪ DB (L1 + R1)", (f || []).length === 2 && f.some((x) => x.id === 7) && f.some((x) => x.id === 8), names(f));
+  }
+
+  // D* — the pure module, real bytes.
+  const D = Delta;
+  const need = (id, label, fn) => { if (!D) return ok(id, label, false, "settingsDelta.js ⛔ נטען"); return fn(); };
+  need("D1", "applyDelta: put מהחלון על `[]`", () => {
+    const out = D.applyDelta("playbook", [], [{ coll: "playbook", key: "101", op: "put", seq: 1 }], [setupW]);
+    ok("D1", "applyDelta: put מהחלון על `[]`", out.length === 1 && out[0].id === 101, names(out));
+  });
+  need("D2", "applyDelta: del = tombstone", () => {
+    const out = D.applyDelta("playbook", [S1, S2], [{ coll: "playbook", key: "2", op: "del", seq: 1 }], [S1]);
+    ok("D2", "applyDelta: del = tombstone", names(out) === JSON.stringify(["S1"]), names(out));
+  });
+  need("D3", "applyDelta: ⛔ ops ⇒ ה-DB הוא התשובה", () => {
+    const out = D.applyDelta("playbook", [S1, S2], [], [S1]);
+    ok("D3", "applyDelta: ⛔ ops ⇒ ה-DB הוא התשובה", names(out) === JSON.stringify(["S1", "S2-OTHER-DEVICE"]), names(out));
+  });
+  need("D4", "applyDelta: put על אותו id ⇒ ערך המכשיר", () => {
+    const out = D.applyDelta("playbook", [{ ...S1, name: "old" }], [{ coll: "playbook", key: "1", op: "put", seq: 1 }], [{ ...S1, name: "new" }]);
+    ok("D4", "applyDelta: put על אותו id ⇒ ערך המכשיר", out.length === 1 && out[0].name === "new", names(out));
+  });
+  need("D5", "applyDelta map: put + del", () => {
+    const out = D.applyDelta("priceAlerts", { KO: 70, AAPL: 300 }, [{ coll: "priceAlerts", key: "EYEPB", op: "put", seq: 1 }, { coll: "priceAlerts", key: "KO", op: "del", seq: 2 }], { EYEPB: 105, AAPL: 300 });
+    ok("D5", "applyDelta map: put + del", JSON.stringify(out) === JSON.stringify({ AAPL: 300, EYEPB: 105 }), JSON.stringify(out));
+  });
+  need("D6", "היומן ⛔ נושא ערכים (⛔ `data:`)", () => {
+    const st = makeLocalStorage({ swingEdgePlaybook: JSON.stringify([{ ...setupW, imagePreview: "data:image/jpeg;base64," + "A".repeat(4000) }]) });
+    D.recordOp(st, "playbook", 101, "put", { onFailure: () => {} });
+    const j = st.getItem(DK) || "";
+    ok("D6", "היומן ⛔ נושא ערכים (⛔ `data:`)", j.length > 0 && !j.includes("data:") && !j.includes("imagePreview") && j.length < 200, `${j.length} chars`);
+  });
+  need("D7", "איחוד לפי key — רק האחרון נשמר", () => {
+    const st = makeLocalStorage();
+    for (const op of ["put", "put", "del"]) D.recordOp(st, "playbook", 5, op, { onFailure: () => {} });
+    const j = JSON.parse(st.getItem(DK) || "[]");
+    ok("D7", "איחוד לפי key — רק האחרון נשמר", j.length === 1 && j[0].op === "del", JSON.stringify(j));
+  });
+  need("D8", "תקרה ⇒ קיפול ל-replace + דיווח", () => {
+    const st = makeLocalStorage(); const f = [];
+    for (let i = 0; i <= D.DELTA_MAX_OPS; i++) D.recordOp(st, "watchlist", `T${i}`, "put", { onFailure: (r) => f.push(r) });
+    const j = JSON.parse(st.getItem(DK) || "[]");
+    ok("D8", "תקרה ⇒ קיפול ל-replace + דיווח", j.length <= 2 && j.some((o) => o.op === "replace") && f.includes("cap"), `ops=${j.length} failures=${JSON.stringify([...new Set(f)])}`);
+  });
+  need("D9", "כתיבת יומן שנכשלה ⇒ מדווחת, ⛔ שקט", () => {
+    const st = makeLocalStorage(); const real = st.setItem;
+    st.setItem = (k, v) => { if (k === DK) throw new Error("QuotaExceededError"); return real(k, v); };
+    const f = [];
+    const res = D.recordOp(st, "playbook", 9, "put", { onFailure: (r) => f.push(r) });
+    ok("D9", "כתיבת יומן שנכשלה ⇒ מדווחת, ⛔ שקט", res === false && f.includes("write"), `returned=${res} failures=${JSON.stringify(f)}`);
+  });
+  need("D10", "settleOps: put מאושר ⇒ נמחק · put שלא נשלח ⇒ נשמר", () => {
+    const st = makeLocalStorage({ swingEdgePlaybook: JSON.stringify([setupW, S1]),
+      [DK]: JSON.stringify([{ coll: "playbook", key: "101", op: "put", seq: 1 }, { coll: "playbook", key: "1", op: "put", seq: 2 }]) });
+    const n = D.settleOps(st, { playbook: [setupW] }, { onFailure: () => {} });
+    const j = JSON.parse(st.getItem(DK) || "[]");
+    ok("D10", "settleOps: put מאושר ⇒ נמחק · put שלא נשלח ⇒ נשמר", n === 1 && j.length === 1 && j[0].key === "1", `settled=${n} left=${JSON.stringify(j)}`);
+  });
+  need("D11", "settleOps watchlist: השוואה על מה שהשורה שומרת (⛔ price/change)", () => {
+    const st = makeLocalStorage({ swingEdgeWatchlist: JSON.stringify([{ ticker: "NVDA", price: 120, change: 1, setup: "Custom", chartSym: "NASDAQ:NVDA" }]),
+      [DK]: JSON.stringify([{ coll: "watchlist", key: "NVDA", op: "put", seq: 1 }]) });
+    const n = D.settleOps(st, { watchlist: [{ ticker: "NVDA", setup: "Custom", chartSym: "NASDAQ:NVDA" }] }, { onFailure: () => {} });
+    ok("D11", "settleOps watchlist: השוואה על מה שהשורה שומרת (⛔ price/change)", n === 1 && st.getItem(DK) === null, `settled=${n}`);
+  });
+
+  // S* — settle through the REAL userSettings: a confirmed upsert, and a skip proven identical
+  // to the row (alreadySent). Without the skip path an op whose result the row already holds
+  // would stay in the journal forever (Niv, 05.10, fix ②).
+  {
+    const ROW = { capital: 49000, playbook: [S1] };
+    const store = makeLocalStorage();
+    const prevLS = globalThis.localStorage; globalThis.localStorage = store;
+    const rows = new Map([["u-sync", { user_id: "u-sync", settings: structuredClone(ROW) }]]);
+    let upserts = 0;
+    const client = { from() { let id = null; const b = {
+      select() { return b; }, eq(_c, v) { id = v; return b; },
+      async maybeSingle() { const r = rows.get(id); return { data: r ? { settings: r.settings, user_id: r.user_id } : null, error: null }; },
+      async upsert(row) { upserts++; rows.set(row.user_id, row); return { data: null, error: null }; },
+    }; return b; } };
+    const synced = [];
+    const has = Settings && typeof Settings.onSettingsSynced === "function";
+    const off = has ? Settings.onSettingsSynced((uid, blob) => synced.push({ uid, blob })) : () => {};
+    if (Settings) await Settings.loadSettings("u-sync", client);
+    if (Settings) Settings.saveSettings("u-sync", { playbook: [S1] }, client); // identical to the row
+    await new Promise((res) => setTimeout(res, 1150));
+    ok("S1", "דילוג `alreadySent` ⇒ onSettingsSynced נקרא (⛔ upsert)", has && upserts === 0 && synced.length === 1 && synced[0].uid === "u-sync",
+      `api=${has} upserts=${upserts} synced=${synced.length}`);
+    if (Settings) Settings.saveSettings("u-sync", { playbook: [S1, S2] }, client); // a real change
+    await new Promise((res) => setTimeout(res, 1150));
+    ok("S2", "upsert מאושר ⇒ onSettingsSynced נקרא עם הבלוב שנשלח", has && upserts === 1 && synced.length === 2 && synced[1].blob.playbook.length === 2,
+      `upserts=${upserts} synced=${synced.length}`);
+    if (Settings) { Settings.saveSettings("u-sync", { playbook: [S1, S2] }, client); await Settings.flushSettings("u-sync", client); }
+    ok("S3", "flush על בלוב זהה ⇒ דילוג ⇒ onSettingsSynced נקרא", has && upserts === 1 && synced.length === 3, `upserts=${upserts} synced=${synced.length}`);
+    off();
+    globalThis.localStorage = prevLS;
+  }
+
   // I5 — שערי-מטא
   const tails = [tailOk, persistTailOk, unloadTailOk, hydrateEffectTailOk, dismissTailOk, tourTailOk, initTailOk, onbDoneTailOk];
   invariant("I5", "7 עוגנים ייחודיים · סוגריים מאוזנים · 8 זנבות תואמים",
@@ -611,12 +791,12 @@ const main = async () => {
 
   const total = pass + inv + fail;
   console.log(`\n${APP}`);
-  console.log(`מבחינות: ${pass}/25 · אינווריאנטות: ${inv}/8 · סה"כ ${pass + inv}/${total}`);
+  console.log(`מבחינות: ${pass}/44 · אינווריאנטות: ${inv}/9 · סה"כ ${pass + inv}/${total}`);
   if (fail) {
     console.log(`🔴 אדומות (${fail}): ${reds.join(" · ")}`);
     process.exit(1);
   }
-  console.log("✅ hydration wiring: 33/33");
+  console.log("✅ hydration wiring: 53/53");
 };
 
 main().catch((e) => { console.error("🔴 harness נפל:", e); process.exit(1); });

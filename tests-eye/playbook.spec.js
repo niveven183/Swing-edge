@@ -393,4 +393,56 @@ test.describe("C-064 · Playbook images (B-015 · B-038)", () => {
       await app.ctx.close(); // the trade is removed by the REST sweep, with every context closed
     }
   });
+
+  // ── f ────────────────────────────────────────────────────────────────────
+  // B-406 (05.10): a setup added WHILE the settings read is in flight. The read is HELD in this
+  // browser (a GET — nothing is written by the hold), the setup is added in the window, the
+  // read is released. Then a SECOND, fresh context (the beforeAll storage state, which never saw
+  // this setup) must show it — so it is proven to be in the DB row, ⛔ only in this tab.
+  // `@deployed`: production must carry the fix — a pull_request run skips it (eye-playbook.yml).
+  test("f · @deployed a setup added while the settings read is in flight survives (B-406)", async ({ browser }, info) => {
+    const app = await openApp(browser, info);
+    const { page, prefix, shot } = app;
+    await withSetups(app, "f", async () => {
+      const name = `${prefix}f-window`;
+      await page.waitForTimeout(2_500); // the first hydration and its write settle
+      let held = 0, release = null, armed = true;
+      await page.route(/\/rest\/v1\/user_settings/, async (route) => {
+        if (armed && route.request().method() === "GET") { held++; await new Promise((r) => { release = r; }); }
+        return route.fallback();
+      });
+      await page.reload({ waitUntil: "load" });
+      await page.locator('[data-tour-tab="dashboard"]').waitFor({ state: "visible", timeout: 30_000 });
+      await expect.poll(() => held, { message: "the settings read was not held — there is no window to test", timeout: 10_000 }).toBeGreaterThan(0);
+      const panel = await openPlaybook(page);
+      await addSetup(page, panel, name, null, null);
+      await shot("f-1-added-in-window");
+      armed = false;
+      release?.();
+      await page.waitForTimeout(4_000); // hydration + the 1000ms debounce + the upsert
+      const local = (await readPlaybook(page)).map((x) => x?.name);
+      expect(local, "B-406: the setup is gone from this tab once the read landed").toContain(name);
+      const journal = await page.evaluate(() => localStorage.getItem("swingEdgeSettingsDelta"));
+      expect(journal, "the journal still holds an op after the write was confirmed").toBeNull();
+
+      // The DB proof: a context that never saw this setup.
+      const ctx2 = await browser.newContext({ ...ctxOpts(info), baseURL: info.project.use.baseURL, ...(STATE ? { storageState: STATE } : {}) });
+      try {
+        if (HERMETIC) await installHermetic(ctx2, app.store);
+        const p2 = await ctx2.newPage();
+        await installOverlayHandlers(p2);
+        if (HERMETIC) await login(p2, QA_EMAIL, QA_PASSWORD);
+        else {
+          await p2.goto("/app", { waitUntil: "load" });
+          await p2.locator('[data-tour-tab="dashboard"]').waitFor({ state: "visible", timeout: 30_000 });
+        }
+        await p2.waitForTimeout(3_000);
+        const p2Panel = await openPlaybook(p2);
+        await expect(cardOf(p2Panel, name), "B-406: the setup never reached the DB row").toHaveCount(1, { timeout: 15_000 });
+        await p2.screenshot({ path: join(app.dir, "f-2-second-context.png") }).catch(() => {});
+      } finally {
+        await ctx2.close();
+      }
+    });
+  });
 });
