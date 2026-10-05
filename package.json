@@ -45,6 +45,7 @@
     "probe:eye": "node scripts/eye-probe.mjs",
     "probe:image": "node scripts/image-store-probe.mjs",
     "probe:image:mutants": "node scripts/image-store-probe.mjs --mutants",
+    "probe:cents:mutants": "node scripts/cents-precision-test.mjs --mutants",
     "probe:firing": "node scripts/sentinel-firing-probe.mjs",
     "probe:count": "node scripts/sentinel-count-probe.mjs",
     "probe:slot": "node scripts/slot-audit-probe.mjs",
@@ -55,6 +56,7 @@
     "test:diagnosis": "node scripts/alert-diagnosis-test.mjs",
     "test:tour": "node scripts/tour-contract-test.mjs",
     "probe:eye:playbook": "node scripts/eye-playbook-probe.mjs",
+    "probe:eye:cents": "node scripts/eye-cents-probe.mjs",
     "test:eye:playbook": "playwright test -c playwright.eye.config.js",
     "probe:eye:overlay": "node scripts/eye-overlay-probe.mjs",
     "probe:eye:sync": "node scripts/eye-sync-probe.mjs"
