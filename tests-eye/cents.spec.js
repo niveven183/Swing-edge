@@ -177,12 +177,27 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     await page.locator('[data-tour="add-trade"]').click();
     const dialog = page.locator('[role="dialog"]').last();
     await page.locator("#log-ticker").fill(TRADE_TICKER);
-    await page.locator("#log-entry").fill(String(ENTRY));
-    await page.locator("#log-stop").fill("99");
-    await page.locator("#log-target").fill("102");
+    // The live quote for the ticker (250ms debounce, retried on an unknown symbol) re-renders the
+    // form while it runs. Prod run 37780897809 (iphone14 · b): Entry came back EMPTY while Stop,
+    // Target and the ticker held ⇒ «Log Trade» disabled for 25s. The prices are typed once the
+    // quote has answered — what a person does after the quote panel fills — and every field is
+    // asserted to HOLD its value, right after its fill and again before submit, so a recurrence
+    // names the field instead of timing out on a disabled button. ⛔ a re-fill: a value the app
+    // drops is reported, ⛔ papered over.
+    const refresh = dialog.getByRole("button", { name: /Refresh price|רענן מחיר/ });
+    await expect(refresh, "the live-quote panel never appeared for the ticker").toBeVisible({ timeout: 10_000 });
+    const sawLoading = await expect.poll(() => refresh.isDisabled(), { timeout: 3_000 }).toBe(true).then(() => true, () => false);
+    console.log(`[K2] quote fetch ${sawLoading ? "observed (Refresh disabled)" : "NOT observed within 3s"} — waiting for it to settle`);
+    await expect(refresh, "the live quote never settled (Refresh price still disabled)").toBeEnabled({ timeout: 30_000 });
+    const PRICES = [["#log-ticker", TRADE_TICKER], ["#log-entry", String(ENTRY)], ["#log-stop", "99"], ["#log-target", "102"]];
+    for (const [sel, v] of PRICES.slice(1)) {
+      await page.locator(sel).fill(v);
+      await expect(page.locator(sel), `${sel} did not take "${v}"`).toHaveValue(v);
+    }
     const ctxToggle = dialog.locator("button[aria-expanded]").filter({ hasText: /הקשר העסקה|Trade Context/ });
     if ((await ctxToggle.getAttribute("aria-expanded")) !== "true") await ctxToggle.click();
     await page.locator("#log-notes").fill(note);
+    for (const [sel, v] of PRICES) await expect(page.locator(sel), `${sel} lost its value before submit`).toHaveValue(v, { timeout: 1_000 });
     const submit = page.getByRole("button", { name: /Log Trade/ });
     await expect(submit).toBeEnabled({ timeout: 25_000 });
     await submit.click();
