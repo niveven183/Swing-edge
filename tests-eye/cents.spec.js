@@ -14,21 +14,29 @@
 //   b · en — the same close toast in English, + the journal card.
 //
 // THE NUMBER. The form has no shares field: shares come from position sizing (capital × risk ÷
-// stop distance). The spec reads `shares` from the saved trade and closes at entry + 0.1247, so
-// P&L = shares × 0.1247 — cents for every share count that is not a multiple of 10,000. The
-// expected string is `fmtMoney` (src/utils.js — the app's own formatter) on that number.
-// ⛔ A QA account whose capital currency differs from the trade's would need an FX rate the
-// spec cannot know ⇒ RED with that reason, ⛔ a guess.
+// stop distance). The spec reads `shares` from the saved trade and picks the close delta from them
+// (DELTAS below). The expected string is `fmtMoney` (src/utils.js — the app's own formatter).
+//
+// THE POPULATION — `$` capital (Niv 08.10, DECISIONS; INCIDENTS #30). The QA row's capital is ₪,
+// and a hand-typed alphabetic ticker under ₪ capital is `B-300`: the form stamps `ILS`,
+// `deriveInstrumentCurrency` returns `contradicted` and the toast carries NO number ("—"). K2 is
+// therefore measured on the `$` population: every context reads the settings row with
+// `capitalCurrency`/`accountCurrency` = USD (and, in b, `lang` stripped) and answers its settings
+// WRITES locally ⇒ ⛔ any write to the QA row (the sweep's rest-of-blob hash proves it).
+// ⛔ The ₪ coverage returns to the QA's real capital when `B-300` meets its closing condition.
+// The precondition is the app's REAL derivation (`deriveInstrumentCurrency` + `isAggregatable`)
+// and the derived code must equal the account currency (identity) — ⛔ the stored label compared
+// with the capital, which is the tautological gate CLAUDE.md §7 forbids (it hid `B-300`).
 //
 // Cleanup: ticker EYEPB + notes `e2e-c064-…` ⇒ the existing REST sweep (tests-eye/qaRest.js).
-// ⛔ Playwright trace (E11). The en context reads the settings row with `lang` stripped and
-// answers its settings WRITES locally, so the QA row's language is never changed.
+// ⛔ Playwright trace (E11).
 
 import { test, expect } from "@playwright/test";
 import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { login, redact } from "../tests/lib/eyeTools.js";
 import { fmtMoney } from "../src/utils.js";
+import { deriveInstrumentCurrency, isAggregatable } from "../src/lib/instrumentCurrency.js";
 import { installHermetic, newStore, DUMMY_EMAIL, DUMMY_PASSWORD } from "./hermetic.js";
 import { sweep, PREFIX_ROOT, TRADE_TICKER } from "./qaRest.js";
 
@@ -39,6 +47,7 @@ const HAVE_CREDS = !!(QA_EMAIL && QA_PASSWORD);
 const RUN = process.env.GITHUB_RUN_ID || `local${Date.now().toString(36)}`;
 const EVIDENCE = process.env.EYE_EVIDENCE_DIR || join(process.cwd(), "eye-evidence");
 const ENTRY = 100;
+const MEASURED_CCY = "USD"; // the population K2 closes on (Niv 08.10) — see THE POPULATION above
 // The close delta is picked from the SAVED shares (position sizing decides them, and production's QA
 // capital gives a different count than the hermetic store): the first candidate whose P&L — and,
 // in a, the setup total base + P&L — prints DIFFERENTLY with and without `Math.round`. That is the
@@ -107,16 +116,22 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     const ctx = await browser.newContext({ ...ctxOpts(info), baseURL: info.project.use.baseURL, ...(STATE ? { storageState: STATE } : {}) });
     const store = HERMETIC ? newStore() : null;
     if (HERMETIC) await installHermetic(ctx, store);
-    if (lang === "en" && !HERMETIC) {
-      // Read the row without `lang` (so the localStorage choice below wins) and keep every settings
-      // WRITE of this context local — the QA row's language must not change. Trades are untouched.
+    if (!HERMETIC) {
+      // Read the row as a `$`-capital user (and, in en, without `lang` so the localStorage choice
+      // below wins); every settings WRITE of this context is answered locally ⇒ the QA row never
+      // changes. Trades are untouched (their own table, swept by ticker + notes prefix).
       await ctx.route(/\/rest\/v1\/user_settings/, async (route) => {
         const req = route.request();
         if (req.method() !== "GET") return route.fulfill({ status: 201, contentType: "application/json", body: "[]" });
         const res = await route.fetch();
         const body = await res.json();
-        const strip = (r) => (r && r.settings ? { ...r, settings: Object.fromEntries(Object.entries(r.settings).filter(([k]) => k !== "lang")) } : r);
-        return route.fulfill({ response: res, json: Array.isArray(body) ? body.map(strip) : strip(body) });
+        const view = (r) => {
+          if (!(r && r.settings)) return r;
+          const settings = { ...r.settings, capitalCurrency: MEASURED_CCY, accountCurrency: MEASURED_CCY };
+          if (lang === "en") delete settings.lang;
+          return { ...r, settings };
+        };
+        return route.fulfill({ response: res, json: Array.isArray(body) ? body.map(view) : view(body) });
       });
     }
     const page = await ctx.newPage();
@@ -152,6 +167,12 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     const ours = () => page.evaluate((n) => {
       try { return (JSON.parse(localStorage.getItem("swingEdgeTrades") || "[]") || []).filter((t) => t && t.notes === n); } catch { return "UNPARSEABLE"; }
     }, note);
+    // The settings read must have LANDED (hydration writes the currencies to localStorage) before
+    // the form stamps the trade — otherwise the trade is priced in the pre-hydration currency.
+    if (!HERMETIC) {
+      await expect.poll(() => page.evaluate(() => [localStorage.getItem("swingEdgeCapitalCurrency"), localStorage.getItem("swingEdgeAccountCurrency")].join("/")),
+        { timeout: 20_000, message: "the $-capital settings view never reached the app" }).toBe(`${MEASURED_CCY}/${MEASURED_CCY}`);
+    }
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.locator('[data-tour="add-trade"]').click();
     const dialog = page.locator('[role="dialog"]').last();
@@ -167,10 +188,14 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     await submit.click();
     await expect.poll(async () => (await ours()).length, { timeout: 20_000, message: "the TEST trade never reached swingEdgeTrades" }).toBe(1);
     const saved = (await ours())[0];
-    const settings = await page.evaluate(() => { try { return JSON.parse(localStorage.getItem("swingEdgeSettings") || "{}"); } catch { return {}; } });
-    const accountCcy = settings.capitalCurrency || settings.accountCurrency || "USD";
-    const tradeCcy = saved.currency || "USD";
-    expect(tradeCcy, `trade currency ${tradeCcy} ≠ capital currency ${accountCcy} — the expected P&L would need an FX rate (refusing to guess)`).toBe(accountCcy);
+    const accountCcy = await page.evaluate(() => localStorage.getItem("swingEdgeAccountCurrency"));
+    expect(accountCcy, "the app's account currency is unreadable — the expected P&L has no currency (⛔ guessing)").toBeTruthy();
+    // ⛔ the stored label vs the capital (tautological — it hid B-300). The app's REAL derivation:
+    // the toast is a number only when the paper is aggregatable and, with no FX rate the spec could
+    // know, only when it IS the account currency (identity).
+    const derived = deriveInstrumentCurrency(saved);
+    expect(isAggregatable(derived) && derived.code === accountCcy,
+      `derived paper currency ${JSON.stringify(derived)} vs account ${accountCcy} — the app would refuse or convert; the expected P&L cannot be computed (B-300 when contradicted)`).toBe(true);
     expect(Number.isInteger(saved.shares) && saved.shares > 0, `saved shares = ${saved.shares}`).toBe(true);
     const exitOf = (d) => (ENTRY + d).toFixed(4);
     const pnlOf = (d) => saved.shares * (Number(exitOf(d)) - ENTRY);
