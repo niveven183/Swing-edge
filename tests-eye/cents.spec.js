@@ -39,8 +39,13 @@ const HAVE_CREDS = !!(QA_EMAIL && QA_PASSWORD);
 const RUN = process.env.GITHUB_RUN_ID || `local${Date.now().toString(36)}`;
 const EVIDENCE = process.env.EYE_EVIDENCE_DIR || join(process.cwd(), "eye-evidence");
 const ENTRY = 100;
-const DELTA = 0.1247;
-const EXIT = "100.1247";
+// The close delta is picked from the SAVED shares (position sizing decides them, and production's QA
+// capital gives a different count than the hermetic store): the first candidate whose P&L — and,
+// in a, the setup total base + P&L — prints DIFFERENTLY with and without `Math.round`. That is the
+// exact property the mutants break; a delta without it is a test that cannot fail (prod run
+// 37760263449: 16 × 0.1247 = 1.9952 ⇒ "+₪2.00" in both trees). 0.1247 stays first ⇒ the hermetic
+// probe is unchanged. ⛔ a fallback: no candidate ⇒ RED.
+const DELTAS = [0.1247, 0.0347, 0.2213, 0.0123, 0.3301, 0.0471];
 
 // Same reason as playbook.spec: overlays a real phone user dismisses first, installed before the
 // first navigation; the iOS dismissal key read from the component, exactly once (B-272).
@@ -139,9 +144,10 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     return { ctx, page, shot, onFail, prefix: `${PREFIX_ROOT}${RUN}-${info.project.name}-cents-` };
   }
 
-  // Log a trade through the real form, then close it at ENTRY + DELTA through the journal card.
-  // Returns the P&L the app should show, computed from the SAVED shares.
-  async function logAndClose(app, note) {
+  // Log a trade through the real form, then close it at ENTRY + delta through the journal card.
+  // Returns the P&L the app should show, computed from the SAVED shares. `bases` = totals the P&L
+  // will be added to on screen (B7) — they must stay distinguishable too.
+  async function logAndClose(app, note, bases = []) {
     const { page } = app;
     const ours = () => page.evaluate((n) => {
       try { return (JSON.parse(localStorage.getItem("swingEdgeTrades") || "[]") || []).filter((t) => t && t.notes === n); } catch { return "UNPARSEABLE"; }
@@ -166,9 +172,16 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     const tradeCcy = saved.currency || "USD";
     expect(tradeCcy, `trade currency ${tradeCcy} ≠ capital currency ${accountCcy} — the expected P&L would need an FX rate (refusing to guess)`).toBe(accountCcy);
     expect(Number.isInteger(saved.shares) && saved.shares > 0, `saved shares = ${saved.shares}`).toBe(true);
-    const pnl = saved.shares * DELTA;
+    const exitOf = (d) => (ENTRY + d).toFixed(4);
+    const pnlOf = (d) => saved.shares * (Number(exitOf(d)) - ENTRY);
+    const tells = (v) => fmtMoney(v, accountCcy) !== fmtMoney(Math.round(v), accountCcy);
+    const delta = DELTAS.find((d) => tells(pnlOf(d)) && bases.every((b) => tells(b + pnlOf(d))));
+    expect(delta, `no close delta in [${DELTAS}] tells rounding from truth for shares ${saved.shares} · bases [${bases}]`).toBeDefined();
+    const EXIT = exitOf(delta);
+    const pnl = pnlOf(delta);
     const shown = fmtMoney(pnl, accountCcy);
-    expect(shown.endsWith(".00"), `shares ${saved.shares} × ${DELTA} has no cents — the trade cannot tell rounding from truth`).toBe(false);
+    expect(shown.endsWith(".00"), `shares ${saved.shares} × ${delta} has no cents — the trade cannot tell rounding from truth`).toBe(false);
+    console.log(`[K2] shares ${saved.shares} · exit ${EXIT} · P&L ${shown} (rounded would be ${fmtMoney(Math.round(pnl), accountCcy)})`);
 
     await page.locator('[data-tour-tab="journal"]').click();
     // An OPEN card is the one that still carries a Close button (status text differs per language).
@@ -200,7 +213,7 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
       const base = before == null ? 0 : parseMoney(before);
       console.log(`[K2 a] ${info.project.name}: setup cell before = ${before ?? "(no row)"}`);
 
-      const r = await logAndClose(app, `${app.prefix}a`);
+      const r = await logAndClose(app, `${app.prefix}a`, [base]);
       console.log(`[K2 a] ${info.project.name}: shares ${r.shares} · expected ${r.shown} (${r.accountCcy})`);
       await expect(page.getByRole("status").getByText(`רווח ${r.shown} נסגר בהצלחה`, { exact: false }),
         `close toast (he) did not show ${r.shown}`).toBeVisible({ timeout: 10_000 });
