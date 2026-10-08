@@ -381,7 +381,7 @@ const generateEquityCurve = (cap, trades = [], calcFn = calcTradeMetrics) => {
     if (m.fxUnconverted) return;
     const pnl = m.pnl || 0;
     balance += pnl;
-    data.push({ date: realizedDayKey(t), equity: Math.round(balance), ticker: t.ticker, pnl: Math.round(pnl) });
+    data.push({ date: realizedDayKey(t), equity: balance, ticker: t.ticker, pnl });
   });
   const firstRaw = realizedAt(sortedTrades[0]);
   const anchorDate = firstRaw
@@ -521,7 +521,7 @@ const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity, cur
     .filter(x => !x.m.fxUnconverted)
     .map(({ t, m }) => {
       runBalance += m.pnl || 0;
-      return { date: t.date, ticker: t.ticker, equity: Math.round(runBalance) };
+      return { date: t.date, ticker: t.ticker, equity: runBalance };
     });
 
   // ONE disclosure line, three reasons — ⛔ not two neighbouring counters.
@@ -3188,15 +3188,15 @@ export default function SwingEdge() {
     setShowCloseForm(false);
     setClosingTrade(null);
     setCloseForm({ exit: "", exitReason: "Target Hit", followedPlan: true, lessonLearned: "", maxFavorable: "", maxAdverse: "" });
-    // ⚑ קטגוריה 2 — **סכום-בחשבון**, ו-🔴 **החוב מופיע כאן**.
-    // `calcTradeMetrics` הוא הגולמי: `pnl` נקוב במטבע ה**נייר**, ואילו
-    // `currencyOf` הוא תווית ה**חשבון** ⇒ רווח של $500 מוכרז "₪500".
-    // ⛔ אל תתקן ל-`fmtPaperPrice` — זה סכום-בחשבון, והתיקון הוא **המרה**
-    // (דרך `stableCalcTradeMetrics`, שנמצא ב-scope כאן). גל ג׳ · docs/STATE.md.
+    // ⚑ קטגוריה 2 — **סכום-בחשבון**. `pnl` נקוב במטבע ה**נייר**, ו-`fmtAcct`
+    // (= `acctDecision`) **ממיר** אותו לחשבון בשער יום המימוש — או מסרב ל-"—".
+    // ⛔ אל תתקן ל-`fmtPaperPrice` — זה סכום-בחשבון, ⛔ מחיר.
     const { pnl } = calcTradeMetrics(closedTrade);
-    // ⚠️ `Math.round` נשמר בדיוק כפי שהיה — הוא בחירת הדיוק של האתר על סכום
-    // ה**נייר**, ולכן ליומן דולרי (זהות) המחרוזת יוצאת byte-identical.
-    const shown = fmtAcct(closedTrade, Math.round(pnl));
+    // 🆕 05.10 (K2 · `B-321`, `DECISIONS` 05.10): ⛔ `Math.round` לפני `fmtAcct`.
+    // ההחלטה של גל ג׳ («`Math.round` נשמר») בוטלה בהכרעת ניב 30.09: `fmtAcct`
+    // כופה 2 ספרות, ולכן `+$12.00` על רווח של `12.47` הוא אגורות **מומצאות**.
+    // העיגול קורה **פעם אחת**, במעצב, בדיוק המטבע (`test:cents` A1 · Z · mutants).
+    const shown = fmtAcct(closedTrade, pnl);
     if (pnl > 0) toast.success(lang === "he" ? `רווח ${shown} נסגר בהצלחה` : `Closed with profit ${shown}`);
     else if (pnl < 0) toast.error(lang === "he" ? `הפסד ${shown} — נסגר` : `Closed with loss ${shown}`);
     else toast.info(lang === "he" ? "העסקה נסגרה" : "Trade closed");
@@ -6421,7 +6421,7 @@ export default function SwingEdge() {
             <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-6">
               <h3 className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mb-4">{t.pnlByTrade}</h3>
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={closedTrades.map(t => ({ name: t.ticker, pnl: Math.round(calcTradeMetrics(t).pnl || 0) }))}>
+                <BarChart data={closedTrades.map(t => ({ name: t.ticker, pnl: calcTradeMetrics(t).pnl || 0 }))}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={(v) => fmt$0(v, dispCcy)} />
@@ -6465,7 +6465,7 @@ export default function SwingEdge() {
               const data = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday"].map(day => ({
                 day: day.slice(0, 3),
                 fullDay: day,
-                pnl: Math.round(dayLookup[day]?.totalPnL || 0),
+                pnl: dayLookup[day]?.totalPnL || 0,
                 count: dayLookup[day]?.count || 0,
               }));
               return (
@@ -6686,7 +6686,7 @@ export default function SwingEdge() {
               });
               const pnlByMonth = Object.values(monthMap)
                 .sort((a, b) => a.month.localeCompare(b.month))
-                .map(m => ({ ...m, pnl: Math.round(m.pnl) }));
+                .map(m => ({ ...m, pnl: m.pnl }));
 
               // 3. Emotion Performance — the hub's emotion breakdown, verbatim.
               // A trade with no recorded emotion lands in the hub's "Unknown"
@@ -6696,7 +6696,7 @@ export default function SwingEdge() {
                 emotion: e.name,
                 count: e.count,
                 wins: e.wins,
-                totalPnL: Math.round(e.totalPnL),
+                totalPnL: e.totalPnL,
                 winRate: Math.round(e.winRate),
               }));
 
@@ -6715,7 +6715,7 @@ export default function SwingEdge() {
                 winRate: s.count ? Math.round(s.winRate) : 0,
                 avgR: s.avgR,
                 rSampleSize: s.rSampleSize,
-                totalPnL: Math.round(s.totalPnL),
+                totalPnL: s.totalPnL,
               })).sort((a, b) => b.totalPnL - a.totalPnL);
 
               // 6. Hold Time vs P&L
@@ -6723,7 +6723,7 @@ export default function SwingEdge() {
                 const { pnl } = calcTradeMetrics(t);
                 const hold = holdDays(t);
                 if (pnl == null || hold == null) return null;
-                return { hold, pnl: Math.round(pnl), ticker: t.ticker };
+                return { hold, pnl: pnl, ticker: t.ticker };
               }).filter(Boolean);
 
               const darkTooltip = { background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 10, fontSize: 11, color: "var(--v3-text-mid)" };

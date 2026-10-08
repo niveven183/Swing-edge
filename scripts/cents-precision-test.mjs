@@ -21,12 +21,13 @@
  * ⛔ **כשל חילוץ הוא אדום קשה ⛔ ולעולם לא דילוג** (`B-272`) — שינוי-שם או
  * ריפורמט **עוצר את השרשרת**. שערי-המטא אוכפים זאת ו⛔ נספרים במנייה.
  *
- * 🔴 **הלדג'ר — `9` אתרים שחייבים להישאר פגומים.** המחלקה היא `14`; הגל של
- * 15.09 תיקן `5`. `8` העקיפים (`B1`–`B8`) ממתינים ל-`B-325` ו-`A1` ל-`B-321`,
- * ולכן הם **מוצהרים** כאן כ-`OPEN` ונמדדים בכיוון ההפוך: הם חייבים להישאר
- * `.00`. ⛔ **זה ⛔ דילוג** — אתר שיתוקן בלי להזיז את השורה כאן יורה **אדום**,
- * וכך הלדג'ר ⛔ יכול לרקוב בשקט. ⛔ **וזה ⛔ `14/14` ירוק** — הסיכום אומר
- * במפורש `5` ירוקים · `9` פגומים-בהצהרה.
+ * 🔴 **הלדג'ר.** המחלקה היא `14`; הגל של 15.09 תיקן `5`, ו-`9` (`A1` · `B1`–`B8`)
+ * הוחזקו כאן כ-`OPEN` בכיוון ההפוך עד 05.10 (K2 · `D-117`), שבו נסגרו כולם.
+ * המנגנון נשאר: אתר שיוצהר `OPEN` חייב להישאר פגום, ותיקון בלי הזזת השורה = אדום.
+ *
+ * 🆕 05.10 — שלוש זרועות נוספות: `Z` (שלם · 0 · שלילי — המעצב על הגולמי, ⛔ קירוב),
+ * `S` (סכום שורות = סה״כ, כי עיגול-לשורה מצטבר) ו-`--mutants` (מחוץ לשרשרת:
+ * `Math.round` מוחזר לכל אתר בנפרד ⇒ חייב אדום).
  *
  * ⛔ מה זה ⛔ מוכיח: JSX · React · recharts · RTL · דפדפן אמיתי · פרודקשן.
  * אותו גבול בדיוק של `C-036`·`C-038`·`C-039`·`C-041`·`C-043` ⇒ `C-049`.
@@ -65,6 +66,53 @@ function countOf(hay, needle) {
   let n = 0, i = 0;
   for (;;) { const j = hay.indexOf(needle, i); if (j < 0) break; n++; i = j + needle.length; }
   return n;
+}
+
+/* ── --mutants · מחוץ לשרשרת (`npm run probe:cents:mutants`) ──────────────────
+ * לכל אחד מ-9 האתרים של K2: `Math.round` מוחזר בעותק זמני של הקובץ, והטסט רץ עליו
+ * עם `--app`. המוטנט **נהרג** רק אם האתר עצמו אדום, וגם `Z-<id>n` ו-`S-<id>` (כשיש
+ * לאתר קבוצה). עוגן שמופיע ≠ פעם אחת = אדום קשה (`B-272`), כי מוטנט no-op מאשר
+ * טסט עיוור. ביקורת: עותק לא-משונה חייב לצאת ירוק. */
+if (argv.includes("--mutants")) {
+  const M = [
+    ["A1", "const shown = fmtAcct(closedTrade, pnl);", "const shown = fmtAcct(closedTrade, Math.round(pnl));", ["A1", "Z-A1n"]],
+    ["B1", "equity: balance, ticker: t.ticker, pnl });", "equity: Math.round(balance), ticker: t.ticker, pnl });", ["B1", "Z-B1n"]],
+    ["B2", "ticker: t.ticker, equity: runBalance };", "ticker: t.ticker, equity: Math.round(runBalance) };", ["B2", "Z-B2n"]],
+    ["B3", "pnl: calcTradeMetrics(t).pnl || 0 }))", "pnl: Math.round(calcTradeMetrics(t).pnl || 0) }))", ["B3", "Z-B3n", "S-B3"]],
+    ["B4", "pnl: dayLookup[day]?.totalPnL || 0,", "pnl: Math.round(dayLookup[day]?.totalPnL || 0),", ["B4", "Z-B4n", "S-B4"]],
+    ["B5", ".map(m => ({ ...m, pnl: m.pnl }));", ".map(m => ({ ...m, pnl: Math.round(m.pnl) }));", ["B5", "Z-B5n", "S-B5"]],
+    ["B6", "totalPnL: e.totalPnL,", "totalPnL: Math.round(e.totalPnL),", ["B6", "Z-B6n", "S-B6"]],
+    ["B7", "totalPnL: s.totalPnL,", "totalPnL: Math.round(s.totalPnL),", ["B7", "Z-B7n", "S-B7"]],
+    ["B8", "return { hold, pnl: pnl, ticker: t.ticker };", "return { hold, pnl: Math.round(pnl), ticker: t.ticker };", ["B8", "Z-B8n", "S-B8"]],
+  ];
+  const { writeFileSync, mkdtempSync, rmSync } = await import("node:fs");
+  const { spawnSync } = await import("node:child_process");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const self = new URL(import.meta.url).pathname;
+  const dir = mkdtempSync(join(tmpdir(), "cents-mut-"));
+  const runOn = (text) => {
+    const f = join(dir, "SwingEdge_App.jsx");
+    writeFileSync(f, text);
+    const r = spawnSync(process.execPath, [self, "--app", f], { encoding: "utf8" });
+    const reds = ((r.stdout.match(/אדומות: (.*)$/m) || [])[1] || "").split(", ").filter(Boolean);
+    return { code: r.status, reds, meta: /שערי-מטא אדומים/.test(r.stdout + r.stderr) };
+  };
+  let bad = 0;
+  const ctl = runOn(src);
+  if (ctl.code === 0) console.log("✅ K0  ביקורת: העותק הלא-משונה ירוק");
+  else { bad++; console.log(`❌ K0  ביקורת אדומה על העותק הלא-משונה (exit ${ctl.code}) — אי-אפשר לסמוך על אף מוטנט`); }
+  for (const [id, find, repl, want] of M) {
+    const n = countOf(src, find);
+    if (n !== 1) { bad++; console.log(`❌ ${id}  עוגן המוטנט מופיע ${n} פעמים (≠ 1) — mutant no-op ⇒ אדום קשה`); continue; }
+    const r = runOn(src.replace(find, repl));
+    const missing = want.filter((w) => !r.reds.includes(w));
+    if (r.code !== 0 && !r.meta && missing.length === 0) console.log(`✅ ${id}  Math.round חזר ⇒ נהרג (אדומות: ${want.join(", ")})`);
+    else { bad++; console.log(`❌ ${id}  המוטנט שרד — חסרות: ${missing.join(", ") || "—"} · exit ${r.code}${r.meta ? " · כשל-מטא" : ""}`); }
+  }
+  rmSync(dir, { recursive: true, force: true });
+  console.log(bad ? `\n❌ cents mutants: ${bad} שרדו/נכשלו` : `\nmutants: ${M.length}/${M.length} נהרגו · ביקורת ירוקה`);
+  process.exit(bad ? 1 : 0);
 }
 
 // סורק קדימה מ-`from` ועוצר בתו-סיום בעומק 0. מודע למחרוזות, כי עוגן אחד
@@ -109,67 +157,76 @@ function run(expr, env) {
 }
 
 /* ── טבלת האתרים ─────────────────────────────────────────────────────────── */
-// `state`: "WAVE" = תוקן בגל 15.09 ⇒ חייב ירוק · "OPEN:<id>" = פגם מוצהר
-// שחייב להישאר פגום עד שהמזהה ייסגר.
+// `state`: "WAVE" = תוקן ⇒ חייב ירוק. 🆕 05.10 (K2 · `B-321` + `B-325`, `D-117`): כל 14
+// האתרים ב-"WAVE" — הלדג׳ר ההפוך התרוקן, ו-`OPEN:<id>` נשאר בקוד כמנגנון לגל הבא.
+// `env(v)` מזריק את הערך הנבדק; `expect(v)` הוא **המעצב מוחל על הערך הגולמי** —
+// כלומר החוזה הוא «⛔ עיגול לפני המעצב», ⛔ «מחרוזת ספציפית».
+const fmtUSD = (v) => fmt$(v, "USD");
 const CLASS = [
   // ── ישיר: `Math.round` ערום בתוך קריאת המעצב עצמו ──
-  { id: "A1", kind: "call", callee: "fmtAcct", state: "OPEN:B-321",
-    label: "toast סגירת עסקה (fmtAcct)", line: 3009,
-    anchor: "const shown = fmtAcct(", env: () => ({ fmtAcct, closedTrade: TRADE, pnl: X }) },
+  { id: "A1", kind: "call", callee: "fmtAcct", state: "WAVE",
+    label: "toast סגירת עסקה (fmtAcct)", line: 3199,
+    anchor: "const shown = fmtAcct(", env: (v) => ({ fmtAcct, closedTrade: TRADE, pnl: v }),
+    expect: (v) => fmtAcct(TRADE, v) },
   { id: "A2", kind: "call", callee: "fmtAcct", state: "WAVE",
-    label: "תא P&L · טבלת הג'ורנל (fmtAcct)", line: 4727,
-    anchor: "}`}>{fmtAcct(", env: () => ({ fmtAcct, t: TRADE, pnl: X }) },
+    label: "תא P&L · טבלת הג'ורנל (fmtAcct)", line: 4950,
+    anchor: "}`}>{fmtAcct(", env: (v) => ({ fmtAcct, t: TRADE, pnl: v }),
+    expect: (v) => fmtAcct(TRADE, v) },
   { id: "A3", kind: "call", callee: "fmt$", state: "WAVE",
-    label: "כרטיס «רווח ממוצע»", line: 5112,
+    label: "כרטיס «רווח ממוצע»", line: 5335,
     anchor: 'journalStats.avgWin == null ? "—" : fmt$(',
-    env: () => ({ fmt$, journalStats: { avgWin: X }, dispCcy: "USD" }) },
+    env: (v) => ({ fmt$, journalStats: { avgWin: v }, dispCcy: "USD" }), expect: fmtUSD },
+  // A4/A5 מקבלים **גודל** חיובי ומציגים אותו שלילי ⇒ המעצב מוחל על `-v`.
   { id: "A4", kind: "call", callee: "fmt$", state: "WAVE",
-    label: "כרטיס «הפסד ממוצע»", line: 5116,
+    label: "כרטיס «הפסד ממוצע»", line: 5339,
     anchor: 'journalStats.avgLoss == null ? "—" : fmt$(',
-    env: () => ({ fmt$, journalStats: { avgLoss: X }, dispCcy: "USD" }) },
+    env: (v) => ({ fmt$, journalStats: { avgLoss: v }, dispCcy: "USD" }), expect: (v) => fmtUSD(-v) },
   { id: "A5", kind: "call", callee: "fmt$", state: "WAVE",
-    label: "כרטיס «Max Drawdown»", line: 5136,
+    label: "כרטיס «Max Drawdown»", line: 5359,
     anchor: 'text-[var(--v3-loss)]">{fmt$(',
-    env: () => ({ fmt$, journalStats: { maxDD: X }, dispCcy: "USD" }) },
+    env: (v) => ({ fmt$, journalStats: { maxDD: v }, dispCcy: "USD" }), expect: (v) => fmtUSD(-v) },
   { id: "A6", kind: "call", callee: "fmt$", state: "WAVE",
-    label: "«היום הטוב ביותר»", line: 6334,
+    label: "«היום הטוב ביותר»", line: 6576,
     anchor: 'text-xs text-slate-500 mt-1">{fmt$(',
-    env: () => ({ fmt$, bestDayEntry: ["Monday", { pnl: X, count: 3 }], dispCcy: "USD" }) },
+    env: (v) => ({ fmt$, bestDayEntry: ["Monday", { pnl: v, count: 3 }], dispCcy: "USD" }), expect: fmtUSD },
 
   // ── עקיף: העיגול יושב ב-payload, והמעצב הדו-ספרתי יושב אצל הצרכן.
   // ⚠️ `B7` הוא **תא טבלה** ⛔ tooltip — מי שיקרא «רק גרפים» ישאיר אותו שבור.
-  { id: "B1", kind: "value", state: "OPEN:B-325", consumer: fmtBalance,
-    label: "עקומת הון → fmtBalance", line: 383,
-    anchor: "realizedDayKey(t), equity: ", env: () => ({ balance: X }),
+  // החוזה כאן כפול: ה-payload **שווה** לערך הגולמי, **וגם** הצרכן מרנדר אותו בלי `.00` מומצא.
+  { id: "B1", kind: "value", state: "WAVE", consumer: fmtBalance,
+    label: "עקומת הון → fmtBalance", line: 384,
+    anchor: "realizedDayKey(t), equity: ", env: (v) => ({ balance: v }),
     consumerAnchor: "${fmtBalance(v, dispCcy)} (${p.payload.ticker})" },
-  { id: "B2", kind: "value", state: "OPEN:B-325", consumer: fmtBalance,
-    label: "עקומת הון מנטי → fmtBalance", line: 523,
-    anchor: "t.ticker, equity: ", env: () => ({ runBalance: X }),
-    consumerAnchor: 'formatter={(v) => [fmtBalance(v, dispCcy), "Equity"]}' },
-  { id: "B3", kind: "value", state: "OPEN:B-325", consumer: fmt$,
-    label: "P&L לפי עסקה → fmt$", line: 6190,
-    anchor: "name: t.ticker, pnl: ", env: () => ({ calcTradeMetrics: () => ({ pnl: X }), t: TRADE }),
+  // 🆕 05.10: ה-`consumerAnchor` הקודם של B2 היה ה-tooltip של **B1** (`:4834`, `data={equityCurve}`).
+  // הצרכן האמיתי של B2 הוא גיאומטריית ה-SVG ב-PDF החודשי ⇒ ⛔ מעצב ⇒ נבדק הערך בלבד.
+  { id: "B2", kind: "value", state: "WAVE", consumer: null,
+    label: "עקומת הון ב-PDF → גיאומטריית SVG (⛔ טקסט)", line: 524,
+    anchor: "t.ticker, equity: ", env: (v) => ({ runBalance: v }),
+    consumerAnchor: "toY(p.equity).toFixed(1)" },
+  { id: "B3", kind: "value", state: "WAVE", consumer: fmt$, group: "trades",
+    label: "P&L לפי עסקה → fmt$", line: 6424,
+    anchor: "name: t.ticker, pnl: ", env: (v) => ({ calcTradeMetrics: () => ({ pnl: v }), t: TRADE }),
     consumerAnchor: 'formatter={v=>[fmt$(v, dispCcy),"P&L"]}' },
-  { id: "B4", kind: "value", state: "OPEN:B-325", consumer: fmt$,
-    label: "P&L לפי יום בשבוע → fmt$", line: 6234,
+  { id: "B4", kind: "value", state: "WAVE", consumer: fmt$, group: "weekdays",
+    label: "P&L לפי יום בשבוע → fmt$", line: 6468,
     anchor: "fullDay: day,\n                pnl: ",
-    env: () => ({ dayLookup: { Monday: { totalPnL: X, count: 3 } }, day: "Monday" }),
+    env: (v) => ({ dayLookup: { Monday: { totalPnL: v, count: 3 } }, day: "Monday" }),
     consumerAnchor: "${fmt$(v, dispCcy)} · ${nTrades(p.payload.count, lang)}" },
-  { id: "B5", kind: "value", state: "OPEN:B-325", consumer: fmt$,
-    label: "P&L לפי חודש → fmt$", line: 6447,
-    anchor: "...m, pnl: ", env: () => ({ m: { pnl: X } }),
+  { id: "B5", kind: "value", state: "WAVE", consumer: fmt$, group: "months",
+    label: "P&L לפי חודש → fmt$", line: 6689,
+    anchor: "...m, pnl: ", env: (v) => ({ m: { pnl: v } }),
     consumerAnchor: "${fmt$(v, dispCcy)} · ${p.payload.count} trade" },
-  { id: "B6", kind: "value", state: "OPEN:B-325", consumer: fmt$,
-    label: "P&L לפי רגש → fmt$", line: 6457,
-    anchor: "wins: e.wins,\n                totalPnL: ", env: () => ({ e: { totalPnL: X } }),
+  { id: "B6", kind: "value", state: "WAVE", consumer: fmt$, group: "emotions",
+    label: "P&L לפי רגש → fmt$", line: 6699,
+    anchor: "wins: e.wins,\n                totalPnL: ", env: (v) => ({ e: { totalPnL: v } }),
     consumerAnchor: "${fmt$(v, dispCcy)} · ${formatPct(p.payload.winRate)} WR" },
-  { id: "B7", kind: "value", state: "OPEN:B-325", consumer: fmt$,
-    label: "P&L לפי setup → **תא טבלה** fmt$", line: 6476,
-    anchor: "rSampleSize: s.rSampleSize,\n                totalPnL: ", env: () => ({ s: { totalPnL: X } }),
+  { id: "B7", kind: "value", state: "WAVE", consumer: fmt$, group: "setups",
+    label: "P&L לפי setup → **תא טבלה** fmt$", line: 6718,
+    anchor: "rSampleSize: s.rSampleSize,\n                totalPnL: ", env: (v) => ({ s: { totalPnL: v } }),
     consumerAnchor: "{fmt$(s.totalPnL, dispCcy)}" },
-  { id: "B8", kind: "value", state: "OPEN:B-325", consumer: fmt$,
-    label: "פיזור החזקה↔P&L → fmt$", line: 6484,
-    anchor: "{ hold, pnl: ", env: () => ({ pnl: X }),
+  { id: "B8", kind: "value", state: "WAVE", consumer: fmt$, group: "scatter",
+    label: "פיזור החזקה↔P&L → fmt$", line: 6726,
+    anchor: "{ hold, pnl: ", env: (v) => ({ pnl: v }),
     consumerAnchor: "{fmt$(d.pnl, dispCcy)}" },
 ];
 
@@ -234,18 +291,25 @@ if (metaFail) {
  */
 const endsInDotZeroZero = (str) => /\.00$/.test(String(str));
 
-function renderOf(site) {
-  const raw = run(site.expr, site.env());
+function renderOf(site, v = X) {
+  const raw = run(site.expr, site.env(v));
   return site.kind === "value" && site.consumer ? site.consumer(raw, "USD") : raw;
 }
+// הערך שהאתר **צריך** להציג: המעצב על הערך הגולמי (`call`) · הצרכן על הגולמי (`value`) ·
+// הגולמי עצמו כשאין צרכן-טקסט (B2).
+const expectOf = (site, v) =>
+  site.kind === "call" ? site.expect(v) : site.consumer ? site.consumer(v, "USD") : v;
+const payloadOf = (site, v) => run(site.expr, site.env(v));
 
-console.log("\n── CLASS · 14 אתרי מחלקת D-068 ──");
+console.log("\n── CLASS · 14 אתרי מחלקת D-068 · קלט 1234.47 ──");
 let waveGreen = 0, ledgerHeld = 0;
 for (const s of CLASS) {
   const out = renderOf(s);
-  const clean = !endsInDotZeroZero(out);
+  const want = expectOf(s, X);
+  const clean = out === want && !endsInDotZeroZero(out)
+    && (s.kind !== "value" || payloadOf(s, X) === X);
   if (s.state === "WAVE") {
-    ok(s.id, `${s.label} (:${s.line}) ⇒ אגורות שורדות`, clean, `"${out}"`);
+    ok(s.id, `${s.label} (:${s.line}) ⇒ אגורות שורדות`, clean, `"${out}"${clean ? "" : ` (מצופה "${want}")`}`);
     if (clean) waveGreen++;
   } else {
     // ⚠️ הכיוון **הפוך** בכוונה: אתר בלדג'ר חייב להישאר פגום. אתר שתוקן בלי
@@ -254,6 +318,38 @@ for (const s of CLASS) {
        !clean, clean ? `"${out}" — 🔴 האתר תוקן! העבר אותו ל-state:"WAVE" באותו קומיט` : `"${out}"`);
     if (!clean) ledgerHeld++;
   }
+}
+
+/* ── Z · זרוע ביקורת: שלם נשאר שלם · 0 נשאר 0 · שלילי נשאר שלילי ───────────
+ * לכל אתר ב-WAVE, שלושה קלטים. החוזה זהה לבלוק הקודם — המעצב על הגולמי — ולכן
+ * תיקון שמחליף `Math.round` ב-`Math.trunc`/`toFixed(0)`/`|| 0` נתפס כאן גם כשהוא
+ * עובר את 1234.47. ⚠️ A4/A5 מקבלים גודל ⇒ «שלילי» שם הוא `-v` של הקלט, כמו במוצר. */
+console.log("\n── Z · שלם · אפס · שלילי (14 × 3) ──");
+let zGreen = 0, zTotal = 0;
+for (const s of CLASS.filter((c) => c.state === "WAVE")) {
+  for (const [tag, v] of [["שלם", 1234], ["אפס", 0], ["שלילי", -12.47]]) {
+    zTotal++;
+    const out = renderOf(s, v), want = expectOf(s, v);
+    const good = Object.is(out, want) || out === want;
+    ok(`Z-${s.id}${tag === "שלם" ? "i" : tag === "אפס" ? "0" : "n"}`, `${s.id} ${tag} (${v})`, good,
+       `"${out}"${good ? "" : ` (מצופה "${want}")`}`);
+    if (good) zGreen++;
+  }
+}
+
+/* ── S · עקביות: סכום השורות = הסה״כ ─────────────────────────────────────────
+ * כל קבוצה (עסקאות · ימים · חודשים · רגשות · setups · פיזור) נבנית מאותו ביטוי
+ * מחולץ, שורה-שורה. עיגול לכל שורה מצטבר: `[0.4,0.4,0.4]` ⇒ `0` מול `1.20`. */
+const ROWS = [0.4, 0.4, 0.4, 12.47, -3.1];
+const rawSum = ROWS.reduce((a, b) => a + b, 0);
+console.log(`\n── S · סכום שורות = סה״כ · שורות ${JSON.stringify(ROWS)} · Σ=${rawSum.toFixed(2)} ──`);
+let sGreen = 0;
+const sSites = CLASS.filter((c) => c.group);
+for (const s of sSites) {
+  const sum = ROWS.reduce((a, v) => a + payloadOf(s, v), 0);
+  const good = Math.abs(sum - rawSum) < 1e-9 && fmtUSD(sum) === fmtUSD(rawSum);
+  ok(`S-${s.id}`, `${s.group}: Σ שורות (${s.id}) = סה״כ`, good, `${fmtUSD(sum)} מול ${fmtUSD(rawSum)}`);
+  if (good) sGreen++;
 }
 
 console.log("\n── CONTROL ARM · 6 · חייבת להישאר ירוקה ──");
@@ -270,10 +366,12 @@ for (const s of CONTROL) {
 const openIds = CLASS.filter((s) => s.state !== "WAVE").map((s) => `${s.id}(${s.state.slice(5)})`);
 const waveTotal = CLASS.filter((s) => s.state === "WAVE").length;
 console.log(`\nCLASS   ${waveGreen}/${waveTotal} תוקנו (אגורות שורדות)`);
+console.log(`Z       ${zGreen}/${zTotal} שלם·אפס·שלילי`);
+console.log(`S       ${sGreen}/${sSites.length} סכום שורות = סה״כ`);
 console.log(`LEDGER  ${ledgerHeld}/${CLASS.length - waveTotal} פגומים-בהצהרה — ${openIds.join(" · ")}`);
 console.log(`CONTROL ${ctlGreen}/${CONTROL.length} ירוקה`);
 console.log(`meta-gate failures: ${metaFail}`);
-console.log(`⚠️  המחלקה היא ${CLASS.length}; ${CLASS.length - waveTotal} עדיין פגומים ⇒ ⛔ לקרוא זאת כ-${CLASS.length}/${CLASS.length} ירוק.`);
+if (CLASS.length - waveTotal) console.log(`⚠️  המחלקה היא ${CLASS.length}; ${CLASS.length - waveTotal} עדיין פגומים ⇒ ⛔ לקרוא זאת כ-${CLASS.length}/${CLASS.length} ירוק.`);
 
 console.log(`\n${pass} עברו · ${fail} נכשלו${fail ? ` — אדומות: ${reds.join(", ")}` : ""}`);
 if (fail) console.error("❌ cents: החוזה הופר.");
