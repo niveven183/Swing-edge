@@ -25,6 +25,7 @@ import { makeOnce, assertCleanTargets, buildTree, serve, runSpec, readResults } 
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const APP = join(ROOT, "SwingEdge_App.jsx");
+const IC = join(ROOT, "src", "lib", "instrumentCurrency.js");
 const PROJECTS = (process.env.EYE_PROJECTS || "pixel7").split(",").map((s) => s.trim()).filter(Boolean);
 const OUT = join(ROOT, "eye-evidence", "probe-cents");
 
@@ -37,14 +38,26 @@ const die = (msg) => { console.log(`\n❌ eye-cents-probe: ${msg}`); process.exi
 
 // ═══ META ═══════════════════════════════════════════════════════════════════
 const once = makeOnce(die);
-assertCleanTargets(ROOT, [APP], die);
+assertCleanTargets(ROOT, [APP, IC], die);
 const ARMS = {
   HEAD: [],
   "MUT-A1": [[APP, "const shown = fmtAcct(closedTrade, pnl);", () => "const shown = fmtAcct(closedTrade, Math.round(pnl));"]],
   "MUT-B7": [[APP, "totalPnL: s.totalPnL,", () => "totalPnL: Math.round(s.totalPnL),"]],
+  // ── B-300 / B-340 · the REAL population: ₪ capital (EYE_CCY=ILS seeds it, /api/fx is mocked) ──
+  "ILS-HEAD":  [],
+  // the label is the capital's again (B-340). The narrow read rule MASKS this at the toast, so the
+  // spec's saved-label assertion is what must catch it.
+  "ILS-MUT-A": [[APP, "currency: stamp.currency,", () => "currency: capitalCurrency,"]],
+  // the pre-fix tree: capital label AND no narrow read rule ⇒ `contradicted` ⇒ the toast is "—".
+  "ILS-OLD":   [[APP, "currency: stamp.currency,", () => "currency: capitalCurrency,"],
+                [IC, 'if (stored === "ILS" && trade?.currency_source !== CURRENCY_SOURCE.MANUAL_CAPITAL)', () => 'if (stored === "ILS")']],
+  // K2 is still caught in ₪: `Math.round` before the converting formatter.
+  "ILS-MUT-A1": [[APP, "const shown = fmtAcct(closedTrade, pnl);", () => "const shown = fmtAcct(closedTrade, Math.round(pnl));"]],
 };
+const ARM_CCY = (arm) => (arm.startsWith("ILS-") ? "ILS" : undefined);
 const appSrc = readFileSync(APP, "utf8");
-for (const [arm, muts] of Object.entries(ARMS)) for (const [, find] of muts) once(appSrc, find, arm);
+const icSrc = readFileSync(IC, "utf8");
+for (const [arm, muts] of Object.entries(ARMS)) for (const [f, find] of muts) once(f === IC ? icSrc : appSrc, find, arm);
 ok("META", true, `mutation anchors match exactly once · target clean in git · projects=${PROJECTS.join(",")}`);
 
 // ═══ BUILD · SERVE · RUN ════════════════════════════════════════════════════
@@ -56,6 +69,7 @@ for (const arm of Object.keys(ARMS)) {
   const dist = await buildTree({ root: ROOT, arm, outDir: join(WORK, `dist-${arm}`), mutations: ARMS[arm], once, die });
   const { server, port } = await serve(dist);
   const json = join(OUT, `${arm}.json`);
+  if (ARM_CCY(arm)) process.env.EYE_CCY = ARM_CCY(arm); else delete process.env.EYE_CCY;
   const run = await runSpec({ root: ROOT, spec: "tests-eye/cents.spec.js", projects: PROJECTS, port, json, evidenceDir: join(OUT, arm) });
   server.close();
   if (!run.ok) die(`${arm}: the spec produced no JSON report (exit ${run.status})\n${run.out.slice(-3000)}`);
@@ -78,6 +92,22 @@ for (const p of PROJECTS) {
     b7.msg.split("\n")[0] || "mutant SURVIVED — a cannot see the setup cell rounded");
 }
 
+for (const p of PROJECTS) {
+  const v = (arm, s) => verdicts[arm][`${p}:${s}`] || { status: "missing", msg: "" };
+  const ih = ["a", "b"].map((s) => [s, v("ILS-HEAD", s)]);
+  ok(`ILS-HEAD/${p}`, ih.every(([, r]) => r.status === "passed"), "₪ capital: a + b green — a NUMBER carrying ₪, saved label = paper currency",
+    ih.filter(([, r]) => r.status !== "passed").map(([s, r]) => `${s}:${r.status} ${r.msg.split("\n")[0]}`).join(" | "));
+  const ia = ["a", "b"].map((s) => [s, v("ILS-MUT-A", s)]);
+  ok(`ILS-MUT-A/${p}`, ia.every(([, r]) => r.status === "failed" && /B-340/.test(r.msg)), "label = capital ⇒ a + b RED on the saved-label assertion (B-340)",
+    ia.map(([s, r]) => `${s}: ${r.msg.split("\n")[0] || "mutant SURVIVED"}`).join(" | "));
+  const io = ["a", "b"].map((s) => [s, v("ILS-OLD", s)]);
+  ok(`ILS-OLD/${p}`, io.every(([, r]) => r.status === "failed"), "the pre-fix tree is RED in ₪ (B-300 reproduced, hermetic)",
+    io.map(([s, r]) => `${s}: ${r.msg.split("\n")[0] || "SURVIVED"}`).join(" | "));
+  const i1 = ["a", "b"].map((s) => [s, v("ILS-MUT-A1", s)]);
+  ok(`ILS-MUT-A1/${p}`, i1.every(([, r]) => r.status === "failed" && /close toast \((he|en)\)/.test(r.msg)), "₪: Math.round before fmtAcct ⇒ a + b RED on the toast",
+    i1.map(([s, r]) => `${s}: ${r.msg.split("\n")[0] || "mutant SURVIVED"}`).join(" | "));
+}
+
 await rm(WORK, { recursive: true, force: true });
-console.log(failures ? `\n❌ eye-cents-probe: ${failures} verdict(s) failed — the spec is not proven` : "\n✅ eye-cents-probe — HEAD green · MUT-A1 red · MUT-B7 red");
+console.log(failures ? `\n❌ eye-cents-probe: ${failures} verdict(s) failed — the spec is not proven` : "\n✅ eye-cents-probe — HEAD green · MUT-A1 red · MUT-B7 red · ILS-HEAD green · ILS-MUT-A/OLD/A1 red");
 process.exit(failures ? 1 : 0);
