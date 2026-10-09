@@ -2428,6 +2428,11 @@ console.log("  18 · G2 · סיכון במטבע ההון");
     (app.match(/^\s*currency: capitalCurrency,/gm) || []).length === 0);
   check("S3 · `riskDollar` (:5208) מודפס ב-`capitalCurrency`, ⛔ לא בתווית השמורה",
     /fmtPrice\(t\.riskDollar, capitalCurrency\)/.test(app));
+  check("S5 · B3 (גרף «P&L לפי עסקה») נבנה מ-`stableCalcTradeMetrics`, ⛔ `calcTradeMetrics` גולמי",
+    /const bars = closedTrades\.map\(t => \(\{ t, m: stableCalcTradeMetrics\(t\) \}\)\)\.filter\(x => !x\.m\.fxUnconverted\);/.test(app)
+    && !/pnl: calcTradeMetrics\(t\)\.pnl \|\| 0 \}\)\)\}>/.test(app));
+  check("S6 · צבעי העמודות נגזרים מאותה רשימה (`bars`), ⛔ מ-`closedTrades` — אין אי-יישור אחרי סינון",
+    /\{bars\.map\(\(\{ m \}, i\) => \(\s*\n\s*<Cell key=\{i\}/.test(app));
   check("S4 · ⛔ אין `|| capitalCurrency` על `stamp`",
     !/stamp[^\n]*\|\|\s*capitalCurrency|stamp\?\.currency\s*\?\?/.test(app));
 }

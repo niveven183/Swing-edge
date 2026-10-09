@@ -51,6 +51,8 @@ const ARMS = {
   // the pre-fix tree: capital label AND no narrow read rule ⇒ `contradicted` ⇒ the toast is "—".
   "ILS-OLD":   [[APP, "currency: stamp.currency,", () => "currency: capitalCurrency,"],
                 [IC, 'if (stored === "ILS" && trade?.currency_source !== CURRENCY_SOURCE.MANUAL_CAPITAL)', () => 'if (stored === "ILS")']],
+  // B3 back to the RAW paper P&L under the ₪ symbol (the bug the ₪ population exposed, 09.10).
+  "ILS-MUT-B3": [[APP, "const bars = closedTrades.map(t => ({ t, m: stableCalcTradeMetrics(t) }))", () => "const bars = closedTrades.map(t => ({ t, m: calcTradeMetrics(t) }))"]],
   // K2 is still caught in ₪: `Math.round` before the converting formatter.
   "ILS-MUT-A1": [[APP, "const shown = fmtAcct(closedTrade, pnl);", () => "const shown = fmtAcct(closedTrade, Math.round(pnl));"]],
 };
@@ -103,6 +105,9 @@ for (const p of PROJECTS) {
   const io = ["a", "b"].map((s) => [s, v("ILS-OLD", s)]);
   ok(`ILS-OLD/${p}`, io.every(([, r]) => r.status === "failed" && /close toast \((he|en)\)/.test(r.msg)), "the pre-fix tree is RED in ₪ ON THE TOAST (B-300 reproduced, hermetic: \"—\" instead of a number)",
     io.map(([s, r]) => `${s}: ${r.msg.split("\n")[0] || "SURVIVED"}`).join(" | "));
+  const b3 = v("ILS-MUT-B3", "a");
+  ok(`ILS-MUT-B3/${p}`, b3.status === "failed" && /B3 tooltip/.test(b3.msg), `₪: B3 raw under ₪ ⇒ a RED on the B3 tooltip (${b3.status})`,
+    b3.msg.split("\n")[0] || "mutant SURVIVED");
   const i1 = ["a", "b"].map((s) => [s, v("ILS-MUT-A1", s)]);
   ok(`ILS-MUT-A1/${p}`, i1.every(([, r]) => r.status === "failed" && /close toast \((he|en)\)/.test(r.msg)), "₪: Math.round before fmtAcct ⇒ a + b RED on the toast",
     i1.map(([s, r]) => `${s}: ${r.msg.split("\n")[0] || "mutant SURVIVED"}`).join(" | "));

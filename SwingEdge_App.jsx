@@ -6423,21 +6423,30 @@ export default function SwingEdge() {
             {/* Per-trade P&L bars */}
             <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-6">
               <h3 className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mb-4">{t.pnlByTrade}</h3>
+              {/* 🔴 B-300 (09.10): ה-payload עבר מ-`calcTradeMetrics` הגולמי ל-`stableCalcTradeMetrics`
+                  (אותה הכרעת המרה של שאר המסך). הערך הגולמי הוא במטבע ה**נייר** והציר/הטולטיפ מדפיסים
+                  `dispCcy` ⇒ בהון ₪ עסקת $ הוצגה «₪3.74» במקום «₪12.35». עסקה שלא הומרה
+                  (`fxUnconverted`) ⛔ אינה מצוירת — אותה הכרעה כמו `generateEquityCurve`; הספירה
+                  שלה כבר מוצגת בתג ההון. ⛔ מעצב/שער חדשים. */}
+              {(() => {
+                const bars = closedTrades.map(t => ({ t, m: stableCalcTradeMetrics(t) })).filter(x => !x.m.fxUnconverted);
+                return (
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={closedTrades.map(t => ({ name: t.ticker, pnl: calcTradeMetrics(t).pnl || 0 }))}>
+                <BarChart data={bars.map(({ t, m }) => ({ name: t.ticker, pnl: m.pnl || 0 }))}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={(v) => fmt$0(v, dispCcy)} />
                   <Tooltip contentStyle={{ background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 10, fontSize: 11 }} formatter={v=>[fmt$(v, dispCcy),"P&L"]} />
                   <ReferenceLine y={0} stroke="var(--v3-text-lo)" />
                   <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
-                    {closedTrades.map((t, i) => {
-                      const { pnl } = calcTradeMetrics(t);
-                      return <Cell key={i} fill={pnl > 0 ? "var(--v3-accent)" : "var(--v3-loss)"} />;
-                    })}
+                    {bars.map(({ m }, i) => (
+                      <Cell key={i} fill={m.pnl > 0 ? "var(--v3-accent)" : "var(--v3-loss)"} />
+                    ))}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
+                );
+              })()}
             </div>
 
             {/* Setup breakdown — dynamic grouping from actual trade data */}
