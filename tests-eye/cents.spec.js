@@ -224,11 +224,10 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     expect(accountCcy, "the population is not the expected capital currency").toBe(EXPECT_CCY);
     // ⛔ the stored label vs the capital (tautological — it hid B-300). The app's REAL derivation:
     // the toast is a number only when the paper is aggregatable.
-    const derived = deriveInstrumentCurrency(saved);
-    expect(isAggregatable(derived),
-      `derived paper currency ${JSON.stringify(derived)} — the app would refuse (B-300 when contradicted)`).toBe(true);
-    // B-340 — the saved label is the PAPER's currency (the unit of entry/stop), ⛔ the capital's.
-    expect(saved.currency, `saved label ${saved.currency} must be the paper currency ${derived.code} (B-340), ⛔ the capital ${accountCcy}`).toBe(derived.code);
+    // The PAPER's currency comes from the TICKER alone (what the form priced entry/stop in), ⛔ from
+    // the saved row — so the pre-fix tree reaches the toast and fails THERE ("—"), as users saw it.
+    const derived = deriveInstrumentCurrency({ ticker: TRADE_TICKER });
+    expect(isAggregatable(derived), `ticker-only derivation ${JSON.stringify(derived)} is not aggregatable`).toBe(true);
     expect(Number.isInteger(saved.shares) && saved.shares > 0, `saved shares = ${saved.shares}`).toBe(true);
     // The conversion the app will apply, from the rate the APP received (identity when paper = account).
     const dayKey = await page.evaluate(() => { const d = new Date(), p = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; });
@@ -265,8 +264,14 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     await card.locator("button").filter({ hasText: /^\s*(סגור|Close)\s*$/ }).click();
     await page.locator("#close-exit").fill(EXIT);
     await page.getByRole("button", { name: /Close Trade/ }).click();
-    return { pnl, shown, accountCcy, shares: saved.shares };
+    return { pnl, shown, accountCcy, shares: saved.shares, savedLabel: saved.currency, paperCode: derived.code };
   }
+
+  // B-340 — asserted AFTER the toast: the saved label is the PAPER's currency (the unit of entry/stop),
+  // ⛔ the capital's. (The narrow read rule of B-300 masks a capital label at the toast, so this is
+  // the assertion that sees it.)
+  const expectPaperLabel = (r) =>
+    expect(r.savedLabel, `saved label ${r.savedLabel} must be the paper currency ${r.paperCode} (B-340), ⛔ the capital ${r.accountCcy}`).toBe(r.paperCode);
 
   // The setup row of the analytics table (B7) — its last cell is `fmt$(s.totalPnL)`.
   async function setupCell(page, setupLabel) {
@@ -292,6 +297,7 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
       await expect(page.getByRole("status").getByText(`רווח ${r.shown} נסגר בהצלחה`, { exact: false }),
         `close toast (he) did not show ${r.shown}`).toBeVisible({ timeout: 10_000 });
       await shot("a-toast");
+      expectPaperLabel(r);
 
       const card = page.locator("article").filter({ hasText: TRADE_TICKER }).filter({ hasText: r.shown });
       await expect(card.first(), `journal card does not show ${r.shown}`).toBeVisible({ timeout: 15_000 });
@@ -353,6 +359,7 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
       await expect(page.getByRole("status").getByText(`Closed with profit ${r.shown}`, { exact: false }),
         `close toast (en) did not show ${r.shown}`).toBeVisible({ timeout: 10_000 });
       await shot("b-toast");
+      expectPaperLabel(r);
       const card = page.locator("article").filter({ hasText: TRADE_TICKER }).filter({ hasText: r.shown });
       await expect(card.first(), `journal card does not show ${r.shown}`).toBeVisible({ timeout: 15_000 });
     } catch (e) {

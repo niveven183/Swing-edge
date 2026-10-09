@@ -101,7 +101,7 @@ for (const p of PROJECTS) {
   ok(`ILS-MUT-A/${p}`, ia.every(([, r]) => r.status === "failed" && /B-340/.test(r.msg)), "label = capital ⇒ a + b RED on the saved-label assertion (B-340)",
     ia.map(([s, r]) => `${s}: ${r.msg.split("\n")[0] || "mutant SURVIVED"}`).join(" | "));
   const io = ["a", "b"].map((s) => [s, v("ILS-OLD", s)]);
-  ok(`ILS-OLD/${p}`, io.every(([, r]) => r.status === "failed"), "the pre-fix tree is RED in ₪ (B-300 reproduced, hermetic)",
+  ok(`ILS-OLD/${p}`, io.every(([, r]) => r.status === "failed" && /close toast \((he|en)\)/.test(r.msg)), "the pre-fix tree is RED in ₪ ON THE TOAST (B-300 reproduced, hermetic: \"—\" instead of a number)",
     io.map(([s, r]) => `${s}: ${r.msg.split("\n")[0] || "SURVIVED"}`).join(" | "));
   const i1 = ["a", "b"].map((s) => [s, v("ILS-MUT-A1", s)]);
   ok(`ILS-MUT-A1/${p}`, i1.every(([, r]) => r.status === "failed" && /close toast \((he|en)\)/.test(r.msg)), "₪: Math.round before fmtAcct ⇒ a + b RED on the toast",
