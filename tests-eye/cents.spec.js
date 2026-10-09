@@ -251,9 +251,10 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     if (derived.code !== accountCcy) {
       const covering = () => app.fx.ranges.filter((x) => x.start <= dayKey && dayKey <= x.end);
       await expect.poll(() => covering().length, { timeout: 20_000, message: `the app never received a /api/fx range answer covering ${dayKey} (answers: ${JSON.stringify(app.fx.ranges.map((x) => [x.start, x.end]))}) — no rate the spec could mirror` }).toBeGreaterThan(0);
-      // The app builds ONE table from the merged answers it holds; mirror that union.
-      const merged = Object.assign({}, ...covering().map((x) => x.rates));
-      table = buildRateTable(derived.code, accountCcy, merged, null, [dayKey]);
+      // The app's table is built from its LATEST completed load (`loadRateTable`), so mirror the
+      // latest answer whose window covers the day — ⛔ a union the app never holds.
+      const last = covering().at(-1);
+      table = buildRateTable(derived.code, accountCcy, last.rates, null, [dayKey]);
       console.log(`[K2] rate source: ${covering().length} covering answer(s) · windows ${JSON.stringify(covering().map((x) => [x.start, x.end, Object.keys(x.rates).length, x.error]))}`);
     }
     const toAcct = (v) => {
