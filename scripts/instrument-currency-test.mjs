@@ -507,7 +507,10 @@ const aggressionOf = (trades, capitalCurrency) =>
                     + (src("../src/components/DayTradesModal.jsx").match(/fmtPrice\([^)]*currencyOf\(/g) || []).length;
     // ⚠️ `:4387` הוא `fmtPrice(t.riskDollar, …)` — **סכום-בחשבון** שנכתב
     //    ב-`fmtPrice`, ולכן נשאר `currencyOf` ונספר כאן כשריד לגיטימי יחיד.
-    eq("נותר אתר מחיר-נייר אחד בלבד עם currencyOf (riskDollar)", paperLeft, 1);
+    // 🆕 הצהרת תזוזה — 09.10 (`B-300`): `1 → 0`. `riskDollar` (:5208) הוא סכום
+    //    במטבע ההון ⇒ עבר ל-`capitalCurrency` (אושר ניב 09.10). האוכלוסייה ירדה
+    //    כי האתר תוקן, ⛔ לא רוככה; ראה בלוק 23 (mutant ג).
+    eq("אפס אתרי מחיר-נייר עם currencyOf (riskDollar עבר ל-capitalCurrency, B-300)", paperLeft, 0);
     // ⚠️ מנייה עמידה-לקינון. הגרסה הקודמת השתמשה ב-`[^)]*`, שאינו יכול לחצות
     //    `Math.round((mm.pnl || 0) * 100)` ⇒ החזירה 8 במקום 10 והחמיצה אתר.
     //    כאן סופרים **מופעים** בשורות שאינן הערה, בניכוי עמודת ה-CSV.
@@ -530,7 +533,8 @@ const aggressionOf = (trades, capitalCurrency) =>
     //
     // ⚠️ המספר ⛔ **לא רוכך כדי לעבור** — הוא ירד מפני שהאתרים תוקנו, והקובץ
     //    מונה **אוכלוסייה**, ⛔ לא מקבע התנהגות שגויה. השורה הבאה היא המכנה.
-    eq("מופע סכום-בחשבון אחד נותר ב-app (riskDollar בלבד)", acctCount(app), 1);
+    // 🆕 09.10 (`B-300`): `1 → 0` — אותו אתר (`riskDollar`), אותה סיבה.
+    eq("אפס מופעי currencyOf בשורות סכום-בחשבון ב-app (B-300)", acctCount(app), 0);
     eq("⛔ אפס ב-MobileTradeCard", acctCount(card), 0);
     eq("⛔ אפס ב-DayTradesModal", acctCount(src("../src/components/DayTradesModal.jsx")), 0);
   }
@@ -856,8 +860,11 @@ const aggressionOf = (trades, capitalCurrency) =>
   console.log("  13.10 · חוזים נעולים");
   check("`:413` עדיין כותב `currencyOf(t)` (מגן על import-test:894)",
     /currencyOf\(t\),/.test(app));
-  check("מסלול הכתיבה עדיין חותם `capitalCurrency` — השקר הוא הראיה",
-    /currency: capitalCurrency,/.test(app));
+  // 🆕 09.10 (`B-300`/`B-340`): ההצהרה **התהפכה**. עד היום השורה הזו מקבעת את
+  //    השקר («חותם `capitalCurrency`» — הראיה לבאג). מאז: התווית מגיעה מ-
+  //    `manualTradeCurrency` (מטבע המחיר שהטופס תמחר בו), ⛔ לא מהעדפת החשבון.
+  check("מסלול הכתיבה ⛔ חותם `capitalCurrency` יותר (B-300)",
+    !/currency: capitalCurrency,/.test(app) && /currency: stamp\.currency,/.test(app));
 
   // ── 13.11 טהרה — המנועים ⛔ לא יודעים שקיים שער ──────────────────────────
   console.log("  13.11 · טהרה");
@@ -2371,6 +2378,63 @@ console.log("  18 · G2 · סיכון במטבע ההון");
     check("🔴 V5 · `no_capital` ⇒ ההודעה מפנה לטעינה מחדש", /טען את הדף מחדש/.test(he(m("no_capital", "he"))));
     check("🔴 V5 · `too_small` ⇒ העצה נשארת (בקרה על המודול)", /הגדל הון/.test(he(m("too_small", "he"))));
   }
+}
+
+
+// ── בלוק 23 · `B-300` + `B-340` — מטבע העסקה = מטבע המחיר, ⛔ מטבע החשבון (09.10) ──
+//
+// 🔴 **הממצא:** הטופס חתם `currency: capitalCurrency` על `entry` נקוב בנייר ⇒ הון ₪ +
+//    AAPL ⇒ `ILS` על טיקר אלפביתי ⇒ `CONTRADICTED/ils_never_measured` ⇒ `fmtAcct`
+//    מסרב ⇒ toast «רווח — נסגר בהצלחה». נמדד prod: ריצה `37768788005`.
+//    DB 09.10: 7/84 שורות `ILS`+`manual_capital`, כולן OPEN, כולן מחירי דולר (אימות ניב).
+//
+// ⚠️ ערך על המודולים האמיתיים (`accountAmount` · `fmtAccountAmount`) + צורה על הבייטים.
+//    זרוע הביקורת `K1`–`K5` חייבת להישאר ירוקה בשני העצים.
+{
+  console.log("\n23 · B-300/B-340 · מטבע השורה = מטבע המחיר");
+  const app = src("../SwingEdge_App.jsx");
+  const IC  = await import("../src/lib/instrumentCurrency.js");
+  const row = (ticker, currency, source, extra = {}) => ({ ticker, side: "LONG", entry: 100, exit: 100.56,
+    shares: 1, status: "CLOSED", date: "2026-10-08", closedAt: "2026-10-08T10:00:00Z",
+    currency, currency_source: source, ...extra });
+  const shown = (t, disp) => fmtAccountAmount(accountAmount(t, calcTradeMetrics(t).pnl, disp, null, "loading"));
+
+  // V — מה שהטופס כותב עכשיו
+  const st = IC.manualTradeCurrency?.("AAPL");
+  eq("V1 · `manualTradeCurrency(AAPL)` → USD (מטבע המחיר, ⛔ לא ההון)", st?.currency, "USD");
+  eq("V2 · ו-`currency_source` נשאר MANUAL_CAPITAL (⛔ מיגרציית CHECK)", st?.currency_source, CURRENCY_SOURCE.MANUAL_CAPITAL);
+  eq("V3 · קריפטו `BTCUSD` → USD", IC.manualTradeCurrency?.("BTCUSD")?.currency, "USD");
+  eq("V4 · מספרי (לא מאומת) → null ⇒ ⛔ שמירה", IC.manualTradeCurrency?.("1234") ?? null, null);
+  eq("V5 · טיקר ריק → null", IC.manualTradeCurrency?.("") ?? null, null);
+  // R — הצרכן האמיתי: הון ₪ + AAPL בתצוגת USD (שער לא נדרש), והשורה כפי שהטופס כותב עכשיו
+  check("R1 · הון $ + AAPL ⇒ מספר, ⛔ «—» (ביקורת)", /^\+\$0\.56$/.test(shown(row("AAPL", "USD", "manual_capital"), "USD")));
+  check("R2 · שורה חדשה (USD על AAPL) בתצוגת ₪ בלי שער ⇒ `no_table` (ממתין לשער), ⛔ `unverified_instrument`",
+    accountAmount(row("AAPL", "USD", "manual_capital"), 0.56, "ILS", null, "loading").reason === "no_table");
+  // K — שורות 7 הקיימות + הכלל הצר
+  check("K1 · `ILS`+`manual_capital` על AAPL ⇒ ASSUMED USD (7/7 השורות הקיימות)",
+    (() => { const d = deriveInstrumentCurrency(row("AAPL", "ILS", "manual_capital")); return d.state === ASSUMED && d.code === "USD"; })());
+  check("K2 · ⛔ `ILS` ללא מקור (null) נשאר CONTRADICTED",
+    deriveInstrumentCurrency(row("AAPL", "ILS", null)).state === CONTRADICTED);
+  check("K3 · ⛔ `ILS`+`account_default` נשאר CONTRADICTED (B- נפרד)",
+    deriveInstrumentCurrency(row("AAPL", "ILS", "account_default")).state === CONTRADICTED);
+  check("K4 · ⛔ `ILS`+`literal_fallback` נשאר CONTRADICTED",
+    deriveInstrumentCurrency(row("AAPL", "ILS", "literal_fallback")).state === CONTRADICTED);
+  check("K5 · מספרי נשאר AMBIGUOUS גם עם `manual_capital`",
+    deriveInstrumentCurrency(row("1234", "ILS", "manual_capital")).state === AMBIGUOUS);
+  // S — צורה על הבייטים
+  check("S1 · `handleSubmit` קורא `manualTradeCurrency(form.ticker)` ושומר כש-`null`",
+    /const stamp = manualTradeCurrency\(form\.ticker\);\s*\n\s*if \(!stamp\)/.test(app));
+  check("S2 · ⛔ `currency: capitalCurrency` אינו נכתב אף פעם (נמדד 0 מופעים)",
+    (app.match(/^\s*currency: capitalCurrency,/gm) || []).length === 0);
+  check("S3 · `riskDollar` (:5208) מודפס ב-`capitalCurrency`, ⛔ לא בתווית השמורה",
+    /fmtPrice\(t\.riskDollar, capitalCurrency\)/.test(app));
+  check("S5 · B3 (גרף «P&L לפי עסקה») נבנה מ-`stableCalcTradeMetrics`, ⛔ `calcTradeMetrics` גולמי",
+    /const bars = closedTrades\.map\(t => \(\{ t, m: stableCalcTradeMetrics\(t\) \}\)\)\.filter\(x => !x\.m\.fxUnconverted\);/.test(app)
+    && !/pnl: calcTradeMetrics\(t\)\.pnl \|\| 0 \}\)\)\}>/.test(app));
+  check("S6 · צבעי העמודות נגזרים מאותה רשימה (`bars`), ⛔ מ-`closedTrades` — אין אי-יישור אחרי סינון",
+    /\{bars\.map\(\(\{ m \}, i\) => \(\s*\n\s*<Cell key=\{i\}/.test(app));
+  check("S4 · ⛔ אין `|| capitalCurrency` על `stamp`",
+    !/stamp[^\n]*\|\|\s*capitalCurrency|stamp\?\.currency\s*\?\?/.test(app));
 }
 
 // ── SUMMARY ──────────────────────────────────────────────────────────────────

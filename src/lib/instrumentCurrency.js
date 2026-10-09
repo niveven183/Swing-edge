@@ -106,7 +106,7 @@ export const CURRENCY_SOURCE = {
   FILE_CELL:         "file_cell",         // דרגה 2 — ראיה: הקובץ הצהיר בתא ממופה
   ACCOUNT_DEFAULT:   "account_default",   // דרגה 3 — הנחה: מטבע ההון
   LITERAL_FALLBACK:  "literal_fallback",  // דרגה 4 — הנחה: הליטרל "USD"
-  MANUAL_CAPITAL:    "manual_capital",    //        — הנחה: לטופס הידני אין שדה מטבע
+  MANUAL_CAPITAL:    "manual_capital",    //        — הנחה: הטופס הידני אין לו שדה מטבע; מאז B-300 התווית = מטבע המחיר שהטופס תמחר בו (`manualTradeCurrency`), ⛔ לא מטבע ההון. השם היסטורי; ⛔ ערך חדש דורש מיגרציית CHECK
 };
 
 // שתי הדרגות שקנו את התווית בראיה. ⛔ הרשימה נגזרת מ-`CURRENCY_SOURCE`
@@ -227,13 +227,34 @@ export const deriveInstrumentCurrency = (trade, opts = {}) => {
     // 4. תווית ILS על טיקר אלפביתי היא ראיה נגד עצמה: אין מסלול שבו ILS נמדד
     //    אי-פעם (0/61), ולכן היא יכולה היה להיכתב רק מהעדפת החשבון. זו עדות
     //    על המשתמש, ⛔ לא על הנייר.
-    if (stored === "ILS") return unmeasured(CONTRADICTED, "ils_never_measured");
+    //    🔴 B-300 (09.10): ⛔ חוץ מ-`MANUAL_CAPITAL`. הטופס הידני חתם עד 09.10
+    //    `currency: capitalCurrency` על `entry` נקוב בנייר, ולכן `ILS` +
+    //    `manual_capital` הוא חותמת העדפת-חשבון — לא עדות על הנייר ולא סתירה לו.
+    //    נופל ל-5 (`ASSUMED USD`, מוצהר). נמדד 09.10: 7/7 השורות הללו מחירי דולר.
+    //    ⛔ `ILS` עם `null`/`account_default`/`literal_fallback` נשאר `CONTRADICTED`.
+    if (stored === "ILS" && trade?.currency_source !== CURRENCY_SOURCE.MANUAL_CAPITAL)
+      return unmeasured(CONTRADICTED, "ils_never_measured");
 
     // 5. אין ראיה נגד. נכנס למצרפי — וההנחה מוצהרת בממשק.
     return { code: "USD", minorUnit: 1, state: ASSUMED, reason: "no_evidence_against" };
   }
 
   return unmeasured(AMBIGUOUS, "unrecognized_ticker");
+};
+
+/**
+ * B-300/B-340 — התווית שהטופס הידני כותב לעסקה חדשה.
+ *
+ * ⚠️ זו **עובדה על המספרים בשורה** (במה `entry` תומחר: `formPaperCcy`), ⛔ לא
+ * הסק על הנייר ו-⛔ לא העדפת החשבון. הדוקטרינה בראש הקובץ ("הסק לא נשמר")
+ * נשארת: ההכרעה הזו אושרה במפורש (ניב 09.10, `DECISIONS`).
+ *
+ * `null` = נייר לא מאומת ⇒ הקורא ⛔ שומר. ⛔ אין ברירת מחדל.
+ */
+export const manualTradeCurrency = (ticker) => {
+  const d = deriveInstrumentCurrency({ ticker });
+  if (!isAggregatable(d)) return null;
+  return { currency: d.code, currency_source: CURRENCY_SOURCE.MANUAL_CAPITAL };
 };
 
 // המטבע ש**כל** נייר מאומת נקוב בו היום. ⚠️ אינו הנחה נוחה — הוא מדידה:

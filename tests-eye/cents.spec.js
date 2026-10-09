@@ -17,7 +17,12 @@
 // stop distance). The spec reads `shares` from the saved trade and picks the close delta from them
 // (DELTAS below). The expected string is `fmtMoney` (src/utils.js — the app's own formatter).
 //
-// THE POPULATION — `$` capital (Niv 08.10, DECISIONS; INCIDENTS #30). The QA row's capital is ₪,
+// 🆕 09.10 (B-300 closed): THE POPULATION is the QA row's REAL capital (₪) again — the `$` override
+// below is gone. The paper (EYEPB, alphabetic) is USD, so the toast is a CONVERSION: the expected
+// string comes from the rate the APP itself received from /api/fx (captured off the wire) through
+// the app's own `buildRateTable`/`convert` — ⛔ a hard-coded rate. It must be a number, not "—",
+// carry ₪, and the saved label must be the PAPER's currency (⛔ the capital's — B-340).
+// (Historical note, 08.10:) THE POPULATION — `$` capital (Niv 08.10, DECISIONS; INCIDENTS #30). The QA row's capital is ₪,
 // and a hand-typed alphabetic ticker under ₪ capital is `B-300`: the form stamps `ILS`,
 // `deriveInstrumentCurrency` returns `contradicted` and the toast carries NO number ("—"). K2 is
 // therefore measured on the `$` population: every context reads the settings row with
@@ -36,6 +41,7 @@ import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { login, redact } from "../tests/lib/eyeTools.js";
 import { fmtMoney } from "../src/utils.js";
+import { buildRateTable, convert } from "../src/lib/fx.js";
 import { deriveInstrumentCurrency, isAggregatable } from "../src/lib/instrumentCurrency.js";
 import { installHermetic, newStore, DUMMY_EMAIL, DUMMY_PASSWORD } from "./hermetic.js";
 import { sweep, PREFIX_ROOT, TRADE_TICKER } from "./qaRest.js";
@@ -47,7 +53,9 @@ const HAVE_CREDS = !!(QA_EMAIL && QA_PASSWORD);
 const RUN = process.env.GITHUB_RUN_ID || `local${Date.now().toString(36)}`;
 const EVIDENCE = process.env.EYE_EVIDENCE_DIR || join(process.cwd(), "eye-evidence");
 const ENTRY = 100;
-const MEASURED_CCY = "USD"; // the population K2 closes on (Niv 08.10) — see THE POPULATION above
+// B-300: the population is the QA row's REAL capital (₪) — no $ override any more. The hermetic arm
+// takes its currency from EYE_CCY (default USD ⇒ the K2 arms are byte-identical).
+const EXPECT_CCY = process.env.EYE_EXPECT_CCY || (HERMETIC ? (process.env.EYE_CCY || "USD") : "ILS");
 // The close delta is picked from the SAVED shares (position sizing decides them, and production's QA
 // capital gives a different count than the hermetic store): the first candidate whose P&L — and,
 // in a, the setup total base + P&L — prints DIFFERENTLY with and without `Math.round`. That is the
@@ -117,7 +125,7 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     const store = HERMETIC ? newStore() : null;
     if (HERMETIC) await installHermetic(ctx, store);
     if (!HERMETIC) {
-      // Read the row as a `$`-capital user (and, in en, without `lang` so the localStorage choice
+      // Read the row AS IT IS (₪ capital; in en without `lang` so the localStorage choice
       // below wins); every settings WRITE of this context is answered locally ⇒ the QA row never
       // changes. Trades are untouched (their own table, swept by ticker + notes prefix).
       await ctx.route(/\/rest\/v1\/user_settings/, async (route) => {
@@ -127,7 +135,7 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
         const body = await res.json();
         const view = (r) => {
           if (!(r && r.settings)) return r;
-          const settings = { ...r.settings, capitalCurrency: MEASURED_CCY, accountCurrency: MEASURED_CCY };
+          const settings = { ...r.settings };
           if (lang === "en") delete settings.lang;
           return { ...r, settings };
         };
@@ -137,6 +145,14 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     const page = await ctx.newPage();
     await installOverlayHandlers(page);
     if (lang) await page.addInitScript((l) => { if (location.protocol.startsWith("http")) localStorage.setItem("swingEdgeLang", l); }, lang);
+    // What the APP received from /api/fx (range answer = the per-day rates the close toast uses).
+    const fx = { range: null };
+    page.on("response", async (r) => {
+      try {
+        const u = r.url();
+        if (/\/api\/fx\?/.test(u) && /[?&]start=/.test(u) && r.ok()) fx.range = await r.json();
+      } catch { /* a response whose body is gone is not a rate; the spec fails on fx.range === null */ }
+    });
     const consoleErrors = [];
     page.on("console", (m) => { if (m.type() === "error") consoleErrors.push(redact(m.text()).slice(0, 400)); });
     page.on("pageerror", (e) => consoleErrors.push(`pageerror: ${redact(e.message).slice(0, 400)}`));
@@ -156,7 +172,7 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
         "── console errors ──", ...(consoleErrors.length ? consoleErrors : ["(none)"]),
       ].join("\n"));
     };
-    return { ctx, page, shot, onFail, prefix: `${PREFIX_ROOT}${RUN}-${info.project.name}-cents-` };
+    return { ctx, page, shot, onFail, fx, prefix: `${PREFIX_ROOT}${RUN}-${info.project.name}-cents-` };
   }
 
   // Log a trade through the real form, then close it at ENTRY + delta through the journal card.
@@ -171,7 +187,7 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     // the form stamps the trade — otherwise the trade is priced in the pre-hydration currency.
     if (!HERMETIC) {
       await expect.poll(() => page.evaluate(() => [localStorage.getItem("swingEdgeCapitalCurrency"), localStorage.getItem("swingEdgeAccountCurrency")].join("/")),
-        { timeout: 20_000, message: "the $-capital settings view never reached the app" }).toBe(`${MEASURED_CCY}/${MEASURED_CCY}`);
+        { timeout: 20_000, message: `the capital settings never reached the app (expected ${EXPECT_CCY})` }).toBe(`${EXPECT_CCY}/${EXPECT_CCY}`);
     }
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.locator('[data-tour="add-trade"]').click();
@@ -195,7 +211,15 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
       await expect(page.locator(sel), `${sel} did not take "${v}"`).toHaveValue(v);
     }
     const ctxToggle = dialog.locator("button[aria-expanded]").filter({ hasText: /הקשר העסקה|Trade Context/ });
-    if ((await ctxToggle.getAttribute("aria-expanded")) !== "true") await ctxToggle.click();
+    // The section must END expanded. A single read-then-click raced the ₪ arm's extra re-render on
+    // WebKit (CI 37927905044, iphone14·b: `#log-notes` never appeared) — the click landed while the
+    // layout moved. Asserted STATE, retried as a whole: ⛔ a value is never re-filled here, only a
+    // toggle is re-driven until the app reports `aria-expanded=true`.
+    await expect(async () => {
+      await ctxToggle.scrollIntoViewIfNeeded();
+      if ((await ctxToggle.getAttribute("aria-expanded")) !== "true") await ctxToggle.click();
+      await expect(ctxToggle).toHaveAttribute("aria-expanded", "true", { timeout: 1_500 });
+    }, "the Trade Context section never expanded").toPass({ timeout: 15_000 });
     await page.locator("#log-notes").fill(note);
     for (const [sel, v] of PRICES) await expect(page.locator(sel), `${sel} lost its value before submit`).toHaveValue(v, { timeout: 1_000 });
     const submit = page.getByRole("button", { name: /Log Trade/ });
@@ -205,15 +229,29 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     const saved = (await ours())[0];
     const accountCcy = await page.evaluate(() => localStorage.getItem("swingEdgeAccountCurrency"));
     expect(accountCcy, "the app's account currency is unreadable — the expected P&L has no currency (⛔ guessing)").toBeTruthy();
+    expect(accountCcy, "the population is not the expected capital currency").toBe(EXPECT_CCY);
     // ⛔ the stored label vs the capital (tautological — it hid B-300). The app's REAL derivation:
-    // the toast is a number only when the paper is aggregatable and, with no FX rate the spec could
-    // know, only when it IS the account currency (identity).
-    const derived = deriveInstrumentCurrency(saved);
-    expect(isAggregatable(derived) && derived.code === accountCcy,
-      `derived paper currency ${JSON.stringify(derived)} vs account ${accountCcy} — the app would refuse or convert; the expected P&L cannot be computed (B-300 when contradicted)`).toBe(true);
+    // the toast is a number only when the paper is aggregatable.
+    // The PAPER's currency comes from the TICKER alone (what the form priced entry/stop in), ⛔ from
+    // the saved row — so the pre-fix tree reaches the toast and fails THERE ("—"), as users saw it.
+    const derived = deriveInstrumentCurrency({ ticker: TRADE_TICKER });
+    expect(isAggregatable(derived), `ticker-only derivation ${JSON.stringify(derived)} is not aggregatable`).toBe(true);
     expect(Number.isInteger(saved.shares) && saved.shares > 0, `saved shares = ${saved.shares}`).toBe(true);
+    // The conversion the app will apply, from the rate the APP received (identity when paper = account).
+    const dayKey = await page.evaluate(() => { const d = new Date(), p = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; });
+    let table = null;
+    if (derived.code !== accountCcy) {
+      await expect.poll(() => app.fx.range, { timeout: 20_000, message: "the app never received a /api/fx range answer — no rate the spec could mirror" }).not.toBeNull();
+      table = buildRateTable(derived.code, accountCcy, app.fx.range.rates, null, [dayKey]);
+    }
+    const toAcct = (v) => {
+      if (derived.code === accountCcy) return v;
+      const c = convert(v, derived.code, accountCcy, table, dayKey);
+      expect(c.value, `no ${derived.code}→${accountCcy} rate for ${dayKey} in what the app received (${c.reason}) — the toast could only be "—"`).not.toBeNull();
+      return c.value;
+    };
     const exitOf = (d) => (ENTRY + d).toFixed(4);
-    const pnlOf = (d) => saved.shares * (Number(exitOf(d)) - ENTRY);
+    const pnlOf = (d) => toAcct(saved.shares * (Number(exitOf(d)) - ENTRY));
     const tells = (v) => fmtMoney(v, accountCcy) !== fmtMoney(Math.round(v), accountCcy);
     const delta = DELTAS.find((d) => tells(pnlOf(d)) && bases.every((b) => tells(b + pnlOf(d))));
     expect(delta, `no close delta in [${DELTAS}] tells rounding from truth for shares ${saved.shares} · bases [${bases}]`).toBeDefined();
@@ -221,6 +259,9 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     const pnl = pnlOf(delta);
     const shown = fmtMoney(pnl, accountCcy);
     expect(shown.endsWith(".00"), `shares ${saved.shares} × ${delta} has no cents — the trade cannot tell rounding from truth`).toBe(false);
+    // B-300 — a number, ⛔ "—", carrying the account's symbol.
+    expect(shown, "expected P&L string is a dash").not.toBe("—");
+    if (accountCcy === "ILS") expect(shown, "expected P&L string lacks ₪").toContain("₪");
     console.log(`[K2] shares ${saved.shares} · exit ${EXIT} · P&L ${shown} (rounded would be ${fmtMoney(Math.round(pnl), accountCcy)})`);
 
     await page.locator('[data-tour-tab="journal"]').click();
@@ -229,10 +270,23 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     const card = page.locator("article").filter({ hasText: TRADE_TICKER }).filter({ has: closeBtn });
     await expect(card, "exactly one open EYEPB card (ours)").toHaveCount(1, { timeout: 15_000 });
     await card.locator("button").filter({ hasText: /^\s*(סגור|Close)\s*$/ }).click();
+    // Same discipline as the entry form (prod run 37780897809): CI 37929305491 (HEAD · iphone14 · b, a
+    // `$` arm this wave did not touch) showed the Close modal still open with Exit EMPTY — the field's
+    // value was dropped. Asserted right after the fill and again before the click, so a recurrence
+    // names `#close-exit` instead of timing out on a toast. ⛔ no re-fill: a dropped value is reported
+    // (B-415), ⛔ papered over.
     await page.locator("#close-exit").fill(EXIT);
+    await expect(page.locator("#close-exit"), `#close-exit did not take "${EXIT}"`).toHaveValue(EXIT);
+    await expect(page.locator("#close-exit"), `#close-exit lost its value before Close Trade (B-415)`).toHaveValue(EXIT, { timeout: 1_000 });
     await page.getByRole("button", { name: /Close Trade/ }).click();
-    return { pnl, shown, accountCcy, shares: saved.shares };
+    return { pnl, shown, accountCcy, shares: saved.shares, savedLabel: saved.currency, paperCode: derived.code };
   }
+
+  // B-340 — asserted AFTER the toast: the saved label is the PAPER's currency (the unit of entry/stop),
+  // ⛔ the capital's. (The narrow read rule of B-300 masks a capital label at the toast, so this is
+  // the assertion that sees it.)
+  const expectPaperLabel = (r) =>
+    expect(r.savedLabel, `saved label ${r.savedLabel} must be the paper currency ${r.paperCode} (B-340), ⛔ the capital ${r.accountCcy}`).toBe(r.paperCode);
 
   // The setup row of the analytics table (B7) — its last cell is `fmt$(s.totalPnL)`.
   async function setupCell(page, setupLabel) {
@@ -258,6 +312,7 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
       await expect(page.getByRole("status").getByText(`רווח ${r.shown} נסגר בהצלחה`, { exact: false }),
         `close toast (he) did not show ${r.shown}`).toBeVisible({ timeout: 10_000 });
       await shot("a-toast");
+      expectPaperLabel(r);
 
       const card = page.locator("article").filter({ hasText: TRADE_TICKER }).filter({ hasText: r.shown });
       await expect(card.first(), `journal card does not show ${r.shown}`).toBeVisible({ timeout: 15_000 });
@@ -319,6 +374,7 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
       await expect(page.getByRole("status").getByText(`Closed with profit ${r.shown}`, { exact: false }),
         `close toast (en) did not show ${r.shown}`).toBeVisible({ timeout: 10_000 });
       await shot("b-toast");
+      expectPaperLabel(r);
       const card = page.locator("article").filter({ hasText: TRADE_TICKER }).filter({ hasText: r.shown });
       await expect(card.first(), `journal card does not show ${r.shown}`).toBeVisible({ timeout: 15_000 });
     } catch (e) {

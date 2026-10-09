@@ -995,7 +995,12 @@ const near = (name, actual, expected) => {
     fieldForHeader("Currency"), "currency");
 }
 
-// ── §2 · the manual form inherits the CAPITAL currency, forever ──────────────
+// ── §2 · the manual form's currency label ────────────────────────────────────
+// 🆕 MOVED BASELINE (09.10, B-300/B-340, Niv-approved): this contract used to say the form
+// inherits the CAPITAL currency "forever". That was the bug — `entry` is priced in the PAPER's
+// currency, so the label is now `manualTradeCurrency(ticker)` (`stamp.currency`). The two
+// guards below (no literal · no display currency) are unchanged; the first now pins the NEW
+// source and ⛔ forbids the capital.
 // No code changed here — the form is already right. This locks the contract so a
 // future refactor cannot quietly undo it. Same source-text technique as §6.
 {
@@ -1004,7 +1009,8 @@ const near = (name, actual, expected) => {
   const i = app.indexOf("const newTrade = {");
   const block = app.slice(i, i + 1400);
   check("the manual trade builder exists", i > -1, true);
-  check("manual trade inherits capitalCurrency", /currency:\s*capitalCurrency/.test(block), true);
+  check("manual trade takes its currency from manualTradeCurrency (the paper's)", /currency:\s*stamp\.currency/.test(block), true);
+  check("manual trade never inherits the CAPITAL currency (B-300)", /currency:\s*capitalCurrency/.test(block), false);
   // Catches `currency: "USD"` and `currency: 'ILS'` — a hardcoded literal.
   check("manual trade never hardcodes a currency literal", /currency:\s*["']/.test(block), false);
   // Catches the §6 failure class reappearing on the manual path.

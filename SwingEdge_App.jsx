@@ -105,7 +105,7 @@ import { convert } from "./src/lib/fx.js";
 import { resolveEquityBase } from "./src/lib/equityBase.js";
 import { deriveEquityState, equityFigure, deriveRiskState, riskFigure } from "./src/lib/equityState.js";
 import { horizonState, horizonLabel } from "./src/lib/tradeHorizon.js";
-import { deriveInstrumentCurrency, matchesCapital, isUnverified, INSTRUMENT_STATE, PAPER_BASE, CURRENCY_SOURCE } from "./src/lib/instrumentCurrency.js";
+import { deriveInstrumentCurrency, matchesCapital, isUnverified, INSTRUMENT_STATE, PAPER_BASE, manualTradeCurrency } from "./src/lib/instrumentCurrency.js";
 import { sizePosition, sizingRefusalReason, saveBlockMessage, FX_SETTLE_MS, capitalGate, submitGate } from "./src/lib/positionSizing.js";
 
 // ⚠️ קבוע מודול, ⛔ לא `[]` inline: מערך טרי בכל רינדור הוא תלות טרייה ב-
@@ -3037,6 +3037,13 @@ export default function SwingEdge() {
       toast.error(saveBlockMessage({ reason: sizingOk ? "too_small" : sizing.reason, lang, paperBase: PAPER_BASE, capitalCurrency }));
       return;
     }
+    // `B-300`/`B-340` — מטבע השורה = מטבע המחיר שהטופס תמחר בו. `null` (נייר לא
+    // מאומת) ⇒ ⛔ שמירה, ⛔ ללא `|| capitalCurrency`.
+    const stamp = manualTradeCurrency(form.ticker);
+    if (!stamp) {
+      toast.error(saveBlockMessage({ reason: "unverified_currency", lang, paperBase: PAPER_BASE, capitalCurrency }));
+      return;
+    }
     // Block geometrically invalid trades from being saved (reversed stop/target).
     const validity = validateTradeInputs(entryN, stopN, targetN, form.side);
     if (!validity.valid) {
@@ -3072,18 +3079,14 @@ export default function SwingEdge() {
       date: todayKey(),
       createdAt: new Date().toISOString(),
       side: form.side,
-      // A hand-typed trade is priced in the CAPITAL's currency by construction —
-      // the form has no currency field and posSize/risk are derived from
-      // `capital`, which is denominated in `capitalCurrency`. Stamping the
-      // DISPLAY currency here would be the split's worst failure mode: a $150
-      // entry saved as "₪150" and then converted again on the way out, so
-      // merely looking at the journal in shekels would silently rewrite it.
-      currency: capitalCurrency,
-      // ⚠️ **הנחה, ⛔ לא ראיה** — וזה בדיוק מה שהשדה אומר. הנימוק שמעל תקף,
-      // אבל הוא נשען על מבנה הטופס ⛔ ולא על משהו שנמדד בשורה עצמה: משתמש
-      // שהונו בדולרים ומקליד נייר ת"א מקבל `USD` שגוי, ובלי התעודה הזו הוא
-      // ייראה זהה ל-`USD` שקובץ הצהיר עליו. `B-129`.
-      currency_source: CURRENCY_SOURCE.MANUAL_CAPITAL,
+      // 🔴 B-300/B-340 (09.10): ⛔ לא `capitalCurrency`. `entry` נשמר גולמי במטבע
+      // ה**נייר** (`formPaperCcy` — כך תומחרה הפוזיציה), ולכן זו התווית הנכונה
+      // לשורה; ההמרה לחשבון קורית בתצוגה (`fmtAcct`/`accountAmount`). התווית
+      // הישנה (`capitalCurrency`) הפכה הון ₪ + AAPL ל-`CONTRADICTED` ⇒ toast
+      // «רווח —». אושר ניב 09.10 (`DECISIONS`): עובדה על המספרים, ⛔ הסק על הנייר.
+      // `currency_source` נשאר `MANUAL_CAPITAL` — ⛔ ערך חדש דורש מיגרציית CHECK.
+      currency: stamp.currency,
+      currency_source: stamp.currency_source,
       source: "manual",
       entry: entryN, stop: stopN, target: targetN,
       shares: effShares, status: "OPEN", exit: null,
@@ -5205,7 +5208,7 @@ export default function SwingEdge() {
     ⚠️ השומר הוא **הערך עצמו**, ⛔ לא `hasStop`: סטופ קיים ⛔ אינו מבטיח המרה.
     ⛔ ואין `|| 0` — `fmtPrice(null)` מחזיר `"$0"` (`Number(null) === 0` עובר
     את `Number.isFinite`), וסיכון לא-מדיד שמוצג כאפס הוא `R-2`. */}
-                                  <td className={`py-2 pe-4 font-bold font-mono ${rowColor}`}>{t.riskDollar != null ? `${fmtPrice(t.riskDollar, currencyOf(t))}` : "—"}</td>
+                                  <td className={`py-2 pe-4 font-bold font-mono ${rowColor}`}>{t.riskDollar != null ? `${fmtPrice(t.riskDollar, capitalCurrency)}` : "—"}</td>
                                   <td className={`py-2 pe-4 font-bold font-mono ${rowColor}`}>{t.riskPct != null ? `${t.riskPct.toFixed(2)}%` : "—"}</td>
                                   <td className="py-2 pe-4 font-mono text-slate-400">
                                     {t.rrRatio !== null ? `${t.rrRatio.toFixed(2)}:1` : "—"}
@@ -6420,21 +6423,30 @@ export default function SwingEdge() {
             {/* Per-trade P&L bars */}
             <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-6">
               <h3 className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mb-4">{t.pnlByTrade}</h3>
+              {/* 🔴 B-300 (09.10): ה-payload עבר מ-`calcTradeMetrics` הגולמי ל-`stableCalcTradeMetrics`
+                  (אותה הכרעת המרה של שאר המסך). הערך הגולמי הוא במטבע ה**נייר** והציר/הטולטיפ מדפיסים
+                  `dispCcy` ⇒ בהון ₪ עסקת $ הוצגה «₪3.74» במקום «₪12.35». עסקה שלא הומרה
+                  (`fxUnconverted`) ⛔ אינה מצוירת — אותה הכרעה כמו `generateEquityCurve`; הספירה
+                  שלה כבר מוצגת בתג ההון. ⛔ מעצב/שער חדשים. */}
+              {(() => {
+                const bars = closedTrades.map(t => ({ t, m: stableCalcTradeMetrics(t) })).filter(x => !x.m.fxUnconverted);
+                return (
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={closedTrades.map(t => ({ name: t.ticker, pnl: calcTradeMetrics(t).pnl || 0 }))}>
+                <BarChart data={bars.map(({ t, m }) => ({ name: t.ticker, pnl: m.pnl || 0 }))}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--v3-line)" />
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: "var(--v3-text-lo)" }} tickLine={false} axisLine={false} tickFormatter={(v) => fmt$0(v, dispCcy)} />
                   <Tooltip contentStyle={{ background: "var(--v3-bg-panel)", border: "1px solid var(--v3-line)", borderRadius: 10, fontSize: 11 }} formatter={v=>[fmt$(v, dispCcy),"P&L"]} />
                   <ReferenceLine y={0} stroke="var(--v3-text-lo)" />
                   <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
-                    {closedTrades.map((t, i) => {
-                      const { pnl } = calcTradeMetrics(t);
-                      return <Cell key={i} fill={pnl > 0 ? "var(--v3-accent)" : "var(--v3-loss)"} />;
-                    })}
+                    {bars.map(({ m }, i) => (
+                      <Cell key={i} fill={m.pnl > 0 ? "var(--v3-accent)" : "var(--v3-loss)"} />
+                    ))}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
+                );
+              })()}
             </div>
 
             {/* Setup breakdown — dynamic grouping from actual trade data */}

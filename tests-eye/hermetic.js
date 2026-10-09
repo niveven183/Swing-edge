@@ -42,8 +42,15 @@ export const SEED_SETTINGS = {
 
 /** One store per test — reloads inside a test see it, the next test starts clean. */
 export function newStore() {
-  return { settings: structuredClone(SEED_SETTINGS), trades: [], ocrCalls: 0 };
+  const settings = structuredClone(SEED_SETTINGS);
+  // B-300 — `EYE_CCY=ILS` seeds the population the QA row actually has (a ₪ capital). The
+  // default stays USD so every other arm is byte-identical.
+  if (process.env.EYE_CCY === "ILS") { settings.capitalCurrency = "ILS"; settings.accountCurrency = "ILS"; }
+  return { settings, trades: [], ocrCalls: 0 };
 }
+
+/** Synthetic FX answer (frankfurter shape of api/fx.js). The spec reads what the APP received, never this constant. */
+export const FX_MOCK_RATE = 3.3;
 
 const eqParam = (url, col) => {
   const v = new URL(url).searchParams.get(col);
@@ -105,6 +112,19 @@ export async function installHermetic(ctx, store) {
     }
     if (method === "GET") return json(route, 200, [], req);
     return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*" }, body: "" });
+  });
+
+  // /api/fx — ILS arm only: the build has no API behind it. Spot + range, every calendar day in the range.
+  await ctx.route(/\/api\/fx\?/, (route) => {
+    const q = new URL(route.request().url()).searchParams;
+    const base = q.get("base"), sym = q.get("symbols");
+    const start = q.get("start"), end = q.get("end");
+    if (start && end) {
+      const rates = {};
+      for (let d = new Date(`${start}T00:00:00Z`); d <= new Date(`${end}T00:00:00Z`); d = new Date(d.getTime() + 864e5)) rates[d.toISOString().slice(0, 10)] = { [sym]: FX_MOCK_RATE };
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ base, start, end, rates }) });
+    }
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ base, date: new Date().toISOString().slice(0, 10), rates: { [sym]: FX_MOCK_RATE } }) });
   });
 
   // /api/ocr is a PAID Vision call in production — the hermetic arm never makes it.

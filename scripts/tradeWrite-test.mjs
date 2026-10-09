@@ -535,8 +535,10 @@ const rowsOf = (n) => Array.from({ length: n }, (_, i) => ({ id: `id-${i}` }));
   const { readFileSync } = await import("node:fs");
   const app = readFileSync(new URL("../SwingEdge_App.jsx", import.meta.url), "utf8");
   check(29, "המסלול הידני מצהיר manual_capital ומקור manual",
-    /currency:\s*capitalCurrency,[\s\S]{0,600}?currency_source:\s*CURRENCY_SOURCE\.MANUAL_CAPITAL,\s*\n\s*source:\s*"manual",/.test(app),
-    `⛔ לא נמצא ליד currency: capitalCurrency — עסקה ידנית בלי תעודה נכתבת ` +
+    // 🆕 09.10 (B-300): התווית והתעודה מגיעות יחד מ-`manualTradeCurrency` (`stamp`); שהתעודה היא
+    // MANUAL_CAPITAL נבדק ב-`test:instrument` בלוק 23 (V2).
+    /currency:\s*stamp\.currency,\s*\n\s*currency_source:\s*stamp\.currency_source,\s*\n\s*source:\s*"manual",/.test(app),
+    `⛔ לא נמצא ליד currency: stamp.currency — עסקה ידנית בלי תעודה נכתבת ` +
       `כ-null, ו-null אומר "נכתב לפני הגל". זו תווית שקר על שורה חדשה`);
 }
 

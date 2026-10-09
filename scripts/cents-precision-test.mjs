@@ -78,7 +78,7 @@ if (argv.includes("--mutants")) {
     ["A1", "const shown = fmtAcct(closedTrade, pnl);", "const shown = fmtAcct(closedTrade, Math.round(pnl));", ["A1", "Z-A1n"]],
     ["B1", "equity: balance, ticker: t.ticker, pnl });", "equity: Math.round(balance), ticker: t.ticker, pnl });", ["B1", "Z-B1n"]],
     ["B2", "ticker: t.ticker, equity: runBalance };", "ticker: t.ticker, equity: Math.round(runBalance) };", ["B2", "Z-B2n"]],
-    ["B3", "pnl: calcTradeMetrics(t).pnl || 0 }))", "pnl: Math.round(calcTradeMetrics(t).pnl || 0) }))", ["B3", "Z-B3n", "S-B3"]],
+    ["B3", "pnl: m.pnl || 0 }))", "pnl: Math.round(m.pnl || 0) }))", ["B3", "Z-B3n", "S-B3"]],
     ["B4", "pnl: dayLookup[day]?.totalPnL || 0,", "pnl: Math.round(dayLookup[day]?.totalPnL || 0),", ["B4", "Z-B4n", "S-B4"]],
     ["B5", ".map(m => ({ ...m, pnl: m.pnl }));", ".map(m => ({ ...m, pnl: Math.round(m.pnl) }));", ["B5", "Z-B5n", "S-B5"]],
     ["B6", "totalPnL: e.totalPnL,", "totalPnL: Math.round(e.totalPnL),", ["B6", "Z-B6n", "S-B6"]],
@@ -205,7 +205,7 @@ const CLASS = [
     consumerAnchor: "toY(p.equity).toFixed(1)" },
   { id: "B3", kind: "value", state: "WAVE", consumer: fmt$, group: "trades",
     label: "P&L לפי עסקה → fmt$", line: 6424,
-    anchor: "name: t.ticker, pnl: ", env: (v) => ({ calcTradeMetrics: () => ({ pnl: v }), t: TRADE }),
+    anchor: "name: t.ticker, pnl: ", env: (v) => ({ m: { pnl: v }, t: TRADE }), // 🆕 09.10 (B-300): payload מ-`m` של `stableCalcTradeMetrics` (המרה), ⛔ `calcTradeMetrics` גולמי
     consumerAnchor: 'formatter={v=>[fmt$(v, dispCcy),"P&L"]}' },
   { id: "B4", kind: "value", state: "WAVE", consumer: fmt$, group: "weekdays",
     label: "P&L לפי יום בשבוע → fmt$", line: 6468,
