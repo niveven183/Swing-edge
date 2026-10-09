@@ -270,7 +270,14 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     const card = page.locator("article").filter({ hasText: TRADE_TICKER }).filter({ has: closeBtn });
     await expect(card, "exactly one open EYEPB card (ours)").toHaveCount(1, { timeout: 15_000 });
     await card.locator("button").filter({ hasText: /^\s*(סגור|Close)\s*$/ }).click();
+    // Same discipline as the entry form (prod run 37780897809): CI 37929305491 (HEAD · iphone14 · b, a
+    // `$` arm this wave did not touch) showed the Close modal still open with Exit EMPTY — the field's
+    // value was dropped. Asserted right after the fill and again before the click, so a recurrence
+    // names `#close-exit` instead of timing out on a toast. ⛔ no re-fill: a dropped value is reported
+    // (B-415), ⛔ papered over.
     await page.locator("#close-exit").fill(EXIT);
+    await expect(page.locator("#close-exit"), `#close-exit did not take "${EXIT}"`).toHaveValue(EXIT);
+    await expect(page.locator("#close-exit"), `#close-exit lost its value before Close Trade (B-415)`).toHaveValue(EXIT, { timeout: 1_000 });
     await page.getByRole("button", { name: /Close Trade/ }).click();
     return { pnl, shown, accountCcy, shares: saved.shares, savedLabel: saved.currency, paperCode: derived.code };
   }
