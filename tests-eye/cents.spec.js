@@ -211,7 +211,15 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
       await expect(page.locator(sel), `${sel} did not take "${v}"`).toHaveValue(v);
     }
     const ctxToggle = dialog.locator("button[aria-expanded]").filter({ hasText: /הקשר העסקה|Trade Context/ });
-    if ((await ctxToggle.getAttribute("aria-expanded")) !== "true") await ctxToggle.click();
+    // The section must END expanded. A single read-then-click raced the ₪ arm's extra re-render on
+    // WebKit (CI 37927905044, iphone14·b: `#log-notes` never appeared) — the click landed while the
+    // layout moved. Asserted STATE, retried as a whole: ⛔ a value is never re-filled here, only a
+    // toggle is re-driven until the app reports `aria-expanded=true`.
+    await expect(async () => {
+      await ctxToggle.scrollIntoViewIfNeeded();
+      if ((await ctxToggle.getAttribute("aria-expanded")) !== "true") await ctxToggle.click();
+      await expect(ctxToggle).toHaveAttribute("aria-expanded", "true", { timeout: 1_500 });
+    }, "the Trade Context section never expanded").toPass({ timeout: 15_000 });
     await page.locator("#log-notes").fill(note);
     for (const [sel, v] of PRICES) await expect(page.locator(sel), `${sel} lost its value before submit`).toHaveValue(v, { timeout: 1_000 });
     const submit = page.getByRole("button", { name: /Log Trade/ });
