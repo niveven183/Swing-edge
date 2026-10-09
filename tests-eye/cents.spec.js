@@ -146,12 +146,20 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     await installOverlayHandlers(page);
     if (lang) await page.addInitScript((l) => { if (location.protocol.startsWith("http")) localStorage.setItem("swingEdgeLang", l); }, lang);
     // What the APP received from /api/fx (range answer = the per-day rates the close toast uses).
-    const fx = { range: null };
+    // EVERY range answer is kept WITH the window it was asked for — prod run 37944572577 (the first
+    // ₪ closing run) failed `no_rate_for_day` intermittently (3 of 8 cells) while /api/fx had the
+    // day's rate: the spec took whichever range answer landed LAST, which could be one for another
+    // window (the app asks again as the journal's days change). The spec now picks the answer whose
+    // window COVERS the close day, as the app's table does.
+    const fx = { ranges: [] };
     page.on("response", async (r) => {
       try {
-        const u = r.url();
-        if (/\/api\/fx\?/.test(u) && /[?&]start=/.test(u) && r.ok()) fx.range = await r.json();
-      } catch { /* a response whose body is gone is not a rate; the spec fails on fx.range === null */ }
+        const u = new URL(r.url());
+        if (u.pathname === "/api/fx" && u.searchParams.get("start") && r.ok()) {
+          const body = await r.json();
+          fx.ranges.push({ start: u.searchParams.get("start"), end: u.searchParams.get("end"), rates: body.rates || {}, error: body.error || null });
+        }
+      } catch { /* a response whose body is gone is not a rate; the spec fails on "no covering answer" */ }
     });
     const consoleErrors = [];
     page.on("console", (m) => { if (m.type() === "error") consoleErrors.push(redact(m.text()).slice(0, 400)); });
@@ -241,8 +249,12 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     const dayKey = await page.evaluate(() => { const d = new Date(), p = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; });
     let table = null;
     if (derived.code !== accountCcy) {
-      await expect.poll(() => app.fx.range, { timeout: 20_000, message: "the app never received a /api/fx range answer — no rate the spec could mirror" }).not.toBeNull();
-      table = buildRateTable(derived.code, accountCcy, app.fx.range.rates, null, [dayKey]);
+      const covering = () => app.fx.ranges.filter((x) => x.start <= dayKey && dayKey <= x.end);
+      await expect.poll(() => covering().length, { timeout: 20_000, message: `the app never received a /api/fx range answer covering ${dayKey} (answers: ${JSON.stringify(app.fx.ranges.map((x) => [x.start, x.end]))}) — no rate the spec could mirror` }).toBeGreaterThan(0);
+      // The app builds ONE table from the merged answers it holds; mirror that union.
+      const merged = Object.assign({}, ...covering().map((x) => x.rates));
+      table = buildRateTable(derived.code, accountCcy, merged, null, [dayKey]);
+      console.log(`[K2] rate source: ${covering().length} covering answer(s) · windows ${JSON.stringify(covering().map((x) => [x.start, x.end, Object.keys(x.rates).length, x.error]))}`);
     }
     const toAcct = (v) => {
       if (derived.code === accountCcy) return v;
