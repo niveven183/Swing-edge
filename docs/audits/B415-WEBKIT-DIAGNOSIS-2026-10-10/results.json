@@ -1,0 +1,5698 @@
+{
+ "generated": "2026-10-10",
+ "engine": "Playwright 1.61.1 WebKit 26.5 (mac: webkit-2311 · linux: mcr.microsoft.com/playwright:v1.61.1-noble, arm64 via colima)",
+ "device": "devices[\"iPhone 14\"]",
+ "N": 30,
+ "note": "head = git archive 9cea2b7; norAF = same tree with `const raf = requestAnimationFrame(focusFirst);` → `const raf = 0;` in src/hooks/useModalA11y.js (scratch only). mac head·close·fill run 1 (0/30) was overwritten by a 2-trial container smoke run; the file below is run 2.",
+ "cells": [
+  {
+   "env": "linux",
+   "build": "head",
+   "field": "close",
+   "mode": "fill",
+   "N": 30,
+   "lost": 0,
+   "lostRate": "0/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 0,
+   "remounts": 0,
+   "trialsWithStrayKeys": 0,
+   "lostTrials": []
+  },
+  {
+   "env": "linux",
+   "build": "head",
+   "field": "close",
+   "mode": "fillLoaded",
+   "N": 30,
+   "lost": 7,
+   "lostRate": "7/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 7,
+   "remounts": 0,
+   "trialsWithStrayKeys": 0,
+   "lostTrials": [
+    {
+     "i": 2,
+     "final": "",
+     "remount": false,
+     "strayKeys": [],
+     "ev": [
+      {
+       "t": 2802,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2802,
+       "type": "focusin",
+       "tgt": "BUTTON",
+       "act": "BUTTON",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2825,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2825,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2859,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2859,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2887,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2887,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "i": 7,
+     "final": "",
+     "remount": false,
+     "strayKeys": [],
+     "ev": [
+      {
+       "t": 2317,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2317,
+       "type": "focusin",
+       "tgt": "BUTTON",
+       "act": "BUTTON",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2332,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2333,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2355,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2355,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2383,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2383,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "i": 8,
+     "final": "",
+     "remount": false,
+     "strayKeys": [],
+     "ev": [
+      {
+       "t": 2222,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2223,
+       "type": "focusin",
+       "tgt": "BUTTON",
+       "act": "BUTTON",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2238,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2238,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2259,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2259,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2287,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2287,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "i": 10,
+     "final": "",
+     "remount": false,
+     "strayKeys": [],
+     "ev": [
+      {
+       "t": 2109,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2109,
+       "type": "focusin",
+       "tgt": "BUTTON",
+       "act": "BUTTON",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2124,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2124,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2156,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2156,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2184,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2185,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "i": 13,
+     "final": "",
+     "remount": false,
+     "strayKeys": [],
+     "ev": [
+      {
+       "t": 2507,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2507,
+       "type": "focusin",
+       "tgt": "BUTTON",
+       "act": "BUTTON",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2525,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2525,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2551,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2551,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2581,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2581,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "i": 14,
+     "final": "",
+     "remount": false,
+     "strayKeys": [],
+     "ev": [
+      {
+       "t": 2329,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2329,
+       "type": "focusin",
+       "tgt": "BUTTON",
+       "act": "BUTTON",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2346,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2346,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2379,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2379,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2407,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2407,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "i": 15,
+     "final": "",
+     "remount": false,
+     "strayKeys": [],
+     "ev": [
+      {
+       "t": 1853,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1853,
+       "type": "focusin",
+       "tgt": "BUTTON",
+       "act": "BUTTON",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1871,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1871,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1900,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1900,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1928,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1929,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "env": "linux",
+   "build": "head",
+   "field": "close",
+   "mode": "human",
+   "N": 30,
+   "lost": 0,
+   "lostRate": "0/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 0,
+   "remounts": 0,
+   "trialsWithStrayKeys": 0,
+   "lostTrials": []
+  },
+  {
+   "env": "linux",
+   "build": "head",
+   "field": "close",
+   "mode": "rafFill",
+   "N": 30,
+   "lost": 0,
+   "lostRate": "0/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 0,
+   "remounts": 0,
+   "trialsWithStrayKeys": 0,
+   "lostTrials": []
+  },
+  {
+   "env": "linux",
+   "build": "head",
+   "field": "close",
+   "mode": "rafFillLoaded",
+   "N": 30,
+   "lost": 0,
+   "lostRate": "0/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 0,
+   "remounts": 0,
+   "trialsWithStrayKeys": 0,
+   "lostTrials": []
+  },
+  {
+   "env": "linux",
+   "build": "head",
+   "field": "close",
+   "mode": "type",
+   "N": 30,
+   "lost": 12,
+   "lostRate": "12/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 12,
+   "remounts": 0,
+   "trialsWithStrayKeys": 12,
+   "lostTrials": [
+    {
+     "i": 2,
+     "final": "1",
+     "remount": false,
+     "strayKeys": [
+      "0→BUTTON[סגור]",
+      "0→BUTTON[סגור]",
+      ".→BUTTON[סגור]",
+      "1→BUTTON[סגור]",
+      "2→BUTTON[סגור]",
+      "4→BUTTON[סגור]",
+      "7→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 2255,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2255,
+       "type": "focusin",
+       "tgt": "BUTTON",
+       "act": "BUTTON",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2271,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2271,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2291,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2291,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2293,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 2294,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 2298,
+       "type": "change",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "1"
+      },
+      {
+       "t": 2299,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "1"
+      },
+      {
+       "t": 2299,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "i": 3,
+     "final": "100.124",
+     "remount": false,
+     "strayKeys": [
+      "7→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 2227,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2227,
+       "type": "focusin",
+       "tgt": "BUTTON",
+       "act": "BUTTON",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2243,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2244,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2263,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2263,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2267,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 2267,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 2276,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 2276,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 2292,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 2293,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "100"
+      },
+      {
+       "t": 2300,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": ".",
+       "v": "100"
+      },
+      {
+       "t": 2301,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": ".",
+       "v": "100."
+      },
+      {
+       "t": 2318,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": "100."
+      },
+      {
+       "t": 2319,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": "100.1"
+      },
+      {
+       "t": 2326,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "2",
+       "v": "100.1"
+      },
+      {
+       "t": 2327,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "2",
+       "v": "100.12"
+      },
+      {
+       "t": 2330,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "4",
+       "v": "100.12"
+      },
+      {
+       "t": 2331,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "4",
+       "v": "100.124"
+      },
+      {
+       "t": 2335,
+       "type": "change",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "100.124"
+      },
+      {
+       "t": 2335,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "100.124"
+      },
+      {
+       "t": 2335,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "i": 7,
+     "final": "1",
+     "remount": false,
+     "strayKeys": [
+      "0→BUTTON[סגור]",
+      "0→BUTTON[סגור]",
+      ".→BUTTON[סגור]",
+      "1→BUTTON[סגור]",
+      "2→BUTTON[סגור]",
+      "4→BUTTON[סגור]",
+      "7→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 2815,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2821,
+       "type": "focusin",
+       "tgt": "BUTTON",
+       "act": "BUTTON",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2849,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2850,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2871,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2871,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2874,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 2875,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 2880,
+       "type": "change",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "1"
+      },
+      {
+       "t": 2880,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "1"
+      },
+      {
+       "t": 2880,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "i": 11,
+     "final": "100",
+     "remount": false,
+     "strayKeys": [
+      ".→BUTTON[סגור]",
+      "1→BUTTON[סגור]",
+      "2→BUTTON[סגור]",
+      "4→BUTTON[סגור]",
+      "7→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 2589,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2590,
+       "type": "focusin",
+       "tgt": "BUTTON",
+       "act": "BUTTON",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2605,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2606,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2664,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2665,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2667,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 2668,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 2688,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 2691,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 2697,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 2697,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "100"
+      },
+      {
+       "t": 2702,
+       "type": "change",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "100"
+      },
+      {
+       "t": 2702,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "100"
+      },
+      {
+       "t": 2703,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "i": 12,
+     "final": "10",
+     "remount": false,
+     "strayKeys": [
+      "0→BUTTON[סגור]",
+      ".→BUTTON[סגור]",
+      "1→BUTTON[סגור]",
+      "2→BUTTON[סגור]",
+      "4→BUTTON[סגור]",
+      "7→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 2370,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2370,
+       "type": "focusin",
+       "tgt": "BUTTON",
+       "act": "BUTTON",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2385,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2386,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2396,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2396,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2399,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 2400,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 2414,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 2414,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 2421,
+       "type": "change",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "10"
+      },
+      {
+       "t": 2421,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "10"
+      },
+      {
+       "t": 2421,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "i": 13,
+     "final": "1",
+     "remount": false,
+     "strayKeys": [
+      "0→BUTTON[סגור]",
+      "0→BUTTON[סגור]",
+      ".→BUTTON[סגור]",
+      "1→BUTTON[סגור]",
+      "2→BUTTON[סגור]",
+      "4→BUTTON[סגור]",
+      "7→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 2409,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2409,
+       "type": "focusin",
+       "tgt": "BUTTON",
+       "act": "BUTTON",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2436,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2436,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2459,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2459,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2462,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 2463,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 2468,
+       "type": "change",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "1"
+      },
+      {
+       "t": 2468,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "1"
+      },
+      {
+       "t": 2469,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "i": 17,
+     "final": "",
+     "remount": false,
+     "strayKeys": [
+      "1→BUTTON[סגור]",
+      "0→BUTTON[סגור]",
+      "0→BUTTON[סגור]",
+      ".→BUTTON[סגור]",
+      "1→BUTTON[סגור]",
+      "2→BUTTON[סגור]",
+      "4→BUTTON[סגור]",
+      "7→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 2405,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2405,
+       "type": "focusin",
+       "tgt": "BUTTON",
+       "act": "BUTTON",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2421,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2421,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2439,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2439,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2442,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2442,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "i": 18,
+     "final": "100",
+     "remount": false,
+     "strayKeys": [
+      ".→BUTTON[סגור]",
+      "1→BUTTON[סגור]",
+      "2→BUTTON[סגור]",
+      "4→BUTTON[סגור]",
+      "7→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 2125,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2126,
+       "type": "focusin",
+       "tgt": "BUTTON",
+       "act": "BUTTON",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2140,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2140,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2158,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2158,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2166,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 2168,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 2177,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 2178,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 2183,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 2183,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "100"
+      },
+      {
+       "t": 2189,
+       "type": "change",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "100"
+      },
+      {
+       "t": 2189,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "100"
+      },
+      {
+       "t": 2189,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "i": 20,
+     "final": "100",
+     "remount": false,
+     "strayKeys": [
+      ".→BUTTON[סגור]",
+      "1→BUTTON[סגור]",
+      "2→BUTTON[סגור]",
+      "4→BUTTON[סגור]",
+      "7→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 2108,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2108,
+       "type": "focusin",
+       "tgt": "BUTTON",
+       "act": "BUTTON",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2127,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2127,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2155,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2155,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2160,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 2161,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 2172,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 2173,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 2182,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 2183,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "100"
+      },
+      {
+       "t": 2193,
+       "type": "change",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "100"
+      },
+      {
+       "t": 2194,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "100"
+      },
+      {
+       "t": 2194,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "i": 24,
+     "final": "100.1",
+     "remount": false,
+     "strayKeys": [
+      "2→BUTTON[סגור]",
+      "4→BUTTON[סגור]",
+      "7→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 2361,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2361,
+       "type": "focusin",
+       "tgt": "BUTTON",
+       "act": "BUTTON",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2380,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2380,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2402,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2402,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2407,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 2408,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 2419,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 2420,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 2435,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 2437,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "100"
+      },
+      {
+       "t": 2449,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": ".",
+       "v": "100"
+      },
+      {
+       "t": 2449,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": ".",
+       "v": "100."
+      },
+      {
+       "t": 2469,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": "100."
+      },
+      {
+       "t": 2470,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": "100.1"
+      },
+      {
+       "t": 2475,
+       "type": "change",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "100.1"
+      },
+      {
+       "t": 2475,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "100.1"
+      },
+      {
+       "t": 2476,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "i": 26,
+     "final": "1",
+     "remount": false,
+     "strayKeys": [
+      "0→BUTTON[סגור]",
+      "0→BUTTON[סגור]",
+      ".→BUTTON[סגור]",
+      "1→BUTTON[סגור]",
+      "2→BUTTON[סגור]",
+      "4→BUTTON[סגור]",
+      "7→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 2168,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2168,
+       "type": "focusin",
+       "tgt": "BUTTON",
+       "act": "BUTTON",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2187,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2187,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2209,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2209,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2212,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 2213,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 2219,
+       "type": "change",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "1"
+      },
+      {
+       "t": 2219,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "1"
+      },
+      {
+       "t": 2219,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "i": 27,
+     "final": "100.1",
+     "remount": false,
+     "strayKeys": [
+      "2→BUTTON[סגור]",
+      "4→BUTTON[סגור]",
+      "7→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 2366,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2366,
+       "type": "focusin",
+       "tgt": "BUTTON",
+       "act": "BUTTON",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2385,
+       "type": "focusout",
+       "tgt": "BUTTON",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2385,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2401,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2401,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 2406,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 2408,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 2422,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 2423,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 2434,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 2435,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "100"
+      },
+      {
+       "t": 2440,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": ".",
+       "v": "100"
+      },
+      {
+       "t": 2441,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": ".",
+       "v": "100."
+      },
+      {
+       "t": 2450,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": "100."
+      },
+      {
+       "t": 2451,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": "100.1"
+      },
+      {
+       "t": 2455,
+       "type": "change",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "100.1"
+      },
+      {
+       "t": 2455,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "100.1"
+      },
+      {
+       "t": 2456,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "env": "linux",
+   "build": "head",
+   "field": "entry",
+   "mode": "fill",
+   "N": 30,
+   "lost": 0,
+   "lostRate": "0/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 0,
+   "remounts": 0,
+   "trialsWithStrayKeys": 0,
+   "tickerLost": 0,
+   "lostTrials": []
+  },
+  {
+   "env": "linux",
+   "build": "head",
+   "field": "entry",
+   "mode": "human",
+   "N": 30,
+   "lost": 0,
+   "lostRate": "0/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 0,
+   "remounts": 0,
+   "trialsWithStrayKeys": 0,
+   "tickerLost": 0,
+   "lostTrials": []
+  },
+  {
+   "env": "linux",
+   "build": "head",
+   "field": "entry",
+   "mode": "type",
+   "N": 30,
+   "lost": 0,
+   "lostRate": "0/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 0,
+   "remounts": 0,
+   "trialsWithStrayKeys": 0,
+   "tickerLost": 0,
+   "lostTrials": []
+  },
+  {
+   "env": "linux",
+   "build": "norAF",
+   "field": "close",
+   "mode": "fill",
+   "N": 30,
+   "lost": 0,
+   "lostRate": "0/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 0,
+   "remounts": 0,
+   "trialsWithStrayKeys": 0,
+   "lostTrials": []
+  },
+  {
+   "env": "linux",
+   "build": "norAF",
+   "field": "close",
+   "mode": "fillLoaded",
+   "N": 30,
+   "lost": 0,
+   "lostRate": "0/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 0,
+   "remounts": 0,
+   "trialsWithStrayKeys": 0,
+   "lostTrials": []
+  },
+  {
+   "env": "linux",
+   "build": "norAF",
+   "field": "close",
+   "mode": "type",
+   "N": 30,
+   "lost": 0,
+   "lostRate": "0/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 0,
+   "remounts": 0,
+   "trialsWithStrayKeys": 0,
+   "lostTrials": []
+  },
+  {
+   "env": "linux",
+   "build": "norAF",
+   "field": "entry",
+   "mode": "fill",
+   "N": 30,
+   "lost": 0,
+   "lostRate": "0/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 0,
+   "remounts": 0,
+   "trialsWithStrayKeys": 0,
+   "tickerLost": 0,
+   "lostTrials": []
+  },
+  {
+   "env": "linux",
+   "build": "norAF",
+   "field": "entry",
+   "mode": "type",
+   "N": 30,
+   "lost": 0,
+   "lostRate": "0/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 0,
+   "remounts": 0,
+   "trialsWithStrayKeys": 0,
+   "tickerLost": 0,
+   "lostTrials": []
+  },
+  {
+   "env": "mac",
+   "build": "head",
+   "field": "close",
+   "mode": "fill",
+   "N": 30,
+   "lost": 2,
+   "lostRate": "2/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 2,
+   "remounts": 0,
+   "trialsWithStrayKeys": 0,
+   "lostTrials": [
+    {
+     "i": 7,
+     "final": "",
+     "remount": false,
+     "strayKeys": [],
+     "ev": [
+      {
+       "t": 1285,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1289,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1289,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1290,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1290,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "i": 9,
+     "final": "",
+     "remount": false,
+     "strayKeys": [],
+     "ev": [
+      {
+       "t": 1379,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1384,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1384,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1385,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1386,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "env": "mac",
+   "build": "head",
+   "field": "close",
+   "mode": "fillLoaded",
+   "N": 30,
+   "lost": 1,
+   "lostRate": "1/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 1,
+   "remounts": 0,
+   "trialsWithStrayKeys": 0,
+   "lostTrials": [
+    {
+     "i": 17,
+     "final": "",
+     "remount": false,
+     "strayKeys": [],
+     "ev": [
+      {
+       "t": 1042,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1047,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1047,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1074,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1074,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "env": "mac",
+   "build": "head",
+   "field": "close",
+   "mode": "human",
+   "N": 30,
+   "lost": 0,
+   "lostRate": "0/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 0,
+   "remounts": 0,
+   "trialsWithStrayKeys": 0,
+   "lostTrials": []
+  },
+  {
+   "env": "mac",
+   "build": "head",
+   "field": "close",
+   "mode": "rafFill",
+   "N": 30,
+   "lost": 0,
+   "lostRate": "0/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 0,
+   "remounts": 0,
+   "trialsWithStrayKeys": 0,
+   "lostTrials": []
+  },
+  {
+   "env": "mac",
+   "build": "head",
+   "field": "close",
+   "mode": "rafFillLoaded",
+   "N": 30,
+   "lost": 0,
+   "lostRate": "0/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 0,
+   "remounts": 0,
+   "trialsWithStrayKeys": 0,
+   "lostTrials": []
+  },
+  {
+   "env": "mac",
+   "build": "head",
+   "field": "close",
+   "mode": "type",
+   "N": 30,
+   "lost": 7,
+   "lostRate": "7/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 7,
+   "remounts": 0,
+   "trialsWithStrayKeys": 7,
+   "lostTrials": [
+    {
+     "i": 3,
+     "final": "1",
+     "remount": false,
+     "strayKeys": [
+      "0→BUTTON[סגור]",
+      "0→BUTTON[סגור]",
+      ".→BUTTON[סגור]",
+      "1→BUTTON[סגור]",
+      "2→BUTTON[סגור]",
+      "4→BUTTON[סגור]",
+      "7→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 1318,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1323,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1323,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1325,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 1326,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 1330,
+       "type": "change",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "1"
+      },
+      {
+       "t": 1330,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "1"
+      },
+      {
+       "t": 1330,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "i": 5,
+     "final": "1",
+     "remount": false,
+     "strayKeys": [
+      "0→BUTTON[סגור]",
+      "0→BUTTON[סגור]",
+      ".→BUTTON[סגור]",
+      "1→BUTTON[סגור]",
+      "2→BUTTON[סגור]",
+      "4→BUTTON[סגור]",
+      "7→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 1182,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1187,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1187,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1189,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 1190,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 1193,
+       "type": "change",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "1"
+      },
+      {
+       "t": 1193,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "1"
+      },
+      {
+       "t": 1193,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "i": 6,
+     "final": "10",
+     "remount": false,
+     "strayKeys": [
+      "0→BUTTON[סגור]",
+      ".→BUTTON[סגור]",
+      "1→BUTTON[סגור]",
+      "2→BUTTON[סגור]",
+      "4→BUTTON[סגור]",
+      "7→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 1162,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1167,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1167,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1169,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 1169,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 1173,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 1173,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 1179,
+       "type": "change",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "10"
+      },
+      {
+       "t": 1179,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "10"
+      },
+      {
+       "t": 1179,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "i": 8,
+     "final": "10",
+     "remount": false,
+     "strayKeys": [
+      "0→BUTTON[סגור]",
+      ".→BUTTON[סגור]",
+      "1→BUTTON[סגור]",
+      "2→BUTTON[סגור]",
+      "4→BUTTON[סגור]",
+      "7→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 1166,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1170,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1170,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1171,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 1172,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 1176,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 1177,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 1181,
+       "type": "change",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "10"
+      },
+      {
+       "t": 1181,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "10"
+      },
+      {
+       "t": 1181,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "i": 14,
+     "final": "10",
+     "remount": false,
+     "strayKeys": [
+      "0→BUTTON[סגור]",
+      ".→BUTTON[סגור]",
+      "1→BUTTON[סגור]",
+      "2→BUTTON[סגור]",
+      "4→BUTTON[סגור]",
+      "7→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 1244,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1249,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1249,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1251,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 1251,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 1256,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 1256,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 1261,
+       "type": "change",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "10"
+      },
+      {
+       "t": 1261,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "10"
+      },
+      {
+       "t": 1261,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "i": 17,
+     "final": "1",
+     "remount": false,
+     "strayKeys": [
+      "0→BUTTON[סגור]",
+      "0→BUTTON[סגור]",
+      ".→BUTTON[סגור]",
+      "1→BUTTON[סגור]",
+      "2→BUTTON[סגור]",
+      "4→BUTTON[סגור]",
+      "7→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 1577,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1584,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1584,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1586,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 1587,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 1591,
+       "type": "change",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "1"
+      },
+      {
+       "t": 1591,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "1"
+      },
+      {
+       "t": 1592,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    },
+    {
+     "i": 20,
+     "final": "1",
+     "remount": false,
+     "strayKeys": [
+      "0→BUTTON[סגור]",
+      "0→BUTTON[סגור]",
+      ".→BUTTON[סגור]",
+      "1→BUTTON[סגור]",
+      "2→BUTTON[סגור]",
+      "4→BUTTON[סגור]",
+      "7→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 1368,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1374,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1375,
+       "type": "focusin",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 1376,
+       "type": "beforeinput",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 1377,
+       "type": "input",
+       "tgt": "#close-exit",
+       "act": "#close-exit",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 1383,
+       "type": "change",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "1"
+      },
+      {
+       "t": 1383,
+       "type": "focusout",
+       "tgt": "#close-exit",
+       "act": "BODY",
+       "data": null,
+       "v": "1"
+      },
+      {
+       "t": 1384,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "env": "mac",
+   "build": "head",
+   "field": "entry",
+   "mode": "fill",
+   "N": 30,
+   "lost": 0,
+   "lostRate": "0/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 0,
+   "remounts": 0,
+   "tickerLost": 0,
+   "lostTrials": []
+  },
+  {
+   "env": "mac",
+   "build": "head",
+   "field": "entry",
+   "mode": "human",
+   "N": 30,
+   "lost": 0,
+   "lostRate": "0/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 0,
+   "remounts": 0,
+   "trialsWithStrayKeys": 0,
+   "tickerLost": 0,
+   "lostTrials": []
+  },
+  {
+   "env": "mac",
+   "build": "head",
+   "field": "entry",
+   "mode": "rafFill",
+   "N": 30,
+   "lost": 0,
+   "lostRate": "0/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 0,
+   "remounts": 0,
+   "trialsWithStrayKeys": 0,
+   "tickerLost": 0,
+   "lostTrials": []
+  },
+  {
+   "env": "mac",
+   "build": "head",
+   "field": "entry",
+   "mode": "type",
+   "N": 30,
+   "lost": 0,
+   "lostRate": "0/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 0,
+   "remounts": 0,
+   "trialsWithStrayKeys": 17,
+   "tickerLost": 17,
+   "lostTrials": [
+    {
+     "i": 2,
+     "final": "100",
+     "remount": false,
+     "ticker": "E",
+     "strayKeys": [
+      "Y→BUTTON[סגור]",
+      "E→BUTTON[סגור]",
+      "P→BUTTON[סגור]",
+      "B→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 5827,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 5833,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 5833,
+       "type": "focusin",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 5834,
+       "type": "beforeinput",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": ""
+      },
+      {
+       "t": 5836,
+       "type": "input",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": "E"
+      },
+      {
+       "t": 5847,
+       "type": "change",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "E"
+      },
+      {
+       "t": 5847,
+       "type": "focusout",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "E"
+      },
+      {
+       "t": 5847,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 5864,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 5864,
+       "type": "focusin",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 5866,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 5868,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 5880,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 5881,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 5891,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 5892,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "100"
+      }
+     ]
+    },
+    {
+     "i": 9,
+     "final": "100",
+     "remount": false,
+     "ticker": "E",
+     "strayKeys": [
+      "Y→BUTTON[סגור]",
+      "E→BUTTON[סגור]",
+      "P→BUTTON[סגור]",
+      "B→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 17225,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 17230,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 17230,
+       "type": "focusin",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 17231,
+       "type": "beforeinput",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": ""
+      },
+      {
+       "t": 17232,
+       "type": "input",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": "E"
+      },
+      {
+       "t": 17241,
+       "type": "change",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "E"
+      },
+      {
+       "t": 17242,
+       "type": "focusout",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "E"
+      },
+      {
+       "t": 17242,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 17256,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 17256,
+       "type": "focusin",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 17258,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 17261,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 17271,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 17272,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 17280,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 17281,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "100"
+      }
+     ]
+    },
+    {
+     "i": 10,
+     "final": "100",
+     "remount": false,
+     "ticker": "E",
+     "strayKeys": [
+      "Y→BUTTON[סגור]",
+      "E→BUTTON[סגור]",
+      "P→BUTTON[סגור]",
+      "B→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 18657,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 18666,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 18666,
+       "type": "focusin",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 18668,
+       "type": "beforeinput",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": ""
+      },
+      {
+       "t": 18669,
+       "type": "input",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": "E"
+      },
+      {
+       "t": 18680,
+       "type": "change",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "E"
+      },
+      {
+       "t": 18680,
+       "type": "focusout",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "E"
+      },
+      {
+       "t": 18680,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 18699,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 18700,
+       "type": "focusin",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 18702,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 18703,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 18712,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 18713,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 18721,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 18722,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "100"
+      }
+     ]
+    },
+    {
+     "i": 12,
+     "final": "100",
+     "remount": false,
+     "ticker": "EY",
+     "strayKeys": [
+      "E→BUTTON[סגור]",
+      "P→BUTTON[סגור]",
+      "B→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 21725,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 21729,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 21729,
+       "type": "focusin",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 21731,
+       "type": "beforeinput",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": ""
+      },
+      {
+       "t": 21731,
+       "type": "input",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": "E"
+      },
+      {
+       "t": 21740,
+       "type": "beforeinput",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "Y",
+       "v": "E"
+      },
+      {
+       "t": 21740,
+       "type": "input",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "Y",
+       "v": "EY"
+      },
+      {
+       "t": 21754,
+       "type": "change",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "EY"
+      },
+      {
+       "t": 21754,
+       "type": "focusout",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "EY"
+      },
+      {
+       "t": 21754,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 21773,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 21773,
+       "type": "focusin",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 21776,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 21777,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 21790,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 21791,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 21797,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 21798,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "100"
+      }
+     ]
+    },
+    {
+     "i": 13,
+     "final": "100",
+     "remount": false,
+     "ticker": "E",
+     "strayKeys": [
+      "Y→BUTTON[סגור]",
+      "E→BUTTON[סגור]",
+      "P→BUTTON[סגור]",
+      "B→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 23191,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 23195,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 23196,
+       "type": "focusin",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 23197,
+       "type": "beforeinput",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": ""
+      },
+      {
+       "t": 23198,
+       "type": "input",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": "E"
+      },
+      {
+       "t": 23206,
+       "type": "change",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "E"
+      },
+      {
+       "t": 23206,
+       "type": "focusout",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "E"
+      },
+      {
+       "t": 23206,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 23216,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 23217,
+       "type": "focusin",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 23218,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 23219,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 23226,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 23227,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 23232,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 23233,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "100"
+      }
+     ]
+    },
+    {
+     "i": 17,
+     "final": "100",
+     "remount": false,
+     "ticker": "E",
+     "strayKeys": [
+      "Y→BUTTON[סגור]",
+      "E→BUTTON[סגור]",
+      "P→BUTTON[סגור]",
+      "B→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 29457,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 29464,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 29464,
+       "type": "focusin",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 29465,
+       "type": "beforeinput",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": ""
+      },
+      {
+       "t": 29466,
+       "type": "input",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": "E"
+      },
+      {
+       "t": 29475,
+       "type": "change",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "E"
+      },
+      {
+       "t": 29475,
+       "type": "focusout",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "E"
+      },
+      {
+       "t": 29475,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 29488,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 29488,
+       "type": "focusin",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 29490,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 29491,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 29499,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 29500,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 29506,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 29507,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "100"
+      }
+     ]
+    },
+    {
+     "i": 18,
+     "final": "100",
+     "remount": false,
+     "ticker": "EY",
+     "strayKeys": [
+      "E→BUTTON[סגור]",
+      "P→BUTTON[סגור]",
+      "B→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 30891,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 30896,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 30896,
+       "type": "focusin",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 30897,
+       "type": "beforeinput",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": ""
+      },
+      {
+       "t": 30898,
+       "type": "input",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": "E"
+      },
+      {
+       "t": 30906,
+       "type": "beforeinput",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "Y",
+       "v": "E"
+      },
+      {
+       "t": 30907,
+       "type": "input",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "Y",
+       "v": "EY"
+      },
+      {
+       "t": 30912,
+       "type": "change",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "EY"
+      },
+      {
+       "t": 30912,
+       "type": "focusout",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "EY"
+      },
+      {
+       "t": 30912,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 30921,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 30921,
+       "type": "focusin",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 30923,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 30924,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 30930,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 30930,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 30934,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 30935,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "100"
+      }
+     ]
+    },
+    {
+     "i": 19,
+     "final": "100",
+     "remount": false,
+     "ticker": "E",
+     "strayKeys": [
+      "Y→BUTTON[סגור]",
+      "E→BUTTON[סגור]",
+      "P→BUTTON[סגור]",
+      "B→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 32323,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 32329,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 32329,
+       "type": "focusin",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 32330,
+       "type": "beforeinput",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": ""
+      },
+      {
+       "t": 32331,
+       "type": "input",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": "E"
+      },
+      {
+       "t": 32339,
+       "type": "change",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "E"
+      },
+      {
+       "t": 32339,
+       "type": "focusout",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "E"
+      },
+      {
+       "t": 32339,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 32350,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 32350,
+       "type": "focusin",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 32352,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 32352,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 32357,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 32358,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 32363,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 32364,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "100"
+      }
+     ]
+    },
+    {
+     "i": 20,
+     "final": "100",
+     "remount": false,
+     "ticker": "EY",
+     "strayKeys": [
+      "E→BUTTON[סגור]",
+      "P→BUTTON[סגור]",
+      "B→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 33723,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 33727,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 33727,
+       "type": "focusin",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 33728,
+       "type": "beforeinput",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": ""
+      },
+      {
+       "t": 33729,
+       "type": "input",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": "E"
+      },
+      {
+       "t": 33738,
+       "type": "beforeinput",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "Y",
+       "v": "E"
+      },
+      {
+       "t": 33738,
+       "type": "input",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "Y",
+       "v": "EY"
+      },
+      {
+       "t": 33743,
+       "type": "change",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "EY"
+      },
+      {
+       "t": 33743,
+       "type": "focusout",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "EY"
+      },
+      {
+       "t": 33743,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 33753,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 33754,
+       "type": "focusin",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 33755,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 33756,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 33764,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 33764,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 33770,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 33771,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "100"
+      }
+     ]
+    },
+    {
+     "i": 21,
+     "final": "100",
+     "remount": false,
+     "ticker": "E",
+     "strayKeys": [
+      "Y→BUTTON[סגור]",
+      "E→BUTTON[סגור]",
+      "P→BUTTON[סגור]",
+      "B→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 35197,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 35204,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 35204,
+       "type": "focusin",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 35206,
+       "type": "beforeinput",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": ""
+      },
+      {
+       "t": 35207,
+       "type": "input",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": "E"
+      },
+      {
+       "t": 35215,
+       "type": "change",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "E"
+      },
+      {
+       "t": 35215,
+       "type": "focusout",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "E"
+      },
+      {
+       "t": 35215,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 35228,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 35229,
+       "type": "focusin",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 35230,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 35231,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 35236,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 35237,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 35243,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 35243,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "100"
+      }
+     ]
+    },
+    {
+     "i": 23,
+     "final": "100",
+     "remount": false,
+     "ticker": "E",
+     "strayKeys": [
+      "Y→BUTTON[סגור]",
+      "E→BUTTON[סגור]",
+      "P→BUTTON[סגור]",
+      "B→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 38326,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 38334,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 38334,
+       "type": "focusin",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 38336,
+       "type": "beforeinput",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": ""
+      },
+      {
+       "t": 38337,
+       "type": "input",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": "E"
+      },
+      {
+       "t": 38346,
+       "type": "change",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "E"
+      },
+      {
+       "t": 38346,
+       "type": "focusout",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "E"
+      },
+      {
+       "t": 38346,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 38362,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 38363,
+       "type": "focusin",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 38364,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 38365,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 38377,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 38377,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 38384,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 38384,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "100"
+      }
+     ]
+    },
+    {
+     "i": 24,
+     "final": "100",
+     "remount": false,
+     "ticker": "E",
+     "strayKeys": [
+      "Y→BUTTON[סגור]",
+      "E→BUTTON[סגור]",
+      "P→BUTTON[סגור]",
+      "B→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 39757,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 39762,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 39763,
+       "type": "focusin",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 39764,
+       "type": "beforeinput",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": ""
+      },
+      {
+       "t": 39765,
+       "type": "input",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": "E"
+      },
+      {
+       "t": 39773,
+       "type": "change",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "E"
+      },
+      {
+       "t": 39773,
+       "type": "focusout",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "E"
+      },
+      {
+       "t": 39774,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 39786,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 39786,
+       "type": "focusin",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 39788,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 39789,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 39797,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 39797,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 39803,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 39803,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "100"
+      }
+     ]
+    },
+    {
+     "i": 25,
+     "final": "100",
+     "remount": false,
+     "ticker": "E",
+     "strayKeys": [
+      "Y→BUTTON[סגור]",
+      "E→BUTTON[סגור]",
+      "P→BUTTON[סגור]",
+      "B→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 41192,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 41198,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 41198,
+       "type": "focusin",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 41200,
+       "type": "beforeinput",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": ""
+      },
+      {
+       "t": 41201,
+       "type": "input",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": "E"
+      },
+      {
+       "t": 41208,
+       "type": "change",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "E"
+      },
+      {
+       "t": 41208,
+       "type": "focusout",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "E"
+      },
+      {
+       "t": 41208,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 41228,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 41228,
+       "type": "focusin",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 41230,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 41230,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 41236,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 41237,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 41243,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 41244,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "100"
+      }
+     ]
+    },
+    {
+     "i": 26,
+     "final": "100",
+     "remount": false,
+     "ticker": "EY",
+     "strayKeys": [
+      "E→BUTTON[סגור]",
+      "P→BUTTON[סגור]",
+      "B→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 42624,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 42628,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 42628,
+       "type": "focusin",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 42630,
+       "type": "beforeinput",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": ""
+      },
+      {
+       "t": 42630,
+       "type": "input",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": "E"
+      },
+      {
+       "t": 42639,
+       "type": "beforeinput",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "Y",
+       "v": "E"
+      },
+      {
+       "t": 42639,
+       "type": "input",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "Y",
+       "v": "EY"
+      },
+      {
+       "t": 42645,
+       "type": "change",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "EY"
+      },
+      {
+       "t": 42645,
+       "type": "focusout",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "EY"
+      },
+      {
+       "t": 42645,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 42660,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 42660,
+       "type": "focusin",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 42662,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 42662,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 42667,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 42668,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 42673,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 42673,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "100"
+      }
+     ]
+    },
+    {
+     "i": 27,
+     "final": "100",
+     "remount": false,
+     "ticker": "E",
+     "strayKeys": [
+      "Y→BUTTON[סגור]",
+      "E→BUTTON[סגור]",
+      "P→BUTTON[סגור]",
+      "B→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 44060,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 44065,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 44065,
+       "type": "focusin",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 44066,
+       "type": "beforeinput",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": ""
+      },
+      {
+       "t": 44067,
+       "type": "input",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": "E"
+      },
+      {
+       "t": 44074,
+       "type": "change",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "E"
+      },
+      {
+       "t": 44075,
+       "type": "focusout",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "E"
+      },
+      {
+       "t": 44075,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 44085,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 44085,
+       "type": "focusin",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 44087,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 44087,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 44092,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 44093,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 44097,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 44097,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "100"
+      }
+     ]
+    },
+    {
+     "i": 28,
+     "final": "100",
+     "remount": false,
+     "ticker": "EY",
+     "strayKeys": [
+      "E→BUTTON[סגור]",
+      "P→BUTTON[סגור]",
+      "B→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 45656,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 45661,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 45662,
+       "type": "focusin",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 45663,
+       "type": "beforeinput",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": ""
+      },
+      {
+       "t": 45664,
+       "type": "input",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": "E"
+      },
+      {
+       "t": 45671,
+       "type": "beforeinput",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "Y",
+       "v": "E"
+      },
+      {
+       "t": 45671,
+       "type": "input",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "Y",
+       "v": "EY"
+      },
+      {
+       "t": 45676,
+       "type": "change",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "EY"
+      },
+      {
+       "t": 45676,
+       "type": "focusout",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "EY"
+      },
+      {
+       "t": 45677,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 45688,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 45688,
+       "type": "focusin",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 45690,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 45691,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 45699,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 45700,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 45706,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 45707,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "100"
+      }
+     ]
+    },
+    {
+     "i": 29,
+     "final": "100",
+     "remount": false,
+     "ticker": "E",
+     "strayKeys": [
+      "Y→BUTTON[סגור]",
+      "E→BUTTON[סגור]",
+      "P→BUTTON[סגור]",
+      "B→BUTTON[סגור]"
+     ],
+     "ev": [
+      {
+       "t": 47093,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 47099,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 47099,
+       "type": "focusin",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 47101,
+       "type": "beforeinput",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": ""
+      },
+      {
+       "t": 47101,
+       "type": "input",
+       "tgt": "#log-ticker",
+       "act": "#log-ticker",
+       "data": "E",
+       "v": "E"
+      },
+      {
+       "t": 47110,
+       "type": "change",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "E"
+      },
+      {
+       "t": 47110,
+       "type": "focusout",
+       "tgt": "#log-ticker",
+       "act": "BODY",
+       "data": null,
+       "v": "E"
+      },
+      {
+       "t": 47110,
+       "type": "focusin",
+       "tgt": "BUTTON[סגור]",
+       "act": "BUTTON[סגור]",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 47120,
+       "type": "focusout",
+       "tgt": "BUTTON[סגור]",
+       "act": "BODY",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 47120,
+       "type": "focusin",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": null,
+       "v": ""
+      },
+      {
+       "t": 47121,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": ""
+      },
+      {
+       "t": 47122,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "1",
+       "v": "1"
+      },
+      {
+       "t": 47128,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "1"
+      },
+      {
+       "t": 47128,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 47133,
+       "type": "beforeinput",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "10"
+      },
+      {
+       "t": 47133,
+       "type": "input",
+       "tgt": "#log-entry",
+       "act": "#log-entry",
+       "data": "0",
+       "v": "100"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "env": "mac",
+   "build": "norAF",
+   "field": "close",
+   "mode": "fill",
+   "N": 30,
+   "lost": 0,
+   "lostRate": "0/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 0,
+   "remounts": 0,
+   "trialsWithStrayKeys": 0,
+   "lostTrials": []
+  },
+  {
+   "env": "mac",
+   "build": "norAF",
+   "field": "close",
+   "mode": "fillLoaded",
+   "N": 30,
+   "lost": 0,
+   "lostRate": "0/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 0,
+   "remounts": 0,
+   "trialsWithStrayKeys": 0,
+   "lostTrials": []
+  },
+  {
+   "env": "mac",
+   "build": "norAF",
+   "field": "close",
+   "mode": "type",
+   "N": 30,
+   "lost": 0,
+   "lostRate": "0/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 0,
+   "remounts": 0,
+   "trialsWithStrayKeys": 0,
+   "lostTrials": []
+  },
+  {
+   "env": "mac",
+   "build": "norAF",
+   "field": "entry",
+   "mode": "type",
+   "N": 30,
+   "lost": 0,
+   "lostRate": "0/30",
+   "lostAppearedThenEmptied": 0,
+   "lostNeverAppeared": 0,
+   "remounts": 0,
+   "trialsWithStrayKeys": 0,
+   "tickerLost": 0,
+   "lostTrials": []
+  }
+ ]
+}
