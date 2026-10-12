@@ -48,7 +48,14 @@ export default function useModalA11y({ active = true, onClose } = {}) {
     // Sync focus survives StrictMode's dev remount (whose cleanup cancels the
     // rAF) and background-tab rAF throttling; the rAF is a follow-up for late layout.
     focusFirst();
-    const raf = requestAnimationFrame(focusFirst);
+    // The rAF is for LATE LAYOUT only: the sync pass found nothing focusable and fell
+    // back to the container (or focus escaped the dialog). ⛔ Re-focus when focus already
+    // sits on a control inside the dialog — that steals it from a field the user (or a
+    // test) already chose: B-415, input typed before this frame landed on the X button.
+    const raf = requestAnimationFrame(() => {
+      const a = document.activeElement;
+      if (a === container || !container.contains(a)) focusFirst();
+    });
 
     const onKeyDown = (e) => {
       if (e.key === "Escape") {
