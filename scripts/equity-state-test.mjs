@@ -270,7 +270,10 @@ ok("S4", "המספר הגדול צורך `riskFig.text` ⛔ ולא `totalRiskPct
 
       ⛔ **כשל חילוץ הוא אדום קשה ⛔ ולעולם לא דילוג** (`B-272`). ────────── */
 
-const A_RD = "fmtPrice(t.riskDollar, currencyOf(t))";
+// 🆕 12.10 (`D-118`, `5577f07`): `riskDollar` הוא `conv.value` — סכום **בהון**, ⛔ בנייר ⇒ התא
+// מעוצב במטבע ההון. העוגן הישן (`currencyOf(t)`) הפך את M6 לאדום ועצר את `verify` מאז `5577f07`
+// בלי שאיש ראה (INCIDENTS#31): ה-`&&` נעצר על `test:registry` האדום שלפניו.
+const A_RD = "fmtPrice(t.riskDollar, capitalCurrency)";
 const A_RP = "t.riskPct.toFixed(2)";
 const nRD = countOccurrences(src, A_RD);
 const nRP = countOccurrences(src, A_RP);
@@ -303,10 +306,11 @@ if (!g8 || !g9) {
   process.exit(1);
 }
 
-const cell = (expr, t) =>
-  new Function("t", "fmtPrice", "currencyOf", `return (${expr});`)(t, fmtPrice, currencyOf);
-const attempt = (expr, t) => {
-  try { return { threw: false, out: cell(expr, t) }; }
+// ⛔ ברירת מחדל ל-`capitalCurrency`: כל קריאה נוקבת את ההון במפורש.
+const cell = (expr, t, capitalCurrency) =>
+  new Function("t", "fmtPrice", "currencyOf", "capitalCurrency", `return (${expr});`)(t, fmtPrice, currencyOf, capitalCurrency);
+const attempt = (expr, t, capitalCurrency) => {
+  try { return { threw: false, out: cell(expr, t, capitalCurrency) }; }
   catch (e) { return { threw: true, out: `${e.constructor.name}: ${e.message}` }; }
 };
 
@@ -317,13 +321,13 @@ const REFUSED = {
   riskDollar: null, riskPct: null, rrRatio: null, currency: "USD",
 };
 
-const rp = attempt(EXPR_RP, REFUSED);
+const rp = attempt(EXPR_RP, REFUSED, "USD");
 ok("R1", "🔴 תא «סיכון %» — סטופ קיים ו-`riskPct=null` ⇒ ⛔ אינו זורק",
    !rp.threw, rp.threw ? `⛔ ${rp.out}` : `"${rp.out}"`);
 ok("R2", "🔴 …ומחזיר `—` ⛔ ולא מספר מומצא",
    !rp.threw && rp.out === "—", rp.threw ? "⛔ זרק" : `"${rp.out}"`);
 
-const rd = attempt(EXPR_RD, REFUSED);
+const rd = attempt(EXPR_RD, REFUSED, "USD");
 // ⚠️ `Number(null) === 0` ⇒ `Number.isFinite` **true** ⇒ `fmtPrice(null)`
 // מחזיר `"$0"`, ⛔ לא `"—"`. סיכון לא-מדיד שהוצג כאפס הוא `R-2`, ⛔ לא נוי.
 ok("R3", "🔴 תא «סיכון $» — `riskDollar=null` ⇒ ⛔ אינו מחזיר `$0`",
@@ -334,10 +338,17 @@ ok("R4", "🔴 …ומחזיר `—` — הודאה, ⛔ לא המצאה",
 /* ⚪ ביקורת חיובית. ⛔ **אינה ראיה לתיקון** — היא ירוקה בשני העצים; היא
    קיימת כדי ש-`R1`–`R4` ⛔ לא ייעברו ע"י `"—"` גורף על כל שורה. */
 const MEASURED = { ...REFUSED, riskDollar: 250, riskPct: 1.25, conv: { value: 250, reason: "converted" } };
-const mp = attempt(EXPR_RP, MEASURED), md = attempt(EXPR_RD, MEASURED);
+const mp = attempt(EXPR_RP, MEASURED, "USD"), md = attempt(EXPR_RD, MEASURED, "USD");
 const intact = !mp.threw && !md.threw && mp.out === "1.25%" && md.out === "$250";
 invariant("R5", 'שורה **מדידה** ⛔ לא זזה — הגדר ⛔ אינו `—` גורף',
   intact, `"${mp.out}" · "${md.out}"`);
+
+/* 🆕 R6 (12.10, `D-118`) — **אסרציית ערך** על הסמנטיקה שזזה: נייר `USD`, הון `ILS`,
+   `riskDollar` = `250` **בהון** (`conv.value`) ⇒ התא נושא `₪`, ⛔ `$`. הוא מה שמבדיל בין עדכון
+   עוגן לבין יישור-ציפייה: מוטנט שמחזיר את מטבע הנייר (`currencyOf(t)`) נצפה אדום כאן. */
+const mi = attempt(EXPR_RD, MEASURED, "ILS");
+ok("R6", "🔴 תא «סיכון $» במטבע **ההון** (`D-118`) — נייר USD · הון ILS ⇒ `₪250`, ⛔ `$250`",
+   !mi.threw && mi.out === fmtPrice(250, "ILS") && !String(mi.out).includes("$"), mi.threw ? `⛔ ${mi.out}` : `"${mi.out}"`);
 
 /* ── בלוק P · שלושת הצרכנים ה**שקטים** (`B-303` 3/6) ──────────────────────
    ⚠️ אלה ⛔ אינם זורקים — ולכן ⛔ אף סנטרי, ⛔ אף Error Boundary ו⛔ אף
@@ -391,5 +402,5 @@ invariant("P6", "`barWidth` של שורה לא-מדודה הוא `0` ⛔ ולא 
   pRefused.barWidth === 0 && Number.isFinite(pRefused.barWidth), `${pRefused.barWidth}`);
 
 const total = pass + fail;
-console.log(`\n${pass}/${total} ✓ · ${fail}/${total} ✗${fail ? `  אדומות: ${reds.join(" ")}` : ""}   (אוכלוסייה: 38 = 22 ערך + 16 חיווט · ⛔ 11 שערי-מטא ו-⚪ R5·P5·P6 אינם נספרים)`);
+console.log(`\n${pass}/${total} ✓ · ${fail}/${total} ✗${fail ? `  אדומות: ${reds.join(" ")}` : ""}   (אוכלוסייה: 39 = 23 ערך + 16 חיווט · ⛔ 11 שערי-מטא ו-⚪ R5·P5·P6 אינם נספרים)`);
 process.exit(fail ? 1 : 0);
