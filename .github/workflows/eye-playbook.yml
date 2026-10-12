@@ -10,7 +10,8 @@ name: Eye · Playbook images (C-064)
 #           (probe:image G1J) · hermetic arms of tests-eye/hydration.spec.js (HEAD · BEFORE ·
 #           MUT-EARLY · MUT-OVERWRITE · MUT-RESURRECT) × two devices.
 #   probe-cents — K2 · B-321 + B-325 (05.10): hermetic arms of tests-eye/cents.spec.js
-#           (HEAD · MUT-A1 · MUT-B7) × two devices. Zero secrets.
+#           (HEAD · MUT-A1 · MUT-B7 · ILS-* · MUT-EXIT/ENTRY-DROP) × two devices. Zero secrets.
+#           + probe:eye:focus — B-415 (12.10): tests-eye/modal-focus.spec.js (HEAD · MUT-RAF).
 #   prod  — both specs against https://swing-edge.com with the QA account. playbook writes
 #           e2e-c064-* setups and one EYEPB trade, then sweeps them and proves 0 residue;
 #           overlay blocks every REST write and only reads.
@@ -48,6 +49,8 @@ on:
       - 'scripts/image-store-probe.mjs'
       - 'scripts/hydration-wiring-test.mjs'
       - 'scripts/eye-cents-probe.mjs'
+      - 'scripts/eye-focus-probe.mjs'
+      - 'src/hooks/useModalA11y.js'
       - 'scripts/cents-precision-test.mjs'
       - '.github/workflows/eye-playbook.yml'
   pull_request:
@@ -73,6 +76,8 @@ on:
       - 'scripts/image-store-probe.mjs'
       - 'scripts/hydration-wiring-test.mjs'
       - 'scripts/eye-cents-probe.mjs'
+      - 'scripts/eye-focus-probe.mjs'
+      - 'src/hooks/useModalA11y.js'
       - 'scripts/cents-precision-test.mjs'
       - '.github/workflows/eye-playbook.yml'
 
@@ -178,6 +183,19 @@ jobs:
         env:
           EYE_PROJECTS: pixel7,iphone14
         run: npm run probe:eye:cents
+      - name: Red-before probe — modal focus (B-415, two devices)
+        if: ${{ always() }}
+        env:
+          EYE_PROJECTS: pixel7,iphone14
+        run: npm run probe:eye:focus
+      - name: Upload focus probe evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: eye-focus-probe-${{ github.run_id }}
+          path: eye-evidence/probe-focus/
+          retention-days: 14
+          if-no-files-found: warn
       - name: Upload cents probe evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@v7
@@ -262,5 +280,6 @@ jobs:
             !eye-evidence/probe-overlay/
             !eye-evidence/probe-sync/
             !eye-evidence/probe-cents/
+            !eye-evidence/probe-focus/
           retention-days: 14
           if-no-files-found: warn

@@ -12,6 +12,7 @@
 //   HEAD     the tree as committed                                ⇒ a + b green
 //   MUT-A1   `Math.round` back in the close toast (fmtAcct)       ⇒ a + b RED on the toast
 //   MUT-B7   `Math.round` back in the setup-table payload         ⇒ a RED on the B7 cell
+//   MUT-EXIT-DROP / MUT-ENTRY-DROP  the app drops a typed price  ⇒ a + b RED naming the field (B-415)
 //
 // ⛔ A mutant that survives means the spec is BLIND ⇒ exit 1. Mutations are applied in place,
 // matched EXACTLY ONCE (B-272), restored in a `finally`, and the restore is checked with git.
@@ -55,6 +56,9 @@ const ARMS = {
   "ILS-MUT-B3": [[APP, "const bars = closedTrades.map(t => ({ t, m: stableCalcTradeMetrics(t) }))", () => "const bars = closedTrades.map(t => ({ t, m: calcTradeMetrics(t) }))"]],
   // K2 is still caught in ₪: `Math.round` before the converting formatter.
   "ILS-MUT-A1": [[APP, "const shown = fmtAcct(closedTrade, pnl);", () => "const shown = fmtAcct(closedTrade, Math.round(pnl));"]],
+  // ── B-415 · the app DROPS a typed price: the spec must name the field, ⛔ time out on a button ──
+  "MUT-EXIT-DROP":  [[APP, "exit:e.target.value", () => 'exit:""']],
+  "MUT-ENTRY-DROP": [[APP, "setForm(f=>({...f,[key]:e.target.value}))", () => 'setForm(f=>({...f,[key]:key==="entry"?"":e.target.value}))']],
 };
 const ARM_CCY = (arm) => (arm.startsWith("ILS-") ? "ILS" : undefined);
 const appSrc = readFileSync(APP, "utf8");
@@ -113,6 +117,16 @@ for (const p of PROJECTS) {
     i1.map(([s, r]) => `${s}: ${r.msg.split("\n")[0] || "mutant SURVIVED"}`).join(" | "));
 }
 
+for (const p of PROJECTS) {
+  const v = (arm, s) => verdicts[arm][`${p}:${s}`] || { status: "missing", msg: "" };
+  const ex = ["a", "b"].map((s) => [s, v("MUT-EXIT-DROP", s)]);
+  ok(`MUT-EXIT-DROP/${p}`, ex.every(([, r]) => r.status === "failed" && /#close-exit did not take/.test(r.msg)), "Exit dropped by the app ⇒ a + b RED naming #close-exit (B-415)",
+    ex.map(([s, r]) => `${s}: ${r.msg.split("\n")[0] || "mutant SURVIVED"}`).join(" | "));
+  const en = ["a", "b"].map((s) => [s, v("MUT-ENTRY-DROP", s)]);
+  ok(`MUT-ENTRY-DROP/${p}`, en.every(([, r]) => r.status === "failed" && /#log-entry did not take/.test(r.msg)), "Entry dropped by the app ⇒ a + b RED naming #log-entry (B-415)",
+    en.map(([s, r]) => `${s}: ${r.msg.split("\n")[0] || "mutant SURVIVED"}`).join(" | "));
+}
+
 await rm(WORK, { recursive: true, force: true });
-console.log(failures ? `\n❌ eye-cents-probe: ${failures} verdict(s) failed — the spec is not proven` : "\n✅ eye-cents-probe — HEAD green · MUT-A1 red · MUT-B7 red · ILS-HEAD green · ILS-MUT-A/OLD/A1 red");
+console.log(failures ? `\n❌ eye-cents-probe: ${failures} verdict(s) failed — the spec is not proven` : "\n✅ eye-cents-probe — HEAD green · MUT-A1 red · MUT-B7 red · ILS-HEAD green · ILS-MUT-A/OLD/A1 red · MUT-EXIT/ENTRY-DROP red");
 process.exit(failures ? 1 : 0);
