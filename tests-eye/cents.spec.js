@@ -209,8 +209,24 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
       await expect.poll(() => page.evaluate(() => [localStorage.getItem("swingEdgeCapitalCurrency"), localStorage.getItem("swingEdgeAccountCurrency")].join("/")),
         { timeout: 20_000, message: `the capital settings never reached the app (expected ${EXPECT_CCY})` }).toBe(`${EXPECT_CCY}/${EXPECT_CCY}`);
     }
-    await page.evaluate(() => window.scrollTo(0, 0));
-    await page.locator('[data-tour="add-trade"]').click();
+    // The FAB HIDES on scroll-down and returns only on a scroll-up of >10px per frame (SwingEdge_App.jsx
+    // `fabVisible`). The B5 before-read scrolls the analytics tab down, and a smooth (index.css) or
+    // coalesced scroll-to-top can miss the reveal: PR #73 CI run 38444103109 (pixel7·b, ILS-HIST) clicked a
+    // FAB still `pointer-events-none` for 20s. So: instant top, and — if it is still hidden — the gesture a
+    // user makes (down, then up, a frame apart), re-driven until the FAB is actionable. ⛔ a forced click.
+    const fab = page.locator('[data-tour="add-trade"]');
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+    await expect(async () => {
+      if (await fab.evaluate((el) => el.classList.contains("pointer-events-none"))) {
+        await page.evaluate(async () => {
+          const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+          window.scrollTo({ top: Math.max(window.scrollY, 300), behavior: "instant" }); await frame();
+          window.scrollTo({ top: 0, behavior: "instant" }); await frame();
+        });
+      }
+      await expect(fab).not.toHaveClass(/pointer-events-none/, { timeout: 1_500 });
+    }, "the FAB never came back (it hides on scroll-down; a scroll-up reveals it)").toPass({ timeout: 15_000 });
+    await fab.click();
     const dialog = page.locator('[role="dialog"]').last();
     await page.locator("#log-ticker").fill(TRADE_TICKER);
     // The live quote for the ticker (250ms debounce, retried on an unknown symbol) re-renders the
