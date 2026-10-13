@@ -388,15 +388,25 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
   // `before`: the six-chart block renders only when the journal has a closed trade (`closedTrades.length
   // > 0`), so an empty journal (the hermetic store) has NO section ⇒ base 0. The AFTER read never takes
   // that path — a locator that finds nothing there is a RED, so a broken locator cannot pass as "empty".
+  // The analytics tab is OPEN once its always-present B3 heading is visible. The click is re-driven until
+  // it is: PR #72 CI run 38424339444 (pixel7·b, ILS-MUT-A) — b's first action after login is this read,
+  // and a single click landed during the hydration re-render and was lost (15s, heading never shown).
+  // ⛔ a value is re-filled here — only a navigation is re-driven, and its END STATE is asserted.
+  async function openAnalytics(page) {
+    const tab = page.locator('[data-tour-tab="analytics"]');
+    const heading = page.getByText(/^(רווח\/הפסד לפי עסקה|P&L by Trade)$/);
+    await expect(async () => {
+      if (!(await heading.isVisible())) await tab.click({ timeout: 3_000 });
+      await expect(heading).toBeVisible({ timeout: 3_000 });
+    }, "the analytics tab never rendered").toPass({ timeout: 25_000 });
+  }
+
   async function monthBar(page, { before = false } = {}) {
-    await page.locator('[data-tour-tab="analytics"]').click();
+    await openAnalytics(page);
     const month = await monthNow(page);
     const sec = chartSection(page, /^(P&L לפי חודש|P&L by Month)/);
-    if (before) {
-      // The tab has rendered once its always-present B3 heading is visible — only then is "no section" an answer.
-      await expect(page.getByText(/^(רווח\/הפסד לפי עסקה|P&L by Trade)$/), "the analytics tab never rendered").toBeVisible({ timeout: 15_000 });
-      if ((await sec.count()) === 0) return null;
-    }
+    // Only on an OPEN tab is "no section" an answer (an empty journal renders no six-chart block).
+    if (before && (await sec.count()) === 0) return null;
     await expect(sec, "the P&L-by-month chart (B5) is not on the analytics tab").toHaveCount(1, { timeout: 15_000 });
     const bars = sec.locator(".recharts-bar-rectangle");
     if ((await bars.count()) === 0) return null;
@@ -424,7 +434,7 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
 
   // B8 — one dot per closed trade; hover until a tooltip names EYEPB AND carries this trade's P&L.
   async function expectScatterDot(page, r) {
-    await page.locator('[data-tour-tab="analytics"]').click();
+    await openAnalytics(page);
     const sec = chartSection(page, /^(זמן החזקה vs P&L|Hold Time vs P&L)/);
     await expect(sec, "the hold-time scatter (B8) is not on the analytics tab").toHaveCount(1, { timeout: 15_000 });
     // The SHAPE (`path.recharts-symbols`, ~4.5px radius), ⛔ its `<g class="recharts-scatter-symbol">`
