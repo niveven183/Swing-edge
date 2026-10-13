@@ -46,7 +46,26 @@ export function newStore() {
   // B-300 — `EYE_CCY=ILS` seeds the population the QA row actually has (a ₪ capital). The
   // default stays USD so every other arm is byte-identical.
   if (process.env.EYE_CCY === "ILS") { settings.capitalCurrency = "ILS"; settings.accountCurrency = "ILS"; }
-  return { settings, trades: [], ocrCalls: 0 };
+  return { settings, trades: process.env.EYE_SEED_HISTORY === "1" ? seedHistory() : [], ocrCalls: 0 };
+}
+
+// B-045 (13.10) — `EYE_SEED_HISTORY=1` gives the hermetic journal the SHAPE production's QA journal has, which
+// an empty store cannot: production run 38434987667 went red on two things the empty store never shows —
+//   ① a non-empty Breakout base whose cent tail flips the sum: −$44.9836 ⇒ ₪−148.44588 (rate 3.3) prints
+//      "-₪148.45", yet base + ₪41.151 prints "-₪107.29" while "-₪148.45" + ₪41.151 prints "-₪107.30";
+//   ② a month worth thousands beside this month's few-₪ bar (−$3000 ⇒ ₪−9,900) ⇒ that bar is ~1px tall.
+// Both are prior months, so this month's B5 bar and the B8 dot are the spec's trade alone. ⛔ the default:
+// every other arm stays byte-identical (empty journal).
+function seedHistory() {
+  const row = (id, ticker, setup, date, closedAt, shares, entry, exit) => ({
+    id, user_id: USER_ID, ticker, side: "LONG", entry, stop: entry - 1, target: entry + 2, shares, exit,
+    status: "CLOSED", date, closedAt, setup, notes: `seed-history-${id}`, emotionAtEntry: "Neutral",
+    marketCondition: "Trending Up", entryQuality: 3, currency: "USD", currency_source: "manual_capital",
+  });
+  return [
+    row("seed-h1", "SEEDA", "Breakout", "2026-08-10", "2026-08-12T15:00:00.000Z", 10, 100, 95.50164),
+    row("seed-h2", "SEEDB", "Pullback", "2026-09-02", "2026-09-04T15:00:00.000Z", 100, 100, 70),
+  ];
 }
 
 /** Synthetic FX answer (frankfurter shape of api/fx.js). The spec reads what the APP received, never this constant. */

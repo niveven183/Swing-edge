@@ -85,6 +85,14 @@ async function installOverlayHandlers(page) {
 
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 // "+$1,234.56" / "-₪12.00" ⇒ number. ⛔ a fallback: an unparseable cell is a RED, ⛔ 0.
+// A base read BACK from the screen is rounded to the cent: the true base lies in [b − 0.005, b + 0.005], so
+// base + P&L prints as one of (at most) two adjacent cents. Production run 38434987667 (push 22d2e98): the
+// B7 base "-₪148.45" + "+₪6.14" printed "-₪142.32" while the spec demanded "-₪142.31". The set is derived from
+// the app's own formatter — ⛔ a numeric tolerance on the app's number — and an empty base (null) is exact.
+const sumStrings = (base, pnl, ccy) => base == null
+  ? [fmtMoney(pnl, ccy)]
+  : [...new Set([-0.005, 0, 0.005].map((e) => fmtMoney(base + e + pnl, ccy)))];
+const MONEY = /[+-][^\d\s]*[\d,]+\.\d{2}/;
 const parseMoney = (s) => {
   const m = /([+-])\D*([\d,]+\.\d{2})/.exec(String(s));
   if (!m) throw new Error(`not a two-decimal money string: ${JSON.stringify(s)}`);
@@ -270,7 +278,10 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     const exitOf = (d) => (ENTRY + d).toFixed(4);
     const pnlOf = (d) => toAcct(saved.shares * (Number(exitOf(d)) - ENTRY));
     const tells = (v) => fmtMoney(v, accountCcy) !== fmtMoney(Math.round(v), accountCcy);
-    const delta = DELTAS.find((d) => tells(pnlOf(d)) && bases.every((b) => tells(b + pnlOf(d))));
+    // `far`: with a non-empty base the accepted set spans ±1 cent (sumStrings), so the rounded value must sit
+    // farther than that from the true one — otherwise MUT-B7/MUT-B5 could land inside the set.
+    const far = (v) => Math.abs(v - Math.round(v)) > 0.02;
+    const delta = DELTAS.find((d) => tells(pnlOf(d)) && bases.every((b) => tells(b + pnlOf(d)) && far(b + pnlOf(d))));
     expect(delta, `no close delta in [${DELTAS}] tells rounding from truth for shares ${saved.shares} · bases [${bases}]`).toBeDefined();
     const EXIT = exitOf(delta);
     const pnl = pnlOf(delta);
@@ -401,6 +412,40 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     }, "the analytics tab never rendered").toPass({ timeout: 25_000 });
   }
 
+  // BarChart's tooltip is AXIS-triggered (the column under the pointer), ⛔ by the bar shape. Production run
+  // 38434987667 (pixel7·b): this month's +₪6.14 B5 bar beside months worth hundreds was 0.3px tall — no hover
+  // and no dispatched event on the shape could open it (B3 has the same exposure: a ~1px EYEPB bar beside a
+  // ₪-9,900 one, EYE_SEED_HISTORY). So the pointer goes where a finger does: the bar's column, at mid-height
+  // of the plot grid, on the chart surface (a large element — RTL WebKit's few-px offset cannot miss a column).
+  // Returns the first tooltip text `done` accepts, or null; the trail is logged either way.
+  async function hoverColumn(page, sec, bar, done, tag) {
+    const surface = sec.locator(".recharts-surface").first();
+    const grid = sec.locator(".recharts-cartesian-grid").first();
+    const trail = [];
+    let tip = null;
+    for (let k = 0; k < 6 && !tip; k++) {
+      try {
+        await surface.evaluate((el) => el.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" }));
+        const [bb, sb, gb] = await Promise.all([bar.boundingBox(), surface.boundingBox(), grid.boundingBox()]);
+        await surface.hover({ timeout: 4_000, position: { x: bb.x + bb.width / 2 - sb.x, y: gb.y + gb.height / 2 - sb.y } });
+      } catch (e) {
+        trail.push(`try ${k}: ${String(e.message).split("\n")[0].slice(0, 140)}`);
+        await page.waitForTimeout(400);
+        continue;
+      }
+      let text = "";
+      for (let j = 0; j < 10 && !text; j++) {
+        text = (await sec.locator(".recharts-tooltip-wrapper").innerText().catch(() => "")).trim();
+        if (!text) await page.waitForTimeout(150);
+      }
+      if (text && done(text)) { tip = text; break; }
+      trail.push(`try ${k}: column tooltip ${JSON.stringify(text.replace(/\s+/g, " ").slice(0, 80))}`);
+      if (text) break; // the column answered with another bar — the caller moves on
+    }
+    if (trail.length) console.log(`[K2] ${tag} column hover trail${tip ? " (answered after)" : ""} —\n  ${trail.join("\n  ")}`);
+    return tip;
+  }
+
   async function monthBar(page, { before = false } = {}) {
     await openAnalytics(page);
     const month = await monthNow(page);
@@ -410,25 +455,25 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     await expect(sec, "the P&L-by-month chart (B5) is not on the analytics tab").toHaveCount(1, { timeout: 15_000 });
     const bars = sec.locator(".recharts-bar-rectangle");
     if ((await bars.count()) === 0) return null;
-    const tip = await hoverUntil(page, sec, bars, () => true, "B5", { onlyLast: true });
+    const tip = await hoverColumn(page, sec, bars.last(), () => true, "B5");
     expect(tip, "the last P&L-by-month bar never showed a tooltip").not.toBeNull();
     if (!tip.includes(month)) return null;
     const line = tip.slice(tip.indexOf("P&L"));
     const count = /·\s*(\d+)\s*trade/.exec(line);
     expect(count, `B5 tooltip has no trade count: ${JSON.stringify(tip)}`).not.toBeNull();
-    return { text: line.replace(/\s+/g, " "), value: parseMoney(line), count: Number(count[1]) };
+    const money = MONEY.exec(line);
+    expect(money, `B5 tooltip has no two-decimal amount: ${JSON.stringify(tip)}`).not.toBeNull();
+    return { text: line.replace(/\s+/g, " "), money: money[0], value: parseMoney(money[0]), count: Number(count[1]) };
   }
 
-  // B5 after the close = the bar before + this trade's CONVERTED P&L, and one more trade. ±0.01 only
-  // because a non-empty base is read back from a two-decimal string (production); hermetic base is 0 ⇒
-  // exact. Raw vs converted differ ×3.3, so the tolerance cannot hide the bug.
+  // B5 after the close = the bar before + this trade's CONVERTED P&L (one of `sumStrings` — the base is read
+  // back rounded to the cent; an empty base is exact), and one more trade. Raw vs converted differ ×3.3.
   async function expectMonthBar(page, before, r) {
     const after = await monthBar(page);
     expect(after, "B5 tooltip: no bar for this month after closing a trade").not.toBeNull();
-    const want = (before?.value ?? 0) + r.pnl;
+    const want = sumStrings(before ? before.value : null, r.pnl, r.accountCcy);
     if (r.accountCcy === "ILS") expect(after.text, "B5 tooltip lacks ₪").toContain("₪");
-    expect(Math.abs(after.value - want) <= 0.01,
-      `B5 tooltip should show ${fmtMoney(want, r.accountCcy)} (before ${before?.text ?? "— no bar"} + ${r.shown}), got ${after.text}`).toBe(true);
+    expect(want, `B5 tooltip should show ${want.join(" or ")} (before ${before?.text ?? "— no bar"} + ${r.shown}), got ${after.text}`).toContain(after.money);
     expect(after.count, `B5 tooltip trade count: ${before?.count ?? 0} + 1`).toBe((before?.count ?? 0) + 1);
   }
 
@@ -473,12 +518,10 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
 
       const after = await setupCell(page, SETUP);
       expect(after, "no setup row after closing a Breakout trade").not.toBeNull();
-      const want = fmtMoney(base + r.pnl, r.accountCcy);
-      expect(after.trim(), `B7 setup cell: ${before ?? "—"} + ${r.shown} should read ${want}`).toBe(want);
+      const want = sumStrings(before == null ? null : base, r.pnl, r.accountCcy);
+      expect(want, `B7 setup cell: ${before ?? "—"} + ${r.shown} should read ${want.join(" or ")}, got ${after.trim()}`).toContain(after.trim());
 
-      // B5 + B8 BEFORE the B3 hover loop — the order test b runs them in. PR #72 CI (iphone14·a, reproduced in
-      // local WebKit): after the B3 loop the page kept moving under the B8 dot (its center alternated
-      // y 651 ↔ 367 between tries) and no hover reached it; b, which never runs the B3 loop, was green.
+      // B5 + B8 (before the B3 hover loop, the order b runs them in).
       await expectMonthBar(page, month5, r);
       await expectScatterDot(page, r);
 
@@ -487,34 +530,10 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
       const bars = sec.locator(".recharts-bar-rectangle");
       const n = await bars.count();
       expect(n, "the per-trade chart has no bars").toBeGreaterThan(0);
+      // One column per closed trade, newest last: hover each column (axis-triggered — see `hoverColumn`) until
+      // the tooltip names EYEPB. (The bar-shape hover it replaces could not reach a ~1px bar.)
       let tip = null;
-      // `locator.hover()` with retries. Its actionability check waits until the bar is stable AND
-      // receives the pointer — which covers the close toast lying over the chart on the 664px
-      // iPhone 14 viewport (measured: elementFromPoint = the toast's div). A detach while recharts
-      // re-mounts the paths during its entry animation is caught and retried. The tooltip wrapper
-      // EXISTS while empty, so its text is polled (CI 37361308589 went red on a one-shot read).
-      // ⚠️ Raw coordinates (`page.mouse.move`) were tried and went red on WebKit in CI
-      // (run 37362747806) while green on Chromium — ⛔ go back to them.
-      const trail = [];
-      for (let i = n - 1; i >= 0 && !tip; i--) {
-        for (let k = 0; k < 8 && !tip; k++) {
-          try {
-            await bars.nth(i).scrollIntoViewIfNeeded({ timeout: 3_000 });
-            await bars.nth(i).hover({ timeout: 4_000 });
-          } catch (e) {
-            trail.push(`bar ${i} try ${k}: ${String(e.message).split("\n")[0].slice(0, 120)}`);
-            await page.waitForTimeout(500);
-            continue;
-          }
-          for (let j = 0; j < 10 && !tip; j++) {
-            const text = await sec.locator(".recharts-tooltip-wrapper").innerText().catch(() => "");
-            if (text.includes(TRADE_TICKER)) tip = text;
-            else await page.waitForTimeout(150);
-          }
-          if (!tip) trail.push(`bar ${i} try ${k}: hovered, tooltip never named ${TRADE_TICKER}`);
-        }
-      }
-      if (!tip) console.log(`[K2 a] ${info.project.name}: B3 hover trail —\n  ${trail.join("\n  ")}`);
+      for (let i = n - 1; i >= 0 && !tip; i--) tip = await hoverColumn(page, sec, bars.nth(i), (t) => t.includes(TRADE_TICKER), `B3 bar ${i}`);
       expect(tip, "no bar of the per-trade chart named EYEPB on hover").not.toBeNull();
       expect(tip, `B3 tooltip should show ${r.shown}`).toContain(r.shown);
       await shot("a-analytics");
