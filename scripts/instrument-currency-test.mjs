@@ -2437,6 +2437,79 @@ console.log("  18 · G2 · סיכון במטבע ההון");
     !/stamp[^\n]*\|\|\s*capitalCurrency|stamp\?\.currency\s*\?\?/.test(app));
 }
 
+// ── בלוק 24 · `B-045` — B5 «P&L לפי חודש» + B8 «זמן החזקה מול P&L» דרך מסלול ההמרה (13.10) ──
+//
+// 🔴 **הממצא (סריקת B1–B8 של `D-118`):** שני הגרפים הוזנו `calcTradeMetrics` **גולמי**
+//    (מטבע הנייר) והודפסו ב-`fmt$(v, dispCcy)` ⇒ בהון ₪ עסקת $ הוצגה `₪3.74` במקום `₪12.35`,
+//    וחודש `₪53.74` במקום `₪177.35`. עסקה ללא שער הוצגה **גולמית** (`₪20.00` על `$20`).
+//    `docs/audits/B045-B5B8-DIAGNOSIS-2026-10-13.md`.
+//
+// ⚠️ **ערך, ⛔ צורה בלבד:** הבלוקים מחולצים לפי עוגן ו**רצים** (`new Function`) מול
+//    `calcTradeMetrics`/`holdDays`/`makeConvertingCalc` האמיתיים — השער הראשון ל-B5/B8 שמודד
+//    **מספר** (S5/S6 של B3 הן צורה). ⛔ **כשל חילוץ = אדום קשה, ⛔ דילוג** (`B-272`).
+//    ⚠️ `K1`/`K2` (יומן `$`, `identity`) חייבות להישאר ירוקות **בשני העצים**.
+//    ⚠️ `INSTRUMENT_APP` (נתיב) — **רק** כדי להריץ את הבלוק על עותק-מוטנט (ד׳/ה׳/ו׳); ⛔ בשרשרת.
+{
+  console.log("\n24 · B-045 · B5 + B8 מומרים (⛔ גולמי תחת ₪)");
+  const app = process.env.INSTRUMENT_APP ? readFileSync(process.env.INSTRUMENT_APP, "utf8") : src("../SwingEdge_App.jsx");
+  const { holdDays } = await import("../src/utils.js");
+  const { buildRateTable } = await import("../src/lib/fx.js");
+  const cut = (a, b) => {
+    const i = app.indexOf(a);
+    const n = i < 0 ? 0 : app.split(a).length - 1;
+    const j = i < 0 ? -1 : app.indexOf(b, i);
+    check(`M · עוגן «${a.slice(0, 40)}» מופיע פעם אחת (${n}) ונסגר ב-«${b.slice(0, 30)}»`, n === 1 && j > i);
+    return n === 1 && j > i ? app.slice(i, j) : null;
+  };
+  const B5 = cut("// 2. P&L by Month", "// 3. Emotion Performance");
+  const B8 = cut("// 6. Hold Time vs P&L", "const darkTooltip");
+  const B3 = cut("const bars = closedTrades.map(t => ({ t, m: stableCalcTradeMetrics(t) }))", "\n");
+  const T = (id, ticker, date, closedAt, shares, entry, exit) => ({ id, ticker, date, closedAt, side: "LONG",
+    shares, entry, exit, status: "CLOSED", currency: "USD", currency_source: "MANUAL_TICKER" });
+  const trades = [
+    T(1, "EYEPB", "2026-09-15", "2026-09-15T15:00:00", 16, 100, 100.2339), // $3.7424 ⇒ ₪12.34992
+    T(2, "AAPL",  "2026-09-18", "2026-09-20T15:00:00", 10, 200, 205),      // $50     ⇒ ₪165
+    T(3, "MSFT",  "2026-10-01", "2026-10-05T15:00:00", 5, 300, 290),       // −$50    ⇒ −₪165
+    T(4, "NVDA",  "2026-09-01", "2026-09-01T15:00:00", 2, 100, 110),       // $20 — ⛔ שער ליום (לפני הטבלה)
+  ];
+  const days = ["2026-09-15", "2026-09-20", "2026-10-05"];
+  const table = buildRateTable("USD", "ILS", Object.fromEntries(days.map((d) => [d, { ILS: 3.3 }])), null, [...days, "2026-09-01"]);
+  const ils = makeConvertingCalc(table, "ILS", "ready");
+  const usd = makeConvertingCalc(null, "USD", "identity");
+  eq("פיקסצ'ר · NVDA ⛔ ניתנת להמרה", ils(trades[3]).fxUnconverted, "no_rate_for_day");
+  const run = (body, ret, calc) => {
+    if (body == null) return null;
+    try {
+      return new Function("closedTrades", "calcTradeMetrics", "stableCalcTradeMetrics", "holdDays", `${body}\nreturn ${ret};`)(
+        trades, calcTradeMetrics, calc, holdDays);
+    } catch (e) { check(`M · הרצת הבלוק (${ret}) — ${e.message}`, false); return null; }
+  };
+  const near = (a, b) => Number.isFinite(a) && Math.abs(a - b) < 0.005;
+  const m5 = run(B5, "pnlByMonth", ils), s8 = run(B8, "holdScatter", ils), b3 = run(B3, "bars", ils);
+  const sep = m5?.find((m) => m.month === "2026-09"), oct = m5?.find((m) => m.month === "2026-10");
+  check(`V1 · B5 2026-09 = Σ המרות לעסקה ₪177.35 (got ${sep?.pnl})`, near(sep?.pnl, 12.34992 + 165));
+  check(`V2 · B5 · עסקה ללא שער ⛔ ב-pnl וגם ⛔ ב-count (2026-09 count ${sep?.count} · 2026-10 ${JSON.stringify(oct)})`,
+    sep?.count === 2 && near(oct?.pnl, -165) && oct?.count === 1);
+  const pt = (tk) => s8?.find((d) => d.ticker === tk);
+  check(`V3 · B8 EYEPB = ₪12.35 (got ${pt("EYEPB")?.pnl}) · AAPL = ₪165 (got ${pt("AAPL")?.pnl})`,
+    near(pt("EYEPB")?.pnl, 12.34992) && near(pt("AAPL")?.pnl, 165) && pt("EYEPB")?.hold === 0);
+  check(`V4 · B8 · עסקה ללא שער ⛔ מצוירת (${s8?.length} נקודות)`, s8 != null && s8.length === 3 && !pt("NVDA"));
+  const sum = (xs, f) => (xs || []).reduce((s, x) => s + f(x), 0);
+  const sB3 = sum(b3, (x) => x.m.pnl || 0);
+  check(`V5 · עקביות · Σ B5 (${sum(m5, (m) => m.pnl).toFixed(4)}) = Σ B3 (${sB3.toFixed(4)})`, b3?.length === 3 && near(sum(m5, (m) => m.pnl), sB3));
+  check(`V6 · עקביות · Σ B8 (${sum(s8, (d) => d.pnl).toFixed(4)}) = Σ B3`, b3?.length === 3 && near(sum(s8, (d) => d.pnl), sB3));
+  // ── ביקורת: יומן `$` ⇒ `identity` ⇒ אותו `m` בדיוק ⇒ byte-identical לגולמי (כולל NVDA) ──
+  const raw5 = {};
+  for (const t of trades) { const k = t.date.slice(0, 7); (raw5[k] ||= { month: k, pnl: 0, count: 0 }); raw5[k].pnl += calcTradeMetrics(t).pnl; raw5[k].count++; }
+  const u5 = run(B5, "pnlByMonth", usd), u8 = run(B8, "holdScatter", usd);
+  check("K1 · יומן $ · B5 byte-identical לגולמי", JSON.stringify(u5) === JSON.stringify(Object.values(raw5).sort((a, b) => a.month.localeCompare(b.month))));
+  check("K2 · יומן $ · B8 byte-identical לגולמי", JSON.stringify(u8) === JSON.stringify(trades.map((t) => ({ hold: holdDays(t), pnl: calcTradeMetrics(t).pnl, ticker: t.ticker }))));
+  // ── צורה: שני הבלוקים קוראים ל-`stableCalcTradeMetrics`, ⛔ `calcTradeMetrics` ערום ──
+  const raw = /(?<!stable)calcTradeMetrics\(t\)/;
+  check("S7 · B5 נבנה מ-`stableCalcTradeMetrics(t)`, ⛔ `calcTradeMetrics` גולמי", B5 != null && /stableCalcTradeMetrics\(t\)/.test(B5) && !raw.test(B5));
+  check("S8 · B8 נבנה מ-`stableCalcTradeMetrics(t)`, ⛔ `calcTradeMetrics` גולמי", B8 != null && /stableCalcTradeMetrics\(t\)/.test(B8) && !raw.test(B8));
+}
+
 // ── SUMMARY ──────────────────────────────────────────────────────────────────
 console.log("");
 if (failures) {

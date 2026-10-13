@@ -13,6 +13,7 @@
 //   MUT-A1   `Math.round` back in the close toast (fmtAcct)       ⇒ a + b RED on the toast
 //   MUT-B7   `Math.round` back in the setup-table payload         ⇒ a RED on the B7 cell
 //   MUT-EXIT-DROP / MUT-ENTRY-DROP  the app drops a typed price  ⇒ a + b RED naming the field (B-415)
+//   ILS-MUT-B5 / ILS-MUT-B8   B5 / B8 back to the raw paper P&L    ⇒ a + b RED on that chart (B-045, ₪)
 //
 // ⛔ A mutant that survives means the spec is BLIND ⇒ exit 1. Mutations are applied in place,
 // matched EXACTLY ONCE (B-272), restored in a `finally`, and the restore is checked with git.
@@ -54,6 +55,12 @@ const ARMS = {
                 [IC, 'if (stored === "ILS" && trade?.currency_source !== CURRENCY_SOURCE.MANUAL_CAPITAL)', () => 'if (stored === "ILS")']],
   // B3 back to the RAW paper P&L under the ₪ symbol (the bug the ₪ population exposed, 09.10).
   "ILS-MUT-B3": [[APP, "const bars = closedTrades.map(t => ({ t, m: stableCalcTradeMetrics(t) }))", () => "const bars = closedTrades.map(t => ({ t, m: calcTradeMetrics(t) }))"]],
+  // 🆕 13.10 (B-045): B5 / B8 back to the RAW paper P&L under ₪ (the calc line only — the payload lines
+  // that `test:cents` anchors on are untouched). The spec reads both in a AND b.
+  "ILS-MUT-B5": [[APP, "const { pnl, fxUnconverted } = stableCalcTradeMetrics(t);\n                if (pnl == null || fxUnconverted) return;",
+                  () => "const { pnl, fxUnconverted } = calcTradeMetrics(t);\n                if (pnl == null || fxUnconverted) return;"]],
+  "ILS-MUT-B8": [[APP, "const { pnl, fxUnconverted } = stableCalcTradeMetrics(t);\n                const hold = holdDays(t);",
+                  () => "const { pnl, fxUnconverted } = calcTradeMetrics(t);\n                const hold = holdDays(t);"]],
   // K2 is still caught in ₪: `Math.round` before the converting formatter.
   "ILS-MUT-A1": [[APP, "const shown = fmtAcct(closedTrade, pnl);", () => "const shown = fmtAcct(closedTrade, Math.round(pnl));"]],
   // ── B-415 · the app DROPS a typed price: the spec must name the field, ⛔ time out on a button ──
@@ -112,6 +119,11 @@ for (const p of PROJECTS) {
   const b3 = v("ILS-MUT-B3", "a");
   ok(`ILS-MUT-B3/${p}`, b3.status === "failed" && /B3 tooltip/.test(b3.msg), `₪: B3 raw under ₪ ⇒ a RED on the B3 tooltip (${b3.status})`,
     b3.msg.split("\n")[0] || "mutant SURVIVED");
+  for (const [arm, re, what] of [["ILS-MUT-B5", /B5 tooltip/, "B5 month bar"], ["ILS-MUT-B8", /B8 tooltip/, "B8 hold-scatter dot"]]) {
+    const r2 = ["a", "b"].map((s) => [s, v(arm, s)]);
+    ok(`${arm}/${p}`, r2.every(([, r]) => r.status === "failed" && re.test(r.msg)), `₪: ${what} raw under ₪ ⇒ a + b RED on the ${what} (B-045)`,
+      r2.map(([s, r]) => `${s}: ${r.msg.split("\n")[0] || "mutant SURVIVED"}`).join(" | "));
+  }
   const i1 = ["a", "b"].map((s) => [s, v("ILS-MUT-A1", s)]);
   ok(`ILS-MUT-A1/${p}`, i1.every(([, r]) => r.status === "failed" && /close toast \((he|en)\)/.test(r.msg)), "₪: Math.round before fmtAcct ⇒ a + b RED on the toast",
     i1.map(([s, r]) => `${s}: ${r.msg.split("\n")[0] || "mutant SURVIVED"}`).join(" | "));
@@ -128,5 +140,5 @@ for (const p of PROJECTS) {
 }
 
 await rm(WORK, { recursive: true, force: true });
-console.log(failures ? `\n❌ eye-cents-probe: ${failures} verdict(s) failed — the spec is not proven` : "\n✅ eye-cents-probe — HEAD green · MUT-A1 red · MUT-B7 red · ILS-HEAD green · ILS-MUT-A/OLD/A1 red · MUT-EXIT/ENTRY-DROP red");
+console.log(failures ? `\n❌ eye-cents-probe: ${failures} verdict(s) failed — the spec is not proven` : "\n✅ eye-cents-probe — HEAD green · MUT-A1 red · MUT-B7 red · ILS-HEAD green · ILS-MUT-A/OLD/B3/B5/B8/A1 red · MUT-EXIT/ENTRY-DROP red");
 process.exit(failures ? 1 : 0);

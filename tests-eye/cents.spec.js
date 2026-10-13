@@ -12,6 +12,8 @@
 //            the setup table cell (B7), the last one measured as a DIFF against the cell before
 //            the trade, so other QA trades in the same setup cannot make it pass or fail.
 //   b · en — the same close toast in English, + the journal card.
+//   🆕 13.10 (B-045): a AND b also read B5 (this month's bar, a DIFF against the bar before the trade)
+//            and B8 (the trade's dot) — both converted to the account currency, ⛔ raw paper P&L.
 //
 // THE NUMBER. The form has no shares field: shares come from position sizing (capital × risk ÷
 // stop distance). The spec reads `shares` from the saved trade and picks the close delta from them
@@ -311,7 +313,98 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     return row.locator("td").last().innerText();
   }
 
-  test("a · he — close toast · journal card · per-trade tooltip (B3) · setup cell (B7) keep their cents", async ({ browser }, info) => {
+  // 🆕 13.10 (B-045): B5 «P&L by Month» + B8 «Hold Time vs P&L» were fed the RAW paper P&L under the
+  // ₪ symbol (₪3.74 for ₪12.35). Both are measured below in he AND en.
+  //
+  // Hover a chart mark and return the first tooltip text `done` accepts. Same discipline as the B3 hover
+  // (locator.hover() with retries — ⛔ raw coordinates, red on WebKit in CI 37362747806): a detach while
+  // recharts re-mounts is retried, and the tooltip text is polled because its wrapper exists while empty.
+  async function hoverUntil(page, sec, marks, done, tag, { onlyLast = false } = {}) {
+    const n = await marks.count();
+    const trail = [];
+    for (let i = n - 1; i >= (onlyLast ? n - 1 : 0); i--) {
+      for (let k = 0; k < 4; k++) {
+        try {
+          await marks.nth(i).scrollIntoViewIfNeeded({ timeout: 3_000 });
+          await marks.nth(i).hover({ timeout: 4_000 });
+        } catch (e) {
+          trail.push(`${tag} mark ${i} try ${k}: ${String(e.message).split("\n")[0].slice(0, 120)}`);
+          await page.waitForTimeout(400);
+          continue;
+        }
+        let text = "";
+        for (let j = 0; j < 10 && !text; j++) {
+          text = (await sec.locator(".recharts-tooltip-wrapper").innerText().catch(() => "")).trim();
+          if (!text) await page.waitForTimeout(150);
+        }
+        if (text && done(text)) return text;
+        trail.push(`${tag} mark ${i} try ${k}: tooltip ${JSON.stringify(text.replace(/\s+/g, " ").slice(0, 80))}`);
+        if (text) break; // a tooltip that answered but is not ours — next mark
+      }
+    }
+    console.log(`[K2] ${tag} hover trail —\n  ${trail.join("\n  ")}`);
+    return null;
+  }
+  const chartSection = (page, title) => page.locator("h3").filter({ hasText: title })
+    .locator("xpath=ancestor::div[.//*[contains(@class,'recharts-wrapper')]][1]");
+  const monthNow = (page) => page.evaluate(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; });
+
+  // B5 — the current month's bar (the trade's entry day is today, and `pnlByMonth` buckets on `t.date`).
+  // Bars are sorted ascending ⇒ this month, when it exists, is the LAST bar. Returns null when there is
+  // no bar for this month yet. ⛔ a fallback: a tooltip that cannot be parsed is a RED.
+  // `before`: the six-chart block renders only when the journal has a closed trade (`closedTrades.length
+  // > 0`), so an empty journal (the hermetic store) has NO section ⇒ base 0. The AFTER read never takes
+  // that path — a locator that finds nothing there is a RED, so a broken locator cannot pass as "empty".
+  async function monthBar(page, { before = false } = {}) {
+    await page.locator('[data-tour-tab="analytics"]').click();
+    const month = await monthNow(page);
+    const sec = chartSection(page, /^(P&L לפי חודש|P&L by Month)/);
+    if (before) {
+      // The tab has rendered once its always-present B3 heading is visible — only then is "no section" an answer.
+      await expect(page.getByText(/^(רווח\/הפסד לפי עסקה|P&L by Trade)$/), "the analytics tab never rendered").toBeVisible({ timeout: 15_000 });
+      if ((await sec.count()) === 0) return null;
+    }
+    await expect(sec, "the P&L-by-month chart (B5) is not on the analytics tab").toHaveCount(1, { timeout: 15_000 });
+    const bars = sec.locator(".recharts-bar-rectangle");
+    if ((await bars.count()) === 0) return null;
+    const tip = await hoverUntil(page, sec, bars, () => true, "B5", { onlyLast: true });
+    expect(tip, "the last P&L-by-month bar never showed a tooltip").not.toBeNull();
+    if (!tip.includes(month)) return null;
+    const line = tip.slice(tip.indexOf("P&L"));
+    const count = /·\s*(\d+)\s*trade/.exec(line);
+    expect(count, `B5 tooltip has no trade count: ${JSON.stringify(tip)}`).not.toBeNull();
+    return { text: line.replace(/\s+/g, " "), value: parseMoney(line), count: Number(count[1]) };
+  }
+
+  // B5 after the close = the bar before + this trade's CONVERTED P&L, and one more trade. ±0.01 only
+  // because a non-empty base is read back from a two-decimal string (production); hermetic base is 0 ⇒
+  // exact. Raw vs converted differ ×3.3, so the tolerance cannot hide the bug.
+  async function expectMonthBar(page, before, r) {
+    const after = await monthBar(page);
+    expect(after, "B5 tooltip: no bar for this month after closing a trade").not.toBeNull();
+    const want = (before?.value ?? 0) + r.pnl;
+    if (r.accountCcy === "ILS") expect(after.text, "B5 tooltip lacks ₪").toContain("₪");
+    expect(Math.abs(after.value - want) <= 0.01,
+      `B5 tooltip should show ${fmtMoney(want, r.accountCcy)} (before ${before?.text ?? "— no bar"} + ${r.shown}), got ${after.text}`).toBe(true);
+    expect(after.count, `B5 tooltip trade count: ${before?.count ?? 0} + 1`).toBe((before?.count ?? 0) + 1);
+  }
+
+  // B8 — one dot per closed trade; hover until a tooltip names EYEPB AND carries this trade's P&L.
+  async function expectScatterDot(page, r) {
+    await page.locator('[data-tour-tab="analytics"]').click();
+    const sec = chartSection(page, /^(זמן החזקה vs P&L|Hold Time vs P&L)/);
+    await expect(sec, "the hold-time scatter (B8) is not on the analytics tab").toHaveCount(1, { timeout: 15_000 });
+    const dots = sec.locator(".recharts-scatter-symbol");
+    expect(await dots.count(), "the hold-time scatter has no dots").toBeGreaterThan(0);
+    const seen = [];
+    const tip = await hoverUntil(page, sec, dots, (t) => {
+      if (t.includes(TRADE_TICKER)) seen.push(t.replace(/\s+/g, " "));
+      return t.includes(TRADE_TICKER) && t.includes(r.shown);
+    }, "B8");
+    expect(tip, `B8 tooltip should show ${r.shown} on an ${TRADE_TICKER} dot (EYEPB tooltips seen: ${JSON.stringify(seen)})`).not.toBeNull();
+  }
+
+  test("a · he — close toast · journal card · per-trade tooltip (B3) · setup cell (B7) · month bar (B5) · hold scatter (B8)", async ({ browser }, info) => {
     const app = await openApp(browser, info, "he");
     const { page, shot } = app;
     try {
@@ -319,8 +412,10 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
       const before = await setupCell(page, SETUP);
       const base = before == null ? 0 : parseMoney(before);
       console.log(`[K2 a] ${info.project.name}: setup cell before = ${before ?? "(no row)"}`);
+      const month5 = await monthBar(page, { before: true });
+      console.log(`[K2 a] ${info.project.name}: B5 this month before = ${month5?.text ?? "(no bar)"}`);
 
-      const r = await logAndClose(app, `${app.prefix}a`, [base]);
+      const r = await logAndClose(app, `${app.prefix}a`, [base, month5?.value ?? 0]);
       console.log(`[K2 a] ${info.project.name}: shares ${r.shares} · expected ${r.shown} (${r.accountCcy})`);
       await expect(page.getByRole("status").getByText(`רווח ${r.shown} נסגר בהצלחה`, { exact: false }),
         `close toast (he) did not show ${r.shown}`).toBeVisible({ timeout: 10_000 });
@@ -370,6 +465,8 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
       if (!tip) console.log(`[K2 a] ${info.project.name}: B3 hover trail —\n  ${trail.join("\n  ")}`);
       expect(tip, "no bar of the per-trade chart named EYEPB on hover").not.toBeNull();
       expect(tip, `B3 tooltip should show ${r.shown}`).toContain(r.shown);
+      await expectMonthBar(page, month5, r);
+      await expectScatterDot(page, r);
       await shot("a-analytics");
     } catch (e) {
       await app.onFail("a");
@@ -379,17 +476,22 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     }
   });
 
-  test("b · en — close toast · journal card keep their cents", async ({ browser }, info) => {
+  test("b · en — close toast · journal card · month bar (B5) · hold scatter (B8)", async ({ browser }, info) => {
     const app = await openApp(browser, info, "en");
     const { page, shot } = app;
     try {
-      const r = await logAndClose(app, `${app.prefix}b`);
+      const month5 = await monthBar(page, { before: true });
+      console.log(`[K2 b] ${info.project.name}: B5 this month before = ${month5?.text ?? "(no bar)"}`);
+      const r = await logAndClose(app, `${app.prefix}b`, [month5?.value ?? 0]);
       await expect(page.getByRole("status").getByText(`Closed with profit ${r.shown}`, { exact: false }),
         `close toast (en) did not show ${r.shown}`).toBeVisible({ timeout: 10_000 });
       await shot("b-toast");
       expectPaperLabel(r);
       const card = page.locator("article").filter({ hasText: TRADE_TICKER }).filter({ hasText: r.shown });
       await expect(card.first(), `journal card does not show ${r.shown}`).toBeVisible({ timeout: 15_000 });
+      await expectMonthBar(page, month5, r);
+      await expectScatterDot(page, r);
+      await shot("b-analytics");
     } catch (e) {
       await app.onFail("b");
       throw e;
