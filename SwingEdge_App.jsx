@@ -6685,12 +6685,17 @@ export default function SwingEdge() {
               });
 
               // 2. P&L by Month
+              // 🔴 B-045 (13.10): the calc moved from the raw `calcTradeMetrics` (paper currency) to
+              // `stableCalcTradeMetrics` — the same conversion decision as B3 and the rest of the screen.
+              // The tooltip prints `dispCcy`, so in ₪ capital a $ month showed «₪53.74» for «₪177.35».
+              // A trade that was not converted (`fxUnconverted`) is ⛔ summed and ⛔ counted — a count
+              // that includes a skipped trade is a false denominator. Its count is already on the capital tag.
               const monthMap = {};
               closedTrades.forEach(t => {
                 const d = t.date;
                 if (!d) return;
-                const { pnl } = calcTradeMetrics(t);
-                if (pnl == null) return;
+                const { pnl, fxUnconverted } = stableCalcTradeMetrics(t);
+                if (pnl == null || fxUnconverted) return;
                 const key = d.slice(0, 7); // YYYY-MM
                 if (!monthMap[key]) monthMap[key] = { month: key, pnl: 0, count: 0 };
                 monthMap[key].pnl += pnl;
@@ -6731,10 +6736,12 @@ export default function SwingEdge() {
               })).sort((a, b) => b.totalPnL - a.totalPnL);
 
               // 6. Hold Time vs P&L
+              // 🔴 B-045 (13.10): same as B5 — converted P&L (`stableCalcTradeMetrics`), ⛔ raw paper P&L
+              // under the ₪ symbol («₪3.74» for «₪12.35»). A trade that was not converted is ⛔ drawn.
               const holdScatter = closedTrades.map(t => {
-                const { pnl } = calcTradeMetrics(t);
+                const { pnl, fxUnconverted } = stableCalcTradeMetrics(t);
                 const hold = holdDays(t);
-                if (pnl == null || hold == null) return null;
+                if (pnl == null || fxUnconverted || hold == null) return null;
                 return { hold, pnl: pnl, ticker: t.ticker };
               }).filter(Boolean);
 
