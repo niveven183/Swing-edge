@@ -215,18 +215,20 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     // FAB still `pointer-events-none` for 20s. So: instant top, and — if it is still hidden — the gesture a
     // user makes (down, then up, a frame apart), re-driven until the FAB is actionable. ⛔ a forced click.
     const fab = page.locator('[data-tour="add-trade"]');
-    await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+    await page.evaluate(() => window.scrollTo({ left: 0, top: 0, behavior: "instant" }));
     await expect(async () => {
       if (await fab.evaluate((el) => el.classList.contains("pointer-events-none"))) {
         await page.evaluate(async () => {
           const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-          window.scrollTo({ top: Math.max(window.scrollY, 300), behavior: "instant" }); await frame();
-          window.scrollTo({ top: 0, behavior: "instant" }); await frame();
+          window.scrollTo({ left: 0, top: Math.max(window.scrollY, 300), behavior: "instant" }); await frame();
+          window.scrollTo({ left: 0, top: 0, behavior: "instant" }); await frame();
         });
       }
       await expect(fab).not.toHaveClass(/pointer-events-none/, { timeout: 1_500 });
     }, "the FAB never came back (it hides on scroll-down; a scroll-up reveals it)").toPass({ timeout: 15_000 });
-    await fab.click();
+    const pan = await page.evaluate(() => `scrollX ${window.scrollX} · visualViewport.offsetLeft ${window.visualViewport?.offsetLeft} · scrollWidth ${document.documentElement.scrollWidth}/${document.documentElement.clientWidth}`);
+    console.log(`[K2] before the FAB click: ${pan}`);
+    await fab.click({ timeout: 10_000 }).catch((e) => { throw new Error(`the FAB click did not land (${pan}): ${String(e.message).split("\n")[0]}`); });
     const dialog = page.locator('[role="dialog"]').last();
     await page.locator("#log-ticker").fill(TRADE_TICKER);
     // The live quote for the ticker (250ms debounce, retried on an unknown symbol) re-renders the
@@ -357,7 +359,7 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
           // Vertical CENTER (away from the bottom edge, where the only B8 dot sat in PR #72 CI run 38358872939),
           // `inline: "nearest"` — ⛔ a horizontal pan. (The iphone14·a red itself is the visual-viewport offset
           // handled in the fallback below; ⛔ an overlay — the hit test returned the dot.)
-          await marks.nth(i).evaluate((el) => el.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" }));
+          await centerY(marks.nth(i));
           await marks.nth(i).hover({ timeout: 4_000 });
         } catch (e) {
           const lines = String(e.message).split("\n");
@@ -405,6 +407,13 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     console.log(`[K2] ${tag} hover trail —\n  ${trail.join("\n  ")}`);
     return null;
   }
+  // Vertical centering ONLY, horizontal pinned at 0: `scrollIntoView({inline: …})` can PAN the page sideways,
+  // and a panned visual viewport sends Playwright's pointer to the wrong place — PR #73 CI run 38448577842
+  // (pixel7·b, ILS-HIST): the page sat shifted left and the fixed FAB's click landed on a chart svg.
+  const centerY = (loc) => loc.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    window.scrollTo({ left: 0, top: window.scrollY + r.top + r.height / 2 - window.innerHeight / 2, behavior: "instant" });
+  });
   const chartSection = (page, title) => page.locator("h3").filter({ hasText: title })
     .locator("xpath=ancestor::div[.//*[contains(@class,'recharts-wrapper')]][1]");
   const monthNow = (page) => page.evaluate(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; });
@@ -441,7 +450,7 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     let tip = null;
     for (let k = 0; k < 6 && !tip; k++) {
       try {
-        await surface.evaluate((el) => el.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" }));
+        await centerY(surface);
         const [bb, sb, gb] = await Promise.all([bar.boundingBox(), surface.boundingBox(), grid.boundingBox()]);
         await surface.hover({ timeout: 4_000, position: { x: bb.x + bb.width / 2 - sb.x, y: gb.y + gb.height / 2 - sb.y } });
       } catch (e) {
