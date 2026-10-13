@@ -14,6 +14,8 @@
 //   b · en — the same close toast in English, + the journal card.
 //   🆕 13.10 (B-045): a AND b also read B5 (this month's bar, a DIFF against the bar before the trade)
 //            and B8 (the trade's dot) — both converted to the account currency, ⛔ raw paper P&L.
+//            ⚠️ iphone14·a (WebKit + RTL) reaches the 9×9 B8 dot through a LOGGED `mouseover` dispatch after
+//            the real hover misses (see `hoverUntil`) — that cell is a rendering proof, ⛔ a pointer-level one.
 //
 // THE NUMBER. The form has no shares field: shares come from position sizing (capital × risk ÷
 // stop distance). The spec reads `shares` from the saved trade and picks the close delta from them
@@ -325,19 +327,50 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     for (let i = n - 1; i >= (onlyLast ? n - 1 : 0); i--) {
       for (let k = 0; k < 4; k++) {
         try {
-          await marks.nth(i).scrollIntoViewIfNeeded({ timeout: 3_000 });
+          // Vertical CENTER (away from the bottom edge, where the only B8 dot sat in PR #72 CI run 38358872939),
+          // `inline: "nearest"` — ⛔ a horizontal pan. (The iphone14·a red itself is the visual-viewport offset
+          // handled in the fallback below; ⛔ an overlay — the hit test returned the dot.)
+          await marks.nth(i).evaluate((el) => el.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" }));
           await marks.nth(i).hover({ timeout: 4_000 });
         } catch (e) {
-          trail.push(`${tag} mark ${i} try ${k}: ${String(e.message).split("\n")[0].slice(0, 120)}`);
-          await page.waitForTimeout(400);
-          continue;
+          const lines = String(e.message).split("\n");
+          const blocker = lines.find((l) => /intercepts pointer events/.test(l)) || "";
+          // What the browser's hit test returns at the mark's center — names a miss instead of guessing it.
+          const hit = await marks.nth(i).evaluate((el) => {
+            const r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+            const h = document.elementFromPoint(x, y);
+            return `bbox ${r.width.toFixed(1)}×${r.height.toFixed(1)} @${x.toFixed(0)},${y.toFixed(0)} · hit ${h ? `${h.tagName}.${h.getAttribute("class") || ""}` : "none"}`;
+          }).catch(() => "bbox n/a");
+          trail.push(`${tag} mark ${i} try ${k}: ${lines[0].slice(0, 120)}${blocker ? ` · ${blocker.trim().slice(0, 160)}` : ""} · ${hit}`);
+          // FALLBACK — WebKit + RTL + a 9×9 SVG dot (PR #72 CI run 38358872939, iphone14·a; reproduced in local
+          // WebKit). Playwright's computed point lands on the `recharts-surface` svg while `elementFromPoint` at
+          // the dot's center returns the dot itself (the RTL page also sits panned by the visual viewport,
+          // `visualViewport.offsetLeft` 0–8 — `B-424`); real-pointer variants (center scroll, path target,
+          // hit-tested `mouse.move` ± the offset) all missed. The discriminating run: a `mouseover` dispatched
+          // on the dot renders the tooltip with the converted value ⇒ pointer geometry, ⛔ the product.
+          // Guarded: dispatched ONLY on a mark our own hit test returns (an overlay lying on top — the B3
+          // WebKit red, run 37362747806 — is still refused), only after the real hover failed, and LOGGED in
+          // the run (C-069 «מה נמצא»). The money assertion is unchanged: React-rendered text from real data.
+          const pt = await marks.nth(i).evaluate((el) => {
+            const r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+            const h = document.elementFromPoint(x, y);
+            const vv = window.visualViewport;
+            return h && (h === el || el.contains(h)) ? { x, y, dx: vv ? vv.offsetLeft : 0, dy: vv ? vv.offsetTop : 0 } : null;
+          }).catch(() => null);
+          if (!pt) { await page.waitForTimeout(400); continue; }
+          await marks.nth(i).dispatchEvent("mouseover", { bubbles: true });
+          trail.push(`${tag} mark ${i} try ${k}: FALLBACK dispatch mouseover on the hit-tested mark (center ${pt.x.toFixed(0)},${pt.y.toFixed(0)} · visual-viewport offset ${pt.dx},${pt.dy})`);
         }
         let text = "";
         for (let j = 0; j < 10 && !text; j++) {
           text = (await sec.locator(".recharts-tooltip-wrapper").innerText().catch(() => "")).trim();
           if (!text) await page.waitForTimeout(150);
         }
-        if (text && done(text)) return text;
+        if (text && done(text)) {
+          // A fallback that carried the read must say so in the run log (C-069 · "מה נמצא") — ⛔ silently.
+          if (trail.length) console.log(`[K2] ${tag} hover trail (answered after) —\n  ${trail.join("\n  ")}`);
+          return text;
+        }
         trail.push(`${tag} mark ${i} try ${k}: tooltip ${JSON.stringify(text.replace(/\s+/g, " ").slice(0, 80))}`);
         if (text) break; // a tooltip that answered but is not ours — next mark
       }
@@ -394,7 +427,10 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     await page.locator('[data-tour-tab="analytics"]').click();
     const sec = chartSection(page, /^(זמן החזקה vs P&L|Hold Time vs P&L)/);
     await expect(sec, "the hold-time scatter (B8) is not on the analytics tab").toHaveCount(1, { timeout: 15_000 });
-    const dots = sec.locator(".recharts-scatter-symbol");
+    // The SHAPE (`path.recharts-symbols`, ~4.5px radius), ⛔ its `<g class="recharts-scatter-symbol">`
+    // wrapper: PR #72 CI + local WebKit (iphone14·a) — at the wrapper's center the hit test returned the
+    // `recharts-surface` svg, so the dot never received the pointer.
+    const dots = sec.locator(".recharts-scatter-symbol .recharts-symbols");
     expect(await dots.count(), "the hold-time scatter has no dots").toBeGreaterThan(0);
     const seen = [];
     const tip = await hoverUntil(page, sec, dots, (t) => {
@@ -429,6 +465,12 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
       expect(after, "no setup row after closing a Breakout trade").not.toBeNull();
       const want = fmtMoney(base + r.pnl, r.accountCcy);
       expect(after.trim(), `B7 setup cell: ${before ?? "—"} + ${r.shown} should read ${want}`).toBe(want);
+
+      // B5 + B8 BEFORE the B3 hover loop — the order test b runs them in. PR #72 CI (iphone14·a, reproduced in
+      // local WebKit): after the B3 loop the page kept moving under the B8 dot (its center alternated
+      // y 651 ↔ 367 between tries) and no hover reached it; b, which never runs the B3 loop, was green.
+      await expectMonthBar(page, month5, r);
+      await expectScatterDot(page, r);
 
       // B3 — one bar per closed trade; hover until the tooltip names EYEPB.
       const sec = page.getByText(/^(רווח\/הפסד לפי עסקה|P&L by Trade)$/).locator("xpath=ancestor::div[.//*[contains(@class,'recharts-wrapper')]][1]");
@@ -465,8 +507,6 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
       if (!tip) console.log(`[K2 a] ${info.project.name}: B3 hover trail —\n  ${trail.join("\n  ")}`);
       expect(tip, "no bar of the per-trade chart named EYEPB on hover").not.toBeNull();
       expect(tip, `B3 tooltip should show ${r.shown}`).toContain(r.shown);
-      await expectMonthBar(page, month5, r);
-      await expectScatterDot(page, r);
       await shot("a-analytics");
     } catch (e) {
       await app.onFail("a");
