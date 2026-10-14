@@ -42,6 +42,7 @@ on:
       - 'src/lib/bottomOverlay.js'
       - 'src/hooks/useBottomOverlay.js'
       - 'scripts/eye-overlay-probe.mjs'
+      - 'scripts/eye-width-probe.mjs'
       - 'scripts/lib/eyeBuild.mjs'
       - 'src/lib/settingsDelta.js'
       - 'src/lib/userSettings.js'
@@ -69,6 +70,7 @@ on:
       - 'src/lib/bottomOverlay.js'
       - 'src/hooks/useBottomOverlay.js'
       - 'scripts/eye-overlay-probe.mjs'
+      - 'scripts/eye-width-probe.mjs'
       - 'scripts/lib/eyeBuild.mjs'
       - 'src/lib/settingsDelta.js'
       - 'src/lib/userSettings.js'
@@ -142,6 +144,20 @@ jobs:
         with:
           name: eye-overlay-probe-${{ github.run_id }}
           path: eye-evidence/probe-overlay/
+          retention-days: 14
+          if-no-files-found: warn
+      # B-424 (13.10) — no main tab wider than the phone (tests-eye/width.spec.js), same five devices.
+      - name: Red-before probe — page width (five devices)
+        if: ${{ always() }}
+        env:
+          EYE_PROJECTS: pixel7,iphone14,iphoneSE,iphone14promax,galaxyS8
+        run: npm run probe:eye:width
+      - name: Upload width probe evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: eye-width-probe-${{ github.run_id }}
+          path: eye-evidence/probe-width/
           retention-days: 14
           if-no-files-found: warn
 
