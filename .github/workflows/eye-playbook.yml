@@ -28,6 +28,9 @@ on:
   push:
     branches: [main]
     paths:
+      # B-426 (14.10, Niv): every App change runs the eye — the repo is public ⇒ minutes are free, the cost is time.
+      - 'SwingEdge_App.jsx'
+      - 'src/**'
       - 'src/lib/imageResize.js'
       - 'src/lib/playbookStore.js'
       - 'src/components/ToastProvider.jsx'
@@ -56,6 +59,9 @@ on:
       - '.github/workflows/eye-playbook.yml'
   pull_request:
     paths:   # same list as push
+      # B-426 (14.10, Niv): every App change runs the eye — the repo is public ⇒ minutes are free, the cost is time.
+      - 'SwingEdge_App.jsx'
+      - 'src/**'
       - 'src/lib/imageResize.js'
       - 'src/lib/playbookStore.js'
       - 'src/components/ToastProvider.jsx'
