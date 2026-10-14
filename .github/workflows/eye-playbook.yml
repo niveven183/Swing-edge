@@ -171,7 +171,9 @@ jobs:
   probe-sync:
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.61.1-noble
-    timeout-minutes: 60
+    # B-408 (14.10): 5 → 14 arms (BEFORE-408 · M3-EARLY · M3-<scalar>×5 · M3-FAILLOCK · M5-NOTIMEOUT),
+    # each limited to its own scenes by --grep. 60 was the old ceiling with 5 full-spec arms.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
         with:

@@ -112,3 +112,38 @@ export async function sweep(email, password) {
   if (report.restHashBefore !== report.restHashAfter) throw new Error("[qaRest] keys OUTSIDE the playbook changed during the sweep — the RMW raced the app or touched what it must not");
   return report;
 }
+
+// ── B-408 (14.10) — the scalars scene (tests-eye/scalars.spec.js) ────────────────────────────
+// Read-only snapshot of the QA blob: its sha256 and the capital. The scene edits the capital
+// THROUGH THE APP and restores it the same way; this proves the row ends byte-identical.
+async function readBlob(tok, uid) {
+  const rows = await rest(`user_settings?select=settings&user_id=eq.${uid}`, tok);
+  if (!Array.isArray(rows) || rows.length !== 1) throw new Error(`[qaRest] user_settings: expected exactly 1 row for the QA account, got ${Array.isArray(rows) ? rows.length : typeof rows}`);
+  const s = rows[0].settings;
+  if (!s || typeof s !== "object" || Array.isArray(s)) throw new Error("[qaRest] user_settings.settings is not an object");
+  return s;
+}
+
+export async function settingsSnapshot(email, password) {
+  if (!restConfigured()) throw new Error("[qaRest] SUPABASE_URL / SUPABASE_ANON_KEY missing — refusing to report a snapshot that never ran");
+  const { token: tok, uid } = await token(email, password);
+  const s = await readBlob(tok, uid);
+  return { sha: sha(JSON.stringify(s)), capital: s.capital };
+}
+
+// The safety net, ⛔ the path: called ONLY with every app context closed (K6 — the blob is
+// last-writer-wins), and only when the in-app restore did not land. Touches `capital` alone and
+// proves every other key byte-identical before/after.
+export async function restoreCapital(email, password, capital) {
+  if (!restConfigured()) throw new Error("[qaRest] SUPABASE_URL / SUPABASE_ANON_KEY missing — refusing to restore blind");
+  if (typeof capital !== "number" || !(capital > 0)) throw new Error("[qaRest] restoreCapital: refusing a non-positive capital");
+  const { token: tok, uid } = await token(email, password);
+  const before = await readBlob(tok, uid);
+  const { capital: _c, ...restBefore } = before;
+  await rest(`user_settings?user_id=eq.${uid}`, tok, { method: "PATCH", prefer: "return=minimal", body: { settings: { ...before, capital } } });
+  const after = await readBlob(tok, uid);
+  const { capital: c2, ...restAfter } = after;
+  if (c2 !== capital) throw new Error("[qaRest] restoreCapital: the capital did not land");
+  if (sha(JSON.stringify(restBefore)) !== sha(JSON.stringify(restAfter))) throw new Error("[qaRest] restoreCapital: keys other than capital changed");
+  return { sha: sha(JSON.stringify(after)), capital: c2 };
+}

@@ -7413,11 +7413,17 @@ export default function SwingEdge() {
                   <h3 className="text-sm font-bold text-white">{t.language}</h3>
                 </div>
                 <p className="text-xs text-[var(--v3-text-lo)] mb-3">{t.languageDesc}</p>
+                {/* B-408 (14.10) — the five scalars are ⛔ editable until the settings read has
+                    spoken (`capitalSettled`: done · failed · or no Supabase). An edit made while the
+                    read was in flight was overwritten by "DB wins" — 0/240 survived (diagnosis
+                    docs/audits/B408-SCALAR-HYDRATION-DIAGNOSIS-2026-10-14.md). A read that never
+                    answers ends as a failure (SETTINGS_READ_TIMEOUT_MS) ⇒ ⛔ a lock for the session. */}
                 <select
                   value={lang}
                   onChange={e => setLang(e.target.value)}
+                  disabled={!capitalSettled}
                   dir="ltr"
-                  className="w-full bg-white/5 border border-[var(--border-subtle)] dark:border-white/[0.10] rounded-lg px-3 py-2.5 text-sm text-white focus:border-[var(--v3-accent)] focus:outline-none transition font-semibold"
+                  className="w-full bg-white/5 border border-[var(--border-subtle)] dark:border-white/[0.10] rounded-lg px-3 py-2.5 text-sm text-white focus:border-[var(--v3-accent)] focus:outline-none transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {LANGUAGES.map(l => (
                     <option key={l.code} value={l.code}>
@@ -7425,6 +7431,9 @@ export default function SwingEdge() {
                     </option>
                   ))}
                 </select>
+                {!capitalSettled && (
+                  <p role="status" aria-live="polite" className="text-[11px] text-[var(--v3-text-lo)] mt-2">{t.loading}</p>
+                )}
               </div>
 
               {/* ── SECURITY (Change Password) ── */}
@@ -7589,8 +7598,9 @@ export default function SwingEdge() {
                     type="number"
                     value={capitalInput}
                     onChange={e => setCapitalInput(e.target.value)}
+                    disabled={!capitalSettled}
                     placeholder={capitalSettled ? `${capital.toLocaleString()}` : "···"}
-                    className="flex-1 bg-white/5 border border-[var(--border-subtle)] dark:border-white/[0.10] rounded-lg px-3 py-2 text-sm text-white placeholder-[var(--v3-text-lo)] focus:border-[var(--v3-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--v3-accent-glow)] transition font-mono"
+                    className="flex-1 bg-white/5 border border-[var(--border-subtle)] dark:border-white/[0.10] rounded-lg px-3 py-2 text-sm text-white placeholder-[var(--v3-text-lo)] focus:border-[var(--v3-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--v3-accent-glow)] transition font-mono disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                   <button
                     onClick={() => {
@@ -7601,10 +7611,14 @@ export default function SwingEdge() {
                         try { localStorage.setItem("swingEdgeCapital", String(val)); } catch {}
                       }
                     }}
-                    className="px-4 py-2 rounded-lg bg-[var(--v3-accent-glow)] border border-[#00C076]/30 text-[var(--v3-accent)] text-xs font-bold hover:bg-[#00C076]/20 transition whitespace-nowrap">
+                    disabled={!capitalSettled}
+                    className="px-4 py-2 rounded-lg bg-[var(--v3-accent-glow)] border border-[#00C076]/30 text-[var(--v3-accent)] text-xs font-bold hover:bg-[#00C076]/20 transition whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed">
                     {t.updateCapital}
                   </button>
                 </div>
+                {!capitalSettled && (
+                  <p role="status" aria-live="polite" className="text-[11px] text-[var(--v3-text-lo)] mt-2">{t.loading}</p>
+                )}
                 <p className="text-[10px] text-[var(--v3-text-lo)] mt-2">
                   {t.currentCapital}:{" "}
                   {capitalSettled ? (
@@ -7630,8 +7644,12 @@ export default function SwingEdge() {
                           setCapitalCurrency(c);
                           try { localStorage.setItem("swingEdgeCapitalCurrency", c); } catch {}
                         }}
-                        className={`px-4 py-2 rounded-lg text-xs font-bold font-mono transition border ${
-                          capitalCurrency === c
+                        disabled={!capitalSettled}
+                        // B-408 ③ — ⛔ a currency shown as chosen before the DB has spoken: in the
+                        // window it is this device's copy, and another device may have changed it.
+                        aria-pressed={capitalSettled ? capitalCurrency === c : undefined}
+                        className={`px-4 py-2 rounded-lg text-xs font-bold font-mono transition border disabled:opacity-50 disabled:cursor-not-allowed ${
+                          capitalSettled && capitalCurrency === c
                             ? "bg-[var(--v3-accent-glow)] border-[#00C076]/30 text-[var(--v3-accent)]"
                             : "bg-white/5 border-[var(--border-subtle)] dark:border-white/[0.10] text-[var(--v3-text-mid)] hover:text-white"
                         }`}>
@@ -7652,8 +7670,10 @@ export default function SwingEdge() {
                           setAccountCurrency(c);
                           try { localStorage.setItem("swingEdgeAccountCurrency", c); } catch {}
                         }}
-                        className={`px-4 py-2 rounded-lg text-xs font-bold font-mono transition border ${
-                          accountCurrency === c
+                        disabled={!capitalSettled}
+                        aria-pressed={capitalSettled ? accountCurrency === c : undefined}
+                        className={`px-4 py-2 rounded-lg text-xs font-bold font-mono transition border disabled:opacity-50 disabled:cursor-not-allowed ${
+                          capitalSettled && accountCurrency === c
                             ? "bg-[var(--v3-accent-glow)] border-[#00C076]/30 text-[var(--v3-accent)]"
                             : "bg-white/5 border-[var(--border-subtle)] dark:border-white/[0.10] text-[var(--v3-text-mid)] hover:text-white"
                         }`}>
@@ -7683,8 +7703,9 @@ export default function SwingEdge() {
                     max="10"
                     value={riskInput}
                     onChange={e => setRiskInput(e.target.value)}
-                    placeholder={`${riskPct}`}
-                    className="flex-1 bg-white/5 border border-[var(--border-subtle)] dark:border-white/[0.10] rounded-lg px-3 py-2 text-sm text-white placeholder-[var(--v3-text-lo)] focus:border-[var(--v3-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--v3-accent-glow)] transition font-mono"
+                    disabled={!capitalSettled}
+                    placeholder={capitalSettled ? `${riskPct}` : "···"}
+                    className="flex-1 bg-white/5 border border-[var(--border-subtle)] dark:border-white/[0.10] rounded-lg px-3 py-2 text-sm text-white placeholder-[var(--v3-text-lo)] focus:border-[var(--v3-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--v3-accent-glow)] transition font-mono disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                   <button
                     onClick={() => {
@@ -7695,12 +7716,21 @@ export default function SwingEdge() {
                         try { localStorage.setItem("swingEdgeRiskPct", String(val)); } catch {}
                       }
                     }}
-                    className="px-4 py-2 rounded-lg bg-[var(--v3-accent-glow)] border border-[#00C076]/30 text-[var(--v3-accent)] text-xs font-bold hover:bg-[#00C076]/20 transition whitespace-nowrap">
+                    disabled={!capitalSettled}
+                    className="px-4 py-2 rounded-lg bg-[var(--v3-accent-glow)] border border-[#00C076]/30 text-[var(--v3-accent)] text-xs font-bold hover:bg-[#00C076]/20 transition whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed">
                     {t.updateRisk}
                   </button>
                 </div>
+                {!capitalSettled && (
+                  <p role="status" aria-live="polite" className="text-[11px] text-[var(--v3-text-lo)] mt-2">{t.loading}</p>
+                )}
                 <p className="text-[10px] text-[var(--v3-text-lo)] mt-2">
-                  {t.currentRisk}: <span className="text-[var(--v3-accent)] font-mono font-bold">{riskPct}%</span>
+                  {t.currentRisk}: {capitalSettled ? (
+                    <span className="text-[var(--v3-accent)] font-mono font-bold">{riskPct}%</span>
+                  ) : (
+                    // B-408 — in the window this is the device's copy (2c: stale 20/20), ⛔ the user's risk.
+                    <span className="inline-block align-middle h-3 w-10 rounded bg-white/10 animate-pulse" aria-hidden="true" />
+                  )}
                 </p>
                 <p className="text-[10px] text-[var(--v3-text-lo)] mt-1 flex items-center gap-1">
                   {t.portfolioCapDerived}: <span className="text-violet-400 font-mono font-bold">{maxRiskPct}%</span>

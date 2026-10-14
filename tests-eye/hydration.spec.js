@@ -21,12 +21,24 @@
 //   H5 fresh-device      · a new browser gets the user's watchlist, ⛔ the defaults (B-407)
 //   C1 control-new-user  · no row, nothing local: the app settles (onboarding), nothing journaled
 //   C2 control-db-only   · a fresh device with data only in the DB loads all of it
+// B-408 (14.10) — the five scalars (capital · riskPct · lang · capitalCurrency · accountCurrency).
+// Option B (Niv 14.10): ⛔ a merge — the nine Settings controls are DISABLED until the read has
+// spoken (`capitalSettled`), and a read that never answers ends as a failure within
+// SETTINGS_READ_TIMEOUT_MS. Diagnosis: docs/audits/B408-SCALAR-HYDRATION-DIAGNOSIS-2026-10-14.md
+//   H6 scalars-window    · in the window: 9 controls disabled · 3 role=status · ⛔ currency shown
+//                          selected · risk is a skeleton; once the read lands, an edit (typed)
+//                          survives — screen · localStorage · DB · reload
+//   C3 failed-read       · a read that FAILS settles the gate: controls enabled + the B-268 banner
+//   C4 not-edited        · a value another device wrote and this one did not edit: DB wins, as today
+//   C5 hang              · a read that NEVER answers: within the deadline the controls are enabled and
+//                          the B-268 banner is shown — ⛔ a lock for the session
+// ⛔ fill · ⛔ addLocatorHandler · ⛔ retry · ⛔ timed waits in these four: conditions only.
 
 import { test, expect } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { installHermetic, newStore, DUMMY_EMAIL, DUMMY_PASSWORD } from "./hermetic.js";
-import { exactRx } from "./labels.js";
+import { exactRx, containsRx } from "./labels.js";
 
 const HERMETIC = process.env.EYE_HERMETIC === "1";
 const EVIDENCE = process.env.EYE_EVIDENCE_DIR || join(process.cwd(), "eye-evidence");
@@ -62,8 +74,12 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
       if (rowMissing && m !== "GET" && m !== "OPTIONS") rowMissing = false; // the first write creates the row
       return route.fallback();
     });
-    const gate = { armed: false, held: 0, release: null };
+    const gate = { armed: false, held: 0, release: null, fail: false };
     await ctx.route(/\/rest\/v1\/user_settings/, async (route) => {
+      // B-408 C3 — a read the server REFUSES (⛔ "no row"): the failure path, measured on screen.
+      if (route.request().method() === "GET" && gate.fail) {
+        return route.fulfill({ status: 500, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ message: "eye: refused" }) });
+      }
       if (route.request().method() === "GET" && gate.armed) {
         gate.held++;
         await new Promise((res) => { gate.release = res; });
@@ -260,5 +276,172 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
       expect((await json(page, "swingEdgePriceAlerts"))?.AAPL).toBe(300);
       await app.shot("C2");
     } finally { await app.ctx.close(); }
+  });
+  // ── B-408 (14.10) ─────────────────────────────────────────────────────────────────────
+  // ⚠️ SETTINGS_READ_TIMEOUT_MS (src/lib/userSettings.js) — mirrored, ⛔ imported: the spec runs
+  // against a BUILD (BEFORE arms do not export it). C5 allows the deadline + a margin.
+  const READ_DEADLINE_MS = 8_000;
+  const B408 = { capital: 12345, riskPct: 2.5, capitalCurrency: "ILS", accountCurrency: "ILS", lang: "es" };
+
+  // A real user: tap the field, type. ⛔ fill.
+  async function typeInto(page, locator, text) {
+    await locator.click();
+    await page.keyboard.type(text);
+  }
+
+  // Login without a single swallowed step: the consent banner is a hard click (⛔ .catch).
+  async function loginReturning(page) {
+    await page.goto("/app");
+    await page.locator('[data-testid="consent-decline"]').click();
+    await typeInto(page, page.locator('input[type="email"]'), DUMMY_EMAIL);
+    await typeInto(page, page.locator('input[autocomplete="current-password"]'), DUMMY_PASSWORD);
+    await page.locator('button[type="submit"]').first().click();
+    await dash(page);
+    // RETURNING = the first hydration wrote the onboarding mirror (the only state with a window).
+    await expect.poll(() => ls(page, "swingEdgeOnboarding"), { message: "the device never became returning — there is no window" }).not.toBeNull();
+  }
+
+  async function reloadHeld(app) {
+    app.gate.armed = true;
+    await app.page.reload({ waitUntil: "load" });
+    await dash(app.page);
+    await expect.poll(() => app.gate.held, { message: "the user_settings read must be held — otherwise there is no window" }).toBeGreaterThan(0);
+  }
+
+  const card = (page, key) => page.locator("div.rounded-xl", { has: page.getByRole("heading", { name: exactRx(key) }) }).last();
+  const ccyBox = (page, key) => page.locator("div.mt-4", { has: page.getByRole("heading", { name: exactRx(key) }) }).last();
+  const capLine = (page) => page.locator("p", { hasText: containsRx("currentCapital") }).first();
+  const riskLine = (page) => page.locator("p", { hasText: containsRx("currentRisk") }).first();
+  const ctl = (page) => ({
+    lang: card(page, "language").locator("select"),
+    capitalInput: card(page, "portfolioCapitalTitle").locator('input[type="number"]'),
+    capitalBtn: card(page, "portfolioCapitalTitle").getByRole("button", { name: exactRx("updateCapital") }),
+    capUSD: ccyBox(page, "capitalCurrencyTitle").getByRole("button", { name: /USD/ }),
+    capILS: ccyBox(page, "capitalCurrencyTitle").getByRole("button", { name: /ILS/ }),
+    accUSD: ccyBox(page, "accountCurrencyTitle").getByRole("button", { name: /USD/ }),
+    accILS: ccyBox(page, "accountCurrencyTitle").getByRole("button", { name: /ILS/ }),
+    riskInput: card(page, "riskPerTradeTitle").locator('input[type="number"]'),
+    riskBtn: card(page, "riskPerTradeTitle").getByRole("button", { name: exactRx("updateRisk") }),
+  });
+  const statusLines = (page) => page.locator('p[role="status"]').filter({ hasText: exactRx("loading") });
+  const failBanner = (page) => page.getByRole("alert").filter({ hasText: /couldn't read your settings|לא הצלחנו לקרוא את ההגדרות/ });
+  const digits = (s) => Number(String(s).replace(/[^0-9.]/g, ""));
+
+  async function expectAllEnabled(page) {
+    for (const [name, loc] of Object.entries(ctl(page))) await expect(loc, `B-408: ${name} must be enabled once the read has spoken`).toBeEnabled();
+  }
+
+  test("H6 scalars-window — the five scalars are locked while the read is in flight, and an edit after it survives", async ({ browser }, info) => {
+    const app = await open(browser, info);
+    const { page, store, gate } = app;
+    try {
+      await loginReturning(page);
+      await reloadHeld(app);
+      await openSettings(page);
+      const c = ctl(page);
+      // ① the window: nothing the user can change, and the screen says why.
+      for (const [name, loc] of Object.entries(c)) await expect(loc, `B-408: ${name} is editable while the settings read is in flight — its edit would be overwritten by the DB`).toBeDisabled();
+      await expect(statusLines(page), "B-408: the three cards must say «loading» while the controls are locked").toHaveCount(3);
+      for (const name of ["capUSD", "capILS", "accUSD", "accILS"]) await expect(c[name], `B-408 ③: ${name} carries a selection before the DB has spoken`).not.toHaveAttribute("aria-pressed");
+      await expect(riskLine(page).locator("span.animate-pulse"), "B-408: the risk shown in the window is a stale local number — it must be a skeleton").toHaveCount(1);
+      await app.shot("H6-1-window");
+      // ② the read lands ⇒ the gate opens (a condition, ⛔ a sleep).
+      gate.armed = false;
+      gate.release?.();
+      await expectAllEnabled(page);
+      await expect(statusLines(page)).toHaveCount(0);
+      // ③ the user edits — typed, tapped, selected.
+      await typeInto(page, c.capitalInput, String(B408.capital));
+      await c.capitalBtn.click();
+      await typeInto(page, c.riskInput, String(B408.riskPct));
+      await c.riskBtn.click();
+      await c.capILS.click();
+      await c.accILS.click();
+      await c.lang.selectOption(B408.lang); // a native <select>: selectOption IS the user's gesture
+      const screen = async () => ({
+        capital: digits(await capLine(page).locator("span").first().textContent()),
+        riskPct: digits(await riskLine(page).locator("span").first().textContent()),
+        capitalCurrency: (await ctl(page).capILS.getAttribute("aria-pressed")) === "true" ? "ILS" : "USD",
+        accountCurrency: (await ctl(page).accILS.getAttribute("aria-pressed")) === "true" ? "ILS" : "USD",
+        lang: await page.evaluate(() => document.documentElement.lang),
+      });
+      const local = async () => ({
+        capital: Number(await ls(page, "swingEdgeCapital")),
+        riskPct: Number(await ls(page, "swingEdgeRiskPct")),
+        capitalCurrency: await ls(page, "swingEdgeCapitalCurrency"),
+        accountCurrency: await ls(page, "swingEdgeAccountCurrency"),
+        lang: await ls(page, "swingEdgeLang"),
+      });
+      const db = () => ({ capital: store.settings.capital, riskPct: store.settings.riskPct, capitalCurrency: store.settings.capitalCurrency, accountCurrency: store.settings.accountCurrency, lang: store.settings.lang });
+      const s1 = await screen();
+      const l2 = await local();
+      expect(s1, "(1) the screen right after the edit").toEqual(B408);
+      expect(l2, "(2) localStorage").toEqual(B408);
+      await expect.poll(db, { message: "(3) the DB row never received the edit" }).toEqual(B408);
+      // ④ a reload reads it back from the row.
+      await page.reload({ waitUntil: "load" });
+      await dash(page);
+      await openSettings(page);
+      await expectAllEnabled(page);
+      const s4 = await screen();
+      evidence(app, "H6", { window: "disabled", screen: s1, local: l2, db: db(), afterReload: s4 });
+      await app.shot("H6-2-after-reload");
+      expect(s4, "(4) after a reload").toEqual(B408);
+    } finally { gate.release?.(); await app.ctx.close(); }
+  });
+
+  test("C3 failed-read — a refused read settles the gate: controls enabled, the B-268 banner shown", async ({ browser }, info) => {
+    const app = await open(browser, info);
+    const { page, gate } = app;
+    try {
+      await loginReturning(page);
+      gate.fail = true;
+      await page.reload({ waitUntil: "load" });
+      await dash(page);
+      await expect(failBanner(page), "the failed read must be announced (B-268)").toBeVisible();
+      await openSettings(page);
+      await expectAllEnabled(page);
+      await expect(statusLines(page)).toHaveCount(0);
+      evidence(app, "C3", { banner: true, enabled: true });
+      await app.shot("C3");
+    } finally { await app.ctx.close(); }
+  });
+
+  test("C4 not-edited — a value another device wrote, and this one did not touch, wins as today", async ({ browser }, info) => {
+    const app = await open(browser, info);
+    const { page, store } = app;
+    try {
+      await loginReturning(page);
+      store.settings.riskPct = 3; // another device; this one still holds 1 locally
+      await page.reload({ waitUntil: "load" });
+      await dash(page);
+      await openSettings(page);
+      await expectAllEnabled(page);
+      await expect(riskLine(page).locator("span").first()).toHaveText(/^\s*3%\s*$/);
+      expect(await ls(page, "swingEdgeRiskPct")).toBe("3");
+      // This device then writes something ELSE — the whole blob goes out; riskPct must still be 3.
+      await typeInto(page, ctl(page).capitalInput, "11111");
+      await ctl(page).capitalBtn.click();
+      await expect.poll(() => store.settings.capital, { message: "the capital edit never reached the row" }).toBe(11111);
+      evidence(app, "C4", { riskPct: store.settings.riskPct, capital: store.settings.capital });
+      expect(store.settings.riskPct, "this device wrote its stale riskPct over the other device's").toBe(3);
+    } finally { await app.ctx.close(); }
+  });
+
+  test("C5 hang — a settings read that never answers ends within the deadline: controls enabled + B-268 banner", async ({ browser }, info) => {
+    const app = await open(browser, info);
+    const { page, gate } = app;
+    try {
+      await loginReturning(page);
+      await reloadHeld(app); // ⛔ released — this read never answers
+      const t0 = Date.now();
+      await expect(failBanner(page), "B-408: a hung settings read is never announced — the session waits forever").toBeVisible({ timeout: READ_DEADLINE_MS + 7_000 });
+      const took = Date.now() - t0;
+      await openSettings(page);
+      await expectAllEnabled(page);
+      evidence(app, "C5", { msToFailure: took, deadline: READ_DEADLINE_MS });
+      await app.shot("C5");
+      expect(took, "the failure arrived far past the deadline").toBeLessThanOrEqual(READ_DEADLINE_MS + 7_000);
+    } finally { gate.release?.(); await app.ctx.close(); }
   });
 });
