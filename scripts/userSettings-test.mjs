@@ -4,12 +4,8 @@
 // NOT touch the real database. (The migration is intentionally NOT applied to
 // prod in M1; that is M2 / manual.) Pure Node. Run: `node scripts/userSettings-test.mjs`.
 
-import {
-  loadSettings,
-  saveSettings,
-  flushSettings,
-  migrateFromLocalStorage,
-} from "../src/lib/userSettings.js";
+import * as US from "../src/lib/userSettings.js";
+const { loadSettings, saveSettings, flushSettings, migrateFromLocalStorage } = US;
 
 let failures = 0;
 const check = (name, cond) => {
@@ -47,11 +43,16 @@ function makeLocalStorage(seed = {}) {
 // rejected. Direction B remembers what it sent so it can skip an unchanged blob —
 // and the one way that turns into silent data loss is remembering a write that
 // never landed. The mock could not express a failing upsert before.
-function makeMockClient(initialRows = {}, { failMode = false, upsertFailMode = false } = {}) {
+// ⚠️ `hangMode` (B-408) models the read that never comes back — a stalled mobile link or
+// a Supabase hang. Like postgrest-js it resolves `{ error }` ONLY when its abort signal
+// fires, and otherwise stays pending forever. `lateRow` makes the stalled read answer
+// AFTER the deadline, so a late success can be seen trying to seed the cache.
+function makeMockClient(initialRows = {}, { failMode = false, upsertFailMode = false, hangMode = false, lateMs = null } = {}) {
   const rows = new Map(Object.entries(initialRows));
-  const calls = { upsert: 0, select: 0 };
+  const calls = { upsert: 0, select: 0, aborted: 0 };
   function from() {
     let filterId = null;
+    let signal = null;
     const builder = {
       select() {
         calls.select++;
@@ -61,7 +62,17 @@ function makeMockClient(initialRows = {}, { failMode = false, upsertFailMode = f
         filterId = v;
         return builder;
       },
+      abortSignal(s) {
+        signal = s;
+        return builder;
+      },
       async maybeSingle() {
+        if (hangMode || lateMs != null) {
+          return new Promise((resolve) => {
+            signal?.addEventListener("abort", () => { calls.aborted++; if (lateMs == null) resolve({ data: null, error: { message: "AbortError" } }); });
+            if (lateMs != null) setTimeout(() => resolve(rows.has(filterId) ? { data: { user_id: filterId, settings: rows.get(filterId) }, error: null } : { data: null, error: null }), lateMs);
+          });
+        }
         if (failMode) return { data: null, error: { message: "RLS denied" } };
         if (!rows.has(filterId)) return { data: null, error: null };
         return { data: { user_id: filterId, settings: rows.get(filterId) }, error: null };
@@ -306,6 +317,54 @@ console.log("test:settings — userSettings module vs mock client (no real DB)\n
   saveSettings("u11", { capital: 200 }, client);
   await flushSettings("u11", client);
   check("⚪ control — identical retry after a FAILED write ⇒ 2 upserts", calls.upsert === 2);
+}
+
+// 12) B-408 — a read that never comes back must END, as a failure, within the deadline.
+//     Without a deadline `hydrationFailed` never fires: the capital gate stays "loading"
+//     forever (Log Trade locked), and the Settings edit gate would lock the five scalars
+//     for the whole session — worse than the bug it closes.
+{
+  console.log("12) a stalled settings read ends as failed within SETTINGS_READ_TIMEOUT_MS");
+  check("SETTINGS_READ_TIMEOUT_MS is exported and is 8000 (aligned with FX_SETTLE_MS, B-376)", US.SETTINGS_READ_TIMEOUT_MS === 8000);
+
+  global.localStorage = makeLocalStorage();
+  const hang = makeMockClient({ u12: { capital: 9000 } }, { hangMode: true });
+  const t0 = Date.now();
+  const r = await Promise.race([
+    loadSettings("u12", hang.client, { timeoutMs: 60 }),
+    sleep(2000).then(() => ({ status: "STILL-PENDING" })),
+  ]);
+  const took = Date.now() - t0;
+  check(`stalled load ⇒ status "failed" (got ${r.status})`, r.status === "failed");
+  check(`stalled load ends near the deadline (${took}ms, deadline 60ms, ≤ 500ms)`, took >= 50 && took <= 500);
+  check("the stalled request was aborted", hang.calls.aborted === 1);
+  await flushSettings("u12", hang.client); // as block 7: the module's own write gate
+  check("⛔ upsert after a timed-out read (the user is not writable)", hang.calls.upsert === 0);
+
+  const hang2 = makeMockClient({ u12b: { capital: 9000 } }, { hangMode: true });
+  const m = await Promise.race([
+    migrateFromLocalStorage("u12b", hang2.client, { timeoutMs: 60 }),
+    sleep(2000).then(() => ({ reason: "STILL-PENDING" })),
+  ]);
+  check(`stalled existence check ⇒ reason "check-failed" (got ${m.reason})`, m.reason === "check-failed");
+  check("⛔ upsert after a timed-out existence check", hang2.calls.upsert === 0);
+
+  // A read that answers AFTER the deadline is DISCARDED: it must not seed the cache or the
+  // sent-hash — the caller already settled the session as failed (writes blocked).
+  global.localStorage = makeLocalStorage();
+  const late = makeMockClient({ u12c: { capital: 7777 } }, { lateMs: 150 });
+  const r2 = await loadSettings("u12c", late.client, { timeoutMs: 60 });
+  check(`late read ⇒ status "failed" (got ${r2.status})`, r2.status === "failed");
+  await sleep(300); // the late answer has now arrived
+  await flushSettings("u12c", late.client);
+  check("⛔ upsert after a late answer (it did not re-open writes)", late.calls.upsert === 0);
+  check("the late answer did ⛔ seed the mirror (swingEdgeSettings)", !String(global.localStorage.getItem("swingEdgeSettings") || "").includes("7777"));
+
+  // ⚪ control: a normal read is untouched by the deadline.
+  global.localStorage = makeLocalStorage();
+  const ok = makeMockClient({ u12d: { capital: 5000 } });
+  const r3 = await loadSettings("u12d", ok.client, { timeoutMs: 60 });
+  check("⚪ control — a prompt read is ok and carries the row", r3.status === "ok" && r3.settings.capital === 5000);
 }
 
 console.log("");

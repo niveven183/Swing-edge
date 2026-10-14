@@ -19,6 +19,8 @@ import { readFileSync } from "node:fs";
 // ⛔ מוק — המודול האמיתי. סטאב כאן היה מודד את הסטאב.
 import { clearUserScopedStorage, DEVICE_KEYS } from "../src/lib/userScopedStorage.js";
 import { persistPlaybookSafely } from "../src/lib/playbookStore.js";
+// B-408 (14.10) — the REAL capital gate: the Settings edit gate must be the same predicate.
+import { capitalGate } from "../src/lib/positionSizing.js";
 // B-406 (05.10) — the REAL delta module and the REAL settings module. Dynamic: on a tree that
 // predates the module the import fails and every assertion that needs it is RED by name,
 // ⛔ the harness crashing before the rest of the block can speak.
@@ -756,6 +758,7 @@ const main = async () => {
     let upserts = 0;
     const client = { from() { let id = null; const b = {
       select() { return b; }, eq(_c, v) { id = v; return b; },
+      abortSignal() { return b; }, // B-408: postgrest-js has it; the read deadline chains it
       async maybeSingle() { const r = rows.get(id); return { data: r ? { settings: r.settings, user_id: r.user_id } : null, error: null }; },
       async upsert(row) { upserts++; rows.set(row.user_id, row); return { data: null, error: null }; },
     }; return b; } };
@@ -777,6 +780,76 @@ const main = async () => {
     globalThis.localStorage = prevLS;
   }
 
+
+  // ── G — B-408 (14.10): the five scalars cannot be edited before the DB has spoken ─────
+  // Diagnosis docs/audits/B408-SCALAR-HYDRATION-DIAGNOSIS-2026-10-14.md: an edit made while the
+  // settings read was in flight was overwritten by "DB wins" — 0/240 survived. The fix is a
+  // GATE (option B, Niv 14.10), ⛔ a merge: the nine Settings controls are disabled until
+  // `capitalSettled`, which already settles on a FAILED read (⛔ a permanent lock).
+  // ⚠️ G1–G8 run the `capitalSettled` BYTES from the file against the REAL `capitalGate`. They are
+  // GREEN in both trees (⚪): they guard NM-FAIL / NM-CFG, ⛔ the fix. G9–G19 are SHAPE on JSX
+  // bytes — they prove the wiring, ⛔ that the screen behaves; that is tests-eye H6 · C3 · C5.
+  {
+    const G_SETTLED = "const capitalSettled = ";
+    const G_FROM = "{/* ── LANGUAGE SELECTOR ── */}";
+    const G_TO = "{/* ── IMPORT JOURNAL ── */}";
+    for (const a of [G_SETTLED, G_FROM, G_TO]) {
+      if (countOccurrences(src, a) !== 1) {
+        console.error(`\n🔴 חילוץ נכשל — עוגן G "${a}" הופיע ${countOccurrences(src, a)} פעמים, נדרש 1 (B-272).`);
+        process.exit(1);
+      }
+    }
+    const at = src.indexOf(G_SETTLED) + G_SETTLED.length;
+    const expr = src.slice(at, src.indexOf(";", at));
+    const settled = new Function("hydrationDone", "hydrationFailed", "isSupabaseConfigured", `return (${expr});`);
+    let i = 0;
+    for (const hD of [false, true]) for (const hF of [false, true]) for (const cfg of [true, false]) {
+      i++;
+      const got = settled(hD, hF, cfg);
+      const want = capitalGate({ hydrationDone: hD, hydrationFailed: hF, supabaseConfigured: cfg, hasLocalCapital: true }) !== "loading";
+      invariant(`G${i}`, `capitalSettled(done=${hD}, failed=${hF}, configured=${cfg}) ≡ capitalGate ≠ loading`, got === want, `${got} (want ${want})`);
+    }
+
+    const region = src.slice(src.indexOf(G_FROM), src.indexOf(G_TO));
+    // The element that carries an anchor: from its opening tag to its end.
+    const el = (anchor, open, close) => {
+      if (countOccurrences(region, anchor) !== 1) {
+        console.error(`\n🔴 חילוץ נכשל — עוגן G "${anchor}" הופיע ${countOccurrences(region, anchor)} פעמים באזור ה-Settings, נדרש 1 (B-272).`);
+        process.exit(1);
+      }
+      const a = region.indexOf(anchor);
+      const b = region.lastIndexOf(open, a);
+      const e = region.indexOf(close, a);
+      if (b < 0 || e < 0) { console.error(`\n🔴 חילוץ נכשל — אין ${open}…${close} סביב "${anchor}" (B-272).`); process.exit(1); }
+      return region.slice(b, e + close.length);
+    };
+    const GATE = "disabled={!capitalSettled}";
+    const sites = [
+      ["G9", "בורר השפה", el("onChange={e => setLang(e.target.value)}", "<select", "</select>")],
+      ["G10", "שדה ההון", el("onChange={e => setCapitalInput(e.target.value)}", "<input", "/>")],
+      ["G11", "כפתור «Update Capital»", el("{t.updateCapital}", "<button", "</button>")],
+      ["G12", "כפתורי מטבע ההון", el("setCapitalCurrency(c);", "<button", "</button>")],
+      ["G13", "כפתורי מטבע התצוגה", el("setAccountCurrency(c);", "<button", "</button>")],
+      ["G14", "שדה הסיכון", el("onChange={e => setRiskInput(e.target.value)}", "<input", "/>")],
+      ["G15", "כפתור «Update Risk»", el("{t.updateRisk}", "<button", "</button>")],
+    ];
+    for (const [id, name, body] of sites) ok(id, `B-408: ${name} נושא ${GATE}`, body.includes(GATE), body.includes(GATE) ? "gated" : "⛔ gate");
+    // G16 — the "why": exactly three role=status lines, each gated, each speaking t.loading.
+    const statuses = [...region.matchAll(/\{!capitalSettled && \(\s*<p role="status" aria-live="polite"[^>]*>\{t\.loading\}<\/p>\s*\)\}/g)].length;
+    ok("G16", "B-408: 3 שורות `role=status` «טוען…» תחת `!capitalSettled` (שפה · הון · סיכון)", statuses === 3, `n=${statuses}`);
+    // G17·G18 — ③ (Niv 14.10): ⛔ currency shown as selected before the DB has spoken.
+    const ccySel = (ccy) => `capitalSettled && ${ccy} === c`;
+    const ccyPressed = (ccy) => `aria-pressed={capitalSettled ? ${ccy} === c : undefined}`;
+    for (const [id, name, ccy, body] of [["G17", "מטבע ההון", "capitalCurrency", sites[3][2]], ["G18", "מטבע התצוגה", "accountCurrency", sites[4][2]]]) {
+      const good = body.includes(ccySel(ccy)) && body.includes(ccyPressed(ccy));
+      ok(id, `B-408 ③: ${name} ⛔ מסומן ⛔ aria-pressed לפני הכרעה`, good, good ? "gated" : "⛔ gate");
+    }
+    // G19 — the stale risk number (2c: 20/20) is a skeleton until the DB has spoken, like capital.
+    const riskAt = region.indexOf("{t.currentRisk}:");
+    const riskLine = riskAt < 0 ? "" : region.slice(riskAt, region.indexOf("</p>", riskAt));
+    ok("G19", "B-408: «סיכון נוכחי» הוא שלד עד ההכרעה", /capitalSettled \?/.test(riskLine) && /animate-pulse/.test(riskLine), /capitalSettled \?/.test(riskLine) ? "gated" : "⛔ gate");
+  }
+
   // I5 — שערי-מטא
   const tails = [tailOk, persistTailOk, unloadTailOk, hydrateEffectTailOk, dismissTailOk, tourTailOk, initTailOk, onbDoneTailOk];
   invariant("I5", "7 עוגנים ייחודיים · סוגריים מאוזנים · 8 זנבות תואמים",
@@ -791,12 +864,12 @@ const main = async () => {
 
   const total = pass + inv + fail;
   console.log(`\n${APP}`);
-  console.log(`מבחינות: ${pass}/44 · אינווריאנטות: ${inv}/9 · סה"כ ${pass + inv}/${total}`);
+  console.log(`מבחינות: ${pass}/55 · אינווריאנטות: ${inv}/17 · סה"כ ${pass + inv}/${total}`);
   if (fail) {
     console.log(`🔴 אדומות (${fail}): ${reds.join(" · ")}`);
     process.exit(1);
   }
-  console.log("✅ hydration wiring: 53/53");
+  console.log("✅ hydration wiring: 72/72");
 };
 
 main().catch((e) => { console.error("🔴 harness נפל:", e); process.exit(1); });

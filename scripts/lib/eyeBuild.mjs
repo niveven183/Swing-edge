@@ -95,10 +95,11 @@ export async function serve(dir) {
  * process — a synchronous child blocks the event loop and every page.goto times out (measured
  * 04.10: HEAD went 5/5 red for exactly that reason).
  */
-export function runSpec({ root, spec, projects, port, json, evidenceDir }) {
+// `grep` (B-408): run only the scenes an arm is about — a full spec per arm outgrew the job's ceiling.
+export function runSpec({ root, spec, projects, port, json, evidenceDir, grep = null }) {
   return new Promise((done) => {
     let out = "";
-    const child = spawn("npx", ["playwright", "test", "-c", "playwright.eye.config.js", spec, ...projects.map((p) => `--project=${p}`)], {
+    const child = spawn("npx", ["playwright", "test", "-c", "playwright.eye.config.js", spec, ...projects.map((p) => `--project=${p}`), ...(grep ? ["--grep", grep] : [])], {
       cwd: root,
       env: { ...process.env, EYE_HERMETIC: "1", TEST_URL: `http://127.0.0.1:${port}`, EYE_JSON: json, EYE_EVIDENCE_DIR: evidenceDir, CI: "" },
     });
