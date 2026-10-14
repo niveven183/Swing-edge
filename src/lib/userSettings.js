@@ -14,6 +14,34 @@ const TABLE = "user_settings";
 const MIRROR_KEY = "swingEdgeSettings"; // single localStorage mirror of the blob
 const DEBOUNCE_MS = 1000;
 
+// B-408 (14.10) — a settings read that never answers must END, as a failure. Without a deadline
+// `hydrationFailed` never fires: the capital gate stays "loading" for the session (Log Trade
+// locked, B-386) and the Settings edit gate would lock the five scalars with it. 8s = the
+// B-376 FX ceiling (FX_SETTLE_MS) — ~6× the slow-4G window measured in the B-408 diagnosis.
+// ⚠️ The bound is PER READ: hydration does two in series (existence check ⇒ load), so a check
+// that answers at 7.9s followed by a load that hangs ends at ~16s. Said, ⛔ hidden.
+export const SETTINGS_READ_TIMEOUT_MS = 8000;
+
+// Race one read against the deadline. On expiry the request is ABORTED and the caller gets
+// `{ error }` — the same shape supabase-js returns for any refused read, so the existing failure
+// paths (`loadFailed` · `check-failed`) handle it. A late answer is DISCARDED: the race has
+// already settled, and nothing below the `await` ever sees it (⛔ cache · ⛔ lastSent · ⛔ mirror).
+async function readWithDeadline(build, timeoutMs) {
+  const ctl = new AbortController();
+  let timer;
+  const deadline = new Promise((resolve) => {
+    timer = setTimeout(() => {
+      ctl.abort();
+      resolve({ data: null, error: { message: `settings read timed out after ${timeoutMs}ms` } });
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([build(ctl.signal), deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // localStorage key -> { field, parse }. `parse` turns the raw stored string into
 // the value we persist in the jsonb blob. betaWelcome is handled separately
 // because its key is per-user (`swingEdgeBetaWelcome:${userId}`).
@@ -187,14 +215,15 @@ async function upsertBlob(userId, blob, client) {
 // as "no row" — the caller could not tell them apart, marked hydration done, and
 // DEFAULT_CAPITAL was then persisted over the user's real capital (B-268).
 // ⛔ The contract is unchanged in one respect: this never throws.
-export async function loadSettings(userId, client = supabase) {
+export async function loadSettings(userId, client = supabase, { timeoutMs = SETTINGS_READ_TIMEOUT_MS } = {}) {
   if (client && userId) {
     try {
-      const { data, error } = await client
+      const { data, error } = await readWithDeadline((signal) => client
         .from(TABLE)
         .select("settings")
         .eq("user_id", userId)
-        .maybeSingle();
+        .abortSignal(signal)
+        .maybeSingle(), timeoutMs);
       if (error) return loadFailed(userId, error);
       if (data && data.settings) {
         cache.set(userId, data.settings);
@@ -280,15 +309,17 @@ export async function flushSettings(userId, client = supabase) {
 // One-shot bridge. If a Supabase row already exists → Supabase wins, do nothing.
 // Otherwise read the 10 localStorage keys, build a parsed blob, and (if non-empty)
 // upsert it with a `_migrated: true` flag stored INSIDE the settings jsonb.
-export async function migrateFromLocalStorage(userId, client = supabase) {
+export async function migrateFromLocalStorage(userId, client = supabase, { timeoutMs = SETTINGS_READ_TIMEOUT_MS } = {}) {
   if (!client || !userId) return { migrated: false, reason: "no-client" };
 
   try {
-    const { data, error } = await client
+    // B-408 — a check that never answers is a check we could not complete ⇒ "check-failed".
+    const { data, error } = await readWithDeadline((signal) => client
       .from(TABLE)
       .select("user_id")
       .eq("user_id", userId)
-      .maybeSingle();
+      .abortSignal(signal)
+      .maybeSingle(), timeoutMs);
     // ⚠️ B-268 / 1a — the cleanest clobber path in the module, and one line.
     // supabase-js RETURNS the error; `!error && data` sent an RLS denial straight
     // through, and the function then built a blob from localStorage and let
