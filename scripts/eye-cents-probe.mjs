@@ -14,6 +14,7 @@
 //   MUT-B7   `Math.round` back in the setup-table payload         ⇒ a RED on the B7 cell
 //   MUT-EXIT-DROP / MUT-ENTRY-DROP  the app drops a typed price  ⇒ a + b RED naming the field (B-415)
 //   ILS-MUT-B5 / ILS-MUT-B8   B5 / B8 back to the raw paper P&L    ⇒ a + b RED on that chart (B-045, ₪)
+//   ILS-HIST / ILS-HIST-MUT-B7  production-shaped history (EYE_SEED_HISTORY) ⇒ green / a RED on B7
 //
 // ⛔ A mutant that survives means the spec is BLIND ⇒ exit 1. Mutations are applied in place,
 // matched EXACTLY ONCE (B-272), restored in a `finally`, and the restore is checked with git.
@@ -61,6 +62,12 @@ const ARMS = {
                   () => "const { pnl, fxUnconverted } = calcTradeMetrics(t);\n                if (pnl == null || fxUnconverted) return;"]],
   "ILS-MUT-B8": [[APP, "const { pnl, fxUnconverted } = stableCalcTradeMetrics(t);\n                const hold = holdDays(t);",
                   () => "const { pnl, fxUnconverted } = calcTradeMetrics(t);\n                const hold = holdDays(t);"]],
+  // ── production SHAPE (EYE_SEED_HISTORY=1, tests-eye/hermetic.js): a non-empty Breakout base whose cent tail
+  // flips the sum + a month worth thousands (this month's bars ~1px). Run 38434987667 went red on exactly
+  // this on production while the empty store was green. HIST must be green; HIST-MUT-B7 proves the cent-set
+  // the spec accepts for a rounded base (`sumStrings`) cannot absorb `Math.round`.
+  "ILS-HIST":        [],
+  "ILS-HIST-MUT-B7": [[APP, "totalPnL: s.totalPnL,", () => "totalPnL: Math.round(s.totalPnL),"]],
   // K2 is still caught in ₪: `Math.round` before the converting formatter.
   "ILS-MUT-A1": [[APP, "const shown = fmtAcct(closedTrade, pnl);", () => "const shown = fmtAcct(closedTrade, Math.round(pnl));"]],
   // ── B-415 · the app DROPS a typed price: the spec must name the field, ⛔ time out on a button ──
@@ -68,6 +75,7 @@ const ARMS = {
   "MUT-ENTRY-DROP": [[APP, "setForm(f=>({...f,[key]:e.target.value}))", () => 'setForm(f=>({...f,[key]:key==="entry"?"":e.target.value}))']],
 };
 const ARM_CCY = (arm) => (arm.startsWith("ILS-") ? "ILS" : undefined);
+const ARM_SEED = (arm) => arm.includes("-HIST");
 const appSrc = readFileSync(APP, "utf8");
 const icSrc = readFileSync(IC, "utf8");
 for (const [arm, muts] of Object.entries(ARMS)) for (const [f, find] of muts) once(f === IC ? icSrc : appSrc, find, arm);
@@ -83,6 +91,7 @@ for (const arm of Object.keys(ARMS)) {
   const { server, port } = await serve(dist);
   const json = join(OUT, `${arm}.json`);
   if (ARM_CCY(arm)) process.env.EYE_CCY = ARM_CCY(arm); else delete process.env.EYE_CCY;
+  if (ARM_SEED(arm)) process.env.EYE_SEED_HISTORY = "1"; else delete process.env.EYE_SEED_HISTORY;
   const run = await runSpec({ root: ROOT, spec: "tests-eye/cents.spec.js", projects: PROJECTS, port, json, evidenceDir: join(OUT, arm) });
   server.close();
   if (!run.ok) die(`${arm}: the spec produced no JSON report (exit ${run.status})\n${run.out.slice(-3000)}`);
@@ -124,6 +133,12 @@ for (const p of PROJECTS) {
     ok(`${arm}/${p}`, r2.every(([, r]) => r.status === "failed" && re.test(r.msg)), `₪: ${what} raw under ₪ ⇒ a + b RED on the ${what} (B-045)`,
       r2.map(([s, r]) => `${s}: ${r.msg.split("\n")[0] || "mutant SURVIVED"}`).join(" | "));
   }
+  const hs = ["a", "b"].map((s) => [s, v("ILS-HIST", s)]);
+  ok(`ILS-HIST/${p}`, hs.every(([, r]) => r.status === "passed"), "₪ + production-shaped history: a + b green (rounded base · ~1px bars)",
+    hs.filter(([, r]) => r.status !== "passed").map(([s, r]) => `${s}:${r.status} ${r.msg.split("\n")[0]}`).join(" | "));
+  const h7 = v("ILS-HIST-MUT-B7", "a");
+  ok(`ILS-HIST-MUT-B7/${p}`, h7.status === "failed" && /B7 setup cell/.test(h7.msg), `₪ + history: Math.round on the setup total ⇒ a RED on the B7 cell (${h7.status})`,
+    h7.msg.split("\n")[0] || "mutant SURVIVED — the cent-set absorbed rounding");
   const i1 = ["a", "b"].map((s) => [s, v("ILS-MUT-A1", s)]);
   ok(`ILS-MUT-A1/${p}`, i1.every(([, r]) => r.status === "failed" && /close toast \((he|en)\)/.test(r.msg)), "₪: Math.round before fmtAcct ⇒ a + b RED on the toast",
     i1.map(([s, r]) => `${s}: ${r.msg.split("\n")[0] || "mutant SURVIVED"}`).join(" | "));
@@ -140,5 +155,5 @@ for (const p of PROJECTS) {
 }
 
 await rm(WORK, { recursive: true, force: true });
-console.log(failures ? `\n❌ eye-cents-probe: ${failures} verdict(s) failed — the spec is not proven` : "\n✅ eye-cents-probe — HEAD green · MUT-A1 red · MUT-B7 red · ILS-HEAD green · ILS-MUT-A/OLD/B3/B5/B8/A1 red · MUT-EXIT/ENTRY-DROP red");
+console.log(failures ? `\n❌ eye-cents-probe: ${failures} verdict(s) failed — the spec is not proven` : "\n✅ eye-cents-probe — HEAD green · MUT-A1 red · MUT-B7 red · ILS-HEAD/HIST green · ILS-MUT-A/OLD/B3/B5/B8/A1 · ILS-HIST-MUT-B7 red · MUT-EXIT/ENTRY-DROP red");
 process.exit(failures ? 1 : 0);

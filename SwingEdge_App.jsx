@@ -5726,7 +5726,9 @@ export default function SwingEdge() {
 
         {/* ══════════════ TOOLS — sub-nav ══════════════ */}
         {tab === "tools" && (
-          <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit mx-auto">
+          // B-424 (13.10): three `px-5` buttons in a row that could not wrap — 16px past a 320px screen
+          // (iPhone SE · en, tests-eye/width.spec.js). They wrap, centred, inside the screen.
+          <div className="flex flex-wrap justify-center gap-1 p-1 bg-slate-100 rounded-xl w-fit max-w-full mx-auto">
             <button
               onClick={() => setToolsTab('analyzer')}
               className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${toolsTab === 'analyzer' ? 'bg-white shadow-sm text-emerald-700' : 'text-[#475569] hover:text-[#334155]'}`}
@@ -6370,9 +6372,14 @@ export default function SwingEdge() {
               </p>
             )}
             {/* ═══════════ HERO — the story of your account ═══════════ */}
+            {/* 🔴 B-424 (13.10): the row did not wrap and its left column could not shrink, while the
+                label beside it is `shrink-0` and its info button is 44px on mobile (index.css touch
+                target) ⇒ a long P&L pushed «EQUITY CURVE ?» past the card: page 437px on a 412px
+                screen, the layout viewport widened and the fixed FAB went partly off-screen.
+                `flex-wrap` + `min-w-0`: the label drops below instead. Gate: tests-eye/width.spec.js. */}
             <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-2xl p-6 md:p-8">
-              <div className="flex items-start justify-between gap-4 mb-6">
-                <div>
+              <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 mb-6">
+                <div className="min-w-0">
                   <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500">
                     {lang === "he" ? "הסיפור של החשבון שלך" : "The story of your account"}
                   </span>
