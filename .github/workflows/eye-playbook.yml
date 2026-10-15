@@ -47,6 +47,7 @@ on:
       - 'scripts/eye-overlay-probe.mjs'
       - 'scripts/eye-width-probe.mjs'
       - 'scripts/lib/eyeBuild.mjs'
+      - 'scripts/lib/syncArms.mjs'   # B-425: eye-sync-probe's arms
       - 'src/lib/settingsDelta.js'
       - 'src/lib/userSettings.js'
       - 'scripts/eye-sync-probe.mjs'
@@ -78,6 +79,7 @@ on:
       - 'scripts/eye-overlay-probe.mjs'
       - 'scripts/eye-width-probe.mjs'
       - 'scripts/lib/eyeBuild.mjs'
+      - 'scripts/lib/syncArms.mjs'   # B-425: eye-sync-probe's arms
       - 'src/lib/settingsDelta.js'
       - 'src/lib/userSettings.js'
       - 'scripts/eye-sync-probe.mjs'

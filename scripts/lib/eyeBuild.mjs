@@ -96,12 +96,14 @@ export async function serve(dir) {
  * 04.10: HEAD went 5/5 red for exactly that reason).
  */
 // `grep` (B-408): run only the scenes an arm is about — a full spec per arm outgrew the job's ceiling.
-export function runSpec({ root, spec, projects, port, json, evidenceDir, grep = null }) {
+// `config` · `extraArgs` · `env` (B-425): scripts/probe-flake.mjs runs the same specs under
+// playwright.flake.config.js with --repeat-each. The defaults keep every existing caller byte-identical.
+export function runSpec({ root, spec, projects, port, json, evidenceDir, grep = null, config = "playwright.eye.config.js", extraArgs = [], env = {} }) {
   return new Promise((done) => {
     let out = "";
-    const child = spawn("npx", ["playwright", "test", "-c", "playwright.eye.config.js", spec, ...projects.map((p) => `--project=${p}`), ...(grep ? ["--grep", grep] : [])], {
+    const child = spawn("npx", ["playwright", "test", "-c", config, spec, ...projects.map((p) => `--project=${p}`), ...(grep ? ["--grep", grep] : []), ...extraArgs], {
       cwd: root,
-      env: { ...process.env, EYE_HERMETIC: "1", TEST_URL: `http://127.0.0.1:${port}`, EYE_JSON: json, EYE_EVIDENCE_DIR: evidenceDir, CI: "" },
+      env: { ...process.env, EYE_HERMETIC: "1", TEST_URL: `http://127.0.0.1:${port}`, EYE_JSON: json, EYE_EVIDENCE_DIR: evidenceDir, CI: "", ...env },
     });
     child.stdout.on("data", (d) => { out += d; });
     child.stderr.on("data", (d) => { out += d; });

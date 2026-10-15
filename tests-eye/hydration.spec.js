@@ -35,7 +35,7 @@
 // ⛔ fill · ⛔ addLocatorHandler · ⛔ retry · ⛔ timed waits in these four: conditions only.
 
 import { test, expect } from "@playwright/test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { installHermetic, newStore, DUMMY_EMAIL, DUMMY_PASSWORD } from "./hermetic.js";
 import { exactRx, containsRx } from "./labels.js";
@@ -43,9 +43,70 @@ import { exactRx, containsRx } from "./labels.js";
 const HERMETIC = process.env.EYE_HERMETIC === "1";
 const EVIDENCE = process.env.EYE_EVIDENCE_DIR || join(process.cwd(), "eye-evidence");
 const DELTA_KEY = "swingEdgeSettingsDelta";
+// B-425 (15.10) — flake diagnosis (scripts/probe-flake.mjs). OBSERVERS ONLY, and only with
+// EYE_FLAKE_DIAG=1: ⛔ an expect, a wait or a timeout changes. Without the flag every scene is
+// byte-for-byte the behaviour it had. Plan: docs/plans/PLAN-2026-10-15-b425-flake-diagnosis.md
+const DIAG = process.env.EYE_FLAKE_DIAG === "1";
+const DIAG_KEYS = ["swingEdgePriceAlerts", "swingEdgeCapital", "swingEdgeRiskPct", DELTA_KEY];
+
+// One timeline per test: user_settings traffic (method · status · the three fields the two scenes
+// are about) · the read gate · console + page errors · every localStorage write to DIAG_KEYS
+// (an init script logs them from inside the page with the page's own clock) · snapshots taken
+// at named moments. t = ms since the context opened.
+async function makeDiag(ctx) {
+  const t0 = Date.now();
+  const events = [];
+  const ev = (kind, data = {}) => events.push({ t: Date.now() - t0, kind, ...data });
+  const pick = (req) => {
+    try {
+      const b = JSON.parse(req.postData() || "null");
+      const row = Array.isArray(b) ? b[0] : b;
+      const st = row?.settings;
+      return st ? { priceAlerts: st.priceAlerts, capital: st.capital, riskPct: st.riskPct } : null;
+    } catch (e) { return { unparsable: String(e.message || e) }; }
+  };
+  const isSettings = (u) => /\/rest\/v1\/user_settings/.test(u);
+  ctx.on("request", (r) => { if (isSettings(r.url())) ev("req", { method: r.method(), body: r.method() === "GET" ? undefined : pick(r) }); });
+  ctx.on("response", (r) => { if (isSettings(r.url())) ev("res", { method: r.request().method(), status: r.status() }); });
+  ctx.on("requestfailed", (r) => { if (isSettings(r.url())) ev("reqfailed", { method: r.method(), failure: r.failure()?.errorText ?? null, body: r.method() === "GET" ? undefined : pick(r) }); });
+  ctx.on("console", (m) => {
+    const text = m.text();
+    const ls = /^\[lsdiag\] (\d+) (set|remove) (\S+) ?(.*)$/s.exec(text);
+    if (ls) events.push({ t: Number(ls[1]) - t0, kind: "ls", op: ls[2], key: ls[3], value: ls[4] || null });
+    else ev("console", { type: m.type(), text: text.slice(0, 2000) });
+  });
+  ctx.on("weberror", (e) => ev("pageerror", { error: String(e.error()?.stack || e.error()).slice(0, 2000) }));
+  await ctx.addInitScript((keys) => {
+    const set = Storage.prototype.setItem, rm = Storage.prototype.removeItem;
+    Storage.prototype.setItem = function (k, v) { if (keys.includes(k)) console.debug(`[lsdiag] ${Date.now()} set ${k} ${String(v).slice(0, 500)}`); return set.call(this, k, v); };
+    Storage.prototype.removeItem = function (k) { if (keys.includes(k)) console.debug(`[lsdiag] ${Date.now()} remove ${k}`); return rm.call(this, k); };
+  }, DIAG_KEYS);
+  const upserts = () => events.filter((e) => e.kind === "req" && e.method !== "GET").length;
+  // A snapshot that cannot be taken is RECORDED as such (⛔ swallowed): the timeline says why.
+  const snap = async (page, tag, extra = {}) => {
+    try {
+      const ls = await page.evaluate((keys) => Object.fromEntries(keys.map((k) => [k, localStorage.getItem(k)])), DIAG_KEYS);
+      ev("snap", { tag, ls, upsertsSoFar: upserts(), ...extra });
+    } catch (e) { ev("snap-failed", { tag, error: String(e.message || e).split("\n")[0] }); }
+  };
+  return { ev, snap, events, t0 };
+}
 
 test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", () => {
   test.skip(!HERMETIC, "hermetic only — the production step is playbook.spec.js f");
+
+  // B-425: the config's `video` does NOT reach contexts made with browser.newContext() (measured
+  // 15.10 — trace did, video did not), so under EYE_FLAKE_DIAG open() records it itself. Kept and
+  // attached only when the test did not end as expected; a pass deletes it. Status is final HERE.
+  let diagVideos = [];
+  test.afterEach(async ({}, info) => {
+    const vids = diagVideos;
+    diagVideos = [];
+    for (const v of vids) {
+      if (info.status !== info.expectedStatus) await info.attach("video", { path: v, contentType: "video/webm" });
+      else rmSync(v, { force: true });
+    }
+  });
 
   const ctxOpts = (info) => {
     const u = info.project.use;
@@ -54,7 +115,8 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
   };
 
   async function open(browser, info, seed = {}, { noRow = false } = {}) {
-    const ctx = await browser.newContext({ ...ctxOpts(info), baseURL: info.project.use.baseURL });
+    const ctx = await browser.newContext({ ...ctxOpts(info), baseURL: info.project.use.baseURL, ...(DIAG ? { recordVideo: { dir: join(info.outputDir, "diag-video") } } : {}) });
+    const diag = DIAG ? await makeDiag(ctx) : null;
     const store = newStore();
     store.settings.lang = "en";
     store.settings.playbook = [];
@@ -82,15 +144,20 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
       }
       if (route.request().method() === "GET" && gate.armed) {
         gate.held++;
+        diag?.ev("gate", { state: "held", held: gate.held });
         await new Promise((res) => { gate.release = res; });
+        diag?.ev("gate", { state: "released" });
       }
       return route.fallback();
     });
     const page = await ctx.newPage();
+    if (DIAG) diagVideos.push(await page.video().path());
     const dir = join(EVIDENCE, "hydration", info.project.name);
     mkdirSync(dir, { recursive: true });
-    const shot = (name) => page.screenshot({ path: join(dir, `${name}.png`) }).catch(() => {});
-    return { ctx, page, store, gate, dir, shot };
+    // B-425: --repeat-each runs a scene N times into ONE directory — repeat 0 keeps the old names.
+    const sfx = info.repeatEachIndex ? `-r${info.repeatEachIndex}` : "";
+    const shot = (name) => page.screenshot({ path: join(dir, `${name}${sfx}.png`) }).catch(() => {});
+    return { ctx, page, store, gate, dir, shot, sfx, diag };
   }
 
   const dash = (page) => page.locator('[data-tour-tab="dashboard"]').waitFor({ state: "visible", timeout: 30_000 });
@@ -111,6 +178,7 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
     const { page, gate } = app;
     await page.waitForTimeout(2_500); // the first hydration + its debounced write settle
     gate.armed = true;
+    app.diag?.ev("gate", { state: "armed" });
     await page.reload({ waitUntil: "load" });
     await dash(page);
     await expect.poll(() => gate.held, { message: "the user_settings read must be held — otherwise there is no window", timeout: 10_000 }).toBeGreaterThan(0);
@@ -120,7 +188,9 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
     const { page, gate } = app;
     gate.armed = false;
     gate.release?.();
+    app.diag?.ev("gate", { state: "release-called" });
     await page.waitForTimeout(3_500); // hydration + the 1000ms debounce + the upsert
+    app.diag?.ev("reload", { by: "releaseAndReload" });
     await page.reload({ waitUntil: "load" });
     await dash(page);
     await page.waitForTimeout(2_500);
@@ -139,7 +209,14 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
   }
 
   const names = (l) => (l || []).map((x) => x.name);
-  const evidence = (app, tag, data) => writeFileSync(join(app.dir, `${tag}.json`), JSON.stringify(data, null, 2));
+  const evidence = (app, tag, data) => writeFileSync(join(app.dir, `${tag}${app.sfx}.json`), JSON.stringify(data, null, 2));
+  // B-425: the diag timeline is written for EVERY run (pass or fail) — the passes are the baseline.
+  // ⛔ a status here: inside `finally` testInfo still says "passed" while the error propagates;
+  // probe-flake joins each timeline to its verdict from the JSON report by repeatEachIndex.
+  const writeDiag = (app, tag, info) => {
+    if (!app.diag) return;
+    writeFileSync(join(app.dir, `${tag}-diag${app.sfx}.json`), JSON.stringify({ scene: tag, project: info.project.name, repeat: info.repeatEachIndex, events: app.diag.events }, null, 2));
+  };
 
   test("H1 playbook-window — a setup added while the settings read is in flight survives", async ({ browser }, info) => {
     const app = await open(browser, info);
@@ -178,14 +255,18 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
       await reloadIntoWindow(app);
       await page.locator('button[title="Price Alert"]').first().click();
       await page.getByPlaceholder("Set target price").fill("105");
+      if (app.diag) await app.diag.snap(page, "before-ok", { inputValue: await page.getByPlaceholder("Set target price").inputValue() });
       await page.getByRole("button", { name: "OK", exact: true }).click();
+      // B-425: the ONE moment that tells "the tap never landed" from "set, then lost".
+      if (app.diag) await app.diag.snap(page, "after-ok", { alertInputOpen: await page.getByPlaceholder("Set target price").count(), dbNow: store.settings.priceAlerts });
       await releaseAndReload(app);
       const local = await json(page, "swingEdgePriceAlerts");
       evidence(app, "H2", { local, db: store.settings.priceAlerts, journal: await ls(page, DELTA_KEY) });
+      await app.diag?.snap(page, "assert", { dbNow: store.settings.priceAlerts });
       await app.shot("H2");
       expect(local?.EYEPB, "B-406: the alert is gone from this device after the read landed").toBe(105);
       expect(store.settings.priceAlerts?.EYEPB, "B-406: the alert never reached the DB").toBe(105);
-    } finally { await app.ctx.close(); }
+    } finally { writeDiag(app, "H2", info); await app.ctx.close(); }
   });
 
   test("H3 other-device — what another device wrote is shown, and this device's write keeps it", async ({ browser }, info) => {
@@ -421,11 +502,19 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
       expect(await ls(page, "swingEdgeRiskPct")).toBe("3");
       // This device then writes something ELSE — the whole blob goes out; riskPct must still be 3.
       await typeInto(page, ctl(page).capitalInput, "11111");
+      if (app.diag) await app.diag.snap(page, "before-click", { inputValue: await ctl(page).capitalInput.inputValue() });
       await ctl(page).capitalBtn.click();
+      // B-425: the ONE moment that tells "the click never landed" from "set, then never written".
+      if (app.diag) await app.diag.snap(page, "after-click", { inputValue: await ctl(page).capitalInput.inputValue(), dbNow: store.settings.capital });
       await expect.poll(() => store.settings.capital, { message: "the capital edit never reached the row" }).toBe(11111);
-      evidence(app, "C4", { riskPct: store.settings.riskPct, capital: store.settings.capital });
       expect(store.settings.riskPct, "this device wrote its stale riskPct over the other device's").toBe(3);
-    } finally { await app.ctx.close(); }
+    } finally {
+      // B-425: written on failure too — before, a red C4 left no evidence at all (INCIDENTS#33).
+      evidence(app, "C4", { riskPct: store.settings.riskPct, capital: store.settings.capital });
+      await app.diag?.snap(page, "assert", { dbNow: store.settings.capital });
+      writeDiag(app, "C4", info);
+      await app.ctx.close();
+    }
   });
 
   test("C5 hang — a settings read that never answers ends within the deadline: controls enabled + B-268 banner", async ({ browser }, info) => {
