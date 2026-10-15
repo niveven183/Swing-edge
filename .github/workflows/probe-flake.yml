@@ -1,0 +1,168 @@
+name: Probe · flake diagnosis (B-425)
+
+# B-425 (15.10) — how often does an edit fail to reach the settings row on a CI runner, and why?
+# H2 (price alert in the hydration window) · C4 (capital edit after hydration) of
+# tests-eye/hydration.spec.js, on the tree as committed (HEAD) and on BEFORE-408 (SwingEdge_App.jsx +
+# userSettings.js as at 3957509 — the arm that went red in INCIDENTS#33), each failure captured
+# with trace + video + the diag timeline. Plan: docs/plans/PLAN-2026-10-15-b425-flake-diagnosis.md
+#
+# ⛔ pull_request · ⛔ push · ⛔ schedule (Niv 15.10, fix ③): a measurement is dispatched on purpose,
+# from main, with the rung of the ladder it is for.
+#
+# ⛔ the `secrets` context anywhere in this file: the job uploads TRACES (E11). Everything is hermetic — the app
+# is built against the synthetic Supabase (tests-eye/hermetic.js) and served from loopback;
+# playwright.flake.config.js refuses any other origin, and scripts/probe-flake.mjs refuses to run
+# if this file names a secret or a secret-shaped variable is in its environment.
+#
+# ⚠️ Emulation, ⛔ a physical iPhone: `iphone14` is WebKit with an iPhone UA/viewport/touch.
+
+on:
+  workflow_dispatch:
+    inputs:
+      repeat:
+        description: "Repeats per cell (insitu: in total, split across shards)"
+        default: "30"
+      modes:
+        description: "isolated · insitu · or both (comma-separated)"
+        default: "isolated,insitu"
+      trees:
+        description: "HEAD · BEFORE-408"
+        default: "HEAD,BEFORE-408"
+      scenes:
+        description: "H2 · C4"
+        default: "H2,C4"
+      projects:
+        description: "iphone14 · pixel7"
+        default: "iphone14,pixel7"
+      shards:
+        description: "Parallel jobs per insitu set"
+        default: "3"
+      debounce:
+        description: "Also measure the debounce window / reload scene (tests-flake/)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      cells: ${{ steps.plan.outputs.cells }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - id: plan
+        env:
+          IN_REPEAT: ${{ inputs.repeat }}
+          IN_MODES: ${{ inputs.modes }}
+          IN_TREES: ${{ inputs.trees }}
+          IN_SCENES: ${{ inputs.scenes }}
+          IN_PROJECTS: ${{ inputs.projects }}
+          IN_SHARDS: ${{ inputs.shards }}
+        run: |
+          cells=$(node scripts/probe-flake.mjs --plan)
+          echo "cells=$cells" >> "$GITHUB_OUTPUT"
+          echo "$cells" | node -e 'const j=JSON.parse(require("fs").readFileSync(0,"utf8")).include; console.log(j.length + " cells"); for (const c of j) console.log(" ", c.id, "×", c.repeat)'
+
+  # The instrument's red-before, on the same runner image: a deterministic red must be seen AND
+  # captured (trace + video + diag) before a single measurement counts.
+  self-test:
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.61.1-noble
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [iphone14, pixel7]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # BEFORE-408 reads 3957509 · makeArms reads 19959e6
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - run: npm ci
+      - run: npm run probe:flake -- --self-test --project ${{ matrix.project }}
+      - name: Upload self-test evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: eye-flake-self-test-${{ matrix.project }}-${{ github.run_id }}
+          path: eye-evidence/probe-flake/
+          retention-days: 14
+          if-no-files-found: warn
+
+  measure:
+    needs: [plan, self-test]
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.61.1-noble
+    # A job budget, ⛔ a test timeout: every Playwright timeout is the eye config's, untouched.
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.cells) }}
+    name: measure · ${{ matrix.id }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - run: npm ci
+      - name: Measure ${{ matrix.id }}
+        run: >
+          npm run probe:flake --
+          --tree ${{ matrix.tree }} --scene ${{ matrix.scene }} --mode ${{ matrix.mode }}
+          --project ${{ matrix.project }} --repeat ${{ matrix.repeat }} --shard ${{ matrix.shard }}
+      - name: Upload evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: eye-flake-${{ matrix.id }}-${{ github.run_id }}
+          path: eye-evidence/probe-flake/
+          retention-days: 14
+          if-no-files-found: warn
+
+  debounce:
+    needs: [self-test]
+    if: ${{ inputs.debounce }}
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.61.1-noble
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [iphone14, pixel7]
+    name: debounce · ${{ matrix.project }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - run: npm ci
+      - run: npm run probe:flake -- --scene DEBOUNCE --project ${{ matrix.project }}
+      - name: Upload evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: eye-flake-debounce-${{ matrix.project }}-${{ github.run_id }}
+          path: eye-evidence/probe-flake/
+          retention-days: 14
+          if-no-files-found: warn
+
+  # One table for the whole dispatch: shards summed per tree · scene · browser · mode.
+  summary:
+    needs: [measure, debounce]
+    if: ${{ always() && needs.measure.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: eye-flake-*
+          path: flake-cells
+      - run: node scripts/probe-flake.mjs --summarize flake-cells
