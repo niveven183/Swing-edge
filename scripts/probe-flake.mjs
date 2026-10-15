@@ -80,13 +80,13 @@ if (flag("summarize")) {
   for (const c of cells) {
     if (c.kind === "debounce") continue;
     const key = [c.tree, c.scene, c.project, c.mode].join(" · ");
-    const a = acc.get(key) || { n: 0, failed: 0, shards: 0, failures: [] };
-    a.n += c.n; a.failed += c.failed; a.shards++; a.failures.push(...c.failures.map((f) => ({ ...f, shard: c.shard })));
+    const a = acc.get(key) || { n: 0, failed: 0, shards: 0, failures: [], instrument: 0 };
+    a.n += c.n; a.failed += c.failed; a.shards++; a.failures.push(...c.failures.map((f) => ({ ...f, shard: c.shard }))); a.instrument += (c.instrument || []).length;
     acc.set(key, a);
   }
-  const lines = ["| עץ · סצנה · דפדפן · mode | אדום | Wilson 95% | C-P 95% | shards |", "|---|---|---|---|---|"];
+  const lines = ["| עץ · סצנה · דפדפן · mode | אדום | Wilson 95% | C-P 95% | shards | INSTRUMENT |", "|---|---|---|---|---|---|"];
   for (const [key, a] of [...acc].sort()) {
-    lines.push(`| ${key} | ${a.failed}/${a.n} | ${wilson(a.failed, a.n).map(pct).join("–")} | ${clopperPearson(a.failed, a.n).map(pct).join("–")} | ${a.shards} |`);
+    lines.push(`| ${key} | ${a.failed}/${a.n} | ${wilson(a.failed, a.n).map(pct).join("–")} | ${clopperPearson(a.failed, a.n).map(pct).join("–")} | ${a.shards} | ${a.instrument} |`);
   }
   const deb = cells.filter((c) => c.kind === "debounce");
   for (const c of deb) {
@@ -200,7 +200,7 @@ function orderGate(recs, setKeys) {
   return { ok: seq.join(",") === want.join(","), seq, want };
 }
 
-async function cell({ tree, scene, mode, repeat, shard = 0, diag = true, label = null, grepOverride = null }) {
+async function cell({ tree, scene, mode, repeat, shard = 0, diag = true, label = null, grepOverride = null, extraEnv = {} }) {
   if (!TREES[tree]) die(`unknown tree "${tree}"`);
   const name = label || `${tree}-${scene}-${mode}-${PROJECT}${shard ? `-s${shard}` : ""}`;
   const dir = join(OUT, name);
@@ -218,7 +218,7 @@ async function cell({ tree, scene, mode, repeat, shard = 0, diag = true, label =
     const run = await runSpec({
       root: ROOT, spec, projects: [PROJECT], port, json, evidenceDir: dir, grep,
       config: "playwright.flake.config.js", extraArgs: ["--repeat-each", String(repeat)],
-      env: { EYE_FLAKE_DIAG: diag ? "1" : "", EYE_FLAKE_OUT: join(dir, "test-results") },
+      env: { EYE_FLAKE_DIAG: diag ? "1" : "", EYE_FLAKE_OUT: join(dir, "test-results"), ...extraEnv },
     });
     server.close();
     if (!run.ok) die(`${name}: the spec produced no JSON report (exit ${run.status})\n${run.out.slice(-3000)}`);
@@ -233,6 +233,9 @@ async function cell({ tree, scene, mode, repeat, shard = 0, diag = true, label =
 }
 
 // A scene's verdict + the capture each failure must carry.
+// B-425 (Niv 15.10, ①): a failure whose message starts with `INSTRUMENT:` (tests-eye/hydration.spec.js —
+// the held read outlived its bound) is the INSTRUMENT's, ⛔ a red of the scene: it is counted apart,
+// leaves the population (n), and the cell exits 1 once its data is written.
 function score({ name, dir, recs }, scene, repeat, { insituSet = null } = {}) {
   const mine = recs.filter((r) => r.key === scene && r.project === PROJECT);
   if (mine.length !== repeat) die(`${name}: ${mine.length} results for ${scene}, expected ${repeat}`);
@@ -241,15 +244,17 @@ function score({ name, dir, recs }, scene, repeat, { insituSet = null } = {}) {
     if (!g.ok) die(`${name}: insitu order gate — the set did not run in file order per repeat\n  got  ${g.seq.slice(0, 40).join(",")}\n  want ${g.want.slice(0, 40).join(",")}`);
   }
   const failures = [];
+  const instrument = [];
   for (const r of mine.filter((x) => x.status !== "passed")) {
     const trace = r.attachments.find((a) => a.name === "trace" && a.path && existsSync(a.path));
     const video = r.attachments.find((a) => a.name === "video" && a.path && existsSync(a.path));
     const diagFile = join(dir, "hydration", PROJECT, `${scene}-diag${r.repeat ? `-r${r.repeat}` : ""}.json`);
     const diag = existsSync(diagFile) ? JSON.parse(readFileSync(diagFile, "utf8")) : null;
     if (!trace || !video || !diag) die(`${name}: repeat ${r.repeat} of ${scene} failed WITHOUT its capture (trace ${!!trace} · video ${!!video} · diag ${!!diag}) — a failure that cannot be classified is a blind instrument`);
-    failures.push({ repeat: r.repeat, status: r.status, msg: r.msg, durationMs: r.durationMs, trace: trace.path.replace(ROOT + "/", ""), video: video.path.replace(ROOT + "/", ""), diag: diagFile.replace(ROOT + "/", ""), snaps: diag.events.filter((e) => e.kind === "snap" || e.kind === "snap-failed") });
+    const rec = { repeat: r.repeat, status: r.status, msg: r.msg, durationMs: r.durationMs, trace: trace.path.replace(ROOT + "/", ""), video: video.path.replace(ROOT + "/", ""), diag: diagFile.replace(ROOT + "/", ""), snaps: diag.events.filter((e) => e.kind === "snap" || e.kind === "snap-failed") };
+    (/\bINSTRUMENT:/.test(r.msg) ? instrument : failures).push(rec);
   }
-  return { n: mine.length, failed: failures.length, failures };
+  return { n: mine.length - instrument.length, failed: failures.length, failures, instrument };
 }
 
 // ═══ --self-test — the instrument's red-before ═══════════════════════════════════
@@ -268,13 +273,25 @@ if (flag("self-test")) {
   check("S5", sC4.failures.every((f) => existsSync(join(ROOT, `eye-evidence/probe-flake/SELF-C4-RED-${PROJECT}/hydration/${PROJECT}/C4${f.repeat ? `-r${f.repeat}` : ""}.json`))), "a red C4 writes its evidence (finally) — before B-425 it wrote none");
   const green = await cell({ tree: "HEAD", scene: "H2", mode: "isolated", repeat: R, label: `SELF-H2-HEAD-${PROJECT}` });
   const sGreen = score(green, "H2", R);
-  check("S6", sGreen.failed === 0, `H2 × HEAD: ${sGreen.failed}/${R} red (must be 0/${R})`);
+  check("S6", sGreen.failed === 0 && sGreen.instrument.length === 0, `H2 × HEAD: ${sGreen.failed}/${R} red · ${sGreen.instrument.length} instrument (must be 0/${R} · 0)`);
+  // S8 (B-433): the production GA property never hears from a hermetic run — GA requests ARE attempted
+  // (index.html loads gtag.js — so the check is not blind), and NONE is answered.
+  const gaEv = [...Array(R).keys()].flatMap((i) => {
+    const f = join(green.dir, "hydration", PROJECT, `H2-diag${i ? `-r${i}` : ""}.json`);
+    return existsSync(f) ? JSON.parse(readFileSync(f, "utf8")).events.filter((e) => e.kind === "ga") : [{ kind: "ga", phase: "missing-diag" }];
+  });
+  const gaReq = gaEv.filter((e) => e.phase === "req").length, gaRes = gaEv.filter((e) => e.phase === "res").length;
+  check("S8", gaReq > 0 && gaRes === 0 && !gaEv.some((e) => e.phase === "missing-diag"), `GA in a hermetic run: ${gaReq} attempted · ${gaRes} answered (must be >0 · 0) — B-433`);
+  // S9 (B-425 ①): a window held past its bound fails as INSTRUMENT, ⛔ as a red of the scene.
+  const bound = await cell({ tree: "HEAD", scene: "H2", mode: "isolated", repeat: 1, label: `SELF-H2-BOUND-${PROJECT}`, extraEnv: { EYE_SELFTEST_GATE_HOLD_MS: "200" } });
+  const sBound = score(bound, "H2", 1);
+  check("S9", sBound.instrument.length === 1 && sBound.failed === 0, `H2 with a 200ms hold bound: ${sBound.instrument.length} instrument · ${sBound.failed} scene red (must be 1 · 0)${sBound.instrument[0] ? ` — ${sBound.instrument[0].msg.slice(0, 120)}` : ""}`);
   const nf = await cell({ tree: "SELF-NOFLUSH", scene: "DEBOUNCE", mode: "isolated", repeat: 1, diag: false, label: `SELF-NOFLUSH-${PROJECT}`, grepOverride: "\\bD2-0 " });
   const nfRed = nf.recs.filter((r) => r.status !== "passed");
   const nfFile = join(nf.dir, "debounce", PROJECT, "D2-0.json");
   const nfj = existsSync(nfFile) ? JSON.parse(readFileSync(nfFile, "utf8")) : null;
   check("S7", !nfRed.length && nfj && nfj.n === 10 && nfj.lost === 10 && nfj.byFlush === 0, `D2-0 × SELF-NOFLUSH: lost ${nfj?.lost}/${nfj?.n} · by flush ${nfj?.byFlush} (must be 10/10 · 0) — the debounce scene can see a lost edit`);
-  summary(`### probe-flake self-test · ${PROJECT}\n${bad ? "❌" : "✅"} S1–S7 (${bad} failed)`);
+  summary(`### probe-flake self-test · ${PROJECT}\n${bad ? "❌" : "✅"} S1–S9 (${bad} failed)`);
   if (bad) die(`self-test: ${bad} check(s) failed — the instrument cannot be trusted`);
   console.log(`\n✅ probe-flake self-test · ${PROJECT} — the instrument sees red and captures it`);
   process.exit(0);
@@ -322,13 +339,17 @@ if (mode === "insitu") {
   insituSet = c.recs.filter((r) => r.repeat === 0).sort((a, b) => a.startTime - b.startTime).map((r) => r.key);
   for (const x of scenes) if (!insituSet.includes(x)) die(`insitu: ${x} is not in the set that ran (${insituSet.join(",")})`);
 }
+let instrumentTotal = 0;
 for (const sc of scenes) {
   const s = score(c, sc, repeat, { insituSet });
-  const out = { kind: "cell", tree, scene: sc, mode, project: PROJECT, shard, repeat, n: s.n, failed: s.failed, failures: s.failures, set: insituSet, minutes: Number(c.minutes.toFixed(1)) };
+  instrumentTotal += s.instrument.length;
+  for (const f of s.instrument) console.log(`::error::B-425 INSTRUMENT ${tree}/${sc}/${PROJECT}/${mode} repeat ${f.repeat}: ${f.msg.slice(0, 240)}`);
+  const out = { kind: "cell", tree, scene: sc, mode, project: PROJECT, shard, repeat, n: s.n, failed: s.failed, failures: s.failures, instrument: s.instrument, set: insituSet, minutes: Number(c.minutes.toFixed(1)) };
   await writeFile(join(OUT, `cell-${tree}-${sc}-${mode}-${PROJECT}${shard ? `-s${shard}` : ""}.json`), JSON.stringify(out, null, 2));
   const line = `${tree} · ${sc} · ${PROJECT} · ${mode}${shard ? ` · shard ${shard}` : ""}${insituSet ? ` (set ${insituSet.join("→")})` : ""}: red ${rate(s.failed, s.n)} · run ${out.minutes} min`;
   console.log(`\n${line}`);
   summary(`- ${line}`);
   for (const f of s.failures) console.log(`::warning::B-425 ${tree}/${sc}/${PROJECT}/${mode} repeat ${f.repeat}: ${f.status} — ${f.msg.slice(0, 200)}`);
 }
+if (instrumentTotal) die(`${instrumentTotal} run(s) failed as INSTRUMENT (the held read outlived its bound) — data written, but the cell is not a clean measurement`);
 process.exit(0);
