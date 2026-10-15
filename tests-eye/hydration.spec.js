@@ -219,20 +219,21 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
   const ls = (page, k) => page.evaluate((k) => localStorage.getItem(k), k);
   const json = async (page, k) => JSON.parse((await ls(page, k)) || "null");
 
-  // B-425 ①: the window must close before its bound. Called right before the scene releases the read.
-  function windowIntact(app) {
+  // B-425 ①: the window must close before its bound. Called right before the scene releases the read —
+  // the ONLY source of INSTRUMENT. A scene that fails EARLIER for its own reason stays a scene red (in an
+  // arm that expects H6 red, its toBeDisabled times out at 15s, long after the 6s release — that red is
+  // the product's, ⛔ the instrument's). The measured window is logged so the margin is a number.
+  function windowIntact(app, scene) {
     const { gate } = app;
     if (gate.unbounded || gate.heldAt == null) return;
     const heldFor = Date.now() - gate.heldAt;
+    gate.windowMs = heldFor;
+    app.diag?.ev("gate", { state: "window-closed", heldFor, bound: GATE_MAX_HOLD_MS });
+    console.log(`[window] ${scene} held ${heldFor}ms · bound ${GATE_MAX_HOLD_MS}ms · deadline ${SETTINGS_READ_TIMEOUT_MS}ms`);
     if (gate.autoReleased || heldFor >= GATE_MAX_HOLD_MS) {
       throw new Error(`INSTRUMENT: the held settings read outlived its bound — held ${heldFor}ms, bound ${GATE_MAX_HOLD_MS}ms (SETTINGS_READ_TIMEOUT_MS ${SETTINGS_READ_TIMEOUT_MS} − ${GATE_MARGIN_MS}ms); the scene no longer measures the window (B-425)`);
     }
   }
-  // Any failure after the gate released itself is the instrument's, ⛔ the scene's: the app was no
-  // longer in the window the scene claims to measure.
-  const asInstrument = (app, e) => (app.gate.autoReleased && !/^INSTRUMENT:/.test(String(e?.message))
-    ? new Error(`INSTRUMENT: the held settings read reached its bound (${GATE_MAX_HOLD_MS}ms) before the scene left the window — original: ${String(e?.message).split("\n")[0]}`)
-    : e);
 
 
   async function login(page) {
@@ -255,9 +256,9 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
     await expect.poll(() => gate.held, { message: "the user_settings read must be held — otherwise there is no window", timeout: 10_000 }).toBeGreaterThan(0);
   }
 
-  async function releaseAndReload(app) {
+  async function releaseAndReload(app, scene) {
     const { page, gate } = app;
-    windowIntact(app);
+    windowIntact(app, scene);
     gate.armed = false;
     gate.release?.();
     app.diag?.ev("gate", { state: "release-called" });
@@ -298,14 +299,14 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
       await reloadIntoWindow(app);
       await openSettings(page);
       await addSetup(page, "H1-WINDOW");
-      await releaseAndReload(app);
+      await releaseAndReload(app, "H1");
       const local = await json(page, "swingEdgePlaybook");
       evidence(app, "H1", { local: names(local), db: names(store.settings.playbook), journal: await ls(page, DELTA_KEY) });
       await app.shot("H1");
       expect(names(local), "B-406: the setup is gone from this device after the read landed").toContain("H1-WINDOW");
       expect(names(store.settings.playbook), "B-406: the setup never reached the DB").toContain("H1-WINDOW");
       expect(await ls(page, DELTA_KEY), "the journal must be empty once the write is confirmed").toBeNull();
-    } catch (e) { throw asInstrument(app, e); } finally { await app.ctx.close(); }
+    } finally { await app.ctx.close(); }
   });
 
   test("H2 alerts-window — a price alert set while the settings read is in flight survives", async ({ browser }, info) => {
@@ -331,14 +332,14 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
       await tapWhenStable(page, page.getByRole("button", { name: "OK", exact: true }), "OK");
       // B-425: the ONE moment that tells "the tap never landed" from "set, then lost".
       if (app.diag) await app.diag.snap(page, "after-ok", { alertInputOpen: await page.getByPlaceholder("Set target price").count(), dbNow: store.settings.priceAlerts });
-      await releaseAndReload(app);
+      await releaseAndReload(app, "H2");
       const local = await json(page, "swingEdgePriceAlerts");
-      evidence(app, "H2", { local, db: store.settings.priceAlerts, journal: await ls(page, DELTA_KEY) });
+      evidence(app, "H2", { local, db: store.settings.priceAlerts, journal: await ls(page, DELTA_KEY), windowMs: app.gate.windowMs, bound: GATE_MAX_HOLD_MS });
       await app.diag?.snap(page, "assert", { dbNow: store.settings.priceAlerts });
       await app.shot("H2");
       expect(local?.EYEPB, "B-406: the alert is gone from this device after the read landed").toBe(105);
       expect(store.settings.priceAlerts?.EYEPB, "B-406: the alert never reached the DB").toBe(105);
-    } catch (e) { throw asInstrument(app, e); } finally { writeDiag(app, "H2", info); await app.ctx.close(); }
+    } finally { writeDiag(app, "H2", info); await app.ctx.close(); }
   });
 
   test("H3 other-device — what another device wrote is shown, and this device's write keeps it", async ({ browser }, info) => {
@@ -373,14 +374,14 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
       const card = page.locator("div.overflow-hidden").filter({ has: page.locator("span", { hasText: /^H4-DELETE-ME$/ }) });
       await card.locator("button:has(svg)").first().click();
       await expect(page.getByText("H4-DELETE-ME", { exact: true })).toHaveCount(0, { timeout: 10_000 });
-      await releaseAndReload(app);
+      await releaseAndReload(app, "H4");
       const local = await json(page, "swingEdgePlaybook");
       evidence(app, "H4", { local: names(local), db: names(store.settings.playbook) });
       await app.shot("H4");
       expect(names(local), "the deleted setup came back from the DB").not.toContain("H4-DELETE-ME");
       expect(names(store.settings.playbook), "the deleted setup is still in the DB").not.toContain("H4-DELETE-ME");
       expect(names(local), "the setup that was NOT deleted is gone").toContain("KEEP");
-    } catch (e) { throw asInstrument(app, e); } finally { await app.ctx.close(); }
+    } finally { await app.ctx.close(); }
   });
 
   test("H5 fresh-device — a new browser gets the user's watchlist, not the defaults", async ({ browser }, info) => {
@@ -501,7 +502,7 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
       await expect(riskLine(page).locator("span.animate-pulse"), "B-408: the risk shown in the window is a stale local number — it must be a skeleton").toHaveCount(1);
       await app.shot("H6-1-window");
       // ② the read lands ⇒ the gate opens (a condition, ⛔ a sleep). B-425 ①: before the bound.
-      windowIntact(app);
+      windowIntact(app, "H6");
       gate.armed = false;
       gate.release?.();
       await expectAllEnabled(page);
@@ -540,10 +541,10 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
       await openSettings(page);
       await expectAllEnabled(page);
       const s4 = await screen();
-      evidence(app, "H6", { window: "disabled", screen: s1, local: l2, db: db(), afterReload: s4 });
+      evidence(app, "H6", { window: "disabled", windowMs: gate.windowMs, bound: GATE_MAX_HOLD_MS, screen: s1, local: l2, db: db(), afterReload: s4 });
       await app.shot("H6-2-after-reload");
       expect(s4, "(4) after a reload").toEqual(B408);
-    } catch (e) { throw asInstrument(app, e); } finally { gate.release?.(); await app.ctx.close(); }
+    } finally { gate.release?.(); await app.ctx.close(); }
   });
 
   test("C3 failed-read — a refused read settles the gate: controls enabled, the B-268 banner shown", async ({ browser }, info) => {

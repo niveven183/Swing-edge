@@ -233,8 +233,8 @@ async function cell({ tree, scene, mode, repeat, shard = 0, diag = true, label =
 }
 
 // A scene's verdict + the capture each failure must carry.
-// B-425 (Niv 15.10, ①): a failure whose message starts with `INSTRUMENT:` (tests-eye/hydration.spec.js —
-// the held read outlived its bound) is the INSTRUMENT's, ⛔ a red of the scene: it is counted apart,
+// B-425 (Niv 15.10, ①): a failure whose message starts with `INSTRUMENT:` (tests-eye/hydration.spec.js
+// windowIntact — the scene reached its release AFTER the bound) is the INSTRUMENT's, ⛔ a red of the scene: it is counted apart,
 // leaves the population (n), and the cell exits 1 once its data is written.
 function score({ name, dir, recs }, scene, repeat, { insituSet = null } = {}) {
   const mine = recs.filter((r) => r.key === scene && r.project === PROJECT);
@@ -251,7 +251,10 @@ function score({ name, dir, recs }, scene, repeat, { insituSet = null } = {}) {
     const diagFile = join(dir, "hydration", PROJECT, `${scene}-diag${r.repeat ? `-r${r.repeat}` : ""}.json`);
     const diag = existsSync(diagFile) ? JSON.parse(readFileSync(diagFile, "utf8")) : null;
     if (!trace || !video || !diag) die(`${name}: repeat ${r.repeat} of ${scene} failed WITHOUT its capture (trace ${!!trace} · video ${!!video} · diag ${!!diag}) — a failure that cannot be classified is a blind instrument`);
-    const rec = { repeat: r.repeat, status: r.status, msg: r.msg, durationMs: r.durationMs, trace: trace.path.replace(ROOT + "/", ""), video: video.path.replace(ROOT + "/", ""), diag: diagFile.replace(ROOT + "/", ""), snaps: diag.events.filter((e) => e.kind === "snap" || e.kind === "snap-failed") };
+    // `crossedBound`: the gate released itself (the bound) before the scene failed — a FLAG on a scene
+    // red, ⛔ a reclassification: only windowIntact raises INSTRUMENT (a scene that failed earlier for its
+    // own reason, e.g. an expected-red H6 timing out at 15s, is the product's red).
+    const rec = { repeat: r.repeat, status: r.status, msg: r.msg, durationMs: r.durationMs, crossedBound: diag.events.some((e) => e.kind === "gate" && e.state === "auto-released"), trace: trace.path.replace(ROOT + "/", ""), video: video.path.replace(ROOT + "/", ""), diag: diagFile.replace(ROOT + "/", ""), snaps: diag.events.filter((e) => e.kind === "snap" || e.kind === "snap-failed") };
     (/\bINSTRUMENT:/.test(r.msg) ? instrument : failures).push(rec);
   }
   return { n: mine.length - instrument.length, failed: failures.length, failures, instrument };
