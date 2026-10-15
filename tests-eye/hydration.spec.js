@@ -185,7 +185,11 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
       if (rowMissing && m !== "GET" && m !== "OPTIONS") rowMissing = false; // the first write creates the row
       return route.fallback();
     });
-    const gate = { armed: false, held: 0, release: null, fail: false, unbounded: false, heldAt: null, autoReleased: false };
+    // `window` = every hold since the gate was ARMED. ⚠️ Measured (PR-2 CI run 38807495195, HEAD H1 iphone14):
+    // loadSettings reads TWICE in sequence; when the first hold auto-releases while still armed, the second
+    // GET is held too. The window runs from the FIRST hold — the first cut measured from the latest one and
+    // reported «held 914ms» for a ~6.9s window. release() frees every pending hold.
+    const gate = { armed: false, held: 0, release: null, fail: false, unbounded: false, window: null, pending: [] };
     await ctx.route(/\/rest\/v1\/user_settings/, async (route) => {
       // B-408 C3 — a read the server REFUSES (⛔ "no row"): the failure path, measured on screen.
       if (route.request().method() === "GET" && gate.fail) {
@@ -193,13 +197,20 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
       }
       if (route.request().method() === "GET" && gate.armed) {
         gate.held++;
-        gate.heldAt = Date.now();
+        const hold = { at: Date.now(), autoReleased: false };
+        if (!gate.window) gate.window = { start: hold.at, holds: [] };
+        gate.window.holds.push(hold);
         diag?.ev("gate", { state: "held", held: gate.held });
         await new Promise((res) => {
           let timer = null;
-          gate.release = () => { clearTimeout(timer); res(); };
+          gate.pending.push(() => { clearTimeout(timer); res(); });
+          gate.release = () => { for (const free of gate.pending.splice(0)) free(); };
           // B-425 ①: released BEFORE the product's deadline, never after it (C5 alone is unbounded).
-          if (!gate.unbounded) timer = setTimeout(() => { gate.autoReleased = true; diag?.ev("gate", { state: "auto-released", afterMs: Date.now() - gate.heldAt }); res(); }, GATE_MAX_HOLD_MS);
+          if (!gate.unbounded) timer = setTimeout(() => {
+            hold.autoReleased = true;
+            diag?.ev("gate", { state: "auto-released", afterMs: Date.now() - hold.at });
+            res();
+          }, GATE_MAX_HOLD_MS);
         });
         diag?.ev("gate", { state: "released" });
       }
@@ -225,13 +236,15 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
   // the product's, ⛔ the instrument's). The measured window is logged so the margin is a number.
   function windowIntact(app, scene) {
     const { gate } = app;
-    if (gate.unbounded || gate.heldAt == null) return;
-    const heldFor = Date.now() - gate.heldAt;
+    const w = gate.window;
+    if (gate.unbounded || !w) return;
+    const heldFor = Date.now() - w.start;
+    const autoReleased = w.holds.filter((h) => h.autoReleased).length;
     gate.windowMs = heldFor;
-    app.diag?.ev("gate", { state: "window-closed", heldFor, bound: GATE_MAX_HOLD_MS });
-    console.log(`[window] ${scene} held ${heldFor}ms · bound ${GATE_MAX_HOLD_MS}ms · deadline ${SETTINGS_READ_TIMEOUT_MS}ms`);
-    if (gate.autoReleased || heldFor >= GATE_MAX_HOLD_MS) {
-      throw new Error(`INSTRUMENT: the held settings read outlived its bound — held ${heldFor}ms, bound ${GATE_MAX_HOLD_MS}ms (SETTINGS_READ_TIMEOUT_MS ${SETTINGS_READ_TIMEOUT_MS} − ${GATE_MARGIN_MS}ms); the scene no longer measures the window (B-425)`);
+    app.diag?.ev("gate", { state: "window-closed", heldFor, bound: GATE_MAX_HOLD_MS, holds: w.holds.length, autoReleased });
+    console.log(`[window] ${scene} held ${heldFor}ms over ${w.holds.length} read(s) · auto-released ${autoReleased} · bound ${GATE_MAX_HOLD_MS}ms · deadline ${SETTINGS_READ_TIMEOUT_MS}ms`);
+    if (autoReleased || heldFor >= GATE_MAX_HOLD_MS) {
+      throw new Error(`INSTRUMENT: the held settings read outlived its bound — window ${heldFor}ms over ${w.holds.length} held read(s), ${autoReleased} auto-released, bound ${GATE_MAX_HOLD_MS}ms (SETTINGS_READ_TIMEOUT_MS ${SETTINGS_READ_TIMEOUT_MS} − ${GATE_MARGIN_MS}ms); the scene no longer measures the window (B-425)`);
     }
   }
 
@@ -249,6 +262,7 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
   async function reloadIntoWindow(app) {
     const { page, gate } = app;
     await page.waitForTimeout(2_500); // the first hydration + its debounced write settle
+    gate.window = null;
     gate.armed = true;
     app.diag?.ev("gate", { state: "armed" });
     await page.reload({ waitUntil: "load" });
@@ -458,6 +472,7 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
   // `unbounded`: C5 only — the scene that measures the product's deadline must hold past it.
   async function reloadHeld(app, { unbounded = false } = {}) {
     app.gate.unbounded = unbounded;
+    app.gate.window = null;
     app.gate.armed = true;
     await app.page.reload({ waitUntil: "load" });
     await dash(app.page);
