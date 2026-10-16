@@ -122,7 +122,7 @@ if (flag("plan")) {
   const shards = Number(process.env.IN_SHARDS || "3");
   if (!(repeatIn >= 1) || !(shards >= 1)) die("--plan: repeat and shards must be ≥ 1");
   for (const m of modes) if (!["isolated", "insitu"].includes(m)) die(`--plan: unknown mode "${m}"`);
-  for (const t of trees) if (!["HEAD", "BEFORE-408"].includes(t)) die(`--plan: unknown tree "${t}"`);
+  for (const t of trees) if (!["HEAD", "BEFORE-408", "PRE-B432"].includes(t)) die(`--plan: unknown tree "${t}"`); // PRE-B432: main before local-first (B-435's question is about it)
   for (const x of scenesIn) if (!["H1", "H2", "H4", "C4", "Q1", "Q2"].includes(x)) die(`--plan: unknown scene "${x}"`);
   const insituKey = (t, x) => (t === "BEFORE-408" && x === "C4" ? "B408-C4" : "FULL");
   const cells = [];
