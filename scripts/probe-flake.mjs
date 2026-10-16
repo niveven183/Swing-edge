@@ -66,6 +66,7 @@ export function clopperPearson(k, n) {
 }
 const pct = (x) => `${(100 * x).toFixed(1)}%`;
 export const rate = (k, n) => `${k}/${n} = ${n ? pct(k / n) : "—"} · Wilson [${wilson(k, n).map(pct).join(", ")}] · C-P [${clopperPearson(k, n).map(pct).join(", ")}]`;
+const quant = (xs, p) => { const s = [...xs].sort((a, b) => a - b); return s.length ? s[Math.min(s.length - 1, Math.ceil(p * s.length) - 1)] : null; };
 
 const summary = (md) => { if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${md}\n`); };
 
@@ -77,8 +78,11 @@ if (flag("summarize")) {
   const cells = walk(dir).filter((f) => /\/cell-[^/]+\.json$/.test(f)).map((f) => JSON.parse(readFileSync(f, "utf8")));
   if (!cells.length) die(`--summarize: no cell-*.json under ${dir}`);
   const acc = new Map();
+  const winAcc = new Map();
   for (const c of cells) {
     if (c.kind === "debounce") continue;
+    const wkey = [c.tree, c.scene, c.project, c.mode].join(" · ");
+    if (c.window?.n) { const w = winAcc.get(wkey) || { samples: [], steps: {} }; w.samples.push(...c.window.samples); winAcc.set(wkey, w); }
     const key = [c.tree, c.scene, c.project, c.mode].join(" · ");
     const a = acc.get(key) || { n: 0, failed: 0, shards: 0, failures: [], instrument: 0 };
     a.n += c.n; a.failed += c.failed; a.shards++; a.failures.push(...c.failures.map((f) => ({ ...f, shard: c.shard }))); a.instrument += (c.instrument || []).length;
@@ -87,6 +91,10 @@ if (flag("summarize")) {
   const lines = ["| עץ · סצנה · דפדפן · mode | אדום | Wilson 95% | C-P 95% | shards | INSTRUMENT |", "|---|---|---|---|---|---|"];
   for (const [key, a] of [...acc].sort()) {
     lines.push(`| ${key} | ${a.failed}/${a.n} | ${wilson(a.failed, a.n).map(pct).join("–")} | ${clopperPearson(a.failed, a.n).map(pct).join("–")} | ${a.shards} | ${a.instrument} |`);
+  }
+  if (winAcc.size) {
+    lines.push("", "| חלון מוחזק · עץ · סצנה · דפדפן · mode | n | p50 | p95 | max |", "|---|---|---|---|---|");
+    for (const [k, w] of [...winAcc].sort()) lines.push(`| ${k} | ${w.samples.length} | ${quant(w.samples, 0.5)}ms | ${quant(w.samples, 0.95)}ms | ${Math.max(...w.samples)}ms |`);
   }
   const deb = cells.filter((c) => c.kind === "debounce");
   for (const c of deb) {
@@ -114,7 +122,7 @@ if (flag("plan")) {
   if (!(repeatIn >= 1) || !(shards >= 1)) die("--plan: repeat and shards must be ≥ 1");
   for (const m of modes) if (!["isolated", "insitu"].includes(m)) die(`--plan: unknown mode "${m}"`);
   for (const t of trees) if (!["HEAD", "BEFORE-408"].includes(t)) die(`--plan: unknown tree "${t}"`);
-  for (const x of scenesIn) if (!["H2", "C4"].includes(x)) die(`--plan: unknown scene "${x}"`);
+  for (const x of scenesIn) if (!["H1", "H2", "H4", "C4"].includes(x)) die(`--plan: unknown scene "${x}"`);
   const insituKey = (t, x) => (t === "BEFORE-408" && x === "C4" ? "B408-C4" : "FULL");
   const cells = [];
   for (const project of projects) for (const t of trees) {
@@ -141,7 +149,8 @@ const PROJECT = arg("project", "iphone14");
 const { APP, SETTINGS, I18N, DELTA, ARMS, ARM_GREP } = makeArms({ root: ROOT, die });
 assertCleanTargets(ROOT, [APP, SETTINGS, I18N, DELTA], die);
 
-const SCENE_RX = { H2: "\\bH2 [a-z]", C4: "\\bC4 [a-z]" };
+// H1/H4 (B-425, Niv 15.10 (i)): the held window's duration is measured on them — the closure condition.
+const SCENE_RX = { H1: "\\bH1 [a-z]", H2: "\\bH2 [a-z]", H4: "\\bH4 [a-z]", C4: "\\bC4 [a-z]" };
 const KEY = (title) => { const m = /^(H\d|C\d) /.exec(title); return m ? m[1] : null; };
 // insitu: the set the scene ran in historically (eye-sync-probe ARM_GREP). BEFORE-408/H2 never ran
 // in that arm ⇒ the full spec, declared.
@@ -179,7 +188,8 @@ function results(jsonPath) {
           if (a.name !== "video" && fromPath !== repeat) die(`${jsonPath}: entry order says repeat ${repeat}, the output dir says ${fromPath} (${a.name})`);
         }
         const msg = (res.errors || []).map((e) => (e.message || "").replace(/\u001b\[[0-9;]*m/g, "").split("\n")[0]).join(" | ");
-        out.push({ title: spec.title, key: KEY(spec.title), line: spec.line, project: t.projectName, repeat, retry: res.retry, status: res.status, startTime: Date.parse(res.startTime), durationMs: res.duration, msg, attachments: (res.attachments || []).map((a) => ({ name: a.name, contentType: a.contentType, path: a.path })) });
+        const stdout = (res.stdout || []).map((o) => o.text ?? "").join("");
+        out.push({ title: spec.title, key: KEY(spec.title), line: spec.line, project: t.projectName, repeat, stdout, retry: res.retry, status: res.status, startTime: Date.parse(res.startTime), durationMs: res.duration, msg, attachments: (res.attachments || []).map((a) => ({ name: a.name, contentType: a.contentType, path: a.path })) });
       }
       }
     }
@@ -230,6 +240,20 @@ async function cell({ tree, scene, mode, repeat, shard = 0, diag = true, label =
   } finally {
     await rm(work, { recursive: true, force: true });
   }
+}
+
+// B-425 (Niv 15.10, (i)): the held window, from the scene's own stdout — `[window] <scene> held <ms>` (one per run
+// that reached its release) and `[window-step] <step> +<ms>`. The closure condition reads `max`.
+export function windowStats(recs, scene) {
+  const mine = recs.filter((r) => r.key === scene && r.project === PROJECT);
+  const samples = [], steps = {};
+  for (const r of mine) {
+    const m = /\[window\] \S+ held (\d+)ms/.exec(r.stdout || "");
+    if (m) samples.push(Number(m[1]));
+    for (const sm of (r.stdout || "").matchAll(/\[window-step\] (\S+) \+(\d+)ms/g)) (steps[sm[1]] ||= []).push(Number(sm[2]));
+  }
+  const stepStats = Object.fromEntries(Object.entries(steps).map(([k, v]) => [k, { n: v.length, p50: quant(v, 0.5), p95: quant(v, 0.95), max: Math.max(...v) }]));
+  return { n: samples.length, p50: quant(samples, 0.5), p95: quant(samples, 0.95), max: samples.length ? Math.max(...samples) : null, samples, steps: stepStats };
 }
 
 // A scene's verdict + the capture each failure must carry.
@@ -307,7 +331,7 @@ const tree = arg("tree", "HEAD");
 const mode = arg("mode", "isolated");
 const repeat = Number(arg("repeat", "30"));
 const shard = Number(arg("shard", "0"));
-if (!scenes.length || !scenes.every((x) => ["H2", "C4", "DEBOUNCE"].includes(x)) || (scenes.includes("DEBOUNCE") && scenes.length > 1)) die(`--scene must be H2 · C4 · H2,C4 · DEBOUNCE (got "${scene}")`);
+if (!scenes.length || !scenes.every((x) => ["H1", "H2", "H4", "C4", "DEBOUNCE"].includes(x)) || (scenes.includes("DEBOUNCE") && scenes.length > 1)) die(`--scene must be H1 · H2 · H4 · C4 (comma-separated insitu) · DEBOUNCE (got "${scene}")`);
 if (scenes.length > 1 && mode !== "insitu") die("several scenes in one run only make sense insitu (one set counts each)");
 if (scenes.length > 1 && new Set(scenes.map((x) => insituGrep(tree, x))).size > 1) die(`${scenes.join(",")} do not share an insitu set on ${tree}`);
 if (!["isolated", "insitu"].includes(mode)) die(`--mode must be isolated · insitu (got "${mode}")`);
@@ -347,7 +371,9 @@ for (const sc of scenes) {
   const s = score(c, sc, repeat, { insituSet });
   instrumentTotal += s.instrument.length;
   for (const f of s.instrument) console.log(`::error::B-425 INSTRUMENT ${tree}/${sc}/${PROJECT}/${mode} repeat ${f.repeat}: ${f.msg.slice(0, 240)}`);
-  const out = { kind: "cell", tree, scene: sc, mode, project: PROJECT, shard, repeat, n: s.n, failed: s.failed, failures: s.failures, instrument: s.instrument, set: insituSet, minutes: Number(c.minutes.toFixed(1)) };
+  const win = windowStats(c.recs, sc);
+  if (win.n) console.log(`window ${sc}: n=${win.n} p50 ${win.p50}ms · p95 ${win.p95}ms · max ${win.max}ms · steps ${Object.entries(win.steps).map(([k, v]) => `${k} p50 ${v.p50}/max ${v.max}`).join(" · ")}`);
+  const out = { kind: "cell", window: win, tree, scene: sc, mode, project: PROJECT, shard, repeat, n: s.n, failed: s.failed, failures: s.failures, instrument: s.instrument, set: insituSet, minutes: Number(c.minutes.toFixed(1)) };
   await writeFile(join(OUT, `cell-${tree}-${sc}-${mode}-${PROJECT}${shard ? `-s${shard}` : ""}.json`), JSON.stringify(out, null, 2));
   const line = `${tree} · ${sc} · ${PROJECT} · ${mode}${shard ? ` · shard ${shard}` : ""}${insituSet ? ` (set ${insituSet.join("→")})` : ""}: red ${rate(s.failed, s.n)} · run ${out.minutes} min`;
   console.log(`\n${line}`);

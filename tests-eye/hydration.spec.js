@@ -163,8 +163,14 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
     return Object.fromEntries(pick.filter((k) => u[k] !== undefined).map((k) => [k, u[k]]));
   };
 
-  async function open(browser, info, seed = {}, { noRow = false } = {}) {
-    const ctx = await browser.newContext({ ...ctxOpts(info), baseURL: info.project.use.baseURL, ...(DIAG ? { recordVideo: { dir: join(info.outputDir, "diag-video") } } : {}) });
+  // `reducedMotion` (B-425, Niv 15.10 (i)): the held window of H1/H4 was CSS motion — measured (local iphone14
+  // trace): every click spent ~450ms in Playwright's stability loop while transitions/animations ran
+  // (open Settings → add → save: ~1,450ms; with reduced motion: 473ms). `prefers-reduced-motion: reduce` is a
+  // real user setting the product honors (src/index.css:778). ⛔ a timeout · ⛔ a margin · ⛔ src/. The
+  // literal (i) «open Settings before arming» is impossible: the reload IS the window, and `tab` resets to
+  // the dashboard on every load (SwingEdge_App.jsx:1499).
+  async function open(browser, info, seed = {}, { noRow = false, reducedMotion = false } = {}) {
+    const ctx = await browser.newContext({ ...ctxOpts(info), baseURL: info.project.use.baseURL, ...(reducedMotion ? { reducedMotion: "reduce" } : {}), ...(DIAG ? { recordVideo: { dir: join(info.outputDir, "diag-video") } } : {}) });
     const diag = DIAG ? await makeDiag(ctx) : null;
     const store = newStore();
     store.settings.lang = "en";
@@ -283,15 +289,25 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
     await page.waitForTimeout(2_500);
   }
 
+  // B-425 (Niv 15.10, (i)): where the held window's time goes — stdout only, ⛔ behaviour. Read by
+  // scripts/probe-flake.mjs (window p50/p95/max per step) to decide what can leave the window.
+  function mark(app, step) {
+    const w = app.gate.window;
+    if (w) console.log(`[window-step] ${step} +${Date.now() - w.start}ms`);
+  }
+
   async function openSettings(page) {
     await page.getByRole("button", { name: exactRx("openUserMenu") }).click();
     await page.getByRole("button", { name: exactRx("settings") }).click();
   }
 
-  async function addSetup(page, name) {
+  async function addSetup(page, name, app = null) {
     await page.getByRole("button", { name: exactRx("addSetup") }).click();
+    if (app) mark(app, "add-form-open");
     await page.getByPlaceholder("Breakout, Pullback…").fill(name);
+    if (app) mark(app, "name-typed");
     await page.getByRole("button", { name: exactRx("saveSetup") }).click();
+    if (app) mark(app, "save-clicked");
     await expect(page.getByRole("button", { name: exactRx("saveSetup") })).toHaveCount(0, { timeout: 10_000 });
   }
 
@@ -306,13 +322,16 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
   };
 
   test("H1 playbook-window — a setup added while the settings read is in flight survives", async ({ browser }, info) => {
-    const app = await open(browser, info);
+    const app = await open(browser, info, {}, { reducedMotion: true });
     const { page, store } = app;
     try {
       await login(page);
       await reloadIntoWindow(app);
+      mark(app, "in-window");
       await openSettings(page);
-      await addSetup(page, "H1-WINDOW");
+      mark(app, "settings-open");
+      await addSetup(page, "H1-WINDOW", app);
+      mark(app, "setup-added");
       await releaseAndReload(app, "H1");
       const local = await json(page, "swingEdgePlaybook");
       evidence(app, "H1", { local: names(local), db: names(store.settings.playbook), journal: await ls(page, DELTA_KEY) });
@@ -320,7 +339,7 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
       expect(names(local), "B-406: the setup is gone from this device after the read landed").toContain("H1-WINDOW");
       expect(names(store.settings.playbook), "B-406: the setup never reached the DB").toContain("H1-WINDOW");
       expect(await ls(page, DELTA_KEY), "the journal must be empty once the write is confirmed").toBeNull();
-    } finally { await app.ctx.close(); }
+    } finally { writeDiag(app, "H1", info); await app.ctx.close(); }
   });
 
   test("H2 alerts-window — a price alert set while the settings read is in flight survives", async ({ browser }, info) => {
@@ -340,7 +359,9 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
       await submit.click();
       await expect(page.locator('[aria-modal="true"]')).toHaveCount(0, { timeout: 20_000 });
       await reloadIntoWindow(app);
+      mark(app, "in-window");
       await tapWhenStable(page, page.locator('button[title="Price Alert"]').first(), "Price Alert");
+      mark(app, "alert-open");
       await page.getByPlaceholder("Set target price").fill("105");
       if (app.diag) await app.diag.snap(page, "before-ok", { inputValue: await page.getByPlaceholder("Set target price").inputValue() });
       await tapWhenStable(page, page.getByRole("button", { name: "OK", exact: true }), "OK");
@@ -379,15 +400,18 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
 
   test("H4 tombstone — a setup deleted while the read is in flight does not come back", async ({ browser }, info) => {
     const S = (id, name) => ({ id, name, description: "", imagePreview: null });
-    const app = await open(browser, info, { playbook: [S(1, "KEEP"), S(2, "H4-DELETE-ME")] });
+    const app = await open(browser, info, { playbook: [S(1, "KEEP"), S(2, "H4-DELETE-ME")] }, { reducedMotion: true });
     const { page, store } = app;
     try {
       await login(page);
       await reloadIntoWindow(app);
+      mark(app, "in-window");
       await openSettings(page);
+      mark(app, "settings-open");
       const card = page.locator("div.overflow-hidden").filter({ has: page.locator("span", { hasText: /^H4-DELETE-ME$/ }) });
       await card.locator("button:has(svg)").first().click();
       await expect(page.getByText("H4-DELETE-ME", { exact: true })).toHaveCount(0, { timeout: 10_000 });
+      mark(app, "setup-deleted");
       await releaseAndReload(app, "H4");
       const local = await json(page, "swingEdgePlaybook");
       evidence(app, "H4", { local: names(local), db: names(store.settings.playbook) });
@@ -395,7 +419,7 @@ test.describe("B-406 · B-397 · B-407 — hydration merges, ⛔ overwrites", ()
       expect(names(local), "the deleted setup came back from the DB").not.toContain("H4-DELETE-ME");
       expect(names(store.settings.playbook), "the deleted setup is still in the DB").not.toContain("H4-DELETE-ME");
       expect(names(local), "the setup that was NOT deleted is gone").toContain("KEEP");
-    } finally { await app.ctx.close(); }
+    } finally { writeDiag(app, "H4", info); await app.ctx.close(); }
   });
 
   test("H5 fresh-device — a new browser gets the user's watchlist, not the defaults", async ({ browser }, info) => {
