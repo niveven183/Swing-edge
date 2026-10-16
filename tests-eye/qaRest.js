@@ -130,7 +130,9 @@ export async function settingsSnapshot(email, password) {
   if (!restConfigured()) throw new Error("[qaRest] SUPABASE_URL / SUPABASE_ANON_KEY missing — refusing to report a snapshot that never ran");
   const { token: tok, uid } = await token(email, password);
   const s = await readBlob(tok, uid);
-  return { sha: sha(JSON.stringify(s)), capital: s.capital };
+  // B-432 · B-435 (16.10): the e2e setups the row holds right now — read-only, for localfirst.spec's B-435 scene.
+  const ours = (Array.isArray(s.playbook) ? s.playbook : []).map((x) => x?.name).filter((n) => typeof n === "string" && n.startsWith(PREFIX_ROOT));
+  return { sha: sha(JSON.stringify(s)), capital: s.capital, ours };
 }
 
 // The safety net, ⛔ the path: called ONLY with every app context closed (K6 — the blob is
