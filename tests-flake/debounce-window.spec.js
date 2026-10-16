@@ -26,6 +26,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { installHermetic, newStore, DUMMY_EMAIL, DUMMY_PASSWORD } from "../tests-eye/hermetic.js";
 import { exactRx, containsRx } from "../tests-eye/labels.js";
+import { tapWhenStable } from "../tests-eye/stableTap.js";
 
 const HERMETIC = process.env.EYE_HERMETIC === "1";
 const EVIDENCE = process.env.EYE_EVIDENCE_DIR || join(process.cwd(), "eye-evidence", "probe-flake");
@@ -201,9 +202,9 @@ test.describe("B-425 — the settings debounce window", () => {
         await dash(page);
         for (let i = 0; i < N_TRIALS; i++) {
           const v = 200 + delta + i + 1;
-          await page.locator('button[title="Price Alert"]').first().click();
+          await tapWhenStable(page, page.locator('button[title="Price Alert"]').first(), "Price Alert");
           await page.getByPlaceholder("Set target price").fill(String(v));
-          await page.getByRole("button", { name: "OK", exact: true }).click();
+          await tapWhenStable(page, page.getByRole("button", { name: "OK", exact: true }), "OK");
           await page.waitForTimeout(delta); // ⚠️ the independent variable
           const tUnload = app.now();
           await page.reload({ waitUntil: "load" });

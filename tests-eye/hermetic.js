@@ -146,6 +146,14 @@ export async function installHermetic(ctx, store) {
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ base, date: new Date().toISOString().slice(0, 10), rates: { [sym]: FX_MOCK_RATE } }) });
   });
 
+  // B-433 (Niv 15.10): a hermetic run must never report to the PRODUCTION Google Analytics property
+  // (G-VC8PKL4NL1). Measured: probe-flake self-test S8 on the tree before this — 18 GA requests from two
+  // hermetic H2 runs, 12 answered (`gcs=G100` consent-mode pings: page_view · scroll). Aborted here, so
+  // the app's consent-default-denied path still runs (window.gtag is the inline stub) — only the
+  // network leaves. The remaining third-party hosts are B-425 (ג), plan A — ⛔ in this change.
+  // The proof is the diag's `ga` events (probe-flake S8: attempted > 0, answered = 0) — ⛔ a counter here.
+  await ctx.route(/^https:\/\/(www\.)?(google-analytics|googletagmanager)\.com\//, (route) => route.abort("blockedbyclient"));
+
   // /api/ocr is a PAID Vision call in production — the hermetic arm never makes it.
   await ctx.route(/\/api\/ocr(\?|$)/, (route) => {
     store.ocrCalls++;

@@ -161,6 +161,13 @@ const CONTROLS = {
   "BEFORE-408": ["C3", "C4"], "M3-EARLY": ["C4"], "M3-LANG": ["C4"], "M3-CAPITAL": ["C4"], "M3-CAPCCY": ["C4"], "M3-ACCCCY": ["C4"], "M3-RISK": ["C4"],
   "M3-FAILLOCK": ["C4"], "M5-NOTIMEOUT": ["C4"],
 };
+// B-425 (Niv 15.10, ①): a scene whose held read outlived its bound fails with `INSTRUMENT:` — the app
+// was no longer in the window. That is ⛔ the red an arm expects (it would certify a blind arm) and
+// ⛔ a green either: every such verdict is its own failed check.
+const isInstrument = (r) => /\bINSTRUMENT:/.test(r.msg || "");
+for (const [arm, byKey] of Object.entries(verdicts)) for (const [k, r] of Object.entries(byKey)) {
+  if (isInstrument(r)) ok(`${arm}/${k}/instrument`, false, "the held settings read outlived its bound — the scene measured nothing", r.msg.slice(0, 300));
+}
 for (const p of PROJECTS) {
   const v = (arm, k) => verdicts[arm][`${p}:${k}`] || { status: "missing", msg: "" };
   if (verdicts.HEAD) {
@@ -170,7 +177,7 @@ for (const p of PROJECTS) {
   for (const [arm, want] of Object.entries(RED)) {
     if (!verdicts[arm]) continue; // not selected (EYE_ARMS)
     const got = want.map((k) => [k, v(arm, k)]);
-    ok(`${arm}/${p}`, got.every(([, r]) => r.status === "failed"), `red: ${got.map(([k, r]) => `${k}=${r.status}`).join(" · ")}`, "the spec is BLIND to this arm");
+    ok(`${arm}/${p}`, got.every(([, r]) => r.status === "failed" && !isInstrument(r)), `red: ${got.map(([k, r]) => `${k}=${r.status}${isInstrument(r) ? "(INSTRUMENT)" : ""}`).join(" · ")}`, "the spec is BLIND to this arm");
     const ctl = CONTROLS[arm].map((k) => [k, v(arm, k)]);
     ok(`${arm}/${p}/controls`, ctl.every(([, r]) => r.status === "passed"), `controls green: ${ctl.map(([k, r]) => `${k}=${r.status}`).join(" · ")}`, "a control went red — the arm broke the app, ⛔ the merge");
   }
