@@ -98,7 +98,9 @@ export async function sweep(email, password) {
     await rest(`user_settings?user_id=eq.${uid}`, tok, {
       method: "PATCH",
       prefer: "return=minimal",
-      body: { settings: { ...before, playbook: pb.filter((s) => !isOurs(s)) } },
+      // B-432 · B-435 (16.10): every writer advances the version token — a PATCH that left `updated_at`
+      // unchanged would read as «the device's own base» and let a stale pending edit win (DECISIONS 16.10).
+      body: { settings: { ...before, playbook: pb.filter((s) => !isOurs(s)) }, updated_at: new Date().toISOString() },
     });
     after = await read();
   }
@@ -140,7 +142,7 @@ export async function restoreCapital(email, password, capital) {
   const { token: tok, uid } = await token(email, password);
   const before = await readBlob(tok, uid);
   const { capital: _c, ...restBefore } = before;
-  await rest(`user_settings?user_id=eq.${uid}`, tok, { method: "PATCH", prefer: "return=minimal", body: { settings: { ...before, capital } } });
+  await rest(`user_settings?user_id=eq.${uid}`, tok, { method: "PATCH", prefer: "return=minimal", body: { settings: { ...before, capital }, updated_at: new Date().toISOString() } }); // B-432 · B-435: advance the token
   const after = await readBlob(tok, uid);
   const { capital: c2, ...restAfter } = after;
   if (c2 !== capital) throw new Error("[qaRest] restoreCapital: the capital did not land");

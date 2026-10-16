@@ -48,10 +48,11 @@ import TickerLogo from "./src/components/TickerLogo.jsx";
 import MobileTradeCard from "./src/components/MobileTradeCard.jsx";
 import { TVTickerTape } from "./src/components/TradingViewWidgets.jsx";
 import { useToast, useConfirm } from "./src/components/ToastProvider.jsx";
-import { supabase, isSupabaseConfigured, tradeForSupabase, tradeFromSupabase } from "./src/supabaseClient.js";
+import { supabase, isSupabaseConfigured, tradeForSupabase, tradeFromSupabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "./src/supabaseClient.js";
 import { cleanTrades, purgeInvalidTrades } from "./src/lib/cleanTrades.js";
 import { deleteTradeVerified, restoreAt, createPendingWrites, insertTradeRow, updateTradeRow, insertTradeRows, deleteTradeRows } from "./src/lib/tradeWrite.js";
-import { loadSettings, saveSettings, flushSettings, migrateFromLocalStorage, onSettingsSynced } from "./src/lib/userSettings.js";
+import { loadSettings, saveSettings, flushSettings, flushKeepalive, currentToken, migrateFromLocalStorage, onSettingsSynced } from "./src/lib/userSettings.js";
+import { readPending, recordScalarEdit, settlePending, clearPending, decidePending } from "./src/lib/settingsPending.js";
 import { calcTradeMetrics, fmt$, fmt$0, fmtR, fmtNum, fmtPrice, fmtBalance, numOrNull, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays, localDayKey, todayKey, realizedAt, realizedDayKey, currencyOf, fmtPaperPrice, paperCurrencyOf, CURRENCY_SYMBOL, fmtAccountAmount, fmtCapitalAmount } from "./src/utils.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -1250,6 +1251,9 @@ export default function SwingEdge() {
   // ── SUPABASE AUTH ──
   const [authReady, setAuthReady] = useState(!isSupabaseConfigured);
   const [session, setSession] = useState(null);
+  // B-432 · B-435: the unload keepalive needs the access token SYNCHRONOUSLY — a ref, ⛔ an await.
+  const sessionRef = useRef(null);
+  sessionRef.current = session;
   const authUser = session?.user || null;
   const isAdmin = (authUser?.email || "").toLowerCase() === "niveven183@gmail.com";
 
@@ -1813,14 +1817,44 @@ export default function SwingEdge() {
   const recordSettingsOp = useCallback((coll, key, op) => {
     recordOp(localStorage, coll, key, op, { onFailure: reportDeltaFailure });
   }, [reportDeltaFailure]);
+  // B-432 · B-435 (16.10) — a scalar edit is on disk the moment the handler returns (⛔ an effect: an unload
+  // can come first — the δ≈0 loss). `base` = the row token this edit was made on.
+  const recordScalar = useCallback((field, value) => {
+    recordScalarEdit(localStorage, field, value, { base: currentToken(authUser?.id), onFailure: reportDeltaFailure });
+  }, [authUser?.id, reportDeltaFailure]);
+  const editLang = useCallback((v) => { recordScalar("lang", v); setLang(v); }, [recordScalar]);
+  // B-432 · B-435 — a real conflict (another device wrote after this one's unconfirmed edit): the row won,
+  // and the rejected local values are offered back (Niv 16.10). ⛔ A silent winner either way.
+  const [settingsConflict, setSettingsConflict] = useState(null);
+  // «Apply my edit»: the rejected values become a NEW edit made on the row as it is now (base = its token),
+  // and the persist effect sends them — a 2xx then settles them like any other edit.
+  const applyMyEdit = useCallback(() => {
+    const c = settingsConflict;
+    if (!c) return;
+    clearPending(localStorage, { onFailure: reportDeltaFailure });
+    const set = { capital: setCapital, riskPct: setRiskPct, lang: setLang, accountCurrency: setAccountCurrency, capitalCurrency: setCapitalCurrency };
+    const lsKey = { capital: "swingEdgeCapital", riskPct: "swingEdgeRiskPct", accountCurrency: "swingEdgeAccountCurrency", capitalCurrency: "swingEdgeCapitalCurrency" };
+    for (const [k, v] of Object.entries(c.rejected)) {
+      recordScalar(k, v);
+      set[k](v);
+      if (lsKey[k]) { try { localStorage.setItem(lsKey[k], String(v)); } catch (e) { reportDeltaFailure("local", e); } }
+    }
+    setSettingsConflict(null);
+  }, [settingsConflict, recordScalar, reportDeltaFailure]);
+  const keepAccountValue = useCallback(() => {
+    clearPending(localStorage, { onFailure: reportDeltaFailure });
+    setSettingsConflict(null);
+  }, [reportDeltaFailure]);
   // An op leaves the journal only when a write is CONFIRMED to hold its result: a landed
   // upsert, or a skip proven identical to the row (userSettings.onSettingsSynced).
   useEffect(() => {
     if (!authUser?.id) return undefined;
     const uid = authUser.id;
-    return onSettingsSynced((syncedUid, blob) => {
+    return onSettingsSynced((syncedUid, blob, token) => {
       if (syncedUid !== uid) return;
       settleOps(localStorage, blob, { onFailure: reportDeltaFailure });
+      // B-432 · B-435 — the same rule for the scalar pending: cleared only by a write that carried it.
+      settlePending(localStorage, blob, { token, onFailure: reportDeltaFailure });
     });
   }, [authUser?.id, reportDeltaFailure]);
 
@@ -1856,8 +1890,9 @@ export default function SwingEdge() {
         setHydrationFailed(true);
         return; // ⛔ hydratedRef stays false
       }
-      const { status, settings: s } = await loadSettings(authUser.id);
+      const { status, settings: loaded, updatedAt } = await loadSettings(authUser.id);
       if (cancelled) return;
+      let s = loaded;
       if (status === "failed") {
         console.error("[hydrate] settings read failed — writes stay blocked for this session");
         // B-365 — the mirror `loadFailed` hands back is FOR DISPLAY. If it carries
@@ -1875,6 +1910,20 @@ export default function SwingEdge() {
       }
       // status === "empty" is AUTHORITATIVE (no row): skip reconciliation, but do
       // mark hydrated — a brand-new user must be able to write his first row.
+
+      // B-432 · B-435 (16.10) — this device's unconfirmed scalar edits vs the row's version token.
+      //   landed   ⇒ our write arrived (its answer was never seen): clear, ⛔ a banner.
+      //   apply    ⇒ it never arrived: the pending wins over the row (and the persist effect sends it).
+      //   conflict ⇒ another device wrote meanwhile: the row wins, the rejected values are offered back.
+      // "empty": no row ⇒ the mirror already carries the edits, and the first write settles them.
+      if (status === "ok") {
+        const verdict = decidePending(readPending(localStorage, { onFailure: reportDeltaFailure }), loaded, updatedAt);
+        if (verdict.action === "landed") clearPending(localStorage, { onFailure: reportDeltaFailure });
+        else if (verdict.action === "apply") s = { ...loaded, ...verdict.apply };
+        else if (verdict.action === "conflict") {
+          setSettingsConflict({ rejected: verdict.rejected, row: Object.fromEntries(Object.keys(verdict.rejected).map((k) => [k, loaded[k]])) });
+        }
+      }
 
       if (typeof s.capital === "number" && s.capital > 0) {
         // B-365 — ONLY on "ok". On "empty" this object is the local mirror, not a
@@ -2008,12 +2057,22 @@ export default function SwingEdge() {
     if (!authUser?.id) return;
     const uid = authUser.id;
     const flush = () => { if (hydratedRef.current) flushSettings(uid); };
-    window.addEventListener("beforeunload", flush);
-    window.addEventListener("pagehide", flush);
+    // B-432 · B-435 (16.10) — LAYER 2: an unload cancels a plain fetch (measured 49/50 on iphone14), so the
+    // unconfirmed blob leaves with `keepalive`. Layer 1 (the pending edit / the delta journal) stays until a
+    // 2xx is seen — the next load decides by the row's token. Synchronous: an unload cannot await.
+    const unload = () => {
+      if (!hydratedRef.current) return;
+      flushKeepalive(uid, { accessToken: sessionRef.current?.access_token, url: SUPABASE_URL, anonKey: SUPABASE_ANON_KEY });
+    };
+    const onHidden = () => { if (document.visibilityState === "hidden") unload(); };
+    window.addEventListener("beforeunload", unload);
+    window.addEventListener("pagehide", unload);
+    document.addEventListener("visibilitychange", onHidden);
     return () => {
-      window.removeEventListener("beforeunload", flush);
-      window.removeEventListener("pagehide", flush);
-      flush();
+      window.removeEventListener("beforeunload", unload);
+      window.removeEventListener("pagehide", unload);
+      document.removeEventListener("visibilitychange", onHidden);
+      flush(); // logout / user switch: the page stays alive ⇒ the ordinary write, its 2xx seen
     };
   }, [authUser?.id]);
 
@@ -4264,6 +4323,27 @@ export default function SwingEdge() {
           {isRTL
             ? "⚠️ לא הצלחנו לקרוא את ההגדרות שלך מהשרת. אנחנו מציגים את הערכים השמורים במכשיר, ושינויים ⛔ לא יישמרו לחשבון עד לרענון מוצלח — כדי שלא נדרוס את הנתונים האמיתיים שלך."
             : "⚠️ We couldn't read your settings from the server. Showing the values stored on this device; changes will NOT be saved to your account until a successful reload — so we don't overwrite your real data."}
+        </div>
+      )}
+
+      {/* ── B-432 · B-435 · a REAL conflict: this device's unconfirmed edit vs another device's write ──
+          The row won (Niv 16.10); the rejected local values are shown and can be applied. Non-blocking
+          (role=status), ⛔ a toast (it would scroll away with the user's edit), 5 languages (t.*). */}
+      {settingsConflict && (
+        <div role="status" aria-live="polite" data-testid="settings-conflict" className="mx-4 mt-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm" style={{ color: "#fcd34d" }}>
+          <p className="font-semibold">⚠️ {t.settingsConflictTitle}</p>
+          <p className="mt-1">{t.settingsConflictBody}</p>
+          <ul className="mt-2 space-y-1 font-mono text-xs">
+            {Object.entries(settingsConflict.rejected).map(([k, v]) => {
+              const label = { capital: t.portfolioCapitalTitle, riskPct: t.riskPerTradeTitle, lang: t.language, accountCurrency: t.accountCurrencyTitle, capitalCurrency: t.capitalCurrencyTitle }[k];
+              const show = (x) => (k === "riskPct" ? `${x}%` : k === "capital" ? Number(x).toLocaleString() : String(x));
+              return <li key={k}>{label}: {t.settingsConflictMine} {show(v)} · {t.settingsConflictSaved} {show(settingsConflict.row[k])}</li>;
+            })}
+          </ul>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <button onClick={applyMyEdit} className="px-3 py-1.5 rounded-lg border border-amber-400/50 bg-amber-500/20 text-xs font-bold">{t.settingsConflictApply}</button>
+            <button onClick={keepAccountValue} className="px-3 py-1.5 rounded-lg border border-white/20 text-xs">{t.settingsConflictDismiss}</button>
+          </div>
         </div>
       )}
 
@@ -7420,7 +7500,7 @@ export default function SwingEdge() {
                     answers ends as a failure (SETTINGS_READ_TIMEOUT_MS) ⇒ ⛔ a lock for the session. */}
                 <select
                   value={lang}
-                  onChange={e => setLang(e.target.value)}
+                  onChange={e => editLang(e.target.value)}
                   disabled={!capitalSettled}
                   dir="ltr"
                   className="w-full bg-white/5 border border-[var(--border-subtle)] dark:border-white/[0.10] rounded-lg px-3 py-2.5 text-sm text-white focus:border-[var(--v3-accent)] focus:outline-none transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
@@ -7606,6 +7686,7 @@ export default function SwingEdge() {
                     onClick={() => {
                       const val = parseFloat(capitalInput);
                       if (val > 0) {
+                        recordScalar("capital", val); // B-432 · B-435 — on disk before anything can unload
                         setCapital(val);
                         setCapitalInput("");
                         try { localStorage.setItem("swingEdgeCapital", String(val)); } catch {}
@@ -7641,6 +7722,7 @@ export default function SwingEdge() {
                       <button
                         key={c}
                         onClick={() => {
+                          recordScalar("capitalCurrency", c); // B-432 · B-435
                           setCapitalCurrency(c);
                           try { localStorage.setItem("swingEdgeCapitalCurrency", c); } catch {}
                         }}
@@ -7667,6 +7749,7 @@ export default function SwingEdge() {
                       <button
                         key={c}
                         onClick={() => {
+                          recordScalar("accountCurrency", c); // B-432 · B-435
                           setAccountCurrency(c);
                           try { localStorage.setItem("swingEdgeAccountCurrency", c); } catch {}
                         }}
@@ -7711,6 +7794,7 @@ export default function SwingEdge() {
                     onClick={() => {
                       const val = parseFloat(riskInput);
                       if (val >= 0.1 && val <= 10) {
+                        recordScalar("riskPct", val); // B-432 · B-435
                         setRiskPct(val);
                         setRiskInput("");
                         try { localStorage.setItem("swingEdgeRiskPct", String(val)); } catch {}

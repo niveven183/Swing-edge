@@ -9,6 +9,8 @@
 // normalized camelCase fields (see LS_KEYS below).
 
 import { supabase } from "../supabaseClient.js";
+// B-432 · B-435 (16.10) — local-first: the pending scalar edits and their version tokens.
+import { markInflight } from "./settingsPending.js";
 
 const TABLE = "user_settings";
 const MIRROR_KEY = "swingEdgeSettings"; // single localStorage mirror of the blob
@@ -111,6 +113,19 @@ function isPlainObject(v) {
 // change — is silent data loss, and that one must be impossible.
 const lastSent = new Map(); // userId -> stableStringify of the blob the DB holds
 
+// B-432 · B-435 (16.10) — the row's VERSION TOKEN as this device last saw it (a confirmed read or write).
+// `updated_at` is created by the client for every write (⛔ a server trigger on it — DECISIONS 16.10), so
+// equality is identity: the row holds exactly the write that carried this token.
+const lastToken = new Map(); // userId -> updated_at
+/** The token of the row this device last read or wrote — the `base` of an edit made now (null: none). */
+export function currentToken(userId) {
+  return lastToken.has(userId) ? lastToken.get(userId) : null;
+}
+// keepalive's own limit is 64KB; the guard sits below it (Niv 16.10). Measured: user_settings p99/max
+// 2,541B (n=52) — the guard is for the playbook-with-images blobs (~1MB, B-437).
+export const KEEPALIVE_MAX_BYTES = 60 * 1024;
+const keepaliveSent = new Map(); // userId -> stableStringify of the blob already sent by keepalive this page
+
 // ⚠️ jsonb does ⛔ not preserve key order, and mergeSettings APPENDS new keys, so
 // `JSON.stringify` of the same CONTENT can differ by ordering alone — and a hash that
 // differs on ordering degrades to "always write", which is the bug we came to fix.
@@ -153,9 +168,10 @@ export function onSettingsSynced(cb) {
   syncedListeners.add(cb);
   return () => syncedListeners.delete(cb);
 }
-function notifySynced(userId, blob) {
+// `token` (B-432 · B-435): the token the row now holds — the confirmed write's, or the read's on a proven skip.
+function notifySynced(userId, blob, token = lastToken.has(userId) ? lastToken.get(userId) : null) {
   for (const cb of syncedListeners) {
-    try { cb(userId, blob); } catch (e) {
+    try { cb(userId, blob, token); } catch (e) {
       // A listener's bug must not fail the write that already landed — and it is said.
       console.error("userSettings: onSettingsSynced listener threw", e);
     }
@@ -177,17 +193,23 @@ async function upsertBlob(userId, blob, client) {
   // and recording the NEWER blob as sent would elide a write that never happened —
   // exactly the silent loss this whole mechanism must not be able to cause.
   const sent = stableStringify(blob);
+  // B-432 · B-435: this write's version token, on disk BEFORE the request leaves — if the page dies before
+  // the answer, the next load can still tell «it landed» (row = token) from «it did not» (row = base).
+  const token = new Date().toISOString();
+  const store = ls();
+  if (store) markInflight(store, token, { onFailure: (reason, e) => console.error(`userSettings: pending ${reason} — the inflight token was not recorded`, e) });
   try {
     const { error } = await client
       .from(TABLE)
-      .upsert({ user_id: userId, settings: blob, updated_at: new Date().toISOString() });
+      .upsert({ user_id: userId, settings: blob, updated_at: token });
     if (error) {
       console.error("userSettings: upsert rejected", error.message || error);
       lastSent.delete(userId); // ⛔ a write that did not land is ⛔ "what the row holds"
       return false;
     }
     lastSent.set(userId, sent);
-    notifySynced(userId, blob);
+    lastToken.set(userId, token);
+    notifySynced(userId, blob, token);
     return true;
   } catch (e) {
     // Network-level failure only — everything else arrives via `error` above.
@@ -220,7 +242,7 @@ export async function loadSettings(userId, client = supabase, { timeoutMs = SETT
     try {
       const { data, error } = await readWithDeadline((signal) => client
         .from(TABLE)
-        .select("settings")
+        .select("settings, updated_at")
         .eq("user_id", userId)
         .abortSignal(signal)
         .maybeSingle(), timeoutMs);
@@ -231,8 +253,11 @@ export async function loadSettings(userId, client = supabase, { timeoutMs = SETT
         // The blob we just READ is by definition what the row holds ⇒ re-sending it
         // is a no-op. This is the one fact strong enough to seed the hash (B-361).
         lastSent.set(userId, stableStringify(data.settings));
+        // B-432 · B-435: the row's version token — the base of any edit made from now on.
+        if (data.updated_at) lastToken.set(userId, data.updated_at);
+        else lastToken.delete(userId);
         writeMirror(data.settings);
-        return { status: "ok", settings: data.settings };
+        return { status: "ok", settings: data.settings, updatedAt: data.updated_at ?? null };
       }
       // Authoritative "no row" (or a row with a null blob): writable.
       // ⛔ The hash is NOT seeded here. There is no row, so the mirror is ⛔ "what the
@@ -242,7 +267,8 @@ export async function loadSettings(userId, client = supabase, { timeoutMs = SETT
       cache.set(userId, mirror);
       writable.add(userId);
       lastSent.delete(userId);
-      return { status: "empty", settings: mirror };
+      lastToken.delete(userId); // no row ⇒ no token: an edit made now has no base, and applies at the next load
+      return { status: "empty", settings: mirror, updatedAt: null };
     } catch (e) {
       return loadFailed(userId, e);
     }
@@ -258,8 +284,9 @@ function loadFailed(userId, err) {
   if (userId) {
     writable.delete(userId);
     lastSent.delete(userId); // we could not read the row ⇒ we do ⛔ know what it holds
+    lastToken.delete(userId);
   }
-  return { status: "failed", settings: readMirror() };
+  return { status: "failed", settings: readMirror(), updatedAt: null };
 }
 
 // Merge `partial` into the cached blob (merge, NOT overwrite), write the mirror
@@ -304,6 +331,57 @@ export async function flushSettings(userId, client = supabase) {
   // or closing the tab re-sends the unchanged blob the timer just declined to send.
   if (alreadySent(userId, blob)) { notifySynced(userId, blob); return; }
   await upsertBlob(userId, blob, existing?.client || client);
+}
+
+// B-432 · B-435 (16.10) — LAYER 2 of local-first: on pagehide / visibilitychange(hidden) the unconfirmed blob
+// goes out with `keepalive`, which the browser keeps alive past the unload (a plain fetch is cancelled by the
+// page — measured: iphone14 CI 49/50). SYNCHRONOUS: an unload handler cannot await. Its answer is usually
+// never seen, so it settles NOTHING by itself — the pending edit (layer 1) stays and the next load decides by
+// the row's token (decidePending). If the page is still alive when the 2xx arrives, it settles as usual.
+// ⛔ sendBeacon: it cannot carry Authorization/apikey, and Supabase REST would refuse it.
+export function flushKeepalive(userId, { accessToken, url, anonKey, fetchImpl = globalThis.fetch } = {}) {
+  if (!userId || !writable.has(userId)) return { sent: false, reason: "not-writable" };
+  const blob = cache.get(userId);
+  if (!blob) return { sent: false, reason: "no-blob" };
+  if (alreadySent(userId, blob)) return { sent: false, reason: "already-sent" };
+  if (!accessToken || !url || !anonKey || typeof fetchImpl !== "function") {
+    console.warn("userSettings: keepalive skipped — no session token / endpoint; the pending edit will be sent at the next load");
+    return { sent: false, reason: "no-endpoint" };
+  }
+  // pagehide + visibilitychange(hidden) + beforeunload can all fire for one unload: one keepalive per blob.
+  const sent = stableStringify(blob);
+  if (keepaliveSent.get(userId) === sent) return { sent: false, reason: "duplicate" };
+  const token = new Date().toISOString();
+  const body = JSON.stringify([{ user_id: userId, settings: blob, updated_at: token }]);
+  const bytes = new TextEncoder().encode(body).length;
+  if (bytes > KEEPALIVE_MAX_BYTES) {
+    console.warn(`userSettings: keepalive skipped — body ${bytes}B > ${KEEPALIVE_MAX_BYTES}B (the 60KB guard); the pending edit will be sent at the next load`);
+    return { sent: false, reason: "too-large", bytes };
+  }
+  const store = ls();
+  if (store) markInflight(store, token, { onFailure: (reason, e) => console.error(`userSettings: pending ${reason} — the inflight token was not recorded`, e) });
+  // The debounced write would carry the same blob — the keepalive replaces it.
+  const existing = pending.get(userId);
+  if (existing?.timer) clearTimeout(existing.timer);
+  pending.delete(userId);
+  keepaliveSent.set(userId, sent);
+  fetchImpl(`${url}/rest/v1/user_settings?on_conflict=user_id`, {
+    method: "POST",
+    keepalive: true,
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates,return=minimal",
+    },
+    body,
+  }).then((res) => {
+    if (!res || !res.ok) { console.error("userSettings: keepalive upsert rejected", res?.status); return; }
+    lastSent.set(userId, sent);
+    lastToken.set(userId, token);
+    notifySynced(userId, blob, token);
+  }).catch((e) => console.error("userSettings: keepalive upsert threw (expected after an unload)", e));
+  return { sent: true, token, bytes };
 }
 
 // One-shot bridge. If a Supabase row already exists → Supabase wins, do nothing.
