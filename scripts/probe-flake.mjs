@@ -165,13 +165,17 @@ const insituGrep = (tree, scene) => (tree === "BEFORE-408" && scene === "C4" ? A
 const SELF_C4 = "setCapital(val);\n                        setCapitalInput(\"\");\n                        try { localStorage.setItem(\"swingEdgeCapital\", String(val)); } catch {}";
 // …and the debounce scene's: the unload flush does nothing, so an edit reloaded inside the window
 // can ONLY be lost — a D2 that still reads "kept" there is a blind measurement.
-const SELF_FLUSH = "const flush = () => { if (hydratedRef.current) flushSettings(uid); };";
+// ⚠️ B-432 · B-435 (16.10): after local-first the unload write is `unload` (keepalive) and the edit is ALSO kept as a
+// pending in the handler — removing `flush` alone no longer removes any write (measured: S7 «lost 0/10 · by flush 10»
+// on the runner). The mutant removes BOTH layers, so D2-0 can only lose the edit.
+const SELF_FLUSH = "const unload = () => {\n      if (!hydratedRef.current) return;";
+const SELF_PENDING = "                        recordScalar(\"capital\", val); // B-432 · B-435 — on disk before anything can unload\n";
 // B-432 · B-435 (16.10): PRE-B432 = the App + userSettings as they were at f2cbbb8 (main before local-first) — the
 // red-before arm of D4/D5. (settingsPending.js / the new exports exist in the tree but the old files ⛔ import them.)
 const PRE_B432_REF = "f2cbbb8";
 const showAt = (f, ref) => execFileSync("git", ["show", `${ref}:${f.replace(ROOT + "/", "")}`], { cwd: ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 const WHOLE_FILE = /^[\s\S]+$/;
-const TREES = { ...ARMS, "SELF-C4-RED": [[APP, SELF_C4, () => "setCapitalInput(\"\");"]], "SELF-NOFLUSH": [[APP, SELF_FLUSH, () => "const flush = () => {};"]],
+const TREES = { ...ARMS, "SELF-C4-RED": [[APP, SELF_C4, () => "setCapitalInput(\"\");"]], "SELF-NOFLUSH": [[APP, SELF_FLUSH, () => "const unload = () => {\n      return;"], [APP, SELF_PENDING, () => ""]],
   "PRE-B432": [APP, SETTINGS].map((f) => { const old = showAt(f, PRE_B432_REF); return [f, WHOLE_FILE, () => old]; }),
   // Mutant (i): the capital edit is ⛔ recorded in its handler — only the persist effect remembers it, and an unload
   // at δ≈0 comes first ⇒ D4/D5 at δ=0 MUST lose the edit, or the scene is blind to where the pending is written.
