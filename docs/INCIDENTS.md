@@ -1575,6 +1575,10 @@ reload»: צפוי `b1…b5`, התקבל `b1 · b2 · b3 · b5`. `b4` **שרד �
 **חומרה (מתוך הלוג של אותה ריצה):** ה-post-sweep של ה-worker (REST, אחרי ניקוי ה-UI של b, שמוחק רק מה **שמוצג**) מצא **`setups found 0`** — ⇒ `b4` היה
 חסר גם **ב-DB**, ⛔ רק במכשיר: הידרציה ממזגת DB + יומן אל המכשיר, ובלי tombstone ⛔ הייתה סיבה שייעלם מהמכשיר אם היה בשורה. כתיבה כלשהי בין
 אימות שלב 4 לרענון של שלב 5 נשאה blob בלי `b4`. ⇒ **`B-435` 🔴**.
+⚠️ **תיקון (16.10, אחרי קריאת הראיות שנשמרו):** `b-console.txt` של סצנה b בפרודקשן מכיל **6×** `userSettings: upsert rejected TypeError: Load failed`
++ **5×** `pageerror: …/rest/v1/user_settings due to access control checks` — ב-WebKit זו חתימת `fetch` **שבוטל בניווט** (ה-reload) ⇒ המנגנון של `B-432`,
+**בפרודקשן**. ⇒ ההשערה «כתיבה נשאה blob בלי `b4`» ⛔ מבוססת: ייתכן ש-`b4` **⛔ הגיע ל-DB מעולם**, וה-op שלו ביומן הדלתא נזרק בלי כתיבה
+מאושרת. ⛔ מוכרע — לאבחון.
 **הקשר:** `1/40` ג׳ובי `prod` מ-01.10 עם החתימה; ⛔ סנטינל חופף (`38865997559` הסתיים 07:15:43); trace/video ⛔ קיימים ב-`prod` מתוכנן (`E11`).
 **ההכרעה (ניב 16.10):** PR #78 **מוזג בלי rerun שמטרתו ירוק** — ה-diff שלו על נתיב `prod` **ריק** (נמדד: `playbook.spec` · `fixtures` · `qaRest` ·
 `playwright.eye.config.js` · `eye-playbook.yml` · `src/` · `SwingEdge_App.jsx` ⛔ השתנו; `hermetic.js` נקרא רק תחת `EYE_HERMETIC`). `probe-sync`
