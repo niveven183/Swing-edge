@@ -122,7 +122,7 @@ if (flag("plan")) {
   if (!(repeatIn >= 1) || !(shards >= 1)) die("--plan: repeat and shards must be ≥ 1");
   for (const m of modes) if (!["isolated", "insitu"].includes(m)) die(`--plan: unknown mode "${m}"`);
   for (const t of trees) if (!["HEAD", "BEFORE-408"].includes(t)) die(`--plan: unknown tree "${t}"`);
-  for (const x of scenesIn) if (!["H1", "H2", "H4", "C4"].includes(x)) die(`--plan: unknown scene "${x}"`);
+  for (const x of scenesIn) if (!["H1", "H2", "H4", "C4", "Q1", "Q2"].includes(x)) die(`--plan: unknown scene "${x}"`);
   const insituKey = (t, x) => (t === "BEFORE-408" && x === "C4" ? "B408-C4" : "FULL");
   const cells = [];
   for (const project of projects) for (const t of trees) {
@@ -150,8 +150,11 @@ const { APP, SETTINGS, I18N, DELTA, ARMS, ARM_GREP } = makeArms({ root: ROOT, di
 assertCleanTargets(ROOT, [APP, SETTINGS, I18N, DELTA], die);
 
 // H1/H4 (B-425, Niv 15.10 (i)): the held window's duration is measured on them — the closure condition.
-const SCENE_RX = { H1: "\\bH1 [a-z]", H2: "\\bH2 [a-z]", H4: "\\bH4 [a-z]", C4: "\\bC4 [a-z]" };
-const KEY = (title) => { const m = /^(H\d|C\d) /.exec(title); return m ? m[1] : null; };
+const SCENE_RX = { H1: "\\bH1 [a-z]", H2: "\\bH2 [a-z]", H4: "\\bH4 [a-z]", C4: "\\bC4 [a-z]", Q1: "\\bQ1 [a-z]", Q2: "\\bQ2 [a-z]" };
+// B-435 (wave B, step B-0): Q1/Q2 live in tests-flake/b435-sequence.spec.js — the photos come from the
+// eye global setup (tests-eye/fixtures.js FIXTURE_DIR); EYE_B435_FREE = chars left free under the quota (Q2).
+const specFor = (scene) => (scene === "DEBOUNCE" ? "tests-flake/debounce-window.spec.js" : /^Q\d/.test(scene) ? "tests-flake/b435-sequence.spec.js" : "tests-eye/hydration.spec.js");
+const KEY = (title) => { const m = /^(H\d|C\d|Q\d) /.exec(title); return m ? m[1] : null; };
 // insitu: the set the scene ran in historically (eye-sync-probe ARM_GREP). BEFORE-408/H2 never ran
 // in that arm ⇒ the full spec, declared.
 const insituGrep = (tree, scene) => (tree === "BEFORE-408" && scene === "C4" ? ARM_GREP["BEFORE-408"] : null);
@@ -223,12 +226,12 @@ async function cell({ tree, scene, mode, repeat, shard = 0, diag = true, label =
     const json = join(dir, "report.json");
     const isDebounce = scene === "DEBOUNCE";
     const grep = grepOverride ?? (isDebounce ? null : mode === "isolated" ? SCENE_RX[scene] : insituGrep(tree, scene));
-    const spec = isDebounce ? "tests-flake/debounce-window.spec.js" : "tests-eye/hydration.spec.js";
+    const spec = specFor(scene.split("+")[0]);
     const t0 = Date.now();
     const run = await runSpec({
       root: ROOT, spec, projects: [PROJECT], port, json, evidenceDir: dir, grep,
       config: "playwright.flake.config.js", extraArgs: ["--repeat-each", String(repeat)],
-      env: { EYE_FLAKE_DIAG: diag ? "1" : "", EYE_FLAKE_OUT: join(dir, "test-results"), ...extraEnv },
+      env: { EYE_FLAKE_DIAG: diag ? "1" : "", EYE_FLAKE_OUT: join(dir, "test-results"), EYE_B435_FIXTURES: join(ROOT, "eye-evidence", "fixtures"), ...extraEnv },
     });
     server.close();
     if (!run.ok) die(`${name}: the spec produced no JSON report (exit ${run.status})\n${run.out.slice(-3000)}`);
@@ -331,7 +334,7 @@ const tree = arg("tree", "HEAD");
 const mode = arg("mode", "isolated");
 const repeat = Number(arg("repeat", "30"));
 const shard = Number(arg("shard", "0"));
-if (!scenes.length || !scenes.every((x) => ["H1", "H2", "H4", "C4", "DEBOUNCE"].includes(x)) || (scenes.includes("DEBOUNCE") && scenes.length > 1)) die(`--scene must be H1 · H2 · H4 · C4 (comma-separated insitu) · DEBOUNCE (got "${scene}")`);
+if (!scenes.length || !scenes.every((x) => ["H1", "H2", "H4", "C4", "Q1", "Q2", "DEBOUNCE"].includes(x)) || (scenes.includes("DEBOUNCE") && scenes.length > 1)) die(`--scene must be H1 · H2 · H4 · C4 (comma-separated insitu) · DEBOUNCE (got "${scene}")`);
 if (scenes.length > 1 && mode !== "insitu") die("several scenes in one run only make sense insitu (one set counts each)");
 if (scenes.length > 1 && new Set(scenes.map((x) => insituGrep(tree, x))).size > 1) die(`${scenes.join(",")} do not share an insitu set on ${tree}`);
 if (!["isolated", "insitu"].includes(mode)) die(`--mode must be isolated · insitu (got "${mode}")`);
