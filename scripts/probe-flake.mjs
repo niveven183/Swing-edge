@@ -396,4 +396,15 @@ for (const sc of scenes) {
   for (const f of s.failures) console.log(`::warning::B-425 ${tree}/${sc}/${PROJECT}/${mode} repeat ${f.repeat}: ${f.status} — ${f.msg.slice(0, 200)}`);
 }
 if (instrumentTotal) die(`${instrumentTotal} run(s) failed as INSTRUMENT (the held read outlived its bound) — data written, but the cell is not a clean measurement`);
+// B-435 Q2 (16.10): a quota variant whose quota NEVER threw measured nothing. Measured: run 38922223377 — the runner
+// stores smaller photos (iphone14 ~131KB, pixel7 ~60KB per setup vs 218KB locally), EYE_B435_FREE 1.5M was never
+// reached, and the 0/100 read like a negative result. ⛔ again: no QuotaExceededError in any repeat ⇒ exit 1.
+if (scenes.includes("Q2")) {
+  const diagDir = join(c.dir, "hydration", PROJECT);
+  const diags = existsSync(diagDir) ? readdirSync(diagDir).filter((f) => /^Q2-diag(-r\d+)?\.json$/.test(f)).map((f) => JSON.parse(readFileSync(join(diagDir, f), "utf8"))) : [];
+  const bit = diags.filter((d) => d.events.some((e) => e.kind === "quota")).length;
+  console.log(`Q2 quota pressure: a QuotaExceededError in ${bit}/${diags.length} repeats (EYE_B435_FREE=${process.env.EYE_B435_FREE || "1500000"})`);
+  summary(`- Q2 quota pressure: QuotaExceededError in ${bit}/${diags.length} repeats`);
+  if (!bit) die(`Q2: the quota never threw in ${diags.length} repeats — the variant measured nothing (lower EYE_B435_FREE for this runner)`);
+}
 process.exit(0);
