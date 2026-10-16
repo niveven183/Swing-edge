@@ -492,6 +492,19 @@ console.log("test:settings — userSettings module vs mock client (no real DB)\n
   const next = await loadSettings("u13h", rh.client); // a fresh page: the keepalive arrived, its answer was never seen
   const dh = has("decidePending") ? P.decidePending(P.readPending(global.localStorage), next.settings, next.updatedAt) : null;
   check("13h keepalive landed + load ⇒ «landed» — 0 banners", delivered.length === 1 && dh?.action === "landed");
+
+  // i — guard for mutant M-v (green on f2cbbb8 too — B-361's rule, now load-bearing for the pending): a brand-new user
+  // (no row) whose mirror already equals the first edit MUST get the row written. Seeding lastSent from the mirror would
+  // read that edit as «already sent», settle it with no 2xx, and never write the row.
+  global.localStorage = makeLocalStorage({ swingEdgeSettings: JSON.stringify({ capital: 5000 }) });
+  const ri = tokenClient({});
+  const li = await loadSettings("u13i", ri.client);
+  if (has("recordScalarEdit")) P.recordScalarEdit(global.localStorage, "capital", 5000, { base: null });
+  const offI = has("settlePending") ? US.onSettingsSynced((uid, blob, tok) => P.settlePending(global.localStorage, blob, { token: tok })) : () => {};
+  saveSettings("u13i", { capital: 5000 }, ri.client);
+  await flushSettings("u13i", ri.client);
+  offI();
+  check("13i no row + mirror = the first edit ⇒ the row IS written (1 upsert) — ⛔ «already sent» from the mirror", li.status === "empty" && ri.calls.upsert === 1 && ri.rows.get("u13i")?.settings?.capital === 5000);
 }
 
 console.log("");

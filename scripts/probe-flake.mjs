@@ -172,7 +172,10 @@ const PRE_B432_REF = "f2cbbb8";
 const showAt = (f, ref) => execFileSync("git", ["show", `${ref}:${f.replace(ROOT + "/", "")}`], { cwd: ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 const WHOLE_FILE = /^[\s\S]+$/;
 const TREES = { ...ARMS, "SELF-C4-RED": [[APP, SELF_C4, () => "setCapitalInput(\"\");"]], "SELF-NOFLUSH": [[APP, SELF_FLUSH, () => "const flush = () => {};"]],
-  "PRE-B432": [APP, SETTINGS].map((f) => { const old = showAt(f, PRE_B432_REF); return [f, WHOLE_FILE, () => old]; }) };
+  "PRE-B432": [APP, SETTINGS].map((f) => { const old = showAt(f, PRE_B432_REF); return [f, WHOLE_FILE, () => old]; }),
+  // Mutant (i): the capital edit is ⛔ recorded in its handler — only the persist effect remembers it, and an unload
+  // at δ≈0 comes first ⇒ D4/D5 at δ=0 MUST lose the edit, or the scene is blind to where the pending is written.
+  "MUT-PENDING-EFFECT": [[APP, "                        recordScalar(\"capital\", val); // B-432 · B-435 — on disk before anything can unload\n", () => ""]] };
 
 // Walk a Playwright JSON report ⇒ one record per (test entry × result).
 function results(jsonPath) {

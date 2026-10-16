@@ -242,7 +242,7 @@ function runHydrate({ loadStatus, mirror = MIRROR_OK, migrateReason = null, canc
                      showOnboarding = null, dbCapitalRef = { current: false }, updatedAt = null,
                      had = { watchlist: false, alerts: false, playbook: false }, deltaFailures = [] }) {
   const calls = { load: 0, hydrationFailed: [], hydrationDone: 0, capital: [], lang: [], clobber: [], errors: [], onboarding: [], profile: [],
-                  watchlist: [], alerts: [], playbook: [], conflict: [] };
+                  watchlist: [], alerts: [], playbook: [], conflict: [], riskPct: [] };
   const hydratedRef = { current: false };
   const welcomeSeenRef = { current: false };
   const localStorage = makeLocalStorage(storage);
@@ -275,7 +275,7 @@ function runHydrate({ loadStatus, mirror = MIRROR_OK, migrateReason = null, canc
     localStorage, CURRENCY_SYMBOL,
     // setAccountCurrency · setCapitalCurrency · setRiskPct · setShowOnboarding · setUserProfile
     // ⚠️ setShowOnboarding היה `() => {}` ו⛔ נמדד — בדיוק המסך שההבהוב חי בו (B-365).
-    () => {}, () => {}, () => {}, (v) => calls.onboarding.push(v), (v) => calls.profile.push(v),
+    () => {}, () => {}, (v) => calls.riskPct.push(v), (v) => calls.onboarding.push(v), (v) => calls.profile.push(v),
     "en",
     (v) => calls.lang.push(v),
     (v) => calls.watchlist.push(v), had.watchlist, (v) => calls.alerts.push(v), had.alerts,
@@ -468,6 +468,12 @@ const main = async () => {
     const ld = runHydrate({ loadStatus: "ok", mirror: { ...MIRROR_OK, capital: 12345 }, updatedAt: T5, storage: pend() });
     await ld.promise;
     ok("P5", "pending + row token = inflight (our write landed) ⇒ pending cleared · ⛔ a conflict", ld.localStorage.getItem("swingEdgeSettingsPending") === null && ld.calls.conflict.length === 0, `pending ${ld.localStorage.getItem("swingEdgeSettingsPending")} · conflicts ${ld.calls.conflict.length}`);
+    // P6 — the case the inflight check exists for: write A (capital) landed, the newer keepalive B (riskPct) was cancelled.
+    // Our own token in the row ⇒ ⛔ a conflict: what A carried is dropped, the newer riskPct applies.
+    const ab = runHydrate({ loadStatus: "ok", mirror: { ...MIRROR_OK, capital: 12345, riskPct: 1 }, updatedAt: T5,
+      storage: { swingEdgeSettingsPending: JSON.stringify({ v: 1, base: T0, inflight: [T5, "2026-10-16T08:00:06.000Z"], values: { capital: 12345, riskPct: 3 } }) } });
+    await ab.promise;
+    ok("P6", "row token = OUR earlier write, a newer edit was cancelled ⇒ ⛔ a conflict · the newer riskPct (3) applies", ab.calls.conflict.length === 0 && ab.calls.capital.at(-1) === 12345 && ab.calls.riskPct.at(-1) === 3, `conflicts ${ab.calls.conflict.length} · capital ${JSON.stringify(ab.calls.capital)} · riskPct ${JSON.stringify(ab.calls.riskPct)}`);
   }
 
   /* A15 · A16 · A17 — החלפת משתמש באותו טאב (B-361 · D-lite, 22.09)
