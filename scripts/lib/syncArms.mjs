@@ -31,7 +31,7 @@ export function makeArms({ root, die }) {
   // Remove ONE site's gate: the anchor ends in it, so the mutant is exactly that line.
   const UNGATE = (anchor) => [APP, anchor, () => anchor.replace(/\n\s*disabled=\{!capitalSettled\}$/, "")];
   const G408 = {
-    lang: "onChange={e => setLang(e.target.value)}\n                  disabled={!capitalSettled}",
+    lang: "onChange={e => editLang(e.target.value)}\n                  disabled={!capitalSettled}", // B-432 · B-435: editLang records the pending
     capitalInput: "onChange={e => setCapitalInput(e.target.value)}\n                    disabled={!capitalSettled}",
     capitalBtn: "localStorage.setItem(\"swingEdgeCapital\", String(val)); } catch {}\n                      }\n                    }}\n                    disabled={!capitalSettled}",
     capitalCurrency: "localStorage.setItem(\"swingEdgeCapitalCurrency\", c); } catch {}\n                        }}\n                        disabled={!capitalSettled}",

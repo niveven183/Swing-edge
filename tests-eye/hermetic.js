@@ -98,10 +98,12 @@ export async function installHermetic(ctx, store) {
     if (path.startsWith("/auth/v1/logout")) return route.fulfill({ status: 204, body: "" });
 
     if (path.startsWith("/rest/v1/user_settings")) {
-      if (method === "GET") return json(route, 200, [{ user_id: USER_ID, settings: store.settings }], req);
+      // B-432 · B-435 (16.10): the row carries its VERSION TOKEN (`updated_at`, written by the client) — without
+      // it every load reads «no base» and the base/inflight decision is never exercised (a blind arm).
+      if (method === "GET") return json(route, 200, [{ user_id: USER_ID, settings: store.settings, updated_at: store.updatedAt ?? null }], req);
       const body = JSON.parse(req.postData() || "{}");
       const row = Array.isArray(body) ? body[0] : body;
-      if (row && row.settings) store.settings = row.settings;
+      if (row && row.settings) { store.settings = row.settings; if (row.updated_at) store.updatedAt = row.updated_at; }
       return json(route, 201, [], req);
     }
     if (path.startsWith("/rest/v1/trades")) {

@@ -24,6 +24,7 @@
 // serve failed · a secret in reach. A red scene is DATA: ::warning:: + the step summary, exit 0.
 
 import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 import { readFileSync, existsSync, readdirSync, appendFileSync, statSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -98,7 +99,7 @@ if (flag("summarize")) {
   }
   const deb = cells.filter((c) => c.kind === "debounce");
   for (const c of deb) {
-    lines.push("", `**debounce · ${c.project}** — D1 n=${c.window.n}: p50 ${c.window.p50}ms · p95 ${c.window.p95}ms · max ${c.window.max}ms`);
+    lines.push("", `**debounce · ${c.tree ?? "HEAD"} · ${c.project}** — D1 n=${c.window.n}: p50 ${c.window.p50}ms · p95 ${c.window.p95}ms · max ${c.window.max}ms`);
     for (const r of c.rows) lines.push(`- ${r.scene}: lost (mock) ${rate(r.lost, r.n)}${r.byFlush == null ? "" : ` · via unload flush ${r.byFlush}/${r.n} · cancelled by the page ${r.cancelled}/${r.n}`}`);
   }
   console.log(lines.join("\n"));
@@ -165,7 +166,13 @@ const SELF_C4 = "setCapital(val);\n                        setCapitalInput(\"\")
 // …and the debounce scene's: the unload flush does nothing, so an edit reloaded inside the window
 // can ONLY be lost — a D2 that still reads "kept" there is a blind measurement.
 const SELF_FLUSH = "const flush = () => { if (hydratedRef.current) flushSettings(uid); };";
-const TREES = { ...ARMS, "SELF-C4-RED": [[APP, SELF_C4, () => "setCapitalInput(\"\");"]], "SELF-NOFLUSH": [[APP, SELF_FLUSH, () => "const flush = () => {};"]] };
+// B-432 · B-435 (16.10): PRE-B432 = the App + userSettings as they were at f2cbbb8 (main before local-first) — the
+// red-before arm of D4/D5. (settingsPending.js / the new exports exist in the tree but the old files ⛔ import them.)
+const PRE_B432_REF = "f2cbbb8";
+const showAt = (f, ref) => execFileSync("git", ["show", `${ref}:${f.replace(ROOT + "/", "")}`], { cwd: ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+const WHOLE_FILE = /^[\s\S]+$/;
+const TREES = { ...ARMS, "SELF-C4-RED": [[APP, SELF_C4, () => "setCapitalInput(\"\");"]], "SELF-NOFLUSH": [[APP, SELF_FLUSH, () => "const flush = () => {};"]],
+  "PRE-B432": [APP, SETTINGS].map((f) => { const old = showAt(f, PRE_B432_REF); return [f, WHOLE_FILE, () => old]; }) };
 
 // Walk a Playwright JSON report ⇒ one record per (test entry × result).
 function results(jsonPath) {
@@ -341,21 +348,23 @@ if (!["isolated", "insitu"].includes(mode)) die(`--mode must be isolated · insi
 if (!(repeat >= 1)) die(`--repeat must be ≥ 1 (got "${arg("repeat")}")`);
 
 if (scene === "DEBOUNCE") {
-  const c = await cell({ tree: "HEAD", scene, mode: "isolated", repeat: 1, diag: false, label: `DEBOUNCE-${PROJECT}` });
+  // --tree (B-432: PRE-B432 is the red-before arm) · --grep (e.g. "\\bD[45]-" — only the drop-cancelled scenes).
+  const dGrep = arg("grep");
+  const c = await cell({ tree, scene, mode: "isolated", repeat: 1, diag: false, label: `DEBOUNCE-${tree}-${PROJECT}`, grepOverride: dGrep });
   const red = c.recs.filter((r) => r.status !== "passed");
   if (red.length) die(`DEBOUNCE: ${red.length} scene(s) could not reach an outcome — ${red.map((r) => `${r.title.split(" ")[0]}: ${r.msg.slice(0, 160)}`).join(" | ")}`);
   const ev = join(c.dir, "debounce", PROJECT);
   const read = (f) => JSON.parse(readFileSync(join(ev, f), "utf8"));
-  const d1 = read("D1.json");
-  if (d1.n !== 30) die(`DEBOUNCE: D1 has ${d1.n} samples, expected 30`);
-  const s = [...d1.samplesMs].sort((a, b) => a - b);
+  const d1 = existsSync(join(ev, "D1.json")) ? read("D1.json") : null;
+  if (!dGrep && (!d1 || d1.n !== 30)) die(`DEBOUNCE: D1 has ${d1?.n} samples, expected 30`);
+  const s = d1 ? [...d1.samplesMs].sort((a, b) => a - b) : [];
   const q = (p) => s[Math.min(s.length - 1, Math.ceil(p * s.length) - 1)];
-  const rows = readdirSync(ev).filter((f) => /^(D2|D3|K1)-\d+\.json$/.test(f)).sort().map((f) => { const j = read(f); return { scene: j.scene, n: j.n, lost: j.lost, byFlush: j.byFlush ?? null, cancelled: j.cancelled ?? null }; });
+  const rows = readdirSync(ev).filter((f) => /^(D2|D3|D4|D5|K1)-\d+\.json$/.test(f)).sort().map((f) => { const j = read(f); return { scene: j.scene, n: j.n, lost: j.lost, byFlush: j.byFlush ?? null, cancelled: j.cancelled ?? null }; });
   for (const r of rows) if (r.n !== 10) die(`DEBOUNCE: ${r.scene} has ${r.n} trials, expected 10`);
-  const out = { kind: "debounce", project: PROJECT, window: { n: s.length, p50: q(0.5), p95: q(0.95), max: s[s.length - 1], samplesMs: d1.samplesMs }, rows };
-  await writeFile(join(OUT, `cell-DEBOUNCE-${PROJECT}.json`), JSON.stringify(out, null, 2));
+  const out = { kind: "debounce", tree, project: PROJECT, window: { n: s.length, p50: q(0.5), p95: q(0.95), max: s[s.length - 1] ?? null, samplesMs: d1?.samplesMs ?? [] }, rows };
+  await writeFile(join(OUT, `cell-DEBOUNCE-${tree}-${PROJECT}.json`), JSON.stringify(out, null, 2));
   const extra = (r) => (r.byFlush == null ? "" : ` · left only via the unload flush ${r.byFlush}/${r.n} · of which cancelled by the page ${r.cancelled}/${r.n}`);
-  const md = [`### debounce window · ${PROJECT}`, `D1 n=${s.length}: p50 ${out.window.p50}ms · p95 ${out.window.p95}ms · max ${out.window.max}ms`, ...rows.map((r) => `- ${r.scene}: lost (mock) ${rate(r.lost, r.n)}${extra(r)}`)].join("\n");
+  const md = [`### debounce window · ${tree} · ${PROJECT}`, `D1 n=${s.length}: p50 ${out.window.p50}ms · p95 ${out.window.p95}ms · max ${out.window.max}ms`, ...rows.map((r) => `- ${r.scene}: lost (mock) ${rate(r.lost, r.n)}${extra(r)}`)].join("\n");
   console.log(md); summary(md);
   for (const r of rows) if (r.lost) console.log(`::warning::B-425 ${r.scene} (${PROJECT}): ${r.lost}/${r.n} edits lost`);
   for (const r of rows) if (r.cancelled) console.log(`::warning::B-425 ${r.scene} (${PROJECT}): ${r.cancelled}/${r.n} edits left only through the unload flush and the page cancelled that request`);
