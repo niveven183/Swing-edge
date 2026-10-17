@@ -23,7 +23,8 @@ import { exactRx, containsRx, TOAST_TEXTS } from "./labels.js";
 import { readManifest, fileFor } from "./fixtures.js";
 import { readPrices, closeOcr } from "./ocr.js";
 import { installHermetic, newStore, DUMMY_EMAIL, DUMMY_PASSWORD } from "./hermetic.js";
-import { sweep, PREFIX_ROOT, TRADE_TICKER } from "./qaRest.js";
+import { sweep, settingsDiag, PREFIX_ROOT, TRADE_TICKER } from "./qaRest.js";
+import { attachB435Diag } from "./b435diag.js";
 
 const HERMETIC = process.env.EYE_HERMETIC === "1";
 const QA_EMAIL = HERMETIC ? DUMMY_EMAIL : process.env.SENTINEL_QA_EMAIL;
@@ -123,11 +124,15 @@ test.describe("C-064 · Playbook images (B-015 · B-038)", () => {
   });
 
   // ── one app session per test ─────────────────────────────────────────────
-  async function openApp(browser, info) {
+  async function openApp(browser, info, { diag: withDiag = false } = {}) {
     const ctx = await browser.newContext({ ...ctxOpts(info), baseURL: info.project.use.baseURL, ...(STATE ? { storageState: STATE } : {}) });
     const store = HERMETIC ? newStore() : null;
     if (HERMETIC) await installHermetic(ctx, store);
     const page = await ctx.newPage();
+    const prefix = `${PREFIX_ROOT}${RUN}-${info.project.name}-`;
+    const dir = join(EVIDENCE, info.project.name);
+    // B-435 (Niv 17.10, 2ב): the detector — attached before the first navigation (its quota wrapper is an init script).
+    const diag = withDiag ? await attachB435Diag(page, { label: "playbook-b", project: info.project.name, prefix, dir, snapshot: HERMETIC ? null : () => settingsDiag(QA_EMAIL, QA_PASSWORD) }) : null;
     await installOverlayHandlers(page);
     await installFlashRecorder(page, TOAST_TEXTS);
     // Console errors are evidence for a red step (redacted — the artifact is public).
@@ -141,8 +146,6 @@ test.describe("C-064 · Playbook images (B-015 · B-038)", () => {
       await page.goto("/app", { waitUntil: "load" });
       await page.locator('[data-tour-tab="dashboard"]').waitFor({ state: "visible", timeout: 30_000 });
     }
-    const prefix = `${PREFIX_ROOT}${RUN}-${info.project.name}-`;
-    const dir = join(EVIDENCE, info.project.name);
     mkdirSync(dir, { recursive: true });
     const shot = (name) => page.screenshot({ path: join(dir, `${name}.png`), mask: [page.locator("header"), page.getByText(/@/)] });
     // On a red step: a screenshot of the moment + the console, BEFORE cleanup changes the screen.
@@ -155,7 +158,7 @@ test.describe("C-064 · Playbook images (B-015 · B-038)", () => {
         "── console errors ──", ...(consoleErrors.length ? consoleErrors : ["(none)"]),
       ].join("\n"));
     };
-    return { ctx, page, store, prefix, dir, shot, ocrRequests, onFail };
+    return { ctx, page, store, prefix, dir, shot, ocrRequests, onFail, diag };
   }
 
   const panelOf = (page) => page.getByRole("heading", { name: exactRx("personalPlaybook") })
@@ -234,6 +237,8 @@ test.describe("C-064 · Playbook images (B-015 · B-038)", () => {
   async function withSetups(app, step, body) {
     let bodyErr = null;
     try { await body(); } catch (e) { bodyErr = e; await app.onFail(step); }
+    // B-435: the last row read lands in the log BEFORE the UI delete rewrites the row from the device's cache.
+    if (app.diag) await app.diag.flush();
     let delErr = null;
     try { await deleteOurSetups(app.page, app.prefix); } catch (e) { delErr = e; }
     await app.ctx.close();
@@ -270,14 +275,16 @@ test.describe("C-064 · Playbook images (B-015 · B-038)", () => {
 
   // ── b ────────────────────────────────────────────────────────────────────
   test("b · five setups with photos, reload after each — k/k survive, earlier images byte-stable", async ({ browser }, info) => {
-    const app = await openApp(browser, info);
-    const { page, prefix, shot } = app;
+    const app = await openApp(browser, info, { diag: true });
+    const { page, prefix, shot, diag } = app;
     await withSetups(app, "b", async () => {
       const hashes = {};
       let panel = await openPlaybook(page);
+      await diag.step("start");
       for (let k = 1; k <= 5; k++) {
         await addSetup(page, panel, `${prefix}b${k}`, `F1_${k}`, "image");
         panel = await reloadToPlaybook(page);
+        await diag.step(`b${k}`); // before the assertion: a red step still carries its line
         const ours = (await readPlaybook(page)).filter((x) => x?.name?.startsWith(`${prefix}b`));
         expect(ours.map((x) => x.name).sort(), `after setup ${k} + reload`).toEqual(Array.from({ length: k }, (_, i) => `${prefix}b${i + 1}`));
         for (const s of ours) {
