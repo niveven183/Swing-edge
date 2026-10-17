@@ -135,6 +135,20 @@ export async function settingsSnapshot(email, password) {
   return { sha: sha(JSON.stringify(s)), capital: s.capital, ours };
 }
 
+// B-435 detector (Niv 17.10, 2ב) — the row's e2e setups AND its version token, read-only, once per scene step.
+// The token is created by the client for every write (DECISIONS 16.10), so an OLDER token appearing after a
+// newer one is an out-of-order write — visible in the log alone. One password grant per page of steps
+// (⛔ one per call): the access token is reused for 30 minutes (Supabase issues 60). Keys only leave here.
+let diagAuth = null;
+export async function settingsDiag(email, password) {
+  if (!restConfigured()) throw new Error("[qaRest] SUPABASE_URL / SUPABASE_ANON_KEY missing — refusing to report a row that was never read");
+  if (!diagAuth || diagAuth.email !== email || Date.now() - diagAuth.at > 30 * 60_000) diagAuth = { email, at: Date.now(), ...(await token(email, password)) };
+  const rows = await rest(`user_settings?select=settings,updated_at&user_id=eq.${diagAuth.uid}`, diagAuth.token);
+  if (!Array.isArray(rows) || rows.length !== 1) throw new Error(`[qaRest] user_settings: expected exactly 1 row for the QA account, got ${Array.isArray(rows) ? rows.length : typeof rows}`);
+  const pb = rows[0].settings?.playbook;
+  return { token: rows[0].updated_at ?? null, ours: (Array.isArray(pb) ? pb : []).map((x) => x?.name).filter((n) => typeof n === "string" && n.startsWith(PREFIX_ROOT)) };
+}
+
 // The safety net, ⛔ the path: called ONLY with every app context closed (K6 — the blob is
 // last-writer-wins), and only when the in-app restore did not land. Touches `capital` alone and
 // proves every other key byte-identical before/after.

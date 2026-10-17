@@ -21,7 +21,8 @@ import { test, expect } from "@playwright/test";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { exactRx, containsRx } from "./labels.js";
-import { settingsSnapshot, restoreCapital, sweep, PREFIX_ROOT } from "./qaRest.js";
+import { settingsSnapshot, settingsDiag, restoreCapital, sweep, PREFIX_ROOT } from "./qaRest.js";
+import { attachB435Diag } from "./b435diag.js";
 
 const HERMETIC = process.env.EYE_HERMETIC === "1";
 const QA_EMAIL = process.env.SENTINEL_QA_EMAIL;
@@ -86,8 +87,12 @@ test.describe("B-432 · B-435 · @deployed an edit reloaded within a second surv
 
     const ctx = await browser.newContext({ ...ctxOpts(info), baseURL: info.project.use.baseURL });
     let bodyPassed = false;
+    let diagRef = null;
     try {
       const page = await ctx.newPage();
+      // B-435 (Niv 17.10, 2ב): the detector, attached before the first navigation.
+      const diag = await attachB435Diag(page, { label: "localfirst-h", project: info.project.name, prefix: PREFIX_ROOT, dir, snapshot: () => settingsDiag(QA_EMAIL, QA_PASSWORD) });
+      diagRef = diag;
       await page.addInitScript((k) => { if (location.protocol.startsWith("http")) localStorage.setItem(k, "1"); }, IOS_DISMISS_KEY);
       const shot = (name) => page.screenshot({ path: join(dir, `${name}.png`), mask: [page.locator("header"), page.getByText(/@/)] });
       await page.goto("/app", { waitUntil: "load" });
@@ -97,12 +102,14 @@ test.describe("B-432 · B-435 · @deployed an edit reloaded within a second surv
       await page.locator('button[type="submit"]').first().click();
       await dash(page);
       await openSettings(page);
+      await diag.step("start");
 
       // h1 — the scalar.
       const ms1 = await editAndReload(page, target);
       report.steps.capitalClickToReloadMs = ms1;
       expect(ms1, "the reload did not follow the click within a second — the scene measured nothing").toBeLessThan(1000);
       await dash(page);
+      await diag.step("h1"); // before the row assertion: a red step still carries its line
       await expect.poll(async () => (await settingsSnapshot(QA_EMAIL, QA_PASSWORD)).capital, { message: "B-432: the capital edited and reloaded within a second never reached the row", timeout: 20_000 }).toBe(target);
       await openSettings(page);
       await expect.poll(() => shown(page), { message: "B-432: the capital did not survive the reload on screen" }).toBe(target);
@@ -121,6 +128,8 @@ test.describe("B-432 · B-435 · @deployed an edit reloaded within a second surv
       await reloading2;
       expect(report.steps.setupClickToReloadMs, "the reload did not follow the save within a second").toBeLessThan(1000);
       await dash(page);
+      await diag.step("h2");
+      await diag.flush(); // the h2 row read lands before the cleanup below writes
       await expect.poll(async () => (await settingsSnapshot(QA_EMAIL, QA_PASSWORD)).ours, { message: "B-435: the setup saved and reloaded within a second never reached the row", timeout: 20_000 }).toContain(setupName);
       await openSettings(page);
       await expect(panelOf(page).getByText(setupName, { exact: true }), "B-435: the setup is gone from the device after the reload").toBeVisible();
@@ -135,6 +144,8 @@ test.describe("B-432 · B-435 · @deployed an edit reloaded within a second surv
       await expect.poll(async () => (await settingsSnapshot(QA_EMAIL, QA_PASSWORD)).capital, { message: "the in-app capital restore never reached the row", timeout: 20_000 }).toBe(before.capital);
       bodyPassed = true;
     } finally {
+      // B-435: the last row read lands in the log BEFORE the cleanup below rewrites the row.
+      if (diagRef) await diagRef.flush();
       await ctx.close();
       let after = await settingsSnapshot(QA_EMAIL, QA_PASSWORD);
       if (after.ours.length) { await sweep(QA_EMAIL, QA_PASSWORD); report.restNet = "e2e setup swept over REST"; after = await settingsSnapshot(QA_EMAIL, QA_PASSWORD); }

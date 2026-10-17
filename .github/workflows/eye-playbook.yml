@@ -38,6 +38,7 @@ on:
       - 'playwright.eye.config.js'
       - 'scripts/eye-playbook-probe.mjs'
       - 'scripts/eye-evidence-scan.mjs'
+      - 'scripts/b435-alert.mjs'      # B-435 (17.10): the prod alert
       - 'src/components/ConsentBanner.jsx'
       - 'src/components/ConsentBanner.css'
       - 'src/components/IOSInstallBanner.jsx'
@@ -70,6 +71,7 @@ on:
       - 'playwright.eye.config.js'
       - 'scripts/eye-playbook-probe.mjs'
       - 'scripts/eye-evidence-scan.mjs'
+      - 'scripts/b435-alert.mjs'      # B-435 (17.10): the prod alert
       - 'src/components/ConsentBanner.jsx'
       - 'src/components/ConsentBanner.css'
       - 'src/components/IOSInstallBanner.jsx'
@@ -263,6 +265,12 @@ jobs:
   prod:
     needs: [probe, probe-overlay, probe-sync, probe-cents, wait-deploy]
     runs-on: ubuntu-latest
+    # B-435 (Niv 17.10, 2ג): issues: write — ONLY this job, ONLY for the B-435 alert below. A job-level block
+    # replaces the workflow's, so the two read scopes are restated.
+    permissions:
+      contents: read
+      deployments: read
+      issues: write
     container: mcr.microsoft.com/playwright:v1.61.1-noble
     timeout-minutes: 40
     steps:
@@ -287,6 +295,14 @@ jobs:
           # B-402: the F2b gate in step d needs the 2000px profile ON production — same reason.
           EYE_PRE_DEPLOY: ${{ github.event_name == 'pull_request' && '1' || '' }}
         run: npx playwright test -c playwright.eye.config.js $SPECS
+      # B-435 (Niv 17.10, 2ג) — a red playbook b on production keeps its evidence past the 14-day artifact and
+      # opens (or comments on) the open B-435 issue: the next occurrence must not depend on someone reading a
+      # log within two weeks. scripts/b435-alert.mjs exits 2 on a report it cannot read (⛔ a silent «green»).
+      # The issue body is written into eye-evidence/ HERE, before the leak scan, so the scan covers it too.
+      - name: B-435 — was playbook b red?
+        id: b435
+        if: ${{ always() }}
+        run: node scripts/b435-alert.mjs eye-results.json eye-evidence eye-evidence/b435-issue.md
       # The artifact is world-readable: it is uploaded ONLY if the leak scan is clean.
       - name: Leak scan (counts only)
         id: scan
@@ -309,3 +325,47 @@ jobs:
             !eye-evidence/probe-focus/
           retention-days: 14
           if-no-files-found: warn
+      - name: B-435 — keep the evidence 90 days
+        if: ${{ always() && steps.b435.outputs.red != '' && steps.scan.outcome == 'success' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: b435-evidence-${{ github.run_id }}
+          path: |
+            eye-evidence/
+            !eye-evidence/probe/
+            !eye-evidence/probe-overlay/
+            !eye-evidence/probe-sync/
+            !eye-evidence/probe-cents/
+            !eye-evidence/probe-focus/
+          retention-days: 90
+          if-no-files-found: error
+      - name: B-435 — open the issue, or comment on the open one
+        if: ${{ always() && steps.b435.outputs.red != '' }}
+        uses: actions/github-script@v9
+        env:
+          SCAN_OK: ${{ steps.scan.outcome == 'success' && '1' || '' }}
+          RED: ${{ steps.b435.outputs.red }}
+        with:
+          script: |
+            const fs = require('fs');
+            const label = 'B-435';
+            const { owner, repo } = context.repo;
+            try {
+              await github.rest.issues.getLabel({ owner, repo, name: label });
+            } catch (e) {
+              if (e.status !== 404) throw e;
+              await github.rest.issues.createLabel({ owner, repo, name: label, color: 'b60205', description: 'Production: a playbook setup lost after reload (docs/BACKLOG.md B-435)' });
+            }
+            // ⛔ an unscanned body on a public issue: if the leak scan did not pass, only the run link is published.
+            const body = process.env.SCAN_OK === '1'
+              ? fs.readFileSync('eye-evidence/b435-issue.md', 'utf8')
+              : `🔴 **B-435 recurred** — playbook b red on production (${process.env.RED}).\n\nRun: ${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}\n\n⛔ Evidence and diag withheld: the leak scan did not pass. Read the job log.`;
+            const open = await github.rest.issues.listForRepo({ owner, repo, state: 'open', labels: label, per_page: 1 });
+            if (open.data.length) {
+              const n = open.data[0].number;
+              await github.rest.issues.createComment({ owner, repo, issue_number: n, body });
+              core.notice(`B-435: commented on #${n}`);
+            } else {
+              const { data } = await github.rest.issues.create({ owner, repo, title: `B-435 · playbook b red on production (run ${context.runId})`, body, labels: [label] });
+              core.notice(`B-435: opened #${data.number}`);
+            }
