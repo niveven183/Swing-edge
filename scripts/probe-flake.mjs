@@ -24,6 +24,7 @@
 // serve failed · a secret in reach. A red scene is DATA: ::warning:: + the step summary, exit 0.
 
 import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 import { readFileSync, existsSync, readdirSync, appendFileSync, statSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -98,7 +99,7 @@ if (flag("summarize")) {
   }
   const deb = cells.filter((c) => c.kind === "debounce");
   for (const c of deb) {
-    lines.push("", `**debounce · ${c.project}** — D1 n=${c.window.n}: p50 ${c.window.p50}ms · p95 ${c.window.p95}ms · max ${c.window.max}ms`);
+    lines.push("", `**debounce · ${c.tree ?? "HEAD"} · ${c.project}** — D1 n=${c.window.n}: p50 ${c.window.p50}ms · p95 ${c.window.p95}ms · max ${c.window.max}ms`);
     for (const r of c.rows) lines.push(`- ${r.scene}: lost (mock) ${rate(r.lost, r.n)}${r.byFlush == null ? "" : ` · via unload flush ${r.byFlush}/${r.n} · cancelled by the page ${r.cancelled}/${r.n}`}`);
   }
   console.log(lines.join("\n"));
@@ -121,8 +122,8 @@ if (flag("plan")) {
   const shards = Number(process.env.IN_SHARDS || "3");
   if (!(repeatIn >= 1) || !(shards >= 1)) die("--plan: repeat and shards must be ≥ 1");
   for (const m of modes) if (!["isolated", "insitu"].includes(m)) die(`--plan: unknown mode "${m}"`);
-  for (const t of trees) if (!["HEAD", "BEFORE-408"].includes(t)) die(`--plan: unknown tree "${t}"`);
-  for (const x of scenesIn) if (!["H1", "H2", "H4", "C4"].includes(x)) die(`--plan: unknown scene "${x}"`);
+  for (const t of trees) if (!["HEAD", "BEFORE-408", "PRE-B432"].includes(t)) die(`--plan: unknown tree "${t}"`); // PRE-B432: main before local-first (B-435's question is about it)
+  for (const x of scenesIn) if (!["H1", "H2", "H4", "C4", "Q1", "Q2"].includes(x)) die(`--plan: unknown scene "${x}"`);
   const insituKey = (t, x) => (t === "BEFORE-408" && x === "C4" ? "B408-C4" : "FULL");
   const cells = [];
   for (const project of projects) for (const t of trees) {
@@ -150,8 +151,11 @@ const { APP, SETTINGS, I18N, DELTA, ARMS, ARM_GREP } = makeArms({ root: ROOT, di
 assertCleanTargets(ROOT, [APP, SETTINGS, I18N, DELTA], die);
 
 // H1/H4 (B-425, Niv 15.10 (i)): the held window's duration is measured on them — the closure condition.
-const SCENE_RX = { H1: "\\bH1 [a-z]", H2: "\\bH2 [a-z]", H4: "\\bH4 [a-z]", C4: "\\bC4 [a-z]" };
-const KEY = (title) => { const m = /^(H\d|C\d) /.exec(title); return m ? m[1] : null; };
+const SCENE_RX = { H1: "\\bH1 [a-z]", H2: "\\bH2 [a-z]", H4: "\\bH4 [a-z]", C4: "\\bC4 [a-z]", Q1: "\\bQ1 [a-z]", Q2: "\\bQ2 [a-z]" };
+// B-435 (wave B, step B-0): Q1/Q2 live in tests-flake/b435-sequence.spec.js — the photos come from the
+// eye global setup (tests-eye/fixtures.js FIXTURE_DIR); EYE_B435_FREE = chars left free under the quota (Q2).
+const specFor = (scene) => (scene === "DEBOUNCE" ? "tests-flake/debounce-window.spec.js" : /^Q\d/.test(scene) ? "tests-flake/b435-sequence.spec.js" : "tests-eye/hydration.spec.js");
+const KEY = (title) => { const m = /^(H\d|C\d|Q\d) /.exec(title); return m ? m[1] : null; };
 // insitu: the set the scene ran in historically (eye-sync-probe ARM_GREP). BEFORE-408/H2 never ran
 // in that arm ⇒ the full spec, declared.
 const insituGrep = (tree, scene) => (tree === "BEFORE-408" && scene === "C4" ? ARM_GREP["BEFORE-408"] : null);
@@ -161,8 +165,21 @@ const insituGrep = (tree, scene) => (tree === "BEFORE-408" && scene === "C4" ? A
 const SELF_C4 = "setCapital(val);\n                        setCapitalInput(\"\");\n                        try { localStorage.setItem(\"swingEdgeCapital\", String(val)); } catch {}";
 // …and the debounce scene's: the unload flush does nothing, so an edit reloaded inside the window
 // can ONLY be lost — a D2 that still reads "kept" there is a blind measurement.
-const SELF_FLUSH = "const flush = () => { if (hydratedRef.current) flushSettings(uid); };";
-const TREES = { ...ARMS, "SELF-C4-RED": [[APP, SELF_C4, () => "setCapitalInput(\"\");"]], "SELF-NOFLUSH": [[APP, SELF_FLUSH, () => "const flush = () => {};"]] };
+// ⚠️ B-432 · B-435 (16.10): after local-first the unload write is `unload` (keepalive) and the edit is ALSO kept as a
+// pending in the handler — removing `flush` alone no longer removes any write (measured: S7 «lost 0/10 · by flush 10»
+// on the runner). The mutant removes BOTH layers, so D2-0 can only lose the edit.
+const SELF_FLUSH = "const unload = () => {\n      if (!hydratedRef.current) return;";
+const SELF_PENDING = "                        recordScalar(\"capital\", val); // B-432 · B-435 — on disk before anything can unload\n";
+// B-432 · B-435 (16.10): PRE-B432 = the App + userSettings as they were at f2cbbb8 (main before local-first) — the
+// red-before arm of D4/D5. (settingsPending.js / the new exports exist in the tree but the old files ⛔ import them.)
+const PRE_B432_REF = "f2cbbb8";
+const showAt = (f, ref) => execFileSync("git", ["show", `${ref}:${f.replace(ROOT + "/", "")}`], { cwd: ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+const WHOLE_FILE = /^[\s\S]+$/;
+const TREES = { ...ARMS, "SELF-C4-RED": [[APP, SELF_C4, () => "setCapitalInput(\"\");"]], "SELF-NOFLUSH": [[APP, SELF_FLUSH, () => "const unload = () => {\n      return;"], [APP, SELF_PENDING, () => ""]],
+  "PRE-B432": [APP, SETTINGS].map((f) => { const old = showAt(f, PRE_B432_REF); return [f, WHOLE_FILE, () => old]; }),
+  // Mutant (i): the capital edit is ⛔ recorded in its handler — only the persist effect remembers it, and an unload
+  // at δ≈0 comes first ⇒ D4/D5 at δ=0 MUST lose the edit, or the scene is blind to where the pending is written.
+  "MUT-PENDING-EFFECT": [[APP, "                        recordScalar(\"capital\", val); // B-432 · B-435 — on disk before anything can unload\n", () => ""]] };
 
 // Walk a Playwright JSON report ⇒ one record per (test entry × result).
 function results(jsonPath) {
@@ -223,12 +240,12 @@ async function cell({ tree, scene, mode, repeat, shard = 0, diag = true, label =
     const json = join(dir, "report.json");
     const isDebounce = scene === "DEBOUNCE";
     const grep = grepOverride ?? (isDebounce ? null : mode === "isolated" ? SCENE_RX[scene] : insituGrep(tree, scene));
-    const spec = isDebounce ? "tests-flake/debounce-window.spec.js" : "tests-eye/hydration.spec.js";
+    const spec = specFor(scene.split("+")[0]);
     const t0 = Date.now();
     const run = await runSpec({
       root: ROOT, spec, projects: [PROJECT], port, json, evidenceDir: dir, grep,
       config: "playwright.flake.config.js", extraArgs: ["--repeat-each", String(repeat)],
-      env: { EYE_FLAKE_DIAG: diag ? "1" : "", EYE_FLAKE_OUT: join(dir, "test-results"), ...extraEnv },
+      env: { EYE_FLAKE_DIAG: diag ? "1" : "", EYE_FLAKE_OUT: join(dir, "test-results"), EYE_B435_FIXTURES: join(ROOT, "eye-evidence", "fixtures"), ...extraEnv },
     });
     server.close();
     if (!run.ok) die(`${name}: the spec produced no JSON report (exit ${run.status})\n${run.out.slice(-3000)}`);
@@ -331,28 +348,30 @@ const tree = arg("tree", "HEAD");
 const mode = arg("mode", "isolated");
 const repeat = Number(arg("repeat", "30"));
 const shard = Number(arg("shard", "0"));
-if (!scenes.length || !scenes.every((x) => ["H1", "H2", "H4", "C4", "DEBOUNCE"].includes(x)) || (scenes.includes("DEBOUNCE") && scenes.length > 1)) die(`--scene must be H1 · H2 · H4 · C4 (comma-separated insitu) · DEBOUNCE (got "${scene}")`);
+if (!scenes.length || !scenes.every((x) => ["H1", "H2", "H4", "C4", "Q1", "Q2", "DEBOUNCE"].includes(x)) || (scenes.includes("DEBOUNCE") && scenes.length > 1)) die(`--scene must be H1 · H2 · H4 · C4 (comma-separated insitu) · DEBOUNCE (got "${scene}")`);
 if (scenes.length > 1 && mode !== "insitu") die("several scenes in one run only make sense insitu (one set counts each)");
 if (scenes.length > 1 && new Set(scenes.map((x) => insituGrep(tree, x))).size > 1) die(`${scenes.join(",")} do not share an insitu set on ${tree}`);
 if (!["isolated", "insitu"].includes(mode)) die(`--mode must be isolated · insitu (got "${mode}")`);
 if (!(repeat >= 1)) die(`--repeat must be ≥ 1 (got "${arg("repeat")}")`);
 
 if (scene === "DEBOUNCE") {
-  const c = await cell({ tree: "HEAD", scene, mode: "isolated", repeat: 1, diag: false, label: `DEBOUNCE-${PROJECT}` });
+  // --tree (B-432: PRE-B432 is the red-before arm) · --grep (e.g. "\\bD[45]-" — only the drop-cancelled scenes).
+  const dGrep = arg("grep");
+  const c = await cell({ tree, scene, mode: "isolated", repeat: 1, diag: false, label: `DEBOUNCE-${tree}-${PROJECT}`, grepOverride: dGrep });
   const red = c.recs.filter((r) => r.status !== "passed");
   if (red.length) die(`DEBOUNCE: ${red.length} scene(s) could not reach an outcome — ${red.map((r) => `${r.title.split(" ")[0]}: ${r.msg.slice(0, 160)}`).join(" | ")}`);
   const ev = join(c.dir, "debounce", PROJECT);
   const read = (f) => JSON.parse(readFileSync(join(ev, f), "utf8"));
-  const d1 = read("D1.json");
-  if (d1.n !== 30) die(`DEBOUNCE: D1 has ${d1.n} samples, expected 30`);
-  const s = [...d1.samplesMs].sort((a, b) => a - b);
+  const d1 = existsSync(join(ev, "D1.json")) ? read("D1.json") : null;
+  if (!dGrep && (!d1 || d1.n !== 30)) die(`DEBOUNCE: D1 has ${d1?.n} samples, expected 30`);
+  const s = d1 ? [...d1.samplesMs].sort((a, b) => a - b) : [];
   const q = (p) => s[Math.min(s.length - 1, Math.ceil(p * s.length) - 1)];
-  const rows = readdirSync(ev).filter((f) => /^(D2|D3|K1)-\d+\.json$/.test(f)).sort().map((f) => { const j = read(f); return { scene: j.scene, n: j.n, lost: j.lost, byFlush: j.byFlush ?? null, cancelled: j.cancelled ?? null }; });
+  const rows = readdirSync(ev).filter((f) => /^(D2|D3|D4|D5|K1)-\d+\.json$/.test(f)).sort().map((f) => { const j = read(f); return { scene: j.scene, n: j.n, lost: j.lost, byFlush: j.byFlush ?? null, cancelled: j.cancelled ?? null }; });
   for (const r of rows) if (r.n !== 10) die(`DEBOUNCE: ${r.scene} has ${r.n} trials, expected 10`);
-  const out = { kind: "debounce", project: PROJECT, window: { n: s.length, p50: q(0.5), p95: q(0.95), max: s[s.length - 1], samplesMs: d1.samplesMs }, rows };
-  await writeFile(join(OUT, `cell-DEBOUNCE-${PROJECT}.json`), JSON.stringify(out, null, 2));
+  const out = { kind: "debounce", tree, project: PROJECT, window: { n: s.length, p50: q(0.5), p95: q(0.95), max: s[s.length - 1] ?? null, samplesMs: d1?.samplesMs ?? [] }, rows };
+  await writeFile(join(OUT, `cell-DEBOUNCE-${tree}-${PROJECT}.json`), JSON.stringify(out, null, 2));
   const extra = (r) => (r.byFlush == null ? "" : ` · left only via the unload flush ${r.byFlush}/${r.n} · of which cancelled by the page ${r.cancelled}/${r.n}`);
-  const md = [`### debounce window · ${PROJECT}`, `D1 n=${s.length}: p50 ${out.window.p50}ms · p95 ${out.window.p95}ms · max ${out.window.max}ms`, ...rows.map((r) => `- ${r.scene}: lost (mock) ${rate(r.lost, r.n)}${extra(r)}`)].join("\n");
+  const md = [`### debounce window · ${tree} · ${PROJECT}`, `D1 n=${s.length}: p50 ${out.window.p50}ms · p95 ${out.window.p95}ms · max ${out.window.max}ms`, ...rows.map((r) => `- ${r.scene}: lost (mock) ${rate(r.lost, r.n)}${extra(r)}`)].join("\n");
   console.log(md); summary(md);
   for (const r of rows) if (r.lost) console.log(`::warning::B-425 ${r.scene} (${PROJECT}): ${r.lost}/${r.n} edits lost`);
   for (const r of rows) if (r.cancelled) console.log(`::warning::B-425 ${r.scene} (${PROJECT}): ${r.cancelled}/${r.n} edits left only through the unload flush and the page cancelled that request`);
@@ -381,4 +400,15 @@ for (const sc of scenes) {
   for (const f of s.failures) console.log(`::warning::B-425 ${tree}/${sc}/${PROJECT}/${mode} repeat ${f.repeat}: ${f.status} — ${f.msg.slice(0, 200)}`);
 }
 if (instrumentTotal) die(`${instrumentTotal} run(s) failed as INSTRUMENT (the held read outlived its bound) — data written, but the cell is not a clean measurement`);
+// B-435 Q2 (16.10): a quota variant whose quota NEVER threw measured nothing. Measured: run 38922223377 — the runner
+// stores smaller photos (iphone14 ~131KB, pixel7 ~60KB per setup vs 218KB locally), EYE_B435_FREE 1.5M was never
+// reached, and the 0/100 read like a negative result. ⛔ again: no QuotaExceededError in any repeat ⇒ exit 1.
+if (scenes.includes("Q2")) {
+  const diagDir = join(c.dir, "hydration", PROJECT);
+  const diags = existsSync(diagDir) ? readdirSync(diagDir).filter((f) => /^Q2-diag(-r\d+)?\.json$/.test(f)).map((f) => JSON.parse(readFileSync(join(diagDir, f), "utf8"))) : [];
+  const bit = diags.filter((d) => d.events.some((e) => e.kind === "quota")).length;
+  console.log(`Q2 quota pressure: a QuotaExceededError in ${bit}/${diags.length} repeats (EYE_B435_FREE=${process.env.EYE_B435_FREE || "1500000"})`);
+  summary(`- Q2 quota pressure: QuotaExceededError in ${bit}/${diags.length} repeats`);
+  if (!bit) die(`Q2: the quota never threw in ${diags.length} repeats — the variant measured nothing (lower EYE_B435_FREE for this runner)`);
+}
 process.exit(0);

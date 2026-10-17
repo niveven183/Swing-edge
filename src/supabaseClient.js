@@ -4,6 +4,10 @@ const supabaseUrl = import.meta.env?.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env?.VITE_SUPABASE_ANON_KEY;
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseKey);
+// B-432 · B-435 (16.10): the unload keepalive (userSettings.flushKeepalive) calls the REST endpoint itself —
+// an unload handler cannot await supabase-js. The anon key is already public in the bundle.
+export const SUPABASE_URL = supabaseUrl;
+export const SUPABASE_ANON_KEY = supabaseKey;
 
 export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseKey, {

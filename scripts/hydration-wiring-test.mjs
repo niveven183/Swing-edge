@@ -26,6 +26,9 @@ import { capitalGate } from "../src/lib/positionSizing.js";
 // ⛔ the harness crashing before the rest of the block can speak.
 let Delta = null, Settings = null;
 try { Delta = await import("../src/lib/settingsDelta.js"); } catch (e) { console.log(`⚠️ settingsDelta.js: ${e.message.split("\n")[0]}`); }
+// B-432 · B-435 (16.10) — the scalar pending module. Absent in the tree before the fix ⇒ the P3–P5 values are red by name.
+let Pending = null;
+try { Pending = await import("../src/lib/settingsPending.js"); } catch (e) { console.log(`⚠️ settingsPending.js: ${e.message.split("\n")[0]}`); }
 try { Settings = await import("../src/lib/userSettings.js"); } catch (e) { console.log(`⚠️ userSettings.js: ${e.message.split("\n")[0]}`); }
 // The default list as SwingEdge_App.jsx builds it — only its tickers and order matter here.
 const DEFAULT_WATCHLIST_PROBE = ["NVDA", "PLTR", "AVGO", "META", "AMD", "MSTR", "SMCI", "TSLA", "BTC", "ETH"]
@@ -94,7 +97,8 @@ function sliceFn(s, startIdx) {
 
 const A_HYDRATE = "const hydrate = async () => {";
 const A_PERSIST = "saveSettings(authUser.id, patch);";
-const A_UNLOAD  = 'window.addEventListener("beforeunload", flush);';
+// B-432 · B-435: the unload listener is now `unload` (keepalive, layer 2); the effect's cleanup keeps `flush`.
+const A_UNLOAD  = 'window.addEventListener("beforeunload", unload);';
 const A_EFFECT  = "useEffect(() => {";
 // A15·A16·A17 (22.09) — D-lite יושב ב**ראש ה-useEffect**, לפני שער ה-early-return,
 // ולכן גוף `hydrate` לבדו ⛔ יכול למדוד אותו: בהתנתקות (`authUser = null`) הגוף
@@ -225,8 +229,8 @@ const tick = () => new Promise((res) => setTimeout(res, 0));
  *  עצמו השתנה** (הישן החזיר את אובייקט ההגדרות עצמו), ⛔ לא כי אותה קלט מייצר
  *  התנהגות שונה. הן ראיה **חלשה יותר** מ-A1-A6/A10-A14, וזה נאמר כאן ⛔ ולא
  *  בסגירה. */
-function loadResult(status, mirror) {
-  return { status, settings: mirror };
+function loadResult(status, mirror, updatedAt = null) {
+  return { status, settings: mirror, updatedAt };
 }
 
 const MIRROR_OK = { capital: 49000, riskPct: 2, lang: "he", accountCurrency: "USD", welcomeSeen: true };
@@ -235,10 +239,10 @@ const MIRROR_2500 = { capital: DEFAULT_CAPITAL, lang: "he", welcomeSeen: false }
 const ONB_PROFILE = { defaults: { capital: 1000, riskPct: 1, capitalCurrency: "USD" } };
 
 function runHydrate({ loadStatus, mirror = MIRROR_OK, migrateReason = null, cancelled = false, storage = {}, uid = "u-probe",
-                     showOnboarding = null, dbCapitalRef = { current: false },
+                     showOnboarding = null, dbCapitalRef = { current: false }, updatedAt = null,
                      had = { watchlist: false, alerts: false, playbook: false }, deltaFailures = [] }) {
   const calls = { load: 0, hydrationFailed: [], hydrationDone: 0, capital: [], lang: [], clobber: [], errors: [], onboarding: [], profile: [],
-                  watchlist: [], alerts: [], playbook: [] };
+                  watchlist: [], alerts: [], playbook: [], conflict: [], riskPct: [] };
   const hydratedRef = { current: false };
   const welcomeSeenRef = { current: false };
   const localStorage = makeLocalStorage(storage);
@@ -257,6 +261,8 @@ function runHydrate({ loadStatus, mirror = MIRROR_OK, migrateReason = null, canc
     // B-406 (05.10) — the delta merge. Injected in BOTH trees: the pre-fix body ⛔ reads them
     // (an unused parameter is a no-op), the fixed body ⛔ reads `had*` any more.
     "hydrateCollections", "DEFAULT_WATCHLIST", "reportDeltaFailure", "persistPlaybookSafely", "readOps",
+    // B-432 · B-435 (16.10) — the pending decision at load. Injected in both trees (the old body ⛔ reads them).
+    "readPending", "decidePending", "clearPending", "setSettingsConflict",
   ];
   const values = [
     cancelled,
@@ -264,12 +270,12 @@ function runHydrate({ loadStatus, mirror = MIRROR_OK, migrateReason = null, canc
     { id: uid },
     { error: (...a) => calls.errors.push(a.map(String).join(" ")), warn() {}, log() {} },
     (v) => calls.hydrationFailed.push(v),
-    async () => { calls.load++; return loadResult(loadStatus, mirror); },
+    async () => { calls.load++; return loadResult(loadStatus, mirror, updatedAt); },
     (v) => calls.capital.push(v),
     localStorage, CURRENCY_SYMBOL,
     // setAccountCurrency · setCapitalCurrency · setRiskPct · setShowOnboarding · setUserProfile
     // ⚠️ setShowOnboarding היה `() => {}` ו⛔ נמדד — בדיוק המסך שההבהוב חי בו (B-365).
-    () => {}, () => {}, () => {}, (v) => calls.onboarding.push(v), (v) => calls.profile.push(v),
+    () => {}, () => {}, (v) => calls.riskPct.push(v), (v) => calls.onboarding.push(v), (v) => calls.profile.push(v),
     "en",
     (v) => calls.lang.push(v),
     (v) => calls.watchlist.push(v), had.watchlist, (v) => calls.alerts.push(v), had.alerts,
@@ -280,6 +286,8 @@ function runHydrate({ loadStatus, mirror = MIRROR_OK, migrateReason = null, canc
     () => { calls.hydrationDone++; },
     showOnboarding, dbCapitalRef,
     Delta ? Delta.hydrateCollections : undefined, DEFAULT_WATCHLIST_PROBE, (reason) => deltaFailures.push(reason), persistPlaybookSafely, Delta ? Delta.readOps : undefined,
+    Pending ? Pending.readPending : undefined, Pending ? Pending.decidePending : undefined, Pending ? Pending.clearPending : undefined,
+    (v) => calls.conflict.push(v),
   ];
 
   const fn = new Function(...names, "return (" + hydrateSrc + ")")(...values);
@@ -316,6 +324,8 @@ function runHydrateEffect({ authUser, hydratedRef, storage = {}, mirror = MIRROR
     "DEFAULT_CAPITAL", "setCapitalMaybeClobbered", "hydratedRef", "setHydrationDone",
     "showOnboarding", "dbCapitalRef",
     "hydrateCollections", "DEFAULT_WATCHLIST", "reportDeltaFailure", "persistPlaybookSafely", "readOps",
+    // B-432 · B-435 (16.10) — the pending decision at load. Injected in both trees (the old body ⛔ reads them).
+    "readPending", "decidePending", "clearPending", "setSettingsConflict",
   ];
   const values = [
     true, {}, authUser, store,
@@ -328,6 +338,8 @@ function runHydrateEffect({ authUser, hydratedRef, storage = {}, mirror = MIRROR
     DEFAULT_CAPITAL, () => {}, hydratedRef, () => {},
     null, { current: false },
     Delta ? Delta.hydrateCollections : undefined, DEFAULT_WATCHLIST_PROBE, () => {}, persistPlaybookSafely, Delta ? Delta.readOps : undefined,
+    Pending ? Pending.readPending : undefined, Pending ? Pending.decidePending : undefined, Pending ? Pending.clearPending : undefined,
+    () => {},
   ];
   const cleanup = new Function(...names, "return (" + hydrateEffectSrc + ")")(...values)();
   return { cleanup, calls, store };
@@ -350,17 +362,23 @@ function runWelcomeAndTourCallbacks({ authUser, hydratedRef }) {
 }
 
 function runUnload(hydratedRef) {
-  const calls = { flush: 0 };
+  const calls = { flush: 0, keepalive: 0, keepaliveArgs: [] };
   const listeners = {};
-  const win = {
-    addEventListener: (e, f) => { (listeners[e] = listeners[e] || []).push(f); },
-    removeEventListener: (e, f) => { listeners[e] = (listeners[e] || []).filter((x) => x !== f); },
-  };
-  const names = ["authUser", "hydratedRef", "window", "flushSettings"];
-  const values = [{ id: "u-probe" }, hydratedRef, win, () => { calls.flush++; }];
+  const target = (prefix) => ({
+    addEventListener: (e, f) => { (listeners[prefix + e] = listeners[prefix + e] || []).push(f); },
+    removeEventListener: (e, f) => { listeners[prefix + e] = (listeners[prefix + e] || []).filter((x) => x !== f); },
+  });
+  const win = target("w:");
+  // B-432 · B-435 — `document` carries visibilitychange; its state is set before firing.
+  const doc = { ...target("d:"), visibilityState: "visible" };
+  const names = ["authUser", "hydratedRef", "window", "flushSettings", "flushKeepalive", "sessionRef", "SUPABASE_URL", "SUPABASE_ANON_KEY", "document"];
+  const values = [{ id: "u-probe" }, hydratedRef, win, () => { calls.flush++; },
+    (...a) => { calls.keepalive++; calls.keepaliveArgs.push(a); return { sent: true }; },
+    { current: { access_token: "tok-probe" } }, "https://probe.supabase.co", "anon-probe", doc];
   const cleanup = new Function(...names, "return (" + unloadSrc + ")")(...values)();
-  const fire = (e) => (listeners[e] || []).forEach((f) => f());
-  return { calls, fire, cleanup };
+  const fire = (e) => (listeners["w:" + e] || []).forEach((f) => f());
+  const hide = () => { doc.visibilityState = "hidden"; (listeners["d:visibilitychange"] || []).forEach((f) => f()); };
+  return { calls, fire, hide, cleanup };
 }
 
 /* ── האסרציות ─────────────────────────────────────────────────────────────*/
@@ -416,10 +434,46 @@ const main = async () => {
     const p = runPersist(r.hydratedRef);
     ok("A12", "failed → persist effect ⇒ saveSettings calls", p.save === 0, String(p.save));
     const u = runUnload(r.hydratedRef);
-    u.fire("beforeunload"); u.fire("pagehide");
-    ok("A13", "failed → beforeunload+pagehide ⇒ flushSettings calls", u.calls.flush === 0, String(u.calls.flush));
+    u.fire("beforeunload"); u.fire("pagehide"); u.hide();
+    // B-432 · B-435 — the unload events now call flushKeepalive; counting flushSettings alone would be ⛔ blind.
+    ok("A13", "failed → beforeunload+pagehide+hidden ⇒ keepalive + flushSettings calls", u.calls.keepalive === 0 && u.calls.flush === 0, `keepalive ${u.calls.keepalive} · flush ${u.calls.flush}`);
     u.cleanup();
     ok("A14", "failed → +cleanup ⇒ flushSettings calls", u.calls.flush === 0, String(u.calls.flush));
+  }
+
+  // P1 · P2 — B-432 · B-435 (16.10): the POSITIVE control of A13 — after a successful hydration the unload sends a
+  // keepalive with the session's token (layer 2), and the cleanup (logout / user switch) the ordinary write.
+  {
+    const u = runUnload({ current: true });
+    u.fire("pagehide");
+    const a = u.calls.keepaliveArgs[0] || [];
+    ok("P1", "hydrated → pagehide ⇒ ONE flushKeepalive(uid, { accessToken from sessionRef, url, anonKey })",
+      u.calls.keepalive === 1 && a[0] === "u-probe" && a[1]?.accessToken === "tok-probe" && a[1]?.url === "https://probe.supabase.co" && a[1]?.anonKey === "anon-probe" && u.calls.flush === 0,
+      `keepalive ${u.calls.keepalive} · ${JSON.stringify(a[1] || null)} · flush ${u.calls.flush}`);
+    u.cleanup();
+    ok("P2", "hydrated → cleanup ⇒ flushSettings (the page is alive: the ordinary write)", u.calls.flush === 1, String(u.calls.flush));
+  }
+
+  // P3 · P4 · P5 — B-432 · B-435: the pending decision inside the REAL hydrate body.
+  {
+    const T0 = "2026-10-16T08:00:00.000Z", T5 = "2026-10-16T08:00:05.000Z", T9 = "2026-10-16T09:00:00.000Z";
+    const pend = () => ({ swingEdgeSettingsPending: JSON.stringify({ v: 1, base: T0, inflight: [T5], values: { capital: 12345 } }) });
+    const row = { ...MIRROR_OK, capital: 9000 };
+    const ap = runHydrate({ loadStatus: "ok", mirror: row, updatedAt: T0, storage: pend() });
+    await ap.promise;
+    ok("P3", "pending + row token = base ⇒ the pending capital is applied (12345, ⛔ the row's 9000)", ap.calls.capital.at(-1) === 12345 && ap.calls.conflict.length === 0, `capital ${JSON.stringify(ap.calls.capital)} · conflicts ${ap.calls.conflict.length}`);
+    const cf = runHydrate({ loadStatus: "ok", mirror: row, updatedAt: T9, storage: pend() });
+    await cf.promise;
+    ok("P4", "pending + a foreign row token ⇒ the row wins (9000) + ONE conflict carrying the rejected 12345", cf.calls.capital.at(-1) === 9000 && cf.calls.conflict.length === 1 && cf.calls.conflict[0]?.rejected?.capital === 12345, `capital ${JSON.stringify(cf.calls.capital)} · conflict ${JSON.stringify(cf.calls.conflict[0] || null)}`);
+    const ld = runHydrate({ loadStatus: "ok", mirror: { ...MIRROR_OK, capital: 12345 }, updatedAt: T5, storage: pend() });
+    await ld.promise;
+    ok("P5", "pending + row token = inflight (our write landed) ⇒ pending cleared · ⛔ a conflict", ld.localStorage.getItem("swingEdgeSettingsPending") === null && ld.calls.conflict.length === 0, `pending ${ld.localStorage.getItem("swingEdgeSettingsPending")} · conflicts ${ld.calls.conflict.length}`);
+    // P6 — the case the inflight check exists for: write A (capital) landed, the newer keepalive B (riskPct) was cancelled.
+    // Our own token in the row ⇒ ⛔ a conflict: what A carried is dropped, the newer riskPct applies.
+    const ab = runHydrate({ loadStatus: "ok", mirror: { ...MIRROR_OK, capital: 12345, riskPct: 1 }, updatedAt: T5,
+      storage: { swingEdgeSettingsPending: JSON.stringify({ v: 1, base: T0, inflight: [T5, "2026-10-16T08:00:06.000Z"], values: { capital: 12345, riskPct: 3 } }) } });
+    await ab.promise;
+    ok("P6", "row token = OUR earlier write, a newer edit was cancelled ⇒ ⛔ a conflict · the newer riskPct (3) applies", ab.calls.conflict.length === 0 && ab.calls.capital.at(-1) === 12345 && ab.calls.riskPct.at(-1) === 3, `conflicts ${ab.calls.conflict.length} · capital ${JSON.stringify(ab.calls.capital)} · riskPct ${JSON.stringify(ab.calls.riskPct)}`);
   }
 
   /* A15 · A16 · A17 — החלפת משתמש באותו טאב (B-361 · D-lite, 22.09)
@@ -825,7 +879,7 @@ const main = async () => {
     };
     const GATE = "disabled={!capitalSettled}";
     const sites = [
-      ["G9", "בורר השפה", el("onChange={e => setLang(e.target.value)}", "<select", "</select>")],
+      ["G9", "בורר השפה", el("onChange={e => editLang(e.target.value)}", "<select", "</select>")],
       ["G10", "שדה ההון", el("onChange={e => setCapitalInput(e.target.value)}", "<input", "/>")],
       ["G11", "כפתור «Update Capital»", el("{t.updateCapital}", "<button", "</button>")],
       ["G12", "כפתורי מטבע ההון", el("setCapitalCurrency(c);", "<button", "</button>")],
@@ -864,12 +918,14 @@ const main = async () => {
 
   const total = pass + inv + fail;
   console.log(`\n${APP}`);
-  console.log(`מבחינות: ${pass}/55 · אינווריאנטות: ${inv}/17 · סה"כ ${pass + inv}/${total}`);
+  // B-432 · B-435 (16.10): the denominators are COUNTED, ⛔ literals — `/55` and `72/72` kept printing after five
+  // assertions were added (B-257's hand-moved count, in this file).
+  console.log(`מבחינות: ${pass}/${total - inv} · אינווריאנטות: ${inv}/${inv} · סה"כ ${pass + inv}/${total}`);
   if (fail) {
     console.log(`🔴 אדומות (${fail}): ${reds.join(" · ")}`);
     process.exit(1);
   }
-  console.log("✅ hydration wiring: 72/72");
+  console.log(`✅ hydration wiring: ${pass + inv}/${total}`);
 };
 
 main().catch((e) => { console.error("🔴 harness נפל:", e); process.exit(1); });

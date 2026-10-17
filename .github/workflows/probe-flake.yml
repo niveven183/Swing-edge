@@ -37,6 +37,9 @@ on:
       shards:
         description: "Parallel jobs per insitu set"
         default: "3"
+      b435_free:
+        description: "B-435 Q2: chars left free under the browser's localStorage quota"
+        default: "1500000"
       debounce:
         description: "Also measure the debounce window / reload scene (tests-flake/)"
         type: boolean
@@ -111,6 +114,8 @@ jobs:
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - run: npm ci
       - name: Measure ${{ matrix.id }}
+        env:
+          EYE_B435_FREE: ${{ inputs.b435_free }}
         run: >
           npm run probe:flake --
           --tree ${{ matrix.tree }} --scene ${{ matrix.scene }} --mode ${{ matrix.mode }}

@@ -367,6 +367,146 @@ console.log("test:settings — userSettings module vs mock client (no real DB)\n
   check("⚪ control — a prompt read is ok and carries the row", r3.status === "ok" && r3.settings.capital === 5000);
 }
 
+// 13) B-432 + B-435 (16.10) — local-first: a pending edit survives a write that never landed.
+// Plan: docs/plans/PLAN-2026-10-16-b432-b435-local-first.md. Every assertion here is RED on the tree before
+// the fix (the module does not exist, loadSettings carries no token, no keepalive path) — each one by name.
+{
+  console.log("13) local-first: pending + inflight + keepalive (B-432 · B-435)");
+  let P = null;
+  try { P = await import("../src/lib/settingsPending.js"); } catch (e) { console.error(`  (settingsPending.js not importable: ${String(e.message).split("\n")[0]})`); }
+  const has = (fn) => P && typeof P[fn] === "function";
+  // A mock with a VERSION TOKEN: the row keeps the updated_at the client sent (no server trigger — DECISIONS 16.10).
+  function tokenClient(seed = {}, { upsertFail = false, upsertThrow = false, hold = false } = {}) {
+    const rows = new Map(Object.entries(seed));
+    const calls = { upsert: 0, sent: [] };
+    let release = null;
+    function from() {
+      let id = null;
+      const b = {
+        select() { return b; }, eq(_c, v) { id = v; return b; }, abortSignal() { return b; },
+        async maybeSingle() { return rows.has(id) ? { data: { user_id: id, ...rows.get(id) }, error: null } : { data: null, error: null }; },
+        upsert(obj) {
+          calls.upsert++; calls.sent.push(obj);
+          if (upsertThrow) return Promise.reject(new TypeError("Load failed"));
+          if (upsertFail) return Promise.resolve({ data: null, error: { message: "TypeError: Load failed" } });
+          const land = () => { rows.set(obj.user_id, { settings: obj.settings, updated_at: obj.updated_at }); return { data: obj, error: null }; };
+          return hold ? new Promise((r) => { release = () => r(land()); }) : Promise.resolve(land());
+        },
+      };
+      return b;
+    }
+    return { client: { from }, calls, rows, release: () => release?.() };
+  }
+  const T0 = "2026-10-16T08:00:00.000Z";
+
+  // a — the edit is on disk the moment the handler returns (⛔ an effect).
+  global.localStorage = makeLocalStorage();
+  const okA = has("recordScalarEdit") && P.recordScalarEdit(global.localStorage, "capital", 12345, { base: T0 });
+  const pa = has("readPending") ? P.readPending(global.localStorage) : null;
+  check("13a recordScalarEdit writes pending synchronously — value parsed, base kept", okA === true && pa?.values?.capital === 12345 && pa?.base === T0);
+
+  // b — the decision at load (Niv 16.10): inflight landed · base ⇒ apply · else ⇒ conflict.
+  // `inflight` is a LIST of this device's outgoing tokens: a debounced write (A) can be in flight when the unload
+  // keepalive (B) goes out — A lands, B is cancelled; one remembered token would turn A into a FALSE conflict.
+  const pend = { v: 1, base: T0, inflight: ["2026-10-16T08:00:05.000Z"], values: { capital: 12345 } };
+  const dec = (tok, row = { capital: 9000 }) => (has("decidePending") ? P.decidePending(pend, row, tok) : null);
+  // ⚠️ A write that LANDED left its value in the row — the fixture must say so (row = 12345 with our token).
+  check("13b row token = inflight AND the row holds our value ⇒ «landed» (⛔ a banner)", dec("2026-10-16T08:00:05.000Z", { capital: 12345 })?.action === "landed");
+  check("13b row token = base ⇒ «apply» (it never landed — the pending wins)", dec(T0)?.action === "apply" && dec(T0)?.apply?.capital === 12345);
+  const c = dec("2026-10-16T09:00:00.000Z");
+  check("13b any other token ⇒ «conflict»: the row wins, the rejected local value is carried", c?.action === "conflict" && c?.rejected?.capital === 12345);
+  check("13b no pending ⇒ «none»", has("decidePending") && P.decidePending(null, { capital: 1 }, T0)?.action === "none");
+  // A landed (row = A, carrying capital 12345), B (newer: riskPct 3) was cancelled ⇒ ⛔ a conflict: drop what A carried, apply the rest.
+  const ab = has("decidePending") ? P.decidePending({ v: 1, base: T0, inflight: ["A-tok", "B-tok"], values: { capital: 12345, riskPct: 3 } }, { capital: 12345, riskPct: 1 }, "A-tok") : null;
+  check("13b row = an EARLIER inflight token ⇒ «apply» only what it did not carry (⛔ a false conflict)", ab?.action === "apply" && ab?.apply?.riskPct === 3 && !("capital" in (ab?.apply || {})));
+
+  // c — the read carries the row's token.
+  global.localStorage = makeLocalStorage();
+  const rc = tokenClient({ u13c: { settings: { capital: 9000 }, updated_at: T0 } });
+  const r13c = await loadSettings("u13c", rc.client);
+  check("13c loadSettings returns the row's updated_at as `updatedAt`", r13c.updatedAt === T0);
+
+  // d — inflight is on disk BEFORE the request resolves, and equals the updated_at that was sent.
+  global.localStorage = makeLocalStorage();
+  const rd = tokenClient({ u13d: { settings: { capital: 9000 }, updated_at: T0 } }, { hold: true });
+  await loadSettings("u13d", rd.client);
+  if (has("recordScalarEdit")) P.recordScalarEdit(global.localStorage, "capital", 11111, { base: T0 });
+  saveSettings("u13d", { capital: 11111 }, rd.client);
+  const fd = flushSettings("u13d", rd.client);
+  await sleep(20);
+  const inflightNow = has("readPending") ? P.readPending(global.localStorage)?.inflight : undefined;
+  check("13d inflight is written BEFORE the upsert resolves — the token the request carries", rd.calls.sent.length === 1 && Array.isArray(inflightNow) && inflightNow.includes(rd.calls.sent[0]?.updated_at));
+  rd.release(); await fd;
+
+  // e — the pending is cleared ONLY by a 2xx that carried it (Niv 16.10). {error} · throw ⇒ it stays.
+  const settleOn = () => (has("settlePending") ? US.onSettingsSynced((uid, blob) => P.settlePending(global.localStorage, blob)) : () => {});
+  for (const [label, opts, keep] of [["{ error } (TypeError: Load failed)", { upsertFail: true }, true], ["a thrown network error", { upsertThrow: true }, true], ["a 2xx that carried it", {}, false]]) {
+    global.localStorage = makeLocalStorage();
+    const off = settleOn();
+    const re = tokenClient({ [`u13e${label.length}`]: { settings: { capital: 9000 }, updated_at: T0 } }, opts);
+    const uid = `u13e${label.length}`;
+    await loadSettings(uid, re.client);
+    if (has("recordScalarEdit")) P.recordScalarEdit(global.localStorage, "capital", 22222, { base: T0 });
+    saveSettings(uid, { capital: 22222 }, re.client);
+    await flushSettings(uid, re.client);
+    off();
+    const left = has("readPending") ? P.readPending(global.localStorage)?.values?.capital : undefined;
+    check(`13e after ${label}: pending ${keep ? "STAYS" : "is cleared"}`, has("readPending") && (keep ? left === 22222 : left === undefined));
+  }
+
+  // f — layer 2: keepalive with the full blob, headers, and the inflight token.
+  global.localStorage = makeLocalStorage();
+  const rf = tokenClient({ u13f: { settings: { capital: 9000 }, updated_at: T0 } });
+  await loadSettings("u13f", rf.client);
+  if (has("recordScalarEdit")) P.recordScalarEdit(global.localStorage, "capital", 33333, { base: T0 });
+  saveSettings("u13f", { capital: 33333 }, rf.client);
+  const fetched = [];
+  const fake = (url, init) => { fetched.push({ url, init }); return Promise.resolve({ ok: true, status: 201 }); };
+  const kf = typeof US.flushKeepalive === "function" ? US.flushKeepalive("u13f", { accessToken: "tok-13f", url: "https://x.supabase.co", anonKey: "anon-13f", fetchImpl: fake }) : null;
+  const sentF = fetched[0];
+  const bodyF = sentF ? JSON.parse(sentF.init.body) : null;
+  check("13f flushKeepalive: one POST with keepalive:true to /rest/v1/user_settings?on_conflict=user_id", kf?.sent === true && fetched.length === 1 && sentF.init.keepalive === true && sentF.init.method === "POST" && sentF.url === "https://x.supabase.co/rest/v1/user_settings?on_conflict=user_id");
+  check("13f headers: apikey · Bearer token · merge-duplicates", sentF?.init.headers?.apikey === "anon-13f" && sentF?.init.headers?.Authorization === "Bearer tok-13f" && /resolution=merge-duplicates/.test(sentF?.init.headers?.Prefer || ""));
+  check("13f body = the full cached blob + updated_at = an inflight token on disk", Array.isArray(bodyF) && bodyF[0]?.settings?.capital === 33333 && !!bodyF[0]?.updated_at && (has("readPending") ? (P.readPending(global.localStorage)?.inflight || []).includes(bodyF[0].updated_at) : false));
+
+  // g — the 60KB guard: ⛔ keepalive, the reason said, the pending kept.
+  global.localStorage = makeLocalStorage();
+  const rg = tokenClient({ u13g: { settings: { capital: 9000 }, updated_at: T0 } });
+  await loadSettings("u13g", rg.client);
+  if (has("recordScalarEdit")) P.recordScalarEdit(global.localStorage, "capital", 44444, { base: T0 });
+  saveSettings("u13g", { capital: 44444, playbook: [{ id: 1, name: "big", imagePreview: "x".repeat(70 * 1024) }] }, rg.client);
+  const fetchedG = [];
+  const warns = []; const ow = console.warn; console.warn = (...a) => warns.push(a.join(" "));
+  const kg = typeof US.flushKeepalive === "function" ? US.flushKeepalive("u13g", { accessToken: "t", url: "https://x.supabase.co", anonKey: "k", fetchImpl: (u, i) => { fetchedG.push(i); return Promise.resolve({ ok: true }); } }) : null;
+  console.warn = ow;
+  check("13g body > 60KB ⇒ ⛔ keepalive · reason «too-large» · said in the console · pending kept", kg?.sent === false && kg?.reason === "too-large" && fetchedG.length === 0 && warns.some((w) => /keepalive/.test(w) && /60/.test(w)) && (has("readPending") ? P.readPending(global.localStorage)?.values?.capital === 44444 : false));
+
+  // h — keepalive that landed + the next load ⇒ 0 banners (Niv 16.10, fix ①).
+  global.localStorage = makeLocalStorage();
+  const rh = tokenClient({ u13h: { settings: { capital: 9000 }, updated_at: T0 } });
+  await loadSettings("u13h", rh.client);
+  if (has("recordScalarEdit")) P.recordScalarEdit(global.localStorage, "capital", 55555, { base: T0 });
+  saveSettings("u13h", { capital: 55555 }, rh.client);
+  const delivered = [];
+  if (typeof US.flushKeepalive === "function") US.flushKeepalive("u13h", { accessToken: "t", url: "https://x.supabase.co", anonKey: "k", fetchImpl: (u, i) => { const b = JSON.parse(i.body)[0]; rh.rows.set("u13h", { settings: b.settings, updated_at: b.updated_at }); delivered.push(b); return Promise.resolve({ ok: true }); } });
+  const next = await loadSettings("u13h", rh.client); // a fresh page: the keepalive arrived, its answer was never seen
+  const dh = has("decidePending") ? P.decidePending(P.readPending(global.localStorage), next.settings, next.updatedAt) : null;
+  check("13h keepalive landed + load ⇒ «landed» — 0 banners", delivered.length === 1 && dh?.action === "landed");
+
+  // i — guard for mutant M-v (green on f2cbbb8 too — B-361's rule, now load-bearing for the pending): a brand-new user
+  // (no row) whose mirror already equals the first edit MUST get the row written. Seeding lastSent from the mirror would
+  // read that edit as «already sent», settle it with no 2xx, and never write the row.
+  global.localStorage = makeLocalStorage({ swingEdgeSettings: JSON.stringify({ capital: 5000 }) });
+  const ri = tokenClient({});
+  const li = await loadSettings("u13i", ri.client);
+  if (has("recordScalarEdit")) P.recordScalarEdit(global.localStorage, "capital", 5000, { base: null });
+  const offI = has("settlePending") ? US.onSettingsSynced((uid, blob, tok) => P.settlePending(global.localStorage, blob, { token: tok })) : () => {};
+  saveSettings("u13i", { capital: 5000 }, ri.client);
+  await flushSettings("u13i", ri.client);
+  offI();
+  check("13i no row + mirror = the first edit ⇒ the row IS written (1 upsert) — ⛔ «already sent» from the mirror", li.status === "empty" && ri.calls.upsert === 1 && ri.rows.get("u13i")?.settings?.capital === 5000);
+}
+
 console.log("");
 if (failures > 0) {
   console.error(`❌ test:settings — ${failures} assertion(s) failed`);

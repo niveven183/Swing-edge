@@ -44,7 +44,10 @@ test.describe("B-425 — the settings debounce window", () => {
     return Object.fromEntries(pick.filter((k) => u[k] !== undefined).map((k) => [k, u[k]]));
   };
 
-  async function open(browser, info) {
+  // `dropCancelled` (B-432 · B-435, 16.10 — D4/D5): a server that ⛔ applies a request the page CANCELLED (the
+  // body never arrived — production logged «TypeError: Load failed»). D2/D3 apply everything at interception,
+  // which is why they read «kept» while the page cancelled 49/50: their «lost» is a LOWER bound.
+  async function open(browser, info, { dropCancelled = false } = {}) {
     const ctx = await browser.newContext({ ...ctxOpts(info), baseURL: info.project.use.baseURL });
     const store = newStore();
     Object.assign(store.settings, { lang: "en", playbook: [], watchlist: [], priceAlerts: {} });
@@ -59,6 +62,19 @@ test.describe("B-425 — the settings debounce window", () => {
     ctx.on("request", (r) => { if (isSettings(r.url())) net.push({ t: Date.now() - t0, kind: "req", method: r.method(), settings: r.method() === "GET" ? null : body(r) }); });
     ctx.on("response", (r) => { if (isSettings(r.url())) net.push({ t: Date.now() - t0, kind: "res", method: r.request().method(), status: r.status() }); });
     ctx.on("requestfailed", (r) => { if (isSettings(r.url())) net.push({ t: Date.now() - t0, kind: "failed", method: r.method(), failure: r.failure()?.errorText ?? null, settings: r.method() === "GET" ? null : body(r) }); });
+    if (dropCancelled) {
+      const cancelled = new Set();
+      ctx.on("requestfailed", (r) => { if (isSettings(r.url())) cancelled.add(r); });
+      await ctx.route(/\/rest\/v1\/user_settings/, async (route) => {
+        const req = route.request();
+        if (req.method() !== "POST") return route.fallback();
+        const bytes = (req.postData() || "").length;
+        await new Promise((r) => setTimeout(r, 150 + (bytes / 2e6) * 1000)); // ⚠️ the simulated network (RTT 150ms + 2MB/s)
+        if (cancelled.has(req)) { net.push({ t: Date.now() - t0, kind: "dropped", settings: body(req) }); return route.abort().catch(() => {}); }
+        net.push({ t: Date.now() - t0, kind: "applied", settings: body(req) });
+        return route.fallback().catch(() => {});
+      });
+    }
     const dir = join(EVIDENCE, "debounce", info.project.name);
     mkdirSync(dir, { recursive: true });
     const now = () => Date.now() - t0;
@@ -171,6 +187,51 @@ test.describe("B-425 — the settings debounce window", () => {
         } finally {
           writeFileSync(join(app.dir, `${tag}${info.repeatEachIndex ? `-r${info.repeatEachIndex}` : ""}.json`), JSON.stringify({ scene: tag, how, deltaMs: delta, project: info.project.name, n: trials.length, lost: trials.filter((t) => !t.kept).length,
             byFlush: trials.filter((t) => t.sentByUnloadFlush).length, cancelled: trials.filter((t) => t.cancelledInPage).length, trials, net: app.net }, null, 2));
+          await app.ctx.close();
+        }
+      });
+    }
+  }
+
+  // D4 (reload) · D5 (tab close) — B-432 · B-435 (16.10): the same edit + unload at δ, against a server that ⛔ applies
+  // what the page cancelled. KEPT = the end state after the next load: screen + LS + the ROW hold the value (the row
+  // is awaited — under local-first the pending is sent by that load; which layer delivered it is in `net`).
+  for (const how of ["reload", "close"]) {
+    for (const delta of DELTAS) {
+      const tag = `${how === "reload" ? "D4" : "D5"}-${delta}`;
+      test(`${tag} ${how} ${delta}ms after «Update Capital», a server that drops cancelled writes — is the edit kept?`, async ({ browser }, info) => {
+        test.setTimeout(290_000);
+        const app = await open(browser, info, { dropCancelled: true });
+        let page = await app.ctx.newPage();
+        const trials = [];
+        try {
+          await login(page);
+          await openSettings(page);
+          for (let i = 0; i < N_TRIALS; i++) {
+            const v = 40_000 + delta * 10 + i + 1;
+            await edit(page, v);
+            const tClick = app.now();
+            await page.waitForTimeout(delta); // ⚠️ the independent variable, ⛔ a wait for a condition
+            const tUnload = app.now();
+            if (how === "reload") {
+              await page.reload({ waitUntil: "load" });
+            } else {
+              await page.close({ runBeforeUnload: true });
+              await expect.poll(() => page.isClosed(), { message: "the tab never closed" }).toBe(true);
+              page = await app.ctx.newPage();
+              await page.goto("/app");
+            }
+            await settled(page, app, tUnload);
+            // The row is awaited (bounded): local-first sends the pending from the NEXT load.
+            let reached = true;
+            try { await expect.poll(() => app.store.settings.capital, { timeout: 8_000 }).toBe(v); } catch { reached = false; } // ⚠️ «not reached» IS the measurement — recorded below
+            const shown = digits(await capLine(page).locator("span").first().textContent());
+            const local = Number(await page.evaluate(() => localStorage.getItem("swingEdgeCapital")));
+            const delivered = app.net.filter((e) => e.kind === "applied" && e.settings?.capital === v).map((e) => (e.t < app.now() && e.t >= tUnload ? "after-unload" : "before-unload"));
+            trials.push({ i, value: v, deltaMs: delta, actualDelayMs: tUnload - tClick, reachedRow: reached, shownAfter: shown, localAfter: local, delivered, kept: reached && shown === v && local === v });
+          }
+        } finally {
+          writeFileSync(join(app.dir, `${tag}${info.repeatEachIndex ? `-r${info.repeatEachIndex}` : ""}.json`), JSON.stringify({ scene: tag, how, deltaMs: delta, project: info.project.name, n: trials.length, lost: trials.filter((t) => !t.kept).length, trials, net: app.net }, null, 2));
           await app.ctx.close();
         }
       });
