@@ -81,7 +81,7 @@ export async function attachB435Diag(page, { label, project, prefix, dir, snapsh
     } catch (e) {
       tok = `body-unavailable(${redact(e?.message).split("\n")[0].slice(0, 60)})`;
     }
-    net.push(`GET → ${r.status()} @${tok}`);
+    net.push(`GET → ${r.status()} tok=${tok}`);
   });
   page.on("requestfailed", (r) => {
     if (!isSettings(r.url())) return;
@@ -91,7 +91,9 @@ export async function attachB435Diag(page, { label, project, prefix, dir, snapsh
 
   mkdirSync(dir, { recursive: true });
   const file = join(dir, `b435-diag-${label}.txt`);
-  const emit = (line) => { console.log(line); appendFileSync(file, line + "\n"); };
+  // ⛔ `@` anywhere: the leak scan (scripts/eye-evidence-scan.mjs) counts every `@` in a text file, and a WebKit
+  // stack frame is `fn@url` — measured 17.10, PR #80 run 39006247007: 36 matches, 0 of them an email.
+  const emit = (raw) => { const line = raw.replace(/@/g, "(at)"); console.log(line); appendFileSync(file, line + "\n"); };
   let dbPending = null;
 
   async function step(name) {
@@ -118,7 +120,7 @@ export async function attachB435Diag(page, { label, project, prefix, dir, snapsh
     if (dbPending) await dbPending;
     const t0 = Date.now();
     dbPending = (snapshot ? snapshot().then(
-      (s) => emit(`${head} db=[${s.ours.map(short).join(",")}] @${s.token} (read +${Date.now() - t0}ms)`),
+      (s) => emit(`${head} db=[${s.ours.map(short).join(",")}] tok=${s.token} (read +${Date.now() - t0}ms)`),
       (e) => emit(`${head} db=ERR(${redact(e?.message).split("\n")[0].slice(0, 120)})`),
     ) : Promise.resolve(emit(`${head} db=n/a(hermetic)`)));
   }

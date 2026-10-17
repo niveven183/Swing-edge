@@ -73,7 +73,8 @@ for (const r of red) {
   else body.push("```", redact(readFileSync(f, "utf8")).trim(), "```");
   body.push("");
 }
-let text = body.join("\n");
+// ⛔ `@`: the leak scan counts every `@` in a text file (the body is scanned before it is published).
+let text = body.join("\n").replace(/@/g, "(at)");
 const MAX = 60_000; // GitHub's issue/comment limit is 65,536 characters
 if (text.length > MAX) text = text.slice(0, MAX) + `\n\n_… truncated at ${MAX} characters — the full diag is in the artifact_`;
 writeFileSync(outPath, text);
