@@ -11,6 +11,14 @@
 //   Q2 quota  — the same + localStorage pre-filled (after login) to EYE_B435_FREE chars below the quota the
 //               browser itself reports, so the ~1MB of images (×2: list + mirror) push writes past it.
 //               Records every QuotaExceededError the app's storage writes throw — and whether it was said.
+//   Q3 late·1 — B-435 hypothesis 10 (Niv 17.10): a request the page CANCELLED is applied after all — LATE, once
+//               ONE request issued after it has been applied (reverse order). Production measured the first half
+//               (M-027: pixel7 2/2 requests seen ERR_ABORTED were applied by the server).
+//   Q4 late·2 — the same, once TWO later requests have been applied. Predicted from the code BEFORE the run
+//               (docs/audits/B435-ERROR-PATHS-2026-10-17.md row 10): Q3 green — the next write to land is the next
+//               page's replay, which carries the same blob — and Q4 red — the late blob overtakes a write that
+//               already carries the next setup and already settled its journal op.
+//               Red = a setup missing in the DB (the device check after each reload, + the DB at the end).
 // HERMETIC ONLY. Reachable only through scripts/probe-flake.mjs (playwright.flake.config.js).
 
 import { test, expect } from "@playwright/test";
@@ -44,7 +52,7 @@ test.describe("B-435 — a Playbook setup lost after the next add + reload", () 
     return Object.fromEntries(pick.filter((k) => u[k] !== undefined).map((k) => [k, u[k]]));
   };
 
-  async function run(browser, info, scene, { quota }) {
+  async function run(browser, info, scene, { quota, lateAfter = 0 }) {
     test.setTimeout(280_000);
     const ctx = await browser.newContext({ ...ctxOpts(info), baseURL: info.project.use.baseURL, recordVideo: { dir: join(info.outputDir, "diag-video") } });
     const store = newStore();
@@ -72,15 +80,45 @@ test.describe("B-435 — a Playbook setup lost after the next add + reload", () 
     });
     ctx.on("requestfailed", (r) => { if (/user_settings/.test(r.url())) { cancelled.add(r); ev("reqfailed", { method: r.method(), failure: r.failure()?.errorText ?? null }); } });
     const names = (body) => { try { const b = JSON.parse(body || "{}"); const row = Array.isArray(b) ? b[0] : b; return (row?.settings?.playbook || []).map((s) => s.name); } catch { return ["UNPARSEABLE"]; } };
+    // Q3/Q4 — the late queue: cancelled requests waiting for `lateAfter` LATER-issued requests to be applied.
+    let issued = 0, busy = 0;
+    const late = [];
+    const tokenOf = (body) => { try { const b = JSON.parse(body || "{}"); const row = Array.isArray(b) ? b[0] : b; return row?.updated_at ?? null; } catch { return null; } };
+    const applyLate = (justApplied) => {
+      for (const l of [...late]) {
+        if (justApplied > l.seq) l.overtakenBy += 1;
+        if (l.overtakenBy < lateAfter) continue;
+        late.splice(late.indexOf(l), 1);
+        const b = JSON.parse(l.body); const row = Array.isArray(b) ? b[0] : b;
+        const rowBefore = { token: store.updatedAt ?? null, playbook: (store.settings.playbook || []).map((x) => x.name) };
+        store.settings = row.settings; if (row.updated_at) store.updatedAt = row.updated_at; // hermetic.js POST semantics, verbatim
+        ev("late-applied", { seq: l.seq, token: row.updated_at, playbook: names(l.body), over: rowBefore, backwards: rowBefore.token != null && row.updated_at < rowBefore.token });
+      }
+    };
     await ctx.route(/\/rest\/v1\/user_settings/, async (route) => {
       const req = route.request();
       if (req.method() !== "POST") return route.fallback();
       const body = req.postData() || "";
-      ev("post", { bytes: body.length, playbook: names(body) });
-      await new Promise((r) => setTimeout(r, RTT_MS + (body.length / UPLOAD_BPS) * 1000)); // ⚠️ the simulated network, ⛔ a wait for a condition
-      if (cancelled.has(req)) { ev("dropped", { bytes: body.length, playbook: names(body) }); return route.abort().catch(() => {}); }
-      ev("applied", { bytes: body.length, playbook: names(body) });
-      return route.fallback().catch((e) => ev("fallback-error", { error: String(e.message).split("\n")[0] }));
+      const seq = ++issued;
+      busy += 1;
+      try {
+        ev("post", { seq, bytes: body.length, playbook: names(body) });
+        await new Promise((r) => setTimeout(r, RTT_MS + (body.length / UPLOAD_BPS) * 1000)); // ⚠️ the simulated network, ⛔ a wait for a condition
+        if (cancelled.has(req)) {
+          if (lateAfter) { late.push({ seq, body, overtakenBy: 0 }); ev("late-queued", { seq, token: tokenOf(body), playbook: names(body) }); }
+          else ev("dropped", { bytes: body.length, playbook: names(body) });
+          return await route.abort().catch(() => {});
+        }
+        ev("applied", { seq, bytes: body.length, playbook: names(body) });
+        if (!lateAfter) return await route.fallback().catch((e) => ev("fallback-error", { error: String(e.message).split("\n")[0] }));
+        // Late mode applies HERE (hermetic.js POST semantics, verbatim) so that the late ones provably go AFTER this
+        // write — a fallback would apply it inside another handler, at a moment this one cannot see.
+        const b = JSON.parse(body || "{}"); const row = Array.isArray(b) ? b[0] : b;
+        if (row && row.settings) { store.settings = row.settings; if (row.updated_at) store.updatedAt = row.updated_at; }
+        applyLate(seq);
+        await route.fulfill({ status: 201, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: "[]" })
+          .catch((e) => ev("fulfill-after-cancel", { seq, error: String(e.message).split("\n")[0] })); // applied, the page left: what a server sees
+      } finally { busy -= 1; }
     });
     const page = await ctx.newPage();
     videos.push(await page.video().path());
@@ -139,6 +177,14 @@ test.describe("B-435 — a Playbook setup lost after the next add + reload", () 
         steps.push({ k, local, db, journal: journal ? JSON.parse(journal) : null, toasts: await toasts() });
         expect(local.sort(), `B-435: after setup ${k} + reload (device)`).toEqual(Array.from({ length: k }, (_, i) => `b${i + 1}`));
       }
+      if (lateAfter) {
+        // The last page's replay write lands (b5 in the DB, nothing in flight) — and any late request it releases
+        // lands with it. THEN the DB must hold all five: a late overtake after the last write is a loss too.
+        await expect.poll(() => busy === 0 && (store.settings.playbook || []).some((s) => s.name === "b5"), { message: "the last page never wrote b5 to the DB", timeout: 20_000 }).toBe(true);
+        const finalDb = (store.settings.playbook || []).map((s) => s.name);
+        steps.push({ k: "final", db: finalDb, lateLeft: late.length });
+        expect(finalDb.sort(), "B-435: the DB at the end").toEqual(["b1", "b2", "b3", "b4", "b5"]);
+      }
     } finally {
       writeFileSync(join(dir, `${scene}${sfx}.json`), JSON.stringify({ scene, steps, db: (store.settings.playbook || []).map((s) => s.name) }, null, 2));
       writeFileSync(join(dir, `${scene}-diag${sfx}.json`), JSON.stringify({ scene, project: info.project.name, repeat: info.repeatEachIndex, events, steps }, null, 2));
@@ -151,5 +197,11 @@ test.describe("B-435 — a Playbook setup lost after the next add + reload", () 
   });
   test("Q2 quota — the same, with localStorage pre-filled near the browser's own quota", async ({ browser }, info) => {
     await run(browser, info, "Q2", { quota: true });
+  });
+  test("Q3 late·1 — a cancelled write applied after ONE later write (B-435 hypothesis 10)", async ({ browser }, info) => {
+    await run(browser, info, "Q3", { quota: false, lateAfter: 1 });
+  });
+  test("Q4 late·2 — a cancelled write applied after TWO later writes (B-435 hypothesis 10)", async ({ browser }, info) => {
+    await run(browser, info, "Q4", { quota: false, lateAfter: 2 });
   });
 });
