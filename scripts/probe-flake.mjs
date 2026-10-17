@@ -123,7 +123,7 @@ if (flag("plan")) {
   if (!(repeatIn >= 1) || !(shards >= 1)) die("--plan: repeat and shards must be ≥ 1");
   for (const m of modes) if (!["isolated", "insitu"].includes(m)) die(`--plan: unknown mode "${m}"`);
   for (const t of trees) if (!["HEAD", "BEFORE-408", "PRE-B432"].includes(t)) die(`--plan: unknown tree "${t}"`); // PRE-B432: main before local-first (B-435's question is about it)
-  for (const x of scenesIn) if (!["H1", "H2", "H4", "C4", "Q1", "Q2"].includes(x)) die(`--plan: unknown scene "${x}"`);
+  for (const x of scenesIn) if (!["H1", "H2", "H4", "C4", "Q1", "Q2", "Q3", "Q4"].includes(x)) die(`--plan: unknown scene "${x}"`);
   const insituKey = (t, x) => (t === "BEFORE-408" && x === "C4" ? "B408-C4" : "FULL");
   const cells = [];
   for (const project of projects) for (const t of trees) {
@@ -151,7 +151,7 @@ const { APP, SETTINGS, I18N, DELTA, ARMS, ARM_GREP } = makeArms({ root: ROOT, di
 assertCleanTargets(ROOT, [APP, SETTINGS, I18N, DELTA], die);
 
 // H1/H4 (B-425, Niv 15.10 (i)): the held window's duration is measured on them — the closure condition.
-const SCENE_RX = { H1: "\\bH1 [a-z]", H2: "\\bH2 [a-z]", H4: "\\bH4 [a-z]", C4: "\\bC4 [a-z]", Q1: "\\bQ1 [a-z]", Q2: "\\bQ2 [a-z]" };
+const SCENE_RX = { H1: "\\bH1 [a-z]", H2: "\\bH2 [a-z]", H4: "\\bH4 [a-z]", C4: "\\bC4 [a-z]", Q1: "\\bQ1 [a-z]", Q2: "\\bQ2 [a-z]", Q3: "\\bQ3 [a-z]", Q4: "\\bQ4 [a-z]" };
 // B-435 (wave B, step B-0): Q1/Q2 live in tests-flake/b435-sequence.spec.js — the photos come from the
 // eye global setup (tests-eye/fixtures.js FIXTURE_DIR); EYE_B435_FREE = chars left free under the quota (Q2).
 const specFor = (scene) => (scene === "DEBOUNCE" ? "tests-flake/debounce-window.spec.js" : /^Q\d/.test(scene) ? "tests-flake/b435-sequence.spec.js" : "tests-eye/hydration.spec.js");
@@ -348,7 +348,7 @@ const tree = arg("tree", "HEAD");
 const mode = arg("mode", "isolated");
 const repeat = Number(arg("repeat", "30"));
 const shard = Number(arg("shard", "0"));
-if (!scenes.length || !scenes.every((x) => ["H1", "H2", "H4", "C4", "Q1", "Q2", "DEBOUNCE"].includes(x)) || (scenes.includes("DEBOUNCE") && scenes.length > 1)) die(`--scene must be H1 · H2 · H4 · C4 (comma-separated insitu) · DEBOUNCE (got "${scene}")`);
+if (!scenes.length || !scenes.every((x) => ["H1", "H2", "H4", "C4", "Q1", "Q2", "Q3", "Q4", "DEBOUNCE"].includes(x)) || (scenes.includes("DEBOUNCE") && scenes.length > 1)) die(`--scene must be H1 · H2 · H4 · C4 (comma-separated insitu) · DEBOUNCE (got "${scene}")`);
 if (scenes.length > 1 && mode !== "insitu") die("several scenes in one run only make sense insitu (one set counts each)");
 if (scenes.length > 1 && new Set(scenes.map((x) => insituGrep(tree, x))).size > 1) die(`${scenes.join(",")} do not share an insitu set on ${tree}`);
 if (!["isolated", "insitu"].includes(mode)) die(`--mode must be isolated · insitu (got "${mode}")`);
@@ -410,5 +410,20 @@ if (scenes.includes("Q2")) {
   console.log(`Q2 quota pressure: a QuotaExceededError in ${bit}/${diags.length} repeats (EYE_B435_FREE=${process.env.EYE_B435_FREE || "1500000"})`);
   summary(`- Q2 quota pressure: QuotaExceededError in ${bit}/${diags.length} repeats`);
   if (!bit) die(`Q2: the quota never threw in ${diags.length} repeats — the variant measured nothing (lower EYE_B435_FREE for this runner)`);
+}
+// B-435 hypothesis 10 (17.10): a late-apply variant in which NO cancelled request was ever applied late measured
+// nothing — the same rule as Q2's pressure gate.
+for (const sc of scenes.filter((x) => x === "Q3" || x === "Q4")) {
+  const diagDir = join(c.dir, "hydration", PROJECT);
+  const rx = new RegExp(`^${sc}-diag(-r\\d+)?\\.json$`);
+  const diags = existsSync(diagDir) ? readdirSync(diagDir).filter((f) => rx.test(f)).map((f) => JSON.parse(readFileSync(join(diagDir, f), "utf8"))) : [];
+  const lates = diags.flatMap((d) => d.events.filter((e) => e.kind === "late-applied"));
+  const lateRepeats = diags.filter((d) => d.events.some((e) => e.kind === "late-applied")).length;
+  const backwards = lates.filter((e) => e.backwards).length;
+  const overwrote = lates.filter((e) => e.over.playbook.some((x) => !e.playbook.includes(x))).length;
+  const line = `${sc} late-apply: applied late in ${lateRepeats}/${diags.length} repeats (${lates.length} requests) · token went backwards ${backwards}/${lates.length} · overwrote a setup the row held ${overwrote}/${lates.length}`;
+  console.log(line);
+  summary(`- ${line}`);
+  if (!lateRepeats) die(`${sc}: no cancelled request was ever applied late in ${diags.length} repeats — the variant measured nothing`);
 }
 process.exit(0);
