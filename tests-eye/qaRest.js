@@ -149,6 +149,24 @@ export async function settingsDiag(email, password) {
   return { token: rows[0].updated_at ?? null, ours: (Array.isArray(pb) ? pb : []).map((x) => x?.name).filter((n) => typeof n === "string" && n.startsWith(PREFIX_ROOT)) };
 }
 
+// B-435 · CAS (17.10) — C-074: «another device» adds an e2e setup and MOVES the row's version (a new updated_at), so
+// the device under test holds a stale base and its next write MUST be refused and rebased. The write is itself
+// conditional on the token it read (⛔ a blind replace over the device) and touches only the e2e prefix.
+export async function addSetupAsOtherDevice(email, password, name) {
+  if (!restConfigured()) throw new Error("[qaRest] SUPABASE_URL / SUPABASE_ANON_KEY missing — refusing to fake a device blind");
+  if (typeof name !== "string" || !name.startsWith(PREFIX_ROOT)) throw new Error(`[qaRest] addSetupAsOtherDevice: «${name}» is not an e2e name`);
+  const { token: tok, uid } = await token(email, password);
+  const rows = await rest(`user_settings?select=settings,updated_at&user_id=eq.${uid}`, tok);
+  if (!Array.isArray(rows) || rows.length !== 1) throw new Error("[qaRest] addSetupAsOtherDevice: expected exactly 1 row");
+  const { settings, updated_at: base } = rows[0];
+  const playbook = [...(Array.isArray(settings.playbook) ? settings.playbook : []), { id: Date.now(), name, description: "", imagePreview: null }];
+  const next = new Date(Math.max(Date.now(), Date.parse(base) + 1)).toISOString();
+  const out = await rest(`user_settings?user_id=eq.${uid}&updated_at=eq.${encodeURIComponent(base)}&select=updated_at`, tok,
+    { method: "PATCH", prefer: "return=representation", body: { settings: { ...settings, playbook }, updated_at: next } });
+  if (!Array.isArray(out) || out.length !== 1) throw new Error("[qaRest] addSetupAsOtherDevice: the row moved under the fake device itself — refusing to retry blind");
+  return { before: base, after: out[0].updated_at };
+}
+
 // The safety net, ⛔ the path: called ONLY with every app context closed (K6 — the blob is
 // last-writer-wins), and only when the in-app restore did not land. Touches `capital` alone and
 // proves every other key byte-identical before/after.

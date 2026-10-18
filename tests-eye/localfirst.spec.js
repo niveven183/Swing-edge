@@ -21,7 +21,7 @@ import { test, expect } from "@playwright/test";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { exactRx, containsRx } from "./labels.js";
-import { settingsSnapshot, settingsDiag, restoreCapital, sweep, PREFIX_ROOT } from "./qaRest.js";
+import { settingsSnapshot, settingsDiag, restoreCapital, sweep, addSetupAsOtherDevice, PREFIX_ROOT } from "./qaRest.js";
 import { attachB435Diag } from "./b435diag.js";
 
 const HERMETIC = process.env.EYE_HERMETIC === "1";
@@ -153,6 +153,70 @@ test.describe("B-432 · B-435 · @deployed an edit reloaded within a second surv
       report.after = { sha: String(after.sha).slice(0, 16), identical: after.sha === before.sha };
       writeFileSync(join(dir, "h.json"), JSON.stringify(report, null, 2));
       console.log(`[B-432/B-435] ${info.project.name}: click→reload ${report.steps.capitalClickToReloadMs}ms/${report.steps.setupClickToReloadMs}ms · blob ${report.before.sha} → ${report.after.sha} · ${report.after.identical ? "identical" : "CHANGED"}`);
+      if (bodyPassed) expect(after.sha, "the QA blob is not byte-identical after the scene").toBe(before.sha);
+    }
+  });
+
+  // C-074 — B-435 · CAS (17.10). «Another device» moves the row (an e2e setup + a NEW version token) while this device
+  // holds the old one; this device then adds its own setup. Its write MUST be refused (0 rows), rebased over the moved
+  // row and written again — BOTH setups in the row, the version moved forward, ⛔ the stuck banner.
+  test("i · @deployed a write refused by CAS (another device moved the row) rebases — both setups land", async ({ browser }, info) => {
+    expect(!!(QA_EMAIL && QA_PASSWORD), "SENTINEL_QA_EMAIL / SENTINEL_QA_PASSWORD are not reaching the test process").toBe(true);
+    const dir = join(EVIDENCE, "localfirst", info.project.name);
+    mkdirSync(dir, { recursive: true });
+    const before = await settingsSnapshot(QA_EMAIL, QA_PASSWORD);
+    expect(before.ours, "e2e setups already in the QA row — a crashed run left residue (the sweep is the net)").toEqual([]);
+    const other = `${PREFIX_ROOT}cas-other-${RUN}-${info.project.name}`;
+    const mine = `${PREFIX_ROOT}cas-mine-${RUN}-${info.project.name}`;
+    const report = { before: { sha: before.sha.slice(0, 16) }, steps: {} };
+    const ctx = await browser.newContext({ ...ctxOpts(info), baseURL: info.project.use.baseURL });
+    let diagRef = null;
+    let bodyPassed = false;
+    try {
+      const page = await ctx.newPage();
+      diagRef = await attachB435Diag(page, { label: "localfirst-i", project: info.project.name, prefix: PREFIX_ROOT, dir, snapshot: () => settingsDiag(QA_EMAIL, QA_PASSWORD) });
+      await page.addInitScript((k) => { if (location.protocol.startsWith("http")) localStorage.setItem(k, "1"); }, IOS_DISMISS_KEY);
+      const conflictLines = [];
+      page.on("console", (m) => { if (/write refused — the row moved/.test(m.text())) conflictLines.push(m.text().slice(0, 160)); });
+      await page.goto("/app", { waitUntil: "load" });
+      await page.locator('[data-testid="consent-decline"]').click();
+      await typeInto(page, page.locator('input[type="email"]'), QA_EMAIL);
+      await typeInto(page, page.locator('input[autocomplete="current-password"]'), QA_PASSWORD);
+      await page.locator('button[type="submit"]').first().click();
+      await dash(page);
+      await openSettings(page);
+      await diagRef.step("start");
+      const tokStart = (await settingsDiag(QA_EMAIL, QA_PASSWORD)).token;
+
+      // the other device writes — the row moves under this one
+      const moved = await addSetupAsOtherDevice(QA_EMAIL, QA_PASSWORD, other);
+      report.steps.otherDevice = moved;
+
+      // this device adds its own setup on the stale version
+      const panel = panelOf(page);
+      await panel.scrollIntoViewIfNeeded();
+      await panel.getByRole("button", { name: exactRx("addSetup") }).click();
+      await panel.getByPlaceholder("Breakout, Pullback…").fill(mine);
+      await panel.getByRole("button", { name: exactRx("saveSetup") }).click();
+      await expect.poll(async () => (await settingsSnapshot(QA_EMAIL, QA_PASSWORD)).ours.sort(), { message: "C-074: after the refused write and the rebase, BOTH setups must be in the row", timeout: 30_000 }).toEqual([mine, other].sort());
+      await diagRef.step("i-after-rebase");
+      await diagRef.flush();
+      expect(conflictLines.length, "C-074: the write was never refused — the scene did not exercise the conflict (it measured nothing)").toBeGreaterThan(0);
+      const tokEnd = (await settingsDiag(QA_EMAIL, QA_PASSWORD)).token;
+      expect(Date.parse(tokEnd) > Date.parse(moved.after) && Date.parse(moved.after) > Date.parse(tokStart), `C-074: the row's version must move FORWARD (start ${tokStart} → other ${moved.after} → end ${tokEnd})`).toBe(true);
+      await expect(panelOf(page).getByText(other, { exact: true }), "C-074: the other device's setup must appear on this device after the rebase").toBeVisible();
+      await expect(page.locator('[data-testid="settings-sync-stuck"]'), "C-074: ⛔ the stuck banner on a single conflict").toHaveCount(0);
+      await page.screenshot({ path: join(dir, "i-after-rebase.png"), mask: [page.locator("header"), page.getByText(/@/)] });
+      report.steps.rebase = { conflicts: conflictLines.length, tokStart, tokEnd };
+      bodyPassed = true;
+    } finally {
+      if (diagRef) await diagRef.flush();
+      await ctx.close();
+      let after = await settingsSnapshot(QA_EMAIL, QA_PASSWORD);
+      if (after.ours.length) { await sweep(QA_EMAIL, QA_PASSWORD); report.restNet = "e2e setups swept over REST (the scene's own two)"; after = await settingsSnapshot(QA_EMAIL, QA_PASSWORD); }
+      report.after = { sha: String(after.sha).slice(0, 16), identical: after.sha === before.sha };
+      writeFileSync(join(dir, "i.json"), JSON.stringify(report, null, 2));
+      console.log(`[C-074] ${info.project.name}: conflicts ${report.steps.rebase?.conflicts ?? "?"} · blob ${report.before.sha} → ${report.after.sha} · ${report.after.identical ? "identical" : "CHANGED"}`);
       if (bodyPassed) expect(after.sha, "the QA blob is not byte-identical after the scene").toBe(before.sha);
     }
   });
