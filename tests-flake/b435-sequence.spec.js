@@ -24,7 +24,7 @@
 import { test, expect } from "@playwright/test";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { installHermetic, newStore, DUMMY_EMAIL, DUMMY_PASSWORD } from "../tests-eye/hermetic.js";
+import { installHermetic, newStore, DUMMY_EMAIL, DUMMY_PASSWORD, applySettingsWrite, pgMicros } from "../tests-eye/hermetic.js";
 import { exactRx, containsRx } from "../tests-eye/labels.js";
 
 const HERMETIC = process.env.EYE_HERMETIC === "1";
@@ -84,20 +84,25 @@ test.describe("B-435 — a Playbook setup lost after the next add + reload", () 
     let issued = 0, busy = 0;
     const late = [];
     const tokenOf = (body) => { try { const b = JSON.parse(body || "{}"); const row = Array.isArray(b) ? b[0] : b; return row?.updated_at ?? null; } catch { return null; } };
+    // B-435 · CAS (17.10): a late request meets the server EXACTLY as any other — hermetic.js's PostgREST semantics
+    // (applySettingsWrite): a conditional PATCH whose token no longer matches is refused (`[]`), an old-tree POST
+    // upsert is applied blind. «late-rejected» is the fix doing its job; «late-applied» is the overwrite.
     const applyLate = (justApplied) => {
       for (const l of [...late]) {
         if (justApplied > l.seq) l.overtakenBy += 1;
         if (l.overtakenBy < lateAfter) continue;
         late.splice(late.indexOf(l), 1);
-        const b = JSON.parse(l.body); const row = Array.isArray(b) ? b[0] : b;
         const rowBefore = { token: store.updatedAt ?? null, playbook: (store.settings.playbook || []).map((x) => x.name) };
-        store.settings = row.settings; if (row.updated_at) store.updatedAt = row.updated_at; // hermetic.js POST semantics, verbatim
-        ev("late-applied", { seq: l.seq, token: row.updated_at, playbook: names(l.body), over: rowBefore, backwards: rowBefore.token != null && row.updated_at < rowBefore.token });
+        const r = applySettingsWrite(store, l.method, l.url, l.headers, l.body);
+        const refused = !r || r.status >= 400 || (Array.isArray(r.body) && r.body.length === 0 && l.method === "PATCH");
+        const tok = tokenOf(l.body);
+        ev(refused ? "late-rejected" : "late-applied", { seq: l.seq, method: l.method, token: tok, playbook: names(l.body), over: rowBefore,
+          backwards: !refused && rowBefore.token != null && pgMicros(tok) < pgMicros(rowBefore.token) });
       }
     };
     await ctx.route(/\/rest\/v1\/user_settings/, async (route) => {
       const req = route.request();
-      if (req.method() !== "POST") return route.fallback();
+      if (req.method() !== "POST" && req.method() !== "PATCH") return route.fallback();
       const body = req.postData() || "";
       const seq = ++issued;
       busy += 1;
@@ -105,18 +110,17 @@ test.describe("B-435 — a Playbook setup lost after the next add + reload", () 
         ev("post", { seq, bytes: body.length, playbook: names(body) });
         await new Promise((r) => setTimeout(r, RTT_MS + (body.length / UPLOAD_BPS) * 1000)); // ⚠️ the simulated network, ⛔ a wait for a condition
         if (cancelled.has(req)) {
-          if (lateAfter) { late.push({ seq, body, overtakenBy: 0 }); ev("late-queued", { seq, token: tokenOf(body), playbook: names(body) }); }
+          if (lateAfter) { late.push({ seq, body, method: req.method(), url: req.url(), headers: req.headers(), overtakenBy: 0 }); ev("late-queued", { seq, method: req.method(), token: tokenOf(body), playbook: names(body) }); }
           else ev("dropped", { bytes: body.length, playbook: names(body) });
           return await route.abort().catch(() => {});
         }
         ev("applied", { seq, bytes: body.length, playbook: names(body) });
         if (!lateAfter) return await route.fallback().catch((e) => ev("fallback-error", { error: String(e.message).split("\n")[0] }));
-        // Late mode applies HERE (hermetic.js POST semantics, verbatim) so that the late ones provably go AFTER this
-        // write — a fallback would apply it inside another handler, at a moment this one cannot see.
-        const b = JSON.parse(body || "{}"); const row = Array.isArray(b) ? b[0] : b;
-        if (row && row.settings) { store.settings = row.settings; if (row.updated_at) store.updatedAt = row.updated_at; }
+        // Late mode applies HERE (hermetic.js's own semantics) so that the late ones provably go AFTER this write — a
+        // fallback would apply it inside another handler, at a moment this one cannot see.
+        const r = applySettingsWrite(store, req.method(), req.url(), req.headers(), body);
         applyLate(seq);
-        await route.fulfill({ status: 201, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: "[]" })
+        await route.fulfill({ status: r ? r.status : 500, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(r ? r.body : { message: "hermetic: unmodelled" }) })
           .catch((e) => ev("fulfill-after-cancel", { seq, error: String(e.message).split("\n")[0] })); // applied, the page left: what a server sees
       } finally { busy -= 1; }
     });

@@ -417,13 +417,17 @@ for (const sc of scenes.filter((x) => x === "Q3" || x === "Q4")) {
   const diagDir = join(c.dir, "hydration", PROJECT);
   const rx = new RegExp(`^${sc}-diag(-r\\d+)?\\.json$`);
   const diags = existsSync(diagDir) ? readdirSync(diagDir).filter((f) => rx.test(f)).map((f) => JSON.parse(readFileSync(join(diagDir, f), "utf8"))) : [];
-  const lates = diags.flatMap((d) => d.events.filter((e) => e.kind === "late-applied"));
-  const lateRepeats = diags.filter((d) => d.events.some((e) => e.kind === "late-applied")).length;
+  // B-435 · CAS (17.10): a late arrival is either APPLIED (the overwrite) or REJECTED by its own condition (the fix).
+  const isLate = (e) => e.kind === "late-applied" || e.kind === "late-rejected";
+  const arrivals = diags.flatMap((d) => d.events.filter(isLate));
+  const lates = arrivals.filter((e) => e.kind === "late-applied");
+  const rejected = arrivals.length - lates.length;
+  const lateRepeats = diags.filter((d) => d.events.some(isLate)).length;
   const backwards = lates.filter((e) => e.backwards).length;
   const overwrote = lates.filter((e) => e.over.playbook.some((x) => !e.playbook.includes(x))).length;
-  const line = `${sc} late-apply: applied late in ${lateRepeats}/${diags.length} repeats (${lates.length} requests) · token went backwards ${backwards}/${lates.length} · overwrote a setup the row held ${overwrote}/${lates.length}`;
+  const line = `${sc} late arrivals in ${lateRepeats}/${diags.length} repeats (${arrivals.length} requests): applied ${lates.length} · REFUSED by their condition ${rejected} · token went backwards ${backwards}/${lates.length} · overwrote a setup the row held ${overwrote}/${lates.length}`;
   console.log(line);
   summary(`- ${line}`);
-  if (!lateRepeats) die(`${sc}: no cancelled request was ever applied late in ${diags.length} repeats — the variant measured nothing`);
+  if (!lateRepeats) die(`${sc}: no cancelled request ever arrived late in ${diags.length} repeats — the variant measured nothing`);
 }
 process.exit(0);

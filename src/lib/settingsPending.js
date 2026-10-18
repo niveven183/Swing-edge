@@ -105,6 +105,39 @@ export function clearPending(store, { onFailure } = {}) {
   return writePending(store, null, onFailure);
 }
 
+// ── B-435 · CAS (17.10) — tokens compared as INSTANTS, ⛔ strings ──────────────────────────────────────
+// Measured (M-027, [B-435 diag]): the client sends `…T07:02:33.965Z`, PostgREST returns the same instant as
+// `…T07:02:33.965+00:00`. A string compare therefore NEVER matched in production — the «landed» branch could
+// not fire, and a second unconfirmed edit read as a false conflict. Rows written by the column default carry
+// microseconds (`now()`), so the instant is kept in µs. Plan: docs/plans/PLAN-2026-10-17-b435-cas.md.
+const ISO = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,6}))?(Z|[+-]\d{2}:?\d{2})$/;
+/** µs since the epoch, or null for a string that is not an ISO instant (reported — ⛔ a guessed «equal»). */
+export function tokenMicros(t) {
+  if (t == null) return null;
+  const m = ISO.exec(String(t));
+  const sec = m ? Date.parse(`${m[1]}${m[3] === "Z" ? "Z" : m[3].replace(/^([+-]\d{2})(\d{2})$/, "$1:$2")}`) : NaN;
+  if (!m || Number.isNaN(sec)) {
+    console.error(`[settingsPending] not an ISO instant: ${JSON.stringify(String(t)).slice(0, 60)}`);
+    return null;
+  }
+  return sec * 1000 + Number((m[2] || "").padEnd(6, "0"));
+}
+/** Same INSTANT. Either side unreadable ⇒ false (said by tokenMicros). */
+export function sameToken(a, b) {
+  const x = tokenMicros(a), y = tokenMicros(b);
+  return x != null && y != null && x === y;
+}
+/**
+ * The token of the NEXT write (Niv 18.10, fix ②): max(now, base + 1ms), as an instant. A client clock behind the
+ * row's base would otherwise send a token OLDER than the row it overwrites — the detector's «the token went
+ * backwards» would then fire on an honest write.
+ */
+export function nextToken(base, nowMs = Date.now()) {
+  const b = tokenMicros(base);
+  const floor = b == null ? -Infinity : Math.floor(b / 1000) + 1;
+  return new Date(Math.max(nowMs, floor)).toISOString();
+}
+
 /**
  * At load, after the row was READ (status "ok"). Pure.
  *   none     — nothing pending.
@@ -114,19 +147,28 @@ export function clearPending(store, { onFailure } = {}) {
  *   conflict — any other token: the row wins; `rejected` = the local values that differ from it.
  * A pending without a base (made before any row was read — a brand-new user) applies.
  */
-export function decidePending(pending, rowSettings, rowToken) {
+export function decidePending(pending, rowSettings, rowToken, { baseSettings = null } = {}) {
   if (!pending || !pending.values || !Object.keys(pending.values).length) return { action: "none" };
   const row = rowSettings || {};
   const differs = (k, v) => JSON.stringify(row[k]) !== JSON.stringify(v);
-  const ours = Array.isArray(pending.inflight) && rowToken != null && pending.inflight.includes(rowToken);
+  const ours = Array.isArray(pending.inflight) && rowToken != null && pending.inflight.some((t) => sameToken(t, rowToken));
   if (ours) {
     // No other device wrote: what our landed write carried equals the row; the rest is newer than it.
     const apply = Object.fromEntries(Object.entries(pending.values).filter(([k, v]) => differs(k, v)));
     return Object.keys(apply).length ? { action: "apply", apply } : { action: "landed" };
   }
-  if (pending.base == null || rowToken === pending.base) return { action: "apply", apply: { ...pending.values } };
+  if (pending.base == null || sameToken(rowToken, pending.base)) return { action: "apply", apply: { ...pending.values } };
+  // B-435 · CAS rebase (18.10, fix ③): when THIS session holds the blob the pending was made on (`baseSettings`),
+  // the decision is per FIELD (3-way): a field the other writer did not touch (row = base) ⇒ ours applies; a field
+  // it changed too ⇒ a real conflict. Without it every rebase would show a banner for the fields nobody else edited.
+  const apply = {};
   const rejected = {};
-  for (const [k, v] of Object.entries(pending.values)) if (differs(k, v)) rejected[k] = v;
-  if (!Object.keys(rejected).length) return { action: "landed" }; // another write already holds exactly these values
-  return { action: "conflict", rejected };
+  for (const [k, v] of Object.entries(pending.values)) {
+    if (!differs(k, v)) continue;
+    if (baseSettings && JSON.stringify(row[k]) === JSON.stringify(baseSettings[k])) apply[k] = v;
+    else rejected[k] = v;
+  }
+  if (Object.keys(rejected).length) return { action: "conflict", rejected, ...(Object.keys(apply).length ? { apply } : {}) };
+  if (Object.keys(apply).length) return { action: "apply", apply };
+  return { action: "landed" }; // another write already holds exactly these values
 }

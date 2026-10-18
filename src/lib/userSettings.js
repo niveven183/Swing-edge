@@ -10,7 +10,10 @@
 
 import { supabase } from "../supabaseClient.js";
 // B-432 · B-435 (16.10) — local-first: the pending scalar edits and their version tokens.
-import { markInflight } from "./settingsPending.js";
+import { markInflight, nextToken, sameToken } from "./settingsPending.js";
+// B-435 · CAS (17.10) — the keys the delta journal owns (they are rebased from it, ⛔ carried from the cache).
+import { COLLECTIONS } from "./settingsDelta.js";
+import { SCALARS } from "./settingsPending.js";
 
 const TABLE = "user_settings";
 const MIRROR_KEY = "swingEdgeSettings"; // single localStorage mirror of the blob
@@ -28,13 +31,13 @@ export const SETTINGS_READ_TIMEOUT_MS = 8000;
 // `{ error }` — the same shape supabase-js returns for any refused read, so the existing failure
 // paths (`loadFailed` · `check-failed`) handle it. A late answer is DISCARDED: the race has
 // already settled, and nothing below the `await` ever sees it (⛔ cache · ⛔ lastSent · ⛔ mirror).
-async function readWithDeadline(build, timeoutMs) {
+async function readWithDeadline(build, timeoutMs, what = "read") {
   const ctl = new AbortController();
   let timer;
   const deadline = new Promise((resolve) => {
     timer = setTimeout(() => {
       ctl.abort();
-      resolve({ data: null, error: { message: `settings read timed out after ${timeoutMs}ms` } });
+      resolve({ data: null, error: { message: `settings ${what} timed out after ${timeoutMs}ms` } });
     }, timeoutMs);
   });
   try {
@@ -43,6 +46,11 @@ async function readWithDeadline(build, timeoutMs) {
     clearTimeout(timer);
   }
 }
+
+// B-435 · CAS (Niv 18.10, fix ①) — a WRITE that never answers must end too: writes are serialized per user
+// (below), so one hung request would otherwise stop every later write of the session. Same mechanism as the
+// read deadline; expiry is handled exactly like a thrown request (⛔ settle, the next write goes out).
+export const SETTINGS_WRITE_TIMEOUT_MS = 10000;
 
 // localStorage key -> { field, parse }. `parse` turns the raw stored string into
 // the value we persist in the jsonb blob. betaWelcome is handled separately
@@ -126,6 +134,58 @@ export function currentToken(userId) {
 export const KEEPALIVE_MAX_BYTES = 60 * 1024;
 const keepaliveSent = new Map(); // userId -> stableStringify of the blob already sent by keepalive this page
 
+// ── B-435 · CAS (17.10) — every write is CONDITIONAL on the row's token ──────────────────────────────────
+// Measured hermetically (M-028): a write the page cancelled, applied by the server LATE, replaced the whole
+// blob over a newer one — pixel7 19/30 (late after 1 write) · 25/30 (after 2) lost a setup. A write now says
+// which version it was built on (`updated_at = base`); 0 rows ⇒ the row moved ⇒ CONFLICT ⇒ the app re-reads
+// and rebases (the hydration itself), ⛔ a blind replace. Plan: docs/plans/PLAN-2026-10-17-b435-cas.md.
+const writeChain = new Map(); // userId -> the promise of the last queued write (one in flight per user)
+const confirmed = new Map(); // userId -> [{ token, blob }] — what the row PROVABLY held, newest last (≤ 8)
+const hadRow = new Set(); // userId -> this session has seen this user's row (fix ④)
+const rowGone = new Set(); // userId -> the row vanished mid-session ⇒ ⛔ an automatic insert (fix ④)
+const conflictListeners = new Set();
+/** A write was refused because the row moved (0 rows / 23505). `cb(userId, reason)`. */
+export function onSettingsConflict(cb) {
+  conflictListeners.add(cb);
+  return () => conflictListeners.delete(cb);
+}
+function remember(userId, token, blob) {
+  const list = (confirmed.get(userId) || []).filter((c) => !sameToken(c.token, token));
+  list.push({ token, blob });
+  confirmed.set(userId, list.slice(-8));
+}
+/** The blob this session PROVABLY saw at `token` (a read or a confirmed write), or null. */
+export function confirmedAt(userId, token) {
+  if (token == null) return null;
+  const hit = (confirmed.get(userId) || []).find((c) => sameToken(c.token, token));
+  return hit ? hit.blob : null;
+}
+/** The rebase is already decided and the result equals the row it read ⇒ that read is the confirmation. */
+export function confirmSynced(userId, blob, token) {
+  notifySynced(userId, blob, token);
+}
+/** True when the row vanished mid-session (fix ④) — the app shows `settings-sync-stuck`. */
+export function settingsRowGone(userId) {
+  return rowGone.has(userId);
+}
+function enqueue(userId, task) {
+  const prev = writeChain.get(userId) || Promise.resolve();
+  const run = prev.then(task, task); // a failed predecessor never stops the next write
+  writeChain.set(userId, run.catch(() => {}));
+  return run;
+}
+function notifyConflict(userId, reason) {
+  lastSent.delete(userId);
+  // The scheduled write would carry the same stale base: the rebase writes instead.
+  const existing = pending.get(userId);
+  if (existing?.timer) clearTimeout(existing.timer);
+  pending.delete(userId);
+  console.warn(`userSettings: write refused — the row moved since this device read it (${reason}); re-reading to rebase`);
+  for (const cb of conflictListeners) {
+    try { cb(userId, reason); } catch (e) { console.error("userSettings: onSettingsConflict listener threw", e); }
+  }
+}
+
 // ⚠️ jsonb does ⛔ not preserve key order, and mergeSettings APPENDS new keys, so
 // `JSON.stringify` of the same CONTENT can differ by ordering alone — and a hash that
 // differs on ordering degrades to "always write", which is the bug we came to fix.
@@ -181,35 +241,60 @@ function notifySynced(userId, blob, token = lastToken.has(userId) ? lastToken.ge
 // ⚠️ supabase-js RETURNS errors, it does not throw them. An RLS denial or a
 // constraint violation arrives as `{ error }` with the promise resolved, so a
 // bare `await` inside try/catch sees only network-level exceptions — and the
-// write failing is exactly the case that matters. Destructuring `{ error }` is
-// what :94 and :145 in this file already do, and tradeWrite.js:39 too; this
-// function was the one path that did not. INCIDENTS#15 registry item.
+// write failing is exactly the case that matters (INCIDENTS#15 registry item).
 //
-// ⛔ The contract is unchanged: a settings write NEVER throws. The only change
-// is that a failure is now visible in the console instead of vanishing.
-async function upsertBlob(userId, blob, client) {
+// ⛔ The contract is unchanged: a settings write NEVER throws.
+//
+// B-435 · CAS (17.10): the write is CONDITIONAL. With a base (the `updated_at` the DB returned for the row this
+// device last read or wrote — byte-identical, ⛔ reformatted by the client) it is
+//   update … where user_id = me and updated_at = base   (select updated_at)
+// and an EMPTY array back (⛔ an error — ⛔ .single()) means the row moved ⇒ conflict. Without a base (no row
+// yet, or the migration) it is an INSERT, and 23505 (two devices at once) ⇒ conflict. ⛔ A blind upsert.
+async function upsertBlob(userId, blob, client, { timeoutMs = SETTINGS_WRITE_TIMEOUT_MS } = {}) {
   if (!client) return false;
+  if (rowGone.has(userId)) {
+    console.error("userSettings: write refused — this account's settings row vanished mid-session; ⛔ an automatic insert (B-191)");
+    return false;
+  }
   // ⚠️ Snapshot BEFORE the await. `cache` can move while the request is in flight,
   // and recording the NEWER blob as sent would elide a write that never happened —
   // exactly the silent loss this whole mechanism must not be able to cause.
   const sent = stableStringify(blob);
+  const base = lastToken.has(userId) ? lastToken.get(userId) : null;
   // B-432 · B-435: this write's version token, on disk BEFORE the request leaves — if the page dies before
   // the answer, the next load can still tell «it landed» (row = token) from «it did not» (row = base).
-  const token = new Date().toISOString();
+  // Fix ② (18.10): max(now, base + 1ms) — ⛔ older than the row it is built on, whatever the client clock says.
+  const token = nextToken(base);
   const store = ls();
   if (store) markInflight(store, token, { onFailure: (reason, e) => console.error(`userSettings: pending ${reason} — the inflight token was not recorded`, e) });
   try {
-    const { error } = await client
-      .from(TABLE)
-      .upsert({ user_id: userId, settings: blob, updated_at: token });
+    const { data, error } = await readWithDeadline((signal) => (base != null
+      ? client.from(TABLE).update({ settings: blob, updated_at: token }).eq("user_id", userId).eq("updated_at", base).select("updated_at").abortSignal(signal)
+      : client.from(TABLE).insert({ user_id: userId, settings: blob, updated_at: token }).select("updated_at").abortSignal(signal)), timeoutMs, "write");
     if (error) {
+      if (base == null && (error.code === "23505" || /duplicate key/i.test(error.message || ""))) {
+        notifyConflict(userId, "insert-23505");
+        return false;
+      }
       console.error("userSettings: upsert rejected", error.message || error);
       lastSent.delete(userId); // ⛔ a write that did not land is ⛔ "what the row holds"
       return false;
     }
+    if (!Array.isArray(data) || data.length === 0) {
+      notifyConflict(userId, "0-rows");
+      return false;
+    }
+    const landed = data[0]?.updated_at;
+    if (landed == null) {
+      console.error("userSettings: the write answered without updated_at — the row's version is unknown; treated as not landed");
+      lastSent.delete(userId);
+      return false;
+    }
     lastSent.set(userId, sent);
-    lastToken.set(userId, token);
-    notifySynced(userId, blob, token);
+    lastToken.set(userId, landed); // what the DB RETURNED (…+00:00), ⛔ the client's string (…Z)
+    hadRow.add(userId);
+    remember(userId, landed, blob);
+    notifySynced(userId, blob, landed);
     return true;
   } catch (e) {
     // Network-level failure only — everything else arrives via `error` above.
@@ -248,16 +333,43 @@ export async function loadSettings(userId, client = supabase, { timeoutMs = SETT
         .maybeSingle(), timeoutMs);
       if (error) return loadFailed(userId, error);
       if (data && data.settings) {
-        cache.set(userId, data.settings);
+        // B-435 · CAS (17.10) — a RE-read (a rebase after a conflict) carries over what this device changed and
+        // the row does not know yet: keys outside the journal and the pending (welcomeSeen · tourDone · onboarding
+        // …) whose cached value differs from what was last CONFIRMED. The journal's collections and the five
+        // scalars are rebased by the app from their own records — carrying the cache's copy would replace again.
+        const prev = cache.get(userId);
+        const last = (confirmed.get(userId) || []).at(-1)?.blob;
+        const carry = {};
+        if (prev && last) {
+          for (const k of Object.keys(prev)) {
+            if (k in COLLECTIONS || SCALARS.includes(k)) continue;
+            if (stableStringify(prev[k]) !== stableStringify(last[k])) carry[k] = prev[k];
+          }
+        }
+        const merged = Object.keys(carry).length ? { ...data.settings, ...carry } : data.settings;
+        cache.set(userId, merged);
         writable.add(userId);
+        hadRow.add(userId);
+        rowGone.delete(userId);
         // The blob we just READ is by definition what the row holds ⇒ re-sending it
         // is a no-op. This is the one fact strong enough to seed the hash (B-361).
         lastSent.set(userId, stableStringify(data.settings));
         // B-432 · B-435: the row's version token — the base of any edit made from now on.
-        if (data.updated_at) lastToken.set(userId, data.updated_at);
+        if (data.updated_at) { lastToken.set(userId, data.updated_at); remember(userId, data.updated_at, data.settings); }
         else lastToken.delete(userId);
-        writeMirror(data.settings);
-        return { status: "ok", settings: data.settings, updatedAt: data.updated_at ?? null };
+        writeMirror(merged);
+        return { status: "ok", settings: merged, updatedAt: data.updated_at ?? null };
+      }
+      // B-435 · CAS (Niv 18.10, fix ④) — no row, AFTER this session saw one: the row was DELETED (account
+      // deletion · an operator). ⛔ An automatic insert: it would resurrect the account from this device's copy.
+      // Writes stay blocked for the session and the app shows `settings-sync-stuck`. Dependency of B-191.
+      if (hadRow.has(userId)) {
+        console.error("userSettings: this account's settings row is gone (it existed earlier in this session) — writes blocked, ⛔ an automatic insert");
+        rowGone.add(userId);
+        writable.delete(userId);
+        lastSent.delete(userId);
+        lastToken.delete(userId);
+        return { status: "failed", gone: true, settings: readMirror(), updatedAt: null };
       }
       // Authoritative "no row" (or a row with a null blob): writable.
       // ⛔ The hash is NOT seeded here. There is no row, so the mirror is ⛔ "what the
@@ -308,7 +420,13 @@ export function saveSettings(userId, partial, client = supabase) {
     // B-361 — identical to the row, ⛔ a write. B-406 — and that identity IS the confirmation
     // the delta journal waits for (lastSent is set only from a confirmed read or write).
     if (alreadySent(userId, blob)) { notifySynced(userId, blob); return; }
-    upsertBlob(userId, blob, client);
+    // B-435 · CAS: serialized — the write takes the base the previous one returned (⛔ a self-conflict).
+    enqueue(userId, () => {
+      if (!writable.has(userId)) return false;
+      const now = cache.get(userId) || {};
+      if (alreadySent(userId, now)) { notifySynced(userId, now); return true; }
+      return upsertBlob(userId, now, client);
+    });
   }, DEBOUNCE_MS);
   if (typeof timer.unref === "function") timer.unref();
   pending.set(userId, { timer, client });
@@ -321,7 +439,7 @@ export function saveSettings(userId, partial, client = supabase) {
 // over the user's real row. The gate asks whether we hold an authoritative blob,
 // ⛔ not whether the cache is non-empty — the cache was non-empty in exactly the
 // failure case.
-export async function flushSettings(userId, client = supabase) {
+export async function flushSettings(userId, client = supabase, { timeoutMs = SETTINGS_WRITE_TIMEOUT_MS } = {}) {
   const existing = pending.get(userId);
   if (existing?.timer) clearTimeout(existing.timer);
   pending.delete(userId);
@@ -330,7 +448,11 @@ export async function flushSettings(userId, client = supabase) {
   // ⚠️ The flush path is a DIFFERENT branch from the timer — B-361 has to gate both,
   // or closing the tab re-sends the unchanged blob the timer just declined to send.
   if (alreadySent(userId, blob)) { notifySynced(userId, blob); return; }
-  await upsertBlob(userId, blob, existing?.client || client);
+  await enqueue(userId, () => {
+    const now = cache.get(userId) || {};
+    if (alreadySent(userId, now)) { notifySynced(userId, now); return true; }
+    return upsertBlob(userId, now, existing?.client || client, { timeoutMs });
+  });
 }
 
 // B-432 · B-435 (16.10) — LAYER 2 of local-first: on pagehide / visibilitychange(hidden) the unconfirmed blob
@@ -344,6 +466,13 @@ export function flushKeepalive(userId, { accessToken, url, anonKey, fetchImpl = 
   const blob = cache.get(userId);
   if (!blob) return { sent: false, reason: "no-blob" };
   if (alreadySent(userId, blob)) return { sent: false, reason: "already-sent" };
+  if (rowGone.has(userId)) return { sent: false, reason: "row-gone" };
+  // B-435 · CAS: the same conditional write. No base ⇒ nothing to condition on ⇒ the pending carries it.
+  const base = lastToken.has(userId) ? lastToken.get(userId) : null;
+  if (base == null) {
+    console.warn("userSettings: keepalive skipped — no row version to condition on; the pending edit will be sent at the next load");
+    return { sent: false, reason: "no-base" };
+  }
   if (!accessToken || !url || !anonKey || typeof fetchImpl !== "function") {
     console.warn("userSettings: keepalive skipped — no session token / endpoint; the pending edit will be sent at the next load");
     return { sent: false, reason: "no-endpoint" };
@@ -351,8 +480,8 @@ export function flushKeepalive(userId, { accessToken, url, anonKey, fetchImpl = 
   // pagehide + visibilitychange(hidden) + beforeunload can all fire for one unload: one keepalive per blob.
   const sent = stableStringify(blob);
   if (keepaliveSent.get(userId) === sent) return { sent: false, reason: "duplicate" };
-  const token = new Date().toISOString();
-  const body = JSON.stringify([{ user_id: userId, settings: blob, updated_at: token }]);
+  const token = nextToken(base);
+  const body = JSON.stringify({ settings: blob, updated_at: token });
   const bytes = new TextEncoder().encode(body).length;
   if (bytes > KEEPALIVE_MAX_BYTES) {
     console.warn(`userSettings: keepalive skipped — body ${bytes}B > ${KEEPALIVE_MAX_BYTES}B (the 60KB guard); the pending edit will be sent at the next load`);
@@ -365,21 +494,29 @@ export function flushKeepalive(userId, { accessToken, url, anonKey, fetchImpl = 
   if (existing?.timer) clearTimeout(existing.timer);
   pending.delete(userId);
   keepaliveSent.set(userId, sent);
-  fetchImpl(`${url}/rest/v1/user_settings?on_conflict=user_id`, {
-    method: "POST",
+  fetchImpl(`${url}/rest/v1/user_settings?user_id=eq.${encodeURIComponent(userId)}&updated_at=eq.${encodeURIComponent(base)}&select=updated_at`, {
+    method: "PATCH",
     keepalive: true,
     headers: {
       apikey: anonKey,
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
-      Prefer: "resolution=merge-duplicates,return=minimal",
+      Prefer: "return=representation",
     },
     body,
-  }).then((res) => {
+  }).then(async (res) => {
+    // Usually never seen (the page is gone). When it is: same reading as the plain write.
     if (!res || !res.ok) { console.error("userSettings: keepalive upsert rejected", res?.status); return; }
+    let rows = null;
+    try { rows = await res.json(); } catch (e) { console.error("userSettings: keepalive answer unreadable — treated as not landed", e); return; }
+    if (!Array.isArray(rows) || rows.length === 0) { notifyConflict(userId, "keepalive-0-rows"); return; } // the pending stays
+    const landed = rows[0]?.updated_at;
+    if (landed == null) { console.error("userSettings: keepalive answered without updated_at — treated as not landed"); return; }
     lastSent.set(userId, sent);
-    lastToken.set(userId, token);
-    notifySynced(userId, blob, token);
+    lastToken.set(userId, landed);
+    hadRow.add(userId);
+    remember(userId, landed, blob);
+    notifySynced(userId, blob, landed);
   }).catch((e) => console.error("userSettings: keepalive upsert threw (expected after an unload)", e));
   return { sent: true, token, bytes };
 }

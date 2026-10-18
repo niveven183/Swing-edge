@@ -4,7 +4,10 @@
 // NOT touch the real database. (The migration is intentionally NOT applied to
 // prod in M1; that is M2 / manual.) Pure Node. Run: `node scripts/userSettings-test.mjs`.
 
-import * as US from "../src/lib/userSettings.js";
+// `US_LIB` (red-before only): a directory holding ANOTHER tree's src/lib — e.g. main's — so block 14 can be seen
+// red on the code before the fix without touching this checkout. Default: this tree.
+const LIB = process.env.US_LIB ? new URL(`file://${process.env.US_LIB}/`) : new URL("../src/lib/", import.meta.url);
+const US = await import(new URL("userSettings.js", LIB).href);
 const { loadSettings, saveSettings, flushSettings, migrateFromLocalStorage } = US;
 
 let failures = 0;
@@ -47,19 +50,53 @@ function makeLocalStorage(seed = {}) {
 // a Supabase hang. Like postgrest-js it resolves `{ error }` ONLY when its abort signal
 // fires, and otherwise stays pending forever. `lateRow` makes the stalled read answer
 // AFTER the deadline, so a late success can be seen trying to seed the cache.
+// B-435 · CAS (17.10): the write path is now a CONDITIONAL update (`.update().eq(user_id).eq(updated_at, base)
+// .select("updated_at")`) or an INSERT (no base). This mock models PostgREST exactly as the module meets it:
+// every row carries a token (a real row's updated_at is NOT NULL), returned in PG's text form (…+00:00); an
+// update whose token filter does not match returns `[]` (⛔ an error); an insert over an existing row returns
+// 23505. `calls.upsert` keeps counting WRITES (update + insert + legacy upsert) — the existing assertions ask
+// «how many writes», and that question did not change.
+const SEED_TOK = "2026-01-01T00:00:00.123456+00:00";
+const pgText = (t) => {
+  const m = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,6}))?(Z|[+-]\d{2}:?\d{2})$/.exec(String(t ?? ""));
+  if (!m) return t;
+  const us = Date.parse(`${m[1]}${m[3] === "Z" ? "Z" : m[3]}`) * 1000 + Number((m[2] || "").padEnd(6, "0"));
+  const frac = String(us % 1e6).padStart(6, "0").replace(/0+$/, "");
+  return `${new Date(Math.floor(us / 1000)).toISOString().slice(0, 19)}${frac ? `.${frac}` : ""}+00:00`;
+};
+const usOf = (t) => {
+  const m = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,6}))?(Z|[+-]\d{2}:?\d{2})$/.exec(String(t ?? ""));
+  return m ? Date.parse(`${m[1]}${m[3] === "Z" ? "Z" : m[3]}`) * 1000 + Number((m[2] || "").padEnd(6, "0")) : null;
+};
 function makeMockClient(initialRows = {}, { failMode = false, upsertFailMode = false, hangMode = false, lateMs = null } = {}) {
   const rows = new Map(Object.entries(initialRows));
-  const calls = { upsert: 0, select: 0, aborted: 0 };
+  const tokens = new Map([...rows.keys()].map((k) => [k, SEED_TOK]));
+  const calls = { upsert: 0, select: 0, aborted: 0, writes: [] };
   function from() {
-    let filterId = null;
+    const f = {};
     let signal = null;
+    let op = null;
+    let payload = null;
+    const exec = () => {
+      if (upsertFailMode) return Promise.resolve({ data: null, error: { message: "RLS denied" } });
+      if (op === "insert") {
+        if (rows.has(payload.user_id)) return Promise.resolve({ data: null, error: { code: "23505", message: "duplicate key value violates unique constraint" } });
+        rows.set(payload.user_id, payload.settings); tokens.set(payload.user_id, payload.updated_at);
+        return Promise.resolve({ data: [{ updated_at: pgText(payload.updated_at) }], error: null });
+      }
+      const id = f.user_id;
+      if (!rows.has(id)) return Promise.resolve({ data: [], error: null });
+      if ("updated_at" in f && usOf(f.updated_at) !== usOf(tokens.get(id))) return Promise.resolve({ data: [], error: null });
+      rows.set(id, payload.settings); tokens.set(id, payload.updated_at);
+      return Promise.resolve({ data: [{ updated_at: pgText(payload.updated_at) }], error: null });
+    };
     const builder = {
       select() {
-        calls.select++;
+        if (!op) calls.select++;
         return builder;
       },
-      eq(_col, v) {
-        filterId = v;
+      eq(col, v) {
+        f[col] = v;
         return builder;
       },
       abortSignal(s) {
@@ -67,26 +104,24 @@ function makeMockClient(initialRows = {}, { failMode = false, upsertFailMode = f
         return builder;
       },
       async maybeSingle() {
+        const filterId = f.user_id;
+        const answer = () => (rows.has(filterId) ? { data: { user_id: filterId, settings: rows.get(filterId), updated_at: pgText(tokens.get(filterId)) }, error: null } : { data: null, error: null });
         if (hangMode || lateMs != null) {
           return new Promise((resolve) => {
             signal?.addEventListener("abort", () => { calls.aborted++; if (lateMs == null) resolve({ data: null, error: { message: "AbortError" } }); });
-            if (lateMs != null) setTimeout(() => resolve(rows.has(filterId) ? { data: { user_id: filterId, settings: rows.get(filterId) }, error: null } : { data: null, error: null }), lateMs);
+            if (lateMs != null) setTimeout(() => resolve(answer()), lateMs);
           });
         }
         if (failMode) return { data: null, error: { message: "RLS denied" } };
-        if (!rows.has(filterId)) return { data: null, error: null };
-        return { data: { user_id: filterId, settings: rows.get(filterId) }, error: null };
+        return answer();
       },
-      upsert(obj) {
-        calls.upsert++;
-        if (upsertFailMode) return Promise.resolve({ data: null, error: { message: "RLS denied" } });
-        rows.set(obj.user_id, obj.settings);
-        return Promise.resolve({ data: obj, error: null });
-      },
+      update(obj) { op = "update"; payload = obj; calls.upsert++; calls.writes.push({ op, obj, filter: f }); return builder; },
+      insert(obj) { op = "insert"; payload = obj; calls.upsert++; calls.writes.push({ op, obj }); return builder; },
+      then(res, rej) { return (op ? exec() : Promise.resolve({ data: [], error: null })).then(res, rej); },
     };
     return builder;
   }
-  return { client: { from }, calls, rows };
+  return { client: { from }, calls, rows, tokens };
 }
 
 // ── W-CAP · B-268/B-269 — the three-state load contract ────────────────────
@@ -373,25 +408,45 @@ console.log("test:settings — userSettings module vs mock client (no real DB)\n
 {
   console.log("13) local-first: pending + inflight + keepalive (B-432 · B-435)");
   let P = null;
-  try { P = await import("../src/lib/settingsPending.js"); } catch (e) { console.error(`  (settingsPending.js not importable: ${String(e.message).split("\n")[0]})`); }
+  try { P = await import(new URL("settingsPending.js", LIB).href); } catch (e) { console.error(`  (settingsPending.js not importable: ${String(e.message).split("\n")[0]})`); }
   const has = (fn) => P && typeof P[fn] === "function";
-  // A mock with a VERSION TOKEN: the row keeps the updated_at the client sent (no server trigger — DECISIONS 16.10).
+  // A mock with a VERSION TOKEN (B-435 · CAS 17.10): the row keeps the updated_at the client sent and returns it in
+  // PG's text form; the write is the module's conditional update / insert. `hold` keeps the write pending until
+  // `release()` — or forever, which is how 14i models the write that never answers (its abortSignal ends it).
   function tokenClient(seed = {}, { upsertFail = false, upsertThrow = false, hold = false } = {}) {
     const rows = new Map(Object.entries(seed));
-    const calls = { upsert: 0, sent: [] };
+    const calls = { upsert: 0, sent: [], filters: [], aborted: 0 };
     let release = null;
     function from() {
-      let id = null;
+      const f = {};
+      let op = null, payload = null, signal = null;
+      const exec = () => {
+        calls.upsert++; calls.sent.push(payload); calls.filters.push({ ...f, op });
+        if (upsertThrow) return Promise.reject(new TypeError("Load failed"));
+        if (upsertFail) return Promise.resolve({ data: null, error: { message: "TypeError: Load failed" } });
+        const land = () => {
+          if (op === "insert") {
+            if (rows.has(payload.user_id)) return { data: null, error: { code: "23505", message: "duplicate key value violates unique constraint" } };
+            rows.set(payload.user_id, { settings: payload.settings, updated_at: payload.updated_at });
+            return { data: [{ updated_at: pgText(payload.updated_at) }], error: null };
+          }
+          const cur = rows.get(f.user_id);
+          if (!cur || ("updated_at" in f && usOf(f.updated_at) !== usOf(cur.updated_at))) return { data: [], error: null };
+          rows.set(f.user_id, { settings: payload.settings, updated_at: payload.updated_at });
+          return { data: [{ updated_at: pgText(payload.updated_at) }], error: null };
+        };
+        if (!hold) return Promise.resolve(land());
+        return new Promise((r) => {
+          release = () => r(land());
+          signal?.addEventListener("abort", () => { calls.aborted++; r({ data: null, error: { message: "AbortError" } }); });
+        });
+      };
       const b = {
-        select() { return b; }, eq(_c, v) { id = v; return b; }, abortSignal() { return b; },
-        async maybeSingle() { return rows.has(id) ? { data: { user_id: id, ...rows.get(id) }, error: null } : { data: null, error: null }; },
-        upsert(obj) {
-          calls.upsert++; calls.sent.push(obj);
-          if (upsertThrow) return Promise.reject(new TypeError("Load failed"));
-          if (upsertFail) return Promise.resolve({ data: null, error: { message: "TypeError: Load failed" } });
-          const land = () => { rows.set(obj.user_id, { settings: obj.settings, updated_at: obj.updated_at }); return { data: obj, error: null }; };
-          return hold ? new Promise((r) => { release = () => r(land()); }) : Promise.resolve(land());
-        },
+        select() { return b; }, eq(c, v) { f[c] = v; return b; }, abortSignal(sg) { signal = sg; return b; },
+        async maybeSingle() { const r = rows.get(f.user_id); return r ? { data: { user_id: f.user_id, settings: r.settings, updated_at: pgText(r.updated_at) }, error: null } : { data: null, error: null }; },
+        update(obj) { op = "update"; payload = obj; return b; },
+        insert(obj) { op = "insert"; payload = obj; return b; },
+        then(res, rej) { return (op ? exec() : Promise.resolve({ data: [], error: null })).then(res, rej); },
       };
       return b;
     }
@@ -417,14 +472,17 @@ console.log("test:settings — userSettings module vs mock client (no real DB)\n
   check("13b any other token ⇒ «conflict»: the row wins, the rejected local value is carried", c?.action === "conflict" && c?.rejected?.capital === 12345);
   check("13b no pending ⇒ «none»", has("decidePending") && P.decidePending(null, { capital: 1 }, T0)?.action === "none");
   // A landed (row = A, carrying capital 12345), B (newer: riskPct 3) was cancelled ⇒ ⛔ a conflict: drop what A carried, apply the rest.
-  const ab = has("decidePending") ? P.decidePending({ v: 1, base: T0, inflight: ["A-tok", "B-tok"], values: { capital: 12345, riskPct: 3 } }, { capital: 12345, riskPct: 1 }, "A-tok") : null;
+  // B-435 · CAS (17.10): tokens are compared as INSTANTS (sameToken) — the fixture's tokens are ISO instants, and the
+  // row returns A's in PG form (…+00:00) as production does. (Before: opaque "A-tok"/"B-tok", string-compared.)
+  const ab = has("decidePending") ? P.decidePending({ v: 1, base: T0, inflight: ["2026-10-16T08:00:05.000Z", "2026-10-16T08:00:06.000Z"], values: { capital: 12345, riskPct: 3 } }, { capital: 12345, riskPct: 1 }, "2026-10-16T08:00:05+00:00") : null;
   check("13b row = an EARLIER inflight token ⇒ «apply» only what it did not carry (⛔ a false conflict)", ab?.action === "apply" && ab?.apply?.riskPct === 3 && !("capital" in (ab?.apply || {})));
 
   // c — the read carries the row's token.
   global.localStorage = makeLocalStorage();
   const rc = tokenClient({ u13c: { settings: { capital: 9000 }, updated_at: T0 } });
   const r13c = await loadSettings("u13c", rc.client);
-  check("13c loadSettings returns the row's updated_at as `updatedAt`", r13c.updatedAt === T0);
+  // B-435 · CAS (17.10): the DB's own string, byte-identical (PG form …+00:00) — ⛔ re-formatted by the client.
+  check("13c loadSettings returns the row's updated_at as `updatedAt` — the DB's string, byte-identical", r13c.updatedAt === pgText(T0) && r13c.updatedAt !== T0);
 
   // d — inflight is on disk BEFORE the request resolves, and equals the updated_at that was sent.
   global.localStorage = makeLocalStorage();
@@ -461,13 +519,15 @@ console.log("test:settings — userSettings module vs mock client (no real DB)\n
   if (has("recordScalarEdit")) P.recordScalarEdit(global.localStorage, "capital", 33333, { base: T0 });
   saveSettings("u13f", { capital: 33333 }, rf.client);
   const fetched = [];
-  const fake = (url, init) => { fetched.push({ url, init }); return Promise.resolve({ ok: true, status: 201 }); };
+  const fake = (url, init) => { fetched.push({ url, init }); return Promise.resolve({ ok: true, status: 200, json: async () => [{ updated_at: "2026-10-16T08:00:09+00:00" }] }); };
   const kf = typeof US.flushKeepalive === "function" ? US.flushKeepalive("u13f", { accessToken: "tok-13f", url: "https://x.supabase.co", anonKey: "anon-13f", fetchImpl: fake }) : null;
   const sentF = fetched[0];
   const bodyF = sentF ? JSON.parse(sentF.init.body) : null;
-  check("13f flushKeepalive: one POST with keepalive:true to /rest/v1/user_settings?on_conflict=user_id", kf?.sent === true && fetched.length === 1 && sentF.init.keepalive === true && sentF.init.method === "POST" && sentF.url === "https://x.supabase.co/rest/v1/user_settings?on_conflict=user_id");
-  check("13f headers: apikey · Bearer token · merge-duplicates", sentF?.init.headers?.apikey === "anon-13f" && sentF?.init.headers?.Authorization === "Bearer tok-13f" && /resolution=merge-duplicates/.test(sentF?.init.headers?.Prefer || ""));
-  check("13f body = the full cached blob + updated_at = an inflight token on disk", Array.isArray(bodyF) && bodyF[0]?.settings?.capital === 33333 && !!bodyF[0]?.updated_at && (has("readPending") ? (P.readPending(global.localStorage)?.inflight || []).includes(bodyF[0].updated_at) : false));
+  // B-435 · CAS (17.10): the keepalive is the same CONDITIONAL write — a PATCH on the row's token (⛔ a POST upsert).
+  const baseF = rf.rows.get("u13f") && "2026-10-16T08:00:00+00:00"; // what the read returned (PG form)
+  check("13f flushKeepalive: one PATCH with keepalive:true, conditioned on user_id AND the row's updated_at", kf?.sent === true && fetched.length === 1 && sentF.init.keepalive === true && sentF.init.method === "PATCH" && sentF.url === `https://x.supabase.co/rest/v1/user_settings?user_id=eq.u13f&updated_at=eq.${encodeURIComponent(baseF)}&select=updated_at`);
+  check("13f headers: apikey · Bearer token · return=representation (0 rows ⇒ conflict is readable)", sentF?.init.headers?.apikey === "anon-13f" && sentF?.init.headers?.Authorization === "Bearer tok-13f" && /return=representation/.test(sentF?.init.headers?.Prefer || ""));
+  check("13f body = the full cached blob + updated_at = an inflight token on disk", bodyF?.settings?.capital === 33333 && !!bodyF?.updated_at && (has("readPending") ? (P.readPending(global.localStorage)?.inflight || []).includes(bodyF.updated_at) : false));
 
   // g — the 60KB guard: ⛔ keepalive, the reason said, the pending kept.
   global.localStorage = makeLocalStorage();
@@ -488,7 +548,7 @@ console.log("test:settings — userSettings module vs mock client (no real DB)\n
   if (has("recordScalarEdit")) P.recordScalarEdit(global.localStorage, "capital", 55555, { base: T0 });
   saveSettings("u13h", { capital: 55555 }, rh.client);
   const delivered = [];
-  if (typeof US.flushKeepalive === "function") US.flushKeepalive("u13h", { accessToken: "t", url: "https://x.supabase.co", anonKey: "k", fetchImpl: (u, i) => { const b = JSON.parse(i.body)[0]; rh.rows.set("u13h", { settings: b.settings, updated_at: b.updated_at }); delivered.push(b); return Promise.resolve({ ok: true }); } });
+  if (typeof US.flushKeepalive === "function") US.flushKeepalive("u13h", { accessToken: "t", url: "https://x.supabase.co", anonKey: "k", fetchImpl: (u, i) => { const b = JSON.parse(i.body); rh.rows.set("u13h", { settings: b.settings, updated_at: b.updated_at }); delivered.push(b); return Promise.resolve({ ok: true, json: async () => [{ updated_at: pgText(b.updated_at) }] }); } });
   const next = await loadSettings("u13h", rh.client); // a fresh page: the keepalive arrived, its answer was never seen
   const dh = has("decidePending") ? P.decidePending(P.readPending(global.localStorage), next.settings, next.updatedAt) : null;
   check("13h keepalive landed + load ⇒ «landed» — 0 banners", delivered.length === 1 && dh?.action === "landed");
@@ -505,6 +565,179 @@ console.log("test:settings — userSettings module vs mock client (no real DB)\n
   await flushSettings("u13i", ri.client);
   offI();
   check("13i no row + mirror = the first edit ⇒ the row IS written (1 upsert) — ⛔ «already sent» from the mirror", li.status === "empty" && ri.calls.upsert === 1 && ri.rows.get("u13i")?.settings?.capital === 5000);
+}
+
+// 14) B-435 · CAS (17.10) — every settings write is CONDITIONAL on the row's version token.
+// Plan: docs/plans/PLAN-2026-10-17-b435-cas.md (approved 18.10 with fixes ①–④). Each assertion is RED on main
+// (US_LIB=<main's src/lib>) — measured before this block was trusted.
+{
+  console.log("14) CAS: conditional writes · conflict · instants · deadline · monotonic token · vanished row (B-435)");
+  let P = null;
+  try { P = await import(new URL("settingsPending.js", LIB).href); } catch {}
+  const tok = (seed, opts) => {
+    // the block-13 client, re-declared here (block scope): rows {settings, updated_at}, PG-form answers.
+    const rows = new Map(Object.entries(seed));
+    const calls = { upsert: 0, sent: [], filters: [], aborted: 0 };
+    function from() {
+      const f = {}; let op = null, payload = null, signal = null;
+      const land = () => {
+        if (op === "insert" || op === "upsert") {
+          if (op === "insert" && rows.has(payload.user_id)) return { data: null, error: { code: "23505", message: "duplicate key value violates unique constraint" } };
+          rows.set(payload.user_id, { settings: payload.settings, updated_at: payload.updated_at });
+          return { data: op === "insert" ? [{ updated_at: pgText(payload.updated_at) }] : payload, error: null };
+        }
+        const cur = rows.get(f.user_id);
+        if (!cur || ("updated_at" in f && usOf(f.updated_at) !== usOf(cur.updated_at))) return { data: [], error: null };
+        rows.set(f.user_id, { settings: payload.settings, updated_at: payload.updated_at });
+        return { data: [{ updated_at: pgText(payload.updated_at) }], error: null };
+      };
+      const exec = () => {
+        calls.upsert++; calls.sent.push(payload); calls.filters.push({ ...f, op });
+        if (opts?.holdFirst && calls.upsert === 1) return new Promise((r) => signal?.addEventListener("abort", () => { calls.aborted++; r({ data: null, error: { message: "AbortError" } }); }));
+        if (opts?.delayMs) return sleep(opts.delayMs).then(land); // the network: the first is still in flight when the second is issued
+        return Promise.resolve(land());
+      };
+      const b = {
+        select() { return b; }, eq(c, v) { f[c] = v; return b; }, abortSignal(sg) { signal = sg; return b; },
+        async maybeSingle() { const r = rows.get(f.user_id); return r ? { data: { user_id: f.user_id, settings: r.settings, updated_at: pgText(r.updated_at) }, error: null } : { data: null, error: null }; },
+        update(o) { op = "update"; payload = o; return b; }, insert(o) { op = "insert"; payload = o; return b; },
+        upsert(o) { op = "upsert"; payload = o; return { then: (res, rej) => exec().then(res, rej) }; }, // main's path, so it can be seen red
+        then(res, rej) { return (op ? exec() : Promise.resolve({ data: [], error: null })).then(res, rej); },
+      };
+      return b;
+    }
+    return { client: { from }, calls, rows };
+  };
+  const conflicts = [];
+  const offC = typeof US.onSettingsConflict === "function" ? US.onSettingsConflict((uid, why) => conflicts.push({ uid, why })) : () => {};
+  const T1 = "2026-10-17T07:02:33.965123+00:00"; // a row written by the column default: microseconds, PG form
+
+  // a — the write carries the row's token as its condition, and it is an UPDATE (⛔ a blind upsert).
+  global.localStorage = makeLocalStorage();
+  const a = tok({ u14a: { settings: { capital: 1000 }, updated_at: T1 } });
+  await loadSettings("u14a", a.client);
+  saveSettings("u14a", { capital: 1100 }, a.client);
+  await flushSettings("u14a", a.client);
+  check("14a the write is an update conditioned on user_id AND the row's updated_at", a.calls.filters[0]?.op === "update" && a.calls.filters[0]?.user_id === "u14a" && a.calls.filters[0]?.updated_at === T1);
+
+  // b — 0 rows (another writer moved the row) ⇒ ⛔ settle · the conflict is SAID · the other writer's row survives.
+  global.localStorage = makeLocalStorage();
+  const b = tok({ u14b: { settings: { capital: 1000, playbook: [{ id: 1, name: "theirs" }] }, updated_at: T1 } });
+  await loadSettings("u14b", b.client);
+  b.rows.set("u14b", { settings: { capital: 1000, playbook: [{ id: 1, name: "theirs" }, { id: 2, name: "new elsewhere" }] }, updated_at: "2026-10-17T07:05:00+00:00" });
+  if (P?.recordScalarEdit) P.recordScalarEdit(global.localStorage, "capital", 1200, { base: T1 });
+  const settledB = [];
+  const offB = US.onSettingsSynced((uid, blob) => settledB.push(blob));
+  conflicts.length = 0;
+  saveSettings("u14b", { capital: 1200 }, b.client);
+  await flushSettings("u14b", b.client);
+  offB();
+  check("14b 0 rows ⇒ a conflict is reported (onSettingsConflict) and ⛔ settled", conflicts.some((c) => c.uid === "u14b") && settledB.length === 0 && P?.readPending(global.localStorage)?.values?.capital === 1200);
+  check("14b … and the other writer's row is ⛔ overwritten (2 setups, its token)", b.rows.get("u14b").settings.playbook.length === 2 && b.rows.get("u14b").updated_at === "2026-10-17T07:05:00+00:00");
+
+  // c — no row when read, another device created it meanwhile ⇒ the insert gets 23505 ⇒ conflict, ⛔ a replace.
+  global.localStorage = makeLocalStorage();
+  const c = tok({});
+  await loadSettings("u14c", c.client);
+  c.rows.set("u14c", { settings: { capital: 7000, watchlist: [{ ticker: "NVDA" }] }, updated_at: T1 });
+  conflicts.length = 0;
+  saveSettings("u14c", { capital: 500 }, c.client);
+  await flushSettings("u14c", c.client);
+  check("14c insert over a row another device created ⇒ conflict (23505), its row intact", conflicts.some((x) => x.uid === "u14c") && c.rows.get("u14c").settings.capital === 7000);
+
+  // d — two writes in a row: the second is conditioned on what the FIRST returned (⛔ a self-conflict), also when
+  // they are started together.
+  global.localStorage = makeLocalStorage();
+  const d = tok({ u14d: { settings: { capital: 1 }, updated_at: T1 } }, { delayMs: 40 });
+  await loadSettings("u14d", d.client);
+  conflicts.length = 0;
+  saveSettings("u14d", { capital: 2 }, d.client);
+  const f1 = flushSettings("u14d", d.client);
+  await sleep(10); // the first write is ON THE WIRE now
+  saveSettings("u14d", { capital: 3 }, d.client);
+  const f2 = flushSettings("u14d", d.client);
+  await Promise.all([f1, f2]);
+  check("14d a 2nd write issued while the 1st is in flight: both land, the 2nd on the 1st's returned token, 0 conflicts", d.rows.get("u14d").settings.capital === 3 && conflicts.length === 0 && d.calls.filters[1]?.updated_at === pgText(d.calls.sent[0]?.updated_at));
+
+  // e — .123Z vs .123+00:00: the base sent is the DB's string, byte-identical (µs kept); after a write the base is
+  // what the write RETURNED (PG form), ⛔ the client's own token.
+  check("14e the base sent = the DB's string byte-identical (µs, +00:00), ⛔ re-formatted", a.calls.filters[0]?.updated_at === T1);
+  check("14e after a write, the next base = the token the DB returned (…+00:00), ⛔ the client's …Z", typeof US.currentToken === "function" && US.currentToken("u14d") === pgText(d.calls.sent[1]?.updated_at) && US.currentToken("u14d") !== d.calls.sent[1]?.updated_at);
+
+  // f — keepalive with no row version ⇒ ⛔ sent (nothing to condition on) — the pending carries it.
+  global.localStorage = makeLocalStorage();
+  const f = tok({});
+  await loadSettings("u14f", f.client);
+  saveSettings("u14f", { capital: 9 }, f.client);
+  const fetchedF = [];
+  const kf = US.flushKeepalive("u14f", { accessToken: "t", url: "https://x.supabase.co", anonKey: "k", fetchImpl: (u, i) => { fetchedF.push(u); return Promise.resolve({ ok: true, json: async () => [] }); } });
+  check("14f keepalive with no row version ⇒ ⛔ sent · reason «no-base»", kf?.sent === false && kf?.reason === "no-base" && fetchedF.length === 0);
+
+  // g — B-270 by construction: a read said «no row» (the cache is partial) and a full row appeared ⇒ the write is
+  // refused (23505), ⛔ the siblings deleted.
+  global.localStorage = makeLocalStorage();
+  const g = tok({});
+  await loadSettings("u14g", g.client);
+  g.rows.set("u14g", { settings: { capital: 5000, watchlist: [{ ticker: "AAPL" }], playbook: [{ id: 9, name: "keep me" }], onboarding: { completed: true } }, updated_at: T1 });
+  saveSettings("u14g", { capital: 5100 }, g.client);
+  await flushSettings("u14g", g.client);
+  const gRow = g.rows.get("u14g").settings;
+  check("14g B-270: a partial cache never replaces a full row — watchlist · playbook · onboarding survive", gRow.watchlist?.length === 1 && gRow.playbook?.length === 1 && gRow.onboarding?.completed === true);
+
+  // h — the measured false conflict (M-027 formats): own write landed (base = …Z the client sent), a 2nd edit, the
+  // reload comes first, the row returns the SAME instant as …+00:00 ⇒ the pending applies, ⛔ a banner.
+  const hp = { v: 1, base: "2026-10-17T07:02:33.965Z", inflight: [], values: { capital: 2222 } };
+  const hd = P?.decidePending ? P.decidePending(hp, { capital: 1111 }, "2026-10-17T07:02:33.965+00:00") : null;
+  check("14h base …965Z vs row …965+00:00 (same instant) ⇒ «apply», ⛔ a false «conflict»", hd?.action === "apply" && hd?.apply?.capital === 2222);
+  const st = P?.sameToken;
+  check("14h sameToken: Z ≡ +00:00 · µs kept · offsets · garbage ⇒ false", !!st && st("2026-10-17T07:02:33.965Z", "2026-10-17T07:02:33.965+00:00") && !st("2026-10-17T07:02:33.965123+00:00", "2026-10-17T07:02:33.965Z") && st("2026-10-17T09:02:33.965+02:00", "2026-10-17T07:02:33.965Z") && (() => { const e = console.error; console.error = () => {}; const r = st("A-tok", "A-tok"); console.error = e; return r === false; })());
+
+  // i — fix ①: a write that never answers ENDS (deadline ⇒ abort, like a throw) and the next write goes out.
+  global.localStorage = makeLocalStorage();
+  const i = tok({ u14i: { settings: { capital: 1 }, updated_at: T1 } }, { holdFirst: true });
+  await loadSettings("u14i", i.client);
+  saveSettings("u14i", { capital: 2 }, i.client);
+  const fi1 = flushSettings("u14i", i.client, { timeoutMs: 60 });
+  const ended = await Promise.race([fi1.then(() => true), sleep(600).then(() => false)]);
+  saveSettings("u14i", { capital: 3 }, i.client);
+  const fi2 = flushSettings("u14i", i.client, { timeoutMs: 60 });
+  await Promise.race([fi2, sleep(600)]);
+  check("14i a hung write ends at its deadline (aborted) and the NEXT write still goes out", ended === true && i.calls.aborted === 1 && i.calls.upsert === 2 && i.rows.get("u14i").settings.capital === 3);
+
+  // k — fix ②: a client clock 5 minutes behind the row ⇒ the new token is still LATER than the base.
+  global.localStorage = makeLocalStorage();
+  const ahead = new Date(Date.now() + 5 * 60_000).toISOString().replace("Z", "+00:00");
+  const k = tok({ u14k: { settings: { capital: 1 }, updated_at: ahead } });
+  await loadSettings("u14k", k.client);
+  saveSettings("u14k", { capital: 2 }, k.client);
+  await flushSettings("u14k", k.client);
+  check("14k clock 5 min behind the row ⇒ the token sent is still later than the base (instant)", usOf(k.calls.sent[0]?.updated_at) > usOf(ahead));
+
+  // j — fix ④: the row existed this session, a write gets 0 rows, the re-read finds NO row ⇒ ⛔ an automatic insert.
+  global.localStorage = makeLocalStorage();
+  const j = tok({ u14j: { settings: { capital: 1, playbook: [{ id: 1, name: "x" }] }, updated_at: T1 } });
+  await loadSettings("u14j", j.client);
+  j.rows.delete("u14j"); // the account's row was deleted elsewhere (B-191)
+  saveSettings("u14j", { capital: 2 }, j.client);
+  await flushSettings("u14j", j.client);
+  const errs = []; const oe = console.error; console.error = (...x) => errs.push(x.join(" "));
+  const rj = await loadSettings("u14j", j.client);
+  saveSettings("u14j", { capital: 3 }, j.client);
+  await flushSettings("u14j", j.client);
+  console.error = oe;
+  check("14j row vanished mid-session ⇒ the re-read is «gone», ⛔ an insert, said in the console", rj?.gone === true && !j.rows.has("u14j") && errs.some((e) => /gone|vanished/.test(e)));
+  // l — the rebase read carries this device's UNCONFIRMED keys outside the journal/pending (welcomeSeen …) over the
+  // new row, and ⛔ a collection (those are rebased from the journal by the app — carrying the cache's array would
+  // replace the other device's again).
+  global.localStorage = makeLocalStorage();
+  const l = tok({ u14l: { settings: { capital: 1, welcomeSeen: false, playbook: [{ id: 1, name: "a" }] }, updated_at: T1 } });
+  await loadSettings("u14l", l.client);
+  saveSettings("u14l", { welcomeSeen: true, playbook: [{ id: 1, name: "a" }, { id: 2, name: "local" }] }, l.client); // ⛔ flushed
+  l.rows.set("u14l", { settings: { capital: 1, welcomeSeen: false, playbook: [{ id: 1, name: "a" }, { id: 3, name: "remote" }], riskPct: 2 }, updated_at: "2026-10-17T07:09:00+00:00" });
+  const rl = await loadSettings("u14l", l.client);
+  check("14l rebase read: the unconfirmed welcomeSeen is carried over the new row · the row's own change (riskPct) kept", rl.settings?.welcomeSeen === true && rl.settings?.riskPct === 2);
+  check("14l … and the collection is the ROW's (⛔ the cache's array — the journal rebases it in the app)", JSON.stringify((rl.settings?.playbook || []).map((x) => x.name)) === JSON.stringify(["a", "remote"]));
+  offC();
 }
 
 console.log("");

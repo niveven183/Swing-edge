@@ -51,7 +51,7 @@ import { useToast, useConfirm } from "./src/components/ToastProvider.jsx";
 import { supabase, isSupabaseConfigured, tradeForSupabase, tradeFromSupabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "./src/supabaseClient.js";
 import { cleanTrades, purgeInvalidTrades } from "./src/lib/cleanTrades.js";
 import { deleteTradeVerified, restoreAt, createPendingWrites, insertTradeRow, updateTradeRow, insertTradeRows, deleteTradeRows } from "./src/lib/tradeWrite.js";
-import { loadSettings, saveSettings, flushSettings, flushKeepalive, currentToken, migrateFromLocalStorage, onSettingsSynced } from "./src/lib/userSettings.js";
+import { loadSettings, saveSettings, flushSettings, flushKeepalive, currentToken, migrateFromLocalStorage, onSettingsSynced, onSettingsConflict, confirmedAt, confirmSynced } from "./src/lib/userSettings.js";
 import { readPending, recordScalarEdit, settlePending, clearPending, decidePending } from "./src/lib/settingsPending.js";
 import { calcTradeMetrics, fmt$, fmt$0, fmtR, fmtNum, fmtPrice, fmtBalance, numOrNull, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays, localDayKey, todayKey, realizedAt, realizedDayKey, currencyOf, fmtPaperPrice, paperCurrencyOf, CURRENCY_SYMBOL, fmtAccountAmount, fmtCapitalAmount } from "./src/utils.js";
 import {
@@ -112,6 +112,8 @@ import { sizePosition, sizingRefusalReason, saveBlockMessage, FX_SETTLE_MS, capi
 // ⚠️ קבוע מודול, ⛔ לא `[]` inline: מערך טרי בכל רינדור הוא תלות טרייה ב-
 // `useFxRates`, וזה לולאת fetch אינסופית.
 const EMPTY_DAYS = [];
+// B-435 · CAS (Niv 17.10): consecutive rebases after a refused settings write before the banner (⛔ a loop).
+const SYNC_CONFLICT_MAX = 3;
 import { fileToResizedDataURL, fileToStoredDataURL, exceedsCap, MAX_EDGE_PX, Q_PRIMARY, Q_FALLBACK } from "./src/lib/imageResize.js";
 import { persistPlaybookSafely } from "./src/lib/playbookStore.js";
 import { hydrateCollections, readOps, recordOp, settleOps } from "./src/lib/settingsDelta.js";
@@ -1826,6 +1828,17 @@ export default function SwingEdge() {
   // B-432 · B-435 — a real conflict (another device wrote after this one's unconfirmed edit): the row won,
   // and the rejected local values are offered back (Niv 16.10). ⛔ A silent winner either way.
   const [settingsConflict, setSettingsConflict] = useState(null);
+  // B-435 · CAS (17.10) — a write refused because the row moved ⇒ the hydration runs again (the rebase).
+  // Niv 17.10: a ceiling of 3 consecutive rebases with no successful write, then a banner — ⛔ an endless loop.
+  const [rehydrateNonce, setRehydrateNonce] = useState(0);
+  const [syncStuck, setSyncStuck] = useState(false);
+  const conflictStreakRef = useRef(0);
+  const hydratedUidRef = useRef(null); // the user this mount already hydrated ⇒ a re-run is a REBASE (fix ③)
+  const retrySync = useCallback(() => {
+    conflictStreakRef.current = 0;
+    setSyncStuck(false);
+    setRehydrateNonce((n) => n + 1);
+  }, []);
   // «Apply my edit»: the rejected values become a NEW edit made on the row as it is now (base = its token),
   // and the persist effect sends them — a 2xx then settles them like any other edit.
   const applyMyEdit = useCallback(() => {
@@ -1852,11 +1865,26 @@ export default function SwingEdge() {
     const uid = authUser.id;
     return onSettingsSynced((syncedUid, blob, token) => {
       if (syncedUid !== uid) return;
+      conflictStreakRef.current = 0; // a confirmed write (or read) ends a conflict streak
       settleOps(localStorage, blob, { onFailure: reportDeltaFailure });
       // B-432 · B-435 — the same rule for the scalar pending: cleared only by a write that carried it.
       settlePending(localStorage, blob, { token, onFailure: reportDeltaFailure });
     });
   }, [authUser?.id, reportDeltaFailure]);
+  useEffect(() => {
+    if (!authUser?.id) return undefined;
+    const uid = authUser.id;
+    return onSettingsConflict((cUid, reason) => {
+      if (cUid !== uid) return;
+      conflictStreakRef.current += 1;
+      if (conflictStreakRef.current > SYNC_CONFLICT_MAX) {
+        console.error(`[settings] ${conflictStreakRef.current - 1} rebases in a row and the write is still refused (${reason}) — stopping; the banner offers a retry`);
+        setSyncStuck(true);
+        return;
+      }
+      setRehydrateNonce((n) => n + 1);
+    });
+  }, [authUser?.id]);
 
   // ── Hydrate user settings: one-shot localStorage→DB migration bridge, then load
   // the DB blob and selectively reconcile into existing state. Writes (setItem) are
@@ -1869,8 +1897,13 @@ export default function SwingEdge() {
     // `authUser?.id` to null, which the guard swallows ⇒ a reset placed after it would
     // never run on the one transition that matters.
     hydratedRef.current = false;
+    if (!authUser?.id) hydratedUidRef.current = null; // a logout ends the session's «already hydrated»
     if (!isSupabaseConfigured || !supabase || !authUser?.id) return;
     let cancelled = false;
+    // B-435 · CAS (18.10, fix ③) — a re-run for the SAME user is a rebase after a refused write: ⛔ the
+    // migration check again, and ⛔ the B-408 lock (capitalSettled stays as it is — the controls stay live;
+    // an edit made meanwhile lands in the pending/journal and is applied over the new row below).
+    const rebase = hydratedUidRef.current === authUser.id;
 
     // ⚠️ B-406 (05.10) — ⛔ snapshot of the local collections here. One used to be taken
     // BEFORE the awaits below ("had anything local?"), and everything the user did while the
@@ -1882,7 +1915,7 @@ export default function SwingEdge() {
       // B-268: a check we could not complete means the DB is unreachable — ⛔ not
       // "this user has no row". Marking hydration done here is what let the default
       // capital be written back over the real one.
-      const m = await migrateFromLocalStorage(authUser.id); // DB row wins if it already exists
+      const m = rebase ? { migrated: false, reason: "rebase" } : await migrateFromLocalStorage(authUser.id); // DB row wins if it already exists
       if (cancelled) return;
       if (m.reason === "check-failed") {
         console.error("[hydrate] settings check failed — writes stay blocked for this session");
@@ -1890,9 +1923,16 @@ export default function SwingEdge() {
         setHydrationFailed(true);
         return; // ⛔ hydratedRef stays false
       }
-      const { status, settings: loaded, updatedAt } = await loadSettings(authUser.id);
+      const { status, settings: loaded, updatedAt, gone } = await loadSettings(authUser.id);
       if (cancelled) return;
       let s = loaded;
+      // B-435 · CAS (18.10, fix ④) — the row vanished mid-session, or a rebase could not read it: ⛔ a guess,
+      // ⛔ an automatic insert. Writes stay blocked; the banner says so and offers a retry.
+      if (gone || (rebase && status !== "ok")) {
+        console.error(`[hydrate] ${gone ? "the settings row is gone" : "the rebase read failed"} — writes blocked; settings-sync-stuck`);
+        setSyncStuck(true);
+        return; // ⛔ hydratedRef stays false
+      }
       if (status === "failed") {
         console.error("[hydrate] settings read failed — writes stay blocked for this session");
         // B-365 — the mirror `loadFailed` hands back is FOR DISPLAY. If it carries
@@ -1916,11 +1956,16 @@ export default function SwingEdge() {
       //   apply    ⇒ it never arrived: the pending wins over the row (and the persist effect sends it).
       //   conflict ⇒ another device wrote meanwhile: the row wins, the rejected values are offered back.
       // "empty": no row ⇒ the mirror already carries the edits, and the first write settles them.
+      let pendingVerdict = "none";
       if (status === "ok") {
-        const verdict = decidePending(readPending(localStorage, { onFailure: reportDeltaFailure }), loaded, updatedAt);
+        const pendingNow = readPending(localStorage, { onFailure: reportDeltaFailure });
+        // B-435 · CAS: the blob this session saw at the pending's base ⇒ a per-field (3-way) decision.
+        const verdict = decidePending(pendingNow, loaded, updatedAt, { baseSettings: confirmedAt(authUser.id, pendingNow?.base) });
+        pendingVerdict = verdict.action;
         if (verdict.action === "landed") clearPending(localStorage, { onFailure: reportDeltaFailure });
         else if (verdict.action === "apply") s = { ...loaded, ...verdict.apply };
         else if (verdict.action === "conflict") {
+          if (verdict.apply) s = { ...loaded, ...verdict.apply };
           setSettingsConflict({ rejected: verdict.rejected, row: Object.fromEntries(Object.keys(verdict.rejected).map((k) => [k, loaded[k]])) });
         }
       }
@@ -1983,6 +2028,13 @@ export default function SwingEdge() {
           const stored = persistPlaybookSafely(() => localStorage, merged.playbook);
           if (stored.status !== "ok") reportDeltaFailure("local", stored.error);
         }
+        // B-435 · CAS — nothing of this device's changes is missing from the row it just read ⇒ that read IS the
+        // confirmation (Niv 16.10's rule for a proven-identical skip): the journal ops it holds settle now. Without
+        // it a rebase whose result equals the row changes no state ⇒ no write ⇒ the ops would stay forever.
+        const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+        if (pendingVerdict !== "apply" && pendingVerdict !== "conflict" && Object.keys(merged).every((c) => same(merged[c], loaded[c]))) {
+          confirmSynced(authUser.id, loaded, updatedAt);
+        }
       }
       if (s.tourDone === true) {
         try { localStorage.setItem("swingEdgeTourDone", "1"); } catch {}
@@ -2008,6 +2060,7 @@ export default function SwingEdge() {
       }
 
       hydratedRef.current = true;
+      hydratedUidRef.current = authUser.id;
       setHydrationDone(true);
     };
 
@@ -2018,7 +2071,7 @@ export default function SwingEdge() {
     // `test:hydration`'s tail meta-gate anchors on it (B-272).
     hydrate();
     return () => { cancelled = true; };
-  }, [authUser?.id]);
+  }, [authUser?.id, rehydrateNonce]);
 
   // ── Persist user settings → DB (M2b). Watches the settings state and pushes via
   // saveSettings (own merge + 1000ms debounce). Gated on hydratedRef so the initial
@@ -4343,6 +4396,18 @@ export default function SwingEdge() {
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <button onClick={applyMyEdit} className="px-3 py-1.5 rounded-lg border border-amber-400/50 bg-amber-500/20 text-xs font-bold">{t.settingsConflictApply}</button>
             <button onClick={keepAccountValue} className="px-3 py-1.5 rounded-lg border border-white/20 text-xs">{t.settingsConflictDismiss}</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── B-435 · CAS — the settings could not be saved: 3 rebases in a row were refused, or the row is gone ──
+          Non-blocking (role=status), 5 languages (t.*), a retry that re-reads and rebases. ⛔ An endless loop. */}
+      {syncStuck && (
+        <div role="status" aria-live="polite" data-testid="settings-sync-stuck" className="mx-4 mt-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm" style={{ color: "#fcd34d" }}>
+          <p className="font-semibold">⚠️ {t.settingsSyncStuckTitle}</p>
+          <p className="mt-1">{t.settingsSyncStuckBody}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <button onClick={retrySync} className="px-3 py-1.5 rounded-lg border border-amber-400/50 bg-amber-500/20 text-xs font-bold">{t.settingsSyncStuckRetry}</button>
           </div>
         </div>
       )}
