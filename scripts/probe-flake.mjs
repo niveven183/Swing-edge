@@ -122,7 +122,7 @@ if (flag("plan")) {
   const shards = Number(process.env.IN_SHARDS || "3");
   if (!(repeatIn >= 1) || !(shards >= 1)) die("--plan: repeat and shards must be ≥ 1");
   for (const m of modes) if (!["isolated", "insitu"].includes(m)) die(`--plan: unknown mode "${m}"`);
-  for (const t of trees) if (!["HEAD", "BEFORE-408", "PRE-B432"].includes(t)) die(`--plan: unknown tree "${t}"`); // PRE-B432: main before local-first (B-435's question is about it)
+  for (const t of trees) if (!["HEAD", "BEFORE-408", "PRE-B432", "MUT-NO-CAS"].includes(t)) die(`--plan: unknown tree "${t}"`); // PRE-B432: main before local-first (B-435's question is about it)
   for (const x of scenesIn) if (!["H1", "H2", "H4", "C4", "Q1", "Q2", "Q3", "Q4"].includes(x)) die(`--plan: unknown scene "${x}"`);
   const insituKey = (t, x) => (t === "BEFORE-408" && x === "C4" ? "B408-C4" : "FULL");
   const cells = [];
@@ -179,7 +179,10 @@ const TREES = { ...ARMS, "SELF-C4-RED": [[APP, SELF_C4, () => "setCapitalInput(\
   "PRE-B432": [APP, SETTINGS].map((f) => { const old = showAt(f, PRE_B432_REF); return [f, WHOLE_FILE, () => old]; }),
   // Mutant (i): the capital edit is ⛔ recorded in its handler — only the persist effect remembers it, and an unload
   // at δ≈0 comes first ⇒ D4/D5 at δ=0 MUST lose the edit, or the scene is blind to where the pending is written.
-  "MUT-PENDING-EFFECT": [[APP, "                        recordScalar(\"capital\", val); // B-432 · B-435 — on disk before anything can unload\n", () => ""]] };
+  "MUT-PENDING-EFFECT": [[APP, "                        recordScalar(\"capital\", val); // B-432 · B-435 — on disk before anything can unload\n", () => ""]],
+  // B-435 · CAS (17.10) mutant (vii) at the eye: the write WITHOUT its condition ⇒ Q3/Q4 must lose setups again.
+  "MUT-NO-CAS": [[SETTINGS, '.eq("user_id", userId).eq("updated_at", base).select("updated_at")', () => '.eq("user_id", userId).select("updated_at")'],
+    [SETTINGS, "&updated_at=eq.${encodeURIComponent(base)}", () => ""]] };
 
 // Walk a Playwright JSON report ⇒ one record per (test entry × result).
 function results(jsonPath) {
