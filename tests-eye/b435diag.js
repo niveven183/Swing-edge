@@ -72,7 +72,20 @@ export async function attachB435Diag(page, { label, project, prefix, dir, snapsh
   page.on("response", async (r) => {
     if (!isSettings(r.url())) return;
     const m = r.request().method();
-    if (m !== "GET") { net.push(`${m} ${tokenOf(r.request().postData())} → ${r.status()}`); return; }
+    if (m !== "GET") {
+      // B-435 · CAS (17.10): a conditional PATCH answers 200 BOTH when it applied and when its condition failed — the
+      // body tells them apart (`[{updated_at}]` vs `[]`), and the URL carries the condition (the base it was built on).
+      const cond = new URL(r.url()).searchParams.get("updated_at");
+      let verdict = "";
+      if (m === "PATCH") {
+        try {
+          const rows = await r.json();
+          verdict = Array.isArray(rows) ? (rows.length ? ` applied tok=${rows[0]?.updated_at ?? "no-token"}` : " CONFLICT(0 rows)") : " body-not-an-array";
+        } catch (e) { verdict = ` body-unavailable(${redact(e?.message).split("\n")[0].slice(0, 60)})`; }
+      }
+      net.push(`${m}${cond ? ` if=${cond.replace(/^eq\./, "")}` : ""} ${tokenOf(r.request().postData())} → ${r.status()}${verdict}`);
+      return;
+    }
     let tok;
     try {
       const body = await r.json();

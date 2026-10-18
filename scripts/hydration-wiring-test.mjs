@@ -110,6 +110,9 @@ const A_TOUR    = "const completeTour = useCallback((done) => {";
 // ה-initializer העצל עצמו, ושל המטפל שלחיצה עליו דורסת את ההון.
 const A_INIT    = "const [showOnboarding, setShowOnboarding] = useState(() => {";
 const A_ONBDONE = "const handleOnboardingComplete = (profile) => {";
+// R1 · R4 (B-435 · CAS, 17.10) — the conflict subscriber (a refused write ⇒ a rebase, a ceiling of 3) and the retry.
+const A_CONFLICT = "return onSettingsConflict((cUid, reason) => {";
+const A_RETRY    = "const retrySync = useCallback(() => {";
 
 // שער-מטא 1 — כל עוגן חייב להופיע בדיוק פעם אחת
 const counts = {
@@ -120,6 +123,8 @@ const counts = {
   tour:    countOccurrences(src, A_TOUR),
   init:    countOccurrences(src, A_INIT),
   onbdone: countOccurrences(src, A_ONBDONE),
+  conflict: countOccurrences(src, A_CONFLICT),
+  retry:   countOccurrences(src, A_RETRY),
 };
 for (const [k, v] of Object.entries(counts)) {
   if (v !== 1) {
@@ -154,6 +159,8 @@ const tourSrc    = sliceCallback(A_TOUR, "const completeTour = useCallback(");
 // ה-initializer העצל של showOnboarding — `() => { … }` בלבד, ⛔ קריאת useState.
 const initSrc    = sliceCallback(A_INIT, "const [showOnboarding, setShowOnboarding] = useState(");
 const onbDoneSrc = sliceCallback(A_ONBDONE, "const handleOnboardingComplete = ");
+const conflictSrc = enclosingEffect(A_CONFLICT);
+const retrySrc   = sliceCallback(A_RETRY, "const retrySync = useCallback(");
 
 // שער-מטא 3 — הזנב המחולץ חייב להיות מה שאנחנו חושבים שהוא
 const tailOk = /setHydrationDone\(true\);\s*\}$/.test(hydrateSrc);
@@ -165,6 +172,8 @@ const dismissTailOk = dismissSrc.includes("welcomeSeen: true");
 const tourTailOk = tourSrc.includes("tourDone: true");
 const initTailOk = initSrc.includes("swingEdgeOnboarding") && /^\(\)\s*=>\s*\{/.test(initSrc);
 const onbDoneTailOk = onbDoneSrc.includes("trackOnboardingCompleted()");
+const conflictTailOk = conflictSrc.includes("setRehydrateNonce") && conflictSrc.includes("SYNC_CONFLICT_MAX");
+const retryTailOk = retrySrc.includes("conflictStreakRef.current = 0") && retrySrc.includes("setRehydrateNonce");
 
 console.log(`extract hydrate : ${hydrateSrc.split("\n").length} lines ${tailOk ? "✓" : "✗"}`);
 console.log(`extract persist : ${persistSrc.split("\n").length} lines ${persistTailOk ? "✓" : "✗"}`);
@@ -229,8 +238,8 @@ const tick = () => new Promise((res) => setTimeout(res, 0));
  *  עצמו השתנה** (הישן החזיר את אובייקט ההגדרות עצמו), ⛔ לא כי אותה קלט מייצר
  *  התנהגות שונה. הן ראיה **חלשה יותר** מ-A1-A6/A10-A14, וזה נאמר כאן ⛔ ולא
  *  בסגירה. */
-function loadResult(status, mirror, updatedAt = null) {
-  return { status, settings: mirror, updatedAt };
+function loadResult(status, mirror, updatedAt = null, gone = false) {
+  return { status, settings: mirror, updatedAt, ...(gone ? { gone: true } : {}) };
 }
 
 const MIRROR_OK = { capital: 49000, riskPct: 2, lang: "he", accountCurrency: "USD", welcomeSeen: true };
@@ -240,9 +249,11 @@ const ONB_PROFILE = { defaults: { capital: 1000, riskPct: 1, capitalCurrency: "U
 
 function runHydrate({ loadStatus, mirror = MIRROR_OK, migrateReason = null, cancelled = false, storage = {}, uid = "u-probe",
                      showOnboarding = null, dbCapitalRef = { current: false }, updatedAt = null,
-                     had = { watchlist: false, alerts: false, playbook: false }, deltaFailures = [] }) {
-  const calls = { load: 0, hydrationFailed: [], hydrationDone: 0, capital: [], lang: [], clobber: [], errors: [], onboarding: [], profile: [],
-                  watchlist: [], alerts: [], playbook: [], conflict: [], riskPct: [] };
+                     had = { watchlist: false, alerts: false, playbook: false }, deltaFailures = [],
+                     rebase = false, confirmedAt = () => null, loadImpl = null, gone = false }) {
+  const calls = { load: 0, migrate: 0, hydrationFailed: [], hydrationDone: 0, hydrationDoneArgs: [], capital: [], lang: [], clobber: [], errors: [], onboarding: [], profile: [],
+                  watchlist: [], alerts: [], playbook: [], conflict: [], riskPct: [], stuck: [], confirm: [] };
+  const hydratedUidRef = { current: rebase ? uid : null };
   const hydratedRef = { current: false };
   const welcomeSeenRef = { current: false };
   const localStorage = makeLocalStorage(storage);
@@ -263,14 +274,16 @@ function runHydrate({ loadStatus, mirror = MIRROR_OK, migrateReason = null, canc
     "hydrateCollections", "DEFAULT_WATCHLIST", "reportDeltaFailure", "persistPlaybookSafely", "readOps",
     // B-432 · B-435 (16.10) — the pending decision at load. Injected in both trees (the old body ⛔ reads them).
     "readPending", "decidePending", "clearPending", "setSettingsConflict",
+    // B-435 · CAS (17.10) — the rebase. Injected in both trees (the old body ⛔ reads them).
+    "rebase", "setSyncStuck", "confirmedAt", "confirmSynced", "hydratedUidRef",
   ];
   const values = [
     cancelled,
-    async () => (migrateReason ? { migrated: false, reason: migrateReason } : { migrated: false }),
+    async () => { calls.migrate++; return migrateReason ? { migrated: false, reason: migrateReason } : { migrated: false }; },
     { id: uid },
     { error: (...a) => calls.errors.push(a.map(String).join(" ")), warn() {}, log() {} },
     (v) => calls.hydrationFailed.push(v),
-    async () => { calls.load++; return loadResult(loadStatus, mirror, updatedAt); },
+    async () => { calls.load++; return loadImpl ? loadImpl(localStorage) : loadResult(loadStatus, mirror, updatedAt, gone); },
     (v) => calls.capital.push(v),
     localStorage, CURRENCY_SYMBOL,
     // setAccountCurrency · setCapitalCurrency · setRiskPct · setShowOnboarding · setUserProfile
@@ -283,11 +296,12 @@ function runHydrate({ loadStatus, mirror = MIRROR_OK, migrateReason = null, canc
     welcomeSeenRef, DEFAULT_CAPITAL,
     (v) => calls.clobber.push(v),
     hydratedRef,
-    () => { calls.hydrationDone++; },
+    (v) => { calls.hydrationDone++; calls.hydrationDoneArgs.push(v); },
     showOnboarding, dbCapitalRef,
     Delta ? Delta.hydrateCollections : undefined, DEFAULT_WATCHLIST_PROBE, (reason) => deltaFailures.push(reason), persistPlaybookSafely, Delta ? Delta.readOps : undefined,
     Pending ? Pending.readPending : undefined, Pending ? Pending.decidePending : undefined, Pending ? Pending.clearPending : undefined,
     (v) => calls.conflict.push(v),
+    rebase, (v) => calls.stuck.push(v), confirmedAt, (...a) => calls.confirm.push(a), hydratedUidRef,
   ];
 
   const fn = new Function(...names, "return (" + hydrateSrc + ")")(...values);
@@ -326,6 +340,7 @@ function runHydrateEffect({ authUser, hydratedRef, storage = {}, mirror = MIRROR
     "hydrateCollections", "DEFAULT_WATCHLIST", "reportDeltaFailure", "persistPlaybookSafely", "readOps",
     // B-432 · B-435 (16.10) — the pending decision at load. Injected in both trees (the old body ⛔ reads them).
     "readPending", "decidePending", "clearPending", "setSettingsConflict",
+    "hydratedUidRef", "setSyncStuck", "confirmedAt", "confirmSynced",
   ];
   const values = [
     true, {}, authUser, store,
@@ -340,6 +355,7 @@ function runHydrateEffect({ authUser, hydratedRef, storage = {}, mirror = MIRROR
     Delta ? Delta.hydrateCollections : undefined, DEFAULT_WATCHLIST_PROBE, () => {}, persistPlaybookSafely, Delta ? Delta.readOps : undefined,
     Pending ? Pending.readPending : undefined, Pending ? Pending.decidePending : undefined, Pending ? Pending.clearPending : undefined,
     () => {},
+    { current: null }, () => {}, () => null, () => {},
   ];
   const cleanup = new Function(...names, "return (" + hydrateEffectSrc + ")")(...values)();
   return { cleanup, calls, store };
@@ -474,6 +490,61 @@ const main = async () => {
       storage: { swingEdgeSettingsPending: JSON.stringify({ v: 1, base: T0, inflight: [T5, "2026-10-16T08:00:06.000Z"], values: { capital: 12345, riskPct: 3 } }) } });
     await ab.promise;
     ok("P6", "row token = OUR earlier write, a newer edit was cancelled ⇒ ⛔ a conflict · the newer riskPct (3) applies", ab.calls.conflict.length === 0 && ab.calls.capital.at(-1) === 12345 && ab.calls.riskPct.at(-1) === 3, `conflicts ${ab.calls.conflict.length} · capital ${JSON.stringify(ab.calls.capital)} · riskPct ${JSON.stringify(ab.calls.riskPct)}`);
+  }
+
+  // R1–R7 — B-435 · CAS (17.10, plan PLAN-2026-10-17-b435-cas, fixes ①–④ 18.10): a refused write ⇒ the
+  // hydration runs again as a REBASE over the new row — bounded, in the background, nothing lost.
+  {
+    const listeners = [];
+    const C = { nonce: 0, stuck: [], errors: [] };
+    const streak = { current: 0 };
+    new Function("authUser", "onSettingsConflict", "conflictStreakRef", "SYNC_CONFLICT_MAX", "setSyncStuck", "setRehydrateNonce", "console",
+      "return (" + conflictSrc + ")")({ id: "u-r" }, (cb) => { listeners.push(cb); return () => {}; }, streak, 3,
+      (v) => C.stuck.push(v), (f) => { C.nonce = typeof f === "function" ? f(C.nonce) : f; }, { error: (...a) => C.errors.push(a.join(" ")), warn() {}, log() {} })();
+    const fire = () => listeners.forEach((cb) => cb("u-r", "0-rows"));
+    fire();
+    ok("R1", "a refused write (onSettingsConflict) ⇒ the hydration is re-run (rehydrateNonce +1)", C.nonce === 1 && C.stuck.length === 0, `nonce ${C.nonce} · stuck ${JSON.stringify(C.stuck)}`);
+    fire(); fire(); fire();
+    ok("R4", "a 4th refusal in a row (ceiling 3) ⇒ ⛔ another rebase · the banner (setSyncStuck(true)) · said", C.nonce === 3 && C.stuck.at(-1) === true && C.errors.length === 1, `nonce ${C.nonce} · stuck ${JSON.stringify(C.stuck)} · errors ${C.errors.length}`);
+    const RS = { nonce: 0, stuck: [] };
+    new Function("conflictStreakRef", "setSyncStuck", "setRehydrateNonce", "return (" + retrySrc + ")")(streak,
+      (v) => RS.stuck.push(v), (f) => { RS.nonce = typeof f === "function" ? f(RS.nonce) : f; })();
+    ok("R4b", "«try again» ⇒ the streak resets · the banner closes · one rebase", streak.current === 0 && RS.stuck.at(-1) === false && RS.nonce === 1, `streak ${streak.current} · stuck ${JSON.stringify(RS.stuck)} · nonce ${RS.nonce}`);
+  }
+  {
+    const T_OLD = "2026-10-17T07:00:00.123456+00:00", T_NEW = "2026-10-17T07:05:00+00:00";
+    // R2 — the journal is applied over the NEW row (another device added a setup; this one added its own).
+    const row = { ...MIRROR_OK, playbook: [{ id: 1, name: "theirs" }, { id: 3, name: "elsewhere" }] };
+    const r2 = runHydrate({ loadStatus: "ok", mirror: row, updatedAt: T_NEW, rebase: true,
+      storage: { swingEdgeSettingsDeltaV1: "1", swingEdgePlaybook: JSON.stringify([{ id: 1, name: "theirs" }, { id: 2, name: "mine" }]),
+        swingEdgeSettingsDelta: JSON.stringify([{ coll: "playbook", key: "2", op: "put", seq: 1 }]) } });
+    await r2.promise;
+    const names2 = (r2.calls.playbook.at(-1) || []).map((x) => x.name).sort();
+    ok("R2", "rebase: the journal's op applied over the NEW row ⇒ theirs + elsewhere + mine · ⛔ the migration check again", JSON.stringify(names2) === JSON.stringify(["elsewhere", "mine", "theirs"]) && r2.calls.migrate === 0, `playbook ${JSON.stringify(names2)} · migrate ${r2.calls.migrate}`);
+    // R5 — fix ③: in the background — ⛔ a B-408 lock, and an edit made WHILE the rebase reads survives (3-way).
+    const r5 = runHydrate({ loadStatus: "ok", rebase: true, confirmedAt: (uid, t) => (t === T_OLD ? { ...MIRROR_OK, capital: 1000 } : null),
+      loadImpl: async (ls) => {
+        // the user edits the capital while the rebase's read is in flight: base = the token the device holds (T_OLD)
+        ls.setItem("swingEdgeSettingsPending", JSON.stringify({ v: 1, base: T_OLD, inflight: [], values: { capital: 777 } }));
+        return loadResult("ok", { ...MIRROR_OK, capital: 1000, riskPct: 4 }, T_NEW); // another writer changed riskPct, ⛔ capital
+      } });
+    await r5.promise;
+    ok("R5", "rebase in the background: ⛔ hydrationDone(false)/hydrationFailed (0 controls disabled) · the mid-rebase edit (777) survives · ⛔ a banner", r5.calls.hydrationFailed.length === 0 && !r5.calls.hydrationDoneArgs.includes(false) && r5.calls.capital.at(-1) === 777 && r5.calls.conflict.length === 0 && r5.calls.riskPct.at(-1) === 4,
+      `failed ${JSON.stringify(r5.calls.hydrationFailed)} · done ${JSON.stringify(r5.calls.hydrationDoneArgs)} · capital ${JSON.stringify(r5.calls.capital)} · conflicts ${r5.calls.conflict.length} · riskPct ${JSON.stringify(r5.calls.riskPct)}`);
+    // R6 — fix ④ / a rebase that cannot read: ⛔ a guess, ⛔ writes; the banner.
+    const r6a = runHydrate({ loadStatus: "failed", rebase: true });
+    await r6a.promise;
+    const r6b = runHydrate({ loadStatus: "failed", gone: true });
+    await r6b.promise;
+    ok("R6", "rebase read failed · OR the row is gone ⇒ setSyncStuck(true) · hydratedRef stays false (⛔ writes)", r6a.calls.stuck.at(-1) === true && r6a.hydratedRef.current === false && r6b.calls.stuck.at(-1) === true && r6b.hydratedRef.current === false,
+      `rebase-failed stuck ${JSON.stringify(r6a.calls.stuck)} ref ${r6a.hydratedRef.current} · gone stuck ${JSON.stringify(r6b.calls.stuck)} ref ${r6b.hydratedRef.current}`);
+    // R7 — nothing of this device's is missing from the row it read ⇒ that read is the confirmation (journal settles).
+    const inRow = { ...MIRROR_OK, playbook: [{ id: 2, name: "mine" }] };
+    const r7 = runHydrate({ loadStatus: "ok", mirror: inRow, updatedAt: T_NEW, rebase: true,
+      storage: { swingEdgeSettingsDeltaV1: "1", swingEdgePlaybook: JSON.stringify([{ id: 2, name: "mine" }]),
+        swingEdgeSettingsDelta: JSON.stringify([{ coll: "playbook", key: "2", op: "put", seq: 1 }]) } });
+    await r7.promise;
+    ok("R7", "the row already holds every journal op ⇒ confirmSynced(uid, row, its token) — ⛔ ops left forever", r7.calls.confirm.length === 1 && r7.calls.confirm[0]?.[2] === T_NEW, `confirm ${JSON.stringify(r7.calls.confirm.map((c) => c[2]))}`);
   }
 
   /* A15 · A16 · A17 — החלפת משתמש באותו טאב (B-361 · D-lite, 22.09)
@@ -808,13 +879,22 @@ const main = async () => {
     const ROW = { capital: 49000, playbook: [S1] };
     const store = makeLocalStorage();
     const prevLS = globalThis.localStorage; globalThis.localStorage = store;
-    const rows = new Map([["u-sync", { user_id: "u-sync", settings: structuredClone(ROW) }]]);
+    // B-435 · CAS (17.10): a real row carries updated_at, and a write is a conditional update (⛔ an upsert).
+    const rows = new Map([["u-sync", { user_id: "u-sync", settings: structuredClone(ROW), updated_at: "2026-10-17T07:00:00+00:00" }]]);
     let upserts = 0;
-    const client = { from() { let id = null; const b = {
-      select() { return b; }, eq(_c, v) { id = v; return b; },
+    const client = { from() { const f = {}; let op = null, payload = null; const b = {
+      select() { return b; }, eq(c, v) { f[c] = v; return b; },
       abortSignal() { return b; }, // B-408: postgrest-js has it; the read deadline chains it
-      async maybeSingle() { const r = rows.get(id); return { data: r ? { settings: r.settings, user_id: r.user_id } : null, error: null }; },
-      async upsert(row) { upserts++; rows.set(row.user_id, row); return { data: null, error: null }; },
+      async maybeSingle() { const r = rows.get(f.user_id); return { data: r ? { settings: r.settings, user_id: r.user_id, updated_at: r.updated_at } : null, error: null }; },
+      update(o) { op = "update"; payload = o; return b; },
+      then(res, rej) {
+        if (op !== "update") return Promise.resolve({ data: [], error: null }).then(res, rej);
+        upserts++;
+        const r = rows.get(f.user_id);
+        if (!r || Date.parse(r.updated_at) !== Date.parse(f.updated_at)) return Promise.resolve({ data: [], error: null }).then(res, rej);
+        rows.set(f.user_id, { user_id: f.user_id, settings: payload.settings, updated_at: payload.updated_at });
+        return Promise.resolve({ data: [{ updated_at: payload.updated_at.replace("Z", "+00:00") }], error: null }).then(res, rej);
+      },
     }; return b; } };
     const synced = [];
     const has = Settings && typeof Settings.onSettingsSynced === "function";
@@ -905,8 +985,8 @@ const main = async () => {
   }
 
   // I5 — שערי-מטא
-  const tails = [tailOk, persistTailOk, unloadTailOk, hydrateEffectTailOk, dismissTailOk, tourTailOk, initTailOk, onbDoneTailOk];
-  invariant("I5", "7 עוגנים ייחודיים · סוגריים מאוזנים · 8 זנבות תואמים",
+  const tails = [tailOk, persistTailOk, unloadTailOk, hydrateEffectTailOk, dismissTailOk, tourTailOk, initTailOk, onbDoneTailOk, conflictTailOk, retryTailOk];
+  invariant("I5", `${Object.keys(counts).length} עוגנים ייחודיים · סוגריים מאוזנים · ${tails.length} זנבות תואמים`,
     Object.values(counts).every((v) => v === 1) && tails.every(Boolean),
     `anchors=${Object.values(counts).join("/")} tails=${tails.join("/")}`);
 

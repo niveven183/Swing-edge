@@ -13,6 +13,18 @@
 //   M-iv   settled BEFORE the 2xx (notify on the way out)      ⇒ test:settings 13e ({error} ⇒ pending stays)
 //   M-v    lastSent seeded from the mirror on «no row»          ⇒ test:settings 13i (B-361: a first write is never sent)
 //   M-vi   no inflight check ⇒ OUR landed write reads as foreign ⇒ test:settings 13b «earlier inflight» · test:hydration P6
+//
+// B-435 · CAS (17.10, plan PLAN-2026-10-17-b435-cas, fixes ①–④ 18.10):
+//   M-vii  the write without `.eq("updated_at", base)`            ⇒ test:settings 14a · 14b (+ probe-flake MUT-NO-CAS Q3/Q4)
+//   M-viii keepalive without the `updated_at=eq.` condition        ⇒ test:settings 13f
+//   M-ix   0 rows read as a success (settled)                      ⇒ test:settings 14b
+//   M-x    the rebase ignores the journal                          ⇒ test:hydration R2
+//   M-xi   tokens compared as strings                              ⇒ test:settings 14h
+//   M-xii  the next base = the client's token, ⛔ the DB's          ⇒ test:settings 14e
+//   M-xiii no write deadline                                       ⇒ test:settings 14i
+//   M-xiv  token = now (no max with base + 1ms)                    ⇒ test:settings 14k
+//   M-xv   «no row» after a row ⇒ the old «empty» (an insert)      ⇒ test:settings 14j
+//   M-xvi  the rebase resets the B-408 lock                        ⇒ test:hydration R5
 
 import { readFile, writeFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
@@ -22,34 +34,55 @@ import { fileURLToPath } from "node:url";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PENDING = join(ROOT, "src", "lib", "settingsPending.js");
 const SETTINGS = join(ROOT, "src", "lib", "userSettings.js");
+const APP = join(ROOT, "SwingEdge_App.jsx");
 let failures = 0;
 const ok = (id, cond, label, detail = "") => { console.log(`${cond ? "✅" : "❌"} ${id}  ${label}${!cond && detail ? `\n      ${detail}` : ""}`); if (!cond) failures++; };
 const die = (m) => { console.log(`\n❌ pending-mutants: ${m}`); process.exit(1); };
 const run = (args) => new Promise((done) => execFile("node", args, { cwd: ROOT, maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => done({ status: err ? (err.code ?? 1) : 0, out: `${stdout}\n${stderr}` })));
 const git = (args) => new Promise((done, fail) => execFile("git", args, { cwd: ROOT }, (err, out) => (err ? fail(err) : done(out))));
 
-for (const f of [PENDING, SETTINGS]) {
+for (const f of [PENDING, SETTINGS, APP]) {
   const dirty = await git(["status", "--porcelain", "--", f]).catch((e) => die(`git cannot read the repository (${e.message.split("\n")[0]})`));
   if (dirty.trim()) die(`${f.replace(ROOT + "/", "")} has uncommitted changes — the restore check would be meaningless`);
 }
 
 const MUTANTS = [
-  ["M-ii", PENDING, "  if (pending.base == null || rowToken === pending.base) return { action: \"apply\", apply: { ...pending.values } };",
+  ["M-ii", PENDING, "  if (pending.base == null || sameToken(rowToken, pending.base)) return { action: \"apply\", apply: { ...pending.values } };",
     "  return { action: \"apply\", apply: { ...pending.values } };",
     [["scripts/userSettings-test.mjs", /✗ 13b any other token ⇒ «conflict»/], ["scripts/hydration-wiring-test.mjs", /P4 [^\n]*✗|🔴 אדומות[^\n]*\bP4\b/]]],
   ["M-iii", SETTINGS, "    keepalive: true,", "    keepalive: false,",
-    [["scripts/userSettings-test.mjs", /✗ 13f flushKeepalive: one POST with keepalive:true/]]],
-  ["M-iv", SETTINGS, "  try {\n    const { error } = await client\n      .from(TABLE)\n      .upsert({ user_id: userId, settings: blob, updated_at: token });",
-    "  notifySynced(userId, blob, token);\n  try {\n    const { error } = await client\n      .from(TABLE)\n      .upsert({ user_id: userId, settings: blob, updated_at: token });",
+    [["scripts/userSettings-test.mjs", /✗ 13f flushKeepalive: one PATCH with keepalive:true/]]],
+  ["M-iv", SETTINGS, "  try {\n    const { data, error } = await readWithDeadline((signal) => (base != null",
+    "  notifySynced(userId, blob, token);\n  try {\n    const { data, error } = await readWithDeadline((signal) => (base != null",
     [["scripts/userSettings-test.mjs", /✗ 13e after \{ error \}[^\n]*pending STAYS/]]],
   ["M-v", SETTINGS, "      lastSent.delete(userId);\n      lastToken.delete(userId); // no row",
     "      lastSent.set(userId, stableStringify(mirror));\n      lastToken.delete(userId); // no row",
     [["scripts/userSettings-test.mjs", /✗ 13i no row \+ mirror = the first edit/]]],
-  ["M-vi", PENDING, "  const ours = Array.isArray(pending.inflight) && rowToken != null && pending.inflight.includes(rowToken);",
+  ["M-vi", PENDING, "  const ours = Array.isArray(pending.inflight) && rowToken != null && pending.inflight.some((t) => sameToken(t, rowToken));",
     "  const ours = false;",
     // ⚠️ ⛔ 13h/P5: with every value equal to the row, «no rejected value ⇒ landed» gives the same verdict — the inflight
     // check matters when OUR token is in the row and a newer value is not (measured 16.10: 13h/P5 stayed green).
     [["scripts/userSettings-test.mjs", /✗ 13b row = an EARLIER inflight token/], ["scripts/hydration-wiring-test.mjs", /P6 [^\n]*✗|🔴 אדומות[^\n]*\bP6\b/]]],
+  ["M-vii", SETTINGS, '.eq("user_id", userId).eq("updated_at", base).select("updated_at")', '.eq("user_id", userId).select("updated_at")',
+    [["scripts/userSettings-test.mjs", /✗ 14a [\s\S]*✗ 14b /]]],
+  ["M-viii", SETTINGS, "&updated_at=eq.${encodeURIComponent(base)}", "",
+    [["scripts/userSettings-test.mjs", /✗ 13f flushKeepalive: one PATCH/]]],
+  ["M-ix", SETTINGS, '      notifyConflict(userId, "0-rows");\n      return false;', "      lastToken.set(userId, token); notifySynced(userId, blob, token);\n      return true;",
+    [["scripts/userSettings-test.mjs", /✗ 14b 0 rows/]]],
+  ["M-x", APP, "          ops: readOps(localStorage, { onFailure: reportDeltaFailure }),", "          ops: [],",
+    [["scripts/hydration-wiring-test.mjs", /R2 [^\n]*✗|🔴 אדומות[^\n]*\bR2\b/]]],
+  ["M-xi", PENDING, "  return x != null && y != null && x === y;", "  return String(a) === String(b);",
+    [["scripts/userSettings-test.mjs", /✗ 14h base/]]],
+  ["M-xii", SETTINGS, "    lastToken.set(userId, landed); // what the DB RETURNED", "    lastToken.set(userId, token); // what the DB RETURNED",
+    [["scripts/userSettings-test.mjs", /✗ 14e after a write/]]],
+  ["M-xiii", SETTINGS, '.abortSignal(signal)), timeoutMs, "write");', '.abortSignal(signal)), 1e9, "write");',
+    [["scripts/userSettings-test.mjs", /✗ 14i /]]],
+  ["M-xiv", PENDING, "  return new Date(Math.max(nowMs, floor)).toISOString();", "  return new Date(nowMs).toISOString();",
+    [["scripts/userSettings-test.mjs", /✗ 14k /]]],
+  ["M-xv", SETTINGS, "      if (hadRow.has(userId)) {\n        console.error(\"userSettings: this account's settings row is gone", "      if (false) {\n        console.error(\"userSettings: this account's settings row is gone",
+    [["scripts/userSettings-test.mjs", /✗ 14j /]]],
+  ["M-xvi", APP, '      const m = rebase ? { migrated: false, reason: "rebase" } : await migrateFromLocalStorage(authUser.id);', '      if (rebase) setHydrationDone(false);\n      const m = rebase ? { migrated: false, reason: "rebase" } : await migrateFromLocalStorage(authUser.id);',
+    [["scripts/hydration-wiring-test.mjs", /R5 [^\n]*✗|🔴 אדומות[^\n]*\bR5\b/]]],
 ];
 
 // Controls: both harnesses green on the unmutated tree — or a red below would mean nothing.

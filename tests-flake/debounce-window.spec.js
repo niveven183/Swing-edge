@@ -67,7 +67,9 @@ test.describe("B-425 — the settings debounce window", () => {
       ctx.on("requestfailed", (r) => { if (isSettings(r.url())) cancelled.add(r); });
       await ctx.route(/\/rest\/v1\/user_settings/, async (route) => {
         const req = route.request();
-        if (req.method() !== "POST") return route.fallback();
+        // B-435 · CAS (17.10): settings writes are a conditional PATCH now (POST = the first-row insert) — both are
+        // writes the page can cancel; matching POST alone would leave the drop model silently off (a blind D4).
+        if (req.method() !== "POST" && req.method() !== "PATCH") return route.fallback();
         const bytes = (req.postData() || "").length;
         await new Promise((r) => setTimeout(r, 150 + (bytes / 2e6) * 1000)); // ⚠️ the simulated network (RTT 150ms + 2MB/s)
         if (cancelled.has(req)) { net.push({ t: Date.now() - t0, kind: "dropped", settings: body(req) }); return route.abort().catch(() => {}); }

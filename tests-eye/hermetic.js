@@ -46,7 +46,57 @@ export function newStore() {
   // B-300 — `EYE_CCY=ILS` seeds the population the QA row actually has (a ₪ capital). The
   // default stays USD so every other arm is byte-identical.
   if (process.env.EYE_CCY === "ILS") { settings.capitalCurrency = "ILS"; settings.accountCurrency = "ILS"; }
-  return { settings, trades: process.env.EYE_SEED_HISTORY === "1" ? seedHistory() : [], ocrCalls: 0 };
+  // B-435 · CAS (17.10): a real row ALWAYS carries `updated_at` (NOT NULL, default now()). A seed without one made
+  // every load read «no version» ⇒ every write an INSERT ⇒ 409 ⇒ conflict — a state production cannot reach.
+  return { settings, updatedAt: SEED_TOKEN, trades: process.env.EYE_SEED_HISTORY === "1" ? seedHistory() : [], ocrCalls: 0 };
+}
+export const SEED_TOKEN = "2026-01-01T00:00:00.123456+00:00"; // µs, like a row written by the column default
+
+// ── B-435 · CAS (17.10) — the synthetic server behaves like PostgREST on user_settings ─────────────────────
+// · tokens are compared as INSTANTS and returned in PG's text form (`…+00:00`, trailing zeros trimmed) — an
+//   echo of the client's `…Z` would leave the «.123Z ≠ .123+00:00» class invisible here, exactly as before;
+// · PATCH with `updated_at=eq.X` applies ONLY when the row's instant equals X ⇒ `[{updated_at}]`, else `[]`;
+//   a PATCH WITHOUT that filter applies unconditionally — as PG would (mutant vii must die of the overwrite,
+//   ⛔ of this server refusing it);
+// · POST with `Prefer: resolution=merge-duplicates` (the trees before CAS: PRE-B432 · BEFORE-408) = the old
+//   unconditional apply; a plain POST is an INSERT ⇒ 409 / 23505 when the row exists.
+export function pgMicros(t) {
+  const m = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,6}))?(Z|[+-]\d{2}:?\d{2})$/.exec(String(t ?? ""));
+  if (!m) return null;
+  const sec = Date.parse(`${m[1]}${m[3] === "Z" ? "Z" : m[3].replace(/^([+-]\d{2})(\d{2})$/, "$1:$2")}`);
+  return Number.isNaN(sec) ? null : sec * 1000 + Number((m[2] || "").padEnd(6, "0"));
+}
+export function pgText(t) {
+  const us = pgMicros(t);
+  if (us == null) return t ?? null;
+  const d = new Date(Math.floor(us / 1000));
+  const frac = String(us % 1_000_000).padStart(6, "0").replace(/0+$/, "");
+  return `${d.toISOString().slice(0, 19)}${frac ? `.${frac}` : ""}+00:00`;
+}
+/** Apply one user_settings write to the store with PostgREST semantics. Returns { status, body }. */
+export function applySettingsWrite(store, method, url, headers, postData) {
+  const q = new URL(url).searchParams;
+  const prefer = headers["prefer"] || "";
+  const body = JSON.parse(postData || "{}");
+  const row = Array.isArray(body) ? body[0] : body;
+  const set = (r) => { store.settings = r.settings; if (r.updated_at) store.updatedAt = r.updated_at; store.rowGone = false; };
+  if (method === "POST") {
+    if (/resolution=merge-duplicates/.test(prefer)) { if (row && row.settings) set(row); return { status: 201, body: [] }; }
+    if (!store.rowGone) return { status: 409, body: { code: "23505", message: 'duplicate key value violates unique constraint "user_settings_pkey"' } };
+    set(row);
+    return { status: 201, body: [{ updated_at: pgText(store.updatedAt) }] };
+  }
+  if (method === "PATCH") {
+    if (store.rowGone) return { status: 200, body: [] };
+    const cond = q.get("updated_at");
+    if (cond != null) {
+      const want = pgMicros(cond.replace(/^eq\./, ""));
+      if (want == null || want !== pgMicros(store.updatedAt)) return { status: 200, body: [] };
+    }
+    set({ settings: row.settings ?? store.settings, updated_at: row.updated_at });
+    return { status: 200, body: [{ updated_at: pgText(store.updatedAt) }] };
+  }
+  return null;
 }
 
 // B-045 (13.10) — `EYE_SEED_HISTORY=1` gives the hermetic journal the SHAPE production's QA journal has, which
@@ -100,11 +150,12 @@ export async function installHermetic(ctx, store) {
     if (path.startsWith("/rest/v1/user_settings")) {
       // B-432 · B-435 (16.10): the row carries its VERSION TOKEN (`updated_at`, written by the client) — without
       // it every load reads «no base» and the base/inflight decision is never exercised (a blind arm).
-      if (method === "GET") return json(route, 200, [{ user_id: USER_ID, settings: store.settings, updated_at: store.updatedAt ?? null }], req);
-      const body = JSON.parse(req.postData() || "{}");
-      const row = Array.isArray(body) ? body[0] : body;
-      if (row && row.settings) { store.settings = row.settings; if (row.updated_at) store.updatedAt = row.updated_at; }
-      return json(route, 201, [], req);
+      if (method === "GET") return json(route, 200, store.rowGone ? [] : [{ user_id: USER_ID, settings: store.settings, updated_at: pgText(store.updatedAt) }], req);
+      const r = applySettingsWrite(store, method, url, req.headers(), req.postData());
+      if (r) return json(route, r.status, r.body, req);
+      // ⛔ the silent 204 below for a settings write this server does not model (B-272 for the fake server).
+      console.error(`[hermetic] unmodelled user_settings ${method} ${url}`);
+      return route.fulfill({ status: 500, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ message: `hermetic: unmodelled ${method}` }) });
     }
     if (path.startsWith("/rest/v1/trades")) {
       if (method === "GET") {
