@@ -158,7 +158,14 @@ const specFor = (scene) => (scene === "DEBOUNCE" ? "tests-flake/debounce-window.
 const KEY = (title) => { const m = /^(H\d|C\d|Q\d) /.exec(title); return m ? m[1] : null; };
 // insitu: the set the scene ran in historically (eye-sync-probe ARM_GREP). BEFORE-408/H2 never ran
 // in that arm ⇒ the full spec, declared.
-const insituGrep = (tree, scene) => (tree === "BEFORE-408" && scene === "C4" ? ARM_GREP["BEFORE-408"] : null);
+// B-441 (19.10): every arm with a historical set (ARM_GREP — the scenes probe-sync runs IN THAT ARM) runs that set when
+// insitu, also under its pre-CAS twin (PRECAS-<arm>) — the eye-run reds happened insitu (C4 after the arm's red H6/C3/C5),
+// never isolated (0/240). A scene the arm's set does not contain keeps the old behaviour (the full spec, declared).
+const insituGrep = (tree, scene) => {
+  const arm = tree.replace(/^PRECAS-/, "");
+  const g = ARM_GREP[arm];
+  return g && new RegExp(g).test(`${scene} x`) ? g : null;
+};
 
 // The instrument's own deterministic red for C4 (self-test only): the capital button stops setting
 // the capital, so the edit can never reach the row.
