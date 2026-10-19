@@ -52,7 +52,8 @@ const DELTA_KEY = "swingEdgeSettingsDelta";
 // EYE_FLAKE_DIAG=1: ⛔ an expect, a wait or a timeout changes. Without the flag every scene is
 // byte-for-byte the behaviour it had. Plan: docs/plans/PLAN-2026-10-15-b425-flake-diagnosis.md
 const DIAG = process.env.EYE_FLAKE_DIAG === "1";
-const DIAG_KEYS = ["swingEdgePriceAlerts", "swingEdgeCapital", "swingEdgeRiskPct", DELTA_KEY];
+// B-441 (19.10): + the scalar pending — «a pending that was deleted» is one of the questions a red C4 must answer.
+const DIAG_KEYS = ["swingEdgePriceAlerts", "swingEdgeCapital", "swingEdgeRiskPct", DELTA_KEY, "swingEdgeSettingsPending"];
 
 // B-425 (Niv 15.10, ①) — EVERY gate that holds a request is subject to the product's deadline.
 // The app races the settings read against SETTINGS_READ_TIMEOUT_MS (B-408); a window held past it
@@ -97,7 +98,15 @@ async function makeDiag(ctx) {
     if (isSettings(r.url())) ev("req", { method: r.method(), body: r.method() === "GET" ? undefined : pick(r) });
     if (isGA(r.url())) ev("ga", { phase: "req", host: new URL(r.url()).host });
   });
-  ctx.on("response", (r) => {
+  ctx.on("response", async (r) => {
+    // B-441 (19.10) — a conditional PATCH answers 200 BOTH when it applied and when its condition failed (B-435 CAS):
+    // only the body tells them apart, and the URL carries the base it was built on. ⛔ read ⇒ said, ⛔ swallowed.
+    if (isSettings(r.url()) && r.request().method() === "PATCH") {
+      let verdict;
+      try { const b = await r.json(); verdict = Array.isArray(b) ? (b.length ? "applied" : "REFUSED-0-rows") : "not-an-array"; } catch (e) { verdict = `body-unavailable: ${String(e.message || e).split("\n")[0].slice(0, 80)}`; }
+      ev("res", { method: "PATCH", status: r.status(), verdict, base: new URL(r.url()).searchParams.get("updated_at") });
+      return;
+    }
     if (isSettings(r.url())) ev("res", { method: r.request().method(), status: r.status() });
     if (isGA(r.url())) ev("ga", { phase: "res", host: new URL(r.url()).host, status: r.status() });
   });
