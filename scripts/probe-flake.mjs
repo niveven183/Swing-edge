@@ -122,7 +122,7 @@ if (flag("plan")) {
   const shards = Number(process.env.IN_SHARDS || "3");
   if (!(repeatIn >= 1) || !(shards >= 1)) die("--plan: repeat and shards must be ≥ 1");
   for (const m of modes) if (!["isolated", "insitu"].includes(m)) die(`--plan: unknown mode "${m}"`);
-  for (const t of trees) if (!["HEAD", "BEFORE-408", "PRE-B432", "MUT-NO-CAS"].includes(t)) die(`--plan: unknown tree "${t}"`); // PRE-B432: main before local-first (B-435's question is about it)
+  for (const t of trees) if (!["HEAD", "BEFORE-408", "PRE-B432", "MUT-NO-CAS", "M3-CAPCCY", "M3-FAILLOCK", "PRECAS-M3-CAPCCY", "PRECAS-M3-FAILLOCK"].includes(t)) die(`--plan: unknown tree "${t}"`); // PRE-B432: main before local-first (B-435's question is about it)
   for (const x of scenesIn) if (!["H1", "H2", "H4", "C4", "Q1", "Q2", "Q3", "Q4"].includes(x)) die(`--plan: unknown scene "${x}"`);
   const insituKey = (t, x) => (t === "BEFORE-408" && x === "C4" ? "B408-C4" : "FULL");
   const cells = [];
@@ -158,7 +158,14 @@ const specFor = (scene) => (scene === "DEBOUNCE" ? "tests-flake/debounce-window.
 const KEY = (title) => { const m = /^(H\d|C\d|Q\d) /.exec(title); return m ? m[1] : null; };
 // insitu: the set the scene ran in historically (eye-sync-probe ARM_GREP). BEFORE-408/H2 never ran
 // in that arm ⇒ the full spec, declared.
-const insituGrep = (tree, scene) => (tree === "BEFORE-408" && scene === "C4" ? ARM_GREP["BEFORE-408"] : null);
+// B-441 (19.10): every arm with a historical set (ARM_GREP — the scenes probe-sync runs IN THAT ARM) runs that set when
+// insitu, also under its pre-CAS twin (PRECAS-<arm>) — the eye-run reds happened insitu (C4 after the arm's red H6/C3/C5),
+// never isolated (0/240). A scene the arm's set does not contain keeps the old behaviour (the full spec, declared).
+const insituGrep = (tree, scene) => {
+  const arm = tree.replace(/^PRECAS-/, "");
+  const g = ARM_GREP[arm];
+  return g && new RegExp(g).test(`${scene} x`) ? g : null;
+};
 
 // The instrument's own deterministic red for C4 (self-test only): the capital button stops setting
 // the capital, so the edit can never reach the row.
@@ -183,6 +190,14 @@ const TREES = { ...ARMS, "SELF-C4-RED": [[APP, SELF_C4, () => "setCapitalInput(\
   // B-435 · CAS (17.10) mutant (vii) at the eye: the write WITHOUT its condition ⇒ Q3/Q4 must lose setups again.
   "MUT-NO-CAS": [[SETTINGS, '.eq("user_id", userId).eq("updated_at", base).select("updated_at")', () => '.eq("user_id", userId).select("updated_at")'],
     [SETTINGS, "&updated_at=eq.${encodeURIComponent(base)}", () => ""]] };
+// B-441 (Niv 19.10): the B-408 mutant arms on the tree BEFORE CAS (fac3146 = main after the harness, before PR #82) —
+// App + userSettings + settingsPending as they were there, the arm's mutation on top. With «M3-* on HEAD» this asks
+// whether CAS raised the C4 rate in those arms. (settingsDelta.js · hermetic.js are shared — the old trees' POST upsert
+// is still modelled by hermetic's merge-duplicates branch.)
+const PRECAS_REF = "fac3146";
+const PENDING_LIB = join(ROOT, "src", "lib", "settingsPending.js");
+const precas = () => [APP, SETTINGS, PENDING_LIB].map((f) => { const old = showAt(f, PRECAS_REF); return [f, WHOLE_FILE, () => old]; });
+for (const arm of ["M3-CAPCCY", "M3-FAILLOCK"]) TREES[`PRECAS-${arm}`] = [...precas(), ...ARMS[arm]];
 
 // Walk a Playwright JSON report ⇒ one record per (test entry × result).
 function results(jsonPath) {
