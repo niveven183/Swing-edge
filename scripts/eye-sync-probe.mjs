@@ -34,6 +34,14 @@
 //   in M3-FAILLOCK where it is the expected red. Each B-408 arm runs only its scenes (--grep):
 //   a full spec per arm outgrew the job's ceiling. EYE_ARMS=a,b runs a subset (local).
 //
+// B-442 (Niv 19.10) — EYE_SYNC_SCOPE splits the probe into two CI jobs:
+//   head     the HEAD arm only (⛔ node mutants) — the job `prod` waits on (`probe-sync-head`)
+//   mutants  phases 1–2 + every other arm — its own job (`probe-sync-mutants`), still a failing check on the PR,
+//            but ⛔ a gate for production verification. Each failure is CLASSIFIED in the step summary:
+//            mutant-survived (an expected red came out green — the spec is blind) · control-red (a control went red
+//            in a mutant arm — reported with the arm and the signature) · instrument. Every class exits 1.
+//   (unset)  everything, as before (local).
+//
 // ⛔ A mutant that survives, a BEFORE that goes green, or a control that goes red ⇒ exit 1.
 // Mutations are applied in place, matched EXACTLY ONCE (B-272), restored, and the restore is
 // proven with git (scripts/lib/eyeBuild.mjs).
@@ -52,9 +60,10 @@ const PROJECTS = (process.env.EYE_PROJECTS || "pixel7").split(",").map((s) => s.
 const OUT = join(ROOT, "eye-evidence", "probe-sync");
 
 let failures = 0;
-const ok = (id, cond, label, detail = "") => {
+const failed = []; // B-442: { id, cls, label, detail } — classified for the step summary
+const ok = (id, cond, label, detail = "", cls = "check") => {
   console.log(`${cond ? "✅" : "❌"} ${id}  ${label}${!cond && detail ? `\n      ${detail}` : ""}`);
-  if (!cond) failures++;
+  if (!cond) { failures++; failed.push({ id, cls, label, detail }); }
 };
 const die = (msg) => { console.log(`\n❌ eye-sync-probe: ${msg}`); process.exit(1); };
 const once = makeOnce(die);
@@ -62,7 +71,10 @@ const once = makeOnce(die);
 const { BEFORE_REF, BEFORE_408_REF, APP, SETTINGS, I18N, DELTA, NODE_MUTANTS, SETTINGS_MUTANTS, VALUE_MUTANT, ARMS, ARM_GREP } = makeArms({ root: ROOT, die });
 assertCleanTargets(ROOT, [APP, SETTINGS, I18N, DELTA], die);
 
-const SELECTED_ARMS = process.env.EYE_ARMS ? process.env.EYE_ARMS.split(",").map((a) => a.trim()) : Object.keys(ARMS);
+const SCOPE = process.env.EYE_SYNC_SCOPE || "all";
+if (!["all", "head", "mutants"].includes(SCOPE)) die(`EYE_SYNC_SCOPE must be head · mutants · (unset) — got "${SCOPE}"`);
+const SELECTED_ARMS = process.env.EYE_ARMS ? process.env.EYE_ARMS.split(",").map((a) => a.trim())
+  : SCOPE === "head" ? ["HEAD"] : SCOPE === "mutants" ? Object.keys(ARMS).filter((a) => a !== "HEAD") : Object.keys(ARMS);
 for (const a of SELECTED_ARMS) if (!ARMS[a]) die(`EYE_ARMS: unknown arm "${a}"`);
 
 const src = (f) => readFileSync(f, "utf8");
@@ -91,6 +103,8 @@ async function withMutations(id, muts, fn) {
   }
 }
 
+// B-442: the HEAD job runs no mutant at all — phases 1–2 are mutation checks and live in probe-sync-mutants.
+if (SCOPE !== "head") {
 // ═══ PHASE 1 — node mutants ═══════════════════════════════════════════════════
 console.log("\n── phase 1 · node mutants (test:hydration) ──");
 const hydration = () => spawnSync("node", ["scripts/hydration-wiring-test.mjs"], { cwd: ROOT, encoding: "utf8" });
@@ -100,7 +114,7 @@ ok("K0", control.status === 0, "control: test:hydration green on the unmutated t
 for (const [id, muts, expect] of NODE_MUTANTS) {
   const r = await withMutations(id, muts.map(([f, find, repl]) => [f, find, repl]), async () => hydration());
   const got = reds(r);
-  ok(id, r.status !== 0 && expect.every((e) => got.includes(e)), `killed by ${expect.join("+")} (red: ${got.join(",") || "none"})`, "mutant SURVIVED or was killed by the wrong assertion");
+  ok(id, r.status !== 0 && expect.every((e) => got.includes(e)), `killed by ${expect.join("+")} (red: ${got.join(",") || "none"})`, "mutant SURVIVED or was killed by the wrong assertion", "mutant-survived");
 }
 
 // B-408 — the read deadline, against test:settings.
@@ -111,7 +125,7 @@ for (const [id, muts] of SETTINGS_MUTANTS) {
   const r = await withMutations(id, muts, async () => settingsTest());
   const out = `${r.stdout || ""}\n${r.stderr || ""}`;
   const red12 = /12\) a stalled settings read[\s\S]*✗ stalled load ⇒ status "failed"/.test(out);
-  ok(id, r.status !== 0 && red12, "killed by test:settings block 12 (stalled load ⇒ failed)", out.split("\n").filter((l) => /✗/.test(l)).slice(0, 4).join(" | ") || "mutant SURVIVED");
+  ok(id, r.status !== 0 && red12, "killed by test:settings block 12 (stalled load ⇒ failed)", out.split("\n").filter((l) => /✗/.test(l)).slice(0, 4).join(" | ") || "mutant SURVIVED", "mutant-survived");
 }
 
 // ═══ PHASE 2 — keys-only journal (probe:image G1J) ═════════════════════════════
@@ -125,7 +139,8 @@ const imgMut = await withMutations("NM-VALUE", VALUE_MUTANT, async () => imagePr
 const imgOut = `${imgMut.stdout || ""}\n${imgMut.stderr || ""}`;
 ok("NM-VALUE", imgMut.status !== 0 && /❌ G1J/.test(imgOut) && /✅ G1b/.test(imgOut),
   "value in the journal ⇒ G1J red, G1b still green (the gate measures the journal, ⛔ the quota alone)",
-  imgOut.split("\n").filter((l) => /G1/.test(l)).join(" | "));
+  imgOut.split("\n").filter((l) => /G1/.test(l)).join(" | "), "mutant-survived");
+} // SCOPE !== "head"
 
 // ═══ PHASE 3 — browser arms ═══════════════════════════════════════════════════
 if (process.argv.includes("--node-only")) {
@@ -166,23 +181,40 @@ const CONTROLS = {
 // ⛔ a green either: every such verdict is its own failed check.
 const isInstrument = (r) => /\bINSTRUMENT:/.test(r.msg || "");
 for (const [arm, byKey] of Object.entries(verdicts)) for (const [k, r] of Object.entries(byKey)) {
-  if (isInstrument(r)) ok(`${arm}/${k}/instrument`, false, "the held settings read outlived its bound — the scene measured nothing", r.msg.slice(0, 300));
+  if (isInstrument(r)) ok(`${arm}/${k}/instrument`, false, "the held settings read outlived its bound — the scene measured nothing", r.msg.slice(0, 300), "instrument");
 }
 for (const p of PROJECTS) {
   const v = (arm, k) => verdicts[arm][`${p}:${k}`] || { status: "missing", msg: "" };
   if (verdicts.HEAD) {
     const head = ALL.map((k) => [k, v("HEAD", k)]);
-    ok(`HEAD/${p}`, head.every(([, r]) => r.status === "passed"), `all ${ALL.length} scenes green`, head.filter(([, r]) => r.status !== "passed").map(([k, r]) => `${k}:${r.status} ${r.msg.split("\n")[0]}`).join(" | "));
+    ok(`HEAD/${p}`, head.every(([, r]) => r.status === "passed"), `all ${ALL.length} scenes green`, head.filter(([, r]) => r.status !== "passed").map(([k, r]) => `${k}:${r.status} ${r.msg.split("\n")[0]}`).join(" | "), "head-red");
   }
   for (const [arm, want] of Object.entries(RED)) {
     if (!verdicts[arm]) continue; // not selected (EYE_ARMS)
     const got = want.map((k) => [k, v(arm, k)]);
-    ok(`${arm}/${p}`, got.every(([, r]) => r.status === "failed" && !isInstrument(r)), `red: ${got.map(([k, r]) => `${k}=${r.status}${isInstrument(r) ? "(INSTRUMENT)" : ""}`).join(" · ")}`, "the spec is BLIND to this arm");
+    ok(`${arm}/${p}`, got.every(([, r]) => r.status === "failed" && !isInstrument(r)), `red: ${got.map(([k, r]) => `${k}=${r.status}${isInstrument(r) ? "(INSTRUMENT)" : ""}`).join(" · ")}`, "the spec is BLIND to this arm", "mutant-survived");
     const ctl = CONTROLS[arm].map((k) => [k, v(arm, k)]);
-    ok(`${arm}/${p}/controls`, ctl.every(([, r]) => r.status === "passed"), `controls green: ${ctl.map(([k, r]) => `${k}=${r.status}`).join(" · ")}`, "a control went red — the arm broke the app, ⛔ the merge");
+    // B-442: the signature travels with the verdict — the arm, the scene, and the first line of its error.
+    ok(`${arm}/${p}/controls`, ctl.every(([, r]) => r.status === "passed"), `controls green: ${ctl.map(([k, r]) => `${k}=${r.status}`).join(" · ")}`,
+      `a control went red — ${ctl.filter(([, r]) => r.status !== "passed").map(([k, r]) => `${k}: ${String(r.msg || r.status).split("\n")[0].slice(0, 200)}`).join(" | ")}`, "control-red");
   }
 }
 
 await rm(WORK, { recursive: true, force: true });
-console.log(failures ? `\n❌ eye-sync-probe: ${failures} verdict(s) failed — the merge is not proven` : `\n✅ eye-sync-probe — node mutants killed · G1J keys-only · arms ${SELECTED_ARMS.join(",")} · every expected red is red · controls green`);
+// B-442 — the classified failures, in the step summary (⛔ only in the log): what blocked, and why.
+if (process.env.GITHUB_STEP_SUMMARY) {
+  const { appendFileSync } = await import("node:fs");
+  const CLS = { "mutant-survived": "🔴 mutant SURVIVED — the spec is blind (blocking)", "control-red": "🟠 control RED in a mutant arm (blocks the PR · ⛔ production verification)", instrument: "🟡 INSTRUMENT — the scene measured nothing", "head-red": "🔴 HEAD red (blocks production verification)", check: "🔴 check failed" };
+  const lines = [`### probe-sync · scope \`${SCOPE}\` · arms ${SELECTED_ARMS.join(", ")}`, ""];
+  if (!failed.length) lines.push(SCOPE === "head" ? "✅ HEAD: every scene green" : "✅ every expected red is red · every control green");
+  for (const [cls, title] of Object.entries(CLS)) {
+    const f = failed.filter((x) => x.cls === cls);
+    if (!f.length) continue;
+    lines.push(`**${title}** — ${f.length}`, ...f.map((x) => `- \`${x.id}\` — ${x.label}${x.detail ? ` — ${x.detail.replace(/\|/g, "\\|").slice(0, 300)}` : ""}`), "");
+  }
+  appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+}
+console.log(failures ? `\n❌ eye-sync-probe: ${failures} verdict(s) failed — the merge is not proven` : SCOPE === "head"
+  ? `\n✅ eye-sync-probe (scope head) — HEAD green on ${PROJECTS.join(",")} · ⛔ mutants in this scope (probe-sync-mutants)`
+  : `\n✅ eye-sync-probe — node mutants killed · G1J keys-only · arms ${SELECTED_ARMS.join(",")} · every expected red is red · controls green`);
 process.exit(failures ? 1 : 0);

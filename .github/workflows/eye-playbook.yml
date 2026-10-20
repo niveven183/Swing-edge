@@ -171,12 +171,15 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
-  # B-406 · B-397 · B-407 — its own job, in parallel with the other two probes.
-  probe-sync:
+  # B-406 · B-397 · B-407 — the hydration delta merge on the COMMITTED tree (the HEAD arm only).
+  # B-442 (Niv 19.10): this is the half `prod` waits on — production verification depends on the deployed
+  # tree being green, ⛔ on a mutant arm that is never deployed (INCIDENTS#36: three runs skipped on a C4 control).
+  probe-sync-head:
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.61.1-noble
     # B-408 (14.10): 5 → 14 arms (BEFORE-408 · M3-EARLY · M3-<scalar>×5 · M3-FAILLOCK · M5-NOTIMEOUT),
     # each limited to its own scenes by --grep. 60 was the old ceiling with 5 full-spec arms.
+    # B-442 (19.10): split from the one `probe-sync` job — timeout and fetch-depth moved as they were.
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
@@ -184,16 +187,48 @@ jobs:
           fetch-depth: 0   # BEFORE reads 19959e6 · probe:image reads 3d24c23
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - run: npm ci
-      - name: Red-before probe — hydration delta merge (two devices)
+      - name: Red-before probe — hydration delta merge (two devices · head)
         env:
           EYE_PROJECTS: pixel7,iphone14
+          EYE_SYNC_SCOPE: head
         run: npm run probe:eye:sync
       # Hermetic evidence: synthetic origin, dummy account, no secret exists in this job.
       - name: Upload sync probe evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@v7
         with:
-          name: eye-sync-probe-${{ github.run_id }}
+          name: eye-sync-probe-head-${{ github.run_id }}
+          path: eye-evidence/probe-sync/
+          retention-days: 14
+          if-no-files-found: warn
+
+  # B-442 — node mutants + every BEFORE-*/MUT-*/M3-*/M5-* arm. Still a failing check (the PR shows it red; the
+  # step summary classifies each failure: mutant SURVIVED · control red · instrument), ⛔ a gate for `prod`.
+  # ⛔ continue-on-error · ⛔ retry: a hidden red is the bug B-442 exists against.
+  probe-sync-mutants:
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.61.1-noble
+    # B-408 (14.10): 5 → 14 arms (BEFORE-408 · M3-EARLY · M3-<scalar>×5 · M3-FAILLOCK · M5-NOTIMEOUT),
+    # each limited to its own scenes by --grep. 60 was the old ceiling with 5 full-spec arms.
+    # B-442 (19.10): split from the one `probe-sync` job — timeout and fetch-depth moved as they were.
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # BEFORE reads 19959e6 · probe:image reads 3d24c23
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - run: npm ci
+      - name: Red-before probe — hydration delta merge (two devices · mutants)
+        env:
+          EYE_PROJECTS: pixel7,iphone14
+          EYE_SYNC_SCOPE: mutants
+        run: npm run probe:eye:sync
+      # Hermetic evidence: synthetic origin, dummy account, no secret exists in this job.
+      - name: Upload sync probe evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: eye-sync-probe-mutants-${{ github.run_id }}
           path: eye-evidence/probe-sync/
           retention-days: 14
           if-no-files-found: warn
@@ -263,7 +298,10 @@ jobs:
         if: ${{ github.event_name != 'push' }}
 
   prod:
-    needs: [probe, probe-overlay, probe-sync, probe-cents, wait-deploy]
+    # B-442 (Niv 19.10): production verification waits on the deploy and on the HEAD arms of the hydration probe ONLY.
+    # The other probes (probe · probe-overlay · probe-cents · probe-sync-mutants) still run and still fail the run —
+    # they are ⛔ a gate for checking production. scripts/workflow-gate-test.mjs (in test:registry) enforces this.
+    needs: [wait-deploy, probe-sync-head]
     runs-on: ubuntu-latest
     # B-435 (Niv 17.10, 2ג): issues: write — ONLY this job, ONLY for the B-435 alert below. A job-level block
     # replaces the workflow's, so the two read scopes are restated.

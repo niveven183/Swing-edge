@@ -32,7 +32,7 @@
     "test:horizon": "node scripts/horizon-test.mjs",
     "test:syntax": "node scripts/script-syntax-test.mjs",
     "test:instrument": "node scripts/instrument-currency-test.mjs",
-    "test:registry": "node scripts/registry-test.mjs",
+    "test:registry": "node scripts/registry-test.mjs && node scripts/workflow-gate-test.mjs",
     "test:dna": "node scripts/dna-growth-test.mjs",
     "test:shortpct": "node scripts/short-pnl-pct-test.mjs",
     "test:watchlist": "node scripts/watchlist-fallback-test.mjs",
