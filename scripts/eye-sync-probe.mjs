@@ -206,7 +206,7 @@ if (process.env.GITHUB_STEP_SUMMARY) {
   const { appendFileSync } = await import("node:fs");
   const CLS = { "mutant-survived": "🔴 mutant SURVIVED — the spec is blind (blocking)", "control-red": "🟠 control RED in a mutant arm (blocks the PR · ⛔ production verification)", instrument: "🟡 INSTRUMENT — the scene measured nothing", "head-red": "🔴 HEAD red (blocks production verification)", check: "🔴 check failed" };
   const lines = [`### probe-sync · scope \`${SCOPE}\` · arms ${SELECTED_ARMS.join(", ")}`, ""];
-  if (!failed.length) lines.push("✅ every expected red is red · every control green");
+  if (!failed.length) lines.push(SCOPE === "head" ? "✅ HEAD: every scene green" : "✅ every expected red is red · every control green");
   for (const [cls, title] of Object.entries(CLS)) {
     const f = failed.filter((x) => x.cls === cls);
     if (!f.length) continue;
@@ -214,5 +214,7 @@ if (process.env.GITHUB_STEP_SUMMARY) {
   }
   appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
 }
-console.log(failures ? `\n❌ eye-sync-probe: ${failures} verdict(s) failed — the merge is not proven` : `\n✅ eye-sync-probe — node mutants killed · G1J keys-only · arms ${SELECTED_ARMS.join(",")} · every expected red is red · controls green`);
+console.log(failures ? `\n❌ eye-sync-probe: ${failures} verdict(s) failed — the merge is not proven` : SCOPE === "head"
+  ? `\n✅ eye-sync-probe (scope head) — HEAD green on ${PROJECTS.join(",")} · ⛔ mutants in this scope (probe-sync-mutants)`
+  : `\n✅ eye-sync-probe — node mutants killed · G1J keys-only · arms ${SELECTED_ARMS.join(",")} · every expected red is red · controls green`);
 process.exit(failures ? 1 : 0);
