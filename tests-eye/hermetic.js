@@ -106,7 +106,7 @@ export function applySettingsWrite(store, method, url, headers, postData) {
 //   ② a month worth thousands beside this month's few-₪ bar (−$3000 ⇒ ₪−9,900) ⇒ that bar is ~1px tall.
 // Both are prior months, so this month's B5 bar and the B8 dot are the spec's trade alone. ⛔ the default:
 // every other arm stays byte-identical (empty journal).
-function seedHistory() {
+export function seedHistory() {
   const row = (id, ticker, setup, date, closedAt, shares, entry, exit) => ({
     id, user_id: USER_ID, ticker, side: "LONG", entry, stop: entry - 1, target: entry + 2, shares, exit,
     status: "CLOSED", date, closedAt, setup, notes: `seed-history-${id}`, emotionAtEntry: "Neutral",
@@ -129,59 +129,78 @@ const eqParam = (url, col) => {
   return m ? m[1].split(",").map((s) => decodeURIComponent(s.replace(/^"|"$/g, ""))) : null;
 };
 
-export async function installHermetic(ctx, store) {
-  const json = (route, status, body, req) => {
-    // supabase-js asks for a single object via this Accept header (`.single()`/`.maybeSingle()`).
-    const single = /vnd\.pgrst\.object/.test(req.headers()["accept"] || "");
-    const payload = single ? (Array.isArray(body) ? body[0] ?? null : body) : body;
-    return route.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(payload) });
-  };
+// supabase-js asks for a single object via this Accept header (`.single()`/`.maybeSingle()`).
+function json(route, status, body, req) {
+  const single = /vnd\.pgrst\.object/.test(req.headers()["accept"] || "");
+  const payload = single ? (Array.isArray(body) ? body[0] ?? null : body) : body;
+  return route.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(payload) });
+}
 
+/**
+ * Answer one `/rest/v1/user_settings` or `/rest/v1/trades` request from `store`. Returns the
+ * fulfil promise, or `null` when the path is neither table (the caller decides what happens then).
+ * Shared by `installHermetic` (synthetic origin) and the production arm of tests-eye/firstrun.spec.js,
+ * which keeps the REAL auth and answers these two tables locally — the QA row is never read or written.
+ * `store.tradesDelayMs` (firstrun, B-445): holds the journal GET back, so a scene can watch the UI
+ * while the trades have not landed. Absent ⇒ 0 ⇒ every existing caller is unchanged.
+ */
+export async function answerRest(route, store) {
+  // Production (firstrun): the session is the REAL QA user's, so the rows must carry that id.
+  const uid = store.userId || USER_ID;
+  const req = route.request();
+  const url = req.url();
+  const path = new URL(url).pathname;
+  const method = req.method();
+  if (path.startsWith("/rest/v1/user_settings")) {
+    // B-432 · B-435 (16.10): the row carries its VERSION TOKEN (`updated_at`, written by the client) — without
+    // it every load reads «no base» and the base/inflight decision is never exercised (a blind arm).
+    if (method === "GET") { await json(route, 200, store.rowGone ? [] : [{ user_id: uid, settings: store.settings, updated_at: pgText(store.updatedAt) }], req); return true; }
+    const r = applySettingsWrite(store, method, url, req.headers(), req.postData());
+    if (r) { await json(route, r.status, r.body, req); return true; }
+    // ⛔ the silent 204 below for a settings write this server does not model (B-272 for the fake server).
+    console.error(`[hermetic] unmodelled user_settings ${method} ${url}`);
+    await route.fulfill({ status: 500, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ message: `hermetic: unmodelled ${method}` }) }); return true;
+  }
+  if (path.startsWith("/rest/v1/trades")) {
+    if (method === "GET") {
+      if (store.tradesDelayMs > 0) await new Promise((ok) => setTimeout(ok, store.tradesDelayMs));
+      const ids = eqParam(url, "user_id");
+      await json(route, 200, ids && !ids.includes(uid) ? [] : store.trades, req); return true;
+    }
+    if (method === "POST") {
+      const body = JSON.parse(req.postData() || "[]");
+      const rows = (Array.isArray(body) ? body : [body]).map((r, i) => ({ ...r, id: r.id ?? `h-${Date.now()}-${i}` }));
+      store.trades.push(...rows);
+      await json(route, 201, rows.map((r) => ({ id: r.id })), req); return true;
+    }
+    if (method === "PATCH") {
+      const ids = eqParam(url, "id") || [];
+      const patch = JSON.parse(req.postData() || "{}");
+      const hit = store.trades.filter((t) => ids.includes(String(t.id)));
+      hit.forEach((t) => Object.assign(t, patch));
+      await json(route, 200, hit.map((t) => ({ id: t.id })), req); return true;
+    }
+    if (method === "DELETE") {
+      const ids = eqParam(url, "id") || [];
+      const hit = store.trades.filter((t) => ids.includes(String(t.id)));
+      store.trades = store.trades.filter((t) => !ids.includes(String(t.id)));
+      await json(route, 200, hit.map((t) => ({ id: t.id })), req); return true;
+    }
+  }
+  return false;
+}
+
+export async function installHermetic(ctx, store) {
   await ctx.route(new RegExp(`https://${SB_HOST.replace(/\./g, "\\.")}/`), async (route) => {
     const req = route.request();
-    const url = req.url();
-    const path = new URL(url).pathname;
+    const path = new URL(req.url()).pathname;
     const method = req.method();
     if (method === "OPTIONS") return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" }, body: "" });
     if (path.startsWith("/auth/v1/token") || path.startsWith("/auth/v1/signup")) return json(route, 200, session(), req);
     if (path.startsWith("/auth/v1/user")) return json(route, 200, session().user, req);
     if (path.startsWith("/auth/v1/logout")) return route.fulfill({ status: 204, body: "" });
 
-    if (path.startsWith("/rest/v1/user_settings")) {
-      // B-432 · B-435 (16.10): the row carries its VERSION TOKEN (`updated_at`, written by the client) — without
-      // it every load reads «no base» and the base/inflight decision is never exercised (a blind arm).
-      if (method === "GET") return json(route, 200, store.rowGone ? [] : [{ user_id: USER_ID, settings: store.settings, updated_at: pgText(store.updatedAt) }], req);
-      const r = applySettingsWrite(store, method, url, req.headers(), req.postData());
-      if (r) return json(route, r.status, r.body, req);
-      // ⛔ the silent 204 below for a settings write this server does not model (B-272 for the fake server).
-      console.error(`[hermetic] unmodelled user_settings ${method} ${url}`);
-      return route.fulfill({ status: 500, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ message: `hermetic: unmodelled ${method}` }) });
-    }
-    if (path.startsWith("/rest/v1/trades")) {
-      if (method === "GET") {
-        const ids = eqParam(url, "user_id");
-        return json(route, 200, ids && !ids.includes(USER_ID) ? [] : store.trades, req);
-      }
-      if (method === "POST") {
-        const body = JSON.parse(req.postData() || "[]");
-        const rows = (Array.isArray(body) ? body : [body]).map((r, i) => ({ ...r, id: r.id ?? `h-${Date.now()}-${i}` }));
-        store.trades.push(...rows);
-        return json(route, 201, rows.map((r) => ({ id: r.id })), req);
-      }
-      if (method === "PATCH") {
-        const ids = eqParam(url, "id") || [];
-        const patch = JSON.parse(req.postData() || "{}");
-        const hit = store.trades.filter((t) => ids.includes(String(t.id)));
-        hit.forEach((t) => Object.assign(t, patch));
-        return json(route, 200, hit.map((t) => ({ id: t.id })), req);
-      }
-      if (method === "DELETE") {
-        const ids = eqParam(url, "id") || [];
-        const hit = store.trades.filter((t) => ids.includes(String(t.id)));
-        store.trades = store.trades.filter((t) => !ids.includes(String(t.id)));
-        return json(route, 200, hit.map((t) => ({ id: t.id })), req);
-      }
-    }
+    if (await answerRest(route, store)) return;
     if (method === "GET") return json(route, 200, [], req);
     return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*" }, body: "" });
   });

@@ -47,5 +47,11 @@ export default defineConfig({
     { name: "iphoneSE", testMatch: /(overlay|width)\.spec\.js/, use: { ...devices["iPhone SE"] } },
     { name: "iphone14promax", testMatch: /(overlay|width)\.spec\.js/, use: { ...devices["iPhone 14 Pro Max"] } },
     { name: "galaxyS8", testMatch: /(overlay|width)\.spec\.js/, use: { ...devices["Galaxy S8"], launchOptions: chromiumLaunch } },
+    // Activation wave 1 (21.10, tests-eye/firstrun.spec.js only). `iPhone 14` above is Playwright's
+    // 390×664 viewport (browser chrome subtracted) — the consent card is COMPACT there
+    // (ConsentBanner.css `max-height: 760px`); the 18.10 audit saw the full card at 390×844, so both
+    // heights are measured. desktop1440: the journal table renders at ≥ md only.
+    { name: "iphone14tall", testMatch: /firstrun\.spec\.js/, use: { ...devices["iPhone 14"], viewport: { width: 390, height: 844 } } },
+    { name: "desktop1440", testMatch: /firstrun\.spec\.js/, use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 }, launchOptions: chromiumLaunch } },
   ]),
 });
