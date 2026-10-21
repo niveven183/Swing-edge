@@ -409,7 +409,13 @@ test.describe("activation wave 1 — first run: questionnaire done ⇒ first tra
   // B-446 G1 (Niv 21.10): with the iOS keyboard open, neither the keyboard nor the fixed footer may sit
   // on the focused field. ⚠️ Playwright cannot open the real iOS keyboard. What iOS DOES is shrink the
   // VISUAL viewport (not the layout one) and fire `visualViewport` resize — so that is what is
-  // simulated here: `height` −330px (keyboard + suggestion bar) + a resize event, on the live object.
+  // simulated here: `height` −380px (iPhone 14 Safari: keyboard ~291pt + QuickType ~45pt + the form
+  // accessory bar ~44pt) + a resize event, on the live object.
+  // ⚠️ PRECONDITION (probe run 21.10: MUT-KB SURVIVED at −330px — the keyboard top (334) sat BELOW the
+  // field (282..326), so the check passed with the hook removed): the simulated keyboard must cover the
+  // field where it was before the keyboard opened. If it does not, the check measured nothing ⇒ red
+  // (B-272: a vacuous check is ⛔ a pass). Hence iPhone 14 at 664 only — at 844 a real keyboard does
+  // not reach the stop field.
   // Judged: the focused field inside [0, min(visual-viewport bottom, footer top)] and its centre hits it.
   // Then the keyboard «closes» (the overrides are removed + resize) and the caller's Log Trade tap runs
   // its usual elementFromPoint check.
@@ -418,7 +424,14 @@ test.describe("activation wave 1 — first run: questionnaire done ⇒ first tra
     const r = await page.evaluate(async () => {
       const vv = window.visualViewport;
       if (!vv) return { error: "no window.visualViewport" };
-      const H = innerHeight - 330;
+      // The keyboard slides in ~250–300ms AFTER focus on iOS: let the focus frame settle first, so the
+      // field is moved ONLY by the reaction to the visualViewport resize (probe 21.10: with the keyboard
+      // installed before the focus rAF, MUT-KB survived through the focusin path).
+      await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
+      await new Promise((ok) => setTimeout(ok, 300));
+      const H = innerHeight - 380;
+      const f0 = document.activeElement.getBoundingClientRect();
+      if (!(f0.bottom > H)) return { vacuous: true, field: document.activeElement.id, top: Math.round(f0.top), bottom: Math.round(f0.bottom), keyboardTop: H };
       Object.defineProperty(vv, "height", { configurable: true, get: () => H });
       Object.defineProperty(vv, "offsetTop", { configurable: true, get: () => 0 });
       vv.dispatchEvent(new Event("resize"));
@@ -439,6 +452,7 @@ test.describe("activation wave 1 — first run: questionnaire done ⇒ first tra
     });
     rec.keyboard = r;
     expect.soft(r.error, "keyboard check could not run").toBeUndefined();
+    expect.soft(r.vacuous, `keyboard check is VACUOUS: the simulated keyboard (top ${r.keyboardTop}) does not cover «${r.field}» (y=${r.top}..${r.bottom}) — it would pass with the hook removed`).toBeUndefined();
     expect.soft(r.ok, `B-446 G1: with the keyboard open (visual viewport bottom ${r.keyboardTop}) the focused «${r.field}» (y=${r.top}..${r.bottom}) is not visible above min(keyboard, footer top ${r.footerTop})`).toBe(true);
   }
 
@@ -453,7 +467,7 @@ test.describe("activation wave 1 — first run: questionnaire done ⇒ first tra
       await page.locator("#log-entry").fill(entry);
     } else app.rec.notes.push(`entry auto-filled: ${await page.locator("#log-entry").inputValue()}`);
     await tap(app, form.locator("#log-stop"), "form: stop", { count });
-    if (count && /^iphone14/.test(test.info().project.name)) await keyboardCheck(app);
+    if (count && test.info().project.name === "iphone14") await keyboardCheck(app);
     await page.locator("#log-stop").fill(stop);
     const submit = form.getByRole("button", { name: /Log Trade/ });
     await expect(submit, "Log Trade stays disabled (capital / rate gate)").toBeEnabled({ timeout: 25_000 });
