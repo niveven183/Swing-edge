@@ -162,3 +162,26 @@
 ## §9 — הכרעה נדרשת (עצירה לפי התוכנית)
 - **G1:** להעביר את שורת הכפתורים של Log Trade ושל Edit ל**פוטר קבוע** מחוץ לגוף הגלילה (`shrink-0`), + `MUT-FOOTER`. מקטין את שטח הגלילה בגובה הפוטר; ⛔ משנה לוגיקה.
 - **G2:** CTA הדאשבורד ב-`390×664` — (א) דחיסת כרטיס «ברוך הבא» במובייל (אימוג׳י/ריווח) כך שה-CTA עולה מעל הכרטיס; אם ⛔ מספיק ⇒ (ב) נגיעה בגובה באנר ההסכמה = **החלטת ניב** (משטח משפטי).
+
+## §10 — אחרי התיקון (`1977342`, אותה סצנה, אותם 8 תאים) + SQL למשפך (`M-032`)
+- **טאפים: `5` ב-`8/8` תאים** — מודאל «תעד את העסקה הראשונה שלך» ⇒ ticker ⇒ entry ⇒ stop ⇒ Log Trade. ⛔ טאפ «תשובה לבאנר» באף תא.
+- הכרעות ניב 21.10 אחרי §9: G1 = פוטר קבוע (Log Trade · Edit · Close Trade — האחרון נמדד אדום אחרי התיקון הראשון ב-`390×664`: X מעל המסך, פעולות תחת הבאנר) · רזרבה פעם אחת, על העוטף · G2 = דחיסת הכרטיס · תוכן in-flow נשפט «נגיש בגלילה ≤`300px`» (נמדד `0`–`280px`, `6/6`).
+- מקלדת (iPhone 14, `visualViewport` −330px **מדומה** — Playwright ⛔ פותח מקלדת iOS): stop ב-y=`282..326` מתחת לקו המקלדת `334` ולפוטר `394` ✓.
+- toast בבהיר: success `6.81:1` · error `6.5:1` (נמדד במסך; המחושב `7.15`/`6.83` — ההפרש = רקע מורכב בפועל).
+- **SQL (read-only, לניב — ⛔ הורץ ע״י Code):**
+```sql
+SET default_transaction_read_only = on;
+WITH u AS (
+  SELECT u.id, u.created_at,
+         EXISTS (SELECT 1 FROM public.trades t WHERE t.user_id = u.id) AS has_trade,
+         EXISTS (SELECT 1 FROM public.user_settings s WHERE s.user_id = u.id AND (s.settings->'onboarding'->>'completed')::boolean) AS onboarded
+  FROM auth.users u
+  WHERE u.deleted_at IS NULL AND u.email_confirmed_at IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM public.admins a WHERE a.user_id = u.id))
+SELECT count(*) AS registered,
+       count(*) FILTER (WHERE has_trade) AS with_trade,
+       count(*) FILTER (WHERE NOT has_trade) AS without_trade,
+       count(*) FILTER (WHERE NOT has_trade AND onboarded) AS onboarded_no_trade,
+       count(*) FILTER (WHERE created_at >= '2026-10-21') AS since_wave
+FROM u;
+```
