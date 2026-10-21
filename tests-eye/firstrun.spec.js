@@ -18,7 +18,10 @@
 // BEFORE EVERY COUNTED TAP: the target is inside the viewport and `elementFromPoint(centre)` is the
 // target — WITHOUT scrolling (B-446). A brand-new user does not know there is something under the
 // banner to scroll to. Questionnaire taps scroll like overlay.spec (`clear()`): a cover there is wave 2,
-// recorded, ⛔ red here.
+// recorded, ⛔ red here. IN-FLOW page content (the empty-journal CTA, a trade card) is judged after a
+// natural scroll of ≤ IN_FLOW_SCROLL_BUDGET px (Niv 21.10 — the shell reserves the banner's height);
+// the counted path and every modal stay strict. iPhone 14: the focused stop field must stay visible
+// with the keyboard open (visualViewport −330px, simulated — see keyboardCheck), then Log Trade is judged.
 //
 // CONTRAST: every visible text node of the welcome modal against its composited background
 // (alpha-blended ancestors, then whatever is painted under it) ≥ 4.5:1, the close icon ≥ 3:1 —
@@ -48,6 +51,10 @@ const EVIDENCE = process.env.EYE_EVIDENCE_DIR || join(process.cwd(), "eye-eviden
 // The questionnaire's capital currency (hermetic ILS arm: the submit waits for /api/fx).
 const CCY = process.env.FIRSTRUN_CCY === "ILS" ? "ILS" : "USD";
 const TAP_BUDGET = 5;
+// In-flow page content (the empty-journal CTA, a trade card) may need a scroll to clear a bottom banner —
+// the shell reserves the banner's height for exactly that (B-404). Budget: 300px (Niv 21.10; measured
+// 80–280px on the fixed tree, 6/6 mobile cells). The counted path and every modal stay strict.
+const IN_FLOW_SCROLL_BUDGET = 300;
 const TICKER = "EYEFR"; // no quote exists for it ⇒ the entry field is never auto-filled ⇒ a deterministic count
 const IOS_BANNER_TEXT = "התקן את SwingEdge"; // hard-coded Hebrew in IOSInstallBanner.jsx
 
@@ -181,7 +188,25 @@ window.__eye = (() => {
     const painted = (bg && bg.a > 0) || borders > 0 || (s.boxShadow && s.boxShadow !== "none");
     return { exists: true, children: el.children.length, w: Math.round(r.width), h: Math.round(r.height), bg: s.backgroundColor, borders, shadow: s.boxShadow, padding: s.padding, shown: r.width * r.height > 0 && painted };
   }
-  return { textContrast, iconContrast, clearNow, toastRegion };
+  // Like overlay.spec's clear(): scroll the element's scroller in 40px steps until its centre is
+  // free (a user CAN scroll in-flow content). Reports how far, and the consent card's top edge.
+  async function clearByScroll(el) {
+    let sc = el.parentElement;
+    while (sc && !(sc.scrollHeight > sc.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement;
+    const scroller = sc || document.scrollingElement;
+    let r = clearNow(el), scrolled = 0;
+    while (!r.ok && scrolled < 1500) {
+      const before = scroller.scrollTop;
+      scroller.scrollTo({ top: before + 40, behavior: "instant" });
+      await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
+      if (scroller.scrollTop === before) break;
+      scrolled += scroller.scrollTop - before;
+      r = clearNow(el);
+    }
+    const card = document.querySelector(".se-consent__card");
+    return { ...r, scrolledPx: scrolled, consentTop: card ? Math.round(card.getBoundingClientRect().top) : null };
+  }
+  return { textContrast, iconContrast, clearNow, toastRegion, clearByScroll };
 })();
 `;
 
@@ -283,7 +308,7 @@ test.describe("activation wave 1 — first run: questionnaire done ⇒ first tra
       const r2 = await locator.evaluate((el) => window.__eye.clearNow(el));
       rec.clear.push({ label: `${label} (after scroll)`, ...r2 });
       if (!r2.ok && r2.by === "consent banner" && (await consentUp(page))) {
-        rec.taps.push(`remedy: answer the consent banner to reach «${label}»`);
+        if (count) rec.taps.push(`remedy: answer the consent banner to reach «${label}»`);
         await page.locator('[data-testid="consent-decline"]').click();
         await page.waitForTimeout(300);
       }
@@ -381,6 +406,42 @@ test.describe("activation wave 1 — first run: questionnaire done ⇒ first tra
     return "unknown";
   }
 
+  // B-446 G1 (Niv 21.10): with the iOS keyboard open, neither the keyboard nor the fixed footer may sit
+  // on the focused field. ⚠️ Playwright cannot open the real iOS keyboard. What iOS DOES is shrink the
+  // VISUAL viewport (not the layout one) and fire `visualViewport` resize — so that is what is
+  // simulated here: `height` −330px (keyboard + suggestion bar) + a resize event, on the live object.
+  // Judged: the focused field inside [0, min(visual-viewport bottom, footer top)] and its centre hits it.
+  // Then the keyboard «closes» (the overrides are removed + resize) and the caller's Log Trade tap runs
+  // its usual elementFromPoint check.
+  async function keyboardCheck(app) {
+    const { page, rec } = app;
+    const r = await page.evaluate(async () => {
+      const vv = window.visualViewport;
+      if (!vv) return { error: "no window.visualViewport" };
+      const H = innerHeight - 330;
+      Object.defineProperty(vv, "height", { configurable: true, get: () => H });
+      Object.defineProperty(vv, "offsetTop", { configurable: true, get: () => 0 });
+      vv.dispatchEvent(new Event("resize"));
+      await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
+      await new Promise((ok) => setTimeout(ok, 150));
+      const el = document.activeElement;
+      const submit = [...document.querySelectorAll('[role="dialog"] button')].find((b) => /Log Trade/.test(b.textContent));
+      const footTop = submit ? submit.parentElement.getBoundingClientRect().top : innerHeight;
+      const f = el.getBoundingClientRect();
+      const limit = Math.min(H, footTop);
+      const cx = f.left + f.width / 2, cy = f.top + f.height / 2;
+      const top = cy < limit && cy >= 0 ? document.elementFromPoint(cx, cy) : null;
+      const out = { field: el.id || el.tagName, top: Math.round(f.top), bottom: Math.round(f.bottom), keyboardTop: H, footerTop: Math.round(footTop), ok: f.top >= 0 && f.bottom <= limit + 0.5 && !!top && (top === el || el.contains(top)) };
+      delete vv.height; delete vv.offsetTop;
+      vv.dispatchEvent(new Event("resize"));
+      await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
+      return out;
+    });
+    rec.keyboard = r;
+    expect.soft(r.error, "keyboard check could not run").toBeUndefined();
+    expect.soft(r.ok, `B-446 G1: with the keyboard open (visual viewport bottom ${r.keyboardTop}) the focused «${r.field}» (y=${r.top}..${r.bottom}) is not visible above min(keyboard, footer top ${r.footerTop})`).toBe(true);
+  }
+
   async function fillAndSave(app, { ticker = TICKER, entry = "100", stop = "99", count = true } = {}) {
     const { page } = app;
     const form = logForm(page);
@@ -392,6 +453,7 @@ test.describe("activation wave 1 — first run: questionnaire done ⇒ first tra
       await page.locator("#log-entry").fill(entry);
     } else app.rec.notes.push(`entry auto-filled: ${await page.locator("#log-entry").inputValue()}`);
     await tap(app, form.locator("#log-stop"), "form: stop", { count });
+    if (count && /^iphone14/.test(test.info().project.name)) await keyboardCheck(app);
     await page.locator("#log-stop").fill(stop);
     const submit = form.getByRole("button", { name: /Log Trade/ });
     await expect(submit, "Log Trade stays disabled (capital / rate gate)").toBeEnabled({ timeout: 25_000 });
@@ -470,11 +532,18 @@ test.describe("activation wave 1 — first run: questionnaire done ⇒ first tra
         await toastContrast(app, "error", /קלט לא תקין|Invalid input/);
         await page.keyboard.press("Escape");
         await expect(page.locator('[aria-modal="true"]')).toHaveCount(0, { timeout: 5_000 });
+        // The error toast lives 3s at the top (z-100) — over a modal's header X. That overlap is this
+        // scene's own doing (recorded in BACKLOG, B-453); the modal checks below start once it is gone.
+        await expect.poll(async () => (await page.evaluate(() => window.__eye.toastRegion())).children, { timeout: 15_000 }).toBe(0);
 
         // Close Trade + Edit modals with the banner still up (⛔ counted, ⛔ submitted).
         if (await consentUp(page)) {
-          const row = isDesktop(info) ? page.locator('[data-testid="journal-table"] tbody tr').filter({ hasText: TICKER }) : page.locator("div.md\\:hidden > div").filter({ hasText: TICKER });
-          await row.locator("button").filter({ hasText: /^\s*(Close|סגור)\s*$/ }).first().click();
+          const row = isDesktop(info) ? page.locator('[data-testid="journal-table"] tbody tr').filter({ hasText: TICKER }) : page.locator("article").filter({ hasText: TICKER });
+          const closeBtn = row.locator("button").filter({ hasText: /^\s*(Close|סגור)\s*$/ }).first();
+          // The card is in-flow page content: a user scrolls to it. How far is recorded (B-446).
+          rec.cardCloseByScroll = await closeBtn.evaluate((el) => window.__eye.clearByScroll(el));
+          expect.soft(rec.cardCloseByScroll.ok && rec.cardCloseByScroll.scrolledPx <= IN_FLOW_SCROLL_BUDGET, `B-446: the trade card's Close is not reachable within ${IN_FLOW_SCROLL_BUDGET}px of scrolling: ${redact(rec.cardCloseByScroll.by)}`).toBe(true);
+          await closeBtn.click();
           const closeModal = page.locator('[role="dialog"][aria-modal="true"]');
           await closeModal.waitFor({ state: "visible", timeout: 10_000 });
           for (const [lbl, loc] of [["close-trade: submit", closeModal.getByRole("button", { name: /Close Trade/ })], ["close-trade: cancel", closeModal.getByRole("button", { name: /^Cancel$/ })], ["close-trade: X", closeModal.getByRole("button", { name: /^(סגור|Close)$/ })]]) {
@@ -486,7 +555,12 @@ test.describe("activation wave 1 — first run: questionnaire done ⇒ first tra
           await page.keyboard.press("Escape");
           await expect(page.locator('[aria-modal="true"]')).toHaveCount(0, { timeout: 5_000 });
           if (isDesktop(info)) await row.locator('button[title="עריכה"], button[title="Edit"]').click();
-          else await row.locator(`text=${TICKER}`).first().click();
+          else {
+            const tick = row.getByText(TICKER, { exact: true }).first();
+            rec.cardEditByScroll = await tick.evaluate((el) => window.__eye.clearByScroll(el));
+            expect.soft(rec.cardEditByScroll.ok && rec.cardEditByScroll.scrolledPx <= IN_FLOW_SCROLL_BUDGET, `B-446: the trade card (edit) is not reachable within ${IN_FLOW_SCROLL_BUDGET}px of scrolling: ${redact(rec.cardEditByScroll.by)}`).toBe(true);
+            await tick.click();
+          }
           const edit = page.locator('[role="dialog"][aria-modal="true"]');
           await edit.waitFor({ state: "visible", timeout: 10_000 });
           for (const [lbl, loc] of [["edit: save", edit.getByRole("button", { name: /שמור שינויים|Save Changes/ })], ["edit: cancel", edit.getByRole("button", { name: /^(ביטול|Cancel)$/ })], ["edit: X", edit.getByRole("button", { name: /^(סגור|Close)$/ })]]) {
@@ -527,7 +601,17 @@ test.describe("activation wave 1 — first run: questionnaire done ⇒ first tra
         await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
         await page.locator('[data-tour-tab="journal"]').first().click();
         await shot("journal-empty");
-        await tap(app, journalCta(page), "journal: add first trade", { count: false });
+        // Recorded both ways: where it renders (the gate below, via tap) and how far a user must
+        // scroll before nothing covers it (`clearByScroll` — evidence for the B-446 journal decision).
+        // ⚠️ GATE = reachable by a natural scroll (Niv 21.10): in-flow page content under the consent
+        // card is scrolled to, like overlay.spec — the shell reserves exactly the banner's height. The
+        // counted path and every modal stay strict (no scroll). Where it renders is recorded, ⛔ judged.
+        await journalCta(page).waitFor({ state: "visible", timeout: 20_000 });
+        rec.journalCtaRendered = await journalCta(page).evaluate((el) => window.__eye.clearNow(el));
+        const js = await journalCta(page).evaluate((el) => window.__eye.clearByScroll(el));
+        rec.journalCtaByScroll = js;
+        expect.soft(js.ok && js.scrolledPx <= IN_FLOW_SCROLL_BUDGET, `B-446: the empty-journal CTA is not reachable within ${IN_FLOW_SCROLL_BUDGET}px of scrolling (scrolled ${js.scrolledPx}px, still: ${redact(js.by)}, consent top ${js.consentTop})`).toBe(true);
+        await journalCta(page).click();
         await expect(logForm(page), "the journal's empty-state CTA did not open the form").toBeVisible({ timeout: 5_000 });
         app.assertNoEscape();
       } finally {

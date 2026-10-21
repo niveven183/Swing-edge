@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo, useId } from "react";
+import { useState, useEffect, useMemo, useId, useRef } from "react";
 import { X } from "lucide-react";
 import TermTooltip from "./ui/TermTooltip.jsx";
 import InfoTooltip from "./ui/InfoTooltip.jsx";
 import SmartSelect from "./ui/SmartSelect.jsx";
 import useModalA11y from "../hooks/useModalA11y.js";
+import useKeepFocusedVisible from "../hooks/useKeepFocusedVisible.js";
 import { getTradeSelectProps, CATEGORY_TOOLTIP } from "../data/tradeOptions.jsx";
 import { qstars, localDayKey, validateTradeInputs } from "../utils.js";
 import { deriveCloseState } from "../lib/tradeCloseState.js";
@@ -32,6 +33,9 @@ export default function EditTradeModal({ trade, lang, onClose, onSave }) {
   // Accessible dialog: focus-in, focus-trap, Esc, focus-restore
   const titleId = useId();
   const modalRef = useModalA11y({ active: !!trade, onClose });
+  const bodyRef = useRef(null);
+  const footerRef = useRef(null);
+  useKeepFocusedVisible(bodyRef, footerRef, !!trade);
 
   const showExitFields = useMemo(
     () => (form.exit !== "" && form.exit != null) || form.status === "CLOSED",
@@ -121,8 +125,12 @@ export default function EditTradeModal({ trade, lang, onClose, onSave }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="w-full max-w-lg bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col focus:outline-none">
+    // B-446 (21.10) — the same bottom-banner reserve the Log Trade modal has had since B-404: the
+    // consent card (z-91) sat over this z-50 dialog. Its actions are a FIXED footer (G1, Niv 21.10):
+    // they were the last row of the scrolling body ⇒ Save/Cancel at y=1038 on a 900px desktop.
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+      style={{ paddingBottom: "calc(1rem + var(--se-bottom-overlay, 0px))" }}>
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="w-full max-w-lg bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[calc(90vh-var(--se-bottom-overlay,0px))] flex flex-col focus:outline-none">
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-gradient-to-r from-cyan-500/5 to-violet-500/5">
           <div className="flex items-center gap-2">
             <span id={titleId} className="text-sm font-bold text-white">
@@ -140,7 +148,7 @@ export default function EditTradeModal({ trade, lang, onClose, onSave }) {
           </button>
         </div>
 
-        <div className="p-5 space-y-4 overflow-y-auto">
+        <div ref={bodyRef} className="p-5 space-y-4 overflow-y-auto min-h-0 flex-1">
           {/* Ticker + Side */}
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -397,7 +405,9 @@ export default function EditTradeModal({ trade, lang, onClose, onSave }) {
             </div>
           )}
 
-          <div className="flex gap-2 pt-1">
+        </div>
+
+        <div ref={footerRef} className="shrink-0 flex gap-2 px-5 py-4 border-t border-[var(--border-subtle)] dark:border-white/[0.06]">
             <button
               onClick={handleSave}
               className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-white text-sm font-bold hover:opacity-90 transition"
@@ -410,7 +420,6 @@ export default function EditTradeModal({ trade, lang, onClose, onSave }) {
             >
               {isHe ? "ביטול" : "Cancel"}
             </button>
-          </div>
         </div>
       </div>
     </div>

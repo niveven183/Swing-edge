@@ -60,6 +60,7 @@
     "probe:eye:focus": "node scripts/eye-focus-probe.mjs",
     "test:eye:playbook": "playwright test -c playwright.eye.config.js",
     "probe:eye:overlay": "node scripts/eye-overlay-probe.mjs",
+    "probe:eye:firstrun": "node scripts/eye-firstrun-probe.mjs",
     "probe:eye:width": "node scripts/eye-width-probe.mjs",
     "probe:eye:sync": "node scripts/eye-sync-probe.mjs",
     "probe:flake": "node scripts/probe-flake.mjs",

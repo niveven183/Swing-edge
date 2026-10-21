@@ -56,6 +56,7 @@ on:
       - 'scripts/hydration-wiring-test.mjs'
       - 'scripts/eye-cents-probe.mjs'
       - 'scripts/eye-focus-probe.mjs'
+      - 'scripts/eye-firstrun-probe.mjs'   # activation wave 1 (21.10)
       - 'src/hooks/useModalA11y.js'
       - 'scripts/cents-precision-test.mjs'
       - '.github/workflows/eye-playbook.yml'
@@ -89,6 +90,7 @@ on:
       - 'scripts/hydration-wiring-test.mjs'
       - 'scripts/eye-cents-probe.mjs'
       - 'scripts/eye-focus-probe.mjs'
+      - 'scripts/eye-firstrun-probe.mjs'   # activation wave 1 (21.10)
       - 'src/hooks/useModalA11y.js'
       - 'scripts/cents-precision-test.mjs'
       - '.github/workflows/eye-playbook.yml'
@@ -168,6 +170,33 @@ jobs:
         with:
           name: eye-width-probe-${{ github.run_id }}
           path: eye-evidence/probe-width/
+          retention-days: 14
+          if-no-files-found: warn
+
+  # Activation wave 1 (21.10, B-443…B-448) — tests-eye/firstrun.spec.js: HEAD green · BEFORE (faf691a) red ·
+  # 11 mutants each killed by its own message. A separate job, ⛔ in prod.needs (a mutant arm is never
+  # deployed — B-442); prod runs the spec itself against production after the deploy.
+  probe-firstrun:
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.61.1-noble
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # BEFORE reads the pre-fix files from faf691a
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - run: npm ci
+      - name: Red-before probe — first run (iPhone 14 ×2 heights · Pixel 7 · desktop 1440)
+        env:
+          EYE_PROJECTS: iphone14,iphone14tall,pixel7,desktop1440
+        run: npm run probe:eye:firstrun
+      # Hermetic evidence: synthetic origin, dummy account, no secret exists in this job.
+      - name: Upload first-run probe evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: eye-firstrun-probe-${{ github.run_id }}
+          path: eye-evidence/probe-firstrun/
           retention-days: 14
           if-no-files-found: warn
 
@@ -361,6 +390,7 @@ jobs:
             !eye-evidence/probe-sync/
             !eye-evidence/probe-cents/
             !eye-evidence/probe-focus/
+            !eye-evidence/probe-firstrun/
           retention-days: 14
           if-no-files-found: warn
       - name: B-435 — keep the evidence 90 days
@@ -375,6 +405,7 @@ jobs:
             !eye-evidence/probe-sync/
             !eye-evidence/probe-cents/
             !eye-evidence/probe-focus/
+            !eye-evidence/probe-firstrun/
           retention-days: 90
           if-no-files-found: error
       - name: B-435 — open the issue, or comment on the open one
