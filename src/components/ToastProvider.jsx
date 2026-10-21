@@ -45,17 +45,22 @@ export function ToastProvider({ children }) {
 
 function Toast({ toast, onClose }) {
   const { kind, message } = toast;
+  // B-447 (21.10) — light mode: `index.css` remaps `.bg-emerald-500/10` (and rose/cyan) to the soft
+  // accent background AND `color: var(--accent-*)`, which beats `text-*-200` ⇒ success text read
+  // #00c805 on #ebfbeb = 2.1:1 (info computed 3.70:1). `light*` = a LIGHT-ONLY colour on the text
+  // and icon (`html:not(.dark)` ⇒ no rule at all in dark ⇒ dark renders exactly as before).
+  // Computed: text 7.15 / 6.83 / 6.84 : 1 · icon 5.10 / 5.36 / 5.36 : 1. ⛔ interpolation (Tailwind JIT).
   const styles = {
-    success: { border: "border-emerald-500/40", bg: "bg-emerald-500/10", text: "text-emerald-200", Icon: CheckCircle2, iconColor: "text-emerald-400" },
-    error: { border: "border-rose-500/40", bg: "bg-rose-500/10", text: "text-rose-200", Icon: AlertTriangle, iconColor: "text-rose-400" },
-    info: { border: "border-cyan-500/40", bg: "bg-cyan-500/10", text: "text-cyan-200", Icon: Info, iconColor: "text-cyan-400" },
+    success: { border: "border-emerald-500/40", bg: "bg-emerald-500/10", text: "text-emerald-200", lightText: "[html:not(.dark)_&]:text-[#065f46]", Icon: CheckCircle2, iconColor: "text-emerald-400", lightIcon: "[html:not(.dark)_&]:text-[#047857]" },
+    error: { border: "border-rose-500/40", bg: "bg-rose-500/10", text: "text-rose-200", lightText: "[html:not(.dark)_&]:text-[#9f1239]", Icon: AlertTriangle, iconColor: "text-rose-400", lightIcon: "[html:not(.dark)_&]:text-[#be123c]" },
+    info: { border: "border-cyan-500/40", bg: "bg-cyan-500/10", text: "text-cyan-200", lightText: "[html:not(.dark)_&]:text-[#075985]", Icon: Info, iconColor: "text-cyan-400", lightIcon: "[html:not(.dark)_&]:text-[#0369a1]" },
   };
   const s = styles[kind] || styles.info;
   const Icon = s.Icon;
   return (
     <div role={kind === "error" ? "alert" : undefined} className={`pointer-events-auto flex items-start gap-2 rounded-xl ${s.bg} border ${s.border} ${s.text} px-4 py-3 shadow-2xl backdrop-blur-md animate-fade-in`}>
-      <Icon size={16} className={`${s.iconColor} shrink-0 mt-0.5`} />
-      <span className="flex-1 text-xs leading-relaxed">{message}</span>
+      <Icon size={16} className={`${s.iconColor} ${s.lightIcon} shrink-0 mt-0.5`} />
+      <span className={`flex-1 text-xs leading-relaxed ${s.lightText}`}>{message}</span>
       <button onClick={onClose}
         aria-label={typeof document !== "undefined" && document.documentElement.lang === "en" ? "Close" : "סגור"}
         className="text-slate-400 hover:text-white transition shrink-0">

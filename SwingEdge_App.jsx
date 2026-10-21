@@ -121,6 +121,7 @@ import InfoTooltip from "./src/components/ui/InfoTooltip.jsx";
 import TermTooltip from "./src/components/ui/TermTooltip.jsx";
 import SmartSelect from "./src/components/ui/SmartSelect.jsx";
 import useModalA11y from "./src/hooks/useModalA11y.js";
+import useKeepFocusedVisible from "./src/hooks/useKeepFocusedVisible.js";
 import { getTradeSelectProps, CATEGORY_TOOLTIP } from "./src/data/tradeOptions.jsx";
 import { TRADING_TOOLTIPS, resolveSetupKey } from "./src/data/tooltips.js";
 import { getSetupTooltip } from "./src/intelligence/knowledgeGlue.js";
@@ -1599,6 +1600,16 @@ export default function SwingEdge() {
   const [form, setForm] = useState({ ticker: "", side: "LONG", entry: "", stop: "", target: "", shares: "", setup: "Breakout", notes: "", marketCondition: "Trending Up", emotionAtEntry: "Neutral", entryQuality: 3, tradeImage: null, tradeImagePreview: null });
   const [showTradeContext, setShowTradeContext] = useState(false);
   const [ocrStatus, setOcrStatus] = useState(null);
+  // B-443 (21.10) — ONE way to open an empty Log Trade form. It was copied inline at three sites
+  // (`N` shortcut · empty-journal CTA · FAB) while the dashboard's «add first trade» only switched
+  // tabs — a new user paid a tap for the copy that was missing. The welcome modal opens it too.
+  // ⛔ a new `source` value: `trackTradeFormOpened` coerces to a closed list (test:analytics).
+  const openTradeForm = useCallback(() => {
+    setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null });
+    setOcrStatus(null);
+    setShowForm(true);
+    trackTradeFormOpened("manual");
+  }, []);
   // Holds the ticker of an OCR read that came back WITHOUT an entry price. While it
   // matches, the live quote must not fill Entry: the trader is looking at a chart
   // whose entry we failed to read, and a current price sitting in that field is
@@ -1621,7 +1632,16 @@ export default function SwingEdge() {
   const logTitleId = useId();
   const closeTitleId = useId();
   const logModalRef = useModalA11y({ active: showForm, onClose: () => setShowForm(false) });
+  // B-446 G1 — the Log Trade actions live in a FIXED footer (they sat at the end of the scrolling
+  // body: outside the viewport in 8/8 measured cells once the sizing panel opened). The focused
+  // field is kept above that footer and above the iOS keyboard (visualViewport).
+  const logBodyRef = useRef(null);
+  const logFooterRef = useRef(null);
+  useKeepFocusedVisible(logBodyRef, logFooterRef, showForm);
   const closeModalRef = useModalA11y({ active: showCloseForm, onClose: () => { setShowCloseForm(false); setClosingTrade(null); } });
+  const closeBodyRef = useRef(null);
+  const closeFooterRef = useRef(null);
+  useKeepFocusedVisible(closeBodyRef, closeFooterRef, showCloseForm);
   const [closeForm, setCloseForm] = useState({ exit: "", exitReason: "Hit Target", followedPlan: true, lessonLearned: "", maxFavorable: "", maxAdverse: "" });
 
   // Trade Analyzer state
@@ -1768,8 +1788,14 @@ export default function SwingEdge() {
   const pendingWrites = pendingWritesRef.current;
 
   // ── Load trades: Supabase is source of truth; localStorage is fallback ──
+  // B-445 (21.10) — `tradesLoaded`: THIS user's journal has been read from the server. Until it
+  // is, `realTrades.length === 0` means «not known yet», ⛔ «empty» — the welcome modal must not
+  // tell a trader with 50 trades to «log your first trade» while the GET is in flight (Niv 21.10).
+  // A failed read stays `false` (⛔ a guessed «empty», R-2). Local-only mode has nothing to wait for.
+  const [tradesLoaded, setTradesLoaded] = useState(!isSupabaseConfigured);
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase || !authUser?.id) return;
+    setTradesLoaded(false);
     let cancelled = false;
     const loadTrades = async () => {
       try {
@@ -1793,6 +1819,7 @@ export default function SwingEdge() {
         // REPLACE — not merge
         const cleaned = purgeInvalidTrades(cleanTrades((data || []).map(tradeFromSupabase)));
         setTrades(cleaned);
+        setTradesLoaded(true);
       } catch (e) {
         console.error("Supabase load failed:", e);
       }
@@ -2220,7 +2247,7 @@ export default function SwingEdge() {
       if (isTyping) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const k = e.key.toLowerCase();
-      if (k === "n") { e.preventDefault(); setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null }); setOcrStatus(null); setShowForm(true); trackTradeFormOpened("manual"); }
+      if (k === "n") { e.preventDefault(); openTradeForm(); }
       else if (k === "j") { e.preventDefault(); setTab("journal"); }
       else if (k === "d") { e.preventDefault(); setTab("dashboard"); }
       else if (k === "a") { e.preventDefault(); setTab("analyzer"); }
@@ -2228,7 +2255,7 @@ export default function SwingEdge() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [showForm, showCloseForm, showEditForm, showProfileDropdown]);
+  }, [showForm, showCloseForm, showEditForm, showProfileDropdown, openTradeForm]);
 
   // Persist price alerts
   useEffect(() => {
@@ -4348,7 +4375,14 @@ export default function SwingEdge() {
 
       {/* ── WELCOME ANNOUNCEMENT (one-time, all users, cross-device) ── */}
       {showWelcome && (
-        <WelcomeAnnouncement lang={lang} isRTL={isRTL} onStart={dismissWelcome} />
+        <WelcomeAnnouncement
+          lang={lang}
+          isRTL={isRTL}
+          onStart={dismissWelcome}
+          // B-445 — «log your first trade» only on a journal KNOWN to be empty (⛔ while it loads).
+          firstTrade={tradesLoaded && realTrades.length === 0}
+          onLogTrade={() => { dismissWelcome(); openTradeForm(); }}
+        />
       )}
 
       {/* ── BETA WELCOME (first login only) ── */}
@@ -4800,8 +4834,10 @@ export default function SwingEdge() {
           <div className="space-y-5 animate-fade-in">
             <>
             {realTrades.length === 0 && (
-              <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-2xl p-6 text-center mb-6">
-                <div className="text-5xl mb-3">👋</div>
+              // B-446 G2 (Niv 21.10) — compact on phones: at 390×664 the consent card covered this CTA
+              // (y=489 he · 533 en). ⛔ touching the consent banner (legal) — the card gives the room.
+              <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-2xl p-4 sm:p-6 text-center mb-6">
+                <div className="hidden sm:block text-5xl mb-3" aria-hidden="true">👋</div>
                 <h2 className="text-white font-bold text-xl mb-2">{t.welcomeTitle}</h2>
                 <p className="text-slate-400 text-sm mb-4 leading-relaxed">
                   {t.welcomeBody1}<br/>
@@ -4809,7 +4845,7 @@ export default function SwingEdge() {
                 </p>
                 <div className="flex flex-wrap gap-2 justify-center">
                   <button
-                    onClick={() => setTab('journal')}
+                    onClick={openTradeForm}
                     className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2.5 rounded-xl font-semibold transition-all shadow-lg shadow-blue-500/20">
                     ➕ {t.addFirstTrade}
                   </button>
@@ -5607,8 +5643,9 @@ export default function SwingEdge() {
                 currency={dispCcy}
               />
             ) : trades.length === 0 ? (
-              <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-2xl p-12 text-center">
-                <BookOpen size={36} className="mx-auto text-slate-600 mb-4" />
+              // B-446 (21.10) — compact on phones: the consent card covered this CTA (Pixel 7 · 390×844, y=711).
+              <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-2xl p-6 sm:p-12 text-center">
+                <BookOpen size={36} className="mx-auto text-slate-600 mb-3 sm:mb-4" />
                 <h3 className="se-serif text-2xl md:text-3xl text-white mb-2 tracking-tight">{t.emptyTitle}</h3>
                 <p className="text-xs text-slate-500 mb-5 max-w-sm mx-auto leading-relaxed">{t.emptyBody}</p>
                 <div className="flex flex-wrap items-center justify-center gap-2">
@@ -5617,7 +5654,7 @@ export default function SwingEdge() {
                       document.querySelector TWO matches and it took this one: an element
                       that vanishes the moment a trade exists. The tour anchors on the FAB,
                       which is always mounted. One anchor, one element. */}
-                  <button data-tour="add-first-trade" onClick={() => { setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null }); setOcrStatus(null); setShowForm(true); trackTradeFormOpened("manual"); }}
+                  <button data-tour="add-first-trade" onClick={openTradeForm}
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--v3-accent)] text-black font-bold text-xs hover:opacity-90 transition">
                     <Plus size={13} /> {lang === "he" ? "עסקה ראשונה" : "Add First Trade"}
                   </button>
@@ -5687,7 +5724,10 @@ export default function SwingEdge() {
                       />
                     </th>
                     {[t.colTicker,t.colDate,t.colSide,t.colEntry,t.colStop,t.colTarget,t.colShares,t.currentPrice,t.livePnl,t.colExit,"P&L","R",t.colHold,t.colSetup,t.colMkt,t.colEmotion,"★",t.colExitReason,t.colPlan,t.colLesson,t.colStatus,t.colAction].map(h => (
-                      <th key={h} className={`p-3 text-start font-semibold whitespace-nowrap ${h===t.currentPrice||h===t.livePnl ? "text-[var(--v3-info)]" : ""}`}>{h}</th>
+                      // B-448 (21.10) — the action column is STICKY on the inline-end edge (left in RTL): 23
+                      // nowrap columns pushed it outside the scroller at every desktop width (1440 · 1024 · 768,
+                      // he x<0 · en x>vw). Opaque cell = the wrapper's surface, so scrolled columns pass UNDER it.
+                      <th key={h} className={`p-3 text-start font-semibold whitespace-nowrap ${h===t.currentPrice||h===t.livePnl ? "text-[var(--v3-info)]" : ""} ${h===t.colAction ? "sticky end-0 z-[1] bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border-s border-[var(--border-subtle)] dark:border-white/[0.06]" : ""}`}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -5700,7 +5740,7 @@ export default function SwingEdge() {
                     // נגזר ברינדור, ⛔ לעולם לא נשמר. `strategy` נעדר → stale=false.
                     const hz = horizonState(t, { strategy: userProfile?.strategy });
                     return (
-                      <tr key={t.id} className={`border-b border-white/[0.04] transition-colors ${isSelected ? "bg-[#06b6d4]/[0.06]" : ""} ${!isOpen && win ? "hover:bg-[#00C076]/[0.04]" : !isOpen ? "hover:bg-[#F43F5E]/[0.04]" : "hover:bg-white/[0.03]"}`}>
+                      <tr key={t.id} className={`group border-b border-white/[0.04] transition-colors ${isSelected ? "bg-[#06b6d4]/[0.06]" : ""} ${!isOpen && win ? "hover:bg-[#00C076]/[0.04]" : !isOpen ? "hover:bg-[#F43F5E]/[0.04]" : "hover:bg-white/[0.03]"}`}>
                         <td className={`p-3 w-8 border-s-[3px] ${isOpen ? "border-[#06b6d4]/40" : win ? "border-[var(--v3-accent)]" : "border-[var(--v3-loss)]"}`}>
                           <input
                             type="checkbox"
@@ -5816,7 +5856,9 @@ export default function SwingEdge() {
                           )}
                         </td>
                         <td className="p-3"><span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${isOpen ? "bg-[#06b6d4]/10 text-[var(--v3-info)] border border-[#06b6d4]/20" : "bg-slate-500/10 text-slate-500 border border-slate-700"}`}>{labelFor("status", t.status, lang)}</span></td>
-                        <td className="p-3">
+                        {/* B-448 — sticky (see the header). The row's selected/hover tint is painted on this
+                            opaque cell as an inset shadow, so the column still reads as part of its row. */}
+                        <td className={`p-3 sticky end-0 z-[1] bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border-s border-[var(--border-subtle)] dark:border-white/[0.06] ${isSelected ? "shadow-[inset_0_0_0_999px_rgba(6,182,212,0.06)]" : ""} ${!isOpen && win ? "group-hover:shadow-[inset_0_0_0_999px_rgba(0,192,118,0.04)]" : !isOpen ? "group-hover:shadow-[inset_0_0_0_999px_rgba(244,63,94,0.04)]" : "group-hover:shadow-[inset_0_0_0_999px_rgba(255,255,255,0.03)]"}`}>
                           <div className="flex items-center gap-1 whitespace-nowrap">
                             {isOpen && (
                               <button onClick={()=>{setClosingTrade(t);setShowCloseForm(true);}}
@@ -8262,7 +8304,7 @@ export default function SwingEdge() {
               </button>
             </div>
 
-            <div className="p-5 space-y-4 overflow-y-auto">
+            <div ref={logBodyRef} className="p-5 space-y-4 overflow-y-auto min-h-0 flex-1">
               {/* Row 1 */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -8680,8 +8722,12 @@ export default function SwingEdge() {
                 </div>
               )}
 
-              {/* Actions */}
-              <div className="flex gap-2 pt-1">
+            </div>
+
+            {/* Actions — B-446 G1: a FIXED footer, outside the scrolling body. ⛔ an overlay reserve
+                here: the wrapper already keeps the whole dialog above any bottom banner (B-404,
+                `--se-bottom-overlay`) — a second one would count the banner twice (Niv 21.10). */}
+            <div ref={logFooterRef} className="shrink-0 flex gap-2 px-5 py-4 border-t border-[var(--border-subtle)] dark:border-[var(--v3-line)]">
                 <button onClick={handleSubmit}
                   disabled={!form.ticker || !entryN || !stopN || submitState.disabled}
                   className="flex-1 py-2.5 rounded-[var(--v3-radius-chip)] bg-gradient-to-r from-[var(--v3-accent)] to-[var(--v3-purple)] text-white text-sm font-bold hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:opacity-40">
@@ -8702,7 +8748,6 @@ export default function SwingEdge() {
                 <button onClick={()=>setShowForm(false)} className="px-4 py-2.5 rounded-[var(--v3-radius-chip)] bg-white/5 border border-[var(--border-subtle)] dark:border-[var(--v3-line)] text-[var(--v3-text-mid)] text-sm hover:text-white hover:border-white/20 transition">
                   Cancel
                 </button>
-              </div>
             </div>
           </div>
         </div>
@@ -8710,8 +8755,10 @@ export default function SwingEdge() {
 
       {/* ── CLOSE TRADE MODAL ── */}
       {showCloseForm && closingTrade && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div ref={closeModalRef} role="dialog" aria-modal="true" aria-labelledby={closeTitleId} tabIndex={-1} className="w-full max-w-md bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden focus:outline-none">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          // B-446 (21.10) — the bottom-banner reserve Log Trade has had since B-404 (consent z-91 over z-50).
+          style={{ paddingBottom: "calc(1rem + var(--se-bottom-overlay, 0px))" }}>
+          <div ref={closeModalRef} role="dialog" aria-modal="true" aria-labelledby={closeTitleId} tabIndex={-1} className="w-full max-w-md bg-[var(--bg-elevated)] dark:bg-[#0d1424] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[calc(90vh-var(--se-bottom-overlay,0px))] flex flex-col focus:outline-none">
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-subtle)] dark:border-white/[0.06] bg-gradient-to-r from-rose-500/5 to-violet-500/5">
               <div className="flex items-center gap-2">
@@ -8725,7 +8772,9 @@ export default function SwingEdge() {
               </button>
             </div>
 
-            <div className="p-5 space-y-4">
+            {/* B-446 G1 (21.10) — the same shape as Log Trade: a scrolling body + a FIXED footer. At
+                390×664 the dialog (no max-h) overflowed both edges: X above the screen, actions under the banner. */}
+            <div ref={closeBodyRef} className="p-5 space-y-4 overflow-y-auto min-h-0 flex-1">
               {/* Trade summary */}
               <div className="bg-white/3 rounded-xl p-3 border border-[var(--border-subtle)] dark:border-white/[0.06] grid grid-cols-3 gap-2 text-center text-[10px]">
                 <div><div className="text-slate-600 uppercase tracking-wider">Entry</div><div className="font-mono font-bold text-slate-300">{fmtPaperPrice(closingTrade.entry, closingTrade)}</div></div>
@@ -8788,8 +8837,10 @@ export default function SwingEdge() {
                   placeholder="What did this trade teach you?" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-violet-500/50 focus:outline-none transition resize-y" />
               </div>
 
-              {/* Actions */}
-              <div className="flex gap-2 pt-1">
+            </div>
+
+            {/* Actions — fixed footer (B-446 G1) */}
+            <div ref={closeFooterRef} className="shrink-0 flex gap-2 px-5 py-4 border-t border-[var(--border-subtle)] dark:border-white/[0.06]">
                 <button onClick={handleCloseSubmit}
                   className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-violet-500 text-white text-sm font-bold hover:opacity-90 transition">
                   Close Trade →
@@ -8797,7 +8848,6 @@ export default function SwingEdge() {
                 <button onClick={()=>{setShowCloseForm(false);setClosingTrade(null);}} className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm hover:text-white hover:border-white/20 transition">
                   Cancel
                 </button>
-              </div>
             </div>
           </div>
         </div>
@@ -8881,7 +8931,7 @@ export default function SwingEdge() {
       {/* ── FLOATING NEW TRADE BUTTON ── */}
       <button
         data-tour="add-trade"
-        onClick={() => { setForm({ ticker:"", side:"LONG", entry:"", stop:"", target:"", shares:"", setup:"Breakout", notes:"", marketCondition:"Trending Up", emotionAtEntry:"Neutral", entryQuality:3, tradeImage:null, tradeImagePreview:null }); setOcrStatus(null); setShowForm(true); trackTradeFormOpened("manual"); }}
+        onClick={openTradeForm}
         className={`fixed bottom-6 right-6 rtl:right-auto rtl:left-6 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-violet-500 text-white shadow-2xl shadow-cyan-500/25 flex items-center justify-center hover:scale-110 active:scale-95 transition-transform motion-reduce:transition-none ${fabVisible ? "translate-y-0 opacity-100" : "translate-y-24 opacity-0 pointer-events-none"}`}
         // B-404/B-405 — lifted above any bottom banner (--se-bottom-overlay, src/lib/bottomOverlay.js).
         style={{ bottom: "calc(1.5rem + env(safe-area-inset-bottom) + var(--se-bottom-overlay, 0px))" }}

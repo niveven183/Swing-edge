@@ -680,8 +680,11 @@ input:disabled {
   border-bottom: 1px solid var(--border-soft);
 }
 
-[class*="toast"],
-[role="status"][class*="fixed"] {
+/* B-447 (21.10) — `[role="status"][class*="fixed"]` was removed from this rule: since B-388 (01.10)
+   gave the toast container `role="status"`, it matched THAT container — the only element it matched —
+   and painted the EMPTY live region as a white 36×32 box with a green edge on every screen (8/8
+   measured cells). Each toast styles itself (ToastProvider.jsx); the region must paint nothing. */
+[class*="toast"] {
   background: var(--surface-elevated);
   border-left: 4px solid var(--accent-emerald);
   border-radius: var(--radius-md);
@@ -701,8 +704,9 @@ input:disabled {
   }
 }
 
-[dir="rtl"] [class*="toast"],
-[dir="rtl"] [role="status"] {
+/* B-447 — likewise `[dir="rtl"] [role="status"]`: it drew a 4px green edge on EVERY status
+   element in RTL (the toast region + 7 in-app `role="status"` lines), never only on toasts. */
+[dir="rtl"] [class*="toast"] {
   border-left: none;
   border-right: 4px solid var(--accent-emerald);
 }
