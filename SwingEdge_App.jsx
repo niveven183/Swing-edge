@@ -8249,7 +8249,7 @@ export default function SwingEdge() {
         {tab === "tools" && toolsTab === 'report' && (
           <MonthlyReportTab
             trades={realTrades}
-            calcMetrics={calcTradeMetrics}
+            calcMetrics={stableCalcTradeMetrics}
             t={t}
             lang={lang}
             isRTL={isRTL}
@@ -8262,7 +8262,7 @@ export default function SwingEdge() {
           <WeeklyReviewTab
             trades={realTrades}
             capital={capital}
-            calcMetrics={calcTradeMetrics}
+            calcMetrics={stableCalcTradeMetrics}
             authUser={authUser}
             t={t}
             lang={lang}

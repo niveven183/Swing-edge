@@ -183,6 +183,13 @@ export default function MonthlyReportTab({ trades, calcMetrics, t, lang, isRTL, 
           {interp(t.avgRSample, { n: summary.rSampleSize, total: summary.totalTrades })}
         </span>, "avgR")}
       </div>
+      {/* B-457 (wave 1 F2) — a closed trade with no FX rate to `currency` is ⛔ in the P&L above and
+          ⛔ counted as ₪. Said here, with its denominator (§2), through the existing 5-language key. */}
+      {summary.fxUnconvertedCount > 0 && (
+        <p role="status" data-testid="mr-fx-excluded" className="-mt-2 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+          ⚠️ {t.unconvertedClosedWarn.replace("{n}", String(summary.fxUnconvertedCount)).replace("{m}", String(summary.fxUnconvertedCount + summary.fxAggregatableCount))}
+        </p>
+      )}
 
       {/* STRENGTHS */}
       <div className={`${CARD} p-5`}>
