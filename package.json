@@ -41,6 +41,7 @@
     "test:cents": "node scripts/cents-precision-test.mjs",
     "probe:boundary": "node scripts/boundary-render-probe.mjs",
     "probe:sentry": "node scripts/sentry-scrub-probe.mjs",
+    "probe:renders": "node scripts/render-count-probe.mjs",
     "probe:dailypnl": "node scripts/daily-pnl-label-test.mjs",
     "probe:deploychunk": "node scripts/deploy-chunk-probe.mjs",
     "probe:eye": "node scripts/eye-probe.mjs",
