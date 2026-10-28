@@ -7,9 +7,9 @@
 // every commit; the root "rendered" when its fiber's memoizedState ≠ its alternate's.
 //
 // Arms (exit 1 on any wrong verdict — a blind probe is red, B-272):
-//   HEAD     the tree                                       ⇒ ≤ 20 / 60 s   (Niv 28.10: was 84)
+//   HEAD     the tree                                       ⇒ ≤ 30 / 60 s   (was 84 — see BUDGET below)
 //   BEFORE   SwingEdge_App.jsx + src/index.css at 9f47d5f   ⇒ ≥ 60 / 60 s
-//   MUT-F5   HEAD + the 1.5 s setPulse interval put back     ⇒ > 20 / 60 s
+//   MUT-F5   HEAD + the 1.5 s setPulse interval put back     ⇒ > 30 / 60 s (the budget must still catch it)
 // --breakdown (B-462): HEAD minus ONE of the four remaining intervals per arm — the delta is that
 //   source's share of the residual. Reported, never judged.
 // ⚠️ The market state is whatever the clock says (the intervals run in every state). n = 1 per arm.
@@ -28,6 +28,11 @@ const APP = join(ROOT, "SwingEdge_App.jsx");
 const CSS = join(ROOT, "src/index.css");
 const BEFORE_REF = "9f47d5f";
 const SECS = 60;
+// BUDGET (Niv 28.10, DECISIONS): ≤ 30, ⛔ the planned ≤ 20. The 20 was a guess from the diagnosis's single
+// 18/min sample; HEAD measured 25 · 24 · 24 · 25 (n = 4), and the residual is the price-refresh cycle
+// (--breakdown: Δ 13 of 25) — which wave 4 (data accuracy) rewrites anyway (B-462), and which tightens this
+// back to ≤ 20. ⛔ A widened gate that hides a regression: BEFORE (≥ 60) and MUT-F5 (> 30) stay red at 30.
+const BUDGET = 30;
 const WORK = mkdtempSync(join(tmpdir(), "probe-renders-"));
 const die = (m) => { console.error(`❌ ${m}`); process.exit(2); };
 const once = makeOnce(die);
@@ -37,9 +42,9 @@ const show = (f) => execFileSync("git", ["show", `${BEFORE_REF}:${f.replace(ROOT
 const ANCHOR = "  // blink in CSS now (.se-pulse-opacity · .se-pulse-emerald, src/index.css). Pinned by test:perf.\n";
 const off = (find, repl) => [APP, find, () => repl];
 const ARMS = {
-  HEAD: { muts: [], max: 20 },
+  HEAD: { muts: [], max: BUDGET },
   BEFORE: { muts: [[APP, WHOLE, () => show(APP)], [CSS, WHOLE, () => show(CSS)]], min: 60 },
-  "MUT-F5": { muts: [[APP, ANCHOR, () => `${ANCHOR}  const [pulse, setPulse] = useState(false); useEffect(() => { const t = setInterval(() => setPulse(p => !p), 1500); return () => clearInterval(t); }, []); void pulse;\n`]], over: 20 },
+  "MUT-F5": { muts: [[APP, ANCHOR, () => `${ANCHOR}  const [pulse, setPulse] = useState(false); useEffect(() => { const t = setInterval(() => setPulse(p => !p), 1500); return () => clearInterval(t); }, []); void pulse;\n`]], over: BUDGET },
 };
 const BREAKDOWN = {
   "NO-MARKET": [off("const t = setInterval(() => setMarketState(getMarketState()), 30_000);", "const t = null;")],

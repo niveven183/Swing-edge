@@ -7,7 +7,7 @@
 //   F2  ₪ account, +$100 (AAPL) + ₪200 (TEVA, file_cell): weekly + monthly + analytics = ₪570 at 3.7;
 //       with no rate ₪200 + «no FX rate for 1 of 2» (BEFORE: ₪300 everywhere)
 //   F3  a password-recovery return `/app#access_token=…&refresh_token=…`: ⛔ token in ANY Sentry envelope
-//   F4  an insert answered 500 + PG "Failing row contains (WAVEF4, 187.45)": one write_failure event,
+//   F4  an insert answered 500 + PG "Failing row contains (WAVEFX, 187.45)": one write_failure event,
 //       tags {op, table, status, code, reason}, ⛔ price · ⛔ ticker · ⛔ PG text
 //   F5  the three dots blink in CSS (open), sit still when closed, and do not move under reduced-motion
 //
@@ -31,11 +31,12 @@ const ARM = process.env.EYE_ARM || (HERMETIC ? "hermetic" : "production");
 const INGEST_RX = /\/api\/\d+\/envelope\//;
 const RATE = 3.7;
 const XSS = "<img src=x onerror=window.__xss=1>";
-const F4_TICKER = "WAVEF4";
+const F4_TICKER = "WAVEFX"; // letters only: a digit makes the paper currency unverified ⇒ no size ⇒ no INSERT (measured 28.10)
 const F4_PRICE = "187.45";
 const PG_TEXT = `Failing row contains (${F4_TICKER}, ${F4_PRICE})`;
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const NO_RATE_RX = new RegExp(allLangs("unconvertedClosedWarn").map((s) => esc(s.replace("{n}", "1").replace("{m}", "2"))).join("|"));
+// «no FX rate for 1 of M»: the weekly window holds 2 closed trades, the reported (previous) month 5.
+const noRateRx = (m) => new RegExp(allLangs("unconvertedClosedWarn").map((s) => esc(s.replace("{n}", "1").replace("{m}", String(m)))).join("|"));
 
 const ctxOpts = (info) => {
   const u = info.project.use;
@@ -152,15 +153,25 @@ test.describe("wave 1 — security & money (B-456 … B-460)", () => {
   // ── F2 · weekly + monthly + analytics agree, converted ──────────────────────────────────────────────────
   for (const lang of ["he", "en"]) {
     for (const fx of ["rate", "none"]) {
-      test(`F2 · ${lang} · ${fx === "rate" ? "rate 3.7 ⇒ ₪570" : "no rate ⇒ ₪200 + 1 of 2"} — weekly · monthly · analytics (B-457)`, async ({ browser }, info) => {
+      test(`F2 · ${lang} · ${fx === "rate" ? "rate 3.7 ⇒ ₪570" : "no rate ⇒ ₪200 + 1 excluded"} — weekly · monthly · analytics (B-457)`, async ({ browser }, info) => {
         const store = newStore();
         store.settings.capitalCurrency = "ILS";
         store.settings.accountCurrency = "ILS";
+        // The weekly window (last 7 days): +$100 + ₪200. The monthly report shows COMPLETED months only and
+        // needs 5 trades ⇒ the previous month: the same pair + three ₪ break-evens. Analytics (all time) = both.
+        const prevMid = new Date(new Date().getFullYear(), new Date().getMonth(), 1, 12) - 15 * 864e5;
+        const pIso = new Date(prevMid).toISOString(), pDay = pIso.slice(0, 10);
+        const pair = (tag, date, closedAt) => [
+          row({ id: `w1-f2-usd-${tag}`, ticker: "AAPL", entry: 100, exit: 110, stop: 95, shares: 10, date, closedAt, currency: "USD", currency_source: "manual_capital" }),
+          row({ id: `w1-f2-ils-${tag}`, ticker: "TEVA", entry: 30, exit: 32, stop: 29, shares: 100, date, closedAt, currency: "ILS", currency_source: "file_cell" }),
+        ];
         store.trades = [
-          row({ id: "w1-f2-usd", ticker: "AAPL", entry: 100, exit: 110, stop: 95, shares: 10, date: today(), closedAt: nowIso(), currency: "USD", currency_source: "manual_capital" }),
-          row({ id: "w1-f2-ils", ticker: "TEVA", entry: 30, exit: 32, stop: 29, shares: 100, date: today(), closedAt: nowIso(), currency: "ILS", currency_source: "file_cell" }),
+          ...pair("week", today(), nowIso()),
+          ...pair("month", pDay, pIso),
+          ...[1, 2, 3].map((i) => row({ id: `w1-f2-be${i}`, ticker: "TEVA", entry: 30, exit: 30, stop: 29, shares: 100, date: pDay, closedAt: pIso, currency: "ILS", currency_source: "file_cell" })),
         ];
         const gold = fx === "rate" ? "570" : "200";
+        const goldAll = fx === "rate" ? "1,140" : "400"; // analytics, all time = week + previous month
         const app = await open(browser, info, lang, store, `F2-${fx}`, { fx });
         const { page } = app;
         try {
@@ -168,25 +179,33 @@ test.describe("wave 1 — security & money (B-456 … B-460)", () => {
           await closeOverlays(page);
           await page.waitForTimeout(2500); // the FX table lands (or is refused)
           const seen = {};
+          const amounts = (t) => (t.match(/[-+]?₪\s?[\d,]+(?:\.\d+)?/g) || []);
+          const isGold = (t) => new RegExp(`^[+]?₪\\s?${gold}(?:\\.00)?$`).test(t.trim());
           await tab(page, "weeklyReview");
-          seen.weekly = await page.locator("main, body").first().innerText();
+          // The weekly hero P&L — the one serif number on the screen.
+          seen.weeklyHero = (await page.locator(".se-serif").first().innerText()).trim();
+          seen.weekly = await page.locator("body").innerText();
           await app.shot("weekly");
           await tab(page, "tools");
           await page.getByRole("button", { name: containsRx("dnaReport") }).first().click();
           await page.waitForTimeout(800);
-          seen.monthly = await page.locator("main, body").first().innerText();
+          // The report opens on the PREVIOUS completed month — where the five trades are.
+          // The monthly summary cards' values (the Net P&L card is one of them).
+          seen.monthlyCards = (await page.locator(".text-xl.font-bold.font-mono").allInnerTexts()).map((x) => x.trim());
+          seen.monthly = await page.locator("body").innerText();
           await app.shot("monthly");
           await tab(page, "analytics");
           await page.waitForTimeout(800);
-          seen.analytics = await page.locator("main, body").first().innerText();
-          writeFileSync(join(app.dir, `F2-${fx}-${lang}.json`), JSON.stringify(Object.fromEntries(Object.entries(seen).map(([k, v]) => [k, (v.match(/[-+]?₪\s?[\d,]+(?:\.\d+)?/g) || []).slice(0, 12)])), null, 2));
-          for (const where of ["weekly", "monthly", "analytics"]) {
-            expect.soft(new RegExp(`₪\\s?${gold}(?![\\d,])`).test(seen[where]), `B-457 (${where}): ₪${gold} is not on screen — amounts seen: ${(seen[where].match(/₪\s?[\d,.]+/g) || []).join(" ")}`).toBe(true);
-            expect.soft(/₪\s?300(?![\d,])/.test(seen[where]), `B-457 (${where}): ₪300 — the $ trade was summed as ₪`).toBe(false);
-          }
+          seen.analytics = await page.locator("body").innerText();
+          writeFileSync(join(app.dir, `F2-${fx}-${lang}.json`), JSON.stringify({ gold, weeklyHero: seen.weeklyHero, monthlyCards: seen.monthlyCards, goldAll, analyticsAmounts: amounts(seen.analytics).slice(0, 16) }, null, 2));
+          expect.soft(isGold(seen.weeklyHero), `B-457 (weekly): the hero P&L is «${seen.weeklyHero}», expected ₪${gold}`).toBe(true);
+          expect.soft(seen.monthlyCards.some(isGold), `B-457 (monthly): no summary card shows ₪${gold} — cards: ${seen.monthlyCards.join(" | ")}`).toBe(true);
+          expect.soft(seen.monthlyCards.some((t) => /^[+]?₪\s?300(?:\.00)?$/.test(t)), "B-457 (monthly): ₪300 — the $ trade was summed as ₪").toBe(false);
+          // analytics: the same engine on the same calc ⇒ the gold is on screen (positive check only — axis ticks are numbers too)
+          expect.soft(new RegExp(`₪\\s?${goldAll}(?:\\.00)?(?![\\d,])`).test(seen.analytics), `B-457 (analytics, all time): ₪${goldAll} is not on screen — ${amounts(seen.analytics).slice(0, 10).join(" ")}`).toBe(true);
           if (fx === "none") {
-            expect.soft(NO_RATE_RX.test(seen.weekly), "B-457: the weekly review does not say «no FX rate for 1 of 2»").toBe(true);
-            expect.soft(NO_RATE_RX.test(seen.monthly), "B-457: the monthly report does not say «no FX rate for 1 of 2»").toBe(true);
+            expect.soft(noRateRx(2).test(seen.weekly), "B-457: the weekly review does not say «no FX rate for 1 of 2»").toBe(true);
+            expect.soft(noRateRx(5).test(seen.monthly), "B-457: the monthly report does not say «no FX rate for 1 of 5»").toBe(true);
           }
         } finally { await app.ctx.close(); }
       });
@@ -230,7 +249,8 @@ test.describe("wave 1 — security & money (B-456 … B-460)", () => {
     const { page } = app;
     try {
       // Registered AFTER the store route ⇒ tried first. Only the INSERT fails; the journal GET still answers.
-      await page.route(/\/rest\/v1\/trades(\?|$)/, (route) => route.request().method() === "POST"
+      let posts = 0;
+      await page.route(/\/rest\/v1\/trades(\?|$)/, (route) => route.request().method() === "POST" && ++posts
         ? route.fulfill({ status: 500, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ code: "23514", message: `new row violates check constraint — ${PG_TEXT}`, details: PG_TEXT, hint: `${F4_TICKER} ${F4_PRICE}` }) })
         : route.fallback());
       await signIn(page, "en");
@@ -245,6 +265,8 @@ test.describe("wave 1 — security & money (B-456 … B-460)", () => {
       await expect(submit).toBeEnabled({ timeout: 25_000 });
       await submit.click();
       await page.waitForTimeout(3000);
+      await app.shot("after-submit");
+      const toastText = await page.locator('[role="status"], [role="alert"]').allInnerTexts().catch(() => []);
       // A LATER, unrelated event — the console.error("Supabase insert failed:", …, PG text) breadcrumb rides on
       // it unless scrubBreadcrumb cut it to its first argument. Without this the G-crumb check is vacuous.
       await page.evaluate(() => { const c = window.__SENTRY__ && window.__SENTRY__[window.__SENTRY__.version]; c && c.defaultCurrentScope.captureMessage("wave1-f4-later"); });
@@ -253,7 +275,8 @@ test.describe("wave 1 — security & money (B-456 … B-460)", () => {
       const wf = evs.filter((e) => e.body.tags && e.body.tags.kind === "write_failure");
       const later = evs.find((e) => e.body.message === "wave1-f4-later" || e.body.message?.formatted === "wave1-f4-later");
       const crumb = (later?.body.breadcrumbs || []).find((b) => b.category === "console" && /Supabase insert failed/.test(b.message || ""));
-      writeFileSync(join(app.dir, "F4.json"), JSON.stringify({ events: evs.length, writeFailures: wf.map((e) => e.body.tags), laterCrumb: crumb || null }, null, 2));
+      writeFileSync(join(app.dir, "F4.json"), JSON.stringify({ posts, toastText, events: evs.length, writeFailures: wf.map((e) => e.body.tags), laterCrumb: crumb || null, laterCrumbs: (later?.body.breadcrumbs || []).map((b) => `${b.category}:${(b.message || "").slice(0, 60)}`) }, null, 2));
+      expect(posts, "F4 is INCONCLUSIVE: the form never sent the INSERT").toBeGreaterThan(0);
       expect(crumb, "G-crumb is INCONCLUSIVE: the later event carries no «Supabase insert failed» console breadcrumb").toBeTruthy();
       expect(crumb.message, "G-crumb: the console breadcrumb carries more than its first argument").toBe("Supabase insert failed:");
       expect(wf.length, "B-459: no write_failure event reached Sentry for the failed insert").toBe(1);
