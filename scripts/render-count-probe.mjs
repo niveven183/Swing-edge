@@ -48,6 +48,9 @@ const BREAKDOWN = {
   "NO-TILT": [off("const id = setInterval(() => setTiltTick(x => x + 1), 60000);", "const id = null;")],
 };
 if (process.argv.includes("--breakdown")) for (const [k, muts] of Object.entries(BREAKDOWN)) ARMS[k] = { muts, report: true };
+// --arms HEAD,BEFORE — run a subset (local triage / repeat measurements); the summary then says "partial".
+const argArms = (() => { const i = process.argv.indexOf("--arms"); return i > 0 ? process.argv[i + 1].split(",") : null; })();
+if (argArms) for (const k of Object.keys(ARMS)) if (!argArms.includes(k)) delete ARMS[k];
 
 async function count(dir) {
   const { server, port } = await serve(dir);
@@ -100,5 +103,5 @@ for (const [arm, a] of Object.entries(ARMS)) {
   if (!ok) failures++;
   console.log(`${ok ? "✅" : "❌"} ${arm.padEnd(12)} ${String(r.renders).padStart(3)} root renders / ${SECS} s · ${r.commits} commits · root hooks ${r.hooks} ⇒ ${verdict}`);
 }
-console.log(failures ? `\n❌ probe:renders — ${failures} arm(s) wrong` : "\n✅ probe:renders: HEAD within budget · BEFORE reproduced · MUT-F5 killed");
+console.log(failures ? `\n❌ probe:renders — ${failures} arm(s) wrong` : argArms ? `\n✅ probe:renders --arms ${argArms.join(",")} (partial run — ⛔ a verdict)` : "\n✅ probe:renders: HEAD within budget · BEFORE reproduced · MUT-F5 killed");
 process.exit(failures ? 1 : 0);
