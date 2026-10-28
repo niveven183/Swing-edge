@@ -278,7 +278,7 @@ test.describe("wave 1 — security & money (B-456 … B-460)", () => {
       writeFileSync(join(app.dir, "F4.json"), JSON.stringify({ posts, toastText, events: evs.length, writeFailures: wf.map((e) => e.body.tags), laterCrumb: crumb || null, laterCrumbs: (later?.body.breadcrumbs || []).map((b) => `${b.category}:${(b.message || "").slice(0, 60)}`) }, null, 2));
       expect(posts, "F4 is INCONCLUSIVE: the form never sent the INSERT").toBeGreaterThan(0);
       expect(crumb, "G-crumb is INCONCLUSIVE: the later event carries no «Supabase insert failed» console breadcrumb").toBeTruthy();
-      expect(crumb.message, "G-crumb: the console breadcrumb carries more than its first argument").toBe("Supabase insert failed:");
+      expect(crumb.message, "B-459 · G-crumb: the console breadcrumb carries more than its first argument (the PG row text)").toBe("Supabase insert failed:");
       expect(wf.length, "B-459: no write_failure event reached Sentry for the failed insert").toBe(1);
       const t = wf[0].body.tags;
       expect({ op: t.op, table: t.table, status: t.status, code: t.code, reason: t.reason }).toEqual({ op: "insert", table: "trades", status: 500, code: "23514", reason: "error" });
