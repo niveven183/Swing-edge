@@ -54,6 +54,8 @@ import { deleteTradeVerified, restoreAt, createPendingWrites, insertTradeRow, up
 import { loadSettings, saveSettings, flushSettings, flushKeepalive, currentToken, migrateFromLocalStorage, onSettingsSynced, onSettingsConflict, confirmedAt, confirmSynced } from "./src/lib/userSettings.js";
 import { readPending, recordScalarEdit, settlePending, clearPending, decidePending } from "./src/lib/settingsPending.js";
 import { calcTradeMetrics, fmt$, fmt$0, fmtR, fmtNum, fmtPrice, fmtBalance, numOrNull, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays, localDayKey, todayKey, realizedAt, realizedDayKey, currencyOf, fmtPaperPrice, paperCurrencyOf, CURRENCY_SYMBOL, fmtAccountAmount, fmtCapitalAmount } from "./src/utils.js";
+// B-459 (wave 1 F4): every trade-write failure reaches Sentry — closed tags only, ⛔ message (src/lib/telemetry.js).
+import { reportWriteFailure } from "./src/lib/telemetry.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell,
@@ -3298,6 +3300,7 @@ export default function SwingEdge() {
         // back after a failed write, not the trader reaching for it.
         setShowForm(true);
         console.error("Supabase insert failed:", res.reason, res.message);
+        reportWriteFailure("insert", res);
         toast.error(
           (lang === "he"
             ? "העסקה לא נשמרה — הטופס הוחזר, נסה שוב: "
@@ -3355,6 +3358,7 @@ export default function SwingEdge() {
       if (!res.ok) {
         setTrades(prev => prev.map(t => t.id === beforeClose.id ? beforeClose : t));
         console.error("Supabase close-update failed:", res.reason, res.message);
+        reportWriteFailure("close", res);
         toast.error(
           (lang === "he"
             ? "הסגירה לא נשמרה — העסקה חזרה להיות פתוחה: "
@@ -3397,6 +3401,7 @@ export default function SwingEdge() {
     if (!res.ok) {
       if (removed) setTrades(prev => restoreAt(prev, removed, idx));
       console.error("Supabase delete failed:", res.reason, res.message);
+      reportWriteFailure("delete", res);
       toast.error(
         (lang === "he" ? "המחיקה נכשלה — העסקה הוחזרה: " : "Delete failed — the trade was restored: ") +
         res.message
@@ -3454,6 +3459,7 @@ export default function SwingEdge() {
         });
       }
       console.error("Supabase bulk delete failed:", res.reason, res.message);
+      reportWriteFailure("bulk_delete", res);
       toast.error(
         (lang === "he"
           ? `נמחקו ${res.rows} מתוך ${ids.length} — ${back.length} הוחזרו: `
@@ -3493,6 +3499,7 @@ export default function SwingEdge() {
       if (!res.ok) {
         if (beforeEdit) setTrades(prev => prev.map(t => t.id === beforeEdit.id ? beforeEdit : t));
         console.error("Supabase update failed:", res.reason, res.message);
+        reportWriteFailure("update", res);
         toast.error(
           (lang === "he"
             ? "העדכון לא נשמר — הערכים הקודמים הוחזרו: "
@@ -3547,6 +3554,7 @@ export default function SwingEdge() {
       setTrades(prev => prev.filter(tr => !missing.has(tr.id)));
       setLastImportIds(ids.filter(id => !missing.has(id)));
       console.error("[import] supabase insert failed:", res.reason, res.message);
+      reportWriteFailure("import_insert", res);
       toast.error(
         (lang === "he"
           ? `יובאו ${res.rows} מתוך ${ids.length} — ${missing.size} נכשלו: `
@@ -3596,6 +3604,7 @@ export default function SwingEdge() {
         setLastImportIds(back.map(x => x.t.id));
       }
       console.error("[import] supabase undo failed:", res.reason, res.message);
+      reportWriteFailure("import_undo", res);
       toast.error(
         (lang === "he"
           ? `בוטלו ${res.rows} מתוך ${ids.length} — ${back.length} הוחזרו: `

@@ -740,6 +740,22 @@ console.log("test:settings — userSettings module vs mock client (no real DB)\n
   offC();
 }
 
+// ── 15 · B-455 (wave 1 F4) — a failed READ is reported, tags only, and nothing else moved ──
+{
+  const { readFileSync } = await import("node:fs");
+  const us = readFileSync(new URL("../src/lib/userSettings.js", import.meta.url), "utf8");
+  const body = (us.match(/function loadFailed\(userId, err\) \{([\s\S]*?)\n\}/) || [])[1] || "";
+  check("15a loadFailed exists exactly once (extraction failure is red, B-272)", (us.match(/function loadFailed\(/g) || []).length === 1 && body !== "");
+  check("15b loadFailed reports an object error through reportSettingsReadFailure(err) — exactly once",
+    (body.match(/reportSettingsReadFailure\(err\)/g) || []).length === 1 && /typeof err === "object"/.test(body));
+  check("15c the report never receives `.message` — only the error object, whose tags telemetry.js closes",
+    !/reportSettingsReadFailure\([^)]*message/.test(us));
+  // the failure contract is UNCHANGED (B-269): still a non-throwing "failed" with the mirror for display.
+  const failing = { from: () => ({ select: () => ({ eq: () => ({ abortSignal: () => ({ maybeSingle: async () => ({ data: null, error: { code: "42501", message: "permission denied — capital 49000" } }) }) }) }) }) };
+  const r15 = await loadSettings("u15", failing);
+  check("15d a failed read still returns status \"failed\" (⛔ throw, ⛔ retry)", r15?.status === "failed");
+}
+
 console.log("");
 if (failures > 0) {
   console.error(`❌ test:settings — ${failures} assertion(s) failed`);
