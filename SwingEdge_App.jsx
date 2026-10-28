@@ -1629,8 +1629,9 @@ export default function SwingEdge() {
   const [formQuote, setFormQuote] = useState(null);
   const [formQuoteLoading, setFormQuoteLoading] = useState(false);
   const formQuoteTimer = useRef(null);
-  const [pulse, setPulse] = useState(false);
-  const [tickerIdx, setTickerIdx] = useState(0);
+  // B-460 (wave 1 F5): `pulse` + `tickerIdx` were two intervals that re-rendered this whole root
+  // (84 → 18 renders/min idle without them). `tickerIdx` had 0 readers; the three dots `pulse` drove
+  // blink in CSS now (.se-pulse-opacity · .se-pulse-emerald, src/index.css). Pinned by test:perf.
   const [showCloseForm, setShowCloseForm] = useState(false);
   const [closingTrade, setClosingTrade] = useState(null);
 
@@ -2974,34 +2975,8 @@ export default function SwingEdge() {
     return merged;
   }, [closedTrades, stats, lang, accountCurrency]);
 
-  // Top ticker ribbon — fixed 8 tickers updated with live prices
-  const TOP_RIBBON = ["NVDA", "AAPL", "TSLA", "MSFT", "META", "AMD", "BTC-USD", "SPY"];
-  const tickerTapeItems = useMemo(() => {
-    return TOP_RIBBON.map(display => {
-      const lookupKey = display.replace("-USD", "");
-      const lp = getLivePrice(lookupKey) || getLivePrice(display);
-      return {
-        ticker: display,
-        displayTicker: display === "BTC-USD" ? "BTC" : display,
-        changePct: lp ? lp.changePct : 0,
-        price: lp ? lp.price : null,
-        open: lp?.regularMarketOpen ?? null,
-        high: lp?.regularMarketDayHigh ?? null,
-        low: lp?.regularMarketDayLow ?? null,
-        prevClose: lp?.previousClose ?? null,
-      };
-    });
-  }, [livePrices]);
-
-  useEffect(() => {
-    const t = setInterval(() => setTickerIdx(i => (i + 1) % Math.max(tickerTapeItems.length, 1)), 2000);
-    return () => clearInterval(t);
-  }, [tickerTapeItems.length]);
-
-  useEffect(() => {
-    const t = setInterval(() => setPulse(p => !p), 1500);
-    return () => clearInterval(t);
-  }, []);
+  // B-460: the top-ribbon `tickerTapeItems` memo went with the `tickerIdx` interval — that interval was
+  // its only reader (0 renders read it; its `changePct: … : 0` was an invented zero, R-2).
 
   // Derived form calcs
   const entryN  = parseFloat(form.entry)  || 0;
@@ -4619,10 +4594,10 @@ export default function SwingEdge() {
               return (
                 <>
                   <span
-                    className="w-2 h-2 rounded-full transition-colors"
+                    className={`w-2 h-2 rounded-full transition-colors${marketState === MARKET_STATE.OPEN ? " se-pulse-opacity" : ""}`}
                     style={{
                       backgroundColor: badge.color,
-                      opacity: marketState === MARKET_STATE.OPEN ? (pulse ? 1 : 0.55) : 0.85,
+                      opacity: marketState === MARKET_STATE.OPEN ? undefined : 0.85,
                     }}
                   />
                   <span
@@ -7406,7 +7381,7 @@ export default function SwingEdge() {
             <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
               <div className="flex items-center gap-2 mb-4">
                 <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">{t.mo_title}</span>
-                <span className={`w-1.5 h-1.5 rounded-full ${pulse ? "bg-emerald-400" : "bg-emerald-700"} transition-colors`} />
+                <span className="w-1.5 h-1.5 rounded-full se-pulse-emerald" />
                 <span className="text-[10px] text-slate-700">
                   {moRange === 1 ? t.mo_change1d : moRange === 30 ? t.mo_change1m : t.mo_change1w}
                 </span>
@@ -8974,7 +8949,7 @@ export default function SwingEdge() {
             const fOpen = marketState === MARKET_STATE.OPEN;
             return (
               <span className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full transition-colors" style={{ backgroundColor: fBadge.color, opacity: fOpen ? (pulse ? 1 : 0.55) : 0.85 }} />
+                <span className={`w-1.5 h-1.5 rounded-full transition-colors${fOpen ? " se-pulse-opacity" : ""}`} style={{ backgroundColor: fBadge.color, opacity: fOpen ? undefined : 0.85 }} />
                 <span style={{ color: fBadge.color }}>{fBadge.emoji} {fBadge.label}</span>
               </span>
             );
