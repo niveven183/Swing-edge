@@ -44,15 +44,26 @@ export function scrubUrl(s) {
 }
 
 // Deep walk over VALUES. Keys are never read for a decision (rule ①).
+//
+// ⚠️ PLAIN data only (object literals and arrays). The event the SDK hands to beforeSend*
+// still carries `sdkProcessingMetadata` — live Scope / Span / Client instances. Walking into
+// those and assigning to them made the SDK drop every transaction (probe:sentry HEAD, 28.10:
+// 0 transactions of 12 envelopes). Class instances are not serialized into the envelope anyway.
+// And a property is written only when its value CHANGED — a no-op write can still hit a frozen object.
+const isPlain = (v) => {
+  const p = Object.getPrototypeOf(v);
+  return p === Object.prototype || p === null;
+};
 function walk(v, seen, depth) {
   if (typeof v === "string") return scrubUrl(v);
   if (!v || typeof v !== "object" || depth > 30 || seen.has(v)) return v;
+  if (!Array.isArray(v) && !isPlain(v)) return v;
   seen.add(v);
   if (Array.isArray(v)) {
-    for (let i = 0; i < v.length; i++) v[i] = walk(v[i], seen, depth + 1);
+    for (let i = 0; i < v.length; i++) { const n = walk(v[i], seen, depth + 1); if (n !== v[i]) v[i] = n; }
     return v;
   }
-  for (const k of Object.keys(v)) v[k] = walk(v[k], seen, depth + 1);
+  for (const k of Object.keys(v)) { const n = walk(v[k], seen, depth + 1); if (n !== v[k]) v[k] = n; }
   return v;
 }
 

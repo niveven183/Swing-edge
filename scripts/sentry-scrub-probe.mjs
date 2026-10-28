@@ -96,7 +96,9 @@ async function measure(dir) {
 }
 
 assertCleanTargets(ROOT, [MAIN], die);
+const ONLY = (process.argv.find((x) => x.startsWith("--only=")) || "").slice(7); // local triage only; CI runs every arm
 for (const [arm, a] of Object.entries(ARMS)) {
+  if (ONLY && arm !== ONLY) continue;
   const dir = await buildTree({ root: ROOT, arm, outDir: join(WORK, `dist-${arm}`), mutations: a.muts, once, die,
     env: { VITE_SENTRY_DSN: `http://probesentrykey@${INGEST}/1`, SENTRY_AUTH_TOKEN: "" } });
   const r = await measure(dir);
@@ -110,5 +112,5 @@ for (const [arm, a] of Object.entries(ARMS)) {
   console.log(`${good ? "✅" : "❌"} ${arm.padEnd(7)} envelopes=${r.envelopes} [${r.types.join(",")}] · refresh_token in ${JSON.stringify(r.hits.refresh_token)} · access_token in ${JSON.stringify(r.hits.access_token)}`
     + ` ⇒ ${!conclusive ? "INCONCLUSIVE (no transaction or no event)" : a.expectLeak ? (leaked ? "red as required" : "GREEN — blind probe") : (leaked ? "LEAK on HEAD" : "0 token values")}`);
 }
-console.log(failures ? `\n❌ probe:sentry — ${failures} arm(s) wrong` : "\n✅ probe:sentry: HEAD 0 tokens in every envelope · BEFORE leaks · MUT-F3 killed");
+console.log(failures ? `\n❌ probe:sentry — ${failures} arm(s) wrong` : ONLY ? `\n✅ probe:sentry --only=${ONLY} (partial run — ⛔ a verdict)` : "\n✅ probe:sentry: HEAD 0 tokens in every envelope · BEFORE leaks · MUT-F3 killed");
 process.exit(failures ? 1 : 0);
