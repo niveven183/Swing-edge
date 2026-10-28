@@ -1641,3 +1641,13 @@ reload»: צפוי `b1…b5`, התקבל `b1 · b2 · b3 · b5`. `b4` **שרד �
 
 ### לקח
 ⚠️ **«קדם לגל / נחשף ע״י הגל» נקבע מסקר ריצות, ⛔ מהריצה הקודמת אחת** — ריצה ירוקה אחת לפני הגל ⛔ מוכיחה שהחתימה חדשה.
+
+## #40 — 2026-10-28 — טוקני התחברות נשלחו ל-Sentry (ערוץ שלישי של `#12`) — דליפה מאומתת ב-build, היקף בפרודקשן לפי בדיקת ניב
+**מה קרה:** `Sentry.init` (`src/main.jsx`) רץ בלי `beforeSend`/`beforeSendTransaction`/`beforeBreadcrumb`. supabase-js רץ ב-implicit flow ⇒ חזרת OAuth/magic-link/איפוס-סיסמה נוחתת על `/app#access_token=…&refresh_token=…`. ה-transaction של ה-pageload (נדגם ב-`tracesSampleRate: 0.1`) נשא את שני הטוקנים ב-`request.url` · `contexts.trace.data["url.full"]` · `spans[].description`, ו-event שנלכד בזמן הטעינה — ב-`request.url`.
+**מה נמדד (28.10):** על הבייטים האמיתיים (`vite build`) + `@sentry/react` `10.67.0` ב-Chromium, ingest מדומה: `refresh_token`/`access_token` ב-`1:event` + `4:transaction` (`docs/audits/WAVE1-DIAGNOSIS-2026-10-28.md` §F3). breadcrumbs — נקיים במדידה; replay — `0/21` envelopes (`replaysOnErrorSampleRate` היה config מת).
+**⛔ נמדד:** האם טוקנים כבר נקלטו בפרויקט ה-Sentry בפרודקשן. ⇒ **ניב:** Data Scrubbing הופעל 28.10; חיפוש `access_token`/`refresh_token` בפרויקט — התוצאה ו-rotation (אם נדרש) נרשמים כאן.
+**התיקון:** `src/lib/sentryScrub.js` בשלושת ה-hooks (`B-458`, גל 1) · `probe:sentry`: HEAD `0` טוקנים ב-`11` envelopes (2 transactions, 4 events) · BEFORE + MUT-F3 דולפים · `test:analytics` 18–27 · `tests-eye/wave1.spec.js` F3 בפרודקשן (envelopes נענים מקומית, ⛔ מועברים).
+**בדרך:** ה-walk הראשון של ה-scrub נכנס ל-`sdkProcessingMetadata` (מופעי Scope/Span חיים) וה-SDK הפיל **כל** transaction — `probe:sentry` HEAD יצא INCONCLUSIVE (`0` transactions); אסרציות הערך היו ירוקות. תוקן (`c666c61`): נתונים פשוטים בלבד, כתיבה רק כשהערך השתנה.
+
+### לקח
+⚠️ **`#12` נסגר בערוץ אחד (gtag), `B-184` בשני (Vercel) — ו-Sentry, ערוץ שלישי שמקבל את אותה כתובת, ⛔ נבדק.** כל ספק שמקבל `location.href` הוא ערוץ; הרשימה היא «כל SDK שנטען בדף», ⛔ «הערוץ שנשבר אחרון». ⚠️ **ואסרציית ערך ירוקה על scrub ⛔ מוכיחה שה-SDK עדיין שולח** — רק envelope אמיתי מוכיח.
