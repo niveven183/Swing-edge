@@ -2514,6 +2514,50 @@ console.log("  18 · G2 · סיכון במטבע ההון");
   check("S8 · B8 נבנה מ-`stableCalcTradeMetrics(t)`, ⛔ `calcTradeMetrics` גולמי", B8 != null && /stableCalcTradeMetrics\(t\)/.test(B8) && !raw.test(B8));
 }
 
+// ── בלוק 25 · `B-457` — הסקירה השבועית מומרת (wave 1 F2, 28.10) + שער `B-144` מורחב ──────────
+//
+// 🔴 נמדד 28.10 (WAVE1-DIAGNOSIS §F2): חשבון ₪, `+$100` (AAPL) ו-`+₪200`, שער 3.7 ⇒ השבועי הציג
+// `₪300` במקום `₪570`. ⚠️ `B-045` נשא את שני הטאבים בכותרתו ונסגר (`D-121`) על B5/B8 בלבד — הם
+// ⛔ תוקנו מעולם. החודשי (`MonthlyReport.js`) נמדד ב-`test:engine`; כאן השבועי + השער.
+{
+  console.log("\n── 25 · B-457 שבועי מומר + שער B-144 על src/components ──");
+  const day = "2026-10-20";
+  const tbl = { base: "USD", quote: "ILS", spot: { rate: 3.7, rateDate: day }, byDay: { [day]: { rate: 3.7, rateDate: day } } };
+  const at = `${day}T15:00:00.000Z`;
+  const usd = { id: "w1", ticker: "AAPL", side: "LONG", entry: 100, exit: 110, shares: 10, status: "CLOSED", date: day, closedAt: at };
+  const ils = { id: "w2", ticker: "TEVA", instrumentCurrency: "ILS", side: "LONG", entry: 30, exit: 32, shares: 100, status: "CLOSED", date: day, closedAt: at };
+  const withRate = computeTradingStats([usd, ils], 10000, makeConvertingCalc(tbl, "ILS", "ready"), "ILS");
+  eq("V1 · עם שער: totalPnL = ₪570 (100×3.7 + 200)", withRate.totalPnL, 570);
+  eq("V2 · עם שער: 0 מוחרגות", withRate.fxUnconvertedCount, 0);
+  const noRate = computeTradingStats([usd, ils], 10000, makeConvertingCalc(null, "ILS", "loading"), "ILS");
+  eq("V3 · בלי שער: totalPnL = ₪200 (ה-$ ⛔ נספר כ-₪)", noRate.totalPnL, 200);
+  eq("V4 · בלי שער: 1 מוחרגת", noRate.fxUnconvertedCount, 1);
+  eq("V5 · בלי שער: המכנה — 1 נספרת", noRate.fxAggregatableCount, 1);
+  eq("V6 · שיעור ההצלחה על כל האוכלוסייה (2/2 = 100%) — הסימן אינו תלוי מטבע", noRate.winRate, 100);
+  const before = computeTradingStats([usd, ils], 10000, calcTradeMetrics, null);
+  check("V7 · BEFORE (calc גולמי) ⇒ ₪300 — הערך שהשער הזה חייב להבדיל ממנו", before.totalPnL === 300 && before.totalPnL !== withRate.totalPnL);
+
+  // ── שער B-144 מורחב: src/components/**/*.jsx ──
+  const { readdirSync } = await import("node:fs");
+  const compDir = new URL("../src/components/", import.meta.url);
+  const comps = readdirSync(compDir).filter((f) => f.endsWith(".jsx"));
+  const compSites = comps.flatMap((f) => (readFileSync(new URL(f, compDir), "utf8").match(/useTradingStats\([^)]*\)/g) || []).map((x) => `${f}: ${x}`));
+  check(`S1 · src/components: ${compSites.length} אתרי useTradingStats — כולם מצהירים יחידה (⛔ null)`,
+    compSites.length >= 1 && compSites.every((x) => !/,\s*null\s*\)$/.test(x)));
+  check("S2 · WeeklyReviewTab מצהיר `currency` כיחידת ה-pnl", compSites.some((x) => /^WeeklyReviewTab\.jsx: useTradingStats\(weekly, capital, calcMetrics, currency\)$/.test(x)));
+  const appSrc = src("../SwingEdge_App.jsx");
+  const propSite = (comp) => { const m = appSrc.match(new RegExp(`<${comp}\\b[^>]*?calcMetrics=\\{(\\w+)\\}`, "s")); return m ? m[1] : null; };
+  eq("S3 · <MonthlyReportTab calcMetrics> = stableCalcTradeMetrics", propSite("MonthlyReportTab"), "stableCalcTradeMetrics");
+  eq("S4 · <WeeklyReviewTab calcMetrics> = stableCalcTradeMetrics", propSite("WeeklyReviewTab"), "stableCalcTradeMetrics");
+  // כל צרכן של `calcMetrics=` ב-SwingEdge_App.jsx. לדג׳ר דו-כיווני: אתר פתוח ⇒ חייב להישאר גולמי עד שהשורה זזה.
+  const OPEN = { TradeCalendar: "B-187" };
+  const allProps = [...appSrc.matchAll(/<(\w+)\b[^>]*?calcMetrics=\{(\w+)\}/gs)].map((m) => ({ comp: m[1], calc: m[2] }));
+  const bad = allProps.filter((p) => (OPEN[p.comp] ? p.calc !== "calcTradeMetrics" : p.calc !== "stableCalcTradeMetrics"));
+  check(`S5 · ${allProps.length} צרכני calcMetrics= — ממירים, מלבד הלדג׳ר הפתוח (TradeCalendar → B-187); תיקון בלי להזיז את השורה ⇒ אדום`,
+    allProps.length === 3 && bad.length === 0);
+  if (bad.length) console.error(`      bad: ${JSON.stringify(bad)}`);
+}
+
 // ── SUMMARY ──────────────────────────────────────────────────────────────────
 console.log("");
 if (failures) {

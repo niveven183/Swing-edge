@@ -49,6 +49,12 @@ function enrich(t, calcMetrics) {
     raw: t,
     ticker: t.ticker || "—",
     pnl,
+    // 🔴 B-457 (wave 1 F2) — the FX seam's refusal, carried through. `makeConvertingCalc` hands back
+    // a trade it could not price in the display currency UNCONVERTED and names it here; summing it
+    // added dollars into a shekel total (measured 28.10: 300 instead of 200 + "1 excluded").
+    // Same split as computeTradingStats (src/lib/tradingStats.js:66-97): COUNTS · RATES · R keep
+    // every trade (the sign of a P&L is currency-independent); every MONEY figure skips it.
+    fxUnconverted: !!m.fxUnconverted,
     // number | null. `: 0` here fabricated a flat-0R outcome for every trade
     // without a stop, which then sat in the numerator AND the denominator of
     // every R average downstream.
@@ -70,14 +76,14 @@ function summarize(list) {
     // winRate null, netPnL 0: an empty month really did realize zero P&L, but
     // it has no win rate to report. Found by the A5 consumer map — same class
     // as summarize() in lib/tradingStats.js, one layer up.
-    return { totalTrades: 0, wins: 0, losses: 0, breakEven: 0, winRate: null, netPnL: 0, avgR: null, rSampleSize: 0, rValues: [] };
+    return { totalTrades: 0, wins: 0, losses: 0, breakEven: 0, winRate: null, netPnL: 0, avgR: null, rSampleSize: 0, rValues: [], fxUnconvertedCount: 0, fxAggregatableCount: 0 };
   }
-  let net = 0, rSum = 0;
+  let net = 0, rSum = 0, fxUnconvertedCount = 0;
   // Only measurable R enters `rValues` — it feeds the consistency term of the
   // grade, and a synthetic 0 there reads as a perfectly repeatable outcome.
   const rValues = [];
   for (const e of list) {
-    net += e.pnl;
+    if (e.fxUnconverted) fxUnconvertedCount++; else net += e.pnl;
     if (e.r != null) { rSum += e.r; rValues.push(e.r); }
   }
   // Three buckets, one rule (T3 · decision 2). `losses: n - wins` counted every
@@ -100,6 +106,9 @@ function summarize(list) {
     avgR: rValues.length ? round(rSum / rValues.length, 2) : null,
     rSampleSize: rValues.length,
     rValues,
+    // B-457: the money population. netPnL sums `fxAggregatableCount` trades of `totalTrades`.
+    fxUnconvertedCount,
+    fxAggregatableCount: n - fxUnconvertedCount,
   };
 }
 
@@ -113,7 +122,7 @@ function groupBy(list, keyFn, minN = 1) {
     const g = map.get(k);
     g.count++;
     if (e.win) g.wins++;
-    g.net += e.pnl;
+    if (!e.fxUnconverted) g.net += e.pnl; // B-457 — money skips an unconverted trade
     // Was `g.r += e.rMultiple` — `enrich` emits `r`, not `rMultiple`, so this
     // added `undefined` and every group avgR collapsed to NaN, which `round`
     // then laundered into a clean 0.00. Read the field that actually exists,
@@ -195,7 +204,7 @@ export function generateMonthlyReport(trades, month, year, calcMetrics) {
       period,
       hasEnoughData: false,
       minTrades: MIN_TRADES,
-      summary: { totalTrades: cur.length, wins: sum.wins, losses: sum.losses, breakEven: sum.breakEven, winRate: sum.winRate, netPnL: sum.netPnL, avgR: sum.avgR, rSampleSize: sum.rSampleSize },
+      summary: { totalTrades: cur.length, wins: sum.wins, losses: sum.losses, breakEven: sum.breakEven, winRate: sum.winRate, netPnL: sum.netPnL, avgR: sum.avgR, rSampleSize: sum.rSampleSize, fxUnconvertedCount: sum.fxUnconvertedCount, fxAggregatableCount: sum.fxAggregatableCount },
     };
   }
 
@@ -315,7 +324,7 @@ export function generateMonthlyReport(trades, month, year, calcMetrics) {
   // ── CHARTS ──
   const dailyMap = new Map();
   for (const e of cur) {
-    if (!e.date) continue;
+    if (!e.date || e.fxUnconverted) continue; // B-457 — a money chart
     const k = localDayKey(e.date);
     dailyMap.set(k, (dailyMap.get(k) || 0) + e.pnl);
   }
@@ -342,7 +351,7 @@ export function generateMonthlyReport(trades, month, year, calcMetrics) {
     .map(g => ({ setup: g.name, count: g.count, winRate: g.winRate }));
 
   // ── SUMMARY (+ deltas) ──
-  const sortedByPnl = [...cur].sort((a, b) => b.pnl - a.pnl);
+  const sortedByPnl = cur.filter(e => !e.fxUnconverted).sort((a, b) => b.pnl - a.pnl); // B-457 — ranked by money
   const bestTrade = sortedByPnl[0] ? { ticker: sortedByPnl[0].ticker, pnl: round(sortedByPnl[0].pnl, 2) } : null;
   const worstTrade = sortedByPnl[sortedByPnl.length - 1] ? { ticker: sortedByPnl[sortedByPnl.length - 1].ticker, pnl: round(sortedByPnl[sortedByPnl.length - 1].pnl, 2) } : null;
 
@@ -355,6 +364,8 @@ export function generateMonthlyReport(trades, month, year, calcMetrics) {
     netPnL: sum.netPnL,
     avgR: sum.avgR,
     rSampleSize: sum.rSampleSize,
+    fxUnconvertedCount: sum.fxUnconvertedCount,
+    fxAggregatableCount: sum.fxAggregatableCount,
     bestTrade,
     worstTrade,
     vsLastMonth: {
@@ -365,7 +376,10 @@ export function generateMonthlyReport(trades, month, year, calcMetrics) {
       winRate: (sum.winRate == null || prevSum.winRate == null)
         ? null
         : round(sum.winRate - prevSum.winRate),
-      netPnL: round(sum.netPnL - prevSum.netPnL, 2),
+      // B-457 — two partial sums do not make a delta: null (shown "—") when either month excluded money.
+      netPnL: (sum.fxUnconvertedCount > 0 || prevSum.fxUnconvertedCount > 0)
+        ? null
+        : round(sum.netPnL - prevSum.netPnL, 2),
       trades: sum.totalTrades - prevSum.totalTrades,
     },
   };

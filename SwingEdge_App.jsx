@@ -54,6 +54,10 @@ import { deleteTradeVerified, restoreAt, createPendingWrites, insertTradeRow, up
 import { loadSettings, saveSettings, flushSettings, flushKeepalive, currentToken, migrateFromLocalStorage, onSettingsSynced, onSettingsConflict, confirmedAt, confirmSynced } from "./src/lib/userSettings.js";
 import { readPending, recordScalarEdit, settlePending, clearPending, decidePending } from "./src/lib/settingsPending.js";
 import { calcTradeMetrics, fmt$, fmt$0, fmtR, fmtNum, fmtPrice, fmtBalance, numOrNull, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays, localDayKey, todayKey, realizedAt, realizedDayKey, currencyOf, fmtPaperPrice, paperCurrencyOf, CURRENCY_SYMBOL, fmtAccountAmount, fmtCapitalAmount } from "./src/utils.js";
+// B-456 (wave 1 F1): HTML built from a string escapes every value through this one function.
+import { escapeHtml } from "./src/lib/escapeHtml.js";
+// B-459 (wave 1 F4): every trade-write failure reaches Sentry — closed tags only, ⛔ message (src/lib/telemetry.js).
+import { reportWriteFailure } from "./src/lib/telemetry.js";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell,
@@ -482,9 +486,13 @@ const exportTradesCSV = (trades) => {
 // so, is the silent failure CLAUDE.md §2 forbids. The `missingCount` gap
 // predates B-119 and had no disclosure at all; both are covered by one line.
 const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity, currency = "USD", calcFn = calcTradeMetrics, equityGaps = null) => {
+  // 🔴 B-456 (wave 1 F1): this document is written into a same-origin popup. Every string that
+  // reaches the template goes through `esc` — measured 28.10, a raw `lessonLearned` ran script
+  // that read the Supabase token from localStorage. Numbers and fmt* output carry no markup.
+  const esc = escapeHtml;
   const sym = CURRENCY_SYMBOL[currency] || CURRENCY_SYMBOL.USD;
   const now = new Date();
-  const monthName = now.toLocaleString("en-US", { month: "long" });
+  const monthName = esc(now.toLocaleString("en-US", { month: "long" }));
   const year = now.getFullYear();
   const thisMonth = now.getMonth();
   const thisYear = now.getFullYear();
@@ -538,10 +546,10 @@ const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity, cur
   // single sentence, so nothing is lost by unifying the count.
   const excludedTotal = noPrice + noRate + closedNoRate;
   const equityIncomplete = excludedTotal > 0
-    ? `Excludes ${excludedTotal} trade(s) from the totals and the equity curve`
+    ? esc(`Excludes ${excludedTotal} trade(s) from the totals and the equity curve`
       + `${noPrice ? ` — ${noPrice} open without a live price` : ""}`
       + `${noRate ? ` — ${noRate} open without an FX rate` : ""}`
-      + `${closedNoRate ? ` — ${closedNoRate} closed without an FX rate to ${currency}` : ""}`
+      + `${closedNoRate ? ` — ${closedNoRate} closed without an FX rate to ${currency}` : ""}`)
     : "";
 
   // Lessons from this month
@@ -568,10 +576,10 @@ const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity, cur
     const r = m.rMultiple;
     return `
       <tr>
-        <td>${t.date}</td>
-        <td><strong>${t.ticker}</strong></td>
-        <td>${t.side}</td>
-        <td>${t.setup ?? "-"}</td>
+        <td>${esc(t.date)}</td>
+        <td><strong>${esc(t.ticker)}</strong></td>
+        <td>${esc(t.side)}</td>
+        <td>${esc(t.setup ?? "-")}</td>
         <td>${fmtPaperPrice(t.entry, t)}</td>
         <td>${t.exit != null ? fmtPaperPrice(t.exit, t) : "-"}</td>
         <td style="color:${pnlColor(pnl)};font-weight:600">${fmtDollar(pnl)}</td>
@@ -581,7 +589,7 @@ const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity, cur
   }).join("");
 
   const lessonRows = lessons.length
-    ? lessons.map(l => `<li><strong>${l.ticker}</strong>: ${l.lesson}</li>`).join("")
+    ? lessons.map(l => `<li><strong>${esc(l.ticker)}</strong>: ${esc(l.lesson)}</li>`).join("")
     : "<li>No lessons recorded this month.</li>";
 
   const html = `<!DOCTYPE html>
@@ -1621,8 +1629,9 @@ export default function SwingEdge() {
   const [formQuote, setFormQuote] = useState(null);
   const [formQuoteLoading, setFormQuoteLoading] = useState(false);
   const formQuoteTimer = useRef(null);
-  const [pulse, setPulse] = useState(false);
-  const [tickerIdx, setTickerIdx] = useState(0);
+  // B-460 (wave 1 F5): `pulse` + `tickerIdx` were two intervals that re-rendered this whole root
+  // (84 → 18 renders/min idle without them). `tickerIdx` had 0 readers; the three dots `pulse` drove
+  // blink in CSS now (.se-pulse-opacity · .se-pulse-emerald, src/index.css). Pinned by test:perf.
   const [showCloseForm, setShowCloseForm] = useState(false);
   const [closingTrade, setClosingTrade] = useState(null);
 
@@ -2966,34 +2975,8 @@ export default function SwingEdge() {
     return merged;
   }, [closedTrades, stats, lang, accountCurrency]);
 
-  // Top ticker ribbon — fixed 8 tickers updated with live prices
-  const TOP_RIBBON = ["NVDA", "AAPL", "TSLA", "MSFT", "META", "AMD", "BTC-USD", "SPY"];
-  const tickerTapeItems = useMemo(() => {
-    return TOP_RIBBON.map(display => {
-      const lookupKey = display.replace("-USD", "");
-      const lp = getLivePrice(lookupKey) || getLivePrice(display);
-      return {
-        ticker: display,
-        displayTicker: display === "BTC-USD" ? "BTC" : display,
-        changePct: lp ? lp.changePct : 0,
-        price: lp ? lp.price : null,
-        open: lp?.regularMarketOpen ?? null,
-        high: lp?.regularMarketDayHigh ?? null,
-        low: lp?.regularMarketDayLow ?? null,
-        prevClose: lp?.previousClose ?? null,
-      };
-    });
-  }, [livePrices]);
-
-  useEffect(() => {
-    const t = setInterval(() => setTickerIdx(i => (i + 1) % Math.max(tickerTapeItems.length, 1)), 2000);
-    return () => clearInterval(t);
-  }, [tickerTapeItems.length]);
-
-  useEffect(() => {
-    const t = setInterval(() => setPulse(p => !p), 1500);
-    return () => clearInterval(t);
-  }, []);
+  // B-460: the top-ribbon `tickerTapeItems` memo went with the `tickerIdx` interval — that interval was
+  // its only reader (0 renders read it; its `changePct: … : 0` was an invented zero, R-2).
 
   // Derived form calcs
   const entryN  = parseFloat(form.entry)  || 0;
@@ -3298,6 +3281,7 @@ export default function SwingEdge() {
         // back after a failed write, not the trader reaching for it.
         setShowForm(true);
         console.error("Supabase insert failed:", res.reason, res.message);
+        reportWriteFailure("insert", res);
         toast.error(
           (lang === "he"
             ? "העסקה לא נשמרה — הטופס הוחזר, נסה שוב: "
@@ -3355,6 +3339,7 @@ export default function SwingEdge() {
       if (!res.ok) {
         setTrades(prev => prev.map(t => t.id === beforeClose.id ? beforeClose : t));
         console.error("Supabase close-update failed:", res.reason, res.message);
+        reportWriteFailure("close", res);
         toast.error(
           (lang === "he"
             ? "הסגירה לא נשמרה — העסקה חזרה להיות פתוחה: "
@@ -3397,6 +3382,7 @@ export default function SwingEdge() {
     if (!res.ok) {
       if (removed) setTrades(prev => restoreAt(prev, removed, idx));
       console.error("Supabase delete failed:", res.reason, res.message);
+      reportWriteFailure("delete", res);
       toast.error(
         (lang === "he" ? "המחיקה נכשלה — העסקה הוחזרה: " : "Delete failed — the trade was restored: ") +
         res.message
@@ -3454,6 +3440,7 @@ export default function SwingEdge() {
         });
       }
       console.error("Supabase bulk delete failed:", res.reason, res.message);
+      reportWriteFailure("bulk_delete", res);
       toast.error(
         (lang === "he"
           ? `נמחקו ${res.rows} מתוך ${ids.length} — ${back.length} הוחזרו: `
@@ -3493,6 +3480,7 @@ export default function SwingEdge() {
       if (!res.ok) {
         if (beforeEdit) setTrades(prev => prev.map(t => t.id === beforeEdit.id ? beforeEdit : t));
         console.error("Supabase update failed:", res.reason, res.message);
+        reportWriteFailure("update", res);
         toast.error(
           (lang === "he"
             ? "העדכון לא נשמר — הערכים הקודמים הוחזרו: "
@@ -3547,6 +3535,7 @@ export default function SwingEdge() {
       setTrades(prev => prev.filter(tr => !missing.has(tr.id)));
       setLastImportIds(ids.filter(id => !missing.has(id)));
       console.error("[import] supabase insert failed:", res.reason, res.message);
+      reportWriteFailure("import_insert", res);
       toast.error(
         (lang === "he"
           ? `יובאו ${res.rows} מתוך ${ids.length} — ${missing.size} נכשלו: `
@@ -3596,6 +3585,7 @@ export default function SwingEdge() {
         setLastImportIds(back.map(x => x.t.id));
       }
       console.error("[import] supabase undo failed:", res.reason, res.message);
+      reportWriteFailure("import_undo", res);
       toast.error(
         (lang === "he"
           ? `בוטלו ${res.rows} מתוך ${ids.length} — ${back.length} הוחזרו: `
@@ -4604,10 +4594,10 @@ export default function SwingEdge() {
               return (
                 <>
                   <span
-                    className="w-2 h-2 rounded-full transition-colors"
+                    className={`w-2 h-2 rounded-full transition-colors${marketState === MARKET_STATE.OPEN ? " se-pulse-opacity" : ""}`}
                     style={{
                       backgroundColor: badge.color,
-                      opacity: marketState === MARKET_STATE.OPEN ? (pulse ? 1 : 0.55) : 0.85,
+                      opacity: marketState === MARKET_STATE.OPEN ? undefined : 0.85,
                     }}
                   />
                   <span
@@ -7391,7 +7381,7 @@ export default function SwingEdge() {
             <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-4">
               <div className="flex items-center gap-2 mb-4">
                 <span className="text-xs font-semibold tracking-widest uppercase text-slate-500">{t.mo_title}</span>
-                <span className={`w-1.5 h-1.5 rounded-full ${pulse ? "bg-emerald-400" : "bg-emerald-700"} transition-colors`} />
+                <span className="w-1.5 h-1.5 rounded-full se-pulse-emerald" />
                 <span className="text-[10px] text-slate-700">
                   {moRange === 1 ? t.mo_change1d : moRange === 30 ? t.mo_change1m : t.mo_change1w}
                 </span>
@@ -8234,7 +8224,7 @@ export default function SwingEdge() {
         {tab === "tools" && toolsTab === 'report' && (
           <MonthlyReportTab
             trades={realTrades}
-            calcMetrics={calcTradeMetrics}
+            calcMetrics={stableCalcTradeMetrics}
             t={t}
             lang={lang}
             isRTL={isRTL}
@@ -8247,7 +8237,7 @@ export default function SwingEdge() {
           <WeeklyReviewTab
             trades={realTrades}
             capital={capital}
-            calcMetrics={calcTradeMetrics}
+            calcMetrics={stableCalcTradeMetrics}
             authUser={authUser}
             t={t}
             lang={lang}
@@ -8959,7 +8949,7 @@ export default function SwingEdge() {
             const fOpen = marketState === MARKET_STATE.OPEN;
             return (
               <span className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full transition-colors" style={{ backgroundColor: fBadge.color, opacity: fOpen ? (pulse ? 1 : 0.55) : 0.85 }} />
+                <span className={`w-1.5 h-1.5 rounded-full transition-colors${fOpen ? " se-pulse-opacity" : ""}`} style={{ backgroundColor: fBadge.color, opacity: fOpen ? undefined : 0.85 }} />
                 <span style={{ color: fBadge.color }}>{fBadge.emoji} {fBadge.label}</span>
               </span>
             );

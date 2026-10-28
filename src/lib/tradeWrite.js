@@ -28,6 +28,11 @@
 // two rows would mean the filter is broken and another user's row just went
 // with it — a case that must never read as success.
 
+// B-459 · fix ③ (Niv 28.10) — the CLOSED set of failure reasons this file can produce. Telemetry
+// sends a reason only if it is in this list (anything else ⇒ "other"), so a caller can never turn
+// the tag into free text. A new reason here is a new tag value — add it deliberately.
+export const WRITE_REASONS = Object.freeze(["error", "threw", "none", "partial", "too-many", "unconfigured", "not-found", "not-written"]);
+
 /**
  * The one classifier. Every verified write in this file is a call to it, so
  * there is exactly one place where "did this write happen" is decided.
@@ -37,9 +42,14 @@
 export function classifyRows(res, opts = {}) {
   const { expected = 1, okReason = "written", noneReason = "none", noneMessage = "", noun = "write" } = opts;
   const { data, error } = res || {};
+  // B-459 (wave 1 F4) — ADDITIVE: the HTTP status and the PostgREST/Postgres code, which this
+  // classifier used to drop, so a failure can be counted by kind in Sentry (src/lib/telemetry.js).
+  // ⛔ ok / reason / message / rows are unchanged. `message` stays local: it can hold row values.
+  const status = Number.isInteger(res?.status) ? res.status : null;
+  const code = typeof error?.code === "string" ? error.code : null;
 
   if (error) {
-    return { ok: false, reason: "error", message: error.message || String(error), rows: 0 };
+    return { ok: false, reason: "error", message: error.message || String(error), rows: 0, status, code };
   }
 
   const rows = countOf(data);
@@ -62,7 +72,7 @@ export function classifyRows(res, opts = {}) {
       ok: false,
       reason: "too-many",
       message: `expected ${expected} row${expected === 1 ? "" : "s"}, the ${noun} returned ${rows}`,
-      rows,
+      rows, status, code,
     };
   }
 
@@ -74,14 +84,14 @@ export function classifyRows(res, opts = {}) {
       ok: false,
       reason: noneReason,
       message: noneMessage || `the ${noun} affected no rows — the data is not where it appears to be`,
-      rows: 0,
+      rows: 0, status, code,
     };
   }
   return {
     ok: false,
     reason: "partial",
     message: `only ${rows} of ${expected} rows were written`,
-    rows,
+    rows, status, code,
   };
 }
 

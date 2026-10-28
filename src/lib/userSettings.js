@@ -14,6 +14,8 @@ import { markInflight, nextToken, sameToken } from "./settingsPending.js";
 // B-435 · CAS (17.10) — the keys the delta journal owns (they are rebased from it, ⛔ carried from the cache).
 import { COLLECTIONS } from "./settingsDelta.js";
 import { SCALARS } from "./settingsPending.js";
+// B-455 (wave 1 F4): a failed user_settings READ is counted in Sentry — tags only (src/lib/telemetry.js).
+import { reportSettingsReadFailure } from "./telemetry.js";
 
 const TABLE = "user_settings";
 const MIRROR_KEY = "swingEdgeSettings"; // single localStorage mirror of the blob
@@ -393,6 +395,10 @@ export async function loadSettings(userId, client = supabase, { timeoutMs = SETT
 // the mirror here is what flushSettings later uploaded over the real row.
 function loadFailed(userId, err) {
   console.error("userSettings: load rejected", err?.message || err);
+  // B-455 — MEASUREMENT ONLY (Niv 28.10): ⛔ retry, ⛔ any change to writable / lastSent / lastToken /
+  // CAS / pending / journal below. A string `err` is the "no client or no userId" branch — a
+  // configuration state, ⛔ a failed read — and is not reported.
+  if (err && typeof err === "object") reportSettingsReadFailure(err);
   if (userId) {
     writable.delete(userId);
     lastSent.delete(userId); // we could not read the row ⇒ we do ⛔ know what it holds

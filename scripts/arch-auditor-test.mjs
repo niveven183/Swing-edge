@@ -59,6 +59,7 @@ const REQUIRED = [
   "endpointsMissingRateLimit",
   "endpointsMissingAuth",
   "isAcknowledged",
+  "rawHtmlSinks",
 ];
 const missing = REQUIRED.filter((n) => typeof mod?.[n] !== "function");
 
@@ -78,7 +79,7 @@ if (missing.length) {
   process.exit(1);
 }
 
-const { loadCorpus, apiEndpoints, endpointsMissingRateLimit, endpointsMissingAuth, isAcknowledged } = mod;
+const { loadCorpus, apiEndpoints, endpointsMissingRateLimit, endpointsMissingAuth, isAcknowledged, rawHtmlSinks } = mod;
 
 const corpus = loadCorpus();
 const endpoints = apiEndpoints(corpus).map((f) => f.rel);
@@ -149,6 +150,40 @@ check(
   !ackBig("src/components/AdminPanel.jsx", 1805),
   `acknowledged=${JSON.stringify(ackBig("src/components/AdminPanel.jsx", 1805))}. Suppressing it ` +
     `would widen a decision that was never taken; it stays a live finding`
+);
+
+// ── 8-10 · B-461 (wave 1 F1) — the auditor can see a raw-HTML sink ─────────────
+const { execFileSync } = await import("node:child_process");
+const mkFile = (rel, text) => ({ rel, text, lines: text.split("\n"), path: rel });
+const liveSinks = rawHtmlSinks(corpus);
+check(
+  "8",
+  "the live tree has 0 unescaped raw-HTML sinks (TradingView clears/JSON are exempt, the PDF export escapes)",
+  liveSinks.length === 0,
+  `sinks: ${JSON.stringify(liveSinks)}`
+);
+const synth = [
+  mkFile("src/a.js", "const w = window.open('', '_blank');\nw.document.write(html);"),
+  mkFile("src/b.js", "node.innerHTML = \"\";\nscript.innerHTML = JSON.stringify(cfg);"),
+  mkFile("src/c.js", "import { escapeHtml } from './lib/escapeHtml.js';\nw.document.write(`<b>${escapeHtml(x)}</b>`);"),
+  mkFile("src/d.js", "el.insertAdjacentHTML('beforeend', userText);"),
+  mkFile("scripts/probe.mjs", "document.body.insertAdjacentHTML('beforeend', x);"),
+];
+const synthHits = rawHtmlSinks(synth);
+check(
+  "9",
+  "document.write / insertAdjacentHTML are flagged · clearing + JSON.stringify are not · escapeHtml files are not · scripts/ never ships",
+  JSON.stringify(synthHits) === JSON.stringify(["src/a.js:2", "src/d.js:1"]),
+  `hits: ${JSON.stringify(synthHits)}`
+);
+let beforeApp = "";
+try { beforeApp = execFileSync("git", ["show", "9f47d5f:SwingEdge_App.jsx"], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }); } catch { /* below */ }
+const beforeHits = beforeApp ? rawHtmlSinks([mkFile("SwingEdge_App.jsx", beforeApp)]) : null;
+check(
+  "10",
+  "red-before: SwingEdge_App.jsx at 9f47d5f (the measured XSS) IS flagged",
+  Array.isArray(beforeHits) && beforeHits.length === 1 && /^SwingEdge_App\.jsx:\d+$/.test(beforeHits[0]),
+  beforeApp ? `hits: ${JSON.stringify(beforeHits)}` : "git show 9f47d5f:SwingEdge_App.jsx failed — a red-before that cannot read BEFORE is red"
 );
 
 const passed = ran - failures.length;

@@ -57,6 +57,8 @@ on:
       - 'scripts/eye-cents-probe.mjs'
       - 'scripts/eye-focus-probe.mjs'
       - 'scripts/eye-firstrun-probe.mjs'   # activation wave 1 (21.10)
+      - 'scripts/eye-wave1-probe.mjs'      # fix round 1 (28.10, B-456…B-460)
+      - 'scripts/sentry-scrub-probe.mjs'   # B-458
       - 'src/hooks/useModalA11y.js'
       - 'scripts/cents-precision-test.mjs'
       - '.github/workflows/eye-playbook.yml'
@@ -91,6 +93,8 @@ on:
       - 'scripts/eye-cents-probe.mjs'
       - 'scripts/eye-focus-probe.mjs'
       - 'scripts/eye-firstrun-probe.mjs'   # activation wave 1 (21.10)
+      - 'scripts/eye-wave1-probe.mjs'      # fix round 1 (28.10, B-456…B-460)
+      - 'scripts/sentry-scrub-probe.mjs'   # B-458
       - 'src/hooks/useModalA11y.js'
       - 'scripts/cents-precision-test.mjs'
       - '.github/workflows/eye-playbook.yml'
@@ -197,6 +201,76 @@ jobs:
         with:
           name: eye-firstrun-probe-${{ github.run_id }}
           path: eye-evidence/probe-firstrun/
+          retention-days: 14
+          if-no-files-found: warn
+
+  # Fix round 1 (28.10, B-456…B-460) — tests-eye/wave1.spec.js: HEAD green · BEFORE (9f47d5f) red · one mutant
+  # per finding, each killed by its own message; plus probe:sentry (the real SDK, HEAD/BEFORE/MUT-F3).
+  # ⛔ in prod.needs (B-442: a mutant arm is never deployed). probe:renders stays local (a render count on a
+  # shared runner is noise, ⛔ a gate; test:perf in verify holds the shape).
+  probe-wave1:
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.61.1-noble
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # BEFORE reads the pre-fix files from 9f47d5f
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - run: npm ci
+      - name: probe:sentry — 0 token values in every envelope (HEAD) · BEFORE + MUT-F3 leak
+        run: npm run probe:sentry
+      - name: Red-before probe — wave 1 (Pixel 7 · iPhone 14 · desktop 1440)
+        env:
+          EYE_PROJECTS: wave1-pixel7,wave1-iphone14,wave1-desktop1440
+        run: npm run probe:eye:wave1
+      # Hermetic evidence: synthetic origin, dummy account, no secret exists in this job.
+      - name: Upload wave 1 probe evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: eye-wave1-probe-${{ github.run_id }}
+          path: eye-evidence/probe-wave1/
+          retention-days: 14
+          if-no-files-found: warn
+
+  # Fix round 1 against PRODUCTION after this commit's deploy (push / dispatch only — on a PR the code is not
+  # deployed). Its own job: `prod` already takes ~22 of its 40 minutes (run 39637288711). ⛔ The QA row is
+  # never read or written (user_settings + trades answered locally, every other REST write blocked) and every
+  # Sentry envelope is answered locally ⇒ it can run beside `prod`.
+  prod-wave1:
+    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    # single-value form on purpose: scripts/workflow-gate-test.mjs M1 identifies `prod` as the one `needs: [… wait-deploy …]` line.
+    needs: wait-deploy
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.61.1-noble
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - run: npm ci
+      - name: wave 1 against production (QA account · iPhone 14 · Pixel 7 · 1440 · he + en)
+        env:
+          CI: 'true'
+          EYE_WAVE1: '1'
+          TEST_URL: ${{ vars.TEST_URL || 'https://swing-edge.com' }}
+          EYE_JSON: eye-wave1-results.json   # outside eye-evidence/: never uploaded
+          SENTINEL_QA_EMAIL: ${{ secrets.SENTINEL_QA_EMAIL }}
+          SENTINEL_QA_PASSWORD: ${{ secrets.SENTINEL_QA_PASSWORD }}
+        run: npx playwright test -c playwright.eye.config.js tests-eye/wave1.spec.js
+      # The artifact is world-readable: it is uploaded ONLY if the leak scan is clean.
+      - name: Leak scan (counts only)
+        id: scan
+        if: ${{ always() }}
+        env:
+          SENTINEL_QA_EMAIL: ${{ secrets.SENTINEL_QA_EMAIL }}
+          SENTINEL_QA_PASSWORD: ${{ secrets.SENTINEL_QA_PASSWORD }}
+        run: node scripts/eye-evidence-scan.mjs eye-evidence
+      - name: Upload wave 1 production evidence
+        if: ${{ always() && steps.scan.outcome == 'success' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: eye-wave1-prod-${{ github.run_id }}
+          path: eye-evidence/wave1/
           retention-days: 14
           if-no-files-found: warn
 
@@ -391,6 +465,8 @@ jobs:
             !eye-evidence/probe-cents/
             !eye-evidence/probe-focus/
             !eye-evidence/probe-firstrun/
+            !eye-evidence/probe-wave1/
+            !eye-evidence/wave1/
           retention-days: 14
           if-no-files-found: warn
       - name: B-435 — keep the evidence 90 days
@@ -406,6 +482,8 @@ jobs:
             !eye-evidence/probe-cents/
             !eye-evidence/probe-focus/
             !eye-evidence/probe-firstrun/
+            !eye-evidence/probe-wave1/
+            !eye-evidence/wave1/
           retention-days: 90
           if-no-files-found: error
       - name: B-435 — open the issue, or comment on the open one

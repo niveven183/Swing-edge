@@ -56,11 +56,12 @@ export default function WeeklyReviewTab({ trades, capital, calcMetrics, authUser
     });
   }, [trades]);
 
-  // B-144 — `null` ⛔ ולא `currency`: המסך הזה מקבל את `calcTradeMetrics`
-  // ה**גולמי** (`calcMetrics={calcTradeMetrics}`) ⇒ ⛔ אין המרה, וכל `pnl`
-  // נקוב במטבע ה**נייר** שלו. מסירת מטבע התצוגה כאן הייתה מתייגת שקלים
-  // כדולרים — מפתח דלי שאינו היחידה של הכסף שבתוכו.
-  const wStats = useTradingStats(weekly, capital, calcMetrics, null);
+  // B-144 → 🔴 B-457 (wave 1 F2, 28.10): the parent now passes `stableCalcTradeMetrics`
+  // (makeConvertingCalc ⇒ every converted `pnl` is in `currency`), so the unit IS declared —
+  // exactly as the four SwingEdge_App.jsx sites do. Before, this screen got the raw calc and
+  // printed `$100 + ₪200` as "₪300" (measured; gold ₪570 at 3.7). A trade with no rate comes back
+  // `fxUnconverted` and computeTradingStats keeps it out of every money figure — counted below.
+  const wStats = useTradingStats(weekly, capital, calcMetrics, currency);
   const edges = useMemo(() => SwingEdgeAI.getEdges(weekly), [weekly]);
 
   // Best/worst setup from the engine breakdown (min sample 2 to avoid noise),
@@ -117,6 +118,11 @@ export default function WeeklyReviewTab({ trades, capital, calcMetrics, authUser
   };
 
   const pnl = wStats.totalPnL || 0;
+  // B-457 — how much of the week the P&L above does NOT contain. Every closed trade without a rate
+  // ⇒ the sum is of nothing, so it shows "—", ⛔ a ₪0 that reads as a flat week.
+  const fxOut = wStats.fxUnconvertedCount || 0;
+  const fxIn = wStats.fxAggregatableCount || 0;
+  const noMoney = fxOut > 0 && fxIn === 0;
   const pnlTone = !Number.isFinite(pnl)
     ? "text-[var(--v3-text-lo)]"
     : isNegativeValue(pnl) ? "text-[var(--v3-loss)]" : "text-[var(--v3-accent)]";
@@ -156,8 +162,13 @@ export default function WeeklyReviewTab({ trades, capital, calcMetrics, authUser
               {t.wr_pnl}
             </div>
             <div className={`se-serif text-5xl md:text-6xl leading-none tracking-tight ${pnlTone}`}>
-              {fmt$0(pnl, currency)}
+              {noMoney ? "—" : fmt$0(pnl, currency)}
             </div>
+            {fxOut > 0 && (
+              <p role="status" data-testid="wr-fx-excluded" className="mt-3 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+                ⚠️ {t.unconvertedClosedWarn.replace("{n}", String(fxOut)).replace("{m}", String(fxOut + fxIn))}
+              </p>
+            )}
           </div>
 
           {/* Stat grid */}

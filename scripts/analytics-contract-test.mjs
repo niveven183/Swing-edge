@@ -255,6 +255,87 @@ const strayVa = /\bwindow\.va\s*\(/.test(app) || /@vercel\/analytics/.test(app)
 ok(17, "only src/main.jsx speaks to the Vercel channel", !strayVa,
   "a second call site bypasses the beforeSend pin entirely");
 
+// ── 18-27: THE THIRD CHANNEL — Sentry (B-458, INCIDENTS #40) ───────────────
+//
+// Measured 28.10 on the real bytes + @sentry/react 10.67 in Chromium (WAVE1-DIAGNOSIS §F3):
+// with no hooks on Sentry.init the sampled pageload transaction carried `refresh_token` and
+// `access_token` in request.url · url.full · spans[].description. These are VALUE assertions
+// on src/lib/sentryScrub.js; that the SDK really calls them is `npm run probe:sentry`.
+// ⚠️ 21 and 27 are self-checks: the same predicate run against a mutant scrub must go RED,
+// otherwise 20 / 19 could be green against any implementation.
+const scrub = await import("../src/lib/sentryScrub.js");
+const SECRETS = ["eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1In0.SIGSECRET", "RTSECRET123", "ya29.PROVIDERSECRET", "PKCESECRET0f6b", "pkce_HASHSECRET"];
+const REAL_URLS = [
+  // implicit OAuth return (Google) — provider_token too
+  `https://swing-edge.com/app#access_token=${SECRETS[0]}&expires_at=1793181328&expires_in=3600&provider_token=${SECRETS[2]}&refresh_token=${SECRETS[1]}&token_type=bearer`,
+  // password recovery return
+  `https://swing-edge.com/app#access_token=${SECRETS[0]}&expires_in=3600&refresh_token=${SECRETS[1]}&token_type=bearer&type=recovery`,
+  // PKCE code exchange
+  `https://swing-edge.com/app?code=${SECRETS[3]}`,
+  // email confirm with token_hash
+  `https://swing-edge.com/auth/confirm?token_hash=${SECRETS[4]}&type=email&next=/app`,
+  // path-only form, as spans[].description carries it
+  `GET /app#access_token=${SECRETS[0]}&refresh_token=${SECRETS[1]}`,
+];
+const leaks = (x) => SECRETS.filter((sec) => JSON.stringify(x).includes(sec));
+const scrubbedUrls = REAL_URLS.map(scrub.scrubUrl);
+ok(18, "5 real Supabase return URLs ⇒ 0 token values survive scrubUrl",
+  scrubbedUrls.every((u) => leaks(u).length === 0), scrubbedUrls.filter((u) => leaks(u).length).join(" | ").slice(0, 160));
+
+const mkEvent = () => ({
+  type: "transaction", transaction: "/app",
+  request: { url: REAL_URLS[1] },
+  contexts: { trace: { data: { "url.full": REAL_URLS[0] } } },
+  spans: [{ description: REAL_URLS[4], data: { "http.url": REAL_URLS[2] } }],
+  breadcrumbs: [{ category: "navigation", data: { from: REAL_URLS[1], to: "/app" } }],
+  tags: {},
+});
+const scrubbedEvent = scrub.sentryBeforeSendTransaction(mkEvent());
+ok(19, "a transaction with the token in request.url · url.full · spans · breadcrumbs ⇒ 0 secrets",
+  leaks(scrubbedEvent).length === 0, `leaked: ${leaks(scrubbedEvent).join(",")}`);
+
+// ① the F3 ↔ F4 collision (Niv 28.10): filtered as a URL parameter VALUE, never by object key.
+const codeOk = (fn) => {
+  const e = fn({ tags: { kind: "write_failure", code: "23514", op: "insert" }, request: { url: "https://swing-edge.com/app?code=abc" } });
+  return e.tags.code === "23514" && /code=\[Filtered\]/.test(e.request.url) && !/code=abc/.test(e.request.url);
+};
+ok(20, "① tags.code \"23514\" survives · request.url ?code=abc ⇒ code=[Filtered]", codeOk(scrub.sentryBeforeSend));
+const KEYED = /^(access_token|refresh_token|provider_token|code|token_hash|type)$/;
+const keyFilterMutant = (e) => { const w = (o) => { for (const k of Object.keys(o)) { if (KEYED.test(k)) o[k] = "[Filtered]"; else if (o[k] && typeof o[k] === "object") w(o[k]); } return o; }; return scrub.sentryBeforeSend(w(e)); };
+ok(21, "① self-check: a scrub that filters by KEY NAME turns 20 red", codeOk(keyFilterMutant) === false);
+
+// ② a '#' is cut only from a URL-like or token-bearing string.
+const plain = ["Trade #3 failed", "rank #1", "Setup #A — 2 of 5", "#hashtag"];
+ok(22, "② \"Trade #3 failed\" · \"rank #1\" · non-URL '#' strings ⇒ byte-identical",
+  plain.every((x) => scrub.scrubUrl(x) === x), plain.map((x) => `${x}→${scrub.scrubUrl(x)}`).join(" | "));
+
+// G-crumb: the console breadcrumb keeps its FIRST argument only.
+const crumb = scrub.scrubBreadcrumb({ category: "console", level: "error",
+  message: "Supabase insert failed: error Failing row contains (AAPL, 187.45)",
+  data: { logger: "console", arguments: ["Supabase insert failed:", "error", "Failing row contains (AAPL, 187.45)"] } });
+ok(23, "G-crumb: console breadcrumb ⇒ first argument only, ⛔ arguments, ⛔ row values",
+  crumb.message === "Supabase insert failed:" && !("arguments" in crumb.data) && !/187\.45|AAPL|Failing row/.test(JSON.stringify(crumb)),
+  JSON.stringify(crumb).slice(0, 140));
+
+const bare = scrub.sentryBeforeSend({ tags: { kind: "write_failure" }, breadcrumbs: [{ category: "fetch", data: { url: "/api/quote?symbols=AAPL" } }] });
+const kept = scrub.sentryBeforeSend({ tags: { kind: "crash" }, breadcrumbs: [{ category: "fetch", data: { url: "/api/quote?symbols=AAPL" } }] });
+ok(24, "write_failure / settings_read_failure events ship ⛔ breadcrumbs · other events keep theirs",
+  !("breadcrumbs" in bare) && Array.isArray(kept.breadcrumbs) && kept.breadcrumbs.length === 1);
+
+const initArgs = (mainSrc.match(/Sentry\.init\(\{([\s\S]*?)\n\}\);/) || [])[1] || "";
+const wired = /beforeSend:\s*sentryBeforeSend,/.test(initArgs)
+  && /beforeSendTransaction:\s*sentryBeforeSendTransaction,/.test(initArgs)
+  && /beforeBreadcrumb:\s*scrubBreadcrumb,/.test(initArgs)
+  && (mainSrc.match(/from "\.\/lib\/sentryScrub\.js"/g) || []).length === 1;
+ok(25, "Sentry.init wires all three outbound hooks to src/lib/sentryScrub.js", initArgs !== "" && wired,
+  initArgs === "" ? "Sentry.init({ … }) not found exactly — extraction failure is red (B-272)" : "a hook is missing or bound to something else");
+
+ok(26, "⛔ replaysOnErrorSampleRate (no replayIntegration ⇒ dead config)",
+  initArgs !== "" && !/^\s*replaysOnErrorSampleRate\s*:/m.test(initArgs));
+
+const passThrough = (e) => e; // MUT-F3: beforeSend returns the event as is
+ok(27, "self-check: a pass-through beforeSend turns 19 red", leaks(passThrough(mkEvent())).length > 0);
+
 console.log(`\n── ${pass}/${pass + failures.length} passed ──`);
 if (failures.length) {
   console.log("\nFAILED:");

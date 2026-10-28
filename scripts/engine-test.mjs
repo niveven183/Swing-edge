@@ -329,6 +329,37 @@ const WEEK = 7 * 86_400_000;
 }
 
 // ── SUMMARY ──────────────────────────────────────────────────────────────────
+// ── B-457 (wave 1 F2, 28.10) — the monthly report converts, and a trade with no rate is EXCLUDED ──
+// Measured: ₪ account, +$100 (AAPL) + ₪200, rate 3.7 ⇒ the tab showed ₪300 (gold ₪570); with no rate
+// MonthlyReport still summed the $100 as ₪ (300, gold 200 + "1 excluded"). Same split as
+// computeTradingStats: counts/rates keep every trade, money skips the unconverted.
+{
+  const { makeConvertingCalc } = await import("../src/hooks/useFxRates.js");
+  const { calcTradeMetrics: rawCalc } = await import("../src/utils.js");
+  const day = "2026-10-20", at = `${day}T15:00:00.000Z`;
+  const tbl = { base: "USD", quote: "ILS", spot: { rate: 3.7, rateDate: day }, byDay: { [day]: { rate: 3.7, rateDate: day } } };
+  const usd = { id: "m1", ticker: "AAPL", side: "LONG", entry: 100, exit: 110, shares: 10, status: "CLOSED", date: day, closedAt: at };
+  const ils = (id, exit) => ({ id, ticker: "TEVA", instrumentCurrency: "ILS", side: "LONG", entry: 30, exit, shares: 100, status: "CLOSED", date: day, closedAt: at });
+  const two = [usd, ils("m2", 32)];
+  const conv = makeConvertingCalc(tbl, "ILS", "ready");
+  const none = makeConvertingCalc(null, "ILS", "loading");
+  const a = generateMonthlyReport(two, 9, 2026, conv).summary;
+  check(`B-457 · with a rate: netPnL = ₪570 (got ${a.netPnL}) · 0 excluded`, a.netPnL === 570 && a.fxUnconvertedCount === 0 && a.fxAggregatableCount === 2);
+  const b = generateMonthlyReport(two, 9, 2026, none).summary;
+  check(`B-457 · no rate: netPnL = ₪200 (got ${b.netPnL}) · 1 excluded of 2 · winRate on 2/2 (got ${b.winRate})`,
+    b.netPnL === 200 && b.fxUnconvertedCount === 1 && b.fxAggregatableCount === 1 && b.totalTrades === 2 && b.winRate === 100);
+  const raw = generateMonthlyReport(two, 9, 2026, rawCalc).summary;
+  check(`B-457 · BEFORE (raw calc) = ₪300 (got ${raw.netPnL}) — the value this block must tell apart`, raw.netPnL === 300);
+  // the full report (≥ 5 trades): every money figure skips the unconverted $ trade
+  const six = [usd, ils("m2", 32), ils("m3", 31), ils("m4", 29), ils("m5", 33), ils("m6", 30.5)];
+  const full = generateMonthlyReport(six, 9, 2026, none);
+  const dailySum = full.charts.dailyPnL.reduce((s2, d) => s2 + d.pnl, 0);
+  check(`B-457 · full report, no rate: netPnL = ₪550 = 200+100−100+300+50 (got ${full.summary.netPnL}) · Σ dailyPnL = netPnL (${dailySum})`,
+    full.summary.netPnL === 550 && Math.abs(dailySum - full.summary.netPnL) < 1e-9 && full.summary.fxUnconvertedCount === 1);
+  check(`B-457 · bestTrade is ranked by money ⇒ ⛔ the unconverted AAPL (got ${full.summary.bestTrade?.ticker} ${full.summary.bestTrade?.pnl})`,
+    full.summary.bestTrade?.ticker === "TEVA" && full.summary.bestTrade?.pnl === 300);
+}
+
 console.log("");
 if (failures) {
   console.error(`❌ engine: ${failures} assertion(s) failed.`);

@@ -786,6 +786,40 @@ button:active::after {
   }
 }
 
+/* ═══════ B-460 (wave 1 F5) — the two "live" dots, in CSS instead of a root re-render ═══════
+   Was: setPulse every 1500 ms in SwingEdge_App.jsx — the WHOLE 276-hook root re-rendered 40×/min
+   to flip one dot (measured 28.10: 84 root renders/min idle, 18 without the two timers).
+   Same look, same 3 s cycle (2 × 1500 ms), same phase order (the state started `false` = dim):
+   · .se-pulse-opacity — the market-state dots (header + footer) while the market is OPEN:
+     0.55 ↔ 1, snapped (opacity was never in transition-colors). Closed ⇒ no class, inline 0.85.
+   · .se-pulse-emerald — the Market Overview dot, every market state. Its "on" frame was the
+     [class*="bg-emerald-400"][class*="rounded-full"] override above (accent + livePulse glow);
+     its "off" frame was plain #047857 (Tailwind emerald-700) with no glow, entered over 150 ms
+     (transition-colors). ::before carries the glow, ::after the dark frame. */
+@keyframes se-pulse-opacity { 0% { opacity: 0.55; } 50% { opacity: 1; } 100% { opacity: 1; } }
+.se-pulse-opacity { animation: se-pulse-opacity 3s step-end infinite; }
+
+@keyframes se-pulse-off { 0% { opacity: 0; } 5% { opacity: 1; } 50% { opacity: 1; } 55% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes se-pulse-on  { 0% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 1; } }
+.se-pulse-emerald { position: relative; background-color: var(--accent-emerald); }
+.se-pulse-emerald::before,
+.se-pulse-emerald::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; }
+.se-pulse-emerald::before {
+  box-shadow: 0 0 0 4px rgba(0,192,118,0.20), 0 0 12px rgba(0,192,118,0.40);
+  animation: livePulse 2s ease-in-out infinite, se-pulse-on 3s step-end infinite;
+}
+.se-pulse-emerald::after {
+  background-color: #047857;
+  animation: se-pulse-off 3s linear infinite;
+}
+/* Reduced motion: no blinking at all (the global rule above only shortens durations — on an
+   infinite animation that is a 0.01 ms flicker). Static "on" frame. */
+@media (prefers-reduced-motion: reduce) {
+  .se-pulse-opacity { animation: none !important; opacity: 1; }
+  .se-pulse-emerald::before { animation: none !important; opacity: 1; }
+  .se-pulse-emerald::after { animation: none !important; opacity: 0; }
+}
+
 /* ═══════ ACCESSIBILITY ═══════ */
 
 [class*="text-4xl"][class*="font-bold"],

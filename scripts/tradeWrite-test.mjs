@@ -542,6 +542,65 @@ const rowsOf = (n) => Array.from({ length: n }, (_, i) => ({ id: `id-${i}` }));
       `כ-null, ו-null אומר "נכתב לפני הגל". זו תווית שקר על שורה חדשה`);
 }
 
+// ── 30-37 · B-459 (wave 1 F4) — כשל כתיבה מגיע ל-Sentry, tags בלבד ─────────────
+//
+// 🔴 נמדד 28.10: `0/7` אתרי כשל-כתיבה הגיעו ל-Sentry. ⛔ `err.message`/`details`/`hint` לעולם
+// לא נשלחים — הודעת PG על הפרת CHECK היא «Failing row contains (…)», כלומר ערכי השורה.
+{
+  const tw = await import("../src/lib/tradeWrite.js");
+  const tel = await import("../src/lib/telemetry.js");
+  const { readFileSync } = await import("node:fs");
+  const app = readFileSync(new URL("../SwingEdge_App.jsx", import.meta.url), "utf8");
+  const PG = { code: "23514", message: "new row violates check constraint — Failing row contains (AAPL, 187.45, 192.10)", details: "Failing row contains (AAPL, 187.45)", hint: "AAPL 187.45" };
+  const r = tw.classifyRows({ data: null, error: PG, status: 400 });
+  check(30, "classifyRows נושא status + code (additive) — ⛔ שינוי ב-ok/reason/message/rows",
+    r.status === 400 && r.code === "23514" && r.ok === false && r.reason === "error" && r.message === PG.message && r.rows === 0,
+    `החזיר ${JSON.stringify(r)}`);
+  const none = tw.classifyRows({ data: [], error: null, status: 201 }, { noneReason: "not-written" });
+  check(31, "ענף אפס-שורות: status מהתשובה · code null",
+    none.status === 201 && none.code === null && none.reason === "not-written", `החזיר ${JSON.stringify(none)}`);
+
+  const tags = tel.writeFailureTags("insert", r);
+  check(32, "tags = בדיוק {kind, op, table, status, code, reason}",
+    JSON.stringify(Object.keys(tags).sort()) === JSON.stringify(["code", "kind", "op", "reason", "status", "table"])
+      && tags.kind === "write_failure" && tags.op === "insert" && tags.table === "trades" && tags.status === 400 && tags.code === "23514" && tags.reason === "error",
+    `tags=${JSON.stringify(tags)}`);
+
+  const calls = [];
+  tel.reportWriteFailure("insert", r, (...a) => calls.push(a));
+  const wire = JSON.stringify(calls, (k, v) => (v instanceof Error ? { name: v.name, message: v.message, stack: v.stack } : v));
+  check(33, "reportWriteFailure: נקרא פעם אחת · ⛔ מחיר · ⛔ טיקר · ⛔ «Failing row» בשום שדה (כולל ה-Error)",
+    calls.length === 1 && !/187\.45|192\.10|AAPL|Failing row|violates/.test(wire) && calls[0][1].tags.code === "23514",
+    `wire=${wire.slice(0, 220)}`);
+
+  const free = tel.writeFailureTags("insert; AAPL", { reason: "AAPL 187.45 rejected", code: "Failing row AAPL", status: "500" });
+  check(34, "③ reason/code/op בטקסט חופשי שמכיל AAPL ⇒ \"other\" · status שאינו מספר ⇒ null",
+    free.reason === "other" && free.code === "other" && free.op === "other" && free.status === null, `tags=${JSON.stringify(free)}`);
+
+  const src = readFileSync(new URL("../src/lib/tradeWrite.js", import.meta.url), "utf8");
+  const literal = new Set([...src.matchAll(/\b(?:reason|noneReason):\s*"([a-z-]+)"/g)].map((m) => m[1]));
+  const okReasons = new Set([...src.matchAll(/\bokReason(?:\s*=|:)\s*"([a-z-]+)"/g)].map((m) => m[1]));
+  const failureLiterals = [...literal].filter((x) => !okReasons.has(x));
+  const missing = failureLiterals.filter((x) => !tw.WRITE_REASONS.includes(x));
+  check(35, `WRITE_REASONS מכסה כל reason-כשל ליטרלי ב-tradeWrite.js (${failureLiterals.length})`,
+    failureLiterals.length >= 7 && missing.length === 0, `חסרים: ${missing.join(",")} · נמצאו: ${failureLiterals.join(",")}`);
+
+  // צורה: כל אחד מ-7 אתרי ה-console.error של כשל-כתיבה מלווה בקריאה ל-reportWriteFailure עם op סגור.
+  const sites = [...app.matchAll(/console\.error\("(?:\[import\] )?[Ss]upabase [a-z -]+ failed:", res\.reason, res\.message\);\s*\n\s*reportWriteFailure\("([a-z_]+)", res\);/g)].map((m) => m[1]);
+  const bareSites = (app.match(/console\.error\("(?:\[import\] )?[Ss]upabase [a-z -]+ failed:", res\.reason, res\.message\);/g) || []).length;
+  check(36, "7/7 אתרי כשל-כתיבה ב-SwingEdge_App.jsx קוראים ל-reportWriteFailure עם op מתוך WRITE_OPS",
+    bareSites === 7 && sites.length === 7 && new Set(sites).size === 7 && sites.every((o) => tel.WRITE_OPS.includes(o)),
+    `console.error=${bareSites} · מדווחים=${sites.length} [${sites.join(",")}]`);
+
+  const sCalls = [];
+  tel.reportSettingsReadFailure({ message: "permission denied for user 22222222 capital 49000", code: "42501", status: 403 }, (...a) => sCalls.push(a));
+  const sWire = JSON.stringify(sCalls);
+  check(37, "B-455: settings_read_failed — tags {kind,table,status,code} בלבד · ⛔ message",
+    sCalls.length === 1 && sCalls[0][0] === "settings_read_failed" && !/49000|permission denied|22222222/.test(sWire)
+      && JSON.stringify(Object.keys(sCalls[0][1].tags).sort()) === JSON.stringify(["code", "kind", "status", "table"]),
+    `wire=${sWire.slice(0, 200)}`);
+}
+
 console.log(`\n${ran - failures.length}/${ran} passed`);
 if (failures.length) {
   console.error(`FAILED: ${failures.join(", ")}`);
