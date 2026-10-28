@@ -48,6 +48,7 @@ import { fmtMoney } from "../src/utils.js";
 import { buildRateTable, convert } from "../src/lib/fx.js";
 import { deriveInstrumentCurrency, isAggregatable } from "../src/lib/instrumentCurrency.js";
 import { installHermetic, newStore, DUMMY_EMAIL, DUMMY_PASSWORD } from "./hermetic.js";
+import { qaFixtureVerdict } from "../tests/lib/qaFixture.js";
 import { sweep, PREFIX_ROOT, TRADE_TICKER } from "./qaRest.js";
 
 const HERMETIC = process.env.EYE_HERMETIC === "1";
@@ -205,9 +206,14 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     }, note);
     // The settings read must have LANDED (hydration writes the currencies to localStorage) before
     // the form stamps the trade — otherwise the trade is priced in the pre-hydration currency.
+    // 🔴 B-465 / INCIDENTS#43: «never reached the app» was printed for a row that HAD reached the
+    // app as USD/USD (edited by hand). Wait for the read to land, then let ONE verdict say which:
+    // not_hydrated (app/network) or fixture (the QA account moved). The need is unchanged.
     if (!HERMETIC) {
-      await expect.poll(() => page.evaluate(() => [localStorage.getItem("swingEdgeCapitalCurrency"), localStorage.getItem("swingEdgeAccountCurrency")].join("/")),
-        { timeout: 20_000, message: `the capital settings never reached the app (expected ${EXPECT_CCY})` }).toBe(`${EXPECT_CCY}/${EXPECT_CCY}`);
+      const ccys = () => page.evaluate(() => ({ capitalCurrency: localStorage.getItem("swingEdgeCapitalCurrency"), accountCurrency: localStorage.getItem("swingEdgeAccountCurrency") }));
+      await expect.poll(async () => qaFixtureVerdict(await ccys(), { expect: EXPECT_CCY }).ok, { timeout: 20_000, message: "the QA capital settings did not settle to the need in 20s" })
+        .toBe(true)
+        .catch(async () => { const v = qaFixtureVerdict(await ccys(), { expect: EXPECT_CCY }); throw new Error(v.message); });
     }
     // The FAB HIDES on scroll-down and returns only on a scroll-up of >10px per frame (SwingEdge_App.jsx
     // `fabVisible`). The B5 before-read scrolls the analytics tab down, and a smooth (index.css) or

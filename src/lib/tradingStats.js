@@ -25,6 +25,32 @@ function rSumStats(items) {
 }
 
 /**
+ * sumConverted — the money total of a small set (a calendar day / month), by the
+ * SAME rule `computeTradingStats` uses for `aggregatable` (B-427/B-187, wave 1b):
+ * a member the converting calc refused (`fxUnconverted`) stays OUT of the sum and
+ * is COUNTED, never added in its paper unit.
+ *
+ * ⛔ No `?? 0` on an empty sum: when nothing could be summed, `pnl` is `null` —
+ * "₪0" would assert a measurement that was never taken (R-2).
+ *
+ * @param {Array}    trades
+ * @param {Function} calc  (trade) => metrics — the converting calc (`stableCalcTradeMetrics`).
+ * @returns {{ pnl: ?number, counted: number, excluded: number, missing: number }}
+ *   `excluded` = no FX rate (`fxUnconverted`) · `missing` = no finite pnl at all.
+ */
+export function sumConverted(trades, calc) {
+  let pnl = 0, counted = 0, excluded = 0, missing = 0;
+  for (const t of trades || []) {
+    const m = calc(t);
+    if (m?.fxUnconverted) { excluded += 1; continue; }
+    if (!Number.isFinite(m?.pnl)) { missing += 1; continue; }
+    pnl += m.pnl;
+    counted += 1;
+  }
+  return { pnl: counted ? pnl : null, counted, excluded, missing };
+}
+
+/**
  * computeTradingStats — Master Stats Hub (pure)
  *
  * Single source of truth for all trading statistics.

@@ -570,7 +570,15 @@ const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity, cur
 
   const tradeRows = [...monthClosed].reverse().map(t => {
     const m = calcFn(t);
-    const pnl = m.pnl != null ? m.pnl : 0;
+    // 🔴 B-427 (wave 1b, 28.10): `calcFn` is the CONVERTING calc. A trade it refused
+    // (`fxUnconverted`) carries its PAPER pnl — printed under `sym` that was "+₪100.00"
+    // for a $100 trade. And `: 0` turned a missing pnl into "+₪0.00". Both now say "—":
+    // the disclosure line above already counts the refusal (`closedNoRate`).
+    const pnlCell = m.fxUnconverted
+      ? `<td style="color:#94a3b8">— <span style="font-size:10px">(no FX rate)</span></td>`
+      : m.pnl == null
+        ? `<td style="color:#94a3b8">—</td>`
+        : `<td style="color:${pnlColor(m.pnl)};font-weight:600">${fmtDollar(m.pnl)}</td>`;
     // `: 0` printed "+0.00R" for a trade that had no stop — an exported,
     // archived document asserting a measurement that was never taken.
     const r = m.rMultiple;
@@ -582,7 +590,7 @@ const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity, cur
         <td>${esc(t.setup ?? "-")}</td>
         <td>${fmtPaperPrice(t.entry, t)}</td>
         <td>${t.exit != null ? fmtPaperPrice(t.exit, t) : "-"}</td>
-        <td style="color:${pnlColor(pnl)};font-weight:600">${fmtDollar(pnl)}</td>
+        ${pnlCell}
         <td style="color:${r == null ? "#94a3b8" : pnlColor(r)};font-weight:600">${fmtR(r)}</td>
         <td>${t.followedPlan === "Partially" ? "◐" : t.followedPlan != null ? (t.followedPlan ? "✓" : "✗") : "-"}</td>
       </tr>`;
@@ -5626,7 +5634,7 @@ export default function SwingEdge() {
             {journalView === 'calendar' ? (
               <TradeCalendar
                 trades={getClosed(filteredTrades)}
-                calcMetrics={calcTradeMetrics}
+                calcMetrics={stableCalcTradeMetrics}
                 fmtAcct={fmtAcct}
                 acctRefusalText={acctRefusalText}
                 lang={lang}

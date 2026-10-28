@@ -8,6 +8,12 @@
 //   MUT-F3   beforeSend / beforeSendTransaction pass events through ⇒ F3 red
 //   MUT-F4   the insert site's reportWriteFailure removed         ⇒ F4 red
 //   MUT-F5   the reduced-motion rule for the dots removed         ⇒ F5 red
+//   wave 1b (B-427/B-187, 28.10):
+//   MUT-F6a  <TradeCalendar calcMetrics> back to the raw calc     ⇒ F6 red (calendar)
+//   MUT-F6b  sumConverted adds the unconverted trade raw          ⇒ F6 red (calendar, no rate)
+//   MUT-F6c  the day total back to `$` + toFixed(0)               ⇒ F6 red (day modal)
+//   MUT-F6d  the modal rows on the CONVERTING calc (double)       ⇒ F6 red (day modal row)
+//   MUT-F7   the PDF row prints an unconverted pnl under `sym`    ⇒ F7 red
 // Each red must carry its own message (a red for the wrong reason is a blind gate). ⛔ A mutant that
 // survives, a BEFORE that goes green, or a red HEAD ⇒ exit 1. Built with a Sentry DSN pointed at a local
 // ingest (the spec routes /api/<n>/envelope/), Supabase at the hermetic synthetic origin. Zero secrets.
@@ -36,8 +42,9 @@ const once = makeOnce(die);
 
 const F = (p) => join(ROOT, p);
 const APP = F("SwingEdge_App.jsx"), MAIN = F("src/main.jsx"), CSS = F("src/index.css");
+const CAL = F("src/components/TradeCalendar.jsx"), DTM = F("src/components/DayTradesModal.jsx"), TSTATS = F("src/lib/tradingStats.js");
 const PRODUCT = [APP, MAIN, CSS, F("src/components/WeeklyReviewTab.jsx"), F("src/components/MonthlyReportTab.jsx"),
-  F("src/intelligence/core/MonthlyReport.js"), F("src/lib/tradeWrite.js"), F("src/lib/userSettings.js")];
+  F("src/intelligence/core/MonthlyReport.js"), F("src/lib/tradeWrite.js"), F("src/lib/userSettings.js"), CAL, DTM, TSTATS];
 assertCleanTargets(ROOT, PRODUCT, die);
 const show = (f) => execFileSync("git", ["show", `${BEFORE_REF}:${f.replace(ROOT + "/", "")}`], { cwd: ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 const WHOLE = /^[\s\S]+$/;
@@ -46,12 +53,17 @@ const ONE = ["wave1-pixel7"];
 const ARMS = {
   HEAD: { muts: [], projects: ALL, grep: null, expect: null },
   BEFORE: { muts: PRODUCT.map((f) => { const old = show(f); return [f, WHOLE, () => old]; }), projects: ALL, grep: null,
-    expect: { F1: /B-456/, F2: /B-457/, F3: /B-458/, F4: /B-459/, F5: /B-460/ } },
+    expect: { F1: /B-456/, F2: /B-457/, F3: /B-458/, F4: /B-459/, F5: /B-460/, F6: /B-427/, F7: /B-427 \(PDF\)/ } },
   "MUT-F1": { muts: [[APP, "${esc(l.lesson)}", () => "${l.lesson}"]], projects: ONE, grep: "F1 ", expect: { F1: /B-456/ } },
   "MUT-F2": { muts: [[APP, "capital={capital}\n            calcMetrics={stableCalcTradeMetrics}", () => "capital={capital}\n            calcMetrics={calcTradeMetrics}"]], projects: ONE, grep: "F2 ", expect: { F2: /B-457 \(weekly\)/ } },
   "MUT-F3": { muts: [[MAIN, "  beforeSend: sentryBeforeSend,\n", () => "  beforeSend: (e) => e,\n"], [MAIN, "  beforeSendTransaction: sentryBeforeSendTransaction,\n", () => "  beforeSendTransaction: (e) => e,\n"]], projects: ONE, grep: "F3 ", expect: { F3: /B-458/ } },
   "MUT-F4": { muts: [[APP, '        reportWriteFailure("insert", res);\n', () => ""]], projects: ONE, grep: "F4 ", expect: { F4: /B-459: no write_failure/ } },
   "MUT-F5": { muts: [[CSS, "  .se-pulse-opacity { animation: none !important; opacity: 1; }\n", () => ""]], projects: ONE, grep: "F5 ", expect: { F5: /B-460 \((header|footer), reduced-motion\)/ } },
+  "MUT-F6a": { muts: [[APP, "trades={getClosed(filteredTrades)}\n                calcMetrics={stableCalcTradeMetrics}", () => "trades={getClosed(filteredTrades)}\n                calcMetrics={calcTradeMetrics}"]], projects: ONE, grep: "F6 ", expect: { F6: /B-427 \(calendar\)/ } },
+  "MUT-F6b": { muts: [[TSTATS, "    if (m?.fxUnconverted) { excluded += 1; continue; }\n", () => ""]], projects: ONE, grep: "F6 ", expect: { F6: /B-427 \(calendar\)/ } },
+  "MUT-F6c": { muts: [[DTM, "{totals.pnl == null ? '—' : fmt$(totals.pnl, currency)}", () => "{totals.pnl >= 0 ? '+' : ''}${(totals.pnl ?? 0).toFixed(0)}"]], projects: ONE, grep: "F6 ", expect: { F6: /B-427 \(day modal\)/ } },
+  "MUT-F6d": { muts: [[DTM, "const rawPnl = calcTradeMetrics(tr).pnl;", () => "const rawPnl = safeCalc(tr).pnl;"]], projects: ONE, grep: "F6 ", expect: { F6: /B-427 \(day modal row\)/ } },
+  "MUT-F7": { muts: [[APP, "    const pnlCell = m.fxUnconverted\n", () => "    const pnlCell = false\n"]], projects: ONE, grep: "F7 ", expect: { F7: /B-427 \(PDF\)/ } },
 };
 
 // Every first anchor must match exactly once in the LIVE bytes before anything is built (B-272).
@@ -65,7 +77,7 @@ const arms = argArms || Object.keys(ARMS);
 for (const a of arms) if (!ARMS[a]) die(`unknown arm ${a}`);
 // Verdict key per test: "F1-he" · "F2-he-rate" · "F3" · "F4" · "F5-he"
 const KEY = (title) => {
-  const m = /^(F[1-5])(?: · (he|en))?(?: · (rate|no rate))?/.exec(title);
+  const m = /^(F[1-7])(?: · (he|en))?(?: · (rate|no rate))?/.exec(title);
   return m ? [m[1], m[2], m[3] && m[3].replace(" ", "")].filter(Boolean).join("-") : null;
 };
 
