@@ -300,6 +300,7 @@ test.describe("wave 1 — security & money (B-456 … B-460)", () => {
       const next = el.nextElementSibling, prev = el.previousElementSibling;
       const where = el.closest("footer") ? "footer" : (next && next.style && next.style.color && el.style.backgroundColor) ? "header" : (prev && prev.tagName === "SPAN" && MO.includes(prev.textContent.trim())) ? "overview" : null;
       if (!where) continue;
+      el.setAttribute("data-w1dot", where);
       const s = getComputedStyle(el), b = getComputedStyle(el, "::before"), a = getComputedStyle(el, "::after");
       out.push({ where, cls: el.className, anim: s.animationName, opacity: s.opacity, bg: s.backgroundColor, before: b.animationName, after: a.animationName, box: [r.x, r.y, r.width, r.height].map(Math.round) });
     }
@@ -318,22 +319,27 @@ test.describe("wave 1 — security & money (B-456 … B-460)", () => {
           await signIn(page, lang);
           await closeOverlays(page);
           await page.waitForTimeout(1500);
-          const dash = await page.evaluate(DOTS);
-          for (const [i, d] of dash.entries()) {
-            const clip = { x: Math.max(0, d.box[0] - 14), y: Math.max(0, d.box[1] - 10), width: 120, height: d.box[3] + 20 };
-            await app.shot(`${d.where}${i}-a`, { clip });
+          // Two frames 1.5 s apart (one blink half-cycle). The dot is scrolled into view first: a clip outside
+          // the viewport fails, and the footer / overview dots sit below the fold on a phone.
+          const frames = async (where, padL, w) => {
+            const loc = page.locator(`[data-w1dot="${where}"]`).first();
+            await loc.scrollIntoViewIfNeeded();
+            await page.waitForTimeout(200);
+            const b = await loc.boundingBox();
+            if (!b) return;
+            const vw = page.viewportSize().width;
+            const x = Math.max(0, Math.min(b.x - padL, vw - w));
+            const clip = { x, y: Math.max(0, b.y - 12), width: Math.min(w, vw - x), height: b.height + 24 };
+            await app.shot(`${where}-a`, { clip });
             await page.waitForTimeout(1500);
-            await app.shot(`${d.where}${i}-b`, { clip });
-          }
+            await app.shot(`${where}-b`, { clip });
+          };
+          const dash = await page.evaluate(DOTS);
+          for (const where of new Set(dash.map((d) => d.where))) await frames(where, where === "header" ? 20 : 12, 140);
           await tab(page, "intel");
           await page.waitForTimeout(1200);
           const intel = (await page.evaluate(DOTS)).filter((d) => d.where === "overview");
-          for (const [i, d] of intel.entries()) {
-            const clip = { x: Math.max(0, d.box[0] - 60), y: Math.max(0, d.box[1] - 10), width: 160, height: d.box[3] + 20 };
-            await app.shot(`overview${i}-a`, { clip });
-            await page.waitForTimeout(1500);
-            await app.shot(`overview${i}-b`, { clip });
-          }
+          if (intel.length) await frames("overview", 150, 200);
           runs[mode] = { dash, intel };
         } finally { await app.ctx.close(); }
       }
