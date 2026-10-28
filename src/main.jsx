@@ -16,6 +16,7 @@ import { trackPageView, analyticsPath } from "./lib/consent.js";
 import { enrichBoundaryScope, currentRoute } from "./components/PanelBoundary.jsx";
 import { reportBoundaryCrash } from "./lib/alertChannel.js";
 import { inject } from "@vercel/analytics";
+import { sentryBeforeSend, sentryBeforeSendTransaction, scrubBreadcrumb } from "./lib/sentryScrub.js";
 
 // ⛔ NEVER call inject() bare. The script Vercel serves builds its payload as
 // `{ o: location.href }` — fragment included — and supabase-js runs the implicit
@@ -45,7 +46,17 @@ Sentry.init({
   environment: import.meta.env.MODE,
   enabled: import.meta.env.PROD,
   tracesSampleRate: 0.1,
-  replaysOnErrorSampleRate: 1.0,
+  // ⛔ replaysOnErrorSampleRate: there is no replayIntegration, so it never sent anything
+  //    (0 replay envelopes of 21, WAVE1-DIAGNOSIS §F3) — dead config, removed (B-458).
+  //
+  // 🔴 B-458 · INCIDENTS #40 — the third token channel. supabase-js lands sign-in returns on
+  // `/#access_token=…&refresh_token=…`; measured on the real bytes, the sampled pageload
+  // transaction and any event captured during the load carried both tokens to Sentry.
+  // All three outbound hooks run the SAME scrub (src/lib/sentryScrub.js). Pinned by
+  // test:analytics 18-27 and proven against the real SDK by `npm run probe:sentry`.
+  beforeSend: sentryBeforeSend,
+  beforeSendTransaction: sentryBeforeSendTransaction,
+  beforeBreadcrumb: scrubBreadcrumb,
   integrations: [
     Sentry.browserTracingIntegration(),
     // Drop errors whose stack is made up EXCLUSIVELY of non-first-party frames

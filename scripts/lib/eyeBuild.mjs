@@ -42,7 +42,9 @@ export function assertCleanTargets(root, files, die) {
  * file and verify the restore with git. A string `find` is replaced once; a RegExp uses the
  * replacement function.
  */
-export async function buildTree({ root, arm, outDir, mutations, once, die }) {
+// `env` (B-458, wave 1): build-time overrides — probe:sentry points VITE_SENTRY_DSN at a local ingest.
+// The default `{}` keeps every existing caller byte-identical (DSN "" ⇒ Sentry off).
+export async function buildTree({ root, arm, outDir, mutations, once, die, env = {} }) {
   const originals = new Map();
   try {
     for (const [f, find, repl] of mutations) {
@@ -53,7 +55,7 @@ export async function buildTree({ root, arm, outDir, mutations, once, die }) {
     }
     execFileSync("npx", ["vite", "build", "--outDir", outDir, "--emptyOutDir", "--logLevel", "error"], {
       cwd: root, stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, VITE_SUPABASE_URL: `https://${SB_HOST}`, VITE_SUPABASE_ANON_KEY: "eye-probe-anon-not-a-secret", VITE_SENTRY_DSN: "" },
+      env: { ...process.env, VITE_SUPABASE_URL: `https://${SB_HOST}`, VITE_SUPABASE_ANON_KEY: "eye-probe-anon-not-a-secret", VITE_SENTRY_DSN: "", ...env },
     });
   } finally {
     for (const [f, src] of originals) await writeFile(f, src, "utf8");
