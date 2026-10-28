@@ -1651,3 +1651,24 @@ reload»: צפוי `b1…b5`, התקבל `b1 · b2 · b3 · b5`. `b4` **שרד �
 
 ### לקח
 ⚠️ **`#12` נסגר בערוץ אחד (gtag), `B-184` בשני (Vercel) — ו-Sentry, ערוץ שלישי שמקבל את אותה כתובת, ⛔ נבדק.** כל ספק שמקבל `location.href` הוא ערוץ; הרשימה היא «כל SDK שנטען בדף», ⛔ «הערוץ שנשבר אחרון». ⚠️ **ואסרציית ערך ירוקה על scrub ⛔ מוכיחה שה-SDK עדיין שולח** — רק envelope אמיתי מוכיח.
+
+## #41 — 2026-10-28 — `eye-playbook` על PR #86 (גל 1 «אבטחה וכסף», `7d18053`, run `40687035465`): `probe-overlay` אדום בתא אחד — אותו תא כמו `#37`, חתימה אחרת
+**מה קרה:** `probe-overlay` ⇒ `❌ HEAD/iphoneSE  all 4 cells green` — `15/16` תאי HEAD ירוקים; BEFORE אדום כנדרש · `MUT-PAD`·`MUT-IOS` נהרגו · `eye-width-probe` ירוק. כל שאר ה-jobs בריצה ירוקים (probe · probe-cents · probe-firstrun · probe-sync-head · probe-sync-mutants · probe-wave1 · prod).
+**החתימה המלאה:** job `probe-overlay` · cell `HEAD/iphoneSE:ios-he` (`iOS install banner · he — never before a first trade, never over a modal, never over a CTA`) · מכשיר iPhone SE (WebKit, CI) · שפה he · `tests-eye/overlay.spec.js:136` (`login`) — `TimeoutError: locator.waitFor: Timeout 30000ms exceeded … waiting for locator('[data-tour-tab="dashboard"]') to be visible`, `31,989ms`. רשומת התא `ios-he.json` = `[]` ו⛔ צילום `he-ios-*` — נפל בכניסה, **לפני** כל מדידה. ⛔ snapshot של הדף (`test-results/` ⛔ מועלה).
+
+| | `#37` (PR #85, run `39619287886`) | `#41` (PR #86, run `40687035465`) |
+|---|---|---|
+| job · arm | `probe-overlay` · HEAD | `probe-overlay` · HEAD |
+| cell | `iphoneSE:ios-he` | `iphoneSE:ios-he` |
+| שלב | אחרי פתיחת הטופס מה-FAB | מיד אחרי לחיצת הכניסה |
+| שורת הכשל | `locator.scrollIntoViewIfNeeded: … waiting for element to be stable` על `Log Trade` | `locator.waitFor: Timeout 30000ms … [data-tour-tab="dashboard"] to be visible` |
+| נגע בקוד הגל? | ✅ — הגל הזיז את `Log Trade` (`B-446` G1) | ⛔ — הגל ⛔ נוגע בכניסה→הידרציה→דשבורד (Sentry כבוי ב-build הזה; הטלמטריה יורה רק על כשל כתיבה/קריאה; הנקודות CSS) |
+| `ios-en` באותו מכשיר | ✅ | ✅ |
+| שחזור מקומי (WebKit אמיתי, `webkit-2311`) | `6/6` ירוק | **`0/6` כשל** בתא (`he` ×6, `7.5–9.3s` מול טיימאאוט 30s) + בקרת `en` ×6 ירוקה — build HEAD זהה ל-probe (⛔ env) |
+| ריצה חוזרת | הדחיפה הבאה הריצה הכל ⇒ ✅ | `gh run rerun --failed` פעם אחת (הכרעת ניב 28.10) ⇒ **attempt 2 ירוק** — `HEAD/iphoneSE all 4 cells green` (`ios-he` passed, job `122848542801`, `22m23s`); ⇒ מוזג `165d2ac` |
+
+**הסיווג:** ⛔ חתימה מתועדת מדויקת — ⛔ (ג) של `B-425` («internal error» ב-reload / `load` ⛔ נורה) ⛔ `#37` («not stable»). **אותה משפחה** (WebKit · iPhone SE · he · תא בודד, ⛔ משוחזר) ⇒ **חתימה חדשה תחת `B-425`**. ⛔ שינוי בקוד או בסף.
+**ההכרעה (ניב 28.10):** ריצה חוזרת **אחת** בלבד; ירוק ⇒ מיזוג; אדום שוב באותו תא ⇒ עצירה, ⛔ מיזוג.
+
+### לקח
+⚠️ **אותו תא אדום פעמיים ב-8 ימים (`#37` · `#41`) בשתי חתימות שונות** ⇒ התא הוא המשתנה, ⛔ החתימה. ⛔ «flake ידוע» מתוך דמיון — הסיווג נשען על `0/6` מקומי + היעדר מסלול מקוד הגל, וזה מה שמתיר ריצה חוזרת אחת. ⚠️ **ובלי snapshot אין עדות למה היה על המסך** — `B-425` (גל 7) צריך להעלות צילום/`error-context` לתא שנכשל ב-probe.
