@@ -39,8 +39,8 @@ export default defineConfig({
     navigationTimeout: 45_000,
   },
   projects: forceChromium([
-    { name: "pixel7", use: { ...devices["Pixel 7"], launchOptions: chromiumLaunch } },
-    { name: "iphone14", use: { ...devices["iPhone 14"] } },
+    { name: "pixel7", testIgnore: /wave1\.spec\.js/, use: { ...devices["Pixel 7"], launchOptions: chromiumLaunch } },
+    { name: "iphone14", testIgnore: /wave1\.spec\.js/, use: { ...devices["iPhone 14"] } },
     // B-404 · B-405 (+ B-424 width.spec) — the overlay matrix needs the short and the narrow screens too
     // (measured 04.10: iPhone SE 568 · Galaxy S8 360 wide · 14 Pro Max 740). The playbook
     // suite stays on the two devices above; these run tests-eye/overlay.spec.js only.
@@ -53,5 +53,13 @@ export default defineConfig({
     // heights are measured. desktop1440: the journal table renders at ≥ md only.
     { name: "iphone14tall", testMatch: /firstrun\.spec\.js/, use: { ...devices["iPhone 14"], viewport: { width: 390, height: 844 } } },
     { name: "desktop1440", testMatch: /firstrun\.spec\.js/, use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 }, launchOptions: chromiumLaunch } },
+    // Fix round 1 (B-456…B-460, 28.10) — tests-eye/wave1.spec.js runs ONLY in its own job (EYE_WAVE1=1:
+    // eye-playbook.yml `prod-wave1` + `probe-wave1`). The `prod` job already takes ~22 of its 40 minutes
+    // (run 39637288711); adding ~20 there would time it out. Default projects ignore the spec.
+    ...(process.env.EYE_WAVE1 === "1" ? [
+      { name: "wave1-pixel7", testMatch: /wave1\.spec\.js/, use: { ...devices["Pixel 7"], launchOptions: chromiumLaunch } },
+      { name: "wave1-iphone14", testMatch: /wave1\.spec\.js/, use: { ...devices["iPhone 14"] } },
+      { name: "wave1-desktop1440", testMatch: /wave1\.spec\.js/, use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 }, launchOptions: chromiumLaunch } },
+    ] : []),
   ]),
 });
