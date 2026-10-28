@@ -82,6 +82,25 @@ function grepFile(file, re) {
   return hits;
 }
 
+// ── raw-HTML sinks (B-461 · wave 1 F1) ───────────────────────────────────────
+// The dangerouslySetInnerHTML check below was the ONLY XSS check, and the one live XSS
+// (exportMonthlyPDF → document.write, measured 28.10) never used it. A sink is
+// document.write · insertAdjacentHTML · an innerHTML/outerHTML assignment. Exempt: clearing
+// ("" / '' / ``) and JSON.stringify(...) into a <script> (raw text, never parsed as HTML).
+// ⚠️ A file that imports escapeHtml counts as filtered — this proves the escape is IN the file,
+// ⛔ that every sink uses it; test:format pins that per value for exportMonthlyPDF.
+const RAW_SINK = /\bdocument\.write(?:ln)?\s*\(|\.insertAdjacentHTML\s*\(|\.(?:inner|outer)HTML\s*=(?!=)/;
+const SAFE_SINK = /\.(?:inner|outer)HTML\s*=\s*(?:""|''|``|JSON\.stringify\()/;
+export function rawHtmlSinks(corpus) {
+  const out = [];
+  for (const f of corpus) {
+    if (/^(?:scripts|tests[\w-]*)\//.test(f.rel)) continue; // probes and tests never ship
+    const escaped = /\bescapeHtml\b/.test(f.text);
+    for (const h of grepFile(f, RAW_SINK)) if (!SAFE_SINK.test(h.text) && !escaped) out.push(`${f.rel}:${h.line}`);
+  }
+  return out;
+}
+
 // ── api endpoints ────────────────────────────────────────────────────────────
 
 // Everything directly under api/ IS a serverless endpoint; everything under
@@ -306,6 +325,13 @@ function auditSecurity(corpus) {
     add("SECURITY", `חשד לסוד מוטמע בקוד — ${secretHits.length} מיקומים`,
       5, 2, secretHits[0],
       "העבר את הערך ל-secret/env, החלף (rotate) אותו, ואמת שאינו נכנס ל-git history.");
+  }
+
+  const sinks = rawHtmlSinks(corpus);
+  if (sinks.length > 0) {
+    add("SECURITY", `HTML גולמי ממחרוזת בלי escapeHtml — ${sinks.length} אתרים`,
+      5, 2, sinks[0],
+      "העבר כל ערך דרך escapeHtml (src/lib/escapeHtml.js) לפני שהוא נכנס ל-HTML — DECISIONS 28.10.");
   }
 
   // dangerouslySetInnerHTML without visible sanitization.

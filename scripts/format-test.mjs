@@ -171,6 +171,25 @@ const LANGS = ["en", "he", "es", "pt", "ar"];
     app.includes('{fmtPaperPrice(tr.stop, tr)}'));
 }
 
+// ── B-456 (wave 1 F1) — escapeHtml, and the PDF export uses it on every user value ──
+{
+  const { escapeHtml } = await import("../src/lib/escapeHtml.js");
+  check("escapeHtml: the five characters", escapeHtml(`<a href="x" title='y'>&</a>`) === "&lt;a href=&quot;x&quot; title=&#39;y&#39;&gt;&amp;&lt;/a&gt;");
+  check("escapeHtml: & first — an entity is not decoded into markup", escapeHtml("&lt;script&gt;") === "&amp;lt;script&amp;gt;");
+  check("escapeHtml: null/undefined ⇒ \"\" · number ⇒ text", escapeHtml(null) === "" && escapeHtml(undefined) === "" && escapeHtml(187.45) === "187.45");
+  check("escapeHtml: the measured payload ⇒ no tag survives", !/<img/i.test(escapeHtml("<img src=x onerror=window.__xss=1>")));
+  const app = readFileSync(new URL("../SwingEdge_App.jsx", import.meta.url), "utf8");
+  const a = app.indexOf("const exportMonthlyPDF = ");
+  const b = app.indexOf("\n// ─── TIME HELPERS", a);
+  const body = a >= 0 && b > a && app.split("const exportMonthlyPDF = ").length === 2 ? app.slice(a, b) : "";
+  check("exportMonthlyPDF extracted exactly once (extraction failure is red, B-272)", body !== "");
+  const userInterps = [...body.matchAll(/\$\{([^}]*\b[tl]\.(?:date|ticker|side|setup|lesson)\b[^}]*)\}/g)].map((m) => m[1].trim());
+  check(`exportMonthlyPDF: every t./l. string value is wrapped in esc( (${userInterps.length}/6)`,
+    userInterps.length === 6 && userInterps.every((x) => /^esc\(/.test(x)));
+  check("exportMonthlyPDF: monthName and equityIncomplete are escaped where they are built",
+    /const monthName = esc\(/.test(body) && /const equityIncomplete = excludedTotal > 0\s*\n\s*\? esc\(/.test(body));
+}
+
 // ── SUMMARY ──────────────────────────────────────────────────────────────────
 console.log("");
 if (failures) {

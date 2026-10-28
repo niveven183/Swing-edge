@@ -54,6 +54,8 @@ import { deleteTradeVerified, restoreAt, createPendingWrites, insertTradeRow, up
 import { loadSettings, saveSettings, flushSettings, flushKeepalive, currentToken, migrateFromLocalStorage, onSettingsSynced, onSettingsConflict, confirmedAt, confirmSynced } from "./src/lib/userSettings.js";
 import { readPending, recordScalarEdit, settlePending, clearPending, decidePending } from "./src/lib/settingsPending.js";
 import { calcTradeMetrics, fmt$, fmt$0, fmtR, fmtNum, fmtPrice, fmtBalance, numOrNull, formatPct, formatReturnPct, qstars, priceBasedRR, inferSide, validateTradeInputs, DEFAULT_CAPITAL, holdDays, localDayKey, todayKey, realizedAt, realizedDayKey, currencyOf, fmtPaperPrice, paperCurrencyOf, CURRENCY_SYMBOL, fmtAccountAmount, fmtCapitalAmount } from "./src/utils.js";
+// B-456 (wave 1 F1): HTML built from a string escapes every value through this one function.
+import { escapeHtml } from "./src/lib/escapeHtml.js";
 // B-459 (wave 1 F4): every trade-write failure reaches Sentry — closed tags only, ⛔ message (src/lib/telemetry.js).
 import { reportWriteFailure } from "./src/lib/telemetry.js";
 import {
@@ -484,9 +486,13 @@ const exportTradesCSV = (trades) => {
 // so, is the silent failure CLAUDE.md §2 forbids. The `missingCount` gap
 // predates B-119 and had no disclosure at all; both are covered by one line.
 const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity, currency = "USD", calcFn = calcTradeMetrics, equityGaps = null) => {
+  // 🔴 B-456 (wave 1 F1): this document is written into a same-origin popup. Every string that
+  // reaches the template goes through `esc` — measured 28.10, a raw `lessonLearned` ran script
+  // that read the Supabase token from localStorage. Numbers and fmt* output carry no markup.
+  const esc = escapeHtml;
   const sym = CURRENCY_SYMBOL[currency] || CURRENCY_SYMBOL.USD;
   const now = new Date();
-  const monthName = now.toLocaleString("en-US", { month: "long" });
+  const monthName = esc(now.toLocaleString("en-US", { month: "long" }));
   const year = now.getFullYear();
   const thisMonth = now.getMonth();
   const thisYear = now.getFullYear();
@@ -540,10 +546,10 @@ const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity, cur
   // single sentence, so nothing is lost by unifying the count.
   const excludedTotal = noPrice + noRate + closedNoRate;
   const equityIncomplete = excludedTotal > 0
-    ? `Excludes ${excludedTotal} trade(s) from the totals and the equity curve`
+    ? esc(`Excludes ${excludedTotal} trade(s) from the totals and the equity curve`
       + `${noPrice ? ` — ${noPrice} open without a live price` : ""}`
       + `${noRate ? ` — ${noRate} open without an FX rate` : ""}`
-      + `${closedNoRate ? ` — ${closedNoRate} closed without an FX rate to ${currency}` : ""}`
+      + `${closedNoRate ? ` — ${closedNoRate} closed without an FX rate to ${currency}` : ""}`)
     : "";
 
   // Lessons from this month
@@ -570,10 +576,10 @@ const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity, cur
     const r = m.rMultiple;
     return `
       <tr>
-        <td>${t.date}</td>
-        <td><strong>${t.ticker}</strong></td>
-        <td>${t.side}</td>
-        <td>${t.setup ?? "-"}</td>
+        <td>${esc(t.date)}</td>
+        <td><strong>${esc(t.ticker)}</strong></td>
+        <td>${esc(t.side)}</td>
+        <td>${esc(t.setup ?? "-")}</td>
         <td>${fmtPaperPrice(t.entry, t)}</td>
         <td>${t.exit != null ? fmtPaperPrice(t.exit, t) : "-"}</td>
         <td style="color:${pnlColor(pnl)};font-weight:600">${fmtDollar(pnl)}</td>
@@ -583,7 +589,7 @@ const exportMonthlyPDF = (trades, capital, stats, monthStats, accountEquity, cur
   }).join("");
 
   const lessonRows = lessons.length
-    ? lessons.map(l => `<li><strong>${l.ticker}</strong>: ${l.lesson}</li>`).join("")
+    ? lessons.map(l => `<li><strong>${esc(l.ticker)}</strong>: ${esc(l.lesson)}</li>`).join("")
     : "<li>No lessons recorded this month.</li>";
 
   const html = `<!DOCTYPE html>
