@@ -1689,3 +1689,16 @@ reload»: צפוי `b1…b5`, התקבל `b1 · b2 · b3 · b5`. `b4` **שרד �
 
 ### לקח
 ⚠️ **בדיקה שקוראת שורה חיה בפרודקשן נשענת על מצב שכל כניסה ידנית יכולה לשנות** — ותנאי שלא כתוב בריפו ⛔ קיים (§2). ⚠️ **ושתי ההודעות האשימו את הדבר הלא-נכון** («read something else» · «never reached») — מחלקת `B-335`: השורה **הגיעה**, היא פשוט `USD`. ⚠️ **ושער הבטיחות של גל 1b הוא שתפס את זה** — `7` ריצות אדומות נצברו ב-6 שעות ⛔ ואף רישום לא נפתח.
+
+## #44 — 2026-10-29 — `eye-playbook` על PR #87 (גל 1b, `4180f79`, run `40742070767`): שני תאים בודדים אדומים בשני jobs — שתי חתימות, שתי משפחות
+**מה קרה:** attempt 1 — כל ה-jobs ירוקים (`probe-wave1` · `probe` · `probe-cents` · `probe-overlay` · `probe-sync-mutants` · `build` · Vercel) מלבד שני תאים:
+- **ⓐ `probe-sync-head` · `HEAD/iphone14:C3`** (WebKit) — «B-408: lang must be enabled once the read has spoken»: `select` השפה ⛔ הופעל אחרי `page.reload`. `HEAD/pixel7` `11/11`; iphone14 `10/11`.
+- **ⓑ `probe-firstrun` · `HEAD desktop1440:actions-en`** (Chromium) — `TimeoutError: locator.waitFor: Timeout 20000ms` על `[data-testid="journal-table"] tbody tr`. HEAD `33/34`; `actions-he` באותו מכשיר ירוק, וגם ריצת `MUT-STICKY` רינדרה את השורות.
+
+**⛔ מגל 1b:** הגל נוגע בלוח השנה, בחלון היום, בשורת ה-PDF וב-`sumConverted` — ⛔ ב-Settings ו⛔ ברשימת היומן. מקומית על אותו commit: `probe:eye:sync` `3/3` ריצות (`11/11` כל אחת) · `probe:eye:firstrun` `3/3` (`10/10`). BEFORE וכל המוטנטים בשני ה-jobs אדומים בהודעה הצפויה.
+**הרצה חוזרת (הכרעת ניב 29.10 — אחת, לשני ה-jobs בלבד, ⛔ לכל ה-CI):** attempt 2 — `probe-sync-head` `11/11` בשני המכשירים · `probe-firstrun` HEAD `34/34` ⇒ מיזוג `ca5327a` (merge commit).
+**main אחרי המיזוג** (`ca5327a`, run `40909046913`): `prod-wave1` `42/42` ✅ · Build ✅ · Smoke ✅ · `prod` ❌ `83/84` — `cents` K2 `b · en` pixel7: `route.fetch: Request context disposed` בתוך ה-route של `user_settings` — חתימת `B-454`, **הופעה 4** (20.10 · 21.10 · 26.10 · 29.10), ⛔ אסרציה שנכשלה; אותו תא ב-iphone14 ירוק. ⛔ rerun — ההרשאה של ניב הייתה לשני ה-jobs של ה-PR בלבד ⇒ ⏸️ ניב.
+**סיווג (הכרעת ניב 29.10):** ⓐ ⇒ משפחת `B-425` (WebKit · iPhone · reload) — **הופעה רביעית**: `#37` (21.10) · `#41` · `#42` (28.10) · `#44` (29.10). ⓑ ⇒ **משפחה אחרת** (Chromium · דסקטופ · timeout ביומן) ⇒ `B-467` נפרד.
+
+### לקח
+⚠️ **ארבע הופעות של `B-425` ב-9 ימים, שלוש מהן ב-28–29.10 — וכל גל משלם rerun.** ⇒ `NEXT`: `B-425` ראשון אחרי גל 1b, לפני גל 2 — גל ייעודי של אבחון שורש לכל המשפחות ותיקון ב-harness, ⛔ הרחבת timeouts (הכרעת ניב). ⚠️ **ⓑ ⛔ צורף בכוונה:** אותו workflow, אבל מנוע, מכשיר וחתימה אחרים — צירוף בלי הוכחה היה מנפח את המונה של `B-425` ומסתיר משפחה שנייה.
