@@ -31,6 +31,9 @@ import {
   CURRENCY_SOURCE, isEvidenceBacked,
 } from "../src/lib/instrumentCurrency.js";
 import { computeTradingStats } from "../src/lib/tradingStats.js";
+// ⚠️ בלוק 26 (`B-427`/`B-187`) — namespace, ⛔ ייבוא בשם (אותו נימוק של בלוק 22): על העץ הישן
+//    `sumConverted` ⛔ קיים, וייבוא בשם היה מפיל את הקובץ כולו ⇒ «אדום» שמודד קריסה.
+import * as TS from "../src/lib/tradingStats.js";
 import { calcTradeMetrics, fmtPaperPrice, paperCurrencyOf, fmt$, currencyOf, realizedDayKey,
          fmtCapitalAmount, fmtAccountAmount, CURRENCY_SYMBOL } from "../src/utils.js";
 import { sizePosition } from "../src/lib/positionSizing.js";
@@ -2550,12 +2553,62 @@ console.log("  18 · G2 · סיכון במטבע ההון");
   eq("S3 · <MonthlyReportTab calcMetrics> = stableCalcTradeMetrics", propSite("MonthlyReportTab"), "stableCalcTradeMetrics");
   eq("S4 · <WeeklyReviewTab calcMetrics> = stableCalcTradeMetrics", propSite("WeeklyReviewTab"), "stableCalcTradeMetrics");
   // כל צרכן של `calcMetrics=` ב-SwingEdge_App.jsx. לדג׳ר דו-כיווני: אתר פתוח ⇒ חייב להישאר גולמי עד שהשורה זזה.
-  const OPEN = { TradeCalendar: "B-187" };
+  // 🆕 28.10 (גל 1b, `B-427`/`B-187`): `TradeCalendar` יצא מהלדג׳ר ⇒ הלדג׳ר ריק. ⛔ חזרה ל-calc גולמי = אדום.
+  const OPEN = {};
   const allProps = [...appSrc.matchAll(/<(\w+)\b[^>]*?calcMetrics=\{(\w+)\}/gs)].map((m) => ({ comp: m[1], calc: m[2] }));
   const bad = allProps.filter((p) => (OPEN[p.comp] ? p.calc !== "calcTradeMetrics" : p.calc !== "stableCalcTradeMetrics"));
-  check(`S5 · ${allProps.length} צרכני calcMetrics= — ממירים, מלבד הלדג׳ר הפתוח (TradeCalendar → B-187); תיקון בלי להזיז את השורה ⇒ אדום`,
+  check(`S5 · ${allProps.length} צרכני calcMetrics= — כולם stableCalcTradeMetrics (הלדג׳ר ריק מ-28.10, גל 1b); תיקון בלי להזיז את השורה ⇒ אדום`,
     allProps.length === 3 && bad.length === 0);
   if (bad.length) console.error(`      bad: ${JSON.stringify(bad)}`);
+}
+
+// ── בלוק 26 · `B-427` + `B-187` — הלוח · סיכום היום · שורת ה-PDF (wave 1b, 28.10) ──────────────
+//
+// 🔴 נמדד 28.10 (`docs/plans/PLAN-2026-10-28-wave1b-currency.md` §0, רינדור שרת של הקומפוננטות
+// האמיתיות): חשבון ₪, `+$100` + `+₪200` ביום אחד, שער 3.7 ⇒ הלוח הציג `+₪300` (זהב `₪570`) והמודאל
+// `+$300`. ⚠️ החלפת ה-calc **לבדה** שוברת את שורות המודאל — `fmtAcct` ממיר שוב ⇒ `370` הפך ל-`₪1,369`.
+// ⇒ שלושה חלקים: calc ממיר · סינון `fxUnconverted` מהסכום · שורות על ה-pnl הגולמי.
+{
+  console.log("\n── 26 · B-427/B-187 לוח · סיכום יום · שורת PDF ──");
+  const day = "2026-10-20";
+  const tbl = { base: "USD", quote: "ILS", spot: { rate: 3.7, rateDate: day }, byDay: { [day]: { rate: 3.7, rateDate: day } } };
+  const at = `${day}T15:00:00.000Z`;
+  const usd = { id: "c1", ticker: "AAPL", side: "LONG", entry: 100, exit: 110, shares: 10, status: "CLOSED", date: day, closedAt: at };
+  const ils = { id: "c2", ticker: "TEVA", instrumentCurrency: "ILS", side: "LONG", entry: 30, exit: 32, shares: 100, status: "CLOSED", date: day, closedAt: at };
+  const sum = typeof TS.sumConverted === "function" ? TS.sumConverted : null;
+  check("C0 · `sumConverted` מיוצא מ-`src/lib/tradingStats.js` (אותו כלל `aggregatable`, ⛔ עותק)", !!sum);
+  const run = (trades, calc) => (sum ? sum(trades, calc) : { pnl: undefined, counted: undefined, excluded: undefined });
+  const withRate = run([usd, ils], makeConvertingCalc(tbl, "ILS", "ready"));
+  eq("C1 · עם שער: יום = ₪570 (100×3.7 + 200)", withRate.pnl, 570);
+  eq("C1b · עם שער: 0 מוחרגות", withRate.excluded, 0);
+  const noRate = run([usd, ils], makeConvertingCalc(null, "ILS", "loading"));
+  eq("C2 · בלי שער: יום = ₪200 (ה-$ ⛔ נספר כ-₪)", noRate.pnl, 200);
+  eq("C2b · בלי שער: 1 מוחרגת", noRate.excluded, 1);
+  eq("C2c · בלי שער: המכנה — 1 נספרת", noRate.counted, 1);
+  const allOut = run([usd], makeConvertingCalc(null, "ILS", "loading"));
+  eq("C3 · כל היום מוחרג ⇒ pnl = null (⛔ ₪0 מומצא)", allOut.pnl, null);
+  eq("C3b · …ו-1 מוחרגת", allOut.excluded, 1);
+  const before = run([usd, ils], calcTradeMetrics);
+  check("C4 · BEFORE (calc גולמי) ⇒ 300 — הערך שהשער חייב להבדיל ממנו", sum ? before.pnl === 300 && before.pnl !== withRate.pnl : false);
+
+  const cal = src("../src/components/TradeCalendar.jsx");
+  const modal = src("../src/components/DayTradesModal.jsx");
+  const app = src("../SwingEdge_App.jsx");
+  // צורה — הכותרת של סיכום היום
+  check("S6 · `DayTradesModal` ⛔ `toFixed(0)` ⛔ `$` קשיח על סכום היום — `fmt$(…, currency)`",
+    !/totals\.pnl\.toFixed\(0\)/.test(modal) && !/\?\s*'\+'\s*:\s*''\}\$\$\{/.test(modal) && /fmt\$\(\s*totals\.pnl\s*,\s*currency\s*\)/.test(modal));
+  // שורות המודאל: ה-pnl הגולמי ⇒ `fmtAcct` (⛔ המרה כפולה)
+  check("S7 · שורות `DayTradesModal` — `fmtAcct` על ה-pnl **הגולמי** (`calcTradeMetrics`), ⛔ על פלט ה-calc הממיר",
+    /import\s*\{[^}]*\bcalcTradeMetrics\b[^}]*\}\s*from\s*'\.\.\/utils\.js'/.test(modal) && /rawPnl\s*=\s*calcTradeMetrics\(tr\)\.pnl/.test(modal) && /fmtAcct\(tr,\s*rawPnl\)/.test(modal) && !/fmtAcct\(tr,\s*pnl\)/.test(modal));
+  // הלוח + המודאל צורכים את אותה פונקציה, ומציגים גילוי
+  check("S9 · `TradeCalendar` ו-`DayTradesModal` סוכמים דרך `sumConverted` (⛔ `reduce` ישיר על pnl)",
+    /\bsumConverted\b/.test(cal) && /\bsumConverted\b/.test(modal) && !/reduce\(\(s(um)?, t\) => s(um)? \+ \(metricsOf\(t\)\.pnl \|\| 0\)/.test(cal));
+  check("S10 · גילוי `unconvertedClosedWarn` בלוח ובמודאל", /unconvertedClosedWarn/.test(cal) && /unconvertedClosedWarn/.test(modal));
+  check("S11 · `TradeCalendar` מעביר `currency` ל-`DayTradesModal`", /<DayTradesModal[\s\S]{0,400}?currency=\{currency\}/.test(cal));
+  // PDF
+  const iRows = app.indexOf("const tradeRows = [...monthClosed]");
+  const rowsSrc = iRows > 0 ? app.slice(iRows, app.indexOf('.join("");', iRows)) : "";
+  check("S8 · PDF `tradeRows` — `fxUnconverted` ⇒ «—», ⛔ `: 0` על pnl חסר", rowsSrc.length > 0 && /m\.fxUnconverted/.test(rowsSrc) && !/m\.pnl != null \? m\.pnl : 0/.test(rowsSrc) && /no FX rate/.test(rowsSrc));
 }
 
 // ── SUMMARY ──────────────────────────────────────────────────────────────────

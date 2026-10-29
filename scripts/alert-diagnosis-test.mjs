@@ -374,6 +374,34 @@ check('E23', '`submitLabel` מזהה את **כל** תוויות ההמתנה (ה
   /Log Trade\|טוען הון\|טוען שער\|אין הון/.test(crumbSrc),
   'תווית שאינה מזוהה ⇒ «לא נמדד» בדיוק ברגע שהיא נחוצה');
 
+// ── QA FIXTURE — `4+2` אסרציות (B-465, wave 1b, 28.10) ──────────────────────────
+// 🔴 28.10 07:53 שורת ה-QA נערכה ידנית ל-USD/USD ⇒ Smoke אדום `7/7` ו-cents K2 `4/4`, וההודעות אמרו
+// «it read something else» / «never reached the app» — ההגדרות **הגיעו**, הן פשוט USD (`INCIDENTS#43`).
+// ⇒ הכרעה טהורה אחת שמבדילה «⛔ הגיע» מ«הגיע-שגוי», וההודעה נוקבת את ה-fixture. ⛔ ריכוך התנאי.
+console.log('\n── QA FIXTURE — B-465 ──');
+let QF = null;
+try { QF = await import(path.join(ROOT, 'tests/lib/qaFixture.js')); } catch (e) { QF = null; }
+const verdict = (row, need) => (QF && typeof QF.qaFixtureVerdict === 'function' ? QF.qaFixtureVerdict(row, need) : { ok: undefined, kind: 'missing', message: '' });
+const v24 = verdict({ capitalCurrency: 'ILS', accountCurrency: 'ILS' }, { expect: 'ILS' });
+check('E24', 'ILS/ILS מול «ILS» ⇒ ok', v24.ok === true && v24.kind === 'ok', JSON.stringify(v24));
+const v25 = verdict({ capitalCurrency: 'USD', accountCurrency: 'USD' }, { expect: 'ILS' });
+check('E25', 'USD/USD מול «ILS» ⇒ fixture — ההודעה נוקבת את המצב וה-fixture, ⛔ «never reached»',
+  v25.ok === false && v25.kind === 'fixture' && /USD\/USD/.test(v25.message) && /PRECONDITION/.test(v25.message) && /QA/.test(v25.message) && !/never reached/i.test(v25.message), JSON.stringify(v25));
+const v26 = verdict({ capitalCurrency: null, accountCurrency: null }, { expect: 'ILS' });
+check('E26', 'null/null ⇒ not_hydrated — «never reached» נשמר **רק** כאן', v26.ok === false && v26.kind === 'not_hydrated' && /never reached/i.test(v26.message), JSON.stringify(v26));
+const v27a = verdict({ capitalCurrency: 'USD', accountCurrency: 'ILS' }, { not: 'USD' });
+const v27b = verdict({ capitalCurrency: 'ILS', accountCurrency: 'USD' }, { not: 'USD' });
+check('E27', 'C-061 צריך הון ≠ USD: USD/ILS ⇒ fixture · ILS/USD ⇒ ok', v27a.ok === false && v27a.kind === 'fixture' && v27b.ok === true, `${JSON.stringify(v27a)} · ${JSON.stringify(v27b)}`);
+const eyeSpec = fs.readFileSync(path.join(ROOT, 'tests/eye.spec.js'), 'utf8');
+const centsSpec = fs.readFileSync(path.join(ROOT, 'tests-eye/cents.spec.js'), 'utf8');
+const iOpen = eyeSpec.indexOf('async function openFilledForm(page');
+const openSrc = iOpen > 0 ? eyeSpec.slice(iOpen, eyeSpec.indexOf('\n  }\n', iOpen)) : '';
+const needSites = (eyeSpec.match(/openFilledForm\(page, \{ needNonUsdCapital: true \}\)/g) || []).length;
+check('E28', 'C-061ⓐⓑⓒ — `openFilledForm` עובר דרך `qaFixtureVerdict` עם `{ not: "USD" }` לפני הטופס, ו-3 האתרים (ⓐⓑⓒ) מבקשים אותו',
+  /qaFixtureVerdict\([\s\S]{0,60}?\{\s*not:\s*"USD"\s*\}\)/.test(openSrc) && openSrc.indexOf('qaFixtureVerdict') < openSrc.indexOf('add-trade') && needSites === 3, `openFilledForm@${iOpen} · needSites=${needSites}`);
+check('E29', 'cents K2 — הפולינג על המטבעות ⇒ `qaFixtureVerdict` עם `{ expect: EXPECT_CCY }`, ⛔ ההודעה «never reached» לבדה',
+  /qaFixtureVerdict\([\s\S]{0,60}?\{\s*expect:\s*EXPECT_CCY\s*\}\)/.test(centsSpec) && !/message: `the capital settings never reached the app \(expected \$\{EXPECT_CCY\}\)`/.test(centsSpec));
+
 // ── SUMMARY ──────────────────────────────────────────────────────────────────
 console.log('\n' + '─'.repeat(72));
 console.log(`LEDGER: ${welded}/13 אתרים עדיין נושאים משפט מרותך  (יעד: 0/13)`);

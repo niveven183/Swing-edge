@@ -23,6 +23,7 @@ import {
   freshUserState,
   redact,
 } from "./lib/eyeTools.js";
+import { qaFixtureVerdict } from "./lib/qaFixture.js";
 
 const BASE_URL = process.env.TEST_URL || "https://swing-edge.com";
 const QA_EMAIL = process.env.SENTINEL_QA_EMAIL;
@@ -288,9 +289,19 @@ test.describe("eye→CI · onboarding + hydration", () => {
   const dialog = (page) => page.locator('[role="dialog"]').first();
   const submitBtn = (page) => dialog(page).getByRole("button", { name: /Log Trade|טוען שער|Loading rate|טוען הון|Loading capital|אין הון|No capital/ });
   const sharesInput = (page) => dialog(page).locator("div.text-center.group").filter({ hasText: /Shares/i }).first().locator("input");
-  async function openFilledForm(page) {
+  // `needNonUsdCapital` — ⓐⓑⓒ read the QA account's LIVE row and need its capital currency
+  // ≠ USD (a USD→capital rate must exist to be "in flight"). 🔴 B-465 / INCIDENTS#43: when the
+  // row was edited to USD/USD these went red as «it read something else». Now the precondition
+  // is checked first and names the fixture. ⓓ/ⓔ intercept the read and do not ask for it.
+  async function openFilledForm(page, { needNonUsdCapital = false } = {}) {
     await page.goto("/app", { waitUntil: "load" });
     await page.locator('[data-tour-tab="dashboard"]').waitFor({ state: "visible", timeout: 25_000 });
+    if (needNonUsdCapital) {
+      const ccys = () => page.evaluate(() => ({ capitalCurrency: localStorage.getItem("swingEdgeCapitalCurrency"), accountCurrency: localStorage.getItem("swingEdgeAccountCurrency") }));
+      await expect.poll(async () => (await ccys()).capitalCurrency, { timeout: 20_000, message: "the capital settings never reached the app (null) — the read did not land" }).not.toBeNull();
+      const v = qaFixtureVerdict(await ccys(), { not: "USD" });
+      expect(v.ok, v.message).toBe(true);
+    }
     // The consent banner sits over the FAB on a fresh device (sentinel step 4
     // declines it the same way). Declining writes localStorage only.
     const decline = page.locator('[data-testid="consent-decline"]');
@@ -313,7 +324,7 @@ test.describe("eye→CI · onboarding + hydration", () => {
       const net = recordNetwork(page);
       const blocker = await blockAllRestWrites(page);
       const fx = await interceptFx(page, "hold");
-      await openFilledForm(page);
+      await openFilledForm(page, { needNonUsdCapital: true });
 
       await expect(submitBtn(page), "while the rate is in flight Log Trade must read «טוען שער…» — it read something else").toHaveText(/טוען שער…|Loading rate…/);
       await expect(submitBtn(page)).toBeDisabled();
@@ -340,7 +351,7 @@ test.describe("eye→CI · onboarding + hydration", () => {
       const net = recordNetwork(page);
       const blocker = await blockAllRestWrites(page);
       const fx = await interceptFx(page, "error");
-      await openFilledForm(page);
+      await openFilledForm(page, { needNonUsdCapital: true });
 
       await expect(dialog(page)).toContainText(NO_RATE_BANNER);
       await expect(submitBtn(page)).toBeEnabled();
@@ -369,7 +380,7 @@ test.describe("eye→CI · onboarding + hydration", () => {
       const net = recordNetwork(page);
       const blocker = await blockAllRestWrites(page);
       const fx = await interceptFx(page, "hang");
-      await openFilledForm(page);
+      await openFilledForm(page, { needNonUsdCapital: true });
 
       await expect(submitBtn(page)).toHaveText(/טוען שער…|Loading rate…/);
       // FX_SETTLE_MS is 8s from the request's start; 15s is the ceiling for the

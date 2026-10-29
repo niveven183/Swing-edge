@@ -121,6 +121,7 @@ test.describe("wave 1 — security & money (B-456 … B-460)", () => {
 
   const nowIso = () => new Date(Date.now() - 3600_000).toISOString();
   const today = () => new Date().toISOString().slice(0, 10);
+  const localDay = () => { const d = new Date(Date.now() - 60_000); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
   const row = (o) => ({ side: "LONG", status: "CLOSED", setup: "Breakout", emotionAtEntry: "Neutral", marketCondition: "Trending Up", entryQuality: 3, notes: "wave1", ...o });
 
   // ── F1 · the PDF export does not run the lesson ─────────────────────────────────────────────────────────
@@ -211,6 +212,95 @@ test.describe("wave 1 — security & money (B-456 … B-460)", () => {
       });
     }
   }
+
+  // ── F6 · the calendar and its day modal, converted (wave 1b, B-427/B-187) ─────────────────────────────
+  // ILS account, one day: +$100 (AAPL) + ₪200 (TEVA). rate 3.7 ⇒ ₪570 · no rate ⇒ ₪200 + «1 of 2» disclosed.
+  // Before: the cell/month read «+₪300» and the modal «+$300»; swapping the calc ALONE made the AAPL row ₪1,369.
+  const f6Pair = () => {
+    const at = new Date(Date.now() - 60_000).toISOString();
+    const day = localDay();
+    return [
+      row({ id: "w1-f6-usd", ticker: "AAPL", entry: 100, exit: 110, stop: 95, shares: 10, date: day, closedAt: at, currency: "USD", currency_source: "manual_capital" }),
+      row({ id: "w1-f6-ils", ticker: "TEVA", entry: 30, exit: 32, stop: 29, shares: 100, date: day, closedAt: at, currency: "ILS", currency_source: "file_cell" }),
+    ];
+  };
+  for (const lang of ["he", "en"]) {
+    for (const fx of ["rate", "none"]) {
+      test(`F6 · ${lang} · ${fx === "rate" ? "rate 3.7 ⇒ ₪570" : "no rate ⇒ ₪200 + 1 excluded"} — calendar day · month · day modal (B-427)`, async ({ browser }, info) => {
+        const store = newStore();
+        store.settings.capitalCurrency = "ILS";
+        store.settings.accountCurrency = "ILS";
+        store.trades = f6Pair();
+        const gold = fx === "rate" ? "570" : "200";
+        const app = await open(browser, info, lang, store, `F6-${fx}`, { fx });
+        const { page } = app;
+        try {
+          await signIn(page, lang);
+          await closeOverlays(page);
+          await page.waitForTimeout(2500); // the FX table lands (or is refused)
+          await tab(page, "journal");
+          await page.getByRole("button", { name: /לוח שנה|Calendar/ }).first().click();
+          const cell = page.locator('button[aria-label*=" — "]').first(); // only days with trades carry « — N trades»
+          await cell.waitFor({ state: "visible", timeout: 15_000 });
+          await cell.scrollIntoViewIfNeeded();
+          const seen = {};
+          seen.cell = (await cell.innerText()).replace(/\s+/g, " ").trim();
+          seen.calendar = (await page.locator("body").innerText());
+          await app.shot("calendar");
+          await cell.click();
+          const dlg = page.locator('[role="dialog"]').first();
+          await dlg.waitFor({ state: "visible", timeout: 10_000 });
+          seen.dayTotal = (await dlg.locator('[data-testid="day-total"]').innerText().catch(() => "(no day-total)")).trim();
+          seen.modal = await dlg.innerText();
+          await app.shot("modal");
+          writeFileSync(join(app.dir, `F6-${fx}-${lang}.json`), JSON.stringify({ gold, ...seen, calendar: undefined, modal: seen.modal.slice(0, 600) }, null, 2));
+          expect.soft(new RegExp(`\\+₪${gold}(?![\\d.,])`).test(seen.cell), `B-427 (calendar): the day cell is «${seen.cell}», expected +₪${gold}`).toBe(true);
+          expect.soft(new RegExp(`\\+₪${gold}\\.00`).test(seen.calendar), `B-427 (calendar): the month badge does not show +₪${gold}.00`).toBe(true);
+          expect.soft(/\+₪300(?![\d,])/.test(seen.cell) || /\+₪300\.00/.test(seen.calendar), "B-427 (calendar): ₪300 — the $ trade was summed as ₪").toBe(false);
+          expect.soft(seen.dayTotal, `B-427 (day modal): the day total is «${seen.dayTotal}», expected +₪${gold}.00`).toBe(`+₪${gold}.00`);
+          expect.soft(/\$/.test(seen.dayTotal), `B-427 (day modal): the day total carries «$» — «${seen.dayTotal}»`).toBe(false);
+          if (fx === "rate") {
+            expect.soft(/\+₪370\.00/.test(seen.modal), "B-427 (day modal row): the AAPL row is not +₪370.00 (converted once)").toBe(true);
+            expect.soft(/₪1,369/.test(seen.modal), "B-427 (day modal row): the AAPL row was converted TWICE (₪1,369)").toBe(false);
+          } else {
+            expect.soft(noRateRx(2).test(seen.calendar), "B-427 (calendar): the month does not say «no FX rate for 1 of 2»").toBe(true);
+            expect.soft(noRateRx(2).test(seen.modal), "B-427 (day modal): the modal does not say «no FX rate for 1 of 2»").toBe(true);
+          }
+        } finally { await app.ctx.close(); }
+      });
+    }
+  }
+
+  // ── F7 · the exported PDF row of a trade with no rate (wave 1b, B-427) ──────────────────────────────────
+  test("F7 · he · no rate — the PDF row of the $ trade is «—», ⛔ «+₪100.00» (B-427)", async ({ browser }, info) => {
+    const store = newStore();
+    store.settings.capitalCurrency = "ILS";
+    store.settings.accountCurrency = "ILS";
+    store.trades = f6Pair();
+    const app = await open(browser, info, "he", store, "F7-none", { fx: "none" });
+    try {
+      await signIn(app.page, "he");
+      await closeOverlays(app.page);
+      await app.page.waitForTimeout(2500);
+      await app.page.getByRole("button", { name: exactRx("openUserMenu") }).click();
+      await app.page.getByRole("button", { name: exactRx("settings") }).click();
+      const btn = app.page.getByRole("button", { name: containsRx("createPdf") }).first();
+      await btn.scrollIntoViewIfNeeded();
+      const [popup] = await Promise.all([app.page.waitForEvent("popup", { timeout: 20_000 }), btn.click()]);
+      await popup.waitForLoadState("load").catch(() => {});
+      await popup.waitForTimeout(800);
+      const rows = await popup.evaluate(() => [...document.querySelectorAll("tr")].map((tr) => [...tr.querySelectorAll("td")].map((td) => td.textContent.trim())).filter((r) => r.length));
+      await popup.screenshot({ path: join(app.dir, "F7-he-popup.png"), fullPage: true }).catch(() => {});
+      writeFileSync(join(app.dir, "F7-he.json"), JSON.stringify(rows, null, 2));
+      const aapl = rows.find((r) => r.includes("AAPL"));
+      const teva = rows.find((r) => r.includes("TEVA"));
+      expect(aapl, `B-427 (PDF): no AAPL row in the report — ${JSON.stringify(rows).slice(0, 300)}`).toBeTruthy();
+      expect.soft(aapl.some((c) => /^—\s*\(no FX rate\)$/.test(c)), `B-427 (PDF): the AAPL row is ${JSON.stringify(aapl)}, expected «— (no FX rate)»`).toBe(true);
+      expect.soft(aapl.some((c) => /₪100\.00/.test(c)), "B-427 (PDF): the $100 trade was printed as ₪100.00").toBe(false);
+      expect.soft(teva && teva.some((c) => /^\+₪200\.00$/.test(c)), `B-427 (PDF): the TEVA row is ${JSON.stringify(teva)}, expected +₪200.00`).toBe(true);
+      await popup.close();
+    } finally { await app.ctx.close(); }
+  });
 
   // ── F3 · a token in the URL never reaches Sentry ────────────────────────────────────────────────────────
   test("F3 — a recovery return `/app#access_token=…&refresh_token=…`: 0 token values in every Sentry envelope (B-458)", async ({ browser }, info) => {

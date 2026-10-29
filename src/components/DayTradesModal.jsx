@@ -7,7 +7,8 @@ import useModalA11y from '../hooks/useModalA11y.js';
 import TickerLogo from './TickerLogo.jsx';
 import InfoTooltip from './ui/InfoTooltip.jsx';
 import { EMOTION_OPTIONS } from '../data/tradeOptions.jsx';
-import { isFollowedPlan, isOffPlan, fmtR, fmtPaperPrice, isNegativeValue } from '../utils.js';
+import { isFollowedPlan, isOffPlan, fmtR, fmtPaperPrice, isNegativeValue, calcTradeMetrics, fmt$ } from '../utils.js';
+import { sumConverted } from '../lib/tradingStats.js';
 import { getSetupTooltip } from '../intelligence/knowledgeGlue.js';
 import { outcomeRates, toPctRound } from '../intelligence/utils/statisticalModels.js';
 
@@ -33,7 +34,16 @@ const pnlClass = (n) => (!Number.isFinite(n)
 // ⚠️ `fmtAcct` / `acctRefusalText` מגיעים כ-props מ-`SwingEdge_App` דרך
 // `TradeCalendar`. ⛔ אין להם ברירת מחדל ו-⛔ אין כאן ייבוא של `accountAmount`:
 // prop חסר ⇒ חריגה, ⛔ לא נפילה שקטה למספר לא-מומר תחת סמל החשבון.
-export default function DayTradesModal({ dateKey, trades = [], calcMetrics, lang = 'he', onClose, fmtAcct, acctRefusalText }) {
+//
+// 🔴 B-427/B-187 (wave 1b, 28.10) — שני מסלולים, ⛔ אחד:
+//   · **סכום היום** ⇐ `calcMetrics` (הממיר, `stableCalcTradeMetrics`) דרך `sumConverted`:
+//     ב-`currency`, עסקה בלי שער מוחרגת ונספרת. לפני: `$` קשיח + `toFixed(0)` על סכום גולמי
+//     (`+$300` ליום של `+$100` + `+₪200`; הזהב `+₪570.00`).
+//   · **שורה** ⇐ ה-pnl ה**גולמי** (`calcTradeMetrics`, נייר) ⇒ `fmtAcct`, שממיר בעצמו.
+//     ⛔ להעביר לשם את פלט ה-calc הממיר — נמדד: `370` הפך ל-`₪1,369` (המרה כפולה).
+// `currency` ⛔ ברירת מחדל: `fmt$` היה נופל ל-USD בשקט.
+export default function DayTradesModal({ dateKey, trades = [], calcMetrics, currency, lang = 'he', onClose, fmtAcct, acctRefusalText }) {
+  if (!currency) throw new Error('DayTradesModal: `currency` is required (B-427) — the day total has no unit without it');
   const t = getTranslations(lang);
   const isRTL = isRTLLang(lang);
   const locale = lang === 'he' ? heLocale : undefined;
@@ -44,32 +54,39 @@ export default function DayTradesModal({ dateKey, trades = [], calcMetrics, lang
   const cardRefs = useRef([]);
   const tabRefs = useRef([]);
 
-  const metricsOf = (tr) => {
+  // A calc that throws yields "no amount" (`pnl: null`) — ⛔ a fabricated 0.
+  const safeCalc = (tr) => {
     try {
-      const m = typeof calcMetrics === 'function' ? calcMetrics(tr) : null;
-      return { pnl: m?.pnl ?? 0, rMultiple: m?.rMultiple ?? null };
+      return typeof calcMetrics === 'function' ? calcMetrics(tr) : { pnl: null };
     } catch {
-      return { pnl: 0, rMultiple: null };
+      return { pnl: null };
     }
   };
 
   const rows = useMemo(
-    () => trades.map(tr => ({ trade: tr, ...metricsOf(tr) })),
+    () => trades.map(tr => {
+      // The row's amount is the PAPER pnl; `fmtAcct` below converts it (once).
+      const rawPnl = calcTradeMetrics(tr).pnl;
+      return { trade: tr, rawPnl, rMultiple: safeCalc(tr)?.rMultiple ?? null };
+    }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [trades],
   );
 
   const totals = useMemo(() => {
-    const pnl = rows.reduce((s, r) => s + (r.pnl || 0), 0);
+    const sum = sumConverted(trades, safeCalc);
     // Same three-outcome rule as everywhere else: a break-even day trade is not
-    // a loss, so it lowers the win rate without inflating the loss count.
-    const { winRate } = outcomeRates(rows, r => r.pnl || 0);
+    // a loss, so it lowers the win rate without inflating the loss count. The
+    // SIGN does not depend on the unit ⇒ the whole day counts (as tradingStats).
+    const { winRate } = outcomeRates(rows, r => r.rawPnl || 0);
     return {
       count: rows.length,
-      pnl,
+      pnl: sum.pnl,            // null ⇒ nothing that day could be summed in `currency`
+      excluded: sum.excluded,  // no FX rate — disclosed below, ⛔ added raw
       winRate: toPctRound(winRate),   // null on an empty day (A5)
     };
-  }, [rows]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, trades]);
 
   // Keep the active index valid if the day array changes underneath us.
   useEffect(() => {
@@ -130,11 +147,13 @@ export default function DayTradesModal({ dateKey, trades = [], calcMetrics, lang
             <span className="px-3 py-1 bg-slate-100 dark:bg-white/[0.08] text-slate-600 dark:text-slate-300 rounded-full text-xs">
               {nTrades(totals.count, lang)}
             </span>
-            <span className={`px-3 py-1 rounded-full text-xs font-mono font-semibold
-              ${totals.pnl >= 0
-                ? 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
-                : 'bg-rose-50 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400'}`}>
-              {totals.pnl >= 0 ? '+' : ''}${totals.pnl.toFixed(0)}
+            <span data-testid="day-total" className={`px-3 py-1 rounded-full text-xs font-mono font-semibold
+              ${totals.pnl == null
+                ? 'bg-slate-100 dark:bg-white/[0.08] text-slate-500 dark:text-slate-400'
+                : totals.pnl >= 0
+                  ? 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+                  : 'bg-rose-50 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400'}`}>
+              {totals.pnl == null ? '—' : fmt$(totals.pnl, currency)}
             </span>
             {/* Unlike the P&L badge beside it, this one is conditional: a day
                 with no rows has no win rate, and "0%" would report a wipeout on
@@ -142,6 +161,11 @@ export default function DayTradesModal({ dateKey, trades = [], calcMetrics, lang
             {totals.winRate != null && (
               <span className="px-3 py-1 bg-slate-100 dark:bg-white/[0.08] text-slate-600 dark:text-slate-300 rounded-full text-xs">
                 {totals.winRate}% {t.winRate}
+              </span>
+            )}
+            {totals.excluded > 0 && (
+              <span data-testid="day-fx-excluded" className="px-3 py-1 bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 rounded-full text-xs">
+                ⚠️ {t.unconvertedClosedWarn.replace('{n}', String(totals.excluded)).replace('{m}', String(totals.count))}
               </span>
             )}
           </div>
@@ -163,7 +187,7 @@ export default function DayTradesModal({ dateKey, trades = [], calcMetrics, lang
             <div role="tablist" aria-label={dayLabel} className="flex-1 flex gap-1.5 overflow-x-auto scrollbar-none py-0.5">
               {rows.map((r, i) => {
                 const isActive = i === active;
-                const p = r.pnl || 0;
+                const p = r.rawPnl; // a SIGN (unit-free); null ⇒ neutral
                 return (
                   <button
                     key={r.trade.id || i}
@@ -201,7 +225,7 @@ export default function DayTradesModal({ dateKey, trades = [], calcMetrics, lang
           {rows.length === 0 ? (
             <p className="text-sm text-slate-400 dark:text-slate-500 py-6 text-center">{t.cal_noTrades}</p>
           ) : rows.map((r, i) => {
-            const { trade: tr, pnl, rMultiple } = r;
+            const { trade: tr, rawPnl, rMultiple } = r;
             const isActive = i === active;
             return (
               <div
@@ -227,12 +251,12 @@ export default function DayTradesModal({ dateKey, trades = [], calcMetrics, lang
                     </span>
                   </div>
                   <div className="text-right shrink-0">
-                    <div title={acctRefusalText(tr, pnl)}
-                         className={`font-mono font-semibold text-sm ${pnlClass(pnl)}`}>
+                    <div title={acctRefusalText(tr, rawPnl)}
+                         className={`font-mono font-semibold text-sm ${pnlClass(rawPnl)}`}>
                       {/* ✅ סכום-בחשבון **מומר** (גל ג׳, 2026-08-12) — `fmtAcct` מוזרם
                           מ-`SwingEdge_App` דרך `TradeCalendar`, ⛔ ולא מיובא כאן.
                           אין שער ⇒ `—` + נימוק ב-`title`. */}
-                      {fmtAcct(tr, pnl)}
+                      {fmtAcct(tr, rawPnl)}
                     </div>
                     {rMultiple !== null && rMultiple !== undefined && (
                       <div className="text-xs text-slate-400 dark:text-slate-500 font-mono">

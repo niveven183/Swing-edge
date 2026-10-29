@@ -7,7 +7,8 @@ import {
 import { he as heLocale } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { nTrades, getTranslations } from '../i18n.js';
-import { localDayKey, fmt$0 } from '../utils.js';
+import { localDayKey, fmt$, fmt$0 } from '../utils.js';
+import { sumConverted } from '../lib/tradingStats.js';
 import { outcomeRates, toPctRound } from '../intelligence/utils/statisticalModels.js';
 import DayTradesModal from './DayTradesModal.jsx';
 
@@ -19,7 +20,11 @@ function dayKeyOf(t) {
 }
 
 // trades: array of trade objects (closed trades preferred — open trades show 0 P&L).
-// calcMetrics: function(trade) -> { pnl, rMultiple }. P&L/R are NOT stored on the trade.
+// calcMetrics: the CONVERTING calc (`stableCalcTradeMetrics`) — every `pnl` it returns is
+// in `currency`, or the trade comes back `fxUnconverted`. 🔴 B-427/B-187 (wave 1b, 28.10):
+// this received the RAW calc and printed `+$100 + ₪200` as "+₪300" (gold ₪570 at 3.7).
+// Money sums go through `sumConverted` — the same rule as computeTradingStats: an
+// unconverted trade is OUT of the sum and COUNTED in the disclosure, never added raw.
 // lang: "he" | "en"
 export function TradeCalendar({ trades = [], calcMetrics, lang = 'he', currency = 'USD', fmtAcct, acctRefusalText }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -28,14 +33,21 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he', currency 
   const t = getTranslations(lang);
   const locale = lang === 'he' ? heLocale : undefined;
   const isRTL = lang === 'he' || lang === 'ar';
-  const metricsOf = (t) => {
+  // A calc that throws yields "no amount" (`pnl: null`) — counted as missing by
+  // sumConverted, ⛔ never a fabricated 0.
+  const safeCalc = (t) => {
     try {
-      const m = typeof calcMetrics === 'function' ? calcMetrics(t) : null;
-      return { pnl: m?.pnl ?? 0, rMultiple: m?.rMultiple ?? null };
+      return typeof calcMetrics === 'function' ? calcMetrics(t) : { pnl: null };
     } catch {
-      return { pnl: 0, rMultiple: null };
+      return { pnl: null };
     }
   };
+  const metricsOf = (t) => {
+    const m = safeCalc(t);
+    return { pnl: m?.pnl ?? null, rMultiple: m?.rMultiple ?? null, fxUnconverted: m?.fxUnconverted };
+  };
+  const warnOf = (excluded, total) =>
+    t.unconvertedClosedWarn.replace('{n}', String(excluded)).replace('{m}', String(total));
 
   // map trades by date key (YYYY-MM-DD)
   const tradesByDate = useMemo(() => {
@@ -49,11 +61,11 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he', currency 
     return map;
   }, [trades]);
 
-  // daily P&L
+  // daily P&L — { pnl: ?number, counted, excluded, missing } per day
   const dailyPnL = useMemo(() => {
     const map = {};
     Object.entries(tradesByDate).forEach(([date, dayTrades]) => {
-      map[date] = dayTrades.reduce((sum, t) => sum + (metricsOf(t).pnl || 0), 0);
+      map[date] = sumConverted(dayTrades, safeCalc);
     });
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -70,7 +82,7 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he', currency 
   const monthSummary = useMemo(() => {
     const prefix = format(currentMonth, 'yyyy-MM');
     const monthTrades = trades.filter(t => (dayKeyOf(t) || '').startsWith(prefix));
-    const pnl = monthTrades.reduce((s, t) => s + (metricsOf(t).pnl || 0), 0);
+    const sum = sumConverted(monthTrades, safeCalc);
     // Win rate via the shared three-outcome rule — a break-even is neither a win
     // nor a loss here, exactly as on the dashboard. The month window is local
     // (the engine groups by weekday and rolling windows, not calendar months),
@@ -78,7 +90,8 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he', currency 
     const { winRate } = outcomeRates(monthTrades, t => metricsOf(t).pnl || 0);
     return {
       count: monthTrades.length,
-      pnl,
+      pnl: sum.pnl,           // null ⇒ nothing in the month could be summed in `currency`
+      excluded: sum.excluded, // no FX rate — disclosed, ⛔ added raw
       // null when the month is empty. The badge below is already gated on
       // `count > 0`, so this never reaches the screen — but the value leaving
       // this hook must still mean what it says (A5).
@@ -129,14 +142,21 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he', currency 
           {monthSummary.count > 0 && (
             <>
               <span className={`px-3 py-1 rounded-full text-xs font-mono font-semibold
-                ${monthSummary.pnl >= 0
-                  ? 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
-                  : 'bg-rose-50 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400'}`}>
-                {fmt$0(monthSummary.pnl, currency)}
+                ${monthSummary.pnl == null
+                  ? 'bg-slate-100 dark:bg-white/[0.08] text-slate-500 dark:text-slate-400'
+                  : monthSummary.pnl >= 0
+                    ? 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+                    : 'bg-rose-50 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400'}`}>
+                {monthSummary.pnl == null ? '—' : fmt$(monthSummary.pnl, currency)}
               </span>
               <span className="px-3 py-1 bg-slate-100 dark:bg-white/[0.08] text-slate-600 dark:text-slate-300 rounded-full text-xs">
                 {monthSummary.winRate}{t.wrSuffix}
               </span>
+              {monthSummary.excluded > 0 && (
+                <span data-testid="cal-fx-excluded" className="px-3 py-1 bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 rounded-full text-xs">
+                  ⚠️ {warnOf(monthSummary.excluded, monthSummary.count)}
+                </span>
+              )}
             </>
           )}
         </div>
@@ -156,7 +176,8 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he', currency 
         {calendarDays.map(day => {
           const key = format(day, 'yyyy-MM-dd');
           const dayTrades = tradesByDate[key] || [];
-          const pnl = dailyPnL[key] || 0;
+          const daySum = dailyPnL[key];
+          const pnl = daySum ? daySum.pnl : null; // null ⇒ nothing that day could be summed in `currency`
           const inMonth = isSameMonth(day, currentMonth);
           const isToday = isSameDay(day, new Date());
           const isSelected = selectedDate && isSameDay(day, selectedDate);
@@ -176,7 +197,9 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he', currency 
                 ${isSelected
                   ? 'bg-emerald-50 dark:bg-emerald-500/20 ring-2 ring-inset ring-emerald-400 dark:ring-emerald-500'
                   : hasTrades
-                    ? pnl > 0
+                    ? pnl == null
+                      ? 'bg-slate-50 dark:bg-white/[0.04] hover:bg-slate-100 dark:hover:bg-white/[0.08]'
+                      : pnl > 0
                       ? 'bg-emerald-50/40 dark:bg-emerald-500/10 hover:bg-emerald-50 dark:hover:bg-emerald-500/20'
                       : 'bg-rose-50/40 dark:bg-rose-500/10 hover:bg-rose-50 dark:hover:bg-rose-500/20'
                     : 'hover:bg-slate-50 dark:hover:bg-white/[0.04]'}
@@ -192,18 +215,22 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he', currency 
               </span>
 
               {hasTrades && (
-                <span className={`
+                // fmt$0: the documented whole-unit formatter for this tight surface (Niv 28.10) —
+                // it prints no cents at all, so it invents none. The modal carries the cents.
+                <span
+                  title={daySum && daySum.excluded > 0 ? warnOf(daySum.excluded, dayTrades.length) : undefined}
+                  className={`
                   text-[10px] font-mono font-semibold block leading-tight
-                  ${pnl >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}
+                  ${pnl == null ? 'text-slate-400 dark:text-slate-500' : pnl >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}
                 `}>
-                  {fmt$0(pnl, currency)}
+                  {pnl == null ? '—' : fmt$0(pnl, currency)}
                 </span>
               )}
 
               {hasTrades && (
                 <div className="flex gap-0.5 mt-0.5 flex-wrap">
                   {dayTrades.slice(0, 4).map((t, i) => {
-                    const p = metricsOf(t).pnl || 0;
+                    const p = metricsOf(t).pnl; // the dot is a SIGN (valid in any unit); null ⇒ neutral
                     return (
                       <div
                         key={t.id || i}
@@ -227,6 +254,7 @@ export function TradeCalendar({ trades = [], calcMetrics, lang = 'he', currency 
           dateKey={selectedKey}
           trades={selectedTrades}
           calcMetrics={calcMetrics}
+          currency={currency}
           fmtAcct={fmtAcct}
           acctRefusalText={acctRefusalText}
           lang={lang}
