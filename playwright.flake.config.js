@@ -24,7 +24,10 @@ export default defineConfig({
   // tests-eye/hydration.spec.js (H2 · C4 and their neighbours) + tests-flake/ (the
   // debounce/reload scene, which exists only here — ⛔ collected by the eye config or by prod).
   testDir: ".",
-  testMatch: /(tests-eye\/hydration|tests-flake\/[^/]+)\.spec\.js$/,
+  testMatch: /(tests-eye\/(hydration|firstrun)|tests-flake\/[^/]+)\.spec\.js$/,
+  // B-425 ⓒ (09.11): tests-flake/signin.spec.js must reach the devices whose #41/#42/#44 cells were red
+  // (iPhone SE · iPhone 14 · tall) — the eye projects with a testMatch of their own would skip it.
+  projects: eye.projects.map((p) => (p.testMatch ? { ...p, testMatch: [p.testMatch, /signin\.spec\.js$/] } : p)),
   use: { ...eye.use, trace: "retain-on-failure", video: "retain-on-failure", screenshot: "only-on-failure" },
   outputDir: process.env.EYE_FLAKE_OUT || "eye-evidence/probe-flake/test-results",
 });

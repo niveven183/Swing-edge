@@ -37,7 +37,7 @@
 import { test, expect } from "@playwright/test";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { installHermetic, newStore, DUMMY_EMAIL, DUMMY_PASSWORD } from "./hermetic.js";
+import { installHermetic, newStore, isOutsideHost, DUMMY_EMAIL, DUMMY_PASSWORD } from "./hermetic.js";
 import { exactRx, containsRx } from "./labels.js";
 import { tapWhenStable } from "./stableTap.js";
 // B-425 (Niv 15.10, ①): the product's own deadline, IMPORTED — ⛔ a mirrored number. The spec runs
@@ -93,10 +93,13 @@ async function makeDiag(ctx) {
   const isSettings = (u) => /\/rest\/v1\/user_settings/.test(u);
   // B-433: the production GA property must never hear from a hermetic run — recorded so the
   // self-test (S8) can prove the block: requests attempted (the check is not blind), none answered.
+  // B-425 (ג): any host a hermetic run must not reach (hermetic.js isOutsideHost) — same three phases as GA.
+  const outside = (u) => isOutsideHost(u);
   const isGA = (u) => /^https:\/\/(www\.)?(google-analytics|googletagmanager)\.com\//.test(u);
   ctx.on("request", (r) => {
     if (isSettings(r.url())) ev("req", { method: r.method(), body: r.method() === "GET" ? undefined : pick(r) });
     if (isGA(r.url())) ev("ga", { phase: "req", host: new URL(r.url()).host });
+    if (outside(r.url())) ev("outside", { phase: "req", host: new URL(r.url()).host });
   });
   ctx.on("response", async (r) => {
     // B-441 (19.10) — a conditional PATCH answers 200 BOTH when it applied and when its condition failed (B-435 CAS):
@@ -109,10 +112,12 @@ async function makeDiag(ctx) {
     }
     if (isSettings(r.url())) ev("res", { method: r.request().method(), status: r.status() });
     if (isGA(r.url())) ev("ga", { phase: "res", host: new URL(r.url()).host, status: r.status() });
+    if (outside(r.url())) ev("outside", { phase: "res", host: new URL(r.url()).host, status: r.status() });
   });
   ctx.on("requestfailed", (r) => {
     if (isSettings(r.url())) ev("reqfailed", { method: r.method(), failure: r.failure()?.errorText ?? null, body: r.method() === "GET" ? undefined : pick(r) });
     if (isGA(r.url())) ev("ga", { phase: "failed", host: new URL(r.url()).host, failure: r.failure()?.errorText ?? null });
+    if (outside(r.url())) ev("outside", { phase: "failed", host: new URL(r.url()).host, failure: r.failure()?.errorText ?? null });
   });
   ctx.on("console", (m) => {
     const text = m.text();

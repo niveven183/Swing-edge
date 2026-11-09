@@ -21,6 +21,7 @@ import { join } from "node:path";
 import { blockAllRestWrites, login } from "../tests/lib/eyeTools.js";
 import { exactRx } from "./labels.js";
 import { installHermetic, newStore, DUMMY_EMAIL, DUMMY_PASSWORD } from "./hermetic.js";
+import { closeCtx } from "./ctxClose.js";
 
 const HERMETIC = process.env.EYE_HERMETIC === "1";
 const QA_EMAIL = HERMETIC ? DUMMY_EMAIL : process.env.SENTINEL_QA_EMAIL;
@@ -127,7 +128,7 @@ test.describe("B-424 — no main tab is wider than the phone", () => {
         }
       } finally {
         writeFileSync(join(dir, `${lang}.json`), JSON.stringify(results, null, 2));
-        await ctx.close();
+        await closeCtx(ctx);
       }
     });
   }

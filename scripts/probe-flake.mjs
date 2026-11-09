@@ -122,7 +122,7 @@ if (flag("plan")) {
   const shards = Number(process.env.IN_SHARDS || "3");
   if (!(repeatIn >= 1) || !(shards >= 1)) die("--plan: repeat and shards must be ≥ 1");
   for (const m of modes) if (!["isolated", "insitu"].includes(m)) die(`--plan: unknown mode "${m}"`);
-  for (const t of trees) if (!["HEAD", "BEFORE-408", "PRE-B432", "MUT-NO-CAS", "M3-CAPCCY", "M3-FAILLOCK", "PRECAS-M3-CAPCCY", "PRECAS-M3-FAILLOCK"].includes(t)) die(`--plan: unknown tree "${t}"`); // PRE-B432: main before local-first (B-435's question is about it)
+  for (const t of trees) if (!["HEAD", "BEFORE-408", "PRE-B432", "HEAD-OPEN", "MUT-NO-CAS", "M3-CAPCCY", "M3-FAILLOCK", "PRECAS-M3-CAPCCY", "PRECAS-M3-FAILLOCK"].includes(t)) die(`--plan: unknown tree "${t}"`); // PRE-B432: main before local-first (B-435's question is about it)
   for (const x of scenesIn) if (!["H1", "H2", "H4", "C4", "Q1", "Q2", "Q3", "Q4"].includes(x)) die(`--plan: unknown scene "${x}"`);
   const insituKey = (t, x) => (t === "BEFORE-408" && x === "C4" ? "B408-C4" : "FULL");
   const cells = [];
@@ -182,7 +182,10 @@ const SELF_PENDING = "                        recordScalar(\"capital\", val); //
 const PRE_B432_REF = "f2cbbb8";
 const showAt = (f, ref) => execFileSync("git", ["show", `${ref}:${f.replace(ROOT + "/", "")}`], { cwd: ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 const WHOLE_FILE = /^[\s\S]+$/;
-const TREES = { ...ARMS, "SELF-C4-RED": [[APP, SELF_C4, () => "setCapitalInput(\"\");"]], "SELF-NOFLUSH": [[APP, SELF_FLUSH, () => "const unload = () => {\n      return;"], [APP, SELF_PENDING, () => ""]],
+// B-425 wave (09.11): HEAD with the hermetic third-party block switched OFF (tests-eye/hermetic.js
+// EYE_SELFTEST_ALLOW_OUTSIDE) = the environment the flake was measured in BEFORE this wave — the red-before of
+// the block. Same bytes as HEAD (no mutation), a different env: `cell()` below sets it.
+const TREES = { ...ARMS, "HEAD-OPEN": [], "SELF-C4-RED": [[APP, SELF_C4, () => "setCapitalInput(\"\");"]], "SELF-NOFLUSH": [[APP, SELF_FLUSH, () => "const unload = () => {\n      return;"], [APP, SELF_PENDING, () => ""]],
   "PRE-B432": [APP, SETTINGS].map((f) => { const old = showAt(f, PRE_B432_REF); return [f, WHOLE_FILE, () => old]; }),
   // Mutant (i): the capital edit is ⛔ recorded in its handler — only the persist effect remembers it, and an unload
   // at δ≈0 comes first ⇒ D4/D5 at δ=0 MUST lose the edit, or the scene is blind to where the pending is written.
@@ -257,13 +260,13 @@ async function cell({ tree, scene, mode, repeat, shard = 0, diag = true, label =
     const { server, port } = await serve(dist);
     const json = join(dir, "report.json");
     const isDebounce = scene === "DEBOUNCE";
-    const grep = grepOverride ?? (isDebounce ? null : mode === "isolated" ? SCENE_RX[scene] : insituGrep(tree, scene));
+    const grep = grepOverride ?? (isDebounce ? null : mode === "isolated" ? SCENE_RX[scene] : insituGrep(tree === "HEAD-OPEN" ? "HEAD" : tree, scene));
     const spec = specFor(scene.split("+")[0]);
     const t0 = Date.now();
     const run = await runSpec({
       root: ROOT, spec, projects: [PROJECT], port, json, evidenceDir: dir, grep,
       config: "playwright.flake.config.js", extraArgs: ["--repeat-each", String(repeat)],
-      env: { EYE_FLAKE_DIAG: diag ? "1" : "", EYE_FLAKE_OUT: join(dir, "test-results"), EYE_B435_FIXTURES: join(ROOT, "eye-evidence", "fixtures"), ...extraEnv },
+      env: { EYE_FLAKE_DIAG: diag ? "1" : "", EYE_FLAKE_OUT: join(dir, "test-results"), EYE_B435_FIXTURES: join(ROOT, "eye-evidence", "fixtures"), ...(tree === "HEAD-OPEN" ? { EYE_SELFTEST_ALLOW_OUTSIDE: "1" } : {}), ...extraEnv },
     });
     server.close();
     if (!run.ok) die(`${name}: the spec produced no JSON report (exit ${run.status})\n${run.out.slice(-3000)}`);
@@ -344,6 +347,21 @@ if (flag("self-test")) {
   });
   const gaReq = gaEv.filter((e) => e.phase === "req").length, gaRes = gaEv.filter((e) => e.phase === "res").length;
   check("S8", gaReq > 0 && gaRes === 0 && !gaEv.some((e) => e.phase === "missing-diag"), `GA in a hermetic run: ${gaReq} attempted · ${gaRes} answered (must be >0 · 0) — B-433`);
+  // S10 (B-425 ג / B-433 remainder): a hermetic run reaches NO host outside loopback + the synthetic Supabase.
+  // Red-before: with the block switched off (EYE_SELFTEST_ALLOW_OUTSIDE) the diag shows ZERO blocked outside
+  // requests; with it on, ≥1 attempted-and-blocked and ZERO answered — so the check can tell the two trees apart.
+  const outsideOf = (c) => [...Array(R).keys()].flatMap((i) => {
+    const f = join(c.dir, "hydration", PROJECT, `H2-diag${i ? `-r${i}` : ""}.json`);
+    return existsSync(f) ? JSON.parse(readFileSync(f, "utf8")).events.filter((e) => e.kind === "outside") : [{ kind: "outside", phase: "missing-diag" }];
+  });
+  // GA stays blocked by its own, older route (B-433) with the block OFF too — S8 owns that host; S10 is about the REST.
+  const isBlocked = (e) => e.phase === "failed" && /blocked/i.test(e.failure || "") && !/(google-analytics|googletagmanager)\.com$/.test(e.host || "");
+  const onEv = outsideOf(green);
+  const open = await cell({ tree: "HEAD", scene: "H2", mode: "isolated", repeat: R, label: `SELF-H2-OPEN-${PROJECT}`, extraEnv: { EYE_SELFTEST_ALLOW_OUTSIDE: "1" } });
+  const offEv = outsideOf(open);
+  const nBlockedOn = onEv.filter(isBlocked).length, nAnsOn = onEv.filter((e) => e.phase === "res" && !/(google-analytics|googletagmanager)\.com$/.test(e.host || "")).length, nBlockedOff = offEv.filter(isBlocked).length;
+  check("S10", !onEv.some((e) => e.phase === "missing-diag") && !offEv.some((e) => e.phase === "missing-diag") && nBlockedOn > 0 && nAnsOn === 0 && nBlockedOff === 0,
+    `outside hosts, block ON: ${nBlockedOn} blocked · ${nAnsOn} answered (must be >0 · 0) · block OFF: ${nBlockedOff} blocked (must be 0) — B-425 ג`);
   // S9 (B-425 ①): a window held past its bound fails as INSTRUMENT, ⛔ as a red of the scene.
   const bound = await cell({ tree: "HEAD", scene: "H2", mode: "isolated", repeat: 1, label: `SELF-H2-BOUND-${PROJECT}`, extraEnv: { EYE_SELFTEST_GATE_HOLD_MS: "200" } });
   const sBound = score(bound, "H2", 1);
@@ -353,7 +371,7 @@ if (flag("self-test")) {
   const nfFile = join(nf.dir, "debounce", PROJECT, "D2-0.json");
   const nfj = existsSync(nfFile) ? JSON.parse(readFileSync(nfFile, "utf8")) : null;
   check("S7", !nfRed.length && nfj && nfj.n === 10 && nfj.lost === 10 && nfj.byFlush === 0, `D2-0 × SELF-NOFLUSH: lost ${nfj?.lost}/${nfj?.n} · by flush ${nfj?.byFlush} (must be 10/10 · 0) — the debounce scene can see a lost edit`);
-  summary(`### probe-flake self-test · ${PROJECT}\n${bad ? "❌" : "✅"} S1–S9 (${bad} failed)`);
+  summary(`### probe-flake self-test · ${PROJECT}\n${bad ? "❌" : "✅"} S1–S10 (${bad} failed)`);
   if (bad) die(`self-test: ${bad} check(s) failed — the instrument cannot be trusted`);
   console.log(`\n✅ probe-flake self-test · ${PROJECT} — the instrument sees red and captures it`);
   process.exit(0);

@@ -190,6 +190,15 @@ export async function answerRest(route, store) {
   return false;
 }
 
+/** True for a URL the hermetic app may NOT reach: not loopback, not the synthetic Supabase host, not data:/blob:. */
+export function isOutsideHost(url) {
+  let u;
+  try { u = typeof url === "string" ? new URL(url) : url; } catch { return false; }
+  if (!/^https?:$/.test(u.protocol)) return false;
+  const h = u.hostname;
+  return !(h === "127.0.0.1" || h === "localhost" || h === "[::1]" || h === "::1" || h === SB_HOST);
+}
+
 export async function installHermetic(ctx, store) {
   await ctx.route(new RegExp(`https://${SB_HOST.replace(/\./g, "\\.")}/`), async (route) => {
     const req = route.request();
@@ -199,6 +208,9 @@ export async function installHermetic(ctx, store) {
     if (path.startsWith("/auth/v1/token") || path.startsWith("/auth/v1/signup")) return json(route, 200, session(), req);
     if (path.startsWith("/auth/v1/user")) return json(route, 200, session().user, req);
     if (path.startsWith("/auth/v1/logout")) return route.fulfill({ status: 204, body: "" });
+    // EYE_SELFTEST_SETTINGS_READ_FAIL=1 — the instrument's own red for B-455 (eye-overlay-probe READFAIL arm): the
+    // settings READ is refused, so the app settles on capitalGate "none" («No capital») and the spec must say so.
+    if (process.env.EYE_SELFTEST_SETTINGS_READ_FAIL === "1" && method === "GET" && path.startsWith("/rest/v1/user_settings")) return json(route, 500, { message: "hermetic: settings read refused" }, req);
 
     if (await answerRest(route, store)) return;
     if (method === "GET") return json(route, 200, [], req);
@@ -225,6 +237,20 @@ export async function installHermetic(ctx, store) {
   // network leaves. The remaining third-party hosts are B-425 (ג), plan A — ⛔ in this change.
   // The proof is the diag's `ga` events (probe-flake S8: attempted > 0, answered = 0) — ⛔ a counter here.
   await ctx.route(/^https:\/\/(www\.)?(google-analytics|googletagmanager)\.com\//, (route) => route.abort("blockedbyclient"));
+
+  // B-425 (ג) / B-433 remainder (09.11, plan A of 15.10): EVERY other host that is neither loopback nor the
+  // synthetic Supabase. Measured (audits/B425-FLAKE-DIAGNOSIS §3ב): C4's `page.reload` died with "WebKit
+  // encountered an internal error" in the very moment a batch of LIVE `tradingview-widget.com` loads was
+  // cancelled, and one `load` event never fired because `…/embed-widget/ticker-tape` hung ⇒ a hermetic run
+  // was talking to the open internet. Aborted (not stubbed): the app's own error paths run, only the network
+  // leaves. ⛔ production (`prod` never calls installHermetic).
+  // EYE_SELFTEST_ALLOW_OUTSIDE=1 is the instrument's own red-before (probe-flake S10): with the block OFF the
+  // diag must show NO blocked outside request — otherwise S10 would pass on a run that never blocked anything.
+  if (process.env.EYE_SELFTEST_ALLOW_OUTSIDE !== "1") await ctx.route((url) => isOutsideHost(url), (route) => route.abort("blockedbyclient"));
+
+  // /api/quote — the build has no API behind it, so the SPA fallback answered HTML 200 and every run logged
+  // "Fetch API cannot load … due to access control checks". Same shape as /api/ocr below: an honest 503 JSON.
+  await ctx.route(/\/api\/quote(\?|$)/, (route) => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "hermetic" }) }));
 
   // /api/ocr is a PAID Vision call in production — the hermetic arm never makes it.
   await ctx.route(/\/api\/ocr(\?|$)/, (route) => {
