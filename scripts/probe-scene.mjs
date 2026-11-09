@@ -66,7 +66,7 @@ if (argv.includes("--summarize")) {
 }
 
 const SCENES = {
-  SIGNIN: { spec: "tests-flake/signin.spec.js", grep: "^SIGNIN" },
+  SIGNIN: { spec: "tests-flake/signin.spec.js", grep: "SIGNIN · " },
   ACTIONS: { spec: "tests-eye/firstrun.spec.js", grep: "journal actions" },
   PATH: { spec: "tests-eye/firstrun.spec.js", grep: "path · " },
 };
