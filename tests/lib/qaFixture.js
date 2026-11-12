@@ -14,10 +14,12 @@
 // Pure (no Playwright) so `test:diagnosis` can assert it in Node.
 
 /**
- * @param {{ capitalCurrency: ?string, accountCurrency: ?string }} row  what the app hydrated
- * @param {{ expect?: string, not?: string }} need
+ * @param {{ capitalCurrency: ?string, accountCurrency: ?string, lang?: ?string }} row  what the app hydrated
+ *   (+ `lang` = the QA ROW's own lang as read from the network — the app's language may be forced by the spec)
+ * @param {{ expect?: string, not?: string, lang?: string }} need
  *   `expect` — capital AND account must both be this code (cents K2: "ILS");
- *   `not`    — the CAPITAL currency must exist and differ from this code (C-061: "USD").
+ *   `not`    — the CAPITAL currency must exist and differ from this code (C-061: "USD");
+ *   `lang`   — 🆕 INCIDENTS#46 (12.11, Niv): the row's lang must be exactly this ("he"); absent ⇒ fixture.
  * @returns {{ ok: boolean, kind: "ok" | "not_hydrated" | "fixture", message: string }}
  */
 export function qaFixtureVerdict(row, need) {
@@ -36,7 +38,17 @@ export function qaFixtureVerdict(row, need) {
     };
   }
   const ok = need.expect ? cc === need.expect && ac === need.expect : cc !== need.not;
-  if (ok) return { ok: true, kind: "ok", message: `QA account ${seen} meets the need` };
+  if (ok && need.lang !== undefined) {
+    const lg = row?.lang ?? null;
+    if (lg !== need.lang) {
+      return {
+        ok: false,
+        kind: "fixture",
+        message: `PRECONDITION — the QA account's lang is ${lg ?? "absent"}; this test needs lang=${need.lang}. The ACCOUNT was edited, not the app (INCIDENTS#46): restore the QA row (B-465), do not change the test.`,
+      };
+    }
+  }
+  if (ok) return { ok: true, kind: "ok", message: `QA account ${seen}${need.lang !== undefined ? ` · lang ${row?.lang}` : ""} meets the need` };
   const wanted = need.expect ? `${need.expect}/${need.expect}` : `a capital currency other than ${need.not}`;
   return {
     ok: false,
