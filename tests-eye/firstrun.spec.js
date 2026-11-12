@@ -367,7 +367,13 @@ test.describe("activation wave 1 — first run: questionnaire done ⇒ first tra
 
   async function setScheme(page, scheme) {
     await page.emulateMedia({ colorScheme: scheme });
-    await expect.poll(() => page.evaluate(() => document.documentElement.classList.contains("dark")), { timeout: 5_000 }).toBe(scheme === "dark");
+    // B-468 (02.11, iphone14tall:path-en): `html.dark` stayed ON for 5s after emulateMedia("light") with the bare
+    // "Expected: false / Received: true". Two different faults hide behind that line, so they are asked apart:
+    // the ENGINE (does matchMedia follow emulateMedia?) and then the APP (does ThemeContext's change handler
+    // follow matchMedia?). Same 5s each as before — ⛔ no new timeout; the message is the change.
+    const want = scheme === "dark";
+    await expect.poll(() => page.evaluate(() => matchMedia("(prefers-color-scheme: dark)").matches), { timeout: 5_000, message: `B-468 ENGINE: matchMedia(prefers-color-scheme: dark) did not become ${want} after emulateMedia(${scheme}) — the browser, ⛔ the app` }).toBe(want);
+    await expect.poll(() => page.evaluate(() => document.documentElement.classList.contains("dark")), { timeout: 5_000, message: `B-468 APP: matchMedia says ${scheme} but <html class="dark"> did not follow (ThemeContext change handler)` }).toBe(want);
     await page.waitForTimeout(150);
   }
 

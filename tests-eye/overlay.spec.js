@@ -30,6 +30,7 @@ import { join } from "node:path";
 import { blockAllRestWrites, redact } from "../tests/lib/eyeTools.js";
 import { exactRx } from "./labels.js";
 import { installHermetic, newStore, DUMMY_EMAIL, DUMMY_PASSWORD } from "./hermetic.js";
+import { closeCtx } from "./ctxClose.js";
 
 const HERMETIC = process.env.EYE_HERMETIC === "1";
 const QA_EMAIL = HERMETIC ? DUMMY_EMAIL : process.env.SENTINEL_QA_EMAIL;
@@ -58,11 +59,18 @@ test.describe("B-404 · B-405 — bottom banners never cover a core CTA", () => 
     // production the blob is answered with this run's language and EVERY write is blocked.
     await ctx.addInitScript((l) => { if (location.protocol.startsWith("http")) localStorage.setItem("swingEdgeLang", l); }, lang);
     const page = await ctx.newPage();
+    const reads = [];
     if (!HERMETIC) {
       await blockAllRestWrites(page);
       await page.route(/\/rest\/v1\/user_settings/, async (route) => {
         if (route.request().method() !== "GET") return route.fallback();
-        const res = await route.fetch();
+        // B-455 (09.11): the origin's answer to every settings GET of this cell — status · ms · error. Without it a
+        // refused read looked like "Log Trade not visible" (cron 20.10 / 26.10) and its cause stayed a hypothesis.
+        // A failed fetch is RECORDED and RE-THROWN (⛔ swallowed): the test still fails, now with its reason.
+        const t0 = Date.now();
+        let res;
+        try { res = await route.fetch(); } catch (e) { reads.push({ ok: false, ms: Date.now() - t0, error: String(e.message || e).split("\n")[0] }); throw e; }
+        reads.push({ ok: res.ok(), status: res.status(), ms: Date.now() - t0 });
         const rows = await res.json().catch(() => null);
         if (Array.isArray(rows) && rows[0]?.settings) rows[0].settings.lang = lang;
         return route.fulfill({ response: res, json: rows });
@@ -72,7 +80,7 @@ test.describe("B-404 · B-405 — bottom banners never cover a core CTA", () => 
     mkdirSync(dir, { recursive: true });
     const results = [];
     const shot = (name) => page.screenshot({ path: join(dir, `${name}.png`), mask: [page.locator("header"), page.getByText(/@/)] }).catch(() => {});
-    return { ctx, page, store, dir, results, shot };
+    return { ctx, page, store, dir, results, shot, reads };
   }
 
   // The landing page owns the language switch for the auth screen (it writes <html lang>).
@@ -90,6 +98,11 @@ test.describe("B-404 · B-405 — bottom banners never cover a core CTA", () => 
     // none, and the cause had to be inferred.
     await locator.waitFor({ state: "visible", timeout: 20_000 }).catch(async (e) => {
       await shot(`${label}-NOT-VISIBLE`);
+      // B-455 (09.11): "not visible" is the WRONG accusation when the app REFUSED — capitalGate "none" (a settings
+      // read that failed, B-268) turns the primary button into «No capital / אין הון». Name the read, ⛔ the pixel.
+      if (await page.getByRole("button", { name: /^(No capital|אין הון)$/ }).count()) {
+        throw new Error(`B-455: ${label} — the app refused (primary button reads «No capital») because its settings READ failed (B-268), ⛔ a visibility fault. settings GETs of this cell: ${JSON.stringify(app.reads)}`, { cause: e });
+      }
       throw e;
     });
     await locator.scrollIntoViewIfNeeded();
@@ -176,7 +189,7 @@ test.describe("B-404 · B-405 — bottom banners never cover a core CTA", () => 
 
   const finish = async (app, info, scenario, lang) => {
     writeFileSync(join(app.dir, `${scenario}-${lang}.json`), JSON.stringify(app.results, null, 2));
-    await app.ctx.close();
+    await closeCtx(app.ctx);
   };
 
   for (const lang of ["he", "en"]) {

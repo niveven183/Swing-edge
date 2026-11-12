@@ -53,7 +53,11 @@ const ARMS = {
   BEFORE: FILES.map((f) => { const old = show(f); return [f, WHOLE, () => old]; }),
   "MUT-PAD": [[OVERLAY, PUBLISH, () => 'document.documentElement.style.setProperty(OVERLAY_VAR, "0px");']],
   "MUT-IOS": [[IOSB, GUARD, () => "const shown = visible;"]],
+  // B-455 (09.11): the HEAD tree with the settings READ refused (tests-eye/hermetic.js hatch) ⇒ the app answers
+  // «No capital» and the spec must NAME the failed read, ⛔ accuse the pixel ("Log Trade not visible").
+  READFAIL: [],
 };
+const ARM_ENV = { READFAIL: { EYE_SELFTEST_SETTINGS_READ_FAIL: "1" } };
 for (const [arm, muts] of Object.entries(ARMS)) for (const [f, find] of muts) once(readFileSync(f, "utf8"), find, arm);
 ok("META", true, `all mutation anchors match exactly once · targets clean in git · projects=${PROJECTS.join(",")}`);
 
@@ -70,7 +74,7 @@ for (const arm of Object.keys(ARMS)) {
   const dist = await buildTree({ root: ROOT, arm, outDir: join(WORK, `dist-${arm}`), mutations: ARMS[arm], once, die });
   const { server, port } = await serve(dist);
   const json = join(OUT, `${arm}.json`);
-  const run = await runSpec({ root: ROOT, spec: "tests-eye/overlay.spec.js", projects: PROJECTS, port, json, evidenceDir: join(OUT, arm) });
+  const run = await runSpec({ root: ROOT, spec: "tests-eye/overlay.spec.js", projects: PROJECTS, port, json, evidenceDir: join(OUT, arm), env: ARM_ENV[arm] || {} });
   server.close();
   if (!run.ok) die(`${arm}: the spec produced no JSON report (exit ${run.status})\n${run.out.slice(-3000)}`);
   verdicts[arm] = readResults(json, KEY);
@@ -92,6 +96,8 @@ for (const p of PROJECTS) {
   const reds = before.filter((r) => r.status === "failed" && /covered by|B-405/.test(r.msg));
   const quiet = [...new Set(before.filter((r) => r.status === "passed").map((r) => r.k))];
   ok(`BEFORE/${p}`, reds.length > 0, `red-before on this device: ${reds.length}/${before.length} cells${quiet.length ? ` · ⚠️ not reproduced here: ${quiet.join(",")}` : ""}`, "no cell red on the pre-fix tree — the spec is BLIND on this device");
+  const rf = cells("READFAIL", p, "consent");
+  ok(`READFAIL/${p}`, rf.every((r) => r.status === "failed" && /B-455: .*settings READ failed/.test(r.msg)), `read refused ⇒ ${rf.map((r) => r.status).join(" · ")}`, `the failure does not name the failed read: ${rf.map((r) => r.msg.slice(0, 160)).join(" | ")}`);
   const pad = cells("MUT-PAD", p, "consent");
   ok(`MUT-PAD/${p}`, pad.some((r) => r.status === "failed" && /covered by/.test(r.msg)), `reserve off ⇒ ${pad.map((r) => r.status).join(" · ")}`, "mutant SURVIVED — the spec cannot see the reserve being removed");
   if (IOS.has(p)) {

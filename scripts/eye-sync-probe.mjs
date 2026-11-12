@@ -52,6 +52,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
+import { unexpectedReds, selfCheck } from "./lib/syncScore.mjs";
 import { makeOnce, assertCleanTargets, buildTree, serve, runSpec, readResults } from "./lib/eyeBuild.mjs";
 import { makeArms } from "./lib/syncArms.mjs";
 
@@ -81,6 +82,11 @@ const src = (f) => readFileSync(f, "utf8");
 for (const [id, muts] of NODE_MUTANTS) for (const [f, find] of muts) once(src(f), find, id);
 for (const [f, find] of VALUE_MUTANT) once(src(f), find, "NM-VALUE");
 for (const [arm, muts] of Object.entries(ARMS)) for (const [f, find] of muts) once(src(f), find, arm);
+{
+  // B-431: the third-scene check must be able to FIRE before its silence means anything.
+  const sc = selfCheck();
+  ok("META/unexpected-red", sc.fires && sc.quietWhenDeclared && sc.ignoresExpectedAndAbsent, `scene scoring: fires on a stray red ${sc.fires} · quiet when declared ${sc.quietWhenDeclared} · ignores expected/absent ${sc.ignoresExpectedAndAbsent}`, "scripts/lib/syncScore.mjs cannot see a third red scene — B-431 would be blind", "instrument");
+}
 ok("META", true, `all anchors match exactly once · targets clean in git · projects=${PROJECTS.join(",")}`);
 
 // In-place mutate → run → restore → prove the restore. A restore that fails is fatal.
@@ -166,7 +172,9 @@ for (const arm of SELECTED_ARMS) {
 console.log("\n── verdicts ──");
 const ALL = ["H1", "H2", "H3", "H4", "H5", "H6", "C1", "C2", "C3", "C4", "C5"];
 const RED = {
-  BEFORE: ["H1", "H2", "H3", "H5"], "MUT-EARLY": ["H1", "H2"], "MUT-OVERWRITE": ["H1", "H2"], "MUT-RESURRECT": ["H4"],
+  // MUT-OVERWRITE · H4: B-431 (12.11, Niv) — the mutant drops this device's journal ops (`mine = []`), so the `del`
+  // tombstone is lost and the DB copy resurrects the setup; HEAD green · MUT red in one local run.
+  BEFORE: ["H1", "H2", "H3", "H5"], "MUT-EARLY": ["H1", "H2"], "MUT-OVERWRITE": ["H1", "H2", "H4"], "MUT-RESURRECT": ["H4"],
   "BEFORE-408": ["H6", "C5"], "M3-EARLY": ["H6"], "M3-LANG": ["H6"], "M3-CAPITAL": ["H6"], "M3-CAPCCY": ["H6"], "M3-ACCCCY": ["H6"], "M3-RISK": ["H6"],
   "M3-FAILLOCK": ["C3"], "M5-NOTIMEOUT": ["C5"],
 };
@@ -200,11 +208,18 @@ for (const p of PROJECTS) {
   }
 }
 
+// B-431 (R-4): every scene that RAN in a mutant arm and is neither an expected red nor a control is GREEN — or
+// declared in scripts/lib/syncScore.mjs. Before this, a stray red there (H2 in MUT-RESURRECT/iphone14, 13.10)
+// passed in silence.
+for (const u of unexpectedReds({ verdicts, red: RED, controls: CONTROLS, all: ALL, projects: PROJECTS })) {
+  ok(`${u.arm}/${u.project}/${u.scene}/unexpected`, false, `scene ${u.scene} is red in ${u.arm} and no check expects it`, `${u.status}: ${u.msg}`, "unexpected-red");
+}
+
 await rm(WORK, { recursive: true, force: true });
 // B-442 — the classified failures, in the step summary (⛔ only in the log): what blocked, and why.
 if (process.env.GITHUB_STEP_SUMMARY) {
   const { appendFileSync } = await import("node:fs");
-  const CLS = { "mutant-survived": "🔴 mutant SURVIVED — the spec is blind (blocking)", "control-red": "🟠 control RED in a mutant arm (blocks the PR · ⛔ production verification)", instrument: "🟡 INSTRUMENT — the scene measured nothing", "head-red": "🔴 HEAD red (blocks production verification)", check: "🔴 check failed" };
+  const CLS = { "unexpected-red": "🟣 UNEXPECTED red — a scene no check expects failed in a mutant arm (B-431)", "mutant-survived": "🔴 mutant SURVIVED — the spec is blind (blocking)", "control-red": "🟠 control RED in a mutant arm (blocks the PR · ⛔ production verification)", instrument: "🟡 INSTRUMENT — the scene measured nothing", "head-red": "🔴 HEAD red (blocks production verification)", check: "🔴 check failed" };
   const lines = [`### probe-sync · scope \`${SCOPE}\` · arms ${SELECTED_ARMS.join(", ")}`, ""];
   if (!failed.length) lines.push(SCOPE === "head" ? "✅ HEAD: every scene green" : "✅ every expected red is red · every control green");
   for (const [cls, title] of Object.entries(CLS)) {

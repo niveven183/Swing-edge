@@ -190,6 +190,17 @@ export async function answerRest(route, store) {
   return false;
 }
 
+/** True for a URL outside loopback + the synthetic Supabase host (http/s only). DIAGNOSTIC: hydration.spec records these as
+ * `outside` events. ⛔ blocked — a block of every outside host was measured 12.11 to WORSEN C4 (11/200 vs 0/200) and to
+ * blind the width probe (MUT-TOOLS survived); removed by Niv's decision, audits/B425-FAMILIES-2026-11.md §7. */
+export function isOutsideHost(url) {
+  let u;
+  try { u = typeof url === "string" ? new URL(url) : url; } catch { return false; }
+  if (!/^https?:$/.test(u.protocol)) return false;
+  const h = u.hostname;
+  return !(h === "127.0.0.1" || h === "localhost" || h === "[::1]" || h === "::1" || h === SB_HOST);
+}
+
 export async function installHermetic(ctx, store) {
   await ctx.route(new RegExp(`https://${SB_HOST.replace(/\./g, "\\.")}/`), async (route) => {
     const req = route.request();
@@ -199,6 +210,9 @@ export async function installHermetic(ctx, store) {
     if (path.startsWith("/auth/v1/token") || path.startsWith("/auth/v1/signup")) return json(route, 200, session(), req);
     if (path.startsWith("/auth/v1/user")) return json(route, 200, session().user, req);
     if (path.startsWith("/auth/v1/logout")) return route.fulfill({ status: 204, body: "" });
+    // EYE_SELFTEST_SETTINGS_READ_FAIL=1 — the instrument's own red for B-455 (eye-overlay-probe READFAIL arm): the
+    // settings READ is refused, so the app settles on capitalGate "none" («No capital») and the spec must say so.
+    if (process.env.EYE_SELFTEST_SETTINGS_READ_FAIL === "1" && method === "GET" && path.startsWith("/rest/v1/user_settings")) return json(route, 500, { message: "hermetic: settings read refused" }, req);
 
     if (await answerRest(route, store)) return;
     if (method === "GET") return json(route, 200, [], req);

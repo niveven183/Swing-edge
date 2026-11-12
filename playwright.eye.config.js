@@ -20,6 +20,21 @@ const forceChromium = (projects) =>
     ? projects.map((p) => ({ ...p, use: { ...p.use, defaultBrowserType: "chromium", browserName: "chromium", launchOptions: chromiumLaunch } }))
     : projects;
 
+// B-425 wave (09.11): a HERMETIC cell that goes red keeps a screenshot + Playwright's error-context.md
+// (page snapshot) next to its evidence. #41 / #42 / #44ⓐ / B-468 were red with NO picture of the screen —
+// "slow login" vs "frozen clock × WebKit" lived only in an artifact that happened to be kept.
+// ⛔ trace · ⛔ video stay OFF everywhere (E11: a trace records storage). Hermetic only — the session there
+// is a dummy, unsigned one; against production (`prod`, no EYE_HERMETIC) nothing is kept.
+const HERMETIC_RUN = process.env.EYE_HERMETIC === "1";
+// The guard that makes "hermetic only" true: failure screenshots are kept ONLY for a loopback origin, so a
+// mis-set EYE_HERMETIC against swing-edge.com is a loud config error, ⛔ a screenshot of the QA account.
+if (HERMETIC_RUN) {
+  const u = (() => { try { return new URL(process.env.TEST_URL || ""); } catch { return null; } })();
+  if (!u || !["127.0.0.1", "localhost", "[::1]"].includes(u.hostname)) {
+    throw new Error(`playwright.eye.config.js: EYE_HERMETIC=1 needs a loopback TEST_URL, got "${process.env.TEST_URL || ""}" (E11)`);
+  }
+}
+
 export default defineConfig({
   testDir: "./tests-eye",
   globalSetup: "./tests-eye/global-setup.js",
@@ -28,12 +43,13 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0,
+  ...(HERMETIC_RUN && process.env.EYE_EVIDENCE_DIR ? { outputDir: `${process.env.EYE_EVIDENCE_DIR}/failure-artifacts` } : {}),
   forbidOnly: !!process.env.CI,
   reporter: [["list"], ["json", { outputFile: process.env.EYE_JSON || "eye-evidence/results.json" }]],
   use: {
     baseURL: BASE_URL,
     trace: "off",
-    screenshot: "off",
+    screenshot: HERMETIC_RUN ? "only-on-failure" : "off",
     video: "off",
     actionTimeout: 20_000,
     navigationTimeout: 45_000,

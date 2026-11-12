@@ -50,6 +50,7 @@ import { deriveInstrumentCurrency, isAggregatable } from "../src/lib/instrumentC
 import { installHermetic, newStore, DUMMY_EMAIL, DUMMY_PASSWORD } from "./hermetic.js";
 import { qaFixtureVerdict } from "../tests/lib/qaFixture.js";
 import { sweep, PREFIX_ROOT, TRADE_TICKER } from "./qaRest.js";
+import { closeCtx } from "./ctxClose.js";
 
 const HERMETIC = process.env.EYE_HERMETIC === "1";
 const QA_EMAIL = HERMETIC ? DUMMY_EMAIL : process.env.SENTINEL_QA_EMAIL;
@@ -572,7 +573,7 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
       await app.onFail("a");
       throw e;
     } finally {
-      await app.ctx.close();
+      await closeCtx(app.ctx);
     }
   });
 
@@ -596,7 +597,7 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
       await app.onFail("b");
       throw e;
     } finally {
-      await app.ctx.close();
+      await closeCtx(app.ctx);
     }
   });
 });

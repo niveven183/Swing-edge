@@ -44,12 +44,26 @@ on:
         description: "Also measure the debounce window / reload scene (tests-flake/)"
         type: boolean
         default: true
+      hydration:
+        description: "Run the hydration cells (H2 · C4 …) — false when only scene_cells is wanted"
+        type: boolean
+        default: true
+      scene_cells:
+        description: "B-425 wave: SCENE:project,… — SIGNIN · ACTIONS · PATH (scripts/probe-scene.mjs). Empty = none"
+        default: ""
+      scene_repeat:
+        description: "scene sets in total per cell (he+en each), split across scene_shards"
+        default: "50"
+      scene_shards:
+        description: "Parallel jobs per scene cell"
+        default: "2"
 
 permissions:
   contents: read
 
 jobs:
   plan:
+    if: ${{ inputs.hydration }}
     runs-on: ubuntu-latest
     outputs:
       cells: ${{ steps.plan.outputs.cells }}
@@ -74,6 +88,7 @@ jobs:
   # The instrument's red-before, on the same runner image: a deterministic red must be seen AND
   # captured (trace + video + diag) before a single measurement counts.
   self-test:
+    if: ${{ inputs.hydration }}
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.61.1-noble
     timeout-minutes: 45
@@ -131,7 +146,7 @@ jobs:
 
   debounce:
     needs: [self-test]
-    if: ${{ inputs.debounce }}
+    if: ${{ inputs.debounce && inputs.hydration }}
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.61.1-noble
     timeout-minutes: 90
@@ -171,3 +186,68 @@ jobs:
           pattern: eye-flake-*
           path: flake-cells
       - run: node scripts/probe-flake.mjs --summarize flake-cells
+
+  # B-425 wave (09.11): the scenes that are not hydration scenes — see scripts/probe-scene.mjs.
+  scene-plan:
+    if: ${{ inputs.scene_cells != '' }}
+    runs-on: ubuntu-latest
+    outputs:
+      cells: ${{ steps.plan.outputs.cells }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - id: plan
+        env:
+          IN_CELLS: ${{ inputs.scene_cells }}
+          IN_REPEAT: ${{ inputs.scene_repeat }}
+          IN_SHARDS: ${{ inputs.scene_shards }}
+        run: |
+          cells=$(node scripts/probe-scene.mjs --plan)
+          echo "cells=$cells" >> "$GITHUB_OUTPUT"
+          echo "$cells" | node -e 'const j=JSON.parse(require("fs").readFileSync(0,"utf8")).include; console.log(j.length + " cells"); for (const c of j) console.log(" ", c.id, "×", c.repeat)'
+
+  scene-measure:
+    needs: [scene-plan]
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.61.1-noble
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.scene-plan.outputs.cells) }}
+    name: scene · ${{ matrix.id }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - run: npm ci
+      - name: Measure ${{ matrix.id }}
+        run: >
+          node scripts/probe-scene.mjs
+          --scene ${{ matrix.scene }} --project ${{ matrix.project }}
+          --repeat ${{ matrix.repeat }} --shard ${{ matrix.shard }}
+      - name: Upload evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: eye-scene-${{ matrix.id }}-${{ github.run_id }}
+          path: eye-evidence/probe-scene/
+          retention-days: 14
+          if-no-files-found: warn
+
+  scene-summary:
+    needs: [scene-measure]
+    if: ${{ always() && needs.scene-measure.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: eye-scene-*
+          path: scene-cells
+      - run: node scripts/probe-scene.mjs --summarize scene-cells
