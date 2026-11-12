@@ -51,6 +51,7 @@ import { installHermetic, newStore, DUMMY_EMAIL, DUMMY_PASSWORD } from "./hermet
 import { qaFixtureVerdict } from "../tests/lib/qaFixture.js";
 import { sweep, PREFIX_ROOT, TRADE_TICKER } from "./qaRest.js";
 import { closeCtx } from "./ctxClose.js";
+import { installCentsSettingsRoute } from "./centsSettingsRoute.js";
 
 const HERMETIC = process.env.EYE_HERMETIC === "1";
 const QA_EMAIL = HERMETIC ? DUMMY_EMAIL : process.env.SENTINEL_QA_EMAIL;
@@ -138,24 +139,9 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     const ctx = await browser.newContext({ ...ctxOpts(info), baseURL: info.project.use.baseURL, ...(STATE ? { storageState: STATE } : {}) });
     const store = HERMETIC ? newStore() : null;
     if (HERMETIC) await installHermetic(ctx, store);
-    if (!HERMETIC) {
-      // Read the row AS IT IS (₪ capital; in en without `lang` so the localStorage choice
-      // below wins); every settings WRITE of this context is answered locally ⇒ the QA row never
-      // changes. Trades are untouched (their own table, swept by ticker + notes prefix).
-      await ctx.route(/\/rest\/v1\/user_settings/, async (route) => {
-        const req = route.request();
-        if (req.method() !== "GET") return route.fulfill({ status: 201, contentType: "application/json", body: "[]" });
-        const res = await route.fetch();
-        const body = await res.json();
-        const view = (r) => {
-          if (!(r && r.settings)) return r;
-          const settings = { ...r.settings };
-          if (lang === "en") delete settings.lang;
-          return { ...r, settings };
-        };
-        return route.fulfill({ response: res, json: Array.isArray(body) ? body.map(view) : view(body) });
-      });
-    }
+    // INCIDENTS#46: the row's OWN lang, as read — for the fixture verdict (the app's language is forced in the route).
+    const row = { lang: undefined };
+    if (!HERMETIC) await installCentsSettingsRoute(ctx, lang, (r) => { row.lang = r.lang; });
     const page = await ctx.newPage();
     await installOverlayHandlers(page);
     if (lang) await page.addInitScript((l) => { if (location.protocol.startsWith("http")) localStorage.setItem("swingEdgeLang", l); }, lang);
@@ -194,7 +180,7 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
         "── console errors ──", ...(consoleErrors.length ? consoleErrors : ["(none)"]),
       ].join("\n"));
     };
-    return { ctx, page, shot, onFail, fx, prefix: `${PREFIX_ROOT}${RUN}-${info.project.name}-cents-` };
+    return { ctx, page, shot, onFail, fx, row, prefix: `${PREFIX_ROOT}${RUN}-${info.project.name}-cents-` };
   }
 
   // Log a trade through the real form, then close it at ENTRY + delta through the journal card.
@@ -212,9 +198,9 @@ test.describe("K2 · money keeps its cents on screen (B-321 · B-325) @deployed"
     // not_hydrated (app/network) or fixture (the QA account moved). The need is unchanged.
     if (!HERMETIC) {
       const ccys = () => page.evaluate(() => ({ capitalCurrency: localStorage.getItem("swingEdgeCapitalCurrency"), accountCurrency: localStorage.getItem("swingEdgeAccountCurrency") }));
-      await expect.poll(async () => qaFixtureVerdict(await ccys(), { expect: EXPECT_CCY }).ok, { timeout: 20_000, message: "the QA capital settings did not settle to the need in 20s" })
+      await expect.poll(async () => qaFixtureVerdict({ ...(await ccys()), lang: app.row.lang }, { expect: EXPECT_CCY, lang: "he" }).ok, { timeout: 20_000, message: "the QA capital settings did not settle to the need in 20s" })
         .toBe(true)
-        .catch(async () => { const v = qaFixtureVerdict(await ccys(), { expect: EXPECT_CCY }); throw new Error(v.message); });
+        .catch(async () => { const v = qaFixtureVerdict({ ...(await ccys()), lang: app.row.lang }, { expect: EXPECT_CCY, lang: "he" }); throw new Error(v.message); });
     }
     // The FAB HIDES on scroll-down and returns only on a scroll-up of >10px per frame (SwingEdge_App.jsx
     // `fabVisible`). The B5 before-read scrolls the analytics tab down, and a smooth (index.css) or

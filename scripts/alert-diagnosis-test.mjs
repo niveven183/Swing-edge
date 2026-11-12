@@ -392,6 +392,13 @@ check('E26', 'null/null ⇒ not_hydrated — «never reached» נשמר **רק**
 const v27a = verdict({ capitalCurrency: 'USD', accountCurrency: 'ILS' }, { not: 'USD' });
 const v27b = verdict({ capitalCurrency: 'ILS', accountCurrency: 'USD' }, { not: 'USD' });
 check('E27', 'C-061 צריך הון ≠ USD: USD/ILS ⇒ fixture · ILS/USD ⇒ ok', v27a.ok === false && v27a.kind === 'fixture' && v27b.ok === true, `${JSON.stringify(v27a)} · ${JSON.stringify(v27b)}`);
+// 🆕 INCIDENTS#46 (12.11): the QA row carried `lang: "en"` (written between 02.11 and 09.11) ⇒ cents `a · he` ran in English and
+// went red on both devices with the trade closed correctly. The fixture now includes lang = "he" (Niv 12.11).
+const v30 = verdict({ capitalCurrency: 'ILS', accountCurrency: 'ILS', lang: 'en' }, { expect: 'ILS', lang: 'he' });
+check('E30', 'ILS/ILS + lang=en מול «ILS · he» ⇒ fixture — ההודעה נוקבת lang ו-#46', v30.ok === false && v30.kind === 'fixture' && /lang/.test(v30.message) && /en/.test(v30.message) && /#46/.test(v30.message), JSON.stringify(v30));
+const v31 = verdict({ capitalCurrency: 'ILS', accountCurrency: 'ILS', lang: 'he' }, { expect: 'ILS', lang: 'he' });
+const v31b = verdict({ capitalCurrency: 'ILS', accountCurrency: 'ILS', lang: null }, { expect: 'ILS', lang: 'he' });
+check('E31', 'lang=he ⇒ ok · lang חסר ⇒ fixture (⛔ «חסר = בסדר»)', v31.ok === true && v31b.ok === false && v31b.kind === 'fixture', `${JSON.stringify(v31)} · ${JSON.stringify(v31b)}`);
 const eyeSpec = fs.readFileSync(path.join(ROOT, 'tests/eye.spec.js'), 'utf8');
 const centsSpec = fs.readFileSync(path.join(ROOT, 'tests-eye/cents.spec.js'), 'utf8');
 const iOpen = eyeSpec.indexOf('async function openFilledForm(page');
@@ -399,8 +406,8 @@ const openSrc = iOpen > 0 ? eyeSpec.slice(iOpen, eyeSpec.indexOf('\n  }\n', iOpe
 const needSites = (eyeSpec.match(/openFilledForm\(page, \{ needNonUsdCapital: true \}\)/g) || []).length;
 check('E28', 'C-061ⓐⓑⓒ — `openFilledForm` עובר דרך `qaFixtureVerdict` עם `{ not: "USD" }` לפני הטופס, ו-3 האתרים (ⓐⓑⓒ) מבקשים אותו',
   /qaFixtureVerdict\([\s\S]{0,60}?\{\s*not:\s*"USD"\s*\}\)/.test(openSrc) && openSrc.indexOf('qaFixtureVerdict') < openSrc.indexOf('add-trade') && needSites === 3, `openFilledForm@${iOpen} · needSites=${needSites}`);
-check('E29', 'cents K2 — הפולינג על המטבעות ⇒ `qaFixtureVerdict` עם `{ expect: EXPECT_CCY }`, ⛔ ההודעה «never reached» לבדה',
-  /qaFixtureVerdict\([\s\S]{0,60}?\{\s*expect:\s*EXPECT_CCY\s*\}\)/.test(centsSpec) && !/message: `the capital settings never reached the app \(expected \$\{EXPECT_CCY\}\)`/.test(centsSpec));
+check('E29', 'cents K2 — הפולינג על המטבעות ⇒ `qaFixtureVerdict` עם `{ expect: EXPECT_CCY, lang: "he" }` (🆕 #46), ⛔ ההודעה «never reached» לבדה',
+  /qaFixtureVerdict\([\s\S]{0,80}?\{\s*expect:\s*EXPECT_CCY,\s*lang:\s*"he"\s*\}\)/.test(centsSpec) && !/message: `the capital settings never reached the app \(expected \$\{EXPECT_CCY\}\)`/.test(centsSpec));
 
 // ── SUMMARY ──────────────────────────────────────────────────────────────────
 console.log('\n' + '─'.repeat(72));

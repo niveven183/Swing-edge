@@ -1710,3 +1710,12 @@ reload»: צפוי `b1…b5`, התקבל `b1 · b2 · b3 · b5`. `b4` **שרד �
 
 ### לקח
 ⚠️ **«4 הופעות» בפרומפט היה מונה את `main` בלבד של משפחה אחת.** `B-454` נרשם `4` ב-`BACKLOG` ונמדד `6/8` — אי-ספירה של `28.10` (אדום שהוסתר מאחורי `#43`) ושל `02.11`. ⇒ סריקת ריצות לפי **חתימה בלוג**, ⛔ לפי «מה כבר רשום».
+
+## #46 — 2026-11-12 — `eye-playbook` `prod` על `main` אחרי מיזוג PR #88 (`da177f3`, run `43268640360`): cents K2 `a · he` אדום בשני המכשירים — שורת ה-QA נשאה `lang: "en"`
+**מה קרה:** `82 passed · 2 failed` — `cents` K2 `a · he` (pixel7 + iphone14): «close toast (he) did not show +₪12.38». `b · en` ירוק בשני המכשירים באותו סכום; ⛔ «Request context disposed» (⛔ `B-454`).
+**מה נמדד:** צילום הכשל — האפליקציה כולה **באנגלית** («Table» · «Calendar» · «Close») והעסקה נסגרה נכון (`+₪12.38`); ⇒ הטוסט האנגלי הוצג והלוקייטור העברי ⛔ מצא. ניב (SELECT 12.11 21:15): `lang=en · ccy=ILS · updated_at 17:43:01 UTC`. ⚠️ **17:43:01 ⛔ הכותב**: זה ה-restore של `scalars.spec` `g` (לוג: `blob a2c66d95 → a2c66d95 · identical`) — `lang=en` היה שם כבר ב-17:27 (cents `a` הוא הטסט הראשון). ריצת ה-PR של 09.11: `restHashBefore = restHashAfter = 78acaf40` ⇒ ⛔ #88. החלון: 02.11 ~13:48 → 09.11 15:02 ⇒ `B-471`.
+**⛔ רגרסיה של #88:** ה-diff ב-`cents.spec` הוא teardown בלבד (`closeCtx` ב-`finally`, אחרי בדיקת הטוסט), ו-`prod` על PR מריץ רק `playbook.spec --grep-invert @deployed` ⇒ cents K2 ⛔ רץ ב-PR כלל.
+**התיקון:** ניב שחזר את השורה ל-`lang=he` (19:31:40 UTC). Harness: `tests-eye/centsSettingsRoute.js` — שפת הבדיקה **מפורשת** (`he` ⇒ `settings.lang = "he"`), שפת השורה מדווחת ל-`qaFixtureVerdict`, שבודק עכשיו גם `lang=he` (`E30`/`E31`, red-before ב-`test:diagnosis`); `probe:centslang` — OLD מעביר `en` (אדום) · NEW `he`.
+
+### לקח
+⚠️ **בדיקה שקוראת שורה חיה ירשה ממנה גם את השפה** — `#43` תפס את המטבע, ⛔ את ה-`lang`. ⚠️ **ו-`updated_at` הוא הכותב האחרון, ⛔ הכותב שגרם** — restore זהה-תוכן מזיז אותו.
