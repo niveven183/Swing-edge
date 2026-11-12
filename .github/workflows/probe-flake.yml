@@ -26,7 +26,7 @@ on:
         description: "isolated · insitu · or both (comma-separated)"
         default: "isolated,insitu"
       trees:
-        description: "HEAD · BEFORE-408 · HEAD-OPEN (HEAD with the hermetic third-party block OFF = the tree before B-425 ג)"
+        description: "HEAD · BEFORE-408"
         default: "HEAD,BEFORE-408"
       scenes:
         description: "H2 · C4"
@@ -57,9 +57,6 @@ on:
       scene_shards:
         description: "Parallel jobs per scene cell"
         default: "2"
-      scene_blocks:
-        description: "on (HEAD) · off (the tree before the third-party block) · or both"
-        default: "on"
 
 permissions:
   contents: read
@@ -206,7 +203,6 @@ jobs:
           IN_CELLS: ${{ inputs.scene_cells }}
           IN_REPEAT: ${{ inputs.scene_repeat }}
           IN_SHARDS: ${{ inputs.scene_shards }}
-          IN_BLOCKS: ${{ inputs.scene_blocks }}
         run: |
           cells=$(node scripts/probe-scene.mjs --plan)
           echo "cells=$cells" >> "$GITHUB_OUTPUT"
@@ -230,7 +226,7 @@ jobs:
       - name: Measure ${{ matrix.id }}
         run: >
           node scripts/probe-scene.mjs
-          --scene ${{ matrix.scene }} --project ${{ matrix.project }} --block ${{ matrix.block }}
+          --scene ${{ matrix.scene }} --project ${{ matrix.project }}
           --repeat ${{ matrix.repeat }} --shard ${{ matrix.shard }}
       - name: Upload evidence
         if: ${{ always() }}

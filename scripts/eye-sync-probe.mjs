@@ -172,7 +172,7 @@ for (const arm of SELECTED_ARMS) {
 console.log("\n── verdicts ──");
 const ALL = ["H1", "H2", "H3", "H4", "H5", "H6", "C1", "C2", "C3", "C4", "C5"];
 const RED = {
-  BEFORE: ["H1", "H2", "H3", "H5"], "MUT-EARLY": ["H1", "H2"], "MUT-OVERWRITE": ["H1", "H2"], "MUT-RESURRECT": ["H4"],
+  BEFORE: ["H1", "H2", "H3", "H5"], "MUT-EARLY": ["H1", "H2"], "MUT-OVERWRITE": ["H1", "H2", "H4"], // H4: B-431 (12.11, Niv) — the mutant drops this device's journal ops (`mine = []`), so the `del` tombstone is lost and the DB copy resurrects the setup; HEAD green · MUT red in one local run "MUT-RESURRECT": ["H4"],
   "BEFORE-408": ["H6", "C5"], "M3-EARLY": ["H6"], "M3-LANG": ["H6"], "M3-CAPITAL": ["H6"], "M3-CAPCCY": ["H6"], "M3-ACCCCY": ["H6"], "M3-RISK": ["H6"],
   "M3-FAILLOCK": ["C3"], "M5-NOTIMEOUT": ["C5"],
 };

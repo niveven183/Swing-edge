@@ -190,7 +190,9 @@ export async function answerRest(route, store) {
   return false;
 }
 
-/** True for a URL the hermetic app may NOT reach: not loopback, not the synthetic Supabase host, not data:/blob:. */
+/** True for a URL outside loopback + the synthetic Supabase host (http/s only). DIAGNOSTIC: hydration.spec records these as
+ * `outside` events. ⛔ blocked — a block of every outside host was measured 12.11 to WORSEN C4 (11/200 vs 0/200) and to
+ * blind the width probe (MUT-TOOLS survived); removed by Niv's decision, audits/B425-FAMILIES-2026-11.md §7. */
 export function isOutsideHost(url) {
   let u;
   try { u = typeof url === "string" ? new URL(url) : url; } catch { return false; }
@@ -237,20 +239,6 @@ export async function installHermetic(ctx, store) {
   // network leaves. The remaining third-party hosts are B-425 (ג), plan A — ⛔ in this change.
   // The proof is the diag's `ga` events (probe-flake S8: attempted > 0, answered = 0) — ⛔ a counter here.
   await ctx.route(/^https:\/\/(www\.)?(google-analytics|googletagmanager)\.com\//, (route) => route.abort("blockedbyclient"));
-
-  // B-425 (ג) / B-433 remainder (09.11, plan A of 15.10): EVERY other host that is neither loopback nor the
-  // synthetic Supabase. Measured (audits/B425-FLAKE-DIAGNOSIS §3ב): C4's `page.reload` died with "WebKit
-  // encountered an internal error" in the very moment a batch of LIVE `tradingview-widget.com` loads was
-  // cancelled, and one `load` event never fired because `…/embed-widget/ticker-tape` hung ⇒ a hermetic run
-  // was talking to the open internet. Aborted (not stubbed): the app's own error paths run, only the network
-  // leaves. ⛔ production (`prod` never calls installHermetic).
-  // EYE_SELFTEST_ALLOW_OUTSIDE=1 is the instrument's own red-before (probe-flake S10): with the block OFF the
-  // diag must show NO blocked outside request — otherwise S10 would pass on a run that never blocked anything.
-  if (process.env.EYE_SELFTEST_ALLOW_OUTSIDE !== "1") await ctx.route((url) => isOutsideHost(url), (route) => route.abort("blockedbyclient"));
-
-  // /api/quote — the build has no API behind it, so the SPA fallback answered HTML 200 and every run logged
-  // "Fetch API cannot load … due to access control checks". Same shape as /api/ocr below: an honest 503 JSON.
-  await ctx.route(/\/api\/quote(\?|$)/, (route) => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "hermetic" }) }));
 
   // /api/ocr is a PAID Vision call in production — the hermetic arm never makes it.
   await ctx.route(/\/api\/ocr(\?|$)/, (route) => {
