@@ -7,7 +7,7 @@
 // be re-learned per probe (R-6).
 
 import { createServer } from "node:http";
-import { readFile, writeFile, readdir } from "node:fs/promises";
+import { readFile, writeFile, readdir, unlink } from "node:fs/promises";
 import { readFileSync, existsSync } from "node:fs";
 import { execFileSync, spawn } from "node:child_process";
 import { join, extname } from "node:path";
@@ -44,8 +44,20 @@ export function assertCleanTargets(root, files, die) {
  */
 // `env` (B-458, wave 1): build-time overrides — probe:sentry points VITE_SENTRY_DSN at a local ingest.
 // The default `{}` keeps every existing caller byte-identical (DSN "" ⇒ Sentry off).
+// Modules a later wave DELETED, with the last commit that still had them. A BEFORE arm swaps
+// an old file in whole (e.g. SwingEdge_App.jsx at d1e05e1); that file still imports the module,
+// and the build fails on a missing import instead of measuring anything (13.11, PR #90: four
+// probes red on `Could not resolve "./src/data/tooltips.js"`). buildTree writes the module from
+// that commit ONLY when a mutated file names it and it is absent, and deletes it afterwards.
+// ⛔ A HEAD arm never gets it — no mutated file imports it, so a live import of a retired module
+// still fails the build, loudly.
+export const RETIRED = {
+  "src/data/tooltips.js": { ref: "c31b227", why: "wave 3 (13.11) — term text moved to src/glossary/" },
+};
+
 export async function buildTree({ root, arm, outDir, mutations, once, die, env = {} }) {
   const originals = new Map();
+  const revived = [];
   try {
     for (const [f, find, repl] of mutations) {
       if (!originals.has(f)) originals.set(f, await readFile(f, "utf8"));
@@ -53,11 +65,24 @@ export async function buildTree({ root, arm, outDir, mutations, once, die, env =
       once(cur, find, `${arm} (live bytes)`);
       await writeFile(f, typeof find === "string" ? cur.replace(find, repl()) : cur.replace(find, repl), "utf8");
     }
+    for (const [rel, { ref }] of Object.entries(RETIRED)) {
+      const abs = join(root, rel);
+      if (existsSync(abs)) continue;
+      const tail = rel.split("/").slice(-2).join("/"); // "data/tooltips.js"
+      const needed = [];
+      for (const f of originals.keys()) if ((await readFile(f, "utf8")).includes(tail)) needed.push(f);
+      if (!needed.length) continue;
+      await writeFile(abs, execFileSync("git", ["show", `${ref}:${rel}`], { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }), "utf8");
+      revived.push(abs);
+      console.log(`   ${arm}: revived ${rel} @ ${ref} for ${needed.map((f) => f.replace(root + "/", "")).join(", ")}`);
+    }
     execFileSync("npx", ["vite", "build", "--outDir", outDir, "--emptyOutDir", "--logLevel", "error"], {
       cwd: root, stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, VITE_SUPABASE_URL: `https://${SB_HOST}`, VITE_SUPABASE_ANON_KEY: "eye-probe-anon-not-a-secret", VITE_SENTRY_DSN: "", ...env },
     });
   } finally {
+    for (const f of revived) await unlink(f);
+    for (const f of revived) if (existsSync(f)) die(`${arm}: revived ${f} was NOT removed`);
     for (const [f, src] of originals) await writeFile(f, src, "utf8");
     for (const f of originals.keys()) {
       try { execFileSync("git", ["diff", "--exit-code", "--quiet", "--", f], { cwd: root }); }
