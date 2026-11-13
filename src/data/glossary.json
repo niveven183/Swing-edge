@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "sourceHash": "9a3edb946897464a",
+    "sourceHash": "7597dbf08dc2e372",
     "generatedBy": "scripts/build-glossary.mjs",
     "source": "src/glossary/terms/"
   },
@@ -29,8 +29,8 @@
       "ar": "Profit Factor"
     },
     "description": {
-      "he": "סך הרווחים הגולמיים חלקי סך ההפסדים הגולמיים בעסקאות הסגורות.\nלדוגמה: הרווחת $3,000 והפסדת $2,000 ⇒ 1.5; מעל 1 = רווח נקי.\nבלי אף הפסד הערך הוא ∞; מחושב לפני עמלות.",
-      "en": "Gross profit divided by gross loss across your closed trades.\nExample: you won $3,000 and lost $2,000 ⇒ 1.5; above 1 means a net profit.\nWith no losses at all it reads ∞; computed before commissions.",
+      "he": "סך הרווחים הגולמיים חלקי סך ההפסדים הגולמיים בעסקאות הסגורות.\nלדוגמה: הרווחת $3,000 והפסדת $2,000 ⇒ 1.5; מעל 1 = הרווחת יותר משהפסדת.\nבלי אף הפסד הערך הוא ∞; מחושב לפני עמלות.",
+      "en": "Gross profit divided by gross loss across your closed trades.\nExample: you won $3,000 and lost $2,000 ⇒ 1.5; above 1 means you won more than you lost.\nWith no losses at all it reads ∞; computed before commissions.",
       "es": "Profit Factor = Ganancias Brutas Totales ÷ Pérdidas Brutas Totales.\n\n• Por encima de 1.0 = rentable\n• Por encima de 1.5 = ventaja sana\n• Por encima de 2.0 = nivel profesional\n• Por encima de 3.0 = excepcional\n\nEs una de las métricas más importantes en el trading.",
       "pt": "Profit Factor = Lucros Brutos Totais ÷ Perdas Brutas Totais.\n\n• Acima de 1.0 = lucrativo\n• Acima de 1.5 = vantagem saudável\n• Acima de 2.0 = nível profissional\n• Acima de 3.0 = excecional\n\nÉ uma das métricas mais importantes no trading.",
       "ar": "Profit Factor = إجمالي الأرباح ÷ إجمالي الخسائر.\n\n• أعلى من 1.0 = رابح\n• أعلى من 1.5 = أفضلية صحّية\n• أعلى من 2.0 = مستوى احترافي\n• أعلى من 3.0 = استثنائي\n\nمن أهم المقاييس في التداول."
@@ -45,8 +45,8 @@
       "ar": "متوسّط R"
     },
     "description": {
-      "he": "ממוצע ה-R בעסקאות סגורות עם סטופ; R = רווח ÷ הסיכון הראשוני, לפי הכיוון (LONG או SHORT).\nלדוגמה: סיכנת $100 והרווחת $150 ⇒ ‎+1.5R.\nעסקה בלי סטופ מוחרגת מהממוצע ואינה נספרת כ-0R.",
-      "en": "Average R of closed trades with a stop; R = profit ÷ initial risk, by direction (LONG/SHORT).\nExample: you risked $100 and made $150 ⇒ +1.5R.\nA trade without a stop is excluded, not counted as 0R.",
+      "he": "ממוצע ה-R בעסקאות סגורות; R = רווח ÷ הסיכון לפי הסטופ השמור, לפי הכיוון (LONG/SHORT).\nלדוגמה: סיכנת $100 והרווחת $150 ⇒ ‎+1.5R.\nעסקה בלי סטופ מוחרגת מהממוצע ואינה נספרת כ-0R.",
+      "en": "Average R of closed trades; R = profit ÷ risk at the saved stop, by direction (LONG/SHORT).\nExample: you risked $100 and made $150 ⇒ +1.5R.\nA trade without a stop is excluded, not counted as 0R.",
       "es": "R-Multiple promedio por operación cerrada.\n\nR = ganancia de la operación ÷ riesgo inicial por acción. La ganancia sigue la dirección de la operación: en un LONG es (Salida − Entrada), en un SHORT es (Entrada − Salida) — así que un SHORT ganador siempre da un R positivo.\n\n+1.0R significa que ganaste exactamente lo que arriesgaste. Apunta a +0.3R o más como promedio mínimo. Los traders de élite promedian +1.5R a +2.5R.\n\nSolo las operaciones con stop pueden medirse en R — una operación sin stop se excluye de este promedio, no cuenta como 0R. La línea bajo el número muestra cuántas de tus operaciones cerradas cubre realmente el promedio.",
       "pt": "R-Multiple médio por operação fechada.\n\nR = lucro da operação ÷ risco inicial por ação. O lucro segue a direção da operação: num LONG é (Saída − Entrada), num SHORT é (Entrada − Saída) — por isso um SHORT vencedor dá sempre um R positivo.\n\n+1.0R significa que ganhaste exatamente o que arriscaste. Aponta para +0.3R ou mais como média mínima. Traders de elite têm média de +1.5R a +2.5R.\n\nSó as operações com stop podem ser medidas em R — uma operação sem stop é excluída desta média, não conta como 0R. A linha por baixo do número mostra quantas das tuas operações fechadas a média cobre realmente.",
       "ar": "متوسّط R-Multiple لكل صفقة مغلقة.\n\nR = ربح الصفقة ÷ المخاطرة الأوّلية للسهم. الربح يتبع اتّجاه الصفقة: في LONG هو (الخروج − الدخول)، وفي SHORT هو (الدخول − الخروج) — لذلك فإن SHORT الرابحة تعطي دائماً R موجباً.\n\n+1.0R يعني أنك ربحت تماماً ما خاطرت به. استهدف +0.3R أو أعلى كحدّ أدنى للمتوسّط. متداولو النخبة يحقّقون متوسّط +1.5R إلى +2.5R.\n\nالصفقات التي لها وقف خسارة فقط يمكن قياسها بـ R — الصفقة بلا وقف تُستثنى من هذا المتوسّط ولا تُحتسب كـ 0R. السطر أسفل الرقم يوضّح كم صفقة مغلقة يغطّيها المتوسّط فعلياً."
@@ -381,8 +381,8 @@
       "ar": "P&L by Month"
     },
     "description": {
-      "he": "סכום ה-P&L של העסקאות הסגורות לכל חודש, לפי תאריך העסקה.\nלדוגמה: במרץ ‎+$200, ‎−$50 ו-‎+$100 ⇒ ‎+$250.\nעסקה שלא הומרה למטבע ההון לא נספרת.",
-      "en": "The sum of closed-trade P&L for each month, by trade date.\nExample: in March +$200, −$50 and +$100 ⇒ +$250.\nA trade not converted to your capital currency is not counted.",
+      "he": "סכום ה-P&L של העסקאות הסגורות לכל חודש, לפי תאריך הכניסה.\nלדוגמה: במרץ ‎+$200, ‎−$50 ו-‎+$100 ⇒ ‎+$250.\nעסקה שלא הומרה למטבע ההון לא נספרת.",
+      "en": "The sum of closed-trade P&L for each month, by entry date.\nExample: in March +$200, −$50 and +$100 ⇒ +$250.\nA trade not converted to your capital currency is not counted.",
       "es": "The sum of closed-trade P&L for each month, by trade date.\nExample: in March +$200, −$50 and +$100 ⇒ +$250.\nA trade not converted to your capital currency is not counted.",
       "pt": "The sum of closed-trade P&L for each month, by trade date.\nExample: in March +$200, −$50 and +$100 ⇒ +$250.\nA trade not converted to your capital currency is not counted.",
       "ar": "The sum of closed-trade P&L for each month, by trade date.\nExample: in March +$200, −$50 and +$100 ⇒ +$250.\nA trade not converted to your capital currency is not counted."
@@ -461,8 +461,8 @@
       "ar": "R-Multiple"
     },
     "description": {
-      "he": "תוצאת העסקה ביחידות של הסיכון הראשוני, לפי הכיוון: LONG (יציאה − כניסה), SHORT (כניסה − יציאה).\nלדוגמה: סיכנת $50 והפסדת $100 ⇒ ‎−2R — הסטופ לא כובד.\nR נמדד לפי הסטופ השמור בעסקה.",
-      "en": "A trade's result in units of initial risk: LONG (Exit − Entry), SHORT (Entry − Exit).\nExample: you risked $50 and lost $100 ⇒ −2R; the stop was not honored.\nMeasured against the saved stop.",
+      "he": "תוצאת העסקה ביחידות של הסיכון לפי הסטופ השמור, לפי הכיוון: LONG (יציאה − כניסה), SHORT (כניסה − יציאה).\nלדוגמה: סיכנת $40 והרווחת $100 ⇒ ‎+2.5R.\nפער פתיחה מעבר לסטופ יכול לתת הפסד גדול מ-‎−1R.",
+      "en": "Your result in units of risk at the saved stop: LONG (Exit − Entry), SHORT (Entry − Exit).\nExample: you risked $40 and made $100 ⇒ +2.5R.\nAn opening gap past the stop can lose more than −1R.",
       "es": "R-Multiple = ganancia de la operación ÷ riesgo inicial. La ganancia sigue la dirección de la operación: en un LONG es (Salida − Entrada), en un SHORT es (Entrada − Salida) — así que un SHORT ganador siempre da un R positivo.\n\nEjemplos:\n+2R = ganaste 2× lo que arriesgaste ✓\n+1R = ganaste exactamente lo que arriesgaste ✓\n-1R = perdiste tu riesgo planificado (normal)\n-2R = el stop no se respetó (problema)\n\nSeguir el R-Multiple elimina el sesgo del dólar y te permite comparar operaciones objetivamente.",
       "pt": "R-Multiple = lucro da operação ÷ risco inicial. O lucro segue a direção da operação: num LONG é (Saída − Entrada), num SHORT é (Entrada − Saída) — por isso um SHORT vencedor dá sempre um R positivo.\n\nExemplos:\n+2R = ganhaste 2× o que arriscaste ✓\n+1R = ganhaste exatamente o que arriscaste ✓\n-1R = perdeste o teu risco planeado (normal)\n-2R = o stop não foi respeitado (problema)\n\nAcompanhar o R-Multiple elimina o viés do dólar e permite comparar operações objetivamente.",
       "ar": "R-Multiple = ربح الصفقة ÷ المخاطرة الأوّلية. الربح يتبع اتّجاه الصفقة: في LONG هو (الخروج − الدخول)، وفي SHORT هو (الدخول − الخروج) — لذلك فإن SHORT الرابحة تعطي دائماً R موجباً.\n\nأمثلة:\n+2R = ربحت 2× ما خاطرت به ✓\n+1R = ربحت تماماً ما خاطرت به ✓\n-1R = خسرت مخاطرتك المخطّطة (طبيعي)\n-2R = لم يُحترم وقف الخسارة (مشكلة)\n\nتتبّع R-Multiple يزيل انحياز الدولار ويتيح لك مقارنة الصفقات موضوعياً."
@@ -669,7 +669,7 @@
       "ar": "Setup"
     },
     "description": {
-      "he": "תבנית הכניסה לעסקה — התנאים המדויקים שבהם אתה נכנס לפוזיציה.\nלדוגמה: Breakout, Pullback או Bull Flag.",
+      "he": "תבנית הכניסה לעסקה — התנאים המדויקים שבהם נכנסת לפוזיציה.\nלדוגמה: Breakout, Pullback או Bull Flag.",
       "en": "Your entry pattern — the exact conditions under which you take a position.\nExample: Breakout, Pullback or Bull Flag.",
       "es": "Your entry pattern — the exact conditions under which you take a position.\nExample: Breakout, Pullback or Bull Flag.",
       "pt": "Your entry pattern — the exact conditions under which you take a position.\nExample: Breakout, Pullback or Bull Flag.",
@@ -685,8 +685,8 @@
       "ar": "المخاطرة لكل صفقة"
     },
     "description": {
-      "he": "כמה אחוזים מההון אתה מוכן להפסיד בעסקה אחת אם הסטופ נפגע.\nלדוגמה: הון $10,000 וסיכון 1% ⇒ הפסד מקסימלי $100.\nכלל אצבע: 1–2% לעסקה (Elder).",
-      "en": "The percentage of capital you accept to lose on one trade if the stop is hit.\nExample: $10,000 capital and 1% risk ⇒ a $100 maximum loss.\nRule of thumb: 1–2% per trade (Elder).",
+      "he": "כמה אחוזים מההון קבעת שתפסיד בעסקה אחת אם הסטופ נפגע.\nלדוגמה: הון $10,000 וסיכון 1% ⇒ הפסד מקסימלי $100.\nכלל אצבע: עד 2% לעסקה (Elder).",
+      "en": "The percentage of capital you chose to lose on one trade if the stop is hit.\nExample: $10,000 capital and 1% risk ⇒ a $100 maximum loss.\nRule of thumb: up to 2% per trade (Elder).",
       "es": "Riesgo máximo por operación como % del total de la cuenta.\n\nEstándar profesional:\n• 1% por operación = conservador, sostenible\n• 2% por operación = moderado, aún aceptable\n• 5%+ por operación = territorio de apuestas\n\nEl 'riesgo de ruina' aumenta exponencialmente por encima del 2% por operación.",
       "pt": "Risco máximo por operação como % do total da conta.\n\nPadrão profissional:\n• 1% por operação = conservador, sustentável\n• 2% por operação = moderado, ainda aceitável\n• 5%+ por operação = território de apostas\n\nO 'risco de ruína' aumenta exponencialmente acima de 2% por operação.",
       "ar": "أقصى مخاطرة لكل صفقة كنسبة % من إجمالي الحساب.\n\nالمعيار الاحترافي:\n• 1% لكل صفقة = متحفّظ، مستدام\n• 2% لكل صفقة = معتدل، لا يزال مقبولاً\n• 5%+ لكل صفقة = منطقة مقامرة\n\n'مخاطر الإفلاس' ترتفع أُسّياً فوق 2% لكل صفقة."
@@ -765,7 +765,7 @@
       "ar": "Breakout"
     },
     "description": {
-      "he": "כניסה כשהמחיר פורץ מעל רמת התנגדות מרכזית, רצוי בנפח עולה.\nלדוגמה: התנגדות ב-$50 ונר יומי שנסגר ב-$51 בנפח כפול מהממוצע.",
+      "he": "כניסה כשהמחיר פורץ מעל רמת התנגדות מרכזית, רצוי במחזור מסחר עולה.\nלדוגמה: התנגדות ב-$50 ונר יומי שנסגר ב-$51 במחזור מסחר כפול מהממוצע.",
       "en": "Entering when price breaks above a key resistance level, ideally on rising volume.\nExample: resistance at $50 and a daily close at $51 on twice the average volume.",
       "es": "Precio rompiendo por encima de un nivel de resistencia clave con volumen. Funciona mejor en mercados con tendencia.",
       "pt": "Preço rompendo acima de um nível de resistência chave com volume. Funciona melhor em mercados com tendência.",
@@ -797,7 +797,7 @@
       "ar": "Bull Flag"
     },
     "description": {
-      "he": "התכנסות צרה, יורדת קלות, אחרי עלייה חדה — בנפח מצטמצם.\nלדוגמה: עלייה מ-$20 ל-$26, ואז 5 ימים בטווח $25–$26.",
+      "he": "התכנסות צרה, יורדת קלות, אחרי עלייה חדה — במחזור מסחר מצטמצם.\nלדוגמה: עלייה מ-$20 ל-$26, ואז 5 ימים בטווח $25–$26.",
       "en": "A tight, slightly falling consolidation after a sharp rise, on shrinking volume.\nExample: a rise from $20 to $26, then 5 days in a $25–$26 range.",
       "es": "Consolidación estrecha tras un movimiento brusco al alza. El volumen debe contraerse durante la bandera.",
       "pt": "Consolidação estreita após um movimento brusco de alta. O volume deve contrair durante a bandeira.",
@@ -829,7 +829,7 @@
       "ar": "VWAP Reclaim"
     },
     "description": {
-      "he": "המחיר חוזר מעל ה-VWAP — הממוצע המשוקלל בנפח של היום — אחרי שירד מתחתיו.\nלדוגמה: VWAP ב-$40, ירידה ל-$39.50 וחזרה מעל $40 בנפח.",
+      "he": "המחיר חוזר מעל ה-VWAP — הממוצע המשוקלל במחזור המסחר של היום — אחרי שירד מתחתיו.\nלדוגמה: VWAP ב-$40, ירידה ל-$39.50 וחזרה מעל $40 במחזור מסחר.",
       "en": "Price reclaims VWAP — the day's volume-weighted average price — after dipping below it.\nExample: VWAP at $40, a dip to $39.50, then back above $40 on volume.",
       "es": "El precio recupera el VWAP tras una caída matinal con volumen. Indica compra institucional.",
       "pt": "O preço recupera o VWAP após uma queda matinal com volume. Indica compra institucional.",
@@ -1005,7 +1005,7 @@
       "ar": "Power Hour Break"
     },
     "description": {
-      "he": "פריצה בשעת המסחר האחרונה, 15:00–16:00 לפי שעון ניו יורק.\nלדוגמה: שיא יומי $70 נפרץ ב-15:20 ⇒ כניסה ב-$70.10.",
+      "he": "פריצה בשעת המסחר האחרונה, 15:00–16:00 לפי שעון ניו יורק (בדרך כלל 22:00–23:00 שעון ישראל).\nלדוגמה: שיא יומי $70 נפרץ ב-15:20 ⇒ כניסה ב-$70.10.",
       "en": "A breakout in the last trading hour, 3–4 pm New York time.\nExample: a $70 daily high broken at 3:20 pm ⇒ entry at $70.10.",
       "es": "Ruptura en la última hora (15:00-16:00 ET). Posicionamiento institucional hacia el cierre.",
       "pt": "Rompimento na última hora (15:00-16:00 ET). Posicionamento institucional rumo ao fecho.",
@@ -1085,7 +1085,7 @@
       "ar": "Resistance Break"
     },
     "description": {
-      "he": "כניסה כשהמחיר פורץ רמת התנגדות ספציפית שעצרה אותו בעבר.\nלדוגמה: נעצר פעמיים ב-$80, ואז נסגר ב-$81 בנפח גבוה.",
+      "he": "כניסה כשהמחיר פורץ רמת התנגדות ספציפית שעצרה אותו בעבר.\nלדוגמה: נעצר פעמיים ב-$80, ואז נסגר ב-$81 במחזור מסחר גבוה.",
       "en": "Entering when price breaks a specific resistance level that stopped it before.\nExample: stopped twice at $80, then a close at $81 on high volume.",
       "es": "Entrar cuando el precio rompe por encima de un nivel de resistencia que antes lo frenaba, idealmente con volumen alto. La ruptura indica que los compradores tomaron el control. Se diferencia de un Breakout genérico por enfocarse en un nivel específico.",
       "pt": "Entrar quando o preço rompe acima de um nível de resistência que antes o travava, idealmente com volume alto. O rompimento sinaliza que os compradores assumiram o controlo. Difere de um Breakout genérico por focar num nível específico.",
@@ -1117,7 +1117,7 @@
       "ar": "Confident"
     },
     "description": {
-      "he": "ביטחון שנשען על setup תקף ועל ניתוח, לא על רצף רווחים.\nלדוגמה: כל התנאים שכתבת התקיימו ונכנסת בגודל הרגיל.\nאחרי רצף רווחים — בדוק שזה לא ביטחון-יתר.",
+      "he": "ביטחון שנשען על סטאפ תקף ועל ניתוח, לא על רצף רווחים.\nלדוגמה: כל התנאים שכתבת התקיימו ונכנסת בגודל הרגיל.\nאחרי רצף רווחים — בדוק שזה לא ביטחון-יתר.",
       "en": "Confidence grounded in a valid setup and analysis, not in a winning streak.\nExample: every condition you wrote down was met and you entered at normal size.\nAfter a winning streak, check that it is not overconfidence.",
       "es": "Confianza basada en el análisis, no en la arrogancia. Sobre un setup válido impulsa una ejecución disciplinada; si se convierte en exceso de confianza tras una racha ganadora, se vuelve peligrosa.",
       "pt": "Confiança baseada na análise, não em arrogância. Sobre um setup válido gera execução disciplinada; se virar excesso de confiança após uma sequência de vitórias, torna-se arriscada.",
@@ -1149,7 +1149,7 @@
       "ar": "Patient"
     },
     "description": {
-      "he": "חיכית ל-setup שעומד בכל הקריטריונים שלך, במקום להיכנס לכל תנועה.\nלדוגמה: דילגת על שתי פריצות חלשות ונכנסת בשלישית.",
+      "he": "חיכית לסטאפ שעומד בכל הקריטריונים שלך, במקום להיכנס לכל תנועה.\nלדוגמה: דילגת על שתי פריצות חלשות ונכנסת בשלישית.",
       "en": "You waited for a setup that met all your criteria instead of entering every move.\nExample: you skipped two weak breakouts and took the third.",
       "es": "Esperar un setup que realmente cumpla tus criterios en lugar de entrar en cada movimiento. La paciencia suele ser lo que separa a un trader rentable de uno perdedor: filtra las operaciones de baja calidad.",
       "pt": "Esperar por um setup que realmente cumpra os seus critérios em vez de entrar em cada movimento. A paciência costuma ser o que separa um trader lucrativo de um perdedor — filtra operações de baixa qualidade.",
@@ -1181,7 +1181,7 @@
       "ar": "Hesitant"
     },
     "description": {
-      "he": "היססת בכניסה — לרוב כשה-setup לא ברור או שהביטחון נמוך.\nלדוגמה: חיכית לעוד נר ונכנסת $0.50 מעל המחיר שתכננת.",
+      "he": "היססת בכניסה — לרוב כשהסטאפ לא ברור או שהביטחון נמוך.\nלדוגמה: חיכית לעוד נר ונכנסת $0.50 מעל המחיר שתכננת.",
       "en": "You hesitated at entry — usually when the setup is unclear or confidence is low.\nExample: you waited for one more candle and entered $0.50 above your planned price.",
       "es": "Vacilación en la entrada, normalmente señal de que el setup no está claro o la confianza es baja. Las entradas vacilantes suelen implicar entrar tarde, poner el stop demasiado ajustado o salir antes por miedo.",
       "pt": "Hesitação na entrada — geralmente sinal de que o setup não está claro ou a confiança está baixa. Entradas hesitantes tendem a significar entrar tarde, colocar o stop apertado demais ou sair cedo por medo.",
@@ -1213,7 +1213,7 @@
       "ar": "FOMO"
     },
     "description": {
-      "he": "נכנסת כי המחיר זז חזק ופחדת להחמיץ, בלי setup תקף.\nלדוגמה: המניה עלתה ‎+6% ונכנסת בשיא בלי סטופ ברור.",
+      "he": "נכנסת כי המחיר זז חזק ופחדת להחמיץ, בלי סטאפ תקף.\nלדוגמה: המניה עלתה ‎+6% ונכנסת בשיא בלי סטופ ברור.",
       "en": "You entered because price moved hard and you feared missing out, with no valid setup.\nExample: the stock was up +6% and you entered at the high with no clear stop.",
       "es": "\"Miedo a quedarse fuera\" — entrar en una operación solo porque el precio se movió con fuerza, sin un setup válido. Uno de los patrones más destructivos: entrada tardía, perseguir el precio y un stop lejano. Una señal de alerta.",
       "pt": "\"Medo de ficar de fora\" — entrar numa operação só porque o preço se moveu com força, sem um setup válido. Um dos padrões mais destrutivos: entrada tardia, perseguir o preço e um stop distante. Um sinal de alerta.",
@@ -1261,8 +1261,8 @@
       "ar": "أضف إلى اليوميّة"
     },
     "description": {
-      "he": "פותח עסקה חדשה ביומן מהגרף — טיקר, מחיר חי, סטופ מוצע ויעד 1:2 — לבדיקה ושמירה.\nלדוגמה: כניסה $50, סטופ $48 ויעד $54 ממולאים, ואתה שומר.",
-      "en": "Opens a journal trade from the chart, prefilled with ticker, live price, a stop and a 1:2 target.\nExample: entry $50, stop $48 and target $54 filled in, and you save.",
+      "he": "פותח עסקה חדשה ביומן מהגרף — טיקר, מחיר חי, סטופ מוצע ויעד 1:2 — לבדיקה ושמירה.\nלדוגמה: כניסה $50, סטופ $48 ויעד $54 ממולאים, ושמרת.",
+      "en": "Opens a journal trade from the chart, prefilled with ticker, live price, a stop and a 1:2 target.\nExample: entry $50, stop $48 and target $54 filled in, and you saved.",
       "es": "Inicia una nueva operación en el diario desde el gráfico actual — ticker, precio en vivo, un stop sugerido y un objetivo 2:1 pre-rellenados — lista para que la revises y guardes.",
       "pt": "Inicia uma nova operação no diário a partir do gráfico atual — ticker, preço ao vivo, um stop sugerido e um alvo 2:1 pré-preenchidos — pronta para reveres e guardares.",
       "ar": "يبدأ صفقة جديدة في اليوميّة من الرسم الحالي — الرمز، السعر الحي، وقف مقترح وهدف 2:1 مملوءة مسبقاً — جاهزة لمراجعتك وحفظك."

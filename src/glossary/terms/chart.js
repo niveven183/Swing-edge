@@ -46,13 +46,13 @@ export default [
       he: {
         label: "הוסף ליומן",
         short: "פותח עסקה חדשה ביומן מהגרף — טיקר, מחיר חי, סטופ מוצע ויעד 1:2 — לבדיקה ושמירה.",
-        example: "לדוגמה: כניסה $50, סטופ $48 ויעד $54 ממולאים, ואתה שומר.",
+        example: "לדוגמה: כניסה $50, סטופ $48 ויעד $54 ממולאים, ושמרת.",
         longForm: "פותח עסקה חדשה ביומן מהגרף הנוכחי — טיקר, מחיר חי, סטופ מוצע ויעד 1:2 ממולאים מראש — מוכן לבדיקה ושמירה.",
       },
       en: {
         label: "Add to Journal",
         short: "Opens a journal trade from the chart, prefilled with ticker, live price, a stop and a 1:2 target.",
-        example: "Example: entry $50, stop $48 and target $54 filled in, and you save.",
+        example: "Example: entry $50, stop $48 and target $54 filled in, and you saved.",
         longForm: "Starts a new journal trade from the current chart — ticker, live price, a suggested stop and a 1:2 target pre-filled — ready for you to review and save.",
       },
       es: {

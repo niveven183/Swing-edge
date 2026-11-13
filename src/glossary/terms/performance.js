@@ -51,14 +51,14 @@ export default [
       he: {
         label: "Profit Factor",
         short: "סך הרווחים הגולמיים חלקי סך ההפסדים הגולמיים בעסקאות הסגורות.",
-        example: "לדוגמה: הרווחת $3,000 והפסדת $2,000 ⇒ 1.5; מעל 1 = רווח נקי.",
+        example: "לדוגמה: הרווחת $3,000 והפסדת $2,000 ⇒ 1.5; מעל 1 = הרווחת יותר משהפסדת.",
         caveat: "בלי אף הפסד הערך הוא ∞; מחושב לפני עמלות.",
         longForm: "Profit Factor = סך הרווחים הגולמיים ÷ סך ההפסדים הגולמיים, בעסקאות סגורות.\n\nמעל 1 — המסחר הרוויח נטו; מתחת ל-1 — הפסיד. בלי אף עסקה מפסידה אין במה לחלק, והערך מוצג כ-∞. החישוב לפני עמלות: אין במערכת מודל עמלות.",
       },
       en: {
         label: "Profit Factor",
         short: "Gross profit divided by gross loss across your closed trades.",
-        example: "Example: you won $3,000 and lost $2,000 ⇒ 1.5; above 1 means a net profit.",
+        example: "Example: you won $3,000 and lost $2,000 ⇒ 1.5; above 1 means you won more than you lost.",
         caveat: "With no losses at all it reads ∞; computed before commissions.",
         longForm: "Profit Factor = total gross profit ÷ total gross loss, across closed trades.\n\nAbove 1 your trading made money net; below 1 it lost. With no losing trade there is nothing to divide by, so it shows ∞. It is computed before commissions — the app has no commission model.",
       },
@@ -87,17 +87,17 @@ export default [
     i18n: {
       he: {
         label: "R ממוצע",
-        short: "ממוצע ה-R בעסקאות סגורות עם סטופ; R = רווח ÷ הסיכון הראשוני, לפי הכיוון (LONG או SHORT).",
+        short: "ממוצע ה-R בעסקאות סגורות; R = רווח ÷ הסיכון לפי הסטופ השמור, לפי הכיוון (LONG/SHORT).",
         example: "לדוגמה: סיכנת $100 והרווחת $150 ⇒ \u200e+1.5R.",
         caveat: "עסקה בלי סטופ מוחרגת מהממוצע ואינה נספרת כ-0R.",
-        longForm: "ממוצע R-Multiple לעסקה סגורה.\n\nR = רווח העסקה ÷ הסיכון הראשוני למניה. הרווח נגזר מכיוון העסקה: ב-LONG הוא (יציאה − כניסה), וב-SHORT הוא (כניסה − יציאה) — כך ש-SHORT מנצחת היא תמיד R חיובי. \u200e+1.0R אומר שהרווחת בדיוק כמה שסיכנת.\n\nרק עסקה עם סטופ ניתנת למדידה ב-R — עסקה בלי סטופ מוחרגת מהממוצע, ואינה נספרת כ-0R. השורה מתחת למספר מראה כמה מהעסקאות הסגורות הממוצע באמת מכסה.",
+        longForm: "ממוצע R-Multiple לעסקה סגורה.\n\nR = רווח העסקה ÷ הסיכון למניה לפי הסטופ השמור. הרווח נגזר מכיוון העסקה: ב-LONG הוא (יציאה − כניסה), וב-SHORT הוא (כניסה − יציאה) — כך ש-SHORT מנצחת היא תמיד R חיובי. \u200e+1.0R אומר שהרווחת בדיוק כמה שסיכנת.\n\nרק עסקה עם סטופ ניתנת למדידה ב-R — עסקה בלי סטופ מוחרגת מהממוצע, ואינה נספרת כ-0R. השורה מתחת למספר מראה כמה מהעסקאות הסגורות הממוצע באמת מכסה.",
       },
       en: {
         label: "Avg R",
-        short: "Average R of closed trades with a stop; R = profit ÷ initial risk, by direction (LONG/SHORT).",
+        short: "Average R of closed trades; R = profit ÷ risk at the saved stop, by direction (LONG/SHORT).",
         example: "Example: you risked $100 and made $150 ⇒ +1.5R.",
         caveat: "A trade without a stop is excluded, not counted as 0R.",
-        longForm: "Average R-Multiple per closed trade.\n\nR = trade profit ÷ initial risk per share. The profit follows the direction of the trade: on a LONG it is (Exit − Entry), on a SHORT it is (Entry − Exit) — so a winning SHORT is always a positive R. +1.0R means you made exactly what you risked.\n\nOnly trades that had a stop can be measured in R — a trade without one is excluded from this average, not counted as 0R. The line under the number shows how many of your closed trades the average actually covers.",
+        longForm: "Average R-Multiple per closed trade.\n\nR = trade profit ÷ risk per share at the saved stop. The profit follows the direction of the trade: on a LONG it is (Exit − Entry), on a SHORT it is (Entry − Exit) — so a winning SHORT is always a positive R. +1.0R means you made exactly what you risked.\n\nOnly trades that had a stop can be measured in R — a trade without one is excluded from this average, not counted as 0R. The line under the number shows how many of your closed trades the average actually covers.",
       },
       es: {
         label: "R Promedio",
@@ -473,7 +473,7 @@ export default [
         short: "דירוג 1–5 כוכבים שנתת לכניסה: עד כמה העיתוי, המחיר והאישור תאמו לתוכנית.",
         example: "לדוגמה: נכנסת במחיר שתכננת אחרי אישור ⇒ 5 כוכבים.",
         caveat: "דירוג עצמי — לא נמדד מהמחירים.",
-        longForm: "דירוג (כוכבים) של עד כמה הכניסה תאמה ל-setup המתוכנן: עיתוי, מחיר ואישור. הדירוג הוא שלך — המערכת לא מודדת אותו מהמחירים.\n\nדירוג גבוה עקבי הוא סימן למשמעת — גם כשהעסקה עצמה מפסידה.",
+        longForm: "דירוג (כוכבים) של עד כמה הכניסה תאמה לסטאפ המתוכנן: עיתוי, מחיר ואישור. הדירוג הוא שלך — המערכת לא מודדת אותו מהמחירים.\n\nדירוג גבוה עקבי הוא סימן למשמעת — גם כשהעסקה עצמה מפסידה.",
       },
       en: {
         label: "Entry Quality",

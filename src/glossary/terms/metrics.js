@@ -49,17 +49,17 @@ export default [
     i18n: {
       he: {
         label: "R-Multiple",
-        short: "תוצאת העסקה ביחידות של הסיכון הראשוני, לפי הכיוון: LONG (יציאה − כניסה), SHORT (כניסה − יציאה).",
-        example: "לדוגמה: סיכנת $50 והפסדת $100 ⇒ \u200e−2R — הסטופ לא כובד.",
-        caveat: "R נמדד לפי הסטופ השמור בעסקה.",
-        longForm: "R-Multiple = רווח העסקה ÷ הסיכון הראשוני. הרווח נגזר מכיוון העסקה: ב-LONG הוא (יציאה − כניסה), וב-SHORT הוא (כניסה − יציאה) — כך ש-SHORT מנצחת היא תמיד R חיובי.\n\n\u200e+2R = הרווחת פי 2 ממה שסיכנת · \u200e−1R = הפסדת את הסיכון המתוכנן · \u200e−2R = הסטופ לא כובד.\n\nהסיכון נמדד לפי הסטופ השמור בעסקה: אם ערכת את הסטופ אחרי הכניסה, ה-R מחושב מהערך החדש. מעקב ב-R מנטרל את גודל הסכום ומאפשר להשוות בין עסקאות.",
+        short: "תוצאת העסקה ביחידות של הסיכון לפי הסטופ השמור, לפי הכיוון: LONG (יציאה − כניסה), SHORT (כניסה − יציאה).",
+        example: "לדוגמה: סיכנת $40 והרווחת $100 ⇒ \u200e+2.5R.",
+        caveat: "פער פתיחה מעבר לסטופ יכול לתת הפסד גדול מ-\u200e−1R.",
+        longForm: "R-Multiple = רווח העסקה ÷ הסיכון לפי הסטופ השמור. הרווח נגזר מכיוון העסקה: ב-LONG הוא (יציאה − כניסה), וב-SHORT הוא (כניסה − יציאה) — כך ש-SHORT מנצחת היא תמיד R חיובי.\n\n\u200e+2R = הרווחת פי 2 ממה שסיכנת · \u200e−1R = הפסדת את הסיכון המתוכנן · \u200e−2R = הפסד כפול מהסיכון (סטופ שלא כובד, או פער פתיחה מעבר לו).\n\nהסיכון נמדד לפי הסטופ השמור בעסקה: אם ערכת את הסטופ אחרי הכניסה, ה-R מחושב מהערך החדש. מעקב ב-R מנטרל את גודל הסכום ומאפשר להשוות בין עסקאות.",
       },
       en: {
         label: "R-Multiple",
-        short: "A trade's result in units of initial risk: LONG (Exit − Entry), SHORT (Entry − Exit).",
-        example: "Example: you risked $50 and lost $100 ⇒ −2R; the stop was not honored.",
-        caveat: "Measured against the saved stop.",
-        longForm: "R-Multiple = trade profit ÷ initial risk. The profit follows the direction of the trade: on a LONG it is (Exit − Entry), on a SHORT it is (Entry − Exit) — so a winning SHORT is always a positive R.\n\n+2R = you made 2× what you risked · −1R = you lost your planned risk · −2R = the stop was not honored.\n\nRisk is measured against the stop saved on the trade: if you edited the stop after entry, R uses the new value. Tracking R removes dollar-size bias and lets you compare trades.",
+        short: "Your result in units of risk at the saved stop: LONG (Exit − Entry), SHORT (Entry − Exit).",
+        example: "Example: you risked $40 and made $100 ⇒ +2.5R.",
+        caveat: "An opening gap past the stop can lose more than −1R.",
+        longForm: "R-Multiple = trade profit ÷ risk at the saved stop. The profit follows the direction of the trade: on a LONG it is (Exit − Entry), on a SHORT it is (Entry − Exit) — so a winning SHORT is always a positive R.\n\n+2R = you made 2× what you risked · −1R = you lost your planned risk · −2R = twice the planned loss (a stop not honored, or an opening gap past it).\n\nRisk is measured against the stop saved on the trade: if you edited the stop after entry, R uses the new value. Tracking R removes dollar-size bias and lets you compare trades.",
       },
       es: {
         label: "R-Multiple",

@@ -15,17 +15,17 @@ export default [
     i18n: {
       he: {
         label: "סיכון לעסקה",
-        short: "כמה אחוזים מההון אתה מוכן להפסיד בעסקה אחת אם הסטופ נפגע.",
+        short: "כמה אחוזים מההון קבעת שתפסיד בעסקה אחת אם הסטופ נפגע.",
         example: "לדוגמה: הון $10,000 וסיכון 1% ⇒ הפסד מקסימלי $100.",
-        caveat: "כלל אצבע: 1–2% לעסקה (Elder).",
-        longForm: "סיכון מקסימלי לעסקה כאחוז מבסיס ההון — הסכום שתפסיד אם הסטופ נפגע. ממנו נגזרים גודל הפוזיציה ותקרת הסיכון לכל הפוזיציות הפתוחות.\n\nכלל אצבע: 1–2% לעסקה (Elder). סוחרים מקצועיים רבים מסכנים קרוב ל-1%.",
+        caveat: "כלל אצבע: עד 2% לעסקה (Elder).",
+        longForm: "סיכון מקסימלי לעסקה כאחוז מבסיס ההון — הסכום שתפסיד אם הסטופ נפגע. ממנו נגזרים גודל הפוזיציה ותקרת הסיכון לכל הפוזיציות הפתוחות.\n\nכלל אצבע: עד 2% לעסקה (Elder). סוחרים מקצועיים רבים מסכנים קרוב ל-1%.",
       },
       en: {
         label: "Risk per Trade",
-        short: "The percentage of capital you accept to lose on one trade if the stop is hit.",
+        short: "The percentage of capital you chose to lose on one trade if the stop is hit.",
         example: "Example: $10,000 capital and 1% risk ⇒ a $100 maximum loss.",
-        caveat: "Rule of thumb: 1–2% per trade (Elder).",
-        longForm: "Maximum risk per trade as a percentage of your capital base — what you lose if the stop is hit. Position size and the cap on all open positions are derived from it.\n\nRule of thumb: 1–2% per trade (Elder). Many professional traders risk closer to 1%.",
+        caveat: "Rule of thumb: up to 2% per trade (Elder).",
+        longForm: "Maximum risk per trade as a percentage of your capital base — what you lose if the stop is hit. Position size and the cap on all open positions are derived from it.\n\nRule of thumb: up to 2% per trade (Elder). Many professional traders risk closer to 1%.",
       },
       es: {
         label: "Riesgo por Operación",

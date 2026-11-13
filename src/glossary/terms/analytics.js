@@ -82,7 +82,7 @@ export default [
         label: "ביצועים לפי סטאפ",
         short: "כרטיס לכל סטאפ שסחרת: מספר עסקאות, אחוז הצלחה ו-R כולל.",
         example: "לדוגמה: Breakout · 8 עסקאות · 50% · \u200e+4R.",
-        longForm: "פירוט של כל setup שאתה סוחר — אחוז הצלחה, R כולל ומספר עסקאות, ממוין לפי מספר העסקאות. מראה במבט אחד אילו סטאפים נושאים את החשבון שלך ואילו מנקזים אותו.",
+        longForm: "פירוט של כל סטאפ שאתה סוחר — אחוז הצלחה, R כולל ומספר עסקאות, ממוין לפי מספר העסקאות. מראה במבט אחד אילו סטאפים נושאים את החשבון שלך ואילו מנקזים אותו.",
       },
       en: {
         label: "Performance by Setup",
@@ -278,13 +278,13 @@ export default [
     i18n: {
       he: {
         label: "רווח/הפסד לפי חודש",
-        short: "סכום ה-P&L של העסקאות הסגורות לכל חודש, לפי תאריך העסקה.",
+        short: "סכום ה-P&L של העסקאות הסגורות לכל חודש, לפי תאריך הכניסה.",
         example: "לדוגמה: במרץ \u200e+$200, \u200e−$50 ו-\u200e+$100 ⇒ \u200e+$250.",
         caveat: "עסקה שלא הומרה למטבע ההון לא נספרת.",
       },
       en: {
         label: "P&L by Month",
-        short: "The sum of closed-trade P&L for each month, by trade date.",
+        short: "The sum of closed-trade P&L for each month, by entry date.",
         example: "Example: in March +$200, −$50 and +$100 ⇒ +$250.",
         caveat: "A trade not converted to your capital currency is not counted.",
       },

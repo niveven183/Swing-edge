@@ -332,7 +332,7 @@ export default [
     i18n: {
       he: {
         label: "סטאפ (Setup)",
-        short: "תבנית הכניסה לעסקה — התנאים המדויקים שבהם אתה נכנס לפוזיציה.",
+        short: "תבנית הכניסה לעסקה — התנאים המדויקים שבהם נכנסת לפוזיציה.",
         example: "לדוגמה: Breakout, Pullback או Bull Flag.",
       },
       en: {
