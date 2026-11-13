@@ -55,7 +55,10 @@ async function bubbleBox(page, lang) {
       const r = pop.getBoundingClientRect();
       const cs = getComputedStyle(pop);
       if (r.width === 0 || cs.visibility === "hidden" || cs.display === "none") continue;
-      return { x: r.x, y: r.y, w: r.width, h: r.height, vw: innerWidth, vh: innerHeight };
+      // The VISIBLE viewport: desktop WebKit draws an 8px scrollbar that innerWidth includes
+      // (measured 13.11: innerWidth 390 · visualViewport 382 on the iphone14 project); a phone's is an overlay.
+      const vv = window.visualViewport;
+      return { x: r.x, y: r.y, w: r.width, h: r.height, vw: vv ? vv.width : document.documentElement.clientWidth, vh: vv ? vv.height : innerHeight };
     }
     return null;
   }, [def(lang).slice(0, 24), POP]);
@@ -102,7 +105,10 @@ test.describe("glossary · the term bubble", () => {
       try {
         await trigger.tap(); await settle(page);
         expect(await bubbleBox(page, lang), "precondition: the first tap opened the bubble").not.toBeNull();
-        await trigger.tap({ force: true }); await settle(page);
+        // The sheet must not lie over its own "?" (the bubble scrolls the page to keep it reachable).
+        const covered = await trigger.evaluate((el) => { const r = el.getBoundingClientRect(); const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return !(top === el || el.contains(top)); });
+        expect(covered, "the open sheet covers the \"?\" — a second tap cannot reach it").toBe(false);
+        await trigger.tap(); await settle(page);
         expect(await bubbleBox(page, lang), "the second tap left the bubble open").toBeNull();
       } finally { await ctx.close(); }
     });

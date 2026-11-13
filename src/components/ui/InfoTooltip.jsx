@@ -69,6 +69,19 @@ export default function InfoTooltip({ children, label = 'More info', closeLabel 
     return () => cancelAnimationFrame(r);
   }, [open, place]);
 
+  // A sheet that lands on its own "?" (trigger low on the page) scrolls the page just enough to keep the
+  // "?" above it — otherwise the second tap hits the sheet and cannot close it (measured 13.11, pixel7).
+  const sheetNow = !!geo?.sheet;
+  useEffect(() => {
+    if (!open || !sheetNow) return;
+    const r = requestAnimationFrame(() => {
+      const t = triggerRef.current?.getBoundingClientRect();
+      const p = popRef.current?.getBoundingClientRect();
+      if (t && p && t.bottom > p.top - MARGIN) window.scrollBy({ top: t.bottom - p.top + 2 * MARGIN, behavior: 'auto' });
+    });
+    return () => cancelAnimationFrame(r);
+  }, [open, sheetNow]);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => { if (e.key === 'Escape') { close(); triggerRef.current?.focus(); } };
