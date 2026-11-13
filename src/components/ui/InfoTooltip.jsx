@@ -77,7 +77,16 @@ export default function InfoTooltip({ children, label = 'More info', closeLabel 
     const r = requestAnimationFrame(() => {
       const t = triggerRef.current?.getBoundingClientRect();
       const p = popRef.current?.getBoundingClientRect();
-      if (t && p && t.bottom > p.top - MARGIN) window.scrollBy({ top: t.bottom - p.top + 2 * MARGIN, behavior: 'auto' });
+      if (!t || !p || t.bottom <= p.top - MARGIN) return;
+      // The app scrolls inside a container, ⛔ always the window: scroll the nearest scrollable ancestor.
+      let box = triggerRef.current.parentElement;
+      while (box && box !== document.body) {
+        const oy = getComputedStyle(box).overflowY;
+        if ((oy === 'auto' || oy === 'scroll') && box.scrollHeight > box.clientHeight) break;
+        box = box.parentElement;
+      }
+      (box && box !== document.body ? box : document.scrollingElement || document.documentElement)
+        .scrollBy({ top: t.bottom - p.top + 2 * MARGIN, behavior: 'auto' });
     });
     return () => cancelAnimationFrame(r);
   }, [open, sheetNow]);

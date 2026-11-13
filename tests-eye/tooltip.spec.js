@@ -55,10 +55,14 @@ async function bubbleBox(page, lang) {
       const r = pop.getBoundingClientRect();
       const cs = getComputedStyle(pop);
       if (r.width === 0 || cs.visibility === "hidden" || cs.display === "none") continue;
-      // The VISIBLE viewport: desktop WebKit draws an 8px scrollbar that innerWidth includes
-      // (measured 13.11: innerWidth 390 · visualViewport 382 on the iphone14 project); a phone's is an overlay.
-      const vv = window.visualViewport;
-      return { x: r.x, y: r.y, w: r.width, h: r.height, vw: vv ? vv.width : document.documentElement.clientWidth, vh: vv ? vv.height : innerHeight };
+      // The reference is the box a fixed element can actually cover (a probe with inset:0): desktop WebKit
+      // draws 8px scrollbars that innerWidth/innerHeight include (measured 13.11: 390 vs 382 on iphone14).
+      const probe = document.createElement("div");
+      probe.style.cssText = "position:fixed;inset:0;pointer-events:none;visibility:hidden";
+      document.body.appendChild(probe);
+      const f = probe.getBoundingClientRect();
+      probe.remove();
+      return { x: r.x, y: r.y, w: r.width, h: r.height, vw: f.width, vh: f.bottom };
     }
     return null;
   }, [def(lang).slice(0, 24), POP]);
