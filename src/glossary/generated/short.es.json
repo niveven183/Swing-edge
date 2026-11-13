@@ -1,5 +1,5 @@
 {
-  "sourceHash": "646b65251c6c42b3",
+  "sourceHash": "9a3edb946897464a",
   "lang": "es",
   "terms": {
     "winRate": {
@@ -38,20 +38,50 @@
     "winStreak": {
       "short": "El número de operaciones ganadoras seguidas. Una racha ganadora genera confianza, pero también es el momento más peligroso para el exceso de confianza y un riesgo indisciplinado."
     },
-    "streakHistory": {
-      "short": "Un registro de tus rachas ganadoras y perdedoras a lo largo del tiempo. Revela patrones emocionales: ¿una racha perdedora te hace operar peor (tilt) o te recuperas con disciplina?"
-    },
     "grade": {
       "short": "Una puntuación ponderada (A–F) que resume la calidad de tu trading del mes: una mezcla de tasa de aciertos, múltiplo R, disciplina y consistencia. Una instantánea rápida, no un sustituto de analizar los detalles."
     },
     "entryQuality": {
       "short": "Una calificación (estrellas) de cuán bien tu entrada coincidió con el setup planificado: timing, precio y confirmación. Una calificación alta y constante indica disciplina, incluso cuando la operación pierde."
     },
+    "accountEquity": {
+      "short": "The capital base you set plus cumulative P&L from closed and open trades.\nExample: a $10,000 base plus +$600 ⇒ $10,600.\nPer-trade risk is sized from your fixed capital base, not current equity."
+    },
+    "streakHistory": {
+      "short": "Un registro de tus rachas ganadoras y perdedoras a lo largo del tiempo. Revela patrones emocionales: ¿una racha perdedora te hace operar peor (tilt) o te recuperas con disciplina?"
+    },
     "dayOfWeek": {
       "short": "Tu ganancia/pérdida desglosada por día de la semana. Revela en qué días ganas o pierdes dinero de forma consistente — muchos traders tienen un edge oculto (o una fuga) ligado a días concretos como lunes o viernes."
     },
     "performanceBySetup": {
       "short": "Un desglose de cada setup que operas — win rate, R total y número de operaciones. Muestra de un vistazo qué setups sostienen tu cuenta y cuáles la drenan. Tus edges y anti-edges, lado a lado."
+    },
+    "winRateBySetup": {
+      "short": "Bar height is the setup's win rate; the number above it is the trade count.\nExample: a purple bar = 50% or more, a gray bar = below 50%.\nSorted by trade count."
+    },
+    "bestDay": {
+      "short": "The weekday with the highest total P&L, by entry day.\nExample: Monday +$400, Tuesday +$150 ⇒ Monday.\nTrade count is not taken into account."
+    },
+    "bestSetup": {
+      "short": "The setup with the highest win rate; on a tie, the one with more trades.\nExample: Pullback at 70% over 10 trades ranks above Breakout at 60%.\nNo minimum sample: one trade at 100% can win. Unknown is excluded."
+    },
+    "bestEmotion": {
+      "short": "The entry emotion you marked with the highest win rate; on a tie, the one with more trades.\nExample: Calm at 65% ranks above Confident at 55%.\nNo minimum sample."
+    },
+    "rDistribution": {
+      "short": "How many closed trades fell into each R range, from losses on the left to wins on the right.\nExample: a +1.4R trade counts in the 1R to 2R range.\nTrades without a stop are not counted."
+    },
+    "pnlByMonth": {
+      "short": "The sum of closed-trade P&L for each month, by trade date.\nExample: in March +$200, −$50 and +$100 ⇒ +$250.\nA trade not converted to your capital currency is not counted."
+    },
+    "emotionPerformance": {
+      "short": "Total closed-trade P&L by the emotion you marked at entry.\nExample: FOMO · 4 trades · −$300.\nA trade with no emotion marked counts as Unknown."
+    },
+    "setupMatrix": {
+      "short": "A table per setup: trades, win rate, average R and P&L, sorted by P&L.\nExample: Breakout · 8 · 50% · +0.4R · +$600."
+    },
+    "holdTimeVsPnl": {
+      "short": "Each dot is a closed trade: holding days on one axis and P&L on the other.\nExample: a dot at 5 days and +$300 = a trade you held 5 days that made $300.\nA trade not converted to your capital currency is not shown."
     },
     "rr": {
       "short": "Riesgo/Beneficio. Beneficio potencial vs. lo que arriesgas. 3:1 = puedes ganar 3× lo que perderías."
@@ -94,6 +124,9 @@
     },
     "dnaGrowth": {
       "short": "Mide tu tendencia de mejora: si aprendes de los datos y mejoras con el tiempo, o repites los mismos errores. Una puntuación creciente es la curva correcta para un trader en desarrollo."
+    },
+    "setup": {
+      "short": "Your entry pattern — the exact conditions under which you take a position.\nExample: Breakout, Pullback or Bull Flag."
     },
     "riskPerTrade": {
       "short": "Riesgo máximo por operación como % del total de la cuenta.\n\nEstándar profesional:\n• 1% por operación = conservador, sostenible\n• 2% por operación = moderado, aún aceptable\n• 5%+ por operación = territorio de apuestas\n\nEl 'riesgo de ruina' aumenta exponencialmente por encima del 2% por operación."
@@ -200,23 +233,14 @@
     "emotionAngry": {
       "short": "Ira tras una pérdida — el combustible del \"trading de venganza\". En este estado el trader intenta recuperar la pérdida de inmediato, aumenta el riesgo y entra en malas operaciones. Así se revientan las cuentas. Detente."
     },
-    "marketTrendingUp": {
-      "short": "Un mercado en tendencia alcista: máximos y mínimos más altos. Los setups en largo funcionan mejor aquí; operar contra la tendencia es arriesgado."
-    },
-    "marketTrendingDown": {
-      "short": "Un mercado en tendencia bajista: máximos y mínimos más bajos. Los setups en corto funcionan mejor; \"atrapar un cuchillo que cae\" en largo es peligroso."
-    },
-    "marketSideways": {
-      "short": "Un mercado sin tendencia clara, que se mueve horizontalmente entre soporte y resistencia. Los setups de tendencia fallan aquí; el trading de rango (comprar en soporte, vender en resistencia) encaja mejor."
-    },
-    "marketVolatile": {
-      "short": "Un mercado con oscilaciones de precio bruscas y rápidas en ambas direcciones. Los stops saltan con facilidad y el tamaño de la posición debe ser menor. Grandes oportunidades pero alto riesgo."
-    },
     "chartCalcPosition": {
       "short": "Rellena automáticamente la Calculadora de Posición desde el gráfico actual — ticker, precio en vivo como entrada, un stop protector y un objetivo 2:1 — y luego la abre para que dimensiones la operación en un clic."
     },
     "chartAddToJournal": {
       "short": "Inicia una nueva operación en el diario desde el gráfico actual — ticker, precio en vivo, un stop sugerido y un objetivo 2:1 pre-rellenados — lista para que la revises y guardes."
+    },
+    "visionOcr": {
+      "short": "Reads a trade from a chart screenshot and fills the fields instead of typing.\nExample: you uploaded a screenshot with entry, stop and target ⇒ the fields were filled.\nCheck the values before saving."
     }
   }
 }

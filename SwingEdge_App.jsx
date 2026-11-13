@@ -128,7 +128,6 @@ import useModalA11y from "./src/hooks/useModalA11y.js";
 import useKeepFocusedVisible from "./src/hooks/useKeepFocusedVisible.js";
 import { getTradeSelectProps, CATEGORY_TOOLTIP } from "./src/data/tradeOptions.jsx";
 import { hasTerm, resolveSetupKey } from "./src/glossary/index.js";
-import { getSetupTooltip } from "./src/intelligence/knowledgeGlue.js";
 import { TradeCalendar } from "./src/components/TradeCalendar.jsx";
 import { AdaptiveLessons } from "./src/intelligence/core/AdaptiveLessons.js";
 import GrowthPredictor from "./src/components/GrowthPredictor.jsx";
@@ -136,21 +135,13 @@ import MonthlyReportTab from "./src/components/MonthlyReportTab.jsx";
 import MonthlyReportModal from "./src/components/MonthlyReportModal.jsx";
 import WeeklyReviewTab from "./src/components/WeeklyReviewTab.jsx";
 import { generateMonthlyReport, findBestMonth } from "./src/intelligence/core/MonthlyReport.js";
-// "?" beside a mapped setup tag — canonical name/definition/coach line. Returns
-// null for unmapped / "Other" / empty setups, so the tag stays plain (as before).
-function SetupTagTip({ setup, isRTL }) {
-  const st = getSetupTooltip(setup);
-  if (!st) return null;
-  const dir = isRTL ? 'rtl' : 'ltr';
-  return (
-    <InfoTooltip label={isRTL ? `מידע על ${st.name}` : `More info: ${st.name}`}>
-      <div dir={dir} style={{ direction: dir, textAlign: 'start' }}>
-        <div className="font-bold text-emerald-600 dark:text-emerald-400 mb-1.5 text-[13px]">{st.name}</div>
-        {st.definition && <div className="whitespace-pre-line mb-2">{st.definition}</div>}
-        {st.coachLine && <div className="whitespace-pre-line text-slate-600 dark:text-slate-300">{st.coachLine}</div>}
-      </div>
-    </InfoTooltip>
-  );
+// "?" beside a setup tag — the setup's glossary term (src/glossary, 5 languages).
+// Returns null for a setup with no term (Other / Crypto / unmapped), so the tag stays plain.
+// 🔁 גל 3: עד 13.11 הציג את knowledge/setups.json — עברית בלבד בכל שפה.
+function SetupTagTip({ setup, lang }) {
+  const key = resolveSetupKey(setup);
+  if (!key) return null;
+  return <TermTooltip term={key} lang={lang} />;
 }
 
 // What the OCR actually contributed. Derived from the response, not from the form:
@@ -857,12 +848,12 @@ const generateSmartLessons = (closedTrades, stats, calcFn, lang = 'he', currency
         type: "insight",
         title: "ההפסדים שלך גדולים מהרווחים",
         detail: `רווח ממוצע: ${fmtPrice(Math.round(avgWin), currency)} מול הפסד ממוצע: ${fmtPrice(Math.round(avgLoss), currency)}.`,
-        action: "הדק את הסטופים או הרחב את היעדים. שאף ליחס סיכון-סיכוי של לפחות 2:1.",
+        action: "הדק את הסטופים או הרחב את היעדים. שאף ליחס סיכון-סיכוי של לפחות 1:2.",
       } : {
         type: "insight",
         title: "Your losses are bigger than your wins",
         detail: `Average win: ${fmtPrice(Math.round(avgWin), currency)} vs average loss: ${fmtPrice(Math.round(avgLoss), currency)}.`,
-        action: "Tighten your stop losses or widen your targets. Aim for at least 2:1 R/R.",
+        action: "Tighten your stop losses or widen your targets. Aim for at least 1:2 R/R.",
       });
     }
   }
@@ -4867,10 +4858,7 @@ export default function SwingEdge() {
             )}
             {/* KPI Row */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              <StatCard anchor="equity" label={t.accountEquity}  value={equityFig.text} sub={`${t.startedAt} ${dispSym}${Math.round(equityBase).toLocaleString()}`} trend={curEquityReturnPct} icon={DollarSign} accent="cyan"
-                info={lang === "he"
-                  ? `הון = בסיס ההון שהגדרת (${dispSym}${Math.round(equityBase).toLocaleString()}) בתוספת P&L מצטבר מעסקאות סגורות ופתוחות. הסיכון לכל עסקה מחושב תמיד מבסיס ההון הקבוע — לא מההון הנוכחי.`
-                  : `Equity = your capital base (${dispSym}${Math.round(equityBase).toLocaleString()}) plus cumulative P&L from closed & open trades. Per-trade risk is always sized from your fixed capital base — not current equity.`} />
+              <StatCard anchor="equity" label={<span className="flex items-center gap-1">{t.accountEquity}<TermTooltip term="accountEquity" lang={lang} /></span>}  value={equityFig.text} sub={`${t.startedAt} ${dispSym}${Math.round(equityBase).toLocaleString()}`} trend={curEquityReturnPct} icon={DollarSign} accent="cyan" />
               <StatCard label={t.netPnlClosed} value={fmt$(Math.round(totalPnL * 100) / 100, dispCcy)} sub={`${closedTrades.length} ${t.closedTrades}`} trend={stats.returnPct} trendText={formatReturnPct(stats.returnPct)} icon={TrendingUp} accent={totalPnL >= 0 ? "green" : "red"} />
               <StatCard label={<span className="flex items-center gap-1">{t.winRate}<TermTooltip term="winRate" lang={lang} /></span>} value={formatPct(winRate)} sub={winLossBeSub(stats)} icon={Target} accent="purple" />
               <StatCard label={<span className="flex items-center gap-1">{t.avgRMultiple}<TermTooltip term="avgR" lang={lang} /></span>} value={fmtR(avgR)} sub={rSampleSub(t, stats)} icon={Activity} accent="amber" />
@@ -4879,7 +4867,7 @@ export default function SwingEdge() {
                   `Math.round(x*100)/100` כמו `:4469` — `fmt$` תמיד מדפיס `.00`, ולכן
                   `Math.round` ערום הבטיח אגורות שאין לו (`D-068`). */}
               <StatCard label={t.openPlusClosedToday} value={fmt$(Math.round(dailyPnL * 100) / 100, dispCcy)} sub={t.openIsCumulative} icon={DollarSign} accent={dailyPnL >= 0 ? "green" : "red"} />
-              <StatCard label={t.streakCounter} value={<span className="flex items-center gap-1">{currentStreak > 0 && <Flame size={18} className="text-orange-400" />}{currentStreak}</span>} sub={`${t.bestStreak}: ${bestStreak}`} icon={Zap} accent={currentStreak >= 3 ? "green" : "amber"} />
+              <StatCard label={<span className="flex items-center gap-1">{t.streakCounter}<TermTooltip term="winStreak" lang={lang} /></span>} value={<span className="flex items-center gap-1">{currentStreak > 0 && <Flame size={18} className="text-orange-400" />}{currentStreak}</span>} sub={`${t.bestStreak}: ${bestStreak}`} icon={Zap} accent={currentStreak >= 3 ? "green" : "amber"} />
             </div>
 
             {/* ─── B-142 · באנר גילוי **אחד**, שלושה מונים, כל אחד עם מכנה ──────
@@ -5112,7 +5100,7 @@ export default function SwingEdge() {
                   <thead>
                     <tr className="text-slate-600 border-b border-[var(--border-subtle)] dark:border-white/[0.06]">
                       {[t.colTicker,t.colDate,t.colSide,t.colEntry,t.colExit,t.colShares,"P&L",t.colRMultiple,t.colSetup].map(h => (
-                        <th key={h} className="pb-2 text-start font-semibold tracking-wider pe-4">{h}</th>
+                        <th key={h} className="pb-2 text-start font-semibold tracking-wider pe-4">{h}{h === t.colRMultiple && <TermTooltip term="rMultiple" lang={lang} />}</th>
                       ))}
                     </tr>
                   </thead>
@@ -5131,7 +5119,7 @@ export default function SwingEdge() {
                           {/* ✅ סכום-בחשבון **מומר** (גל ג׳, 2026-08-12). אין שער ⇒ `—` + נימוק. */}
                           <td title={acctRefusalText(t, pnl)} className={`py-2 pe-4 font-bold font-mono ${win ? "text-[var(--v3-accent)]" : "text-[var(--v3-loss)]"}`}>{fmtAcct(t, pnl)}</td>
                           <td className={`py-2 pe-4 font-bold font-mono ${rMultiple == null ? "text-slate-600" : rMultiple >= 0 ? "text-cyan-400" : "text-[var(--v3-loss)]"}`}>{fmtR(rMultiple)}</td>
-                          <td className="py-2 pe-4"><span className="inline-flex items-center gap-1"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">{labelFor("setup", t.setup, lang)}</span><SetupTagTip setup={t.setup} isRTL={isRTL} /></span></td>
+                          <td className="py-2 pe-4"><span className="inline-flex items-center gap-1"><span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">{labelFor("setup", t.setup, lang)}</span><SetupTagTip setup={t.setup} lang={lang} /></span></td>
                         </tr>
                       );
                     })}
@@ -5390,7 +5378,7 @@ export default function SwingEdge() {
                                   <td className={`py-2 pe-4 font-bold font-mono ${rowColor}`}>{t.riskDollar != null ? `${fmtPrice(t.riskDollar, capitalCurrency)}` : "—"}</td>
                                   <td className={`py-2 pe-4 font-bold font-mono ${rowColor}`}>{t.riskPct != null ? `${t.riskPct.toFixed(2)}%` : "—"}</td>
                                   <td className="py-2 pe-4 font-mono text-slate-400">
-                                    {t.rrRatio !== null ? `${t.rrRatio.toFixed(2)}:1` : "—"}
+                                    {t.rrRatio !== null ? `1:${t.rrRatio.toFixed(2)}` : "—"}
                                   </td>
                                   <td className="py-2 pe-4 w-24">
                                     <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden w-20">
@@ -5819,7 +5807,7 @@ export default function SwingEdge() {
                             return d === 0 ? "<1d" : `${d}d`;
                           })()}
                         </td>
-                        <td className="p-3"><span className="inline-flex items-center gap-1"><span className="text-[10px] px-2 py-0.5 rounded bg-[#A78BFA]/10 text-[var(--v3-purple)] border border-[#A78BFA]/20 whitespace-nowrap">{labelFor("setup", t.setup, lang)}</span><SetupTagTip setup={t.setup} isRTL={isRTL} /></span></td>
+                        <td className="p-3"><span className="inline-flex items-center gap-1"><span className="text-[10px] px-2 py-0.5 rounded bg-[#A78BFA]/10 text-[var(--v3-purple)] border border-[#A78BFA]/20 whitespace-nowrap">{labelFor("setup", t.setup, lang)}</span><SetupTagTip setup={t.setup} lang={lang} /></span></td>
                         <td className="p-3 text-slate-500 text-[10px] whitespace-nowrap">{t.marketCondition ? labelFor("market", t.marketCondition, lang) : "–"}</td>
                         <td className="p-3 text-slate-500 text-[10px] whitespace-nowrap">{t.emotionAtEntry ? labelFor("emotion", t.emotionAtEntry, lang) : "–"}</td>
                         <td className="p-3 text-amber-400 text-xs font-mono">{qstars(t.entryQuality) ? `${"★".repeat(qstars(t.entryQuality))}` : "–"}</td>
@@ -6040,7 +6028,7 @@ export default function SwingEdge() {
                   <div className="text-center">
                     <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1 flex items-center justify-center gap-1">R/R Ratio<TermTooltip term="rr" lang={lang} /></div>
                     <div className={`text-lg font-bold font-mono ${azRRRatio >= 2 ? "text-[var(--v3-accent)]" : azRRRatio >= 1 ? "text-[var(--v3-warn)]" : "text-[var(--v3-loss)]"}`}>
-                      {azTarget > 0 ? `${azRRRatio.toFixed(2)}:1` : "–"}
+                      {azTarget > 0 ? `1:${azRRRatio.toFixed(2)}` : "–"}
                     </div>
                   </div>
                   <div className="text-center">
@@ -6171,7 +6159,7 @@ export default function SwingEdge() {
 
                   {/* Entry Quality (stars) */}
                   <div>
-                    <label className="text-[10px] text-slate-500 tracking-widest uppercase block mb-1.5">{t.entryQuality}</label>
+                    <label className="text-[10px] text-slate-500 tracking-widest uppercase mb-1.5 flex items-center gap-1">{t.entryQuality}<TermTooltip term="entryQuality" lang={lang} /></label>
                     <div className="flex items-center gap-1 mt-1">
                       {[1,2,3,4,5].map(star => (
                         <button key={star} type="button" onClick={() => setAnalyzerForm(f=>({...f,entryQuality:star}))}
@@ -6609,7 +6597,7 @@ export default function SwingEdge() {
               <StatCard label={t.totalTrades}  value={realTrades.length} sub={t.allTime}      icon={Layers}    accent="cyan"   />
               <StatCard label={<span className="flex items-center gap-1">{t.winRate}<TermTooltip term="winRate" lang={lang} /></span>} value={formatPct(winRate)} sub={`${stats.wins} ${t.wins}`} icon={CheckCircle} accent="green" />
               <StatCard label={<span className="flex items-center gap-1">{t.avgRMultiple}<TermTooltip term="avgR" lang={lang} /></span>} value={fmtR(avgR)} sub={rSampleSub(t, stats)} icon={Activity}  accent="purple" />
-              <StatCard label={t.totalReturn}   value={formatReturnPct(stats.returnPct)} sub={`${fmt$0(totalPnL, dispCcy)} P&L`} icon={TrendingUp} accent={totalPnL>=0?"green":"red"} />
+              <StatCard label={<span className="flex items-center gap-1">{t.totalReturn}<TermTooltip term="totalReturn" lang={lang} /></span>}   value={formatReturnPct(stats.returnPct)} sub={`${fmt$0(totalPnL, dispCcy)} P&L`} icon={TrendingUp} accent={totalPnL>=0?"green":"red"} />
             </div>
 
             {/* Per-trade P&L bars */}
@@ -6709,7 +6697,7 @@ export default function SwingEdge() {
               const short = name => name.length > 11 ? name.slice(0, 10) + "…" : name;
               return (
                 <div data-tour="setup-matrix" className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-6">
-                  <h3 className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mb-1 flex items-center gap-1.5">{t.winRateBySetup}<InfoTooltip label="Win Rate by Setup">{lang === 'he' ? 'אחוז הזכייה לכל סטאפ. עמודות סגולות = מעל 50% WR. עמודות אפורות = מתחת ל-50%. גובה העמודה = מספר עסקאות.' : 'Win rate per setup. Purple bars = above 50% WR. Gray bars = below 50%. Bar height = trade count.'}</InfoTooltip></h3>
+                  <h3 className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mb-1 flex items-center gap-1.5">{t.winRateBySetup}<TermTooltip term="winRateBySetup" lang={lang} /></h3>
                   <p className="text-xs text-slate-600 mb-4">{t.winRateBySetupSubtitle}</p>
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={data} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
@@ -6772,7 +6760,7 @@ export default function SwingEdge() {
                   {/* Best Day */}
                   <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-emerald-500/20 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs font-semibold tracking-widest uppercase text-emerald-400 flex items-center gap-1">{t.bestDay}<InfoTooltip label="Best Day">{lang === 'he' ? 'יום השבוע שבו הרווחת הכי הרבה מבחינת P&L כולל ומספר עסקאות.' : 'The weekday where you made the most total P&L and traded most successfully.'}</InfoTooltip></span>
+                      <span className="text-xs font-semibold tracking-widest uppercase text-emerald-400 flex items-center gap-1">{t.bestDay}<TermTooltip term="bestDay" lang={lang} /></span>
                     </div>
                     {bestDayEntry ? (
                       <>
@@ -6787,7 +6775,7 @@ export default function SwingEdge() {
                   {/* Best Setup */}
                   <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--v3-purple)]/25 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs font-semibold tracking-widest uppercase text-[var(--v3-purple)] flex items-center gap-1">{t.bestSetup}<InfoTooltip label="Best Setup">{lang === 'he' ? 'הסטאפ הרווחי ביותר שלך לפי P&L כולל ואחוז הצלחה. זה ה-Edge שלך — תסחור אותו יותר.' : 'Your most profitable setup by total P&L and win rate. This is your edge — trade it more.'}</InfoTooltip></span>
+                      <span className="text-xs font-semibold tracking-widest uppercase text-[var(--v3-purple)] flex items-center gap-1">{t.bestSetup}<TermTooltip term="bestSetup" lang={lang} /></span>
                     </div>
                     {bestSetup ? (
                       <>
@@ -6802,7 +6790,7 @@ export default function SwingEdge() {
                   {/* Best Emotion */}
                   <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-amber-500/20 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs font-semibold tracking-widest uppercase text-amber-400 flex items-center gap-1">{t.bestEmotion}<InfoTooltip label="Best Emotion">{lang === 'he' ? 'המצב הרגשי שבו אתה מניב הכי טוב. כשאתה מרגיש ככה — הביצועים שלך חדים יותר.' : 'The emotional state where you perform best. When you feel this way, your trading is sharper.'}</InfoTooltip></span>
+                      <span className="text-xs font-semibold tracking-widest uppercase text-amber-400 flex items-center gap-1">{t.bestEmotion}<TermTooltip term="bestEmotion" lang={lang} /></span>
                     </div>
                     {bestEmotion ? (
                       <>
@@ -6946,11 +6934,7 @@ export default function SwingEdge() {
                     <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-6">
                       <h3 className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mb-1 flex items-center gap-1.5">
                         {lang === "he" ? "התפלגות R Multiple" : "R Multiple Distribution"}
-                        <InfoTooltip label="R Distribution">
-                          {lang === "he"
-                            ? "כמה עסקאות בכל טווח R. רוב העסקאות ב-0-1R = יוצא מוקדם מדי."
-                            : "Trades per R range. Most in 0-1R = exiting too early."}
-                        </InfoTooltip>
+                        <TermTooltip term="rDistribution" lang={lang} />
                       </h3>
                       <p className="text-xs text-slate-600 mb-4">{lang === "he" ? "איפה העסקאות נוחתות — המנצחות מימין" : "Where your trades land — winners cluster right"}</p>
                       <ResponsiveContainer width="100%" height={200}>
@@ -6972,11 +6956,7 @@ export default function SwingEdge() {
                     <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-6">
                       <h3 className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mb-1 flex items-center gap-1.5">
                         {lang === "he" ? "P&L לפי חודש" : "P&L by Month"}
-                        <InfoTooltip label="P&L by Month">
-                          {lang === "he"
-                            ? "רווח/הפסד חודשי. עוזר לזהות חודשים חזקים וחלשים."
-                            : "Monthly P&L. Spot your strong and weak months."}
-                        </InfoTooltip>
+                        <TermTooltip term="pnlByMonth" lang={lang} />
                       </h3>
                       <p className="text-xs text-slate-600 mb-4">{lang === "he" ? "לוח התוצאות חודש-אחר-חודש" : "Your month-by-month scoreboard"}</p>
                       <ResponsiveContainer width="100%" height={200}>
@@ -6999,11 +6979,7 @@ export default function SwingEdge() {
                     <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-6">
                       <h3 className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mb-1 flex items-center gap-1.5">
                         {lang === "he" ? "ביצועים לפי רגש" : "Performance by Emotion"}
-                        <InfoTooltip label="Emotion Performance">
-                          {lang === "he"
-                            ? "P&L כולל לפי רגש בכניסה. FOMO/Angry שלילי = להימנע."
-                            : "Total P&L by entry emotion. Negative FOMO/Angry = avoid."}
-                        </InfoTooltip>
+                        <TermTooltip term="emotionPerformance" lang={lang} />
                       </h3>
                       <p className="text-xs text-slate-600 mb-4">{lang === "he" ? "הרגש שמרוויח לך כסף" : "Which emotion pays off"}</p>
                       <ResponsiveContainer width="100%" height={200}>
@@ -7039,11 +7015,7 @@ export default function SwingEdge() {
                     <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-6">
                       <h3 className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mb-1 flex items-center gap-1.5">
                         {lang === "he" ? "היסטוריית רצפים" : "Streak History"}
-                        <InfoTooltip label="Streak History">
-                          {lang === "he"
-                            ? "רצפי ניצחונות/הפסדים. רצף הפסד ארוך = איתות לעצור ולנשום."
-                            : "Win/loss streaks. Long loss streak = stop and reassess."}
-                        </InfoTooltip>
+                        <TermTooltip term="streakHistory" lang={lang} />
                       </h3>
                       <p className="text-xs text-slate-600 mb-4">{lang === "he" ? `${streaks.length} רצפים · מקסימום ${maxStreak}` : `${streaks.length} streaks · max ${maxStreak}`}</p>
                       <div className="space-y-1.5 max-h-48 overflow-y-auto pe-1">
@@ -7070,11 +7042,7 @@ export default function SwingEdge() {
                   <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-6">
                     <h3 className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mb-1 flex items-center gap-1.5">
                       {lang === "he" ? "מטריצת סטאפים" : "Setup Matrix"}
-                      <InfoTooltip label="Setup Matrix">
-                        {lang === "he"
-                          ? "ביצועים מלאים לכל סטאפ: עסקאות, WR%, ממוצע R, רווח כולל."
-                          : "Full performance per setup: trades, WR%, avg R, total P&L."}
-                      </InfoTooltip>
+                      <TermTooltip term="setupMatrix" lang={lang} />
                     </h3>
                     <p className="text-xs text-slate-600 mb-4">{lang === "he" ? "מסודר לפי רווח כולל" : "Sorted by total P&L"}</p>
                     <div className="overflow-x-auto">
@@ -7131,11 +7099,7 @@ export default function SwingEdge() {
                     <div className="bg-[var(--bg-elevated)] dark:bg-[var(--v3-bg-panel)] border border-[var(--border-subtle)] dark:border-white/[0.06] rounded-xl p-6">
                       <h3 className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mb-1 flex items-center gap-1.5">
                         {lang === "he" ? "זמן החזקה vs P&L" : "Hold Time vs P&L"}
-                        <InfoTooltip label="Hold Time vs PnL">
-                          {lang === "he"
-                            ? "כל נקודה = עסקה אחת. רואים אם החזקה ארוכה משתלמת."
-                            : "Each dot = one trade. Reveals if longer holds pay off."}
-                        </InfoTooltip>
+                        <TermTooltip term="holdTimeVsPnl" lang={lang} />
                       </h3>
                       <p className="text-xs text-slate-600 mb-4">{nTrades(holdScatter.length, lang)}</p>
                       <ResponsiveContainer width="100%" height={280}>
@@ -8473,7 +8437,7 @@ export default function SwingEdge() {
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-[var(--v3-text-lo)] uppercase tracking-wider mb-0.5 flex items-center justify-center gap-1">R/R Ratio<TermTooltip term="rr" lang={lang} /></div>
-                    <div className={`text-sm font-bold font-mono ${tradeValidity.valid?(targetN>0?(rrRatio>=2?"text-[var(--v3-accent)]":rrRatio>=1?"text-[var(--v3-warn)]":"text-[var(--v3-loss)]"):"text-[var(--v3-text-lo)]"):"text-[var(--v3-text-lo)]"}`}>{tradeValidity.valid?(targetN>0?`${rrRatio.toFixed(2)}:1`:"–"):"—"}</div>
+                    <div className={`text-sm font-bold font-mono ${tradeValidity.valid?(targetN>0?(rrRatio>=2?"text-[var(--v3-accent)]":rrRatio>=1?"text-[var(--v3-warn)]":"text-[var(--v3-loss)]"):"text-[var(--v3-text-lo)]"):"text-[var(--v3-text-lo)]"}`}>{tradeValidity.valid?(targetN>0?`1:${rrRatio.toFixed(2)}`:"–"):"—"}</div>
                   </div>
                   </div>
                   {hasSharesOverride && (
@@ -8686,7 +8650,7 @@ export default function SwingEdge() {
 
               {/* Entry Quality (stars) */}
               <div>
-                <label className="text-[10px] text-[var(--v3-text-lo)] tracking-widest uppercase block mb-1">Entry Quality</label>
+                <label className="text-[10px] text-[var(--v3-text-lo)] tracking-widest uppercase mb-1 flex items-center gap-1">Entry Quality<TermTooltip term="entryQuality" lang={lang} /></label>
                 <div className="flex items-center gap-1 mt-1">
                   {[1,2,3,4,5].map(star => (
                     <button key={star} type="button" onClick={() => setForm(f=>({...f,entryQuality:star}))}

@@ -1,18 +1,29 @@
 // src/glossary/terms/emotions.js — רגשות
 // ⛔ מקור האמת היחיד למונחים האלה. עריכה כאן ⇒ `npm run glossary` באותו קומיט (test:glossary תופס סחיפה).
+// פורמט (גל 3): short = הגדרה במשפט אחד ≤18 מילים · example = "לדוגמה:"/"Example:" במספרים היפותטיים · caveat אחד לכל היותר · longForm = הטקסט המלא (מודאל המילון).
+// pendingTranslation: es/pt/ar עדיין בטקסט הישן — שלב 5.
 
 /** @type {import("../types.js").GlossaryTerm[]} */
 export default [
   {
     id: "emotionConfident",
+    sources: ["DOUGLAS"],
+    shownAt: ["SwingEdge_App.jsx — אנליטיקס · מקרא ביצועים לפי רגש"],
+    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Confident",
-        short: "ביטחון מבוסס ניתוח, לא יוהרה. כשהוא נשען על setup תקף — מוביל לביצוע ממושמע. כשהוא הופך לביטחון-יתר אחרי רצף נצחונות, הוא מסוכן.",
+        short: "ביטחון שנשען על setup תקף ועל ניתוח, לא על רצף רווחים.",
+        example: "לדוגמה: כל התנאים שכתבת התקיימו ונכנסת בגודל הרגיל.",
+        caveat: "אחרי רצף רווחים — בדוק שזה לא ביטחון-יתר.",
+        longForm: "ביטחון מבוסס ניתוח, לא יוהרה. כשהוא נשען על setup תקף — מוביל לביצוע ממושמע. כשהוא הופך לביטחון-יתר אחרי רצף נצחונות, הוא מסוכן.",
       },
       en: {
         label: "Confident",
-        short: "Confidence grounded in analysis, not bravado. When based on a valid setup it drives disciplined execution; when it tips into overconfidence after a win streak, it becomes risky.",
+        short: "Confidence grounded in a valid setup and analysis, not in a winning streak.",
+        example: "Example: every condition you wrote down was met and you entered at normal size.",
+        caveat: "After a winning streak, check that it is not overconfidence.",
+        longForm: "Confidence grounded in analysis, not bravado. When based on a valid setup it drives disciplined execution; when it tips into overconfidence after a win streak, it becomes risky.",
       },
       es: {
         label: "Confident",
@@ -30,14 +41,21 @@ export default [
   },
   {
     id: "emotionCalm",
+    sources: ["DOUGLAS"],
+    shownAt: ["SwingEdge_App.jsx — אנליטיקס · מקרא ביצועים לפי רגש"],
+    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Calm",
-        short: "המצב הרגשי האופטימלי לסוחר. שלווה מאפשרת לעקוב אחרי התוכנית בלי לרדוף או להיבהל. עסקאות שנפתחות ברוגע נוטות לדבוק ב-stop וב-target.",
+        short: "נכנסת בלי לחץ ובלי מרדף, לפי התוכנית.",
+        example: "לדוגמה: חיכית למחיר שתכננת והצבת סטופ ויעד מראש.",
+        longForm: "המצב הרגשי האופטימלי לסוחר. שלווה מאפשרת לעקוב אחרי התוכנית בלי לרדוף או להיבהל. עסקאות שנפתחות ברוגע נוטות לדבוק ב-stop וב-target.",
       },
       en: {
         label: "Calm",
-        short: "The optimal emotional state for a trader. Calm lets you follow your plan without chasing or panicking. Trades opened calmly tend to respect their stop and target.",
+        short: "You entered without pressure or chasing, according to plan.",
+        example: "Example: you waited for your planned price and set the stop and target in advance.",
+        longForm: "The optimal emotional state for a trader. Calm lets you follow your plan without chasing or panicking. Trades opened calmly tend to respect their stop and target.",
       },
       es: {
         label: "Calm",
@@ -55,14 +73,20 @@ export default [
   },
   {
     id: "emotionPatient",
+    shownAt: ["SwingEdge_App.jsx — אנליטיקס · מקרא ביצועים לפי רגש"],
+    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Patient",
-        short: "המתנה ל-setup שבאמת עומד בקריטריונים, במקום להיכנס לכל תנועה. סבלנות היא לרוב ההבדל בין סוחר רווחי למפסיד — היא מסננת עסקאות באיכות נמוכה.",
+        short: "חיכית ל-setup שעומד בכל הקריטריונים שלך, במקום להיכנס לכל תנועה.",
+        example: "לדוגמה: דילגת על שתי פריצות חלשות ונכנסת בשלישית.",
+        longForm: "המתנה ל-setup שבאמת עומד בקריטריונים, במקום להיכנס לכל תנועה. סבלנות היא לרוב ההבדל בין סוחר רווחי למפסיד — היא מסננת עסקאות באיכות נמוכה.",
       },
       en: {
         label: "Patient",
-        short: "Waiting for a setup that genuinely meets your criteria instead of entering every move. Patience is often what separates a profitable trader from a losing one — it filters out low-quality trades.",
+        short: "You waited for a setup that met all your criteria instead of entering every move.",
+        example: "Example: you skipped two weak breakouts and took the third.",
+        longForm: "Waiting for a setup that genuinely meets your criteria instead of entering every move. Patience is often what separates a profitable trader from a losing one — it filters out low-quality trades.",
       },
       es: {
         label: "Patient",
@@ -80,14 +104,20 @@ export default [
   },
   {
     id: "emotionNeutral",
+    shownAt: ["SwingEdge_App.jsx — אנליטיקס · מקרא ביצועים לפי רגש"],
+    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Neutral",
-        short: "כניסה ללא מטען רגשי — לא נלהב ולא חושש. מצב יציב שמאפשר החלטות אובייקטיביות לפי הנתונים בלבד. בסיס טוב, גם אם פחות חד מ-\"רגוע\".",
+        short: "נכנסת בלי מטען רגשי — לא נלהב ולא חושש.",
+        example: "לדוגמה: עוד עסקה מתוך התוכנית, בלי ציפייה מיוחדת.",
+        longForm: "כניסה ללא מטען רגשי — לא נלהב ולא חושש. מצב יציב שמאפשר החלטות אובייקטיביות לפי הנתונים בלבד. בסיס טוב, גם אם פחות חד מ-\"רגוע\".",
       },
       en: {
         label: "Neutral",
-        short: "Entering with no emotional charge — neither excited nor fearful. A stable state that allows objective, data-driven decisions. A solid baseline, even if less sharp than \"Calm\".",
+        short: "You entered with no emotional charge — neither excited nor fearful.",
+        example: "Example: one more trade from the plan, with no special expectation.",
+        longForm: "Entering with no emotional charge — neither excited nor fearful. A stable state that allows objective, data-driven decisions. A solid baseline, even if less sharp than \"Calm\".",
       },
       es: {
         label: "Neutral",
@@ -105,14 +135,20 @@ export default [
   },
   {
     id: "emotionHesitant",
+    shownAt: ["SwingEdge_App.jsx — אנליטיקס · מקרא ביצועים לפי רגש"],
+    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Hesitant",
-        short: "היסוס בכניסה — לרוב סימן ש-setup לא ברור או שביטחון העצמי נמוך. כניסות מהוססות נוטות לכניסה מאוחרת, stop קרוב מדי, או יציאה מוקדמת מפחד.",
+        short: "היססת בכניסה — לרוב כשה-setup לא ברור או שהביטחון נמוך.",
+        example: "לדוגמה: חיכית לעוד נר ונכנסת $0.50 מעל המחיר שתכננת.",
+        longForm: "היסוס בכניסה — לרוב סימן ש-setup לא ברור או שביטחון העצמי נמוך. כניסות מהוססות נוטות לכניסה מאוחרת, stop קרוב מדי, או יציאה מוקדמת מפחד.",
       },
       en: {
         label: "Hesitant",
-        short: "Hesitation at entry — usually a sign the setup isn't clear or confidence is low. Hesitant entries tend to mean entering late, placing the stop too tight, or exiting early out of fear.",
+        short: "You hesitated at entry — usually when the setup is unclear or confidence is low.",
+        example: "Example: you waited for one more candle and entered $0.50 above your planned price.",
+        longForm: "Hesitation at entry — usually a sign the setup isn't clear or confidence is low. Hesitant entries tend to mean entering late, placing the stop too tight, or exiting early out of fear.",
       },
       es: {
         label: "Hesitant",
@@ -130,14 +166,22 @@ export default [
   },
   {
     id: "emotionNervous",
+    shownAt: ["SwingEdge_App.jsx — אנליטיקס · מקרא ביצועים לפי רגש"],
+    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Nervous",
-        short: "מתח שמקשה על קבלת החלטות. עצבנות מובילה לבדיקת מחיר אובססיבית, הזזת stop, ויציאות פזיזות. לרוב מעידה על פוזיציה גדולה מדי או חוסר ביטחון ב-setup.",
+        short: "מתח שהעיב על שיקול הדעת שלך בזמן העסקה.",
+        example: "לדוגמה: בדקת את המחיר כל דקה והזזת את הסטופ פעמיים.",
+        caveat: "לעיתים סימן שהפוזיציה גדולה מדי.",
+        longForm: "מתח שמקשה על קבלת החלטות. עצבנות מובילה לבדיקת מחיר אובססיבית, הזזת stop, ויציאות פזיזות. לרוב מעידה על פוזיציה גדולה מדי או חוסר ביטחון ב-setup.",
       },
       en: {
         label: "Nervous",
-        short: "Tension that clouds decision-making. Nervousness leads to obsessive price-checking, moving the stop, and impulsive exits. Often a sign the position is too large or the setup isn't trusted.",
+        short: "Tension that clouded your judgment during the trade.",
+        example: "Example: you checked the price every minute and moved the stop twice.",
+        caveat: "Sometimes a sign the position is too large.",
+        longForm: "Tension that clouds decision-making. Nervousness leads to obsessive price-checking, moving the stop, and impulsive exits. Often a sign the position is too large or the setup isn't trusted.",
       },
       es: {
         label: "Nervous",
@@ -155,14 +199,20 @@ export default [
   },
   {
     id: "emotionFOMO",
+    shownAt: ["SwingEdge_App.jsx — אנליטיקס · מקרא ביצועים לפי רגש"],
+    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "FOMO",
-        short: "\"פחד מהחמצה\" — כניסה לעסקה רק כי המחיר זז בחדות, בלי setup תקף. אחד הדפוסים ההפסדיים ביותר: כניסה מאוחרת, מרדף אחרי המחיר, ו-stop רחוק. דגל אזהרה.",
+        short: "נכנסת כי המחיר זז חזק ופחדת להחמיץ, בלי setup תקף.",
+        example: "לדוגמה: המניה עלתה \u200e+6% ונכנסת בשיא בלי סטופ ברור.",
+        longForm: "\"פחד מהחמצה\" — כניסה לעסקה רק כי המחיר זז בחדות, בלי setup תקף. אחד הדפוסים ההפסדיים ביותר: כניסה מאוחרת, מרדף אחרי המחיר, ו-stop רחוק. דגל אזהרה.",
       },
       en: {
         label: "FOMO",
-        short: "\"Fear Of Missing Out\" — entering a trade just because price moved sharply, with no valid setup. One of the most destructive patterns: late entry, chasing price, and a distant stop. A red flag.",
+        short: "You entered because price moved hard and you feared missing out, with no valid setup.",
+        example: "Example: the stock was up +6% and you entered at the high with no clear stop.",
+        longForm: "\"Fear Of Missing Out\" — entering a trade just because price moved sharply, with no valid setup. One of the most destructive patterns: late entry, chasing price, and a distant stop. A red flag.",
       },
       es: {
         label: "FOMO",
@@ -180,14 +230,21 @@ export default [
   },
   {
     id: "emotionAngry",
+    sources: ["STEEN"],
+    shownAt: ["SwingEdge_App.jsx — אנליטיקס · מקרא ביצועים לפי רגש"],
+    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Angry",
-        short: "כעס אחרי הפסד — הדלק של \"מסחר נקמה\". במצב הזה הסוחר מנסה להחזיר הפסד מיד, מגדיל סיכון, ונכנס לעסקאות גרועות. זה המצב שבו מאבדים חשבונות. עצור.",
+        short: "כעס אחרי הפסד שדחף אותך להחזיר אותו מיד — מסחר נקמה.",
+        example: "לדוגמה: הפסדת $200 ופתחת מיד עסקה בגודל כפול.",
+        longForm: "כעס אחרי הפסד — הדלק של \"מסחר נקמה\". במצב הזה הסוחר מנסה להחזיר הפסד מיד, מגדיל סיכון, ונכנס לעסקאות גרועות. זה המצב שבו מאבדים חשבונות. עצור.",
       },
       en: {
         label: "Angry",
-        short: "Anger after a loss — the fuel of \"revenge trading\". In this state a trader tries to win back a loss immediately, raises risk, and takes bad trades. This is how accounts blow up. Stop.",
+        short: "Anger after a loss that pushed you to win it back at once — revenge trading.",
+        example: "Example: you lost $200 and immediately opened a trade at double size.",
+        longForm: "Anger after a loss — the fuel of \"revenge trading\". In this state a trader tries to win back a loss immediately, raises risk, and takes bad trades. This is how accounts blow up. Stop.",
       },
       es: {
         label: "Angry",

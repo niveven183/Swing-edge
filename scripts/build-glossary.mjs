@@ -19,19 +19,20 @@ import { composeShort as compose } from "../src/glossary/compose.js";
 export const LANGS = ["he", "en", "es", "pt", "ar"];
 export const CATEGORIES = {
   performance: "מדדי ביצוע",
+  analytics: "אנליטיקס — גרפים וכרטיסי תובנה",
   metrics: "מדדים נוספים",
   concepts: "מושגים / AI",
   risk: "ניהול סיכון",
   setups: "סטאפים",
   emotions: "רגשות",
-  market: "תנאי שוק",
-  chart: "פעולות גרף",
+  chart: "פעולות ותכונות",
 };
 const LANGNAMES = { he: "עברית", en: "English", es: "Español", pt: "Português", ar: "العربية" };
-const TERM_KEYS = new Set(["id", "aliases", "computedIn", "related", "sources", "shownAt", "glossaryOnly", "mustContain", "i18n"]);
+const TERM_KEYS = new Set(["id", "aliases", "computedIn", "related", "sources", "shownAt", "glossaryOnly", "mustContain", "pendingTranslation", "i18n"]);
 const TEXT_KEYS = new Set(["label", "short", "example", "caveat", "longForm"]);
 const OPTIONAL_TEXT = ["example", "caveat", "longForm"];
-const STRING_ARRAYS = ["aliases", "computedIn", "related", "sources", "shownAt"];
+const STRING_ARRAYS = ["aliases", "computedIn", "related", "sources", "shownAt", "pendingTranslation"];
+export const PENDING_OK = ["es", "pt", "ar"]; // שלב 5 מרוקן — רק שפות אלה רשאיות להמתין לתרגום
 
 // ── load ─────────────────────────────────────────────────────────────────────
 // מחזיר { terms: [{...term, category}], loadErrors: [] }. כשל טעינה הוא שגיאה, ⛔ דילוג.
@@ -68,8 +69,10 @@ export async function loadTerms(root) {
 }
 
 // ── validate ─────────────────────────────────────────────────────────────────
-export function validateTerms(terms) {
+// sources: מפתחות מ-src/glossary/sources.js (מועבר מבחוץ כדי שהפונקציה תישאר טהורה).
+export function validateTerms(terms, sources = null) {
   const issues = [];
+  const ids = new Set(terms.map((t) => t.id));
   const seen = new Map();
   const aliasOwner = new Map();
   for (const t of terms) {
@@ -84,6 +87,9 @@ export function validateTerms(terms) {
       }
     }
     if (t.glossaryOnly !== undefined && !(typeof t.glossaryOnly === "string" && t.glossaryOnly.trim())) issues.push(`${where}: glossaryOnly חייב נימוק`);
+    for (const l of t.pendingTranslation ?? []) if (!PENDING_OK.includes(l)) issues.push(`${where}: pendingTranslation רק es/pt/ar (קיבל ${l})`);
+    if (sources) for (const k of t.sources ?? []) if (!sources[k]) issues.push(`${where}: מקור לא מוכר "${k}" (src/glossary/sources.js)`);
+    for (const k of t.related ?? []) if (!ids.has(k)) issues.push(`${where}: related "${k}" אינו מונח`);
     if (t.aliases && t.category !== "setups") issues.push(`${where}: aliases מותר רק בסטאפים`);
     for (const a of t.aliases ?? []) {
       if (!/^[a-z0-9]+( [a-z0-9]+)*$/.test(a)) issues.push(`${where}: alias "${a}" אינו בצורה מנורמלת`);
@@ -169,7 +175,8 @@ export function buildArtifacts(terms) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const root = path.resolve(fileURLToPath(import.meta.url), "../..");
   const { terms, loadErrors } = await loadTerms(root);
-  const issues = [...loadErrors, ...validateTerms(terms)];
+  const sources = (await import(pathToFileURL(path.join(root, "src/glossary/sources.js")).href)).default;
+  const issues = [...loadErrors, ...validateTerms(terms, sources)];
   if (issues.length) {
     console.error(`❌ build-glossary: ${issues.length} בעיות — לא נכתב דבר\n  ` + issues.join("\n  "));
     process.exit(1);

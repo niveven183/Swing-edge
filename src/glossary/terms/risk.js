@@ -1,18 +1,31 @@
 // src/glossary/terms/risk.js — ניהול סיכון
 // ⛔ מקור האמת היחיד למונחים האלה. עריכה כאן ⇒ `npm run glossary` באותו קומיט (test:glossary תופס סחיפה).
+// פורמט (גל 3): short = הגדרה במשפט אחד ≤18 מילים · example = "לדוגמה:"/"Example:" במספרים היפותטיים · caveat אחד לכל היותר · longForm = הטקסט המלא (מודאל המילון).
+// pendingTranslation: es/pt/ar עדיין בטקסט הישן — שלב 5.
 
 /** @type {import("../types.js").GlossaryTerm[]} */
 export default [
   {
     id: "riskPerTrade",
+    computedIn: ["src/lib/positionSizing.js"],
+    sources: ["ELDER"],
+    related: ["riskLimits", "positionSize"],
+    shownAt: ["SwingEdge_App.jsx — הגדרות · סיכון לעסקה"],
+    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "סיכון לעסקה",
-        short: "סיכון מקסימלי לעסקה כאחוז מהחשבון הכולל.\n\nסטנדרט מקצועי:\n• 1% לעסקה = שמרני, בר-קיימא\n• 2% לעסקה = מתון, עדיין מקובל\n• 5%+ לעסקה = טריטוריית הימור\n\n'סיכון פשיטת רגל' עולה באופן מעריכי מעל 2% לעסקה.",
+        short: "כמה אחוזים מההון אתה מוכן להפסיד בעסקה אחת אם הסטופ נפגע.",
+        example: "לדוגמה: הון $10,000 וסיכון 1% ⇒ הפסד מקסימלי $100.",
+        caveat: "כלל אצבע: 1–2% לעסקה (Elder).",
+        longForm: "סיכון מקסימלי לעסקה כאחוז מבסיס ההון — הסכום שתפסיד אם הסטופ נפגע. ממנו נגזרים גודל הפוזיציה ותקרת הסיכון לכל הפוזיציות הפתוחות.\n\nכלל אצבע: 1–2% לעסקה (Elder). סוחרים מקצועיים רבים מסכנים קרוב ל-1%.",
       },
       en: {
         label: "Risk per Trade",
-        short: "Maximum risk per trade as % of total account.\n\nProfessional standard:\n• 1% per trade = conservative, sustainable\n• 2% per trade = moderate, still acceptable\n• 5%+ per trade = gambling territory\n\n'Risk of ruin' increases exponentially above 2% per trade.",
+        short: "The percentage of capital you accept to lose on one trade if the stop is hit.",
+        example: "Example: $10,000 capital and 1% risk ⇒ a $100 maximum loss.",
+        caveat: "Rule of thumb: 1–2% per trade (Elder).",
+        longForm: "Maximum risk per trade as a percentage of your capital base — what you lose if the stop is hit. Position size and the cap on all open positions are derived from it.\n\nRule of thumb: 1–2% per trade (Elder). Many professional traders risk closer to 1%.",
       },
       es: {
         label: "Riesgo por Operación",
@@ -30,14 +43,26 @@ export default [
   },
   {
     id: "riskLimits",
+    computedIn: ["SwingEdge_App.jsx:1492"],
+    sources: ["ELDER"],
+    related: ["riskPerTrade"],
+    shownAt: ["SwingEdge_App.jsx — דשבורד · לוח סיכון · הגדרות"],
+    pendingTranslation: ["es", "pt", "ar"],
+    mustContain: { he: ["3%", "5%"], en: ["3%", "5%"] },
     i18n: {
       he: {
         label: "תקרות סיכון",
-        short: "שתי תקרות שעובדות יחד:\n\n• סיכון/עסקה — המקסימום שאתה מסכן בפוזיציה בודדת. אתה בוחר אותו בהגדרות.\n• מקסימום סיכון מותר — המקסימום שאתה מסכן בכל הפוזיציות הפתוחות יחד. הוא נגזר מסיכון/עסקה: כפול שתיים, אף פעם לא מתחת ל-3% ולא מעל 5%.\n\nחלוקת מקסימום הסיכון המותר בסיכון/עסקה נותנת כמה פוזיציות בגודל מלא אפשר להחזיק בו-זמנית.",
+        short: "שתי תקרות: הסיכון לעסקה שבחרת, ותקרה לכל הפוזיציות הפתוחות — פי 2, בין 3% ל-5%.",
+        example: "לדוגמה: 1% ⇒ 3% · 2% ⇒ 4% · 3% ⇒ 5%.",
+        caveat: "התקרה ÷ סיכון לעסקה = פוזיציות מלאות במקביל.",
+        longForm: "שתי תקרות שעובדות יחד:\n\n• סיכון/עסקה — המקסימום שאתה מסכן בפוזיציה בודדת. אתה בוחר אותו בהגדרות.\n• מקסימום סיכון מותר — המקסימום שאתה מסכן בכל הפוזיציות הפתוחות יחד. הוא נגזר מסיכון/עסקה: כפול שתיים, אף פעם לא מתחת ל-3% ולא מעל 5%.\n\nחלוקת מקסימום הסיכון המותר בסיכון/עסקה נותנת כמה פוזיציות בגודל מלא אפשר להחזיק בו-זמנית.",
       },
       en: {
         label: "Risk Limits",
-        short: "Two limits work together:\n\n• Risk/Trade — the most you risk on a single position. You choose this in Settings.\n• Max Allowed Risk — the most you risk across ALL open positions combined. It is derived from Risk/Trade: twice that value, never below 3% and never above 5%.\n\nDivide Max Allowed Risk by Risk/Trade to see how many full-size positions you can hold at once.",
+        short: "Your per-trade risk, plus a cap on all open positions: 2× it, between 3% and 5%.",
+        example: "Example: 1% ⇒ 3% · 2% ⇒ 4% · 3% ⇒ 5%.",
+        caveat: "Cap ÷ per-trade risk = how many full-size positions fit at once.",
+        longForm: "Two limits work together:\n\n• Risk/Trade — the most you risk on a single position. You choose this in Settings.\n• Max Allowed Risk — the most you risk across ALL open positions combined. It is derived from Risk/Trade: twice that value, never below 3% and never above 5%.\n\nDivide Max Allowed Risk by Risk/Trade to see how many full-size positions you can hold at once.",
       },
       es: {
         label: "Límites de Riesgo",
@@ -55,14 +80,25 @@ export default [
   },
   {
     id: "positionSize",
+    computedIn: ["src/lib/positionSizing.js"],
+    sources: ["ELDER", "THARP"],
+    related: ["riskPerTrade", "stopLoss"],
+    shownAt: ["SwingEdge_App.jsx — מחשבון פוזיציה"],
+    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "גודל פוזיציה",
-        short: "גודל פוזיציה = (גודל חשבון × % סיכון) ÷ (כניסה − סטופ לוס)\n\nדוגמה: חשבון $10,000, סיכון 1%, כניסה $100, סטופ $97:\nפוזיציה = $100 ÷ $3 = 33 מניות\n\nתמיד חשב לפני כניסה. לעולם אל תסיז לפי תחושה.",
+        short: "מספר המניות = (הון × אחוז סיכון) ÷ המרחק בין הכניסה לסטופ.",
+        example: "לדוגמה: $10,000 × 1% = $100; כניסה $100 וסטופ $97 ⇒ 33 מניות.",
+        caveat: "תמיד מעוגל כלפי מטה.",
+        longForm: "גודל פוזיציה = (גודל חשבון × % סיכון) ÷ (כניסה − סטופ לוס)\n\nדוגמה: חשבון $10,000, סיכון 1%, כניסה $100, סטופ $97:\nפוזיציה = $100 ÷ $3 = 33 מניות\n\nתמיד חשב לפני כניסה. לעולם אל תקבע גודל לפי תחושה.",
       },
       en: {
         label: "Position Size",
-        short: "Position Size = (Account Size × Risk %) ÷ (Entry − Stop Loss)\n\nExample: $10,000 account, 1% risk, $100 entry, $97 stop:\nPosition = $100 ÷ $3 = 33 shares\n\nAlways calculate before entry. Never size by feel.",
+        short: "Shares = (capital × risk %) ÷ the distance between entry and stop.",
+        example: "Example: $10,000 × 1% = $100; entry $100 and stop $97 ⇒ 33 shares.",
+        caveat: "Always rounded down.",
+        longForm: "Position Size = (Account Size × Risk %) ÷ (Entry − Stop Loss)\n\nExample: $10,000 account, 1% risk, $100 entry, $97 stop:\nPosition = $100 ÷ $3 = 33 shares\n\nAlways calculate before entry. Never size by feel.",
       },
       es: {
         label: "Tamaño de Posición",
@@ -80,14 +116,23 @@ export default [
   },
   {
     id: "stopLoss",
+    related: ["rMultiple", "positionSize", "takeProfit"],
+    shownAt: ["SwingEdge_App.jsx — יומן · שורת עסקה", "src/components/EditTradeModal.jsx — עריכת עסקה"],
+    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "סטופ לוס",
-        short: "סטופ לוס — רמת המחיר שבה יוצאים מעסקה מפסידה כדי למנוע הפסדים גדולים יותר.\n\nהצב ברמה טכנית הגיונית:\n• מתחת לתמיכה מרכזית (עסקאות לונג)\n• מעל להתנגדות מרכזית (עסקאות שורט)\n• לעולם לא שרירותי (למשל 'רק $0.50 מתחת לכניסה')\n\nסטופ לוס הוא לא אופציונלי — הוא הבסיס של ניהול הסיכון.",
+        short: "המחיר שקבעת מראש ליציאה מעסקה מפסידה, כדי להגביל את ההפסד לסיכון שתכננת.",
+        example: "לדוגמה: LONG בכניסה $50 וסטופ מתחת לתמיכה ב-$48 ⇒ סיכון $2 למניה.",
+        caveat: "ה-R וגודל הפוזיציה מחושבים מהסטופ השמור בעסקה.",
+        longForm: "סטופ לוס — רמת המחיר שבה יוצאים מעסקה מפסידה כדי למנוע הפסדים גדולים יותר.\n\nהצב ברמה טכנית הגיונית:\n• מתחת לתמיכה מרכזית (עסקאות LONG)\n• מעל להתנגדות מרכזית (עסקאות SHORT)\n• לא שרירותי (למשל 'רק $0.50 מתחת לכניסה')\n\nה-R וגודל הפוזיציה מחושבים מהסטופ השמור בעסקה.",
       },
       en: {
         label: "Stop Loss",
-        short: "Stop Loss — the price level where you exit a losing trade to prevent larger losses.\n\nPlace at a logical technical level:\n• Below key support (long trades)\n• Above key resistance (short trades)\n• Never arbitrary (e.g., 'just $0.50 below entry')\n\nA stop loss is not optional — it's the foundation of risk management.",
+        short: "The price you set in advance to exit a losing trade, capping the loss at your plan.",
+        example: "Example: LONG at $50, stop below support at $48 ⇒ $2 risk per share.",
+        caveat: "R and position size use the saved stop.",
+        longForm: "Stop Loss — the price level where you exit a losing trade to prevent larger losses.\n\nPlace it at a logical technical level:\n• Below key support (LONG trades)\n• Above key resistance (SHORT trades)\n• Never arbitrary (e.g., 'just $0.50 below entry')\n\nR and position size are computed from the stop saved on the trade.",
       },
       es: {
         label: "Stop Loss",
@@ -105,14 +150,23 @@ export default [
   },
   {
     id: "takeProfit",
+    related: ["rr", "stopLoss", "chartCalcPosition"],
+    shownAt: ["SwingEdge_App.jsx — יומן · שורת עסקה", "src/components/EditTradeModal.jsx — עריכת עסקה"],
+    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Take Profit",
-        short: "Take Profit — מחיר היעד שלך לסגירת עסקה מנצחת.\n\nכלל מינימום: היעד חייב להיות לפחות 1.5× הסיכון שלך (1.5R).\n\nשיטה טובה:\n• צאת חלקית: קח 50% ב-1R, החזק שאר עד היעד\n• השתמש ברמות טכניות (התנגדות, שיאים קודמים)\n• לעולם אל תזיז יעד למטה בזמן שמנצחים",
+        short: "מחיר היעד שקבעת לסגירת עסקה מנצחת.",
+        example: "לדוגמה: כניסה $100 וסטופ $98 ⇒ יעד ברירת המחדל $104 (1:2).",
+        caveat: "ברירת המחדל בגרף ובמאמן היא 1:2.",
+        longForm: "Take Profit — מחיר היעד לסגירת עסקה מנצחת.\n\nברירת המחדל במערכת — בפעולות הגרף ובמאמן — היא יחס 1:2: יעד במרחק פי 2 מהסטופ.\n\nשיטות נפוצות:\n• יציאה חלקית: חלק ב-1R, השאר עד היעד\n• יעד ברמה טכנית (התנגדות, שיא קודם)\n• לא להוריד יעד בזמן שהעסקה מרוויחה",
       },
       en: {
         label: "Take Profit",
-        short: "Take Profit — your target price for exiting a winning trade.\n\nMinimum rule: Target must be at least 1.5× your risk (1.5R).\n\nBest practice:\n• Scale out: take 50% at 1R, hold rest to target\n• Use technical levels (resistance, prior highs)\n• Never move target lower when winning",
+        short: "The target price you set to close a winning trade.",
+        example: "Example: entry $100 and stop $98 ⇒ a default target of $104 (1:2).",
+        caveat: "The default on the chart and in the coach is 1:2.",
+        longForm: "Take Profit — your target price for exiting a winning trade.\n\nThe app's default — in the chart actions and the coach — is a 1:2 ratio: a target twice as far as the stop.\n\nCommon practice:\n• Scale out: part at 1R, the rest to target\n• Use technical levels (resistance, prior highs)\n• Never lower the target while the trade is winning",
       },
       es: {
         label: "Take Profit",

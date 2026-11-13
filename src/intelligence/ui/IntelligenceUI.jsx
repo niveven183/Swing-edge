@@ -58,10 +58,10 @@ export const DNACard = ({ dna, lang = "he" }) => {
         empty: "Not enough data yet — close a trade to see your DNA" };
 
   const rows = [
-    { key: "risk",        value: dna.scores.risk,        accent: "cyan"   },
-    { key: "discipline",  value: dna.scores.discipline,  accent: "violet" },
-    { key: "consistency", value: dna.scores.consistency, accent: "amber"  },
-    { key: "growth",      value: dna.scores.growth,      accent: "green"  },
+    { key: "risk",        term: "dnaRisk",        value: dna.scores.risk,        accent: "cyan"   },
+    { key: "discipline",  term: "discipline",     value: dna.scores.discipline,  accent: "violet" },
+    { key: "consistency", term: "dnaConsistency", value: dna.scores.consistency, accent: "amber"  },
+    { key: "growth",      term: "dnaGrowth",      value: dna.scores.growth,      accent: "green"  },
   ];
 
   return (
@@ -80,7 +80,7 @@ export const DNACard = ({ dna, lang = "he" }) => {
         {rows.map(r => (
           <div key={r.key} className="space-y-1">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-slate-500 dark:text-slate-400">{labels[r.key]}</span>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">{labels[r.key]}<TermTooltip term={r.term} lang={lang} /></span>
               {/* B-156: a null score is UNMEASURED, not zero — an em dash, never
                   the raw null rendering as the literal string "null", and never
                   a fabricated 50/100. Muted colour matches the muted ScoreBar
@@ -351,6 +351,7 @@ export const TiltShield = ({ tilt, lang = "he", onDismiss, onCooldown, onClearCo
           <span className={`text-xs font-semibold uppercase tracking-widest ${styleByLevel.text}`}>
             {pick(tilt.label, lang)}
           </span>
+          <TermTooltip term="tilt" lang={lang} />
         </div>
         {tilt.level < 3 && onDismiss && (
           <button onClick={onDismiss} className="text-[10px] text-slate-500 hover:text-white transition">

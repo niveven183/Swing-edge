@@ -1,5 +1,5 @@
 {
-  "sourceHash": "646b65251c6c42b3",
+  "sourceHash": "9a3edb946897464a",
   "lang": "ar",
   "terms": {
     "winRate": {
@@ -38,20 +38,50 @@
     "winStreak": {
       "short": "عدد الصفقات الرابحة المتتالية. سلسلة الانتصارات تبني الثقة — لكنها أيضاً أخطر وقت للثقة المفرطة والمخاطرة غير المنضبطة."
     },
-    "streakHistory": {
-      "short": "سجلّ لسلاسل انتصاراتك وخسائرك عبر الزمن. يكشف الأنماط العاطفية: هل تجعلك سلسلة الخسائر تتداول بشكل أسوأ (tilt)، أم تتعافى بانضباط؟"
-    },
     "grade": {
       "short": "درجة مرجّحة (A–F) تلخّص جودة تداولك خلال الشهر: مزيج من نسبة النجاح ومضاعف R والانضباط والاتّساق. لقطة سريعة — لا تُغني عن التعمّق في التفاصيل."
     },
     "entryQuality": {
       "short": "تقييم (بالنجوم) لمدى مطابقة دخولك للنموذج المخطّط: التوقيت، والسعر، والتأكيد. التقييم العالي المتّسق يدل على الانضباط — حتى عندما تخسر الصفقة نفسها."
     },
+    "accountEquity": {
+      "short": "The capital base you set plus cumulative P&L from closed and open trades.\nExample: a $10,000 base plus +$600 ⇒ $10,600.\nPer-trade risk is sized from your fixed capital base, not current equity."
+    },
+    "streakHistory": {
+      "short": "سجلّ لسلاسل انتصاراتك وخسائرك عبر الزمن. يكشف الأنماط العاطفية: هل تجعلك سلسلة الخسائر تتداول بشكل أسوأ (tilt)، أم تتعافى بانضباط؟"
+    },
     "dayOfWeek": {
       "short": "أرباحك/خسائرك موزّعة حسب أيام الأسبوع. تكشف في أي الأيام تربح أو تخسر باستمرار — كثير من المتداولين لديهم أفضلية خفية (أو تسريب) مرتبط بأيام محدّدة كالإثنين أو الجمعة."
     },
     "performanceBySetup": {
       "short": "تفصيل لكل setup تتداوله — نسبة الربح، إجمالي R، وعدد الصفقات. يُظهر بنظرة واحدة أي النماذج تحمل حسابك وأيّها يستنزفه. أفضلياتك وأنتي-أفضلياتك، جنباً إلى جنب."
+    },
+    "winRateBySetup": {
+      "short": "Bar height is the setup's win rate; the number above it is the trade count.\nExample: a purple bar = 50% or more, a gray bar = below 50%.\nSorted by trade count."
+    },
+    "bestDay": {
+      "short": "The weekday with the highest total P&L, by entry day.\nExample: Monday +$400, Tuesday +$150 ⇒ Monday.\nTrade count is not taken into account."
+    },
+    "bestSetup": {
+      "short": "The setup with the highest win rate; on a tie, the one with more trades.\nExample: Pullback at 70% over 10 trades ranks above Breakout at 60%.\nNo minimum sample: one trade at 100% can win. Unknown is excluded."
+    },
+    "bestEmotion": {
+      "short": "The entry emotion you marked with the highest win rate; on a tie, the one with more trades.\nExample: Calm at 65% ranks above Confident at 55%.\nNo minimum sample."
+    },
+    "rDistribution": {
+      "short": "How many closed trades fell into each R range, from losses on the left to wins on the right.\nExample: a +1.4R trade counts in the 1R to 2R range.\nTrades without a stop are not counted."
+    },
+    "pnlByMonth": {
+      "short": "The sum of closed-trade P&L for each month, by trade date.\nExample: in March +$200, −$50 and +$100 ⇒ +$250.\nA trade not converted to your capital currency is not counted."
+    },
+    "emotionPerformance": {
+      "short": "Total closed-trade P&L by the emotion you marked at entry.\nExample: FOMO · 4 trades · −$300.\nA trade with no emotion marked counts as Unknown."
+    },
+    "setupMatrix": {
+      "short": "A table per setup: trades, win rate, average R and P&L, sorted by P&L.\nExample: Breakout · 8 · 50% · +0.4R · +$600."
+    },
+    "holdTimeVsPnl": {
+      "short": "Each dot is a closed trade: holding days on one axis and P&L on the other.\nExample: a dot at 5 days and +$300 = a trade you held 5 days that made $300.\nA trade not converted to your capital currency is not shown."
     },
     "rr": {
       "short": "المخاطرة/العائد. الربح المحتمل مقابل ما تخاطر به. 3:1 = يمكنك ربح 3× ما قد تخسره."
@@ -94,6 +124,9 @@
     },
     "dnaGrowth": {
       "short": "يقيس اتجاه تحسّنك: هل تتعلّم من البيانات وتتحسّن مع الوقت، أم تكرّر الأخطاء نفسها. الدرجة المتصاعدة هي المنحنى الصحيح للمتداول الذي يتطوّر."
+    },
+    "setup": {
+      "short": "Your entry pattern — the exact conditions under which you take a position.\nExample: Breakout, Pullback or Bull Flag."
     },
     "riskPerTrade": {
       "short": "أقصى مخاطرة لكل صفقة كنسبة % من إجمالي الحساب.\n\nالمعيار الاحترافي:\n• 1% لكل صفقة = متحفّظ، مستدام\n• 2% لكل صفقة = معتدل، لا يزال مقبولاً\n• 5%+ لكل صفقة = منطقة مقامرة\n\n'مخاطر الإفلاس' ترتفع أُسّياً فوق 2% لكل صفقة."
@@ -200,23 +233,14 @@
     "emotionAngry": {
       "short": "الغضب بعد الخسارة — وقود \"التداول الانتقامي\". في هذه الحالة يحاول المتداول استعادة خسارته فوراً، فيرفع المخاطرة ويدخل صفقات سيئة. هكذا تُدمَّر الحسابات. توقّف."
     },
-    "marketTrendingUp": {
-      "short": "سوق في اتجاه صاعد: قمم أعلى وقيعان أعلى. نماذج الشراء تعمل بأفضل شكل هنا؛ والتداول عكس الاتجاه محفوف بالمخاطر."
-    },
-    "marketTrendingDown": {
-      "short": "سوق في اتجاه هابط: قمم أدنى وقيعان أدنى. نماذج البيع تعمل بأفضل شكل؛ و\"إمساك السكين الساقط\" بصفقة شراء أمر خطير."
-    },
-    "marketSideways": {
-      "short": "سوق بلا اتجاه واضح، يتحرك أفقياً بين الدعم والمقاومة. نماذج الاتجاه تفشل هنا؛ والتداول ضمن النطاق (شراء عند الدعم، بيع عند المقاومة) أنسب."
-    },
-    "marketVolatile": {
-      "short": "سوق بتقلّبات سعرية حادّة وسريعة في الاتجاهين. تُضرب أوامر وقف الخسارة بسهولة، وينبغي تصغير حجم الصفقة. فرص كبيرة لكن مخاطرة عالية."
-    },
     "chartCalcPosition": {
       "short": "يملأ تلقائياً حاسبة الصفقة من الرسم الحالي — الرمز، السعر الحي كدخول، وقف حماية وهدف 2:1 — ثم يفتحها لتحدّد حجم الصفقة بنقرة واحدة."
     },
     "chartAddToJournal": {
       "short": "يبدأ صفقة جديدة في اليوميّة من الرسم الحالي — الرمز، السعر الحي، وقف مقترح وهدف 2:1 مملوءة مسبقاً — جاهزة لمراجعتك وحفظك."
+    },
+    "visionOcr": {
+      "short": "Reads a trade from a chart screenshot and fills the fields instead of typing.\nExample: you uploaded a screenshot with entry, stop and target ⇒ the fields were filled.\nCheck the values before saving."
     }
   }
 }

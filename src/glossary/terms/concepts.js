@@ -1,18 +1,30 @@
 // src/glossary/terms/concepts.js — מושגים / AI
 // ⛔ מקור האמת היחיד למונחים האלה. עריכה כאן ⇒ `npm run glossary` באותו קומיט (test:glossary תופס סחיפה).
+// פורמט (גל 3): short = הגדרה במשפט אחד ≤18 מילים · example = "לדוגמה:"/"Example:" במספרים היפותטיים · caveat אחד לכל היותר · longForm = הטקסט המלא (מודאל המילון).
+// pendingTranslation: es/pt/ar עדיין בטקסט הישן — שלב 5.
 
 /** @type {import("../types.js").GlossaryTerm[]} */
 export default [
   {
     id: "dna",
+    computedIn: ["src/intelligence/core/TradeDNA.js:150"],
+    related: ["dnaRisk", "discipline", "dnaConsistency", "dnaGrowth"],
+    shownAt: ["src/intelligence/ui/IntelligenceUI.jsx — דשבורד · כרטיס ה-DNA"],
+    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "DNA מסחרי",
-        short: "ה-DNA המסחרי שלך מודד 4 ממדים מרכזיים:\n\n• ניהול סיכון (0-100): כמה טוב אתה שולט בהפסדים\n• משמעת (0-100): האם אתה עוקב אחר הכללים שלך?\n• עקביות (0-100): תוצאות יציבות בתנאים שונים\n• צמיחה (0-100): האם אתה משתפר לאורך זמן?\n\nמבוסס על היסטוריית העסקאות האמיתית שלך — לא הערכה עצמית.",
+        short: "ארבעה ציונים 0–100 — ניהול סיכון, משמעת, עקביות וצמיחה — מחושבים מהעסקאות הסגורות שלך.",
+        example: "לדוגמה: סיכון ממוצע של 2% לעסקה ⇒ ציון ניהול סיכון 50.",
+        caveat: "המשמעת נשענת על הסימון 'עקבתי אחרי התוכנית' — דיווח עצמי.",
+        longForm: "ה-DNA המסחרי שלך הוא ארבעה ציונים 0–100, מחושבים מהעסקאות הסגורות:\n\nניהול סיכון — הסיכון הממוצע לעסקה כאחוז מההון. משמעת — אחוז העסקאות שסימנת 'עקבתי אחרי התוכנית'. עקביות — פיזור תוצאות ה-R. צמיחה — שיפוע ה-R המצטבר ב-20 העסקאות האחרונות.\n\nשלושה מהם נמדדים מהעסקאות; המשמעת היא דיווח עצמי. ציון שאין לו נתונים מוצג כ-—, לא כ-50.",
       },
       en: {
         label: "Trading DNA",
-        short: "Your Trading DNA measures 4 core dimensions of your trading personality:\n\n• Risk Management (0-100): How well you control losses\n• Discipline (0-100): Do you follow your rules?\n• Consistency (0-100): Stable results across different conditions\n• Growth (0-100): Are you improving over time?\n\nBased on your actual trade history — not self-assessment.",
+        short: "Four 0–100 scores — risk, discipline, consistency, growth — from your closed trades.",
+        example: "Example: 2% average risk per trade ⇒ risk score 50.",
+        caveat: "Discipline is the self-reported 'followed my plan' flag.",
+        longForm: "Your Trading DNA is four 0–100 scores computed from your closed trades:\n\nRisk management — your average risk per trade as a percentage of capital. Discipline — the share of trades you marked 'followed my plan'. Consistency — the spread of your R outcomes. Growth — the slope of cumulative R over your last 20 trades.\n\nThree are measured from the trades; discipline is a self-report. A score with no data shows as —, never as 50.",
       },
       es: {
         label: "Trading DNA",
@@ -30,14 +42,25 @@ export default [
   },
   {
     id: "edge",
+    computedIn: ["src/lib/tradingStats.js:538"],
+    sources: ["WILSON"],
+    related: ["antiEdge", "wilson"],
+    shownAt: ["SwingEdge_App.jsx — דשבורד · אנליטיקס · כרטיסי Edge", "src/intelligence/ui/IntelligenceUI.jsx — כרטיס Edge", "src/components/LandingPage.jsx — דף הנחיתה · הדגשת מונח"],
+    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Edge",
-        short: "ה-Edge שלך — סטאפים שבהם יש לך יתרון סטטיסטי משמעותי לפי היסטוריית העסקאות האמיתית שלך.\n\nאחוז זכייה גבוה + R ממוצע חיובי = Edge אמיתי. אלה הסטאפים שעליך לסחור הכי הרבה. השוק משלם לך על אלה.",
+        short: "צירופי סטאפ ורגש שבהם אחוז ההצלחה וה-R שלך הכי חזקים, מדורגים לפי ציון Wilson.",
+        example: "לדוגמה: Breakout + Calm · 4 רווחיות מ-5 · R ממוצע \u200e+1.2R.",
+        caveat: "דרושות 3 עסקאות לפחות; זה דירוג, לא מבחן מובהקות.",
+        longForm: "ה-Edge שלך — עד 5 צירופי סטאפ × רגש שבהם הביצועים שלך הכי חזקים, לפי היסטוריית העסקאות.\n\nצירוף נכנס רק אם יש לו 3 עסקאות לפחות, והדירוג הוא ציון Wilson של אחוז ההצלחה כפול (1 + R ממוצע). זה דירוג יחסי ולא מבחן מובהקות סטטיסטית — במדגם קטן, Edge יכול להיעלם.",
       },
       en: {
         label: "Edge",
-        short: "Your Edge — setups where you have a statistically significant advantage based on your actual trade history.\n\nHigh win rate + positive average R = real edge. These are the setups you should trade most. The market is paying you to do these.",
+        short: "Setup-and-emotion pairs where your win rate and R are strongest, ranked by Wilson score.",
+        example: "Example: Breakout + Calm · 4 of 5 won · average +1.2R.",
+        caveat: "Needs 3+ trades; a ranking, not a significance test.",
+        longForm: "Your Edge — up to 5 setup × emotion pairs where your results are strongest, from your trade history.\n\nA pair qualifies only with at least 3 trades, and it is ranked by the Wilson score of its win rate times (1 + average R). It is a relative ranking, not a statistical significance test — on a small sample an edge can disappear.",
       },
       es: {
         label: "Edge",
@@ -55,14 +78,25 @@ export default [
   },
   {
     id: "antiEdge",
+    computedIn: ["src/lib/tradingStats.js:538"],
+    sources: ["WILSON"],
+    related: ["edge"],
+    shownAt: ["SwingEdge_App.jsx — דשבורד · אנליטיקס · כרטיסי Edge", "src/intelligence/ui/IntelligenceUI.jsx — כרטיס Edge"],
+    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Anti-Edge",
-        short: "Anti-Edge — סטאפים שבהם אתה מפסיד כסף באופן עקבי לפי היסטוריית העסקאות שלך.\n\nאחוז זכייה נמוך + R שלילי = ה-Anti-Edge האישי שלך. תתקן אותם (תלמד למה הם נכשלים עבורך) או תפסיק לסחור אותם לחלוטין.\n\nהימנעות מ-Anti-Edge חשובה כמו ניצול Edge.",
+        short: "צירופי סטאפ ורגש שבהם אחוז ההצלחה שלך מתחת ל-50% או ה-R הממוצע שלילי.",
+        example: "לדוגמה: Breakout + FOMO · רווח אחד מ-4 · R ממוצע \u200e−0.8R.",
+        caveat: "דרושות 2 עסקאות לפחות; מוצגים עד 5.",
+        longForm: "Anti-Edge — עד 5 צירופי סטאפ × רגש שבהם אחוז ההצלחה מתחת ל-50% או ה-R הממוצע שלילי, בצירוף של 2 עסקאות לפחות.\n\nתתקן אותם (תבין למה הם נכשלים אצלך) או תפסיק לסחור אותם. הימנעות מ-Anti-Edge חשובה כמו ניצול Edge.",
       },
       en: {
         label: "Anti-Edge",
-        short: "Anti-Edge — setups where you consistently lose money based on your trade history.\n\nLow win rate + negative R = your personal anti-edge. Either fix these setups (study why they fail for you) or stop trading them entirely.\n\nAvoiding anti-edges is as important as exploiting edges.",
+        short: "Setup-and-emotion pairs where your win rate is below 50% or your average R is negative.",
+        example: "Example: Breakout + FOMO · 1 win out of 4 · average R −0.8R.",
+        caveat: "Needs at least 2 trades; up to 5 are shown.",
+        longForm: "Anti-Edge — up to 5 setup × emotion pairs where your win rate is below 50% or your average R is negative, for pairs with at least 2 trades.\n\nEither fix them (study why they fail for you) or stop trading them. Avoiding anti-edges is as important as exploiting edges.",
       },
       es: {
         label: "Anti-Edge",
@@ -80,14 +114,25 @@ export default [
   },
   {
     id: "tilt",
+    computedIn: ["src/intelligence/core/TiltProtection.js:76"],
+    sources: ["DOUGLAS", "STEEN"],
+    related: ["emotionAngry", "winStreak"],
+    shownAt: ["src/intelligence/ui/IntelligenceUI.jsx — דשבורד · Tilt Shield", "src/components/LandingPage.jsx — דף הנחיתה · הדגשת מונח"],
+    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Tilt",
-        short: "Tilt — מצב רגשי שגורם לסטייה מכללי המסחר שלך.\n\nנפוץ אחרי: הפסדים גדולים, פספוס תנועה גדולה, או סדרת ניצחונות שיוצרת בטחון יתר.\n\nסימנים: הגדלת גודל פוזיציה, מסחר תכוף יותר, התעלמות מסטופים.\n\nמניעה: הפסקה חובה אחרי 2+ הפסדים רצופים.",
+        short: "מצב רגשי שמוציא אותך מהכללים שלך — לרוב אחרי הפסדים — ומוביל למסחר נקמה.",
+        example: "לדוגמה: 3 הפסדים ברצף ⇒ Tilt Shield מתריע לפני העסקה הבאה.",
+        caveat: "כלל אצבע: הפסקה אחרי 2 הפסדים רצופים.",
+        longForm: "Tilt — מצב רגשי שגורם לסטייה מכללי המסחר שלך. נפוץ אחרי הפסדים גדולים, פספוס תנועה גדולה, או רצף רווחים שיוצר ביטחון-יתר.\n\nסימנים: הגדלת פוזיציה, מסחר תכוף יותר, התעלמות מסטופים. Tilt Shield מתריע על 3 הפסדים ברצף ומעלה, על עסקה זמן קצר אחרי הפסד, על 4 עסקאות ומעלה ביום, על מסחר מחוץ לשעות ועל 2 חריגות מהתוכנית בשבוע.\n\nכלל אצבע: הפסקה אחרי 2 הפסדים רצופים.",
       },
       en: {
         label: "Tilt",
-        short: "Tilt — emotional state that causes you to deviate from your trading rules.\n\nCommon after: large losses, missing a big move, or a string of wins creating overconfidence.\n\nSigns: increasing position size, trading more frequently, ignoring stops.\n\nPrevention: mandatory break after 2+ consecutive losses.",
+        short: "An emotional state that pushes you off your rules, usually after losses.",
+        example: "Example: 3 losses in a row ⇒ Tilt Shield warns before the next trade.",
+        caveat: "Rule of thumb: take a break after 2 consecutive losses.",
+        longForm: "Tilt — an emotional state that makes you deviate from your trading rules. Common after large losses, missing a big move, or a winning streak that breeds overconfidence.\n\nSigns: larger positions, more frequent trades, ignored stops. Tilt Shield warns on 3+ losses in a row, a trade soon after a loss, 4+ trades in a day, trading outside your hours, and 2 plan deviations in a week.\n\nRule of thumb: take a break after 2 consecutive losses.",
       },
       es: {
         label: "Tilt",
@@ -105,14 +150,25 @@ export default [
   },
   {
     id: "marketRegime",
+    computedIn: ["src/intelligence/core/MarketRegime.js"],
+    sources: ["MURPHY"],
+    related: ["dna"],
+    shownAt: ["src/components/EditTradeModal.jsx — עריכת עסקה · מצב שוק", "src/intelligence/ui/IntelligenceUI.jsx — דשבורד · מחוון מצב שוק"],
+    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "מצב שוק",
-        short: "מצב שוק — סביבת השוק הנוכחית, נקראת מפעולת מחיר אמיתית (לא מהעסקאות שלך). מחושב מ-SPY/QQQ מול הממוצע הנע ל-20 יום, אחוז מגמה, כמה סקטורים עולים (רוחב שוק), ותנודתיות ממומשת.\n\n• שוק עולה: מגמת עלייה — המחיר מעל ממוצע נע עולה ל-20 יום עם השתתפות רחבה. העדף פריצות ותיקונים.\n• שוק יורד: מגמת ירידה — המחיר מתחת לממוצע נע יורד ל-20 יום, חולשה רחבה. העדף שורטים או שב בצד.\n• שוק צדדי/טווח: אין מגמה נטו — המחיר תקוע בין תמיכה להתנגדות. סחור בקצוות, הימנע מפריצות.\n• תנודתיות גבוהה: תנודות יומיות חדות שולטות. הקטן גודל ב-50% והרחב סטופים.\n• תנודתיות נמוכה: שוק שקט ודחוס — צפה לתנועות קטנות.\n\nמציג 'נתונים לא מספיקים' כשאין מספיק היסטוריית מחירים לסיווג.",
+        short: "סביבת השוק, נקראת מ-SPY/QQQ מול ממוצע 20 יום, מרוחב הסקטורים ומהתנודתיות.",
+        example: "לדוגמה: מחיר מעל ממוצע 20 יום עולה ורוב הסקטורים עולים ⇒ שוק עולה.",
+        caveat: "מבוסס מחירי שוק, לא העסקאות שלך.",
+        longForm: "מצב שוק — סביבת השוק הנוכחית, נקראת מפעולת מחיר אמיתית (לא מהעסקאות שלך). מחושב מ-SPY/QQQ מול הממוצע הנע ל-20 יום, אחוז מגמה, כמה סקטורים עולים (רוחב שוק) ותנודתיות ממומשת.\n\n• שוק עולה: המחיר מעל ממוצע נע עולה ל-20 יום עם השתתפות רחבה. העדף פריצות ותיקונים.\n• שוק יורד: המחיר מתחת לממוצע נע יורד ל-20 יום, חולשה רחבה. העדף שורטים או שב בצד.\n• שוק צדדי/טווח: אין מגמה נטו — המחיר תקוע בין תמיכה להתנגדות. סחור בקצוות, הימנע מפריצות.\n• תנודתיות גבוהה: תנודות יומיות חדות שולטות. כלל אצבע: הקטן גודל בכ-50% והרחב סטופים.\n• תנודתיות נמוכה: שוק שקט ודחוס — צפה לתנועות קטנות.\n\nמציג 'נתונים לא מספיקים' כשאין מספיק היסטוריית מחירים לסיווג.",
       },
       en: {
         label: "Market Regime",
-        short: "Market Regime — the current market environment, read from real price action (not your trades). Computed from SPY/QQQ vs their 20-day average, trend %, how many sector ETFs are rising (breadth), and realized volatility.\n\n• Bull Trend: Uptrend — price above a rising 20-day average with broad participation. Favor breakouts and pullbacks.\n• Bear Trend: Downtrend — price below a falling 20-day average, broad weakness. Favor shorts or stand aside.\n• Choppy/Range: No net trend — price stuck between support and resistance. Fade the extremes, avoid breakouts.\n• High Volatility: Large daily swings dominate. Cut size ~50% and widen stops.\n• Low Volatility: Quiet, coiled tape — expect small moves.\n\nShows 'insufficient data' when there isn't enough price history to classify.",
+        short: "The market environment, read from SPY/QQQ versus their 20-day average, sector breadth and volatility.",
+        example: "Example: price above a rising 20-day average with most sectors rising ⇒ Bull Trend.",
+        caveat: "Based on market prices, not your trades.",
+        longForm: "Market Regime — the current market environment, read from real price action (not your trades). Computed from SPY/QQQ versus their 20-day average, trend %, how many sector ETFs are rising (breadth) and realized volatility.\n\n• Bull Trend: price above a rising 20-day average with broad participation. Favor breakouts and pullbacks.\n• Bear Trend: price below a falling 20-day average, broad weakness. Favor shorts or stand aside.\n• Choppy/Range: no net trend — price stuck between support and resistance. Fade the extremes, avoid breakouts.\n• High Volatility: large daily swings dominate. Rule of thumb: cut size ~50% and widen stops.\n• Low Volatility: quiet, coiled tape — expect small moves.\n\nShows 'insufficient data' when there isn't enough price history to classify.",
       },
       es: {
         label: "Régimen de Mercado",
@@ -130,14 +186,24 @@ export default [
   },
   {
     id: "discipline",
+    computedIn: ["src/intelligence/utils/psychologyPatterns.js:106"],
+    related: ["dna", "grade", "entryQuality"],
+    shownAt: ["src/intelligence/ui/IntelligenceUI.jsx — דשבורד · כרטיס ה-DNA · שורה"],
+    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "משמעת",
-        short: "האם עקבת אחרי התוכנית: סטופ, גודל פוזיציה ויעד — בלי לסטות מרגש. הליבה של רווחיות לאורך זמן.",
+        short: "אחוז העסקאות הסגורות שסימנת בהן 'עקבתי אחרי התוכנית'.",
+        example: "לדוגמה: סימנת 'כן' ב-8 מתוך 10 ⇒ 80.",
+        caveat: "דיווח עצמי; עסקה שלא סומנה לא נספרת.",
+        longForm: "אחוז העסקאות הסגורות שסימנת בהן 'עקבתי אחרי התוכנית' — סטופ, גודל פוזיציה ויעד, בלי לסטות מרגש. עסקה שלא סומנה לא נספרת במכנה.\n\nזה דיווח עצמי: המערכת לא בודקת אם הסטופ כובד בפועל.",
       },
       en: {
         label: "Discipline",
-        short: "Whether you followed your plan — stop, size, target — without emotional deviation. The core of long-term profitability.",
+        short: "The share of your closed trades you marked 'followed my plan'.",
+        example: "Example: you marked 'yes' on 8 of 10 ⇒ 80.",
+        caveat: "Self-reported; an unmarked trade is not counted.",
+        longForm: "The share of your closed trades you marked 'followed my plan' — stop, size and target, without emotional deviation. An unmarked trade is not in the denominator.\n\nIt is a self-report: the app does not check whether the stop was actually honored.",
       },
       es: {
         label: "Disciplina",
@@ -155,14 +221,24 @@ export default [
   },
   {
     id: "dnaRisk",
+    computedIn: ["src/intelligence/core/TradeDNA.js:164"],
+    related: ["dna", "riskPerTrade"],
+    shownAt: ["src/intelligence/ui/IntelligenceUI.jsx — דשבורד · כרטיס ה-DNA · שורה"],
+    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
-        label: "Risk",
-        short: "מודד עד כמה אתה עקבי בניהול סיכון: גודל פוזיציה אחיד, הקפדה על stop, ואי-חריגה מהסיכון המתוכנן לעסקה. ציון נמוך = סיכון לא עקבי, הסכנה הגדולה ביותר לחשבון.",
+        label: "ניהול סיכון",
+        short: "ציון 0–100 לפי הסיכון הממוצע לעסקה, כאחוז מההון בעת הכניסה.",
+        example: "לדוגמה: 1% ומטה ⇒ 100 · 2% ⇒ 50 · 3% ומעלה ⇒ 0.",
+        caveat: "לא מודד אם כיבדת את הסטופ.",
+        longForm: "ציון ניהול הסיכון נגזר מהסיכון הממוצע לעסקה — המרחק לסטופ × מספר המניות, כאחוז מההון בעת הכניסה. עד 1% — 100; כל אחוז מעל זה מוריד 50 נקודות; מ-3% ומעלה — 0.\n\nהוא לא מודד אם כיבדת את הסטופ או אם גודל הפוזיציה אחיד — רק כמה סיכנת בממוצע.",
       },
       en: {
-        label: "Risk",
-        short: "Measures how consistent you are at managing risk: uniform position size, respecting stops, and not exceeding your planned per-trade risk. A low score means inconsistent risk — the single biggest threat to an account.",
+        label: "Risk management",
+        short: "A 0–100 score from your average risk per trade as a percentage of capital.",
+        example: "Example: 1% or less ⇒ 100 · 2% ⇒ 50 · 3%+ ⇒ 0.",
+        caveat: "Does not measure whether you honored the stop.",
+        longForm: "The risk score comes from your average risk per trade — distance to stop × shares, as a percentage of capital at entry. Up to 1% scores 100; each percentage point above that removes 50; 3% or more scores 0.\n\nIt does not measure whether you honored the stop or kept position size uniform — only how much you risked on average.",
       },
       es: {
         label: "Risk",
@@ -180,14 +256,24 @@ export default [
   },
   {
     id: "dnaConsistency",
+    computedIn: ["src/intelligence/core/TradeDNA.js:190"],
+    related: ["dna", "sharpe"],
+    shownAt: ["src/intelligence/ui/IntelligenceUI.jsx — דשבורד · כרטיס ה-DNA · שורה"],
+    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
-        label: "Consistency",
-        short: "מודד את יציבות הביצועים לאורך זמן: האם התוצאות אחידות, או תלויות בכמה עסקאות ענק. עקביות גבוהה = שיטה שניתן לסמוך עליה; נמוכה = תוצאות אקראיות.",
+        label: "עקביות",
+        short: "ציון 0–100 לפי פיזור תוצאות ה-R שלך: פיזור קטן = ציון גבוה.",
+        example: "לדוגמה: סטיית תקן 0R ⇒ 100 · 1.5R ⇒ 50 · 3R ומעלה ⇒ 0.",
+        caveat: "דרושות 2 עסקאות עם R לפחות.",
+        longForm: "ציון העקביות נגזר מסטיית התקן של תוצאות ה-R בעסקאות סגורות עם סטופ: 1 − (סטיית תקן ÷ 3), ומ-3R ומעלה — 0.\n\nציון גבוה = תוצאות דומות זו לזו; נמוך = תוצאות שתלויות בכמה עסקאות קיצוניות. דרושות 2 עסקאות עם R לפחות, אחרת מוצג —.",
       },
       en: {
         label: "Consistency",
-        short: "Measures the stability of your performance over time: are results uniform, or dependent on a few huge trades. High consistency means a method you can rely on; low means random results.",
+        short: "A 0–100 score from the spread of your R outcomes; less spread scores higher.",
+        example: "Example: standard deviation 0R ⇒ 100 · 1.5R ⇒ 50 · 3R+ ⇒ 0.",
+        caveat: "Needs 2+ trades with an R.",
+        longForm: "The consistency score comes from the standard deviation of R across closed trades with a stop: 1 − (standard deviation ÷ 3), and 0 from 3R up.\n\nHigh means outcomes that resemble each other; low means results that hinge on a few extreme trades. It needs at least 2 trades with an R, otherwise it shows —.",
       },
       es: {
         label: "Consistency",
@@ -205,14 +291,24 @@ export default [
   },
   {
     id: "dnaGrowth",
+    computedIn: ["src/intelligence/core/TradeDNA.js:199"],
+    related: ["dna", "equityCurve"],
+    shownAt: ["src/intelligence/ui/IntelligenceUI.jsx — דשבורד · כרטיס ה-DNA · שורה"],
+    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
-        label: "Growth",
-        short: "מודד את מגמת השיפור שלך: האם אתה לומד מהנתונים ומשתפר לאורך זמן, או חוזר על אותן טעויות. ציון עולה = העקומה הנכונה לסוחר מתפתח.",
+        label: "צמיחה",
+        short: "ציון 0–100 לפי שיפוע ה-R המצטבר ב-20 העסקאות הסגורות האחרונות; 50 = שטוח.",
+        example: "לדוגמה: R מצטבר שעולה בכ-\u200e+0.5R לעסקה ⇒ כ-75.",
+        caveat: "מעל \u200e+1R לעסקה ⇒ 100; מתחת ל-\u200e−1R ⇒ 0.",
+        longForm: "ציון הצמיחה נגזר משיפוע ה-R המצטבר ב-20 העסקאות הסגורות האחרונות עם סטופ. שיפוע אפס = 50; שיפוע של \u200e+1R לעסקה ומעלה = 100; \u200e−1R ומטה = 0.\n\nהוא מודד מגמה בתוצאות, לא למידה: ציון עולה אומר שה-R המצטבר עולה בעסקאות האחרונות.",
       },
       en: {
         label: "Growth",
-        short: "Measures your improvement trend: are you learning from the data and getting better over time, or repeating the same mistakes. A rising score is the right curve for a developing trader.",
+        short: "A 0–100 score from the slope of cumulative R over your last 20 closed trades; 50 = flat.",
+        example: "Example: cumulative R rising about +0.5R per trade ⇒ about 75.",
+        caveat: "Above +1R per trade ⇒ 100; below −1R ⇒ 0.",
+        longForm: "The growth score comes from the slope of cumulative R over your last 20 closed trades with a stop. A flat slope = 50; +1R per trade or more = 100; −1R or less = 0.\n\nIt measures a trend in results, not learning: a rising score means cumulative R is climbing over your recent trades.",
       },
       es: {
         label: "Growth",
@@ -225,6 +321,36 @@ export default [
       ar: {
         label: "Growth",
         short: "يقيس اتجاه تحسّنك: هل تتعلّم من البيانات وتتحسّن مع الوقت، أم تكرّر الأخطاء نفسها. الدرجة المتصاعدة هي المنحنى الصحيح للمتداول الذي يتطوّر.",
+      },
+    },
+  },
+  {
+    id: "setup",
+    related: ["performanceBySetup", "breakout"],
+    shownAt: ["src/components/LandingPage.jsx — דף הנחיתה · הדגשת מונח"],
+    pendingTranslation: ["es", "pt", "ar"],
+    i18n: {
+      he: {
+        label: "סטאפ (Setup)",
+        short: "תבנית הכניסה לעסקה — התנאים המדויקים שבהם אתה נכנס לפוזיציה.",
+        example: "לדוגמה: Breakout, Pullback או Bull Flag.",
+      },
+      en: {
+        label: "Setup",
+        short: "Your entry pattern — the exact conditions under which you take a position.",
+        example: "Example: Breakout, Pullback or Bull Flag.",
+      },
+      es: {
+        label: "Setup",
+        short: "Your entry pattern — the exact conditions under which you take a position.\nExample: Breakout, Pullback or Bull Flag.",
+      },
+      pt: {
+        label: "Setup",
+        short: "Your entry pattern — the exact conditions under which you take a position.\nExample: Breakout, Pullback or Bull Flag.",
+      },
+      ar: {
+        label: "Setup",
+        short: "Your entry pattern — the exact conditions under which you take a position.\nExample: Breakout, Pullback or Bull Flag.",
       },
     },
   },

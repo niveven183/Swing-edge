@@ -5,11 +5,11 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { getTranslations, isRTLLang, nTrades } from '../i18n.js';
 import useModalA11y from '../hooks/useModalA11y.js';
 import TickerLogo from './TickerLogo.jsx';
-import InfoTooltip from './ui/InfoTooltip.jsx';
+import TermTooltip from './ui/TermTooltip.jsx';
 import { EMOTION_OPTIONS } from '../data/tradeOptions.jsx';
 import { isFollowedPlan, isOffPlan, fmtR, fmtPaperPrice, isNegativeValue, calcTradeMetrics, fmt$ } from '../utils.js';
 import { sumConverted } from '../lib/tradingStats.js';
-import { getSetupTooltip } from '../intelligence/knowledgeGlue.js';
+import { resolveSetupKey } from '../glossary/index.js';
 import { outcomeRates, toPctRound } from '../intelligence/utils/statisticalModels.js';
 
 const EMOTION_EMOJI = Object.fromEntries(EMOTION_OPTIONS.map(o => [o.value, o.emoji]));
@@ -270,7 +270,7 @@ export default function DayTradesModal({ dateKey, trades = [], calcMetrics, curr
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-xs">
                   <Field label={t.cal_entry} value={tr.entry != null ? `${fmtPaperPrice(tr.entry, tr)}` : '–'} mono />
                   <Field label={t.cal_exit} value={tr.exit != null ? `${fmtPaperPrice(tr.exit, tr)}` : '–'} mono />
-                  <Field label={t.cal_setup} value={tr.setup || '–'} tip={<SetupTip setup={tr.setup} isRTL={isRTL} />} />
+                  <Field label={t.cal_setup} value={tr.setup || '–'} tip={<SetupTip setup={tr.setup} lang={lang} />} />
                   <Field
                     label={t.cal_emotion}
                     value={tr.emotionAtEntry
@@ -308,23 +308,13 @@ export default function DayTradesModal({ dateKey, trades = [], calcMetrics, curr
   );
 }
 
-// Info "?" beside a mapped setup tag — knowledge name/definition/coach line.
-// Returns null for unmapped / "Other" / empty setups, so the tag stays plain.
-function SetupTip({ setup, isRTL }) {
-  const st = getSetupTooltip(setup);
-  if (!st) return null;
-  const dir = isRTL ? 'rtl' : 'ltr';
-  return (
-    <InfoTooltip label={isRTL ? `מידע על ${st.name}` : `More info: ${st.name}`}>
-      <div dir={dir} style={{ direction: dir, textAlign: 'start' }}>
-        <div className="font-bold text-emerald-600 dark:text-emerald-400 mb-1.5 text-[13px]">{st.name}</div>
-        {st.definition && <div className="whitespace-pre-line mb-2">{st.definition}</div>}
-        {st.coachLine && (
-          <div className="whitespace-pre-line text-slate-600 dark:text-slate-300">{st.coachLine}</div>
-        )}
-      </div>
-    </InfoTooltip>
-  );
+// Info "?" beside a setup tag — the setup's glossary term (src/glossary, 5 languages).
+// Returns null for a setup with no term (Other / unmapped), so the tag stays plain.
+// 🔁 גל 3: עד 13.11 הציג את knowledge/setups.json — עברית בלבד בכל שפה.
+function SetupTip({ setup, lang }) {
+  const key = resolveSetupKey(setup);
+  if (!key) return null;
+  return <TermTooltip term={key} lang={lang} />;
 }
 
 function Field({ label, value, mono = false, tip = null }) {

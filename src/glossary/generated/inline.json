@@ -1,5 +1,5 @@
 {
-  "sourceHash": "646b65251c6c42b3",
+  "sourceHash": "9a3edb946897464a",
   "terms": {
     "winRate": {
       "category": "performance",
@@ -44,8 +44,8 @@
     "sharpe": {
       "category": "performance",
       "label": {
-        "he": "יחס שארפ",
-        "en": "Sharpe Ratio",
+        "he": "Sharpe לעסקה (R)",
+        "en": "Per-trade Sharpe (R)",
         "es": "Ratio de Sharpe",
         "pt": "Rácio de Sharpe",
         "ar": "مقياس شارب"
@@ -104,7 +104,7 @@
     "totalReturn": {
       "category": "performance",
       "label": {
-        "he": "Total Return",
+        "he": "תשואה כוללת",
         "en": "Total Return",
         "es": "Total Return",
         "pt": "Total Return",
@@ -114,28 +114,18 @@
     "winStreak": {
       "category": "performance",
       "label": {
-        "he": "Win Streak",
-        "en": "Win Streak",
+        "he": "רצף נוכחי",
+        "en": "Current Streak",
         "es": "Win Streak",
         "pt": "Win Streak",
         "ar": "Win Streak"
       }
     },
-    "streakHistory": {
-      "category": "performance",
-      "label": {
-        "he": "Streak History",
-        "en": "Streak History",
-        "es": "Streak History",
-        "pt": "Streak History",
-        "ar": "Streak History"
-      }
-    },
     "grade": {
       "category": "performance",
       "label": {
-        "he": "Grade",
-        "en": "Grade",
+        "he": "ציון חודשי",
+        "en": "Monthly Grade",
         "es": "Grade",
         "pt": "Grade",
         "ar": "Grade"
@@ -144,15 +134,35 @@
     "entryQuality": {
       "category": "performance",
       "label": {
-        "he": "Entry Quality",
+        "he": "איכות כניסה",
         "en": "Entry Quality",
         "es": "Entry Quality",
         "pt": "Entry Quality",
         "ar": "Entry Quality"
       }
     },
-    "dayOfWeek": {
+    "accountEquity": {
       "category": "performance",
+      "label": {
+        "he": "הון החשבון",
+        "en": "Account Equity",
+        "es": "Account Equity",
+        "pt": "Account Equity",
+        "ar": "Account Equity"
+      }
+    },
+    "streakHistory": {
+      "category": "analytics",
+      "label": {
+        "he": "היסטוריית רצפים",
+        "en": "Streak History",
+        "es": "Streak History",
+        "pt": "Streak History",
+        "ar": "Streak History"
+      }
+    },
+    "dayOfWeek": {
+      "category": "analytics",
       "label": {
         "he": "רווח/הפסד לפי יום בשבוע",
         "en": "P&L by Day of Week",
@@ -162,13 +172,103 @@
       }
     },
     "performanceBySetup": {
-      "category": "performance",
+      "category": "analytics",
       "label": {
         "he": "ביצועים לפי סטאפ",
         "en": "Performance by Setup",
         "es": "Rendimiento por Setup",
         "pt": "Desempenho por Setup",
         "ar": "الأداء حسب السيناريو"
+      }
+    },
+    "winRateBySetup": {
+      "category": "analytics",
+      "label": {
+        "he": "אחוז הצלחה לפי סטאפ",
+        "en": "Win Rate by Setup",
+        "es": "Win Rate by Setup",
+        "pt": "Win Rate by Setup",
+        "ar": "Win Rate by Setup"
+      }
+    },
+    "bestDay": {
+      "category": "analytics",
+      "label": {
+        "he": "היום הטוב ביותר",
+        "en": "Best Day",
+        "es": "Best Day",
+        "pt": "Best Day",
+        "ar": "Best Day"
+      }
+    },
+    "bestSetup": {
+      "category": "analytics",
+      "label": {
+        "he": "הסטאפ הטוב ביותר",
+        "en": "Best Setup",
+        "es": "Best Setup",
+        "pt": "Best Setup",
+        "ar": "Best Setup"
+      }
+    },
+    "bestEmotion": {
+      "category": "analytics",
+      "label": {
+        "he": "הרגש הטוב ביותר",
+        "en": "Best Emotion",
+        "es": "Best Emotion",
+        "pt": "Best Emotion",
+        "ar": "Best Emotion"
+      }
+    },
+    "rDistribution": {
+      "category": "analytics",
+      "label": {
+        "he": "התפלגות R",
+        "en": "R Distribution",
+        "es": "R Distribution",
+        "pt": "R Distribution",
+        "ar": "R Distribution"
+      }
+    },
+    "pnlByMonth": {
+      "category": "analytics",
+      "label": {
+        "he": "רווח/הפסד לפי חודש",
+        "en": "P&L by Month",
+        "es": "P&L by Month",
+        "pt": "P&L by Month",
+        "ar": "P&L by Month"
+      }
+    },
+    "emotionPerformance": {
+      "category": "analytics",
+      "label": {
+        "he": "ביצועים לפי רגש",
+        "en": "Emotion Performance",
+        "es": "Emotion Performance",
+        "pt": "Emotion Performance",
+        "ar": "Emotion Performance"
+      }
+    },
+    "setupMatrix": {
+      "category": "analytics",
+      "label": {
+        "he": "מטריצת סטאפים",
+        "en": "Setup Matrix",
+        "es": "Setup Matrix",
+        "pt": "Setup Matrix",
+        "ar": "Setup Matrix"
+      }
+    },
+    "holdTimeVsPnl": {
+      "category": "analytics",
+      "label": {
+        "he": "זמן החזקה מול רווח",
+        "en": "Hold Time vs P&L",
+        "es": "Hold Time vs P&L",
+        "pt": "Hold Time vs P&L",
+        "ar": "Hold Time vs P&L"
       }
     },
     "rr": {
@@ -284,8 +384,8 @@
     "dnaRisk": {
       "category": "concepts",
       "label": {
-        "he": "Risk",
-        "en": "Risk",
+        "he": "ניהול סיכון",
+        "en": "Risk management",
         "es": "Risk",
         "pt": "Risk",
         "ar": "Risk"
@@ -294,7 +394,7 @@
     "dnaConsistency": {
       "category": "concepts",
       "label": {
-        "he": "Consistency",
+        "he": "עקביות",
         "en": "Consistency",
         "es": "Consistency",
         "pt": "Consistency",
@@ -304,11 +404,21 @@
     "dnaGrowth": {
       "category": "concepts",
       "label": {
-        "he": "Growth",
+        "he": "צמיחה",
         "en": "Growth",
         "es": "Growth",
         "pt": "Growth",
         "ar": "Growth"
+      }
+    },
+    "setup": {
+      "category": "concepts",
+      "label": {
+        "he": "סטאפ (Setup)",
+        "en": "Setup",
+        "es": "Setup",
+        "pt": "Setup",
+        "ar": "Setup"
       }
     },
     "riskPerTrade": {
@@ -661,46 +771,6 @@
         "ar": "Angry"
       }
     },
-    "marketTrendingUp": {
-      "category": "market",
-      "label": {
-        "he": "Trending Up",
-        "en": "Trending Up",
-        "es": "Trending Up",
-        "pt": "Trending Up",
-        "ar": "Trending Up"
-      }
-    },
-    "marketTrendingDown": {
-      "category": "market",
-      "label": {
-        "he": "Trending Down",
-        "en": "Trending Down",
-        "es": "Trending Down",
-        "pt": "Trending Down",
-        "ar": "Trending Down"
-      }
-    },
-    "marketSideways": {
-      "category": "market",
-      "label": {
-        "he": "Sideways",
-        "en": "Sideways",
-        "es": "Sideways",
-        "pt": "Sideways",
-        "ar": "Sideways"
-      }
-    },
-    "marketVolatile": {
-      "category": "market",
-      "label": {
-        "he": "Volatile",
-        "en": "Volatile",
-        "es": "Volatile",
-        "pt": "Volatile",
-        "ar": "Volatile"
-      }
-    },
     "chartCalcPosition": {
       "category": "chart",
       "label": {
@@ -719,6 +789,16 @@
         "es": "Añadir al Diario",
         "pt": "Adicionar ao Diário",
         "ar": "أضف إلى اليوميّة"
+      }
+    },
+    "visionOcr": {
+      "category": "chart",
+      "label": {
+        "he": "Vision OCR",
+        "en": "Vision OCR",
+        "es": "Vision OCR",
+        "pt": "Vision OCR",
+        "ar": "Vision OCR"
       }
     }
   },
