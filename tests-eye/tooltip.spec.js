@@ -86,7 +86,16 @@ test.describe("glossary · the term bubble", () => {
     const trigger = page.getByRole("button", { name: TRIGGER[lang](label(lang)), exact: true }).first();
     await trigger.waitFor({ state: "visible", timeout: 15_000 });
     // Centre the "?" so a bottom sheet (≤70vh, content-sized) never lands on top of it.
-    await trigger.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    // Precondition: the dashboard finished laying out. Measured 13.11 (pixel7): the page grew 2772→2858 and
+    // scrolled 0→221 AFTER the "?" was visible, so a tap landed on a moving target. Stable = same box twice, 250ms apart.
+    let last = null, stable = false;
+    for (let i = 0; i < 40 && !stable; i++) {
+      await trigger.evaluate((el) => el.scrollIntoView({ block: "center" }));
+      const b = JSON.stringify(await trigger.boundingBox());
+      stable = b === last; last = b;
+      if (!stable) await page.waitForTimeout(250);
+    }
+    if (!stable) throw new Error("precondition: the dashboard layout never settled (the \"?\" kept moving for 10s)");
     return { ctx, page, trigger };
   }
   const touch = (info) => !!info.project.use.hasTouch;
@@ -110,8 +119,8 @@ test.describe("glossary · the term bubble", () => {
         await trigger.tap(); await settle(page);
         expect(await bubbleBox(page, lang), "precondition: the first tap opened the bubble").not.toBeNull();
         // The sheet must not lie over its own "?" (the bubble scrolls the page to keep it reachable).
-        const covered = await trigger.evaluate((el) => { const r = el.getBoundingClientRect(); const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return !(top === el || el.contains(top)); });
-        expect(covered, "the open sheet covers the \"?\" — a second tap cannot reach it").toBe(false);
+        const cover = await trigger.evaluate((el) => { const r = el.getBoundingClientRect(); const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return top === el || el.contains(top) ? null : `${top?.tagName}.${String(top?.className).slice(0, 60)} at y=${Math.round(r.y)}`; });
+        expect(cover, `something covers the "?" — a second tap cannot reach it`).toBeNull();
         await trigger.tap(); await settle(page);
         expect(await bubbleBox(page, lang), "the second tap left the bubble open").toBeNull();
       } finally { await ctx.close(); }
