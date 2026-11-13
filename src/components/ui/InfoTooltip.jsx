@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useId } from 'react';
+import { createPortal } from 'react-dom';
 
 // The "?" toggletip (wave 3, 13.11 — tests-eye/tooltip.spec.js · red-before scripts/eye-tooltip-probe.mjs).
 //
@@ -14,6 +15,9 @@ import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useId
 // (the bubble is clamped into the viewport; the arrow is not). ✕ at the inline END (`end-2`).
 // A11y: button aria-expanded/aria-controls + the content in a role=status region (toggletip pattern;
 // role=tooltip is for hover/focus hints, ⛔ for content opened by a click).
+// Portal: the bubble renders into document.body. Inline, `position: fixed` was anchored to whichever
+// ancestor had a transform/filter (cards, panels) ⇒ measured 13.11: a 382px "sheet" in a 390px
+// iPhone viewport, and a sheet lying over its own "?" so the second tap could not reach it.
 // `children` may be a function ({ close }) => node, so content can close the bubble (TermTooltip's
 // "more in glossary" link).
 
@@ -140,7 +144,7 @@ export default function InfoTooltip({ children, label = 'More info', closeLabel 
         ?
       </button>
 
-      {open && geo && (
+      {open && geo && createPortal(
         <div
           ref={popRef}
           data-term-pop=""
@@ -188,7 +192,8 @@ export default function InfoTooltip({ children, label = 'More info', closeLabel 
           >
             ✕
           </button>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
