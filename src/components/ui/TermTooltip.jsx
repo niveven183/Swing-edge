@@ -1,14 +1,13 @@
 import InfoTooltip from './InfoTooltip.jsx';
-import { TRADING_TOOLTIPS, TERM_LABELS } from '../../data/tooltips.js';
+import { termText, termLabel } from '../../glossary/index.js';
 import { isRTLLang } from '../../i18n.js';
 
 // Thin, lang-aware wrapper over the accessible InfoTooltip primitive.
-// Reads copy from the central glossary (single source: data/tooltips.js).
+// Reads copy from the central glossary (single source: src/glossary/terms → generated/).
 // Usage: <TermTooltip term="rr" lang={lang} />  or  <TermTooltip term="rr" lang={lang}>R/R</TermTooltip>
 export default function TermTooltip({ term, lang = 'he', label, children }) {
-  const entry = TRADING_TOOLTIPS[term];
-  const desc = entry ? (entry[lang] || entry.en) : '';
-  const heading = label ?? (TERM_LABELS[term]?.[lang] || TERM_LABELS[term]?.en);
+  const desc = termText(term, lang) ?? '';
+  const heading = label ?? termLabel(term, lang);
 
   if (!desc) return children ?? null;
 

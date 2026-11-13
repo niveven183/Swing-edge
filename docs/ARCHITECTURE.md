@@ -37,11 +37,13 @@ primitives (incl. `setupGraphs.jsx`, used by `tradeOptions.jsx`).
   `VALID_EMOTIONS`. Never rename a `value`.
 - `tradeOptions.jsx` — **re-exports every name from `tradeEnums.js`** and adds
   the React/graph layer. ⛔ Not a second source — import from either.
-- `tooltips.js` — term dictionary in **5 languages** (en/he/es/pt/ar), **72
-  terms**, plus `TERM_LABELS` (also 72), consumed by `TermTooltip`.
-  ⚠️ `glossary.json` is **derived** from it — after editing a tooltip run
-  `npm run glossary` in the same commit, or `test:copy` #5 catches the drift.
-  _`node -e "import('./src/data/tooltips.js').then(m=>console.log(Object.keys(m.TRADING_TOOLTIPS).length))"`_
+- ~~`tooltips.js`~~ — **removed 13.11 (wave 3)**. The term dictionary lives in
+  `src/glossary/terms/<category>.js` (8 files, 5 languages); the app reads only
+  `src/glossary/index.js` (`termText` · `termLabel` · `hasTerm` ·
+  `resolveSetupKey`), which reads only `src/glossary/generated/*.json`.
+  ⚠️ `glossary.json` here is **generated** from that source — after editing a
+  term run `npm run glossary` in the same commit, or `test:glossary` catches it.
+  _`node -e "import('./src/glossary/generated/inline.json',{with:{type:'json'}}).then(m=>console.log(Object.keys(m.default.terms).length))"`_
 - `tickers.js`, `glossary.json` — symbol list and glossary content (see
   `scripts/build-glossary.mjs`).
 

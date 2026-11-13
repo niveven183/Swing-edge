@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import InfoTooltip from "../../components/ui/InfoTooltip.jsx";
 import TermTooltip from "../../components/ui/TermTooltip.jsx";
-import { TRADING_TOOLTIPS } from "../../data/tooltips.js";
+import { hasTerm } from "../../glossary/index.js";
 import { dayLabel } from "../utils/statisticalModels.js";
 import { fmtR } from "../../utils.js";
 import { nTrades, labelFor } from "../../i18n.js";
@@ -135,7 +135,7 @@ export const PatternTags = ({ parts = [], className = "", lang = "en" }) => {
       {list.map((p, i) => {
         // Canonical "?" home for the R/R "3+" band — the only rr value with glossary
         // copy. Other bands (<1, 1-2, 2-3) intentionally render no tooltip.
-        const showRRHelp = p.dim === "rr" && p.value === "3+" && TRADING_TOOLTIPS.rrBucket3plus;
+        const showRRHelp = p.dim === "rr" && p.value === "3+" && hasTerm("rrBucket3plus");
         return (
           <span
             key={`${p.dim}:${p.value}:${i}`}

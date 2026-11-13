@@ -23,9 +23,10 @@
 // formula that only affects the 8/32 users at 0.5%.
 //
 // GLOSSARY DRIFT (assertion 5). src/data/glossary.json holds a generated COPY
-// of every tooltip, built by `npm run glossary`. That script is in neither
-// `build` nor `verify`, so editing tooltips.js alone leaves the stale sentence
-// alive in the glossary with nothing to notice. This assertion is the notice.
+// of every tooltip, built by `npm run glossary` from src/glossary/terms/.
+// Editing a term without regenerating leaves the stale sentence alive in the
+// copy. test:glossary now catches every generated file byte-for-byte; this
+// assertion stays as the riskLimits-specific notice it always was.
 //
 // CONTRAST (assertions 8-15). The onboarding recommendation banner — the first
 // screen a new user sees — rendered text-emerald-400 on bg-emerald-500/10.
@@ -40,7 +41,7 @@
 // capability-guard-test: they prove the write is WRITTEN, not that it RUNS.
 
 import { readFileSync } from "node:fs";
-import { TRADING_TOOLTIPS } from "../src/data/tooltips.js";
+import { termText } from "../src/glossary/index.js";
 
 const read = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
 const landingSrc = read("../src/components/LandingPage.jsx");
@@ -57,7 +58,8 @@ function check(id, label, ok, detail = "") {
 }
 
 // ── §1 — the riskLimits tooltip is generic ──────────────────────────────────
-const riskLimits = TRADING_TOOLTIPS.riskLimits;
+// The DISPLAYED text per language, from the one runtime source (src/glossary/index.js).
+const riskLimits = Object.fromEntries(LANGS.map((l) => [l, termText("riskLimits", l)]));
 
 {
   const bad = LANGS.filter((l) => /\(\s*1\s*%\s*\)/.test(riskLimits[l] || ""));
@@ -99,7 +101,7 @@ const riskLimits = TRADING_TOOLTIPS.riskLimits;
   const drifted = g === null
     ? ["glossary.json has no riskLimits desc — shape changed"]
     : LANGS.filter((l) => (g[l] || "") !== (riskLimits[l] || ""));
-  check("5", "glossary.json riskLimits matches tooltips.js (run `npm run glossary`)",
+  check("5", "glossary.json riskLimits matches the displayed text (run `npm run glossary`)",
     Array.isArray(drifted) && drifted.length === 0,
     Array.isArray(drifted) ? `drifted: ${drifted.join(", ")}` : "");
 }

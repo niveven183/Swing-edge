@@ -1,0 +1,222 @@
+{
+  "sourceHash": "646b65251c6c42b3",
+  "lang": "es",
+  "terms": {
+    "winRate": {
+      "short": "La Win Rate es el porcentaje de tus operaciones cerradas que terminaron en ganancia.\n\nPor encima del 55% es sólido. Pero la win rate por sí sola no determina el éxito — un trader con 40% puede ser rentable con buenas relaciones riesgo-beneficio. Fíjate también en el Profit Factor."
+    },
+    "profitFactor": {
+      "short": "Profit Factor = Ganancias Brutas Totales ÷ Pérdidas Brutas Totales.\n\n• Por encima de 1.0 = rentable\n• Por encima de 1.5 = ventaja sana\n• Por encima de 2.0 = nivel profesional\n• Por encima de 3.0 = excepcional\n\nEs una de las métricas más importantes en el trading."
+    },
+    "avgR": {
+      "short": "R-Multiple promedio por operación cerrada.\n\nR = ganancia de la operación ÷ riesgo inicial por acción. La ganancia sigue la dirección de la operación: en un LONG es (Salida − Entrada), en un SHORT es (Entrada − Salida) — así que un SHORT ganador siempre da un R positivo.\n\n+1.0R significa que ganaste exactamente lo que arriesgaste. Apunta a +0.3R o más como promedio mínimo. Los traders de élite promedian +1.5R a +2.5R.\n\nSolo las operaciones con stop pueden medirse en R — una operación sin stop se excluye de este promedio, no cuenta como 0R. La línea bajo el número muestra cuántas de tus operaciones cerradas cubre realmente el promedio."
+    },
+    "expectancy": {
+      "short": "Expectativa = (% Ganancias × Ganancia Media) − (% Pérdidas × Pérdida Media).\n\nTe dice el beneficio esperado en dólares por operación en promedio. Positiva = tu sistema tiene ventaja. Negativa = pierdes dinero con el tiempo sin importar las ganancias individuales."
+    },
+    "sharpe": {
+      "short": "El Ratio de Sharpe mide el rendimiento ajustado al riesgo.\n\n• Por encima de 1.0 = bueno\n• Por encima de 2.0 = excelente\n• Por encima de 3.0 = excepcional (nivel de hedge fund)\n\nUn Sharpe alto significa rendimientos consistentes sin oscilaciones bruscas. Más importante que el beneficio bruto para evaluar la calidad del sistema."
+    },
+    "maxDD": {
+      "short": "Drawdown Máximo — la mayor caída en dólares desde un pico en el saldo de tu cuenta hasta el punto más bajo antes de recuperarse.\n\nUn número menor significa menos rachas perdedoras grandes y mejor preservación del capital. Los drawdowns profundos son psicológicamente dañinos y difíciles de recuperar matemáticamente."
+    },
+    "avgWin": {
+      "short": "Beneficio promedio en operaciones ganadoras."
+    },
+    "avgLoss": {
+      "short": "Pérdida promedio en operaciones perdedoras."
+    },
+    "avgHold": {
+      "short": "Periodo medio de mantenimiento por operación cerrada (en días).\n\nEl swing trading suele apuntar a mantener 2-10 días. Mantenimientos muy cortos (< 1 día) a menudo indican cerrar operaciones demasiado pronto. Mantenimientos muy largos (> 20 días) pueden sugerir evitar los stop-loss."
+    },
+    "equityCurve": {
+      "short": "Tu Curva de Capital muestra el saldo de la cuenta a lo largo del tiempo.\n\nUna curva suave y en ascenso constante = ventaja consistente y buena gestión del riesgo.\nPicos irregulares = tamaño de posición inconsistente o trading emocional.\nLargos periodos planos = sobreoperar sin ventaja."
+    },
+    "totalReturn": {
+      "short": "Tu ganancia o pérdida total desde que empezaste, como porcentaje del capital inicial. La cifra principal de rendimiento, pero sin contexto de riesgo no cuenta toda la historia."
+    },
+    "winStreak": {
+      "short": "El número de operaciones ganadoras seguidas. Una racha ganadora genera confianza, pero también es el momento más peligroso para el exceso de confianza y un riesgo indisciplinado."
+    },
+    "streakHistory": {
+      "short": "Un registro de tus rachas ganadoras y perdedoras a lo largo del tiempo. Revela patrones emocionales: ¿una racha perdedora te hace operar peor (tilt) o te recuperas con disciplina?"
+    },
+    "grade": {
+      "short": "Una puntuación ponderada (A–F) que resume la calidad de tu trading del mes: una mezcla de tasa de aciertos, múltiplo R, disciplina y consistencia. Una instantánea rápida, no un sustituto de analizar los detalles."
+    },
+    "entryQuality": {
+      "short": "Una calificación (estrellas) de cuán bien tu entrada coincidió con el setup planificado: timing, precio y confirmación. Una calificación alta y constante indica disciplina, incluso cuando la operación pierde."
+    },
+    "dayOfWeek": {
+      "short": "Tu ganancia/pérdida desglosada por día de la semana. Revela en qué días ganas o pierdes dinero de forma consistente — muchos traders tienen un edge oculto (o una fuga) ligado a días concretos como lunes o viernes."
+    },
+    "performanceBySetup": {
+      "short": "Un desglose de cada setup que operas — win rate, R total y número de operaciones. Muestra de un vistazo qué setups sostienen tu cuenta y cuáles la drenan. Tus edges y anti-edges, lado a lado."
+    },
+    "rr": {
+      "short": "Riesgo/Beneficio. Beneficio potencial vs. lo que arriesgas. 3:1 = puedes ganar 3× lo que perderías."
+    },
+    "rMultiple": {
+      "short": "R-Multiple = ganancia de la operación ÷ riesgo inicial. La ganancia sigue la dirección de la operación: en un LONG es (Salida − Entrada), en un SHORT es (Entrada − Salida) — así que un SHORT ganador siempre da un R positivo.\n\nEjemplos:\n+2R = ganaste 2× lo que arriesgaste ✓\n+1R = ganaste exactamente lo que arriesgaste ✓\n-1R = perdiste tu riesgo planificado (normal)\n-2R = el stop no se respetó (problema)\n\nSeguir el R-Multiple elimina el sesgo del dólar y te permite comparar operaciones objetivamente."
+    },
+    "mfeMae": {
+      "short": "Cuán lejos llegó una operación a tu favor (MFE) y en tu contra (MAE) antes de cerrarse. Ayuda a afinar stops y objetivos."
+    },
+    "wilson": {
+      "short": "Una estimación cautelosa de tu win rate \"real\" cuando el tamaño de muestra es pequeño. Evita que una racha corta te engañe."
+    },
+    "rrBucket3plus": {
+      "short": "Un grupo de operaciones con una relación riesgo/beneficio de 3 o más: la recompensa potencial es al menos 3× el riesgo. Son las operaciones de mayor calidad por ratio: incluso con una tasa de aciertos baja, ganar una fracción basta para ser rentable."
+    },
+    "dna": {
+      "short": "Tu Trading DNA mide 4 dimensiones centrales de tu personalidad como trader:\n\n• Gestión de Riesgo (0-100): Qué tan bien controlas las pérdidas\n• Disciplina (0-100): ¿Sigues tus reglas?\n• Consistencia (0-100): Resultados estables en distintas condiciones\n• Crecimiento (0-100): ¿Estás mejorando con el tiempo?\n\nBasado en tu historial real de operaciones — no en autoevaluación."
+    },
+    "edge": {
+      "short": "Tu Edge — setups donde tienes una ventaja estadísticamente significativa según tu historial real de operaciones.\n\nAlta win rate + R promedio positivo = edge real. Estos son los setups que más deberías operar. El mercado te paga por hacerlos."
+    },
+    "antiEdge": {
+      "short": "Anti-Edge — setups donde pierdes dinero de forma consistente según tu historial de operaciones.\n\nWin rate baja + R negativo = tu anti-edge personal. O corriges estos setups (estudia por qué te fallan) o dejas de operarlos por completo.\n\nEvitar los anti-edges es tan importante como explotar los edges."
+    },
+    "tilt": {
+      "short": "Tilt — estado emocional que te hace desviarte de tus reglas de trading.\n\nComún tras: grandes pérdidas, perderte un gran movimiento, o una racha de ganancias que genera exceso de confianza.\n\nSeñales: aumentar el tamaño de posición, operar con más frecuencia, ignorar los stops.\n\nPrevención: pausa obligatoria tras 2+ pérdidas consecutivas."
+    },
+    "marketRegime": {
+      "short": "Régimen de Mercado — el entorno de mercado actual, leído de la acción real del precio (no de tus operaciones). Se calcula con SPY/QQQ frente a su media de 20 días, el % de tendencia, cuántos ETF sectoriales suben (amplitud) y la volatilidad realizada.\n\n• Tendencia Alcista: Tendencia al alza — precio por encima de una media de 20 días creciente con participación amplia. Favorece breakouts y pullbacks.\n• Tendencia Bajista: Tendencia a la baja — precio por debajo de una media de 20 días decreciente, debilidad amplia. Favorece cortos o mantente al margen.\n• Lateral/Rango: Sin tendencia neta — precio atrapado entre soporte y resistencia. Opera los extremos, evita breakouts.\n• Alta Volatilidad: Dominan los fuertes vaivenes diarios. Reduce tamaño ~50% y amplía stops.\n• Baja Volatilidad: Mercado tranquilo y comprimido — espera movimientos pequeños.\n\nMuestra 'Datos insuficientes' cuando no hay suficiente historial de precios para clasificar."
+    },
+    "discipline": {
+      "short": "Si seguiste tu plan — stop, tamaño, objetivo — sin desviación emocional. El núcleo de la rentabilidad a largo plazo."
+    },
+    "dnaRisk": {
+      "short": "Mide cuán consistente eres gestionando el riesgo: tamaño de posición uniforme, respetar los stops y no superar el riesgo planificado por operación. Una puntuación baja significa riesgo inconsistente, la mayor amenaza para una cuenta."
+    },
+    "dnaConsistency": {
+      "short": "Mide la estabilidad de tu rendimiento a lo largo del tiempo: si los resultados son uniformes o dependen de unas pocas operaciones enormes. Alta consistencia es un método fiable; baja, resultados aleatorios."
+    },
+    "dnaGrowth": {
+      "short": "Mide tu tendencia de mejora: si aprendes de los datos y mejoras con el tiempo, o repites los mismos errores. Una puntuación creciente es la curva correcta para un trader en desarrollo."
+    },
+    "riskPerTrade": {
+      "short": "Riesgo máximo por operación como % del total de la cuenta.\n\nEstándar profesional:\n• 1% por operación = conservador, sostenible\n• 2% por operación = moderado, aún aceptable\n• 5%+ por operación = territorio de apuestas\n\nEl 'riesgo de ruina' aumenta exponencialmente por encima del 2% por operación."
+    },
+    "riskLimits": {
+      "short": "Dos límites funcionan juntos:\n\n• Riesgo/Operación — lo máximo que arriesgas en una sola posición. Tú lo eliges en Ajustes.\n• Riesgo Máximo Permitido — lo máximo que arriesgas en TODAS las posiciones abiertas combinadas. Se deriva del Riesgo/Operación: el doble, nunca por debajo del 3% ni por encima del 5%.\n\nDivide el Riesgo Máximo Permitido entre el Riesgo/Operación para saber cuántas posiciones de tamaño completo puedes mantener a la vez."
+    },
+    "positionSize": {
+      "short": "Tamaño de Posición = (Tamaño de Cuenta × % Riesgo) ÷ (Entrada − Stop Loss)\n\nEjemplo: cuenta de $10,000, 1% de riesgo, entrada $100, stop $97:\nPosición = $100 ÷ $3 = 33 acciones\n\nCalcula siempre antes de entrar. Nunca dimensiones por intuición."
+    },
+    "stopLoss": {
+      "short": "Stop Loss — el nivel de precio donde sales de una operación perdedora para evitar pérdidas mayores.\n\nColócalo en un nivel técnico lógico:\n• Por debajo de un soporte clave (operaciones largas)\n• Por encima de una resistencia clave (operaciones cortas)\n• Nunca arbitrario (p. ej., 'solo $0.50 bajo la entrada')\n\nUn stop loss no es opcional — es la base de la gestión del riesgo."
+    },
+    "takeProfit": {
+      "short": "Take Profit — tu precio objetivo para salir de una operación ganadora.\n\nRegla mínima: El objetivo debe ser al menos 1.5× tu riesgo (1.5R).\n\nBuena práctica:\n• Salida escalonada: toma 50% en 1R, mantén el resto hasta el objetivo\n• Usa niveles técnicos (resistencia, máximos previos)\n• Nunca muevas el objetivo más abajo cuando vas ganando"
+    },
+    "breakout": {
+      "short": "Precio rompiendo por encima de un nivel de resistencia clave con volumen. Funciona mejor en mercados con tendencia."
+    },
+    "pullback": {
+      "short": "Comprar cuando un precio en tendencia alcista retrocede temporalmente hacia un soporte —una media móvil, un nivel de ruptura previo o una línea de tendencia— y luego retoma el alza. Entrar en el retroceso da mejor precio y un stop más ajustado que perseguir."
+    },
+    "bullFlag": {
+      "short": "Consolidación estrecha tras un movimiento brusco al alza. El volumen debe contraerse durante la bandera."
+    },
+    "ORBBreakout": {
+      "short": "Opening Range Breakout — ruptura del máximo/mínimo de los primeros 15-30 min. Fuerte en días de tendencia."
+    },
+    "VWAPReclaim": {
+      "short": "El precio recupera el VWAP tras una caída matinal con volumen. Indica compra institucional."
+    },
+    "higherLow": {
+      "short": "Cada retroceso forma un mínimo más alto que el anterior. El setup más limpio en tendencia alcista."
+    },
+    "cupAndHandle": {
+      "short": "Consolidación en forma de U con un asa estrecha a la derecha. Patrón de continuación clásico."
+    },
+    "failedBreakout": {
+      "short": "Ruptura que se revierte rápidamente. Trampa para compradores tardíos — corto al recuperar el nivel de ruptura."
+    },
+    "overextendedFade": {
+      "short": "Operación contra-tendencia cuando el precio está 8%+ sobre la 20 EMA con RSI alto. Requiere paciencia."
+    },
+    "EMABounce50": {
+      "short": "Retroceso a la 50 EMA en gráfico diario. Soporte importante en tendencias alcistas fuertes."
+    },
+    "trendContinuation": {
+      "short": "Entrada en un retroceso superficial a la 9 EMA en una tendencia establecida. Stops ajustados, R alto."
+    },
+    "gapAndGo": {
+      "short": "La acción abre con hueco al alza y continúa sin rellenarlo. Mejor con un catalizador de noticias."
+    },
+    "earningsGapPlay": {
+      "short": "Operar la reacción del hueco tras resultados. Mantén las ganadoras, cubre a la primera señal de compra."
+    },
+    "rangeBreakout": {
+      "short": "El precio rompe un rango de varios días/semanas. Más fiable cuando el volumen se expande."
+    },
+    "postEarningsStrength": {
+      "short": "La acción se mantiene sobre el hueco alcista tras superar resultados. Señal de acumulación institucional."
+    },
+    "powerHourBreak": {
+      "short": "Ruptura en la última hora (15:00-16:00 ET). Posicionamiento institucional hacia el cierre."
+    },
+    "MOCFade": {
+      "short": "Fade de Market-On-Close. Operar contra movimientos extendidos hacia el cierre para un giro al día siguiente."
+    },
+    "overnightHold": {
+      "short": "Operación mantenida toda la noche. Mayor potencial de recompensa pero expuesta al riesgo de hueco."
+    },
+    "overnightReversal": {
+      "short": "Operar el giro del movimiento nocturno en la apertura. Contra-tendencia, requiere confirmación."
+    },
+    "supportBounce": {
+      "short": "Comprar cuando el precio cae a un nivel de soporte conocido y rebota al alza. La lógica: los compradores defienden el nivel. El stop va debajo del soporte; si se rompe, la tesis queda anulada."
+    },
+    "resistanceBreak": {
+      "short": "Entrar cuando el precio rompe por encima de un nivel de resistencia que antes lo frenaba, idealmente con volumen alto. La ruptura indica que los compradores tomaron el control. Se diferencia de un Breakout genérico por enfocarse en un nivel específico."
+    },
+    "pullback20EMA": {
+      "short": "Comprar cuando un precio en tendencia alcista retrocede a la media móvil de 20 períodos y rebota. La 20 EMA actúa como soporte dinámico; este setup combina tendencia con un punto de entrada preciso."
+    },
+    "emotionConfident": {
+      "short": "Confianza basada en el análisis, no en la arrogancia. Sobre un setup válido impulsa una ejecución disciplinada; si se convierte en exceso de confianza tras una racha ganadora, se vuelve peligrosa."
+    },
+    "emotionCalm": {
+      "short": "El estado emocional óptimo para un trader. La calma te permite seguir tu plan sin perseguir ni entrar en pánico. Las operaciones abiertas con calma tienden a respetar su stop y objetivo."
+    },
+    "emotionPatient": {
+      "short": "Esperar un setup que realmente cumpla tus criterios en lugar de entrar en cada movimiento. La paciencia suele ser lo que separa a un trader rentable de uno perdedor: filtra las operaciones de baja calidad."
+    },
+    "emotionNeutral": {
+      "short": "Entrar sin carga emocional, ni eufórico ni temeroso. Un estado estable que permite decisiones objetivas basadas en datos. Una buena base, aunque menos afilada que \"Calm\"."
+    },
+    "emotionHesitant": {
+      "short": "Vacilación en la entrada, normalmente señal de que el setup no está claro o la confianza es baja. Las entradas vacilantes suelen implicar entrar tarde, poner el stop demasiado ajustado o salir antes por miedo."
+    },
+    "emotionNervous": {
+      "short": "Tensión que nubla la toma de decisiones. El nerviosismo lleva a revisar el precio de forma obsesiva, mover el stop y salir impulsivamente. Suele indicar una posición demasiado grande o falta de confianza en el setup."
+    },
+    "emotionFOMO": {
+      "short": "\"Miedo a quedarse fuera\" — entrar en una operación solo porque el precio se movió con fuerza, sin un setup válido. Uno de los patrones más destructivos: entrada tardía, perseguir el precio y un stop lejano. Una señal de alerta."
+    },
+    "emotionAngry": {
+      "short": "Ira tras una pérdida — el combustible del \"trading de venganza\". En este estado el trader intenta recuperar la pérdida de inmediato, aumenta el riesgo y entra en malas operaciones. Así se revientan las cuentas. Detente."
+    },
+    "marketTrendingUp": {
+      "short": "Un mercado en tendencia alcista: máximos y mínimos más altos. Los setups en largo funcionan mejor aquí; operar contra la tendencia es arriesgado."
+    },
+    "marketTrendingDown": {
+      "short": "Un mercado en tendencia bajista: máximos y mínimos más bajos. Los setups en corto funcionan mejor; \"atrapar un cuchillo que cae\" en largo es peligroso."
+    },
+    "marketSideways": {
+      "short": "Un mercado sin tendencia clara, que se mueve horizontalmente entre soporte y resistencia. Los setups de tendencia fallan aquí; el trading de rango (comprar en soporte, vender en resistencia) encaja mejor."
+    },
+    "marketVolatile": {
+      "short": "Un mercado con oscilaciones de precio bruscas y rápidas en ambas direcciones. Los stops saltan con facilidad y el tamaño de la posición debe ser menor. Grandes oportunidades pero alto riesgo."
+    },
+    "chartCalcPosition": {
+      "short": "Rellena automáticamente la Calculadora de Posición desde el gráfico actual — ticker, precio en vivo como entrada, un stop protector y un objetivo 2:1 — y luego la abre para que dimensiones la operación en un clic."
+    },
+    "chartAddToJournal": {
+      "short": "Inicia una nueva operación en el diario desde el gráfico actual — ticker, precio en vivo, un stop sugerido y un objetivo 2:1 pre-rellenados — lista para que la revises y guardes."
+    }
+  }
+}

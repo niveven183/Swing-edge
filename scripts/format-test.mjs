@@ -18,7 +18,7 @@
 
 import { readFileSync } from "node:fs";
 import { fmt$, fmt$0, fmtR, formatPct, formatReturnPct, isNegativeValue, fmtPaperPrice } from "../src/utils.js";
-import { TRADING_TOOLTIPS } from "../src/data/tooltips.js";
+import { termText } from "../src/glossary/index.js";
 
 let failures = 0;
 const check = (name, cond) => {
@@ -103,14 +103,14 @@ const LANGS = ["en", "he", "es", "pt", "ar"];
   console.log("\n7 · tooltips · R is direction-aware in all 5 languages");
   for (const key of ["avgR", "rMultiple"]) {
     for (const lang of LANGS) {
-      const s = TRADING_TOOLTIPS[key]?.[lang];
+      const s = termText(key, lang);
       check(`${key}.${lang} names LONG and SHORT`,
         typeof s === "string" && s.includes("LONG") && s.includes("SHORT"));
     }
   }
   for (const lang of LANGS) {
     check(`avgR.${lang} still states that a stopless trade is excluded, not 0R`,
-      /0R/.test(TRADING_TOOLTIPS.avgR?.[lang] ?? ""));
+      /0R/.test(termText("avgR", lang) ?? ""));
   }
 }
 

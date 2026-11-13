@@ -1,0 +1,750 @@
+{
+  "sourceHash": "646b65251c6c42b3",
+  "terms": {
+    "winRate": {
+      "category": "performance",
+      "label": {
+        "he": "אחוז הצלחה",
+        "en": "Win Rate",
+        "es": "Tasa de Acierto",
+        "pt": "Taxa de Acerto",
+        "ar": "نسبة الربح"
+      }
+    },
+    "profitFactor": {
+      "category": "performance",
+      "label": {
+        "he": "Profit Factor",
+        "en": "Profit Factor",
+        "es": "Profit Factor",
+        "pt": "Profit Factor",
+        "ar": "Profit Factor"
+      }
+    },
+    "avgR": {
+      "category": "performance",
+      "label": {
+        "he": "R ממוצע",
+        "en": "Avg R",
+        "es": "R Promedio",
+        "pt": "R Médio",
+        "ar": "متوسّط R"
+      }
+    },
+    "expectancy": {
+      "category": "performance",
+      "label": {
+        "he": "תוחלת",
+        "en": "Expectancy",
+        "es": "Expectativa",
+        "pt": "Expectativa",
+        "ar": "التوقّع"
+      }
+    },
+    "sharpe": {
+      "category": "performance",
+      "label": {
+        "he": "יחס שארפ",
+        "en": "Sharpe Ratio",
+        "es": "Ratio de Sharpe",
+        "pt": "Rácio de Sharpe",
+        "ar": "مقياس شارب"
+      }
+    },
+    "maxDD": {
+      "category": "performance",
+      "label": {
+        "he": "ירידה מקסימלית",
+        "en": "Max Drawdown",
+        "es": "Drawdown Máximo",
+        "pt": "Drawdown Máximo",
+        "ar": "أقصى تراجع"
+      }
+    },
+    "avgWin": {
+      "category": "performance",
+      "label": {
+        "he": "רווח ממוצע",
+        "en": "Avg Win",
+        "es": "Ganancia Media",
+        "pt": "Ganho Médio",
+        "ar": "متوسّط الربح"
+      }
+    },
+    "avgLoss": {
+      "category": "performance",
+      "label": {
+        "he": "הפסד ממוצע",
+        "en": "Avg Loss",
+        "es": "Pérdida Media",
+        "pt": "Perda Média",
+        "ar": "متوسّط الخسارة"
+      }
+    },
+    "avgHold": {
+      "category": "performance",
+      "label": {
+        "he": "זמן החזקה ממוצע",
+        "en": "Avg Hold",
+        "es": "Tiempo Medio",
+        "pt": "Tempo Médio",
+        "ar": "متوسّط مدّة الاحتفاظ"
+      }
+    },
+    "equityCurve": {
+      "category": "performance",
+      "label": {
+        "he": "עקומת הון",
+        "en": "Equity Curve",
+        "es": "Curva de Capital",
+        "pt": "Curva de Capital",
+        "ar": "منحنى رأس المال"
+      }
+    },
+    "totalReturn": {
+      "category": "performance",
+      "label": {
+        "he": "Total Return",
+        "en": "Total Return",
+        "es": "Total Return",
+        "pt": "Total Return",
+        "ar": "Total Return"
+      }
+    },
+    "winStreak": {
+      "category": "performance",
+      "label": {
+        "he": "Win Streak",
+        "en": "Win Streak",
+        "es": "Win Streak",
+        "pt": "Win Streak",
+        "ar": "Win Streak"
+      }
+    },
+    "streakHistory": {
+      "category": "performance",
+      "label": {
+        "he": "Streak History",
+        "en": "Streak History",
+        "es": "Streak History",
+        "pt": "Streak History",
+        "ar": "Streak History"
+      }
+    },
+    "grade": {
+      "category": "performance",
+      "label": {
+        "he": "Grade",
+        "en": "Grade",
+        "es": "Grade",
+        "pt": "Grade",
+        "ar": "Grade"
+      }
+    },
+    "entryQuality": {
+      "category": "performance",
+      "label": {
+        "he": "Entry Quality",
+        "en": "Entry Quality",
+        "es": "Entry Quality",
+        "pt": "Entry Quality",
+        "ar": "Entry Quality"
+      }
+    },
+    "dayOfWeek": {
+      "category": "performance",
+      "label": {
+        "he": "רווח/הפסד לפי יום בשבוע",
+        "en": "P&L by Day of Week",
+        "es": "G/P por Día de la Semana",
+        "pt": "L/P por Dia da Semana",
+        "ar": "الربح/الخسارة حسب يوم الأسبوع"
+      }
+    },
+    "performanceBySetup": {
+      "category": "performance",
+      "label": {
+        "he": "ביצועים לפי סטאפ",
+        "en": "Performance by Setup",
+        "es": "Rendimiento por Setup",
+        "pt": "Desempenho por Setup",
+        "ar": "الأداء حسب السيناريو"
+      }
+    },
+    "rr": {
+      "category": "metrics",
+      "label": {
+        "he": "סיכון / סיכוי · R/R",
+        "en": "Risk / Reward",
+        "es": "Riesgo / Beneficio · R/R",
+        "pt": "Risco / Retorno · R/R",
+        "ar": "المخاطرة / العائد · R/R"
+      }
+    },
+    "rMultiple": {
+      "category": "metrics",
+      "label": {
+        "he": "R-Multiple",
+        "en": "R-Multiple",
+        "es": "R-Multiple",
+        "pt": "R-Multiple",
+        "ar": "R-Multiple"
+      }
+    },
+    "mfeMae": {
+      "category": "metrics",
+      "label": {
+        "he": "MFE / MAE",
+        "en": "MFE / MAE",
+        "es": "MFE / MAE",
+        "pt": "MFE / MAE",
+        "ar": "MFE / MAE"
+      }
+    },
+    "wilson": {
+      "category": "metrics",
+      "label": {
+        "he": "ציון Wilson",
+        "en": "Wilson Score",
+        "es": "Wilson Score",
+        "pt": "Wilson Score",
+        "ar": "Wilson Score"
+      }
+    },
+    "rrBucket3plus": {
+      "category": "metrics",
+      "label": {
+        "he": "R/R 3+",
+        "en": "R/R 3+",
+        "es": "R/R 3+",
+        "pt": "R/R 3+",
+        "ar": "R/R 3+"
+      }
+    },
+    "dna": {
+      "category": "concepts",
+      "label": {
+        "he": "DNA מסחרי",
+        "en": "Trading DNA",
+        "es": "Trading DNA",
+        "pt": "Trading DNA",
+        "ar": "Trading DNA"
+      }
+    },
+    "edge": {
+      "category": "concepts",
+      "label": {
+        "he": "Edge",
+        "en": "Edge",
+        "es": "Edge",
+        "pt": "Edge",
+        "ar": "Edge"
+      }
+    },
+    "antiEdge": {
+      "category": "concepts",
+      "label": {
+        "he": "Anti-Edge",
+        "en": "Anti-Edge",
+        "es": "Anti-Edge",
+        "pt": "Anti-Edge",
+        "ar": "Anti-Edge"
+      }
+    },
+    "tilt": {
+      "category": "concepts",
+      "label": {
+        "he": "Tilt",
+        "en": "Tilt",
+        "es": "Tilt",
+        "pt": "Tilt",
+        "ar": "Tilt"
+      }
+    },
+    "marketRegime": {
+      "category": "concepts",
+      "label": {
+        "he": "מצב שוק",
+        "en": "Market Regime",
+        "es": "Régimen de Mercado",
+        "pt": "Regime de Mercado",
+        "ar": "نظام السوق"
+      }
+    },
+    "discipline": {
+      "category": "concepts",
+      "label": {
+        "he": "משמעת",
+        "en": "Discipline",
+        "es": "Disciplina",
+        "pt": "Disciplina",
+        "ar": "الانضباط"
+      }
+    },
+    "dnaRisk": {
+      "category": "concepts",
+      "label": {
+        "he": "Risk",
+        "en": "Risk",
+        "es": "Risk",
+        "pt": "Risk",
+        "ar": "Risk"
+      }
+    },
+    "dnaConsistency": {
+      "category": "concepts",
+      "label": {
+        "he": "Consistency",
+        "en": "Consistency",
+        "es": "Consistency",
+        "pt": "Consistency",
+        "ar": "Consistency"
+      }
+    },
+    "dnaGrowth": {
+      "category": "concepts",
+      "label": {
+        "he": "Growth",
+        "en": "Growth",
+        "es": "Growth",
+        "pt": "Growth",
+        "ar": "Growth"
+      }
+    },
+    "riskPerTrade": {
+      "category": "risk",
+      "label": {
+        "he": "סיכון לעסקה",
+        "en": "Risk per Trade",
+        "es": "Riesgo por Operación",
+        "pt": "Risco por Operação",
+        "ar": "المخاطرة لكل صفقة"
+      }
+    },
+    "riskLimits": {
+      "category": "risk",
+      "label": {
+        "he": "תקרות סיכון",
+        "en": "Risk Limits",
+        "es": "Límites de Riesgo",
+        "pt": "Limites de Risco",
+        "ar": "حدود المخاطرة"
+      }
+    },
+    "positionSize": {
+      "category": "risk",
+      "label": {
+        "he": "גודל פוזיציה",
+        "en": "Position Size",
+        "es": "Tamaño de Posición",
+        "pt": "Tamanho de Posição",
+        "ar": "حجم الصفقة"
+      }
+    },
+    "stopLoss": {
+      "category": "risk",
+      "label": {
+        "he": "סטופ לוס",
+        "en": "Stop Loss",
+        "es": "Stop Loss",
+        "pt": "Stop Loss",
+        "ar": "Stop Loss"
+      }
+    },
+    "takeProfit": {
+      "category": "risk",
+      "label": {
+        "he": "Take Profit",
+        "en": "Take Profit",
+        "es": "Take Profit",
+        "pt": "Take Profit",
+        "ar": "Take Profit"
+      }
+    },
+    "breakout": {
+      "category": "setups",
+      "label": {
+        "he": "Breakout",
+        "en": "Breakout",
+        "es": "Breakout",
+        "pt": "Breakout",
+        "ar": "Breakout"
+      }
+    },
+    "pullback": {
+      "category": "setups",
+      "label": {
+        "he": "Pullback",
+        "en": "Pullback",
+        "es": "Pullback",
+        "pt": "Pullback",
+        "ar": "Pullback"
+      }
+    },
+    "bullFlag": {
+      "category": "setups",
+      "label": {
+        "he": "Bull Flag",
+        "en": "Bull Flag",
+        "es": "Bull Flag",
+        "pt": "Bull Flag",
+        "ar": "Bull Flag"
+      }
+    },
+    "ORBBreakout": {
+      "category": "setups",
+      "label": {
+        "he": "ORB Breakout",
+        "en": "ORB Breakout",
+        "es": "ORB Breakout",
+        "pt": "ORB Breakout",
+        "ar": "ORB Breakout"
+      }
+    },
+    "VWAPReclaim": {
+      "category": "setups",
+      "label": {
+        "he": "VWAP Reclaim",
+        "en": "VWAP Reclaim",
+        "es": "VWAP Reclaim",
+        "pt": "VWAP Reclaim",
+        "ar": "VWAP Reclaim"
+      }
+    },
+    "higherLow": {
+      "category": "setups",
+      "label": {
+        "he": "Higher Low",
+        "en": "Higher Low",
+        "es": "Higher Low",
+        "pt": "Higher Low",
+        "ar": "Higher Low"
+      }
+    },
+    "cupAndHandle": {
+      "category": "setups",
+      "label": {
+        "he": "Cup & Handle",
+        "en": "Cup & Handle",
+        "es": "Cup & Handle",
+        "pt": "Cup & Handle",
+        "ar": "Cup & Handle"
+      }
+    },
+    "failedBreakout": {
+      "category": "setups",
+      "label": {
+        "he": "Failed Breakout",
+        "en": "Failed Breakout",
+        "es": "Failed Breakout",
+        "pt": "Failed Breakout",
+        "ar": "Failed Breakout"
+      }
+    },
+    "overextendedFade": {
+      "category": "setups",
+      "label": {
+        "he": "Overextended Fade",
+        "en": "Overextended Fade",
+        "es": "Overextended Fade",
+        "pt": "Overextended Fade",
+        "ar": "Overextended Fade"
+      }
+    },
+    "EMABounce50": {
+      "category": "setups",
+      "label": {
+        "he": "50 EMA Bounce",
+        "en": "50 EMA Bounce",
+        "es": "50 EMA Bounce",
+        "pt": "50 EMA Bounce",
+        "ar": "50 EMA Bounce"
+      }
+    },
+    "trendContinuation": {
+      "category": "setups",
+      "label": {
+        "he": "Trend Continuation",
+        "en": "Trend Continuation",
+        "es": "Trend Continuation",
+        "pt": "Trend Continuation",
+        "ar": "Trend Continuation"
+      }
+    },
+    "gapAndGo": {
+      "category": "setups",
+      "label": {
+        "he": "Gap & Go",
+        "en": "Gap & Go",
+        "es": "Gap & Go",
+        "pt": "Gap & Go",
+        "ar": "Gap & Go"
+      }
+    },
+    "earningsGapPlay": {
+      "category": "setups",
+      "label": {
+        "he": "Earnings Gap Play",
+        "en": "Earnings Gap Play",
+        "es": "Earnings Gap Play",
+        "pt": "Earnings Gap Play",
+        "ar": "Earnings Gap Play"
+      }
+    },
+    "rangeBreakout": {
+      "category": "setups",
+      "label": {
+        "he": "Range Breakout",
+        "en": "Range Breakout",
+        "es": "Range Breakout",
+        "pt": "Range Breakout",
+        "ar": "Range Breakout"
+      }
+    },
+    "postEarningsStrength": {
+      "category": "setups",
+      "label": {
+        "he": "Post-Earnings Strength",
+        "en": "Post-Earnings Strength",
+        "es": "Post-Earnings Strength",
+        "pt": "Post-Earnings Strength",
+        "ar": "Post-Earnings Strength"
+      }
+    },
+    "powerHourBreak": {
+      "category": "setups",
+      "label": {
+        "he": "Power Hour Break",
+        "en": "Power Hour Break",
+        "es": "Power Hour Break",
+        "pt": "Power Hour Break",
+        "ar": "Power Hour Break"
+      }
+    },
+    "MOCFade": {
+      "category": "setups",
+      "label": {
+        "he": "MOC Fade",
+        "en": "MOC Fade",
+        "es": "MOC Fade",
+        "pt": "MOC Fade",
+        "ar": "MOC Fade"
+      }
+    },
+    "overnightHold": {
+      "category": "setups",
+      "label": {
+        "he": "Overnight Hold",
+        "en": "Overnight Hold",
+        "es": "Overnight Hold",
+        "pt": "Overnight Hold",
+        "ar": "Overnight Hold"
+      }
+    },
+    "overnightReversal": {
+      "category": "setups",
+      "label": {
+        "he": "Overnight Reversal",
+        "en": "Overnight Reversal",
+        "es": "Overnight Reversal",
+        "pt": "Overnight Reversal",
+        "ar": "Overnight Reversal"
+      }
+    },
+    "supportBounce": {
+      "category": "setups",
+      "label": {
+        "he": "Support Bounce",
+        "en": "Support Bounce",
+        "es": "Support Bounce",
+        "pt": "Support Bounce",
+        "ar": "Support Bounce"
+      }
+    },
+    "resistanceBreak": {
+      "category": "setups",
+      "label": {
+        "he": "Resistance Break",
+        "en": "Resistance Break",
+        "es": "Resistance Break",
+        "pt": "Resistance Break",
+        "ar": "Resistance Break"
+      }
+    },
+    "pullback20EMA": {
+      "category": "setups",
+      "label": {
+        "he": "Pullback to 20 EMA",
+        "en": "Pullback to 20 EMA",
+        "es": "Pullback to 20 EMA",
+        "pt": "Pullback to 20 EMA",
+        "ar": "Pullback to 20 EMA"
+      }
+    },
+    "emotionConfident": {
+      "category": "emotions",
+      "label": {
+        "he": "Confident",
+        "en": "Confident",
+        "es": "Confident",
+        "pt": "Confident",
+        "ar": "Confident"
+      }
+    },
+    "emotionCalm": {
+      "category": "emotions",
+      "label": {
+        "he": "Calm",
+        "en": "Calm",
+        "es": "Calm",
+        "pt": "Calm",
+        "ar": "Calm"
+      }
+    },
+    "emotionPatient": {
+      "category": "emotions",
+      "label": {
+        "he": "Patient",
+        "en": "Patient",
+        "es": "Patient",
+        "pt": "Patient",
+        "ar": "Patient"
+      }
+    },
+    "emotionNeutral": {
+      "category": "emotions",
+      "label": {
+        "he": "Neutral",
+        "en": "Neutral",
+        "es": "Neutral",
+        "pt": "Neutral",
+        "ar": "Neutral"
+      }
+    },
+    "emotionHesitant": {
+      "category": "emotions",
+      "label": {
+        "he": "Hesitant",
+        "en": "Hesitant",
+        "es": "Hesitant",
+        "pt": "Hesitant",
+        "ar": "Hesitant"
+      }
+    },
+    "emotionNervous": {
+      "category": "emotions",
+      "label": {
+        "he": "Nervous",
+        "en": "Nervous",
+        "es": "Nervous",
+        "pt": "Nervous",
+        "ar": "Nervous"
+      }
+    },
+    "emotionFOMO": {
+      "category": "emotions",
+      "label": {
+        "he": "FOMO",
+        "en": "FOMO",
+        "es": "FOMO",
+        "pt": "FOMO",
+        "ar": "FOMO"
+      }
+    },
+    "emotionAngry": {
+      "category": "emotions",
+      "label": {
+        "he": "Angry",
+        "en": "Angry",
+        "es": "Angry",
+        "pt": "Angry",
+        "ar": "Angry"
+      }
+    },
+    "marketTrendingUp": {
+      "category": "market",
+      "label": {
+        "he": "Trending Up",
+        "en": "Trending Up",
+        "es": "Trending Up",
+        "pt": "Trending Up",
+        "ar": "Trending Up"
+      }
+    },
+    "marketTrendingDown": {
+      "category": "market",
+      "label": {
+        "he": "Trending Down",
+        "en": "Trending Down",
+        "es": "Trending Down",
+        "pt": "Trending Down",
+        "ar": "Trending Down"
+      }
+    },
+    "marketSideways": {
+      "category": "market",
+      "label": {
+        "he": "Sideways",
+        "en": "Sideways",
+        "es": "Sideways",
+        "pt": "Sideways",
+        "ar": "Sideways"
+      }
+    },
+    "marketVolatile": {
+      "category": "market",
+      "label": {
+        "he": "Volatile",
+        "en": "Volatile",
+        "es": "Volatile",
+        "pt": "Volatile",
+        "ar": "Volatile"
+      }
+    },
+    "chartCalcPosition": {
+      "category": "chart",
+      "label": {
+        "he": "חשב פוזיציה",
+        "en": "Calculate Position",
+        "es": "Calcular Posición",
+        "pt": "Calcular Posição",
+        "ar": "احسب الصفقة"
+      }
+    },
+    "chartAddToJournal": {
+      "category": "chart",
+      "label": {
+        "he": "הוסף ליומן",
+        "en": "Add to Journal",
+        "es": "Añadir al Diario",
+        "pt": "Adicionar ao Diário",
+        "ar": "أضف إلى اليوميّة"
+      }
+    }
+  },
+  "setupAliases": {
+    "breakout": "breakout",
+    "pullback": "pullback",
+    "bull flag": "bullFlag",
+    "orb breakout": "ORBBreakout",
+    "vwap reclaim": "VWAPReclaim",
+    "higher low": "higherLow",
+    "cup and handle": "cupAndHandle",
+    "failed breakout": "failedBreakout",
+    "overextended fade": "overextendedFade",
+    "ema bounce 50": "EMABounce50",
+    "50 ema bounce": "EMABounce50",
+    "trend continuation": "trendContinuation",
+    "gap and go": "gapAndGo",
+    "earnings gap play": "earningsGapPlay",
+    "range breakout": "rangeBreakout",
+    "post earnings strength": "postEarningsStrength",
+    "power hour break": "powerHourBreak",
+    "moc fade": "MOCFade",
+    "overnight hold": "overnightHold",
+    "overnight reversal": "overnightReversal",
+    "support bounce": "supportBounce",
+    "resistance break": "resistanceBreak",
+    "pullback to 20 ema": "pullback20EMA"
+  }
+}

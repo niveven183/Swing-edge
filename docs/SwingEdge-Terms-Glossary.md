@@ -1,13 +1,12 @@
 # 📘 SwingEdge — מילון מונחים · 5 שפות
 
-> מקור אמת יחיד לכל מונחי המערכת. נבנה אוטומטית מ-`src/data/tooltips.js` (commit fcd6260).
-> **70 מונחים** · 5 שפות מלאות (עברית · English · Español · Português · العربية).
-> תחזוקה: המונחים חיים בקוד ב-`tooltips.js`. קובץ זה מסונכרן ממנו — אל תערוך ידנית, הרץ מחדש את הבנייה.
+> ⛔ קובץ מחולל — אל תערוך. המקור: `src/glossary/terms/` · הרץ `npm run glossary`.
+> sourceHash `646b65251c6c42b3` · **72 מונחים** · 5 שפות (עברית · English · Español · Português · العربية).
 
 ---
 
 ## תוכן עניינים
-- **מדדי ביצוע** (15)
+- **מדדי ביצוע** (17)
 - **מדדים נוספים** (5)
 - **מושגים / AI** (9)
 - **ניהול סיכון** (5)
@@ -169,6 +168,26 @@
 | **Español** | Una calificación (estrellas) de cuán bien tu entrada coincidió con el setup planificado: timing, precio y confirmación. Una calificación alta y constante indica disciplina, incluso cuando la operación pierde. |
 | **Português** | Uma classificação (estrelas) de quão bem a sua entrada correspondeu ao setup planeado: timing, preço e confirmação. Uma classificação alta e constante indica disciplina — mesmo quando a operação perde. |
 | **العربية** | تقييم (بالنجوم) لمدى مطابقة دخولك للنموذج المخطّط: التوقيت، والسعر، والتأكيد. التقييم العالي المتّسق يدل على الانضباط — حتى عندما تخسر الصفقة نفسها. |
+
+### `dayOfWeek` — P&L by Day of Week · רווח/הפסד לפי יום בשבוע
+
+| שפה | הסבר |
+|---|---|
+| **עברית** | הרווח/הפסד שלך מחולק לפי ימי השבוע. חושף באילו ימים אתה עקבית מרוויח או מפסיד — לרבים יש Edge נסתר (או דליפה) שקשור לימים מסוימים כמו שני או שישי. |
+| **English** | Your profit/loss broken down by day of the week. Reveals which days you consistently make or lose money — many traders have a hidden edge (or leak) tied to specific days like Mondays or Fridays. |
+| **Español** | Tu ganancia/pérdida desglosada por día de la semana. Revela en qué días ganas o pierdes dinero de forma consistente — muchos traders tienen un edge oculto (o una fuga) ligado a días concretos como lunes o viernes. |
+| **Português** | O teu lucro/perda discriminado por dia da semana. Revela em que dias ganhas ou perdes dinheiro de forma consistente — muitos traders têm um edge oculto (ou uma fuga) ligado a dias específicos como segundas ou sextas. |
+| **العربية** | أرباحك/خسائرك موزّعة حسب أيام الأسبوع. تكشف في أي الأيام تربح أو تخسر باستمرار — كثير من المتداولين لديهم أفضلية خفية (أو تسريب) مرتبط بأيام محدّدة كالإثنين أو الجمعة. |
+
+### `performanceBySetup` — Performance by Setup · ביצועים לפי סטאפ
+
+| שפה | הסבר |
+|---|---|
+| **עברית** | פירוט של כל setup שאתה סוחר — אחוז זכייה, R כולל, ומספר עסקאות. מראה במבט אחד אילו סטאפים נושאים את החשבון שלך ואילו מנקזים אותו. ה-Edges וה-Anti-Edges שלך, זה לצד זה. |
+| **English** | A breakdown of every setup you trade — win rate, total R, and number of trades. Shows at a glance which setups carry your account and which drain it. Your edges and anti-edges, side by side. |
+| **Español** | Un desglose de cada setup que operas — win rate, R total y número de operaciones. Muestra de un vistazo qué setups sostienen tu cuenta y cuáles la drenan. Tus edges y anti-edges, lado a lado. |
+| **Português** | Uma discriminação de cada setup que operas — win rate, R total e número de operações. Mostra num relance quais setups sustentam a tua conta e quais a drenam. Os teus edges e anti-edges, lado a lado. |
+| **العربية** | تفصيل لكل setup تتداوله — نسبة الربح، إجمالي R، وعدد الصفقات. يُظهر بنظرة واحدة أي النماذج تحمل حسابك وأيّها يستنزفه. أفضلياتك وأنتي-أفضلياتك، جنباً إلى جنب. |
 
 ## מדדים נוספים
 
@@ -733,6 +752,3 @@
 | **Español** | Inicia una nueva operación en el diario desde el gráfico actual — ticker, precio en vivo, un stop sugerido y un objetivo 2:1 pre-rellenados — lista para que la revises y guardes. |
 | **Português** | Inicia uma nova operação no diário a partir do gráfico atual — ticker, preço ao vivo, um stop sugerido e um alvo 2:1 pré-preenchidos — pronta para reveres e guardares. |
 | **العربية** | يبدأ صفقة جديدة في اليوميّة من الرسم الحالي — الرمز، السعر الحي، وقف مقترح وهدف 2:1 مملوءة مسبقاً — جاهزة لمراجعتك وحفظك. |
-
-## לא מקוטלג
-`dayOfWeek`, `performanceBySetup`

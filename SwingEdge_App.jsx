@@ -127,7 +127,7 @@ import SmartSelect from "./src/components/ui/SmartSelect.jsx";
 import useModalA11y from "./src/hooks/useModalA11y.js";
 import useKeepFocusedVisible from "./src/hooks/useKeepFocusedVisible.js";
 import { getTradeSelectProps, CATEGORY_TOOLTIP } from "./src/data/tradeOptions.jsx";
-import { TRADING_TOOLTIPS, resolveSetupKey } from "./src/data/tooltips.js";
+import { hasTerm, resolveSetupKey } from "./src/glossary/index.js";
 import { getSetupTooltip } from "./src/intelligence/knowledgeGlue.js";
 import { TradeCalendar } from "./src/components/TradeCalendar.jsx";
 import { AdaptiveLessons } from "./src/intelligence/core/AdaptiveLessons.js";
@@ -7028,7 +7028,7 @@ export default function SwingEdge() {
                             <span key={e.emotion} className="inline-flex items-center gap-1 text-[11px] text-slate-400">
                               <span className={`w-2 h-2 rounded-full ${e.totalPnL >= 0 ? "bg-emerald-500" : "bg-rose-500"}`} />
                               {labelFor("emotion", e.emotion, lang)}
-                              {TRADING_TOOLTIPS[emoKey] && <TermTooltip term={emoKey} lang={lang} />}
+                              {hasTerm(emoKey) && <TermTooltip term={emoKey} lang={lang} />}
                             </span>
                           );
                         })}
