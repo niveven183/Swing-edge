@@ -5,6 +5,7 @@
 //   src/glossary/generated/inline.json        תוויות × 5 שפות + מפת aliases — סינכרוני, בצ'אנק הראשי
 //   src/glossary/generated/short.<lang>.json  הטקסט המוצג בבועה (×5)
 //   src/glossary/generated/long.<lang>.json   longForm — רק למודאל המילון (×5) ⛔ לייבא מהצ'אנק הראשי
+//   src/glossary/generated/meta.json          sources · related · computedIn — רק למודאל (src/glossary/long.js)
 //   src/data/glossary.json                    עותק {label, description} — test:copy #5 קורא אותו
 //   docs/SwingEdge-Terms-Glossary.md          עותק קריא
 //
@@ -132,6 +133,14 @@ export function buildArtifacts(terms) {
     for (const a of t.aliases ?? []) inline.setupAliases[a] = t.id;
   }
   files["src/glossary/generated/inline.json"] = json(inline);
+
+  // meta.json — language-free facts the glossary DIALOG shows (sources · related · computedIn · glossaryOnly).
+  // Imported only by src/glossary/long.js (the lazy chunk) — ⛔ the main chunk (test:glossary R8).
+  const meta = { sourceHash, terms: {} };
+  for (const t of terms) {
+    meta.terms[t.id] = Object.fromEntries(["sources", "related", "computedIn", "glossaryOnly"].filter((k) => t[k] !== undefined).map((k) => [k, t[k]]));
+  }
+  files["src/glossary/generated/meta.json"] = json(meta);
 
   for (const l of LANGS) {
     const short = { sourceHash, lang: l, terms: {} };

@@ -68,7 +68,7 @@ export default defineConfig({
     // (ConsentBanner.css `max-height: 760px`); the 18.10 audit saw the full card at 390×844, so both
     // heights are measured. desktop1440: the journal table renders at ≥ md only.
     { name: "iphone14tall", testMatch: /firstrun\.spec\.js/, use: { ...devices["iPhone 14"], viewport: { width: 390, height: 844 } } },
-    { name: "desktop1440", testMatch: /firstrun\.spec\.js/, use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 }, launchOptions: chromiumLaunch } },
+    { name: "desktop1440", testMatch: /(firstrun|tooltip)\.spec\.js/, use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 }, launchOptions: chromiumLaunch } },
     // Fix round 1 (B-456…B-460, 28.10) — tests-eye/wave1.spec.js runs ONLY in its own job (EYE_WAVE1=1:
     // eye-playbook.yml `prod-wave1` + `probe-wave1`). The `prod` job already takes ~22 of its 40 minutes
     // (run 39637288711); adding ~20 there would time it out. Default projects ignore the spec.

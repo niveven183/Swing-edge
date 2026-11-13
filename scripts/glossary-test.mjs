@@ -138,6 +138,14 @@ const genImporters = Object.entries(SRC).filter(([, s]) => /glossary\/generated\
 check("R2", "אף קובץ מחוץ ל-src/glossary לא מייבא את generated/ ישירות (נקודת כניסה אחת)", genImporters.length === 0, genImporters.join(", "));
 const indexSrc = fs.readFileSync(path.join(ROOT, "src/glossary/index.js"), "utf8");
 check("R3", "index.js לא מייבא long.*.json (הטקסט הארוך ⛔ בצ'אנק הראשי)", !/long\.\w+\.json/.test(indexSrc));
+// R8 — the long text reaches the app ONLY through the lazy dialog body: src/glossary/long.js is imported by
+// GlossaryBody.jsx alone, and GlossaryBody is never imported statically (⛔ a static import = it is in the main chunk).
+const longImporters = Object.entries(SRC).filter(([, s]) => /from\s+["'][^"']*glossary\/long(\.js)?["']/.test(s)).map(([f]) => f);
+const bodyStatic = Object.entries(SRC).filter(([, s]) => /import\s+\w+\s+from\s+["'][^"']*GlossaryBody(\.jsx)?["']/.test(s)).map(([f]) => f);
+const bodyDynamic = Object.entries(SRC).filter(([, s]) => /import\(\s*["'][^"']*GlossaryBody\.jsx["']\s*\)/.test(s)).map(([f]) => f);
+check("R8", "הטקסט הארוך רק דרך import() — long.js ⇐ GlossaryBody בלבד · GlossaryBody ⇐ import() בלבד",
+  JSON.stringify(longImporters) === JSON.stringify([path.join("src", "components", "GlossaryBody.jsx")]) && bodyStatic.length === 0 && bodyDynamic.length === 1,
+  `long.js ⇐ ${longImporters.join(", ") || "—"} · סטטי ${bodyStatic.join(", ") || "—"} · דינמי ${bodyDynamic.join(", ") || "—"}`);
 
 const staticIds = [];
 const dynamic = {};

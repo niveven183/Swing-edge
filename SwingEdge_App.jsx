@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef, useId, memo, lazy, Suspense, Fragment } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, useId, memo, Suspense, Fragment } from "react";
 import OnboardingScreen from "./src/components/OnboardingScreen.jsx";
 import AuthScreen from "./src/components/AuthScreen.jsx";
 import Logo from "./src/components/Logo.jsx";
@@ -19,25 +19,11 @@ import PanelBoundary from "./src/components/PanelBoundary.jsx";
 // dist/index.html statically <link rel=modulepreload>s on every page load. Every
 // visitor downloads it (measured 2026-09-13, B-320). The retry below only covers
 // dynamic imports — a statically preloaded chunk never reaches importFn.
-function lazyWithRetry(importFn) {
-  return lazy(() =>
-    importFn().catch((err) => {
-      const isChunkError =
-        /Failed to fetch dynamically imported module/i.test(err?.message || "") ||
-        err?.name === "ChunkLoadError";
-      if (!isChunkError) throw err;
-
-      const flagKey = "chunk-reloaded-adminpanel";
-      if (sessionStorage.getItem(flagKey)) {
-        throw err;
-      }
-      sessionStorage.setItem(flagKey, "1");
-      window.location.reload();
-      return new Promise(() => {});
-    })
-  );
-}
+// lazyWithRetry moved to src/lib (wave 3) — the glossary dialog uses the same mechanism.
+import lazyWithRetry from "./src/lib/lazyWithRetry.js";
 const AdminPanel = lazyWithRetry(() => import("./src/components/AdminPanel.jsx"));
+import GlossaryShell from "./src/components/GlossaryShell.jsx";
+import { onGlossaryOpen, openGlossary, glossaryUi } from "./src/glossary/ui.js";
 import EditTradeModal from "./src/components/EditTradeModal.jsx";
 import ImportJournalModal from "./src/components/ImportJournalModal.jsx";
 import ResetAllModal from "./src/components/ResetAllModal.jsx";
@@ -1486,6 +1472,10 @@ export default function SwingEdge() {
 
   // Modals + PWA install
   const [showHelpModal, setShowHelpModal] = useState(false);
+  // Glossary dialog (wave 3): null = closed · "" = the index · id = land on that term. Opened by any
+  // "?" bubble's "עוד במילון ›" (src/glossary/ui.js event) or the user menu.
+  const [glossaryTerm, setGlossaryTerm] = useState(null);
+  useEffect(() => onGlossaryOpen((id) => setGlossaryTerm(id)), []);
   const [showImportModal, setShowImportModal] = useState(false);
   const [lastImportIds, setLastImportIds] = useState([]);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
@@ -4549,6 +4539,7 @@ export default function SwingEdge() {
                   <UserMenuItem icon={MessageCircle} label={t.sendFeedback}  color="text-violet-400" onClick={() => { setTab("feedback"); setShowProfileDropdown(false); }} />
                   <UserMenuItem icon={Settings}      label={t.settings}      color="text-cyan-400"    onClick={() => { setTab("settings"); setShowProfileDropdown(false); }} />
                   <UserMenuItem icon={HelpCircle}    label={t.helpDocs}      color="text-blue-400"   onClick={() => { setShowHelpModal(true); setShowProfileDropdown(false); }} />
+                  <UserMenuItem icon={BookOpen}      label={glossaryUi(lang).title} color="text-emerald-400" onClick={() => { openGlossary(""); setShowProfileDropdown(false); }} />
                   <UserMenuItem icon={Bell}          label={t.notifications} color="text-amber-400"  onClick={() => { toast.info(t.notifications); setShowProfileDropdown(false); }} />
                   {pwaPromptEvent && (
                     <UserMenuItem icon={Smartphone} label={t.installApp} color="text-cyan-400" onClick={() => { handleInstallPwa(); }} />
@@ -8845,6 +8836,7 @@ export default function SwingEdge() {
       )}
 
       {/* ── HELP MODAL ── */}
+      {glossaryTerm !== null && <GlossaryShell term={glossaryTerm} lang={lang} onClose={() => setGlossaryTerm(null)} />}
       {showHelpModal && <HelpModal onClose={() => setShowHelpModal(false)} onStartTour={() => { setShowHelpModal(false); startTour(); }} t={t} />}
 
       {/* ── IMPORT JOURNAL MODAL ──

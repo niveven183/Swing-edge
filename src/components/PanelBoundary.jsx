@@ -32,6 +32,7 @@ const PANEL_LABELS = {
   mentoring: "המאמן",
   analytics: "האנליטיקה",
   watchlist: "רשימת המעקב",
+  glossary: "המילון",
 };
 
 export function panelLabel(name) {
@@ -65,9 +66,12 @@ export function enrichBoundaryScope(scope, name) {
   return scope;
 }
 
-export default function PanelBoundary({ name, children }) {
+// onReset (optional): called when the user presses "נסה שוב" — a lazy panel uses it to build a
+// fresh React.lazy (a rejected import is cached; re-rendering the same one would fail again).
+export default function PanelBoundary({ name, children, onReset }) {
   return (
     <Sentry.ErrorBoundary
+      onReset={onReset}
       beforeCapture={(scope) => enrichBoundaryScope(scope, name)}
       onError={(error) =>
         reportBoundaryCrash({ error, boundary: name, route: currentRoute() })

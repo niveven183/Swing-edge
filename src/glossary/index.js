@@ -16,6 +16,12 @@ const SHORT = { he: shortHe, en: shortEn, es: shortEs, pt: shortPt, ar: shortAr 
 
 export const GLOSSARY_LANGS = Object.keys(SHORT);
 
+/** Every term id, in source order (category file order). */
+export const TERM_IDS = Object.keys(inline.terms);
+export function termCategory(id) {
+  return inline.terms[id]?.category ?? null;
+}
+
 export function hasTerm(id) {
   return Object.prototype.hasOwnProperty.call(inline.terms, id);
 }
