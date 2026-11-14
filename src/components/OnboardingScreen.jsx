@@ -135,7 +135,7 @@ const generateProfile = (answers) => {
     recs.push({
       icon: Target,
       title: "הגדר יחס R:R",
-      text: "חפש עסקאות עם יחס של לפחות 2:1 (תגמול לסיכון). זה המפתח לרווחיות לטווח ארוך.",
+      text: "חפש עסקאות עם יחס של לפחות 1:2 (סיכון:סיכוי). זה המפתח לרווחיות לטווח ארוך.",
       color: "amber",
     });
   } else if (experience === "intermediate") {
@@ -511,7 +511,7 @@ export default function OnboardingScreen({ onComplete }) {
                     </div>
                     <div className="bg-white/3 rounded-lg p-2.5 text-center border border-white/5">
                       <div className="text-[10px] text-slate-600 uppercase tracking-wider mb-1">Max R:R</div>
-                      <div className="text-sm font-bold font-mono text-emerald-400">2:1</div>
+                      <div className="text-sm font-bold font-mono text-emerald-400">1:2</div>
                     </div>
                   </div>
                 </div>

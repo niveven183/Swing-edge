@@ -1,0 +1,221 @@
+// src/glossary/terms/metrics.js — מדדים נוספים
+// ⛔ מקור האמת היחיד למונחים האלה. עריכה כאן ⇒ `npm run glossary` באותו קומיט (test:glossary תופס סחיפה).
+// פורמט (גל 3): short = הגדרה במשפט אחד ≤18 מילים · example = "לדוגמה:"/"Example:" במספרים היפותטיים · caveat אחד לכל היותר · longForm = הטקסט המלא (מודאל המילון).
+// 5 שפות מלאות (שלב 5, 14.11): es/pt/ar מתורגמים מ-he/en, ≤110% מתווי en. שפה שממתינה לתרגום ⇒ pendingTranslation + שורה ב-test:glossary (L3).
+
+/** @type {import("../types.js").GlossaryTerm[]} */
+export default [
+  {
+    id: "rr",
+    computedIn: ["src/utils.js:75"],
+    related: ["takeProfit", "stopLoss", "rrBucket3plus"],
+    shownAt: ["SwingEdge_App.jsx — מנתח עסקה · טופס עסקה", "src/components/LandingPage.jsx — דף הנחיתה · הדגשת מונח"],
+    i18n: {
+      he: {
+        label: "סיכון / סיכוי · R/R",
+        short: "היחס בין הסיכון לרווח הפוטנציאלי, בכתיב סיכון:סיכוי.",
+        example: "לדוגמה: סטופ $2 מתחת לכניסה ויעד $6 מעליה ⇒ 1:3.",
+        longForm: "יחס סיכון-סיכוי: כמה אתה עלול להרוויח מול כמה אתה מסכן, בכתיב סיכון:סיכוי. 1:3 = פוטנציאל רווח פי 3 מההפסד המתוכנן.",
+      },
+      en: {
+        label: "Risk / Reward",
+        short: "The ratio between your risk and the potential reward, written risk:reward.",
+        example: "Example: a stop $2 below entry and a target $6 above ⇒ 1:3.",
+        longForm: "Risk/Reward: potential profit versus what you risk, written risk:reward. 1:3 = you stand to make 3× your planned loss.",
+      },
+      es: {
+        label: "Riesgo / Beneficio · R/R",
+        short: "La relación entre tu riesgo y el beneficio potencial, escrita riesgo:beneficio.",
+        example: "Ejemplo: stop $2 bajo la entrada y objetivo $6 sobre ella ⇒ 1:3.",
+        longForm: "Riesgo/Beneficio: el beneficio potencial frente a lo que arriesgas, escrito riesgo:beneficio. 1:3 = puedes ganar 3× tu pérdida planificada.",
+      },
+      pt: {
+        label: "Risco / Retorno · R/R",
+        short: "A relação entre o seu risco e o retorno potencial, escrita risco:retorno.",
+        example: "Exemplo: um stop $2 abaixo da entrada e um alvo $6 acima ⇒ 1:3.",
+        longForm: "Risco/Retorno: o lucro potencial em relação ao que você arrisca, escrito risco:retorno. 1:3 = você pode ganhar 3× a perda planejada.",
+      },
+      ar: {
+        label: "المخاطرة / العائد · R/R",
+        short: "النسبة بين مخاطرتك والعائد المحتمل، تُكتب مخاطرة:عائد.",
+        example: "مثال: وقف خسارة أدنى الدخول بـ $2 وهدف أعلاه بـ $6 ⇒ 1:3.",
+        longForm: "المخاطرة/العائد: الربح المحتمل مقابل ما تخاطر به، يُكتب مخاطرة:عائد. 1:3 = يمكنك أن تربح 3× خسارتك المخططة.",
+      },
+    },
+  },
+  {
+    id: "rMultiple",
+    computedIn: ["src/utils.js:58"],
+    sources: ["THARP"],
+    related: ["avgR", "stopLoss"],
+    shownAt: ["SwingEdge_App.jsx — דשבורד · עמודת R ביומן", "src/components/LandingPage.jsx — דף הנחיתה · הדגשת מונח"],
+    mustContain: { he: ["LONG", "SHORT"], en: ["LONG", "SHORT"], es: ["LONG", "SHORT"], pt: ["LONG", "SHORT"], ar: ["LONG", "SHORT"] },
+    i18n: {
+      he: {
+        label: "R-Multiple",
+        short: "תוצאת העסקה ביחידות של הסיכון לפי הסטופ השמור, לפי הכיוון: LONG (יציאה − כניסה), SHORT (כניסה − יציאה).",
+        example: "לדוגמה: סיכנת $40 והרווחת $100 ⇒ \u200e+2.5R.",
+        caveat: "פער פתיחה מעבר לסטופ יכול לתת הפסד גדול מ-\u200e−1R.",
+        longForm: "R-Multiple = רווח העסקה ÷ הסיכון לפי הסטופ השמור. הרווח נגזר מכיוון העסקה: ב-LONG הוא (יציאה − כניסה), וב-SHORT הוא (כניסה − יציאה) — כך ש-SHORT מנצחת היא תמיד R חיובי.\n\n\u200e+2R = הרווחת פי 2 ממה שסיכנת · \u200e−1R = הפסדת את הסיכון המתוכנן · \u200e−2R = הפסד כפול מהסיכון (סטופ שלא כובד, או פער פתיחה מעבר לו).\n\nהסיכון נמדד לפי הסטופ השמור בעסקה: אם ערכת את הסטופ אחרי הכניסה, ה-R מחושב מהערך החדש. מעקב ב-R מנטרל את גודל הסכום ומאפשר להשוות בין עסקאות.",
+      },
+      en: {
+        label: "R-Multiple",
+        short: "Your result in units of risk at the saved stop: LONG (Exit − Entry), SHORT (Entry − Exit).",
+        example: "Example: you risked $40 and made $100 ⇒ +2.5R.",
+        caveat: "An opening gap past the stop can lose more than −1R.",
+        longForm: "R-Multiple = trade profit ÷ risk at the saved stop. The profit follows the direction of the trade: on a LONG it is (Exit − Entry), on a SHORT it is (Entry − Exit) — so a winning SHORT is always a positive R.\n\n+2R = you made 2× what you risked · −1R = you lost your planned risk · −2R = twice the planned loss (a stop not honored, or an opening gap past it).\n\nRisk is measured against the stop saved on the trade: if you edited the stop after entry, R uses the new value. Tracking R removes dollar-size bias and lets you compare trades.",
+      },
+      es: {
+        label: "R-Multiple",
+        short: "Tu resultado en unidades de riesgo del stop guardado: LONG (Salida − Entrada), SHORT (Entrada − Salida).",
+        example: "Ejemplo: arriesgaste $40, ganaste $100 ⇒ +2.5R.",
+        caveat: "Un gap de apertura tras el stop puede perder más de −1R.",
+        longForm: "R-Multiple = ganancia de la operación ÷ riesgo según el stop guardado. La ganancia sigue la dirección de la operación: en un LONG es (Salida − Entrada), en un SHORT es (Entrada − Salida) — así que un SHORT ganador siempre da un R positivo.\n\n+2R = ganaste 2× lo que arriesgaste · −1R = perdiste tu riesgo planificado · −2R = el doble de la pérdida planificada (un stop no respetado, o un gap de apertura más allá de él).\n\nEl riesgo se mide contra el stop guardado en la operación: si editaste el stop tras la entrada, el R usa el nuevo valor. Seguir el R elimina el sesgo del tamaño en dólares y te permite comparar operaciones.",
+      },
+      pt: {
+        label: "R-Multiple",
+        short: "Seu resultado em unidades de risco no stop salvo: LONG (Saída − Entrada), SHORT (Entrada − Saída).",
+        example: "Exemplo: você arriscou $40 e ganhou $100 ⇒ +2.5R.",
+        caveat: "Um gap de abertura além do stop pode perder mais que −1R.",
+        longForm: "R-Multiple = lucro da operação ÷ risco no stop salvo. O lucro segue a direção da operação: em um LONG é (Saída − Entrada), em um SHORT é (Entrada − Saída) — então um SHORT vencedor é sempre um R positivo.\n\n+2R = você ganhou 2× o que arriscou · −1R = você perdeu o risco planejado · −2R = o dobro da perda planejada (um stop não respeitado ou um gap de abertura além dele).\n\nO risco é medido em relação ao stop salvo na operação: se você editou o stop depois da entrada, o R usa o novo valor. Acompanhar em R elimina o viés do tamanho em dólares e permite comparar operações.",
+      },
+      ar: {
+        label: "R-Multiple",
+        short: "نتيجتك بوحدات المخاطرة عند وقف الخسارة المحفوظ: LONG (الخروج − الدخول)، SHORT (الدخول − الخروج).",
+        example: "مثال: خاطرت بـ $40 وربحت $100 ⇒ \u200e+2.5R.",
+        caveat: "فجوة افتتاح تتجاوز وقف الخسارة قد تخسر أكثر من \u200e−1R.",
+        longForm: "R-Multiple = ربح الصفقة ÷ المخاطرة عند وقف الخسارة المحفوظ. يتبع الربح اتجاه الصفقة: في LONG هو (الخروج − الدخول)، وفي SHORT هو (الدخول − الخروج) — لذلك فإن صفقة SHORT الرابحة تعطي دائمًا R موجبًا.\n\n\u200e+2R = ربحت 2× ما خاطرت به · \u200e−1R = خسرت مخاطرتك المخططة · \u200e−2R = ضعف الخسارة المخططة (وقف خسارة لم يُحترم، أو فجوة افتتاح تجاوزته).\n\nتُقاس المخاطرة مقابل وقف الخسارة المحفوظ في الصفقة: إذا عدّلت وقف الخسارة بعد الدخول، يستخدم R القيمة الجديدة. التتبع بوحدات R يزيل انحياز حجم المبلغ بالدولار ويتيح لك مقارنة الصفقات.",
+      },
+    },
+  },
+  {
+    id: "mfeMae",
+    sources: ["SWEENEY"],
+    related: ["stopLoss", "takeProfit"],
+    shownAt: ["src/components/EditTradeModal.jsx — עריכת עסקה · שדות"],
+    i18n: {
+      he: {
+        label: "MFE / MAE",
+        short: "כמה הלכה העסקה לטובתך (MFE) וכמה נגדך (MAE) לפני שנסגרה.",
+        example: "לדוגמה: נכנסת ב-$100, המחיר עלה ל-$106 וירד ל-$97 ⇒ MFE $6, MAE $3.",
+        caveat: "נמדד רק אם מילאת את השדות בעסקה.",
+        longForm: "Maximum Favorable Excursion (MFE) — כמה רחוק הלכה העסקה לטובתך לפני הסגירה. Maximum Adverse Excursion (MAE) — כמה רחוק היא הלכה נגדך.\n\nהשוואה בין עסקאות עוזרת לכוון סטופים ויעדים (Sweeney, 1997). השדות ממולאים על ידך — בלי ערך, אין מדידה.",
+      },
+      en: {
+        label: "MFE / MAE",
+        short: "How far a trade ran in your favor (MFE) and against you (MAE) before it closed.",
+        example: "Example: entry $100, high $106, low $97 ⇒ MFE $6, MAE $3.",
+        caveat: "Only if you filled in the fields.",
+        longForm: "Maximum Favorable Excursion (MFE) — how far a trade ran in your favor before it closed. Maximum Adverse Excursion (MAE) — how far it ran against you.\n\nComparing them across trades helps tune stops and targets (Sweeney, 1997). You fill in the fields — with no value there is no measurement.",
+      },
+      es: {
+        label: "MFE / MAE",
+        short: "Cuánto avanzó una operación a tu favor (MFE) y en tu contra (MAE) antes de cerrarse.",
+        example: "Ejemplo: entrada $100, máximo $106, mínimo $97 ⇒ MFE $6, MAE $3.",
+        caveat: "Solo si rellenaste los campos.",
+        longForm: "Maximum Favorable Excursion (MFE) — cuánto avanzó una operación a tu favor antes de cerrarse. Maximum Adverse Excursion (MAE) — cuánto avanzó en tu contra.\n\nCompararlas entre operaciones ayuda a ajustar stops y objetivos (Sweeney, 1997). Tú rellenas los campos — sin valor, no hay medición.",
+      },
+      pt: {
+        label: "MFE / MAE",
+        short: "Quanto uma operação andou a seu favor (MFE) e contra você (MAE) antes de fechar.",
+        example: "Exemplo: entrada $100, máxima $106, mínima $97 ⇒ MFE $6, MAE $3.",
+        caveat: "Só se você preencheu os campos.",
+        longForm: "Maximum Favorable Excursion (MFE) — quanto uma operação andou a seu favor antes de fechar. Maximum Adverse Excursion (MAE) — quanto ela andou contra você.\n\nCompará-las entre operações ajuda a ajustar stops e alvos (Sweeney, 1997). Você preenche os campos — sem valor, não há medição.",
+      },
+      ar: {
+        label: "MFE / MAE",
+        short: "إلى أي مدى تحرّكت الصفقة لصالحك (MFE) وضدك (MAE) قبل إغلاقها.",
+        example: "مثال: دخول $100، أعلى $106، أدنى $97 ⇒ MFE $6، MAE $3.",
+        caveat: "فقط إذا ملأت الحقول.",
+        longForm: "Maximum Favorable Excursion (MFE) — إلى أي مدى تحرّكت الصفقة لصالحك قبل إغلاقها. Maximum Adverse Excursion (MAE) — إلى أي مدى تحرّكت ضدك.\n\nمقارنتهما عبر الصفقات تساعد على ضبط أوامر الوقف والأهداف (Sweeney، 1997). أنت من يملأ الحقول — دون قيمة لا يوجد قياس.",
+      },
+    },
+  },
+  {
+    id: "wilson",
+    computedIn: ["src/intelligence/utils/statisticalModels.js:220"],
+    sources: ["WILSON"],
+    related: ["edge", "winRate"],
+    glossaryOnly: "משמש לדירוג Edge/Anti-Edge; אין מסך שמציג את הערך עצמו (הכרעת ניב 13.11)",
+    i18n: {
+      he: {
+        label: "ציון Wilson",
+        short: "הגבול התחתון של אחוז ההצלחה ה'אמיתי' ברמת ביטחון 95% — זהיר כשיש מעט עסקאות.",
+        example: "לדוגמה: 3 רווחים מ-3 = 100%, אבל הגבול התחתון כ-44%.",
+        caveat: "משמש לדירוג ה-Edge.",
+        longForm: "ציון Wilson (Wilson, 1927) הוא הגבול התחתון של רווח-סמך ברמת 95% לשיעור הצלחה. כשיש מעט עסקאות הוא נמוך בהרבה מהאחוז הגולמי, וככל שהמדגם גדל הוא מתקרב אליו.\n\nכך סדרה קצרה של רווחים לא מדורגת מעל דפוס שהוכח על עשרות עסקאות. המערכת משתמשת בו לדירוג Edge ו-Anti-Edge.",
+      },
+      en: {
+        label: "Wilson Score",
+        short: "The lower bound of your 'true' win rate at 95% confidence — cautious when trades are few.",
+        example: "Example: 3 wins out of 3 = 100%, but the lower bound is about 44%.",
+        caveat: "Used to rank your Edge.",
+        longForm: "The Wilson score (Wilson, 1927) is the lower bound of a 95% confidence interval for a success rate. With few trades it sits well below the raw percentage, and it approaches it as the sample grows.\n\nThat keeps a short run of wins from ranking above a pattern proven over dozens of trades. The app uses it to rank Edge and Anti-Edge.",
+      },
+      es: {
+        label: "Puntuación Wilson",
+        short: "El límite inferior de tu Win Rate 'real' al 95% de confianza — prudente con pocas operaciones.",
+        example: "Ejemplo: 3 ganadas de 3 = 100%, pero el límite inferior ronda el 44%.",
+        caveat: "Se usa para ordenar tu Edge.",
+        longForm: "La puntuación Wilson (Wilson, 1927) es el límite inferior de un intervalo de confianza del 95% para una tasa de éxito. Con pocas operaciones queda muy por debajo del porcentaje bruto, y se acerca a él a medida que crece la muestra.\n\nAsí, una racha corta de ganancias no se clasifica por encima de un patrón probado en decenas de operaciones. La app la usa para ordenar el Edge y el Anti-Edge.",
+      },
+      pt: {
+        label: "Escore de Wilson",
+        short: "O limite inferior do seu Win Rate 'real' com 95% de confiança — cauteloso com poucas operações.",
+        example: "Exemplo: 3 vitórias em 3 = 100%, mas o limite inferior é cerca de 44%.",
+        caveat: "Usado para ordenar seu Edge.",
+        longForm: "O escore de Wilson (Wilson, 1927) é o limite inferior de um intervalo de confiança de 95% para uma taxa de sucesso. Com poucas operações, ele fica bem abaixo do percentual bruto e se aproxima dele à medida que a amostra cresce.\n\nIsso impede que uma sequência curta de ganhos fique acima de um padrão comprovado em dezenas de operações. O app o usa para ordenar Edge e Anti-Edge.",
+      },
+      ar: {
+        label: "درجة Wilson",
+        short: "الحد الأدنى لـ Win Rate 'الحقيقي' لديك بثقة 95% — حذِر عندما تكون الصفقات قليلة.",
+        example: "مثال: 3 أرباح من 3 = 100%، لكن الحد الأدنى نحو 44%.",
+        caveat: "تُستخدم لترتيب الـ Edge الخاص بك.",
+        longForm: "درجة Wilson (Wilson، 1927) هي الحد الأدنى لفترة ثقة 95% لمعدل نجاح. مع قلة الصفقات تكون أدنى بكثير من النسبة الخام، وتقترب منها كلما كبرت العينة.\n\nهكذا لا تتقدّم سلسلة قصيرة من الأرباح على نمط ثبت عبر عشرات الصفقات. يستخدمها التطبيق لترتيب Edge و Anti-Edge.",
+      },
+    },
+  },
+  {
+    id: "rrBucket3plus",
+    computedIn: ["src/intelligence/utils/statisticalModels.js:345"],
+    related: ["rr"],
+    shownAt: ["src/intelligence/ui/IntelligenceUI.jsx — תובנות · דפוסים"],
+    i18n: {
+      he: {
+        label: "R/R 3+",
+        short: "עסקאות שהיחס המתוכנן שלהן, סטופ מול יעד, הוא 1:3 ומעלה.",
+        example: "לדוגמה: סטופ $1 מתחת לכניסה ויעד $3.50 מעליה ⇒ 1:3.5 ⇒ בקבוצה.",
+        caveat: "ביחס 1:3 מספיק 25% הצלחה כדי לא להפסיד, לפני עמלות.",
+        longForm: "קבוצת עסקאות שהיחס המתוכנן שלהן — המרחק ליעד מול המרחק לסטופ — הוא 1:3 ומעלה. זה יחס מתוכנן, לא התוצאה בפועל.\n\nבחשבון: ביחס 1:3 אחוז ההצלחה שבו אין רווח ואין הפסד הוא 1 ÷ (1 + 3) = 25%, לפני עמלות. מעל זה הקבוצה רווחית — אם היעדים אכן הושגו.",
+      },
+      en: {
+        label: "R/R 3+",
+        short: "Trades whose planned ratio, stop versus target, is 1:3 or more.",
+        example: "Example: a stop $1 below entry and a target $3.50 above ⇒ 1:3.5 ⇒ in the group.",
+        caveat: "At 1:3, a 25% win rate breaks even, before commissions.",
+        longForm: "The group of trades whose planned ratio — distance to target versus distance to stop — is 1:3 or more. It is the planned ratio, not the realized outcome.\n\nThe arithmetic: at 1:3 the break-even win rate is 1 ÷ (1 + 3) = 25%, before commissions. Above that the group is profitable — if the targets were actually reached.",
+      },
+      es: {
+        label: "R/R 3+",
+        short: "Operaciones con ratio planificado (stop frente a objetivo) de 1:3 o más.",
+        example: "Ejemplo: stop $1 bajo la entrada, objetivo $3.50 sobre ella ⇒ 1:3.5 ⇒ en el grupo.",
+        caveat: "A 1:3, un Win Rate del 25% empata, antes de comisiones.",
+        longForm: "El grupo de operaciones cuyo ratio planificado — distancia al objetivo frente a distancia al stop — es 1:3 o más. Es el ratio planificado, no el resultado real.\n\nLa aritmética: a 1:3 el Win Rate de equilibrio es 1 ÷ (1 + 3) = 25%, antes de comisiones. Por encima, el grupo es rentable — si los objetivos realmente se alcanzaron.",
+      },
+      pt: {
+        label: "R/R 3+",
+        short: "Operações cuja relação planejada, stop versus alvo, é 1:3 ou mais.",
+        example: "Exemplo: um stop $1 abaixo da entrada e um alvo $3.50 acima ⇒ 1:3.5 ⇒ no grupo.",
+        caveat: "Em 1:3, um Win Rate de 25% empata, antes das comissões.",
+        longForm: "O grupo de operações cuja relação planejada — distância até o alvo versus distância até o stop — é 1:3 ou mais. É a relação planejada, não o resultado realizado.\n\nA conta: em 1:3, o Win Rate de empate é 1 ÷ (1 + 3) = 25%, antes das comissões. Acima disso o grupo é lucrativo — se os alvos foram de fato atingidos.",
+      },
+      ar: {
+        label: "R/R 3+",
+        short: "صفقات نسبتها المخططة، وقف الخسارة مقابل الهدف، 1:3 أو أكثر.",
+        example: "مثال: وقف خسارة أدنى الدخول بـ $1 وهدف أعلاه بـ $3.50 ⇒ 1:3.5 ⇒ ضمن المجموعة.",
+        caveat: "عند 1:3، يحقق Win Rate بنسبة 25% التعادل، قبل العمولات.",
+        longForm: "مجموعة الصفقات التي نسبتها المخططة — المسافة إلى الهدف مقابل المسافة إلى وقف الخسارة — 1:3 أو أكثر. إنها النسبة المخططة لا النتيجة الفعلية.\n\nالحساب: عند 1:3 يكون Win Rate التعادل 1 ÷ (1 + 3) = 25%، قبل العمولات. فوق ذلك تكون المجموعة رابحة — إن تحققت الأهداف فعلًا.",
+      },
+    },
+  },
+];

@@ -129,6 +129,7 @@ export default function MonthlyReportTab({ trades, calcMetrics, t, lang, isRTL, 
             {report.hasEnoughData && (
               <div className={`inline-flex items-center gap-1 mt-1 text-[10px] px-2 py-0.5 rounded-full border font-semibold ${gs.chip}`}>
                 <Award size={11} /> {t.mr_grade}: {report.grade} · {report.gradeScore}/100
+                <TermTooltip term="grade" lang={lang} />
               </div>
             )}
           </div>

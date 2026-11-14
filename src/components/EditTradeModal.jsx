@@ -278,7 +278,7 @@ export default function EditTradeModal({ trade, lang, onClose, onSave }) {
 
           {/* Entry Quality */}
           <div>
-            <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1">{isHe ? "איכות כניסה" : "Entry Quality"}</label>
+            <label className="text-[10px] text-slate-600 tracking-widest uppercase mb-1 flex items-center gap-1">{isHe ? "איכות כניסה" : "Entry Quality"}<TermTooltip term="entryQuality" lang={lang} /></label>
             <div className="flex items-center gap-1 mt-1">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button

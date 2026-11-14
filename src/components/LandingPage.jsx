@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import Logo from "./Logo.jsx";
 import { supabase, isSupabaseConfigured } from "../supabaseClient.js";
 import "./LandingPage.css";
+import { termText, termLabel } from "../glossary/index.js";
 
 /* ============================================================
    Bilingual content (he / en). All strings + section data live
@@ -270,57 +271,10 @@ const SOURCES = ["Minervini", "O'Neil", "Bulkowski", "Douglas", "Wyckoff", "Qull
    layout is untouched) plus a hover/click tooltip explaining
    the essence of the term. Bilingual (he / en).
    ============================================================ */
-const TERMS = {
-  edge: {
-    title: { he: "Edge", en: "Edge" },
-    desc: {
-      he: "הסטאפים שבהם יש לך יתרון סטטיסטי אמיתי — לפי היסטוריית העסקאות שלך, לא לפי תחושה.",
-      en: "The setups where you hold a real statistical advantage — based on your actual trade history, not a hunch.",
-    },
-  },
-  tilt: {
-    title: { he: "Tilt", en: "Tilt" },
-    desc: {
-      he: "מצב רגשי שמוציא אותך מהכללים: מסחר נקמה, הגדלת פוזיציות, רדיפה אחרי הפסד. הרוצח השקט של חשבונות.",
-      en: "The emotional state that breaks your rules: revenge trading, sizing up, chasing losses. The silent account-killer.",
-    },
-  },
-  setup: {
-    title: { he: "סטאפ (Setup)", en: "Setup" },
-    desc: {
-      he: "תבנית הכניסה לעסקה — התנאים המדויקים שבהם אתה נכנס לפוזיציה (למשל פריצה, פולבק, דגל).",
-      en: "Your entry pattern — the exact conditions under which you take a position (e.g. breakout, pullback, flag).",
-    },
-  },
-  rr: {
-    title: { he: "R/R — סיכון / סיכוי", en: "R/R — Risk / Reward" },
-    desc: {
-      he: "יחס סיכון-סיכוי: כמה אתה עלול להרוויח מול כמה אתה מסכן. 1:2.4 = פוטנציאל רווח פי 2.4 מההפסד.",
-      en: "Risk/Reward: potential profit vs. what you risk. 1:2.4 = you stand to make 2.4× what you'd lose.",
-    },
-  },
-  winRate: {
-    title: { he: "Win Rate — אחוז זכייה", en: "Win Rate" },
-    desc: {
-      he: "האחוז מהעסקאות הסגורות שהסתיימו ברווח. מעל 55% זה טוב — אבל לבד זה לא כל הסיפור.",
-      en: "The share of your closed trades that ended in profit. Above 55% is solid — but on its own it's not the whole story.",
-    },
-  },
-  rMultiple: {
-    title: { he: "R-Multiple", en: "R-Multiple" },
-    desc: {
-      he: "מודד רווח/הפסד ביחידות של הסיכון: ‎+2R = הרווחת פי 2 מהסיכון, ‎−1R = הפסד מתוכנן. מנטרל את גודל הסכום.",
-      en: "Measures P&L in units of risk: +2R = you made 2× your risk, −1R = a planned loss. Removes dollar-size bias.",
-    },
-  },
-  visionOcr: {
-    title: { he: "Vision OCR", en: "Vision OCR" },
-    desc: {
-      he: "קליטת עסקה אוטומטית מצילום מסך של הצ'ארט — במקום להקליד ידנית.",
-      en: "Auto-captures a trade straight from a screenshot of your chart — instead of typing it in by hand.",
-    },
-  },
-};
+// Landing-page term highlights — the text comes from the one glossary source
+// (src/glossary/terms). 🔁 גל 3 (13.11): עד אז הדף נשא עותק משלו he/en של 7 מונחים,
+// כולל «מעל 55% זה טוב» שהוסר מהמקור. המזהים הם הערכים של SURFACE_KEY למטה;
+// test:glossary קורא אותם משם (shownAt) ודורש שכל אחד קיים במקור.
 
 // Surface forms (as they literally appear in the copy) → glossary key.
 // Latin terms are guarded with (?<![A-Za-z]) … (?![A-Za-z]) so e.g. the
@@ -473,9 +427,9 @@ function renderTerms(text, lang, tone = "light") {
   while ((m = TERM_PATTERN.exec(text)) !== null) {
     if (m.index > last) parts.push(text.slice(last, m.index));
     const surface = m[0];
-    const def = TERMS[SURFACE_KEY[surface.toLowerCase()]];
+    const id = SURFACE_KEY[surface.toLowerCase()];
     parts.push(
-      <Term key={key++} tone={tone} lang={lang} title={def.title[lang]} desc={def.desc[lang]}>
+      <Term key={key++} tone={tone} lang={lang} title={termLabel(id, lang)} desc={termText(id, lang)}>
         {surface}
       </Term>
     );

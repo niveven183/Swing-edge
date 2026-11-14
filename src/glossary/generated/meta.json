@@ -1,0 +1,564 @@
+{
+  "sourceHash": "30d651feac2a5bd6",
+  "terms": {
+    "winRate": {
+      "related": [
+        "profitFactor",
+        "avgR"
+      ],
+      "computedIn": [
+        "src/lib/tradingStats.js"
+      ]
+    },
+    "profitFactor": {
+      "sources": [
+        "TRADESTATION"
+      ],
+      "related": [
+        "winRate",
+        "avgWin",
+        "avgLoss"
+      ],
+      "computedIn": [
+        "src/intelligence/utils/statisticalModels.js:187"
+      ]
+    },
+    "avgR": {
+      "sources": [
+        "THARP"
+      ],
+      "related": [
+        "rMultiple",
+        "stopLoss"
+      ],
+      "computedIn": [
+        "src/utils.js:58"
+      ]
+    },
+    "expectancy": {
+      "sources": [
+        "THARP"
+      ],
+      "related": [
+        "avgR",
+        "winRate"
+      ],
+      "computedIn": [
+        "src/intelligence/utils/statisticalModels.js:156"
+      ],
+      "glossaryOnly": "מחושב ב-TradeDNA.metrics בלבד; אין מסך שמציג את הערך (הכרעת ניב 13.11)"
+    },
+    "sharpe": {
+      "sources": [
+        "SHARPE"
+      ],
+      "related": [
+        "avgR",
+        "dnaConsistency"
+      ],
+      "computedIn": [
+        "src/intelligence/utils/statisticalModels.js:195"
+      ],
+      "glossaryOnly": "מחושב ב-TradeDNA.metrics בלבד; אין מסך שמציג את הערך (הכרעת ניב 13.11)"
+    },
+    "maxDD": {
+      "sources": [
+        "CFA"
+      ],
+      "related": [
+        "equityCurve"
+      ],
+      "computedIn": [
+        "src/lib/tradingStats.js:214"
+      ]
+    },
+    "avgWin": {
+      "related": [
+        "avgLoss",
+        "profitFactor"
+      ],
+      "computedIn": [
+        "src/lib/tradingStats.js"
+      ]
+    },
+    "avgLoss": {
+      "related": [
+        "avgWin",
+        "profitFactor"
+      ],
+      "computedIn": [
+        "src/lib/tradingStats.js"
+      ]
+    },
+    "avgHold": {
+      "related": [
+        "holdTimeVsPnl"
+      ],
+      "computedIn": [
+        "src/utils.js:48"
+      ]
+    },
+    "equityCurve": {
+      "related": [
+        "maxDD",
+        "accountEquity"
+      ],
+      "computedIn": [
+        "src/lib/tradingStats.js:392"
+      ]
+    },
+    "totalReturn": {
+      "related": [
+        "accountEquity",
+        "equityCurve"
+      ],
+      "computedIn": [
+        "src/lib/tradingStats.js:343"
+      ]
+    },
+    "winStreak": {
+      "related": [
+        "streakHistory",
+        "tilt"
+      ],
+      "computedIn": [
+        "SwingEdge_App.jsx:2961"
+      ]
+    },
+    "grade": {
+      "related": [
+        "winRate",
+        "avgR",
+        "discipline",
+        "dnaConsistency"
+      ],
+      "computedIn": [
+        "src/intelligence/core/MonthlyReport.js:172"
+      ]
+    },
+    "entryQuality": {
+      "related": [
+        "discipline"
+      ]
+    },
+    "accountEquity": {
+      "related": [
+        "equityCurve",
+        "riskPerTrade"
+      ],
+      "computedIn": [
+        "src/lib/equityState.js"
+      ]
+    },
+    "streakHistory": {
+      "related": [
+        "winStreak"
+      ],
+      "computedIn": [
+        "src/lib/tradingStats.js"
+      ]
+    },
+    "dayOfWeek": {
+      "related": [
+        "bestDay"
+      ],
+      "computedIn": [
+        "src/lib/tradingStats.js:488"
+      ]
+    },
+    "performanceBySetup": {
+      "related": [
+        "setupMatrix",
+        "edge"
+      ],
+      "computedIn": [
+        "src/lib/tradingStats.js"
+      ]
+    },
+    "winRateBySetup": {
+      "related": [
+        "winRate",
+        "performanceBySetup"
+      ],
+      "computedIn": [
+        "src/lib/tradingStats.js"
+      ]
+    },
+    "bestDay": {
+      "related": [
+        "dayOfWeek"
+      ],
+      "computedIn": [
+        "SwingEdge_App.jsx:6739"
+      ]
+    },
+    "bestSetup": {
+      "related": [
+        "edge",
+        "performanceBySetup"
+      ],
+      "computedIn": [
+        "SwingEdge_App.jsx:6751"
+      ]
+    },
+    "bestEmotion": {
+      "related": [
+        "emotionPerformance"
+      ],
+      "computedIn": [
+        "SwingEdge_App.jsx:6768"
+      ]
+    },
+    "rDistribution": {
+      "related": [
+        "rMultiple",
+        "avgR"
+      ],
+      "computedIn": [
+        "SwingEdge_App.jsx:6863"
+      ]
+    },
+    "pnlByMonth": {
+      "related": [
+        "equityCurve"
+      ],
+      "computedIn": [
+        "SwingEdge_App.jsx:6885"
+      ]
+    },
+    "emotionPerformance": {
+      "related": [
+        "bestEmotion"
+      ],
+      "computedIn": [
+        "SwingEdge_App.jsx:6904"
+      ]
+    },
+    "setupMatrix": {
+      "related": [
+        "performanceBySetup",
+        "bestSetup"
+      ],
+      "computedIn": [
+        "SwingEdge_App.jsx:6919"
+      ]
+    },
+    "holdTimeVsPnl": {
+      "related": [
+        "avgHold"
+      ],
+      "computedIn": [
+        "SwingEdge_App.jsx:6933"
+      ]
+    },
+    "rr": {
+      "related": [
+        "takeProfit",
+        "stopLoss",
+        "rrBucket3plus"
+      ],
+      "computedIn": [
+        "src/utils.js:75"
+      ]
+    },
+    "rMultiple": {
+      "sources": [
+        "THARP"
+      ],
+      "related": [
+        "avgR",
+        "stopLoss"
+      ],
+      "computedIn": [
+        "src/utils.js:58"
+      ]
+    },
+    "mfeMae": {
+      "sources": [
+        "SWEENEY"
+      ],
+      "related": [
+        "stopLoss",
+        "takeProfit"
+      ]
+    },
+    "wilson": {
+      "sources": [
+        "WILSON"
+      ],
+      "related": [
+        "edge",
+        "winRate"
+      ],
+      "computedIn": [
+        "src/intelligence/utils/statisticalModels.js:220"
+      ],
+      "glossaryOnly": "משמש לדירוג Edge/Anti-Edge; אין מסך שמציג את הערך עצמו (הכרעת ניב 13.11)"
+    },
+    "rrBucket3plus": {
+      "related": [
+        "rr"
+      ],
+      "computedIn": [
+        "src/intelligence/utils/statisticalModels.js:345"
+      ]
+    },
+    "dna": {
+      "related": [
+        "dnaRisk",
+        "discipline",
+        "dnaConsistency",
+        "dnaGrowth"
+      ],
+      "computedIn": [
+        "src/intelligence/core/TradeDNA.js:150"
+      ]
+    },
+    "edge": {
+      "sources": [
+        "WILSON"
+      ],
+      "related": [
+        "antiEdge",
+        "wilson"
+      ],
+      "computedIn": [
+        "src/lib/tradingStats.js:538"
+      ]
+    },
+    "antiEdge": {
+      "sources": [
+        "WILSON"
+      ],
+      "related": [
+        "edge"
+      ],
+      "computedIn": [
+        "src/lib/tradingStats.js:538"
+      ]
+    },
+    "tilt": {
+      "sources": [
+        "DOUGLAS",
+        "STEEN"
+      ],
+      "related": [
+        "emotionAngry",
+        "winStreak"
+      ],
+      "computedIn": [
+        "src/intelligence/core/TiltProtection.js:76"
+      ]
+    },
+    "marketRegime": {
+      "sources": [
+        "MURPHY"
+      ],
+      "related": [
+        "dna"
+      ],
+      "computedIn": [
+        "src/intelligence/core/MarketRegime.js"
+      ]
+    },
+    "discipline": {
+      "related": [
+        "dna",
+        "grade",
+        "entryQuality"
+      ],
+      "computedIn": [
+        "src/intelligence/utils/psychologyPatterns.js:106"
+      ]
+    },
+    "dnaRisk": {
+      "related": [
+        "dna",
+        "riskPerTrade"
+      ],
+      "computedIn": [
+        "src/intelligence/core/TradeDNA.js:164"
+      ]
+    },
+    "dnaConsistency": {
+      "related": [
+        "dna",
+        "sharpe"
+      ],
+      "computedIn": [
+        "src/intelligence/core/TradeDNA.js:190"
+      ]
+    },
+    "dnaGrowth": {
+      "related": [
+        "dna",
+        "equityCurve"
+      ],
+      "computedIn": [
+        "src/intelligence/core/TradeDNA.js:199"
+      ]
+    },
+    "setup": {
+      "related": [
+        "performanceBySetup",
+        "breakout"
+      ]
+    },
+    "riskPerTrade": {
+      "sources": [
+        "ELDER"
+      ],
+      "related": [
+        "riskLimits",
+        "positionSize"
+      ],
+      "computedIn": [
+        "src/lib/positionSizing.js"
+      ]
+    },
+    "riskLimits": {
+      "sources": [
+        "ELDER"
+      ],
+      "related": [
+        "riskPerTrade"
+      ],
+      "computedIn": [
+        "SwingEdge_App.jsx:1492"
+      ]
+    },
+    "positionSize": {
+      "sources": [
+        "ELDER",
+        "THARP"
+      ],
+      "related": [
+        "riskPerTrade",
+        "stopLoss"
+      ],
+      "computedIn": [
+        "src/lib/positionSizing.js"
+      ]
+    },
+    "stopLoss": {
+      "related": [
+        "rMultiple",
+        "positionSize",
+        "takeProfit"
+      ]
+    },
+    "takeProfit": {
+      "related": [
+        "rr",
+        "stopLoss",
+        "chartCalcPosition"
+      ]
+    },
+    "breakout": {
+      "sources": [
+        "MURPHY"
+      ]
+    },
+    "pullback": {
+      "sources": [
+        "MURPHY"
+      ]
+    },
+    "bullFlag": {
+      "sources": [
+        "BULK"
+      ]
+    },
+    "ORBBreakout": {
+      "sources": [
+        "CRABEL"
+      ]
+    },
+    "VWAPReclaim": {
+      "sources": [
+        "STOCKCHARTS"
+      ]
+    },
+    "higherLow": {
+      "sources": [
+        "MURPHY"
+      ]
+    },
+    "cupAndHandle": {
+      "sources": [
+        "ONEIL"
+      ]
+    },
+    "failedBreakout": {
+      "sources": [
+        "BULK"
+      ]
+    },
+    "overextendedFade": {},
+    "EMABounce50": {},
+    "trendContinuation": {},
+    "gapAndGo": {},
+    "earningsGapPlay": {},
+    "rangeBreakout": {},
+    "postEarningsStrength": {},
+    "powerHourBreak": {
+      "sources": [
+        "NYSE"
+      ]
+    },
+    "MOCFade": {
+      "sources": [
+        "NYSE"
+      ]
+    },
+    "overnightHold": {},
+    "overnightReversal": {},
+    "supportBounce": {
+      "sources": [
+        "MURPHY"
+      ]
+    },
+    "resistanceBreak": {
+      "sources": [
+        "MURPHY"
+      ]
+    },
+    "pullback20EMA": {},
+    "emotionConfident": {
+      "sources": [
+        "DOUGLAS"
+      ]
+    },
+    "emotionCalm": {
+      "sources": [
+        "DOUGLAS"
+      ]
+    },
+    "emotionPatient": {},
+    "emotionNeutral": {},
+    "emotionHesitant": {},
+    "emotionNervous": {},
+    "emotionFOMO": {},
+    "emotionAngry": {
+      "sources": [
+        "STEEN"
+      ]
+    },
+    "chartCalcPosition": {
+      "related": [
+        "positionSize",
+        "takeProfit"
+      ]
+    },
+    "chartAddToJournal": {
+      "related": [
+        "takeProfit"
+      ]
+    },
+    "visionOcr": {
+      "computedIn": [
+        "api/ocr.js"
+      ]
+    }
+  }
+}

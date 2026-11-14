@@ -23,7 +23,7 @@ SwingEdge הוא יומן מסחר מקצועי לסוחרי סווינג.
 - **Routing (react-router-dom@7.17.0):** `main.jsx` wraps in `<BrowserRouter>`. `/` = `LandingGate` (redirects to `/app` if authenticated, else `LandingPage`). `/app` = `SwingEdge_App.jsx`.
 - **R/R (single source):** all screens use `priceBasedRR(entry, stop, target)` + `inferSide(entry, stop, target)` from `src/utils.js`. Side-agnostic; SHORT handled correctly everywhere.
   - ⚠️ `inferSide` *infers* direction from price geometry, so it masks reversed/garbage input (a SHORT typed as LONG still "looks" valid). For validation and analysis pass the **explicit `side`** — do not rely on `inferSide`.
-- **Term accessibility (single source):** `src/data/tooltips.js` = bilingual dictionary (~38 terms, he+en) + `TERM_LABELS`. `TermTooltip` (thin wrapper over `InfoTooltip`) is the only component that should render `?` term tooltips.
+- **Term accessibility (single source):** `src/glossary/terms/` = the term dictionary (5 languages), read at runtime only through `src/glossary/index.js` (generated JSON, `npm run glossary`; `test:glossary`). `TermTooltip` (thin wrapper over `InfoTooltip`) is the only component that should render `?` term tooltips.
 
 ## Unified Analysis Engine (canonical — single source)
 Both the **Log New Trade** form and the standalone **Trade Analyzer** run on one engine, `coachTrade`. There is no second analysis path.
@@ -303,13 +303,13 @@ Two conclusions that should shape any import work:
 
 ### UI
 - `ui/InfoTooltip.jsx` — tooltip with `position:fixed` + viewport-aware
-- `ui/TermTooltip.jsx` — thin wrapper over `InfoTooltip`; looks up term in `TRADING_TOOLTIPS` + renders `TERM_LABELS[term]` as the trigger. Use this for all `?` term tooltips.
+- `ui/TermTooltip.jsx` — thin wrapper over `InfoTooltip`; looks up `termText(term, lang)` + renders `termLabel(term, lang)` as the heading (`src/glossary/index.js`). Use this for all `?` term tooltips.
 - `TradeCalendar.jsx` — monthly calendar with P&L per day. Props: `{ trades, calcMetrics, lang }`
 - `src/components/TradingViewSearch.jsx` — professional symbol autocomplete (debounce, AbortController, keyboard nav)
 - `src/components/PrivacyModal.jsx` — privacy/security modal (accessible from profile dropdown)
 
 ### Data
-- `src/data/tooltips.js` — `TRADING_TOOLTIPS` (~38 terms, bilingual he+en) + `TERM_LABELS` (display labels per term). Single source for all term definitions.
+- `src/glossary/` — single source for all term definitions: `terms/<category>.js` (source) → `scripts/build-glossary.mjs` → `generated/*.json` → `index.js` (runtime API). Replaced `src/data/tooltips.js` (13.11).
 - `src/data/tickers.js` — 90+ `POPULAR_TICKERS` + `searchTickers()` + `getTickerMeta()`
 
 ### Intelligence
@@ -513,7 +513,7 @@ source of truth; no metric is computed in two places.
 - **F4** 🟡 Avg Win / Avg Loss had no `?` tooltip → fixed (2179c63)
 
 ### Backlog (🔵 non-critical, not yet scheduled)
-- **F5:** Glossary terms `sharpe` + `expectancy` exist in `tooltips.js` but no `?` is wired on any screen.
+- **F5:** Glossary terms `sharpe` + `expectancy` exist in the glossary (`src/glossary/terms/performance.js`) but no `?` is wired on any screen.
 - **F6:** TradeDNA 4 dimensions (Risk/Discipline/Consistency/Growth) — umbrella `dna` tooltip exists; individual dimension `?` not added. `discipline` key is in glossary but not connected to a label in any `.map`.
 - **F7:** `✕` close button in `InfoTooltip` uses `right-2` physical offset → incorrect position in RTL (cosmetic only).
 - **F8:** `?` trigger does not open on keyboard `focus` (only `Enter`/`Space` on click) — valid for click-tooltip pattern; optional a11y upgrade.
