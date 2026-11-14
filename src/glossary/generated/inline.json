@@ -1,5 +1,5 @@
 {
-  "sourceHash": "7597dbf08dc2e372",
+  "sourceHash": "30d651feac2a5bd6",
   "terms": {
     "winRate": {
       "category": "performance",
@@ -46,9 +46,9 @@
       "label": {
         "he": "Sharpe לעסקה (R)",
         "en": "Per-trade Sharpe (R)",
-        "es": "Ratio de Sharpe",
-        "pt": "Rácio de Sharpe",
-        "ar": "مقياس شارب"
+        "es": "Sharpe por operación (R)",
+        "pt": "Sharpe por operação (R)",
+        "ar": "شارب لكل صفقة (R)"
       }
     },
     "maxDD": {
@@ -106,9 +106,9 @@
       "label": {
         "he": "תשואה כוללת",
         "en": "Total Return",
-        "es": "Total Return",
-        "pt": "Total Return",
-        "ar": "Total Return"
+        "es": "Rendimiento Total",
+        "pt": "Retorno Total",
+        "ar": "العائد الإجمالي"
       }
     },
     "winStreak": {
@@ -116,9 +116,9 @@
       "label": {
         "he": "רצף נוכחי",
         "en": "Current Streak",
-        "es": "Win Streak",
-        "pt": "Win Streak",
-        "ar": "Win Streak"
+        "es": "Racha Actual",
+        "pt": "Sequência Atual",
+        "ar": "السلسلة الحالية"
       }
     },
     "grade": {
@@ -126,9 +126,9 @@
       "label": {
         "he": "ציון חודשי",
         "en": "Monthly Grade",
-        "es": "Grade",
-        "pt": "Grade",
-        "ar": "Grade"
+        "es": "Calificación Mensual",
+        "pt": "Nota Mensal",
+        "ar": "التقييم الشهري"
       }
     },
     "entryQuality": {
@@ -136,9 +136,9 @@
       "label": {
         "he": "איכות כניסה",
         "en": "Entry Quality",
-        "es": "Entry Quality",
-        "pt": "Entry Quality",
-        "ar": "Entry Quality"
+        "es": "Calidad de Entrada",
+        "pt": "Qualidade de Entrada",
+        "ar": "جودة الدخول"
       }
     },
     "accountEquity": {
@@ -146,9 +146,9 @@
       "label": {
         "he": "הון החשבון",
         "en": "Account Equity",
-        "es": "Account Equity",
-        "pt": "Account Equity",
-        "ar": "Account Equity"
+        "es": "Capital de la Cuenta",
+        "pt": "Patrimônio da Conta",
+        "ar": "رأس مال الحساب"
       }
     },
     "streakHistory": {
@@ -156,9 +156,9 @@
       "label": {
         "he": "היסטוריית רצפים",
         "en": "Streak History",
-        "es": "Streak History",
-        "pt": "Streak History",
-        "ar": "Streak History"
+        "es": "Historial de Rachas",
+        "pt": "Histórico de Sequências",
+        "ar": "سجل السلاسل"
       }
     },
     "dayOfWeek": {
@@ -186,9 +186,9 @@
       "label": {
         "he": "אחוז הצלחה לפי סטאפ",
         "en": "Win Rate by Setup",
-        "es": "Win Rate by Setup",
-        "pt": "Win Rate by Setup",
-        "ar": "Win Rate by Setup"
+        "es": "Win Rate por Setup",
+        "pt": "Win Rate por Setup",
+        "ar": "Win Rate حسب السيناريو"
       }
     },
     "bestDay": {
@@ -196,9 +196,9 @@
       "label": {
         "he": "היום הטוב ביותר",
         "en": "Best Day",
-        "es": "Best Day",
-        "pt": "Best Day",
-        "ar": "Best Day"
+        "es": "Mejor Día",
+        "pt": "Melhor Dia",
+        "ar": "أفضل يوم"
       }
     },
     "bestSetup": {
@@ -206,9 +206,9 @@
       "label": {
         "he": "הסטאפ הטוב ביותר",
         "en": "Best Setup",
-        "es": "Best Setup",
-        "pt": "Best Setup",
-        "ar": "Best Setup"
+        "es": "Mejor Setup",
+        "pt": "Melhor Setup",
+        "ar": "أفضل سيناريو"
       }
     },
     "bestEmotion": {
@@ -216,9 +216,9 @@
       "label": {
         "he": "הרגש הטוב ביותר",
         "en": "Best Emotion",
-        "es": "Best Emotion",
-        "pt": "Best Emotion",
-        "ar": "Best Emotion"
+        "es": "Mejor Emoción",
+        "pt": "Melhor Emoção",
+        "ar": "أفضل شعور"
       }
     },
     "rDistribution": {
@@ -226,9 +226,9 @@
       "label": {
         "he": "התפלגות R",
         "en": "R Distribution",
-        "es": "R Distribution",
-        "pt": "R Distribution",
-        "ar": "R Distribution"
+        "es": "Distribución de R",
+        "pt": "Distribuição de R",
+        "ar": "توزيع R"
       }
     },
     "pnlByMonth": {
@@ -236,9 +236,9 @@
       "label": {
         "he": "רווח/הפסד לפי חודש",
         "en": "P&L by Month",
-        "es": "P&L by Month",
-        "pt": "P&L by Month",
-        "ar": "P&L by Month"
+        "es": "G/P por Mes",
+        "pt": "L/P por Mês",
+        "ar": "الربح/الخسارة حسب الشهر"
       }
     },
     "emotionPerformance": {
@@ -246,9 +246,9 @@
       "label": {
         "he": "ביצועים לפי רגש",
         "en": "Emotion Performance",
-        "es": "Emotion Performance",
-        "pt": "Emotion Performance",
-        "ar": "Emotion Performance"
+        "es": "Rendimiento por Emoción",
+        "pt": "Desempenho por Emoção",
+        "ar": "الأداء حسب الشعور"
       }
     },
     "setupMatrix": {
@@ -256,9 +256,9 @@
       "label": {
         "he": "מטריצת סטאפים",
         "en": "Setup Matrix",
-        "es": "Setup Matrix",
-        "pt": "Setup Matrix",
-        "ar": "Setup Matrix"
+        "es": "Matriz de Setups",
+        "pt": "Matriz de Setups",
+        "ar": "مصفوفة السيناريوهات"
       }
     },
     "holdTimeVsPnl": {
@@ -266,9 +266,9 @@
       "label": {
         "he": "זמן החזקה מול רווח",
         "en": "Hold Time vs P&L",
-        "es": "Hold Time vs P&L",
-        "pt": "Hold Time vs P&L",
-        "ar": "Hold Time vs P&L"
+        "es": "Tiempo de Tenencia vs G/P",
+        "pt": "Tempo de Posição vs L/P",
+        "ar": "مدة الاحتفاظ مقابل الربح/الخسارة"
       }
     },
     "rr": {
@@ -306,9 +306,9 @@
       "label": {
         "he": "ציון Wilson",
         "en": "Wilson Score",
-        "es": "Wilson Score",
-        "pt": "Wilson Score",
-        "ar": "Wilson Score"
+        "es": "Puntuación Wilson",
+        "pt": "Escore de Wilson",
+        "ar": "درجة Wilson"
       }
     },
     "rrBucket3plus": {
@@ -386,9 +386,9 @@
       "label": {
         "he": "ניהול סיכון",
         "en": "Risk management",
-        "es": "Risk",
-        "pt": "Risk",
-        "ar": "Risk"
+        "es": "Gestión del riesgo",
+        "pt": "Gestão de risco",
+        "ar": "إدارة المخاطر"
       }
     },
     "dnaConsistency": {
@@ -396,9 +396,9 @@
       "label": {
         "he": "עקביות",
         "en": "Consistency",
-        "es": "Consistency",
-        "pt": "Consistency",
-        "ar": "Consistency"
+        "es": "Consistencia",
+        "pt": "Consistência",
+        "ar": "الاتساق"
       }
     },
     "dnaGrowth": {
@@ -406,9 +406,9 @@
       "label": {
         "he": "צמיחה",
         "en": "Growth",
-        "es": "Growth",
-        "pt": "Growth",
-        "ar": "Growth"
+        "es": "Crecimiento",
+        "pt": "Crescimento",
+        "ar": "النمو"
       }
     },
     "setup": {
@@ -418,7 +418,7 @@
         "en": "Setup",
         "es": "Setup",
         "pt": "Setup",
-        "ar": "Setup"
+        "ar": "نموذج الدخول (Setup)"
       }
     },
     "riskPerTrade": {
@@ -458,7 +458,7 @@
         "en": "Stop Loss",
         "es": "Stop Loss",
         "pt": "Stop Loss",
-        "ar": "Stop Loss"
+        "ar": "وقف الخسارة"
       }
     },
     "takeProfit": {

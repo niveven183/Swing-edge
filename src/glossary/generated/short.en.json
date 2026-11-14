@@ -1,5 +1,5 @@
 {
-  "sourceHash": "7597dbf08dc2e372",
+  "sourceHash": "30d651feac2a5bd6",
   "lang": "en",
   "terms": {
     "winRate": {
@@ -171,9 +171,9 @@
       "caveat": "Needs at least 2 trades; up to 5 are shown."
     },
     "tilt": {
-      "short": "An emotional state that pushes you off your rules, usually after losses.",
+      "short": "An emotional state that pushes you off your rules.",
       "example": "Example: 3 losses in a row ⇒ Tilt Shield warns before the next trade.",
-      "caveat": "Rule of thumb: take a break after 2 consecutive losses."
+      "caveat": "Rule of thumb: take a short break after a losing streak; Tilt Shield warns from 3."
     },
     "marketRegime": {
       "short": "The market environment, read from SPY/QQQ versus their 20-day average, sector breadth and volatility.",

@@ -1,5 +1,5 @@
 {
-  "sourceHash": "7597dbf08dc2e372",
+  "sourceHash": "30d651feac2a5bd6",
   "lang": "en",
   "terms": {
     "winRate": "Win Rate is the percentage of your closed trades that ended in profit. A break-even trade counts in the denominator and is not a win — the line under the number shows how many there were.\n\nWin rate alone does not decide profitability: a trader at 40% can be profitable when the average win is larger than the average loss. Look at Profit Factor and Avg R too.",
@@ -27,7 +27,7 @@
     "dna": "Your Trading DNA is four 0–100 scores computed from your closed trades:\n\nRisk management — your average risk per trade as a percentage of capital. Discipline — the share of trades you marked 'followed my plan'. Consistency — the spread of your R outcomes. Growth — the slope of cumulative R over your last 20 trades.\n\nThree are measured from the trades; discipline is a self-report. A score with no data shows as —, never as 50.",
     "edge": "Your Edge — up to 5 setup × emotion pairs where your results are strongest, from your trade history.\n\nA pair qualifies only with at least 3 trades, and it is ranked by the Wilson score of its win rate times (1 + average R). It is a relative ranking, not a statistical significance test — on a small sample an edge can disappear.",
     "antiEdge": "Anti-Edge — up to 5 setup × emotion pairs where your win rate is below 50% or your average R is negative, for pairs with at least 2 trades.\n\nEither fix them (study why they fail for you) or stop trading them. Avoiding anti-edges is as important as exploiting edges.",
-    "tilt": "Tilt — an emotional state that makes you deviate from your trading rules. Common after large losses, missing a big move, or a winning streak that breeds overconfidence.\n\nSigns: larger positions, more frequent trades, ignored stops. Tilt Shield warns on 3+ losses in a row, a trade soon after a loss, 4+ trades in a day, trading outside your hours, and 2 plan deviations in a week.\n\nRule of thumb: take a break after 2 consecutive losses.",
+    "tilt": "Tilt — an emotional state that makes you deviate from your trading rules. Common after large losses, missing a big move, or a winning streak that breeds overconfidence.\n\nSigns: larger positions, more frequent trades, ignored stops. Tilt Shield warns on 3+ losses in a row, a trade soon after a loss, 4+ trades in a day, trading outside your hours, and 2 plan deviations in a week.\n\nRule of thumb: take a short break after a losing streak; Tilt Shield warns from 3.",
     "marketRegime": "Market Regime — the current market environment, read from real price action (not your trades). Computed from SPY/QQQ versus their 20-day average, trend %, how many sector ETFs are rising (breadth) and realized volatility.\n\n• Bull Trend: price above a rising 20-day average with broad participation. Favor breakouts and pullbacks.\n• Bear Trend: price below a falling 20-day average, broad weakness. Favor shorts or stand aside.\n• Choppy/Range: no net trend — price stuck between support and resistance. Fade the extremes, avoid breakouts.\n• High Volatility: large daily swings dominate. Rule of thumb: cut size ~50% and widen stops.\n• Low Volatility: quiet, coiled tape — expect small moves.\n\nShows 'insufficient data' when there isn't enough price history to classify.",
     "discipline": "The share of your closed trades you marked 'followed my plan' — stop, size and target, without emotional deviation. An unmarked trade is not in the denominator.\n\nIt is a self-report: the app does not check whether the stop was actually honored.",
     "dnaRisk": "The risk score comes from your average risk per trade — distance to stop × shares, as a percentage of capital at entry. Up to 1% scores 100; each percentage point above that removes 50; 3% or more scores 0.\n\nIt does not measure whether you honored the stop or kept position size uniform — only how much you risked on average.",
@@ -45,7 +45,7 @@
     "VWAPReclaim": "Price reclaiming VWAP after a morning dip, on volume.",
     "higherLow": "Each pullback makes a higher low than the previous. Cleanest setup in uptrend.",
     "cupAndHandle": "U-shaped consolidation with tight handle on right. Classic continuation pattern.",
-    "failedBreakout": "Breakout that quickly reverses. Trap for late buyers — short on reclaim of breakout level.",
+    "failedBreakout": "Breakout that quickly reverses. Trap for late buyers — SHORT when price falls back below the breakout level.",
     "overextendedFade": "Counter-trend trade when price is unusually far above the 20 EMA, often with a high RSI. Requires patience.",
     "EMABounce50": "Pullback to 50 EMA on daily chart. Major support in strong uptrends.",
     "trendContinuation": "Entry on shallow pullback to 9 EMA in established trend. Tight stops, high R.",

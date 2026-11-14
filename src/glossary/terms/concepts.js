@@ -1,7 +1,7 @@
 // src/glossary/terms/concepts.js — מושגים / AI
 // ⛔ מקור האמת היחיד למונחים האלה. עריכה כאן ⇒ `npm run glossary` באותו קומיט (test:glossary תופס סחיפה).
 // פורמט (גל 3): short = הגדרה במשפט אחד ≤18 מילים · example = "לדוגמה:"/"Example:" במספרים היפותטיים · caveat אחד לכל היותר · longForm = הטקסט המלא (מודאל המילון).
-// pendingTranslation: es/pt/ar עדיין בטקסט הישן — שלב 5.
+// 5 שפות מלאות (שלב 5, 14.11): es/pt/ar מתורגמים מ-he/en, ≤110% מתווי en. שפה שממתינה לתרגום ⇒ pendingTranslation + שורה ב-test:glossary (L3).
 
 /** @type {import("../types.js").GlossaryTerm[]} */
 export default [
@@ -10,7 +10,6 @@ export default [
     computedIn: ["src/intelligence/core/TradeDNA.js:150"],
     related: ["dnaRisk", "discipline", "dnaConsistency", "dnaGrowth"],
     shownAt: ["src/intelligence/ui/IntelligenceUI.jsx — דשבורד · כרטיס ה-DNA"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "DNA מסחרי",
@@ -28,15 +27,24 @@ export default [
       },
       es: {
         label: "Trading DNA",
-        short: "Tu Trading DNA mide 4 dimensiones centrales de tu personalidad como trader:\n\n• Gestión de Riesgo (0-100): Qué tan bien controlas las pérdidas\n• Disciplina (0-100): ¿Sigues tus reglas?\n• Consistencia (0-100): Resultados estables en distintas condiciones\n• Crecimiento (0-100): ¿Estás mejorando con el tiempo?\n\nBasado en tu historial real de operaciones — no en autoevaluación.",
+        short: "Cuatro puntuaciones 0–100 — riesgo, disciplina, consistencia, crecimiento — de tus operaciones cerradas.",
+        example: "Ejemplo: 2% de riesgo medio por operación ⇒ riesgo 50.",
+        caveat: "Disciplina = la marca autodeclarada 'seguí mi plan'.",
+        longForm: "Tu Trading DNA son cuatro puntuaciones 0–100 calculadas a partir de tus operaciones cerradas:\n\nGestión del riesgo — tu riesgo medio por operación como porcentaje del capital. Disciplina — la proporción de operaciones que marcaste 'seguí mi plan'. Consistencia — la dispersión de tus resultados en R. Crecimiento — la pendiente del R acumulado en tus últimas 20 operaciones.\n\nTres se miden a partir de las operaciones; la disciplina es autodeclarada. Una puntuación sin datos se muestra como —, nunca como 50.",
       },
       pt: {
         label: "Trading DNA",
-        short: "O teu Trading DNA mede 4 dimensões centrais da tua personalidade como trader:\n\n• Gestão de Risco (0-100): Quão bem controlas as perdas\n• Disciplina (0-100): Segues as tuas regras?\n• Consistência (0-100): Resultados estáveis em diferentes condições\n• Crescimento (0-100): Estás a melhorar com o tempo?\n\nBaseado no teu histórico real de operações — não em autoavaliação.",
+        short: "Quatro pontuações 0–100 — risco, disciplina, consistência, crescimento — das suas operações fechadas.",
+        example: "Exemplo: risco médio de 2% por operação ⇒ risco 50.",
+        caveat: "Disciplina é a marcação autodeclarada 'segui meu plano'.",
+        longForm: "Seu Trading DNA são quatro pontuações 0–100 calculadas a partir das suas operações fechadas:\n\nGestão de risco — seu risco médio por operação como porcentagem do capital. Disciplina — a fração das operações que você marcou 'segui meu plano'. Consistência — a dispersão dos seus resultados em R. Crescimento — a inclinação do R acumulado nas suas últimas 20 operações.\n\nTrês são medidas a partir das operações; a disciplina é autodeclarada. Uma pontuação sem dados aparece como —, nunca como 50.",
       },
       ar: {
         label: "Trading DNA",
-        short: "يقيس Trading DNA الخاص بك 4 أبعاد أساسية لشخصيتك كمتداول:\n\n• إدارة المخاطر (0-100): مدى تحكّمك في الخسائر\n• الانضباط (0-100): هل تتّبع قواعدك؟\n• الاتّساق (0-100): نتائج مستقرّة عبر ظروف مختلفة\n• النموّ (0-100): هل تتحسّن مع الوقت؟\n\nمبني على سجلّ صفقاتك الحقيقي — لا على التقييم الذاتي.",
+        short: "أربع درجات 0–100 — المخاطرة والانضباط والاتساق والنمو — من صفقاتك المغلقة.",
+        example: "مثال: متوسط مخاطرة 2% لكل صفقة ⇒ درجة مخاطرة 50.",
+        caveat: "الانضباط هو علامة 'اتبعت خطتي' التي تضعها بنفسك.",
+        longForm: "Trading DNA الخاص بك هو أربع درجات 0–100 محسوبة من صفقاتك المغلقة:\n\nإدارة المخاطر — متوسط مخاطرتك لكل صفقة كنسبة مئوية من رأس المال. الانضباط — نسبة الصفقات التي وضعت عليها علامة 'اتبعت خطتي'. الاتساق — تشتت نتائج R لديك. النمو — ميل R التراكمي في آخر 20 صفقة لك.\n\nثلاث منها تُقاس من الصفقات؛ أما الانضباط فتقرير ذاتي. الدرجة التي لا بيانات لها تظهر كـ —، وليس كـ 50.",
       },
     },
   },
@@ -46,7 +54,6 @@ export default [
     sources: ["WILSON"],
     related: ["antiEdge", "wilson"],
     shownAt: ["SwingEdge_App.jsx — דשבורד · אנליטיקס · כרטיסי Edge", "src/intelligence/ui/IntelligenceUI.jsx — כרטיס Edge", "src/components/LandingPage.jsx — דף הנחיתה · הדגשת מונח"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Edge",
@@ -64,15 +71,24 @@ export default [
       },
       es: {
         label: "Edge",
-        short: "Tu Edge — setups donde tienes una ventaja estadísticamente significativa según tu historial real de operaciones.\n\nAlta win rate + R promedio positivo = edge real. Estos son los setups que más deberías operar. El mercado te paga por hacerlos.",
+        short: "Pares setup-emoción con tu Win Rate y tu R más fuertes, ordenados por puntuación Wilson.",
+        example: "Ejemplo: Breakout + Calm · 4 de 5 ganadas · media +1.2R.",
+        caveat: "Mínimo 3 operaciones; un ranking, no una prueba de significancia.",
+        longForm: "Tu Edge — hasta 5 pares setup × emoción donde tus resultados son más fuertes, según tu historial de operaciones.\n\nUn par solo califica con al menos 3 operaciones, y se ordena por la puntuación Wilson de su Win Rate multiplicada por (1 + R promedio). Es un ranking relativo, no una prueba de significancia estadística — con una muestra pequeña, un edge puede desaparecer.",
       },
       pt: {
         label: "Edge",
-        short: "O teu Edge — setups onde tens uma vantagem estatisticamente significativa segundo o teu histórico real de operações.\n\nWin rate alta + R médio positivo = edge real. Estes são os setups que mais deves operar. O mercado paga-te para os fazeres.",
+        short: "Pares setup-emoção com seu Win Rate e seu R mais fortes, ordenados pelo escore de Wilson.",
+        example: "Exemplo: Breakout + Calm · 4 de 5 vencedoras · média +1.2R.",
+        caveat: "Exige 3+ operações; um ranking, não teste de significância.",
+        longForm: "Seu Edge — até 5 pares setup × emoção em que seus resultados são mais fortes, a partir do seu histórico de operações.\n\nUm par só entra com pelo menos 3 operações e é ordenado pelo escore de Wilson do seu Win Rate vezes (1 + R médio). É um ranking relativo, não um teste de significância estatística — em uma amostra pequena, um edge pode desaparecer.",
       },
       ar: {
         label: "Edge",
-        short: "الـ Edge الخاص بك — نماذج دخول تملك فيها أفضلية ذات دلالة إحصائية بناءً على سجلّ صفقاتك الحقيقي.\n\nنسبة ربح عالية + متوسّط R موجب = أفضلية حقيقية. هذه النماذج هي التي يجب أن تتداولها أكثر. السوق يدفع لك مقابل تنفيذها.",
+        short: "أزواج نموذج دخول وعاطفة يكون فيها Win Rate و R لديك في أقوى حالاتهما، مرتبة حسب درجة Wilson.",
+        example: "مثال: Breakout + Calm · 4 رابحة من 5 · متوسط \u200e+1.2R.",
+        caveat: "يتطلب 3 صفقات أو أكثر؛ هذا ترتيب، لا اختبار دلالة إحصائية.",
+        longForm: "الـ Edge الخاص بك — حتى 5 أزواج نموذج دخول × عاطفة تكون فيها نتائجك في أقوى حالاتها، من سجل صفقاتك.\n\nلا يتأهل الزوج إلا بـ 3 صفقات على الأقل، ويُرتَّب حسب درجة Wilson لـ Win Rate الخاص به مضروبة في (1 + متوسط R). إنه ترتيب نسبي وليس اختبار دلالة إحصائية — في عينة صغيرة قد يختفي الـ Edge.",
       },
     },
   },
@@ -82,7 +98,6 @@ export default [
     sources: ["WILSON"],
     related: ["edge"],
     shownAt: ["SwingEdge_App.jsx — דשבורד · אנליטיקס · כרטיסי Edge", "src/intelligence/ui/IntelligenceUI.jsx — כרטיס Edge"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Anti-Edge",
@@ -100,15 +115,24 @@ export default [
       },
       es: {
         label: "Anti-Edge",
-        short: "Anti-Edge — setups donde pierdes dinero de forma consistente según tu historial de operaciones.\n\nWin rate baja + R negativo = tu anti-edge personal. O corriges estos setups (estudia por qué te fallan) o dejas de operarlos por completo.\n\nEvitar los anti-edges es tan importante como explotar los edges.",
+        short: "Pares de setup y emoción donde tu Win Rate está por debajo del 50% o tu R promedio es negativo.",
+        example: "Ejemplo: Breakout + FOMO · 1 ganada de 4 · R promedio −0.8R.",
+        caveat: "Requiere al menos 2 operaciones; se muestran hasta 5.",
+        longForm: "Anti-Edge — hasta 5 pares setup × emoción donde tu Win Rate está por debajo del 50% o tu R promedio es negativo, en pares con al menos 2 operaciones.\n\nO los corriges (estudia por qué te fallan) o dejas de operarlos. Evitar los anti-edges es tan importante como aprovechar los edges.",
       },
       pt: {
         label: "Anti-Edge",
-        short: "Anti-Edge — setups onde perdes dinheiro de forma consistente segundo o teu histórico de operações.\n\nWin rate baixa + R negativo = o teu anti-edge pessoal. Ou corriges estes setups (estuda por que te falham) ou deixas de os operar por completo.\n\nEvitar os anti-edges é tão importante como explorar os edges.",
+        short: "Pares de setup e emoção em que seu Win Rate está abaixo de 50% ou seu R médio é negativo.",
+        example: "Exemplo: Breakout + FOMO · 1 vencedora em 4 · R médio −0.8R.",
+        caveat: "Exige pelo menos 2 operações; são exibidos até 5.",
+        longForm: "Anti-Edge — até 5 pares setup × emoção em que seu Win Rate está abaixo de 50% ou seu R médio é negativo, em pares com pelo menos 2 operações.\n\nOu você os corrige (estude por que falham com você) ou para de operá-los. Evitar anti-edges é tão importante quanto explorar edges.",
       },
       ar: {
         label: "Anti-Edge",
-        short: "Anti-Edge — نماذج دخول تخسر فيها المال باستمرار بناءً على سجلّ صفقاتك.\n\nنسبة ربح منخفضة + R سالب = الأنتي-إيدج الشخصي لديك. إمّا أن تُصلح هذه النماذج (ادرس لماذا تفشل معك) أو تتوقّف عن تداولها نهائياً.\n\nتجنّب الأنتي-إيدج لا يقلّ أهمية عن استغلال الإيدج.",
+        short: "أزواج نموذج دخول وعاطفة يكون فيها Win Rate لديك أقل من 50% أو متوسط R سالبًا.",
+        example: "مثال: Breakout + FOMO · ربح واحد من 4 · متوسط R \u200e−0.8R.",
+        caveat: "يتطلب صفقتين على الأقل؛ تُعرض حتى 5.",
+        longForm: "Anti-Edge — حتى 5 أزواج نموذج دخول × عاطفة يكون فيها Win Rate أقل من 50% أو متوسط R سالبًا، للأزواج التي لها صفقتان على الأقل.\n\nإما أن تُصلحها (ادرس لماذا تفشل معك) أو تتوقف عن تداولها. تجنّب الـ Anti-Edge لا يقل أهمية عن استغلال الـ Edge.",
       },
     },
   },
@@ -118,33 +142,41 @@ export default [
     sources: ["DOUGLAS", "STEEN"],
     related: ["emotionAngry", "winStreak"],
     shownAt: ["src/intelligence/ui/IntelligenceUI.jsx — דשבורד · Tilt Shield", "src/components/LandingPage.jsx — דף הנחיתה · הדגשת מונח"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Tilt",
-        short: "מצב רגשי שמוציא אותך מהכללים שלך — לרוב אחרי הפסדים — ומוביל למסחר נקמה.",
+        short: "מצב רגשי שמוציא אותך מהכללים שלך ומוביל למסחר נקמה.",
         example: "לדוגמה: 3 הפסדים ברצף ⇒ Tilt Shield מתריע לפני העסקה הבאה.",
-        caveat: "כלל אצבע: הפסקה אחרי 2 הפסדים רצופים.",
-        longForm: "Tilt — מצב רגשי שגורם לסטייה מכללי המסחר שלך. נפוץ אחרי הפסדים גדולים, פספוס תנועה גדולה, או רצף רווחים שיוצר ביטחון-יתר.\n\nסימנים: הגדלת פוזיציה, מסחר תכוף יותר, התעלמות מסטופים. Tilt Shield מתריע על 3 הפסדים ברצף ומעלה, על עסקה זמן קצר אחרי הפסד, על 4 עסקאות ומעלה ביום, על מסחר מחוץ לשעות ועל 2 חריגות מהתוכנית בשבוע.\n\nכלל אצבע: הפסקה אחרי 2 הפסדים רצופים.",
+        caveat: "כלל אצבע: הפסקה קצרה אחרי רצף הפסדים; Tilt Shield מתריע מ-3.",
+        longForm: "Tilt — מצב רגשי שגורם לסטייה מכללי המסחר שלך. נפוץ אחרי הפסדים גדולים, פספוס תנועה גדולה, או רצף רווחים שיוצר ביטחון-יתר.\n\nסימנים: הגדלת פוזיציה, מסחר תכוף יותר, התעלמות מסטופים. Tilt Shield מתריע על 3 הפסדים ברצף ומעלה, על עסקה זמן קצר אחרי הפסד, על 4 עסקאות ומעלה ביום, על מסחר מחוץ לשעות ועל 2 חריגות מהתוכנית בשבוע.\n\nכלל אצבע: הפסקה קצרה אחרי רצף הפסדים; Tilt Shield מתריע מ-3.",
       },
       en: {
         label: "Tilt",
-        short: "An emotional state that pushes you off your rules, usually after losses.",
+        short: "An emotional state that pushes you off your rules.",
         example: "Example: 3 losses in a row ⇒ Tilt Shield warns before the next trade.",
-        caveat: "Rule of thumb: take a break after 2 consecutive losses.",
-        longForm: "Tilt — an emotional state that makes you deviate from your trading rules. Common after large losses, missing a big move, or a winning streak that breeds overconfidence.\n\nSigns: larger positions, more frequent trades, ignored stops. Tilt Shield warns on 3+ losses in a row, a trade soon after a loss, 4+ trades in a day, trading outside your hours, and 2 plan deviations in a week.\n\nRule of thumb: take a break after 2 consecutive losses.",
+        caveat: "Rule of thumb: take a short break after a losing streak; Tilt Shield warns from 3.",
+        longForm: "Tilt — an emotional state that makes you deviate from your trading rules. Common after large losses, missing a big move, or a winning streak that breeds overconfidence.\n\nSigns: larger positions, more frequent trades, ignored stops. Tilt Shield warns on 3+ losses in a row, a trade soon after a loss, 4+ trades in a day, trading outside your hours, and 2 plan deviations in a week.\n\nRule of thumb: take a short break after a losing streak; Tilt Shield warns from 3.",
       },
       es: {
         label: "Tilt",
-        short: "Tilt — estado emocional que te hace desviarte de tus reglas de trading.\n\nComún tras: grandes pérdidas, perderte un gran movimiento, o una racha de ganancias que genera exceso de confianza.\n\nSeñales: aumentar el tamaño de posición, operar con más frecuencia, ignorar los stops.\n\nPrevención: pausa obligatoria tras 2+ pérdidas consecutivas.",
+        short: "Un estado emocional que te saca de tus reglas.",
+        example: "Ejemplo: 3 pérdidas seguidas ⇒ Tilt Shield avisa antes de la siguiente operación.",
+        caveat: "Regla general: pausa corta tras una racha perdedora; Tilt Shield avisa desde 3.",
+        longForm: "Tilt — un estado emocional que te hace desviarte de tus reglas de trading. Común tras grandes pérdidas, perderte un gran movimiento o una racha ganadora que genera exceso de confianza.\n\nSeñales: posiciones más grandes, operaciones más frecuentes, stops ignorados. Tilt Shield avisa con 3+ pérdidas seguidas, una operación poco después de una pérdida, 4+ operaciones en un día, operar fuera de tu horario y 2 desviaciones del plan en una semana.\n\nRegla general: haz una pausa corta tras una racha perdedora; Tilt Shield avisa desde 3.",
       },
       pt: {
         label: "Tilt",
-        short: "Tilt — estado emocional que te faz desviar das tuas regras de trading.\n\nComum após: grandes perdas, perder um grande movimento, ou uma sequência de ganhos que gera excesso de confiança.\n\nSinais: aumentar o tamanho de posição, operar com mais frequência, ignorar os stops.\n\nPrevenção: pausa obrigatória após 2+ perdas consecutivas.",
+        short: "Um estado emocional que tira você das suas regras.",
+        example: "Exemplo: 3 perdas seguidas ⇒ o Tilt Shield avisa antes da próxima operação.",
+        caveat: "Regra prática: pausa curta após uma sequência de perdas; o Tilt Shield avisa a partir de 3.",
+        longForm: "Tilt — um estado emocional que faz você se desviar das suas regras de trading. Comum após grandes perdas, depois de perder um grande movimento ou numa sequência de ganhos que gera excesso de confiança.\n\nSinais: posições maiores, operações mais frequentes, stops ignorados. O Tilt Shield avisa com 3+ perdas seguidas, uma operação logo após uma perda, 4+ operações em um dia, operar fora do seu horário e 2 desvios do plano em uma semana.\n\nRegra prática: faça uma pausa curta após uma sequência de perdas; o Tilt Shield avisa a partir de 3.",
       },
       ar: {
         label: "Tilt",
-        short: "Tilt — حالة عاطفية تجعلك تنحرف عن قواعد تداولك.\n\nشائعة بعد: خسائر كبيرة، أو تفويت حركة كبيرة، أو سلسلة انتصارات تولّد ثقة مفرطة.\n\nالعلامات: زيادة حجم الصفقة، التداول بوتيرة أعلى، تجاهل أوامر الوقف.\n\nالوقاية: استراحة إلزامية بعد خسارتين متتاليتين أو أكثر.",
+        short: "حالة عاطفية تُخرجك عن قواعدك.",
+        example: "مثال: 3 خسائر متتالية ⇒ ينبّهك Tilt Shield قبل الصفقة التالية.",
+        caveat: "قاعدة عامة: خذ استراحة قصيرة بعد سلسلة خسائر؛ ينبّه Tilt Shield ابتداءً من 3.",
+        longForm: "Tilt — حالة عاطفية تجعلك تنحرف عن قواعد تداولك. شائعة بعد خسائر كبيرة، أو تفويت حركة كبيرة، أو سلسلة أرباح تولّد ثقة مفرطة.\n\nالعلامات: صفقات أكبر، وتداول أكثر تكرارًا، وتجاهل أوامر الوقف. ينبّه Tilt Shield عند 3 خسائر متتالية أو أكثر، وصفقة بعد خسارة بوقت قصير، و4 صفقات أو أكثر في يوم واحد، والتداول خارج ساعاتك، وانحرافين عن الخطة في أسبوع.\n\nقاعدة عامة: خذ استراحة قصيرة بعد سلسلة خسائر؛ ينبّه Tilt Shield ابتداءً من 3.",
       },
     },
   },
@@ -154,7 +186,6 @@ export default [
     sources: ["MURPHY"],
     related: ["dna"],
     shownAt: ["src/components/EditTradeModal.jsx — עריכת עסקה · מצב שוק", "src/intelligence/ui/IntelligenceUI.jsx — דשבורד · מחוון מצב שוק"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "מצב שוק",
@@ -172,15 +203,24 @@ export default [
       },
       es: {
         label: "Régimen de Mercado",
-        short: "Régimen de Mercado — el entorno de mercado actual, leído de la acción real del precio (no de tus operaciones). Se calcula con SPY/QQQ frente a su media de 20 días, el % de tendencia, cuántos ETF sectoriales suben (amplitud) y la volatilidad realizada.\n\n• Tendencia Alcista: Tendencia al alza — precio por encima de una media de 20 días creciente con participación amplia. Favorece breakouts y pullbacks.\n• Tendencia Bajista: Tendencia a la baja — precio por debajo de una media de 20 días decreciente, debilidad amplia. Favorece cortos o mantente al margen.\n• Lateral/Rango: Sin tendencia neta — precio atrapado entre soporte y resistencia. Opera los extremos, evita breakouts.\n• Alta Volatilidad: Dominan los fuertes vaivenes diarios. Reduce tamaño ~50% y amplía stops.\n• Baja Volatilidad: Mercado tranquilo y comprimido — espera movimientos pequeños.\n\nMuestra 'Datos insuficientes' cuando no hay suficiente historial de precios para clasificar.",
+        short: "Entorno de mercado según SPY/QQQ frente a su media de 20 días, amplitud sectorial y volatilidad.",
+        example: "Ejemplo: precio sobre una media de 20 días al alza y la mayoría de sectores subiendo ⇒ Tendencia Alcista.",
+        caveat: "Usa precios de mercado, no tus operaciones.",
+        longForm: "Régimen de Mercado — el entorno de mercado actual, leído de la acción real del precio (no de tus operaciones). Se calcula con SPY/QQQ frente a su media de 20 días, el % de tendencia, cuántos ETF sectoriales suben (amplitud) y la volatilidad realizada.\n\n• Tendencia Alcista: precio sobre una media de 20 días al alza con participación amplia. Favorece breakouts y pullbacks.\n• Tendencia Bajista: precio bajo una media de 20 días a la baja, debilidad amplia. Favorece operaciones SHORT o quédate al margen.\n• Lateral/Rango: sin tendencia neta — precio atrapado entre soporte y resistencia. Opera contra los extremos, evita breakouts.\n• Alta Volatilidad: dominan los grandes vaivenes diarios. Regla general: reduce el tamaño ~50% y amplía los stops.\n• Baja Volatilidad: mercado tranquilo y comprimido — espera movimientos pequeños.\n\nMuestra 'datos insuficientes' cuando no hay suficiente historial de precios para clasificar.",
       },
       pt: {
         label: "Regime de Mercado",
-        short: "Regime de Mercado — o ambiente de mercado atual, lido da ação real do preço (não das tuas operações). Calculado a partir de SPY/QQQ face à média de 20 dias, % de tendência, quantos ETF setoriais sobem (amplitude) e volatilidade realizada.\n\n• Tendência de Alta: Tendência de subida — preço acima de uma média de 20 dias ascendente com participação ampla. Favorece breakouts e pullbacks.\n• Tendência de Baixa: Tendência de descida — preço abaixo de uma média de 20 dias descendente, fraqueza ampla. Favorece vendas ou fica de fora.\n• Lateral/Range: Sem tendência líquida — preço preso entre suporte e resistência. Opera os extremos, evita breakouts.\n• Alta Volatilidade: Dominam as fortes oscilações diárias. Reduz tamanho ~50% e amplia stops.\n• Baixa Volatilidade: Mercado calmo e comprimido — espera movimentos pequenos.\n\nMostra 'Dados insuficientes' quando não há histórico de preços suficiente para classificar.",
+        short: "Ambiente de mercado lido de SPY/QQQ versus a média de 20 dias, amplitude setorial e volatilidade.",
+        example: "Exemplo: preço acima de uma média de 20 dias em alta e a maioria dos setores subindo ⇒ Tendência de Alta.",
+        caveat: "Usa preços de mercado, não suas operações.",
+        longForm: "Regime de Mercado — o ambiente de mercado atual, lido da ação real do preço (não das suas operações). Calculado a partir de SPY/QQQ em relação à média de 20 dias, % de tendência, quantos ETFs setoriais estão subindo (amplitude) e volatilidade realizada.\n\n• Tendência de Alta: preço acima de uma média de 20 dias em alta com participação ampla. Prefira breakouts e pullbacks.\n• Tendência de Baixa: preço abaixo de uma média de 20 dias em queda, fraqueza ampla. Prefira operações SHORT ou fique de fora.\n• Lateral/Range: sem tendência líquida — preço preso entre suporte e resistência. Opere contra os extremos, evite breakouts.\n• Alta Volatilidade: grandes oscilações diárias dominam. Regra prática: reduza o tamanho em ~50% e alargue os stops.\n• Baixa Volatilidade: mercado calmo e comprimido — espere movimentos pequenos.\n\nMostra 'dados insuficientes' quando não há histórico de preços suficiente para classificar.",
       },
       ar: {
         label: "نظام السوق",
-        short: "نظام السوق — بيئة السوق الحالية، تُقرأ من حركة السعر الحقيقية (وليس من صفقاتك). يُحسب من SPY/QQQ مقابل متوسّطها المتحرّك لـ20 يومًا، ونسبة الاتجاه، وكم قطاعًا يرتفع (اتساع السوق)، والتقلّب المحقَّق.\n\n• اتجاه صاعد: اتجاه صعودي — السعر فوق متوسّط 20 يومًا صاعد بمشاركة واسعة. فضّل الاختراقات والتراجعات.\n• اتجاه هابط: اتجاه هبوطي — السعر تحت متوسّط 20 يومًا هابط، ضعف واسع. فضّل البيع أو ابقَ جانبًا.\n• عرضي/نطاق: لا اتجاه صافٍ — السعر محصور بين الدعم والمقاومة. تاجر عند الأطراف وتجنّب الاختراقات.\n• تقلّب عالٍ: تسيطر التذبذبات اليومية الحادة. قلّل الحجم ~50% ووسّع أوامر الوقف.\n• تقلّب منخفض: سوق هادئ ومضغوط — توقّع حركات صغيرة.\n\nيعرض 'بيانات غير كافية' عند عدم توفّر تاريخ أسعار كافٍ للتصنيف.",
+        short: "بيئة السوق، تُقرأ من SPY/QQQ مقابل متوسط 20 يومًا، واتساع القطاعات، والتقلب.",
+        example: "مثال: السعر فوق متوسط 20 يومًا صاعد ومعظم القطاعات ترتفع ⇒ اتجاه صاعد.",
+        caveat: "مبني على أسعار السوق، لا على صفقاتك.",
+        longForm: "نظام السوق — بيئة السوق الحالية، تُقرأ من حركة السعر الحقيقية (وليس من صفقاتك). يُحسب من SPY/QQQ مقابل متوسطها لـ 20 يومًا، ونسبة الاتجاه %، وعدد صناديق ETF القطاعية التي ترتفع (الاتساع)، والتقلب المحقَّق.\n\n• اتجاه صاعد: السعر فوق متوسط 20 يومًا صاعد بمشاركة واسعة. فضّل الاختراقات والتراجعات.\n• اتجاه هابط: السعر تحت متوسط 20 يومًا هابط، مع ضعف واسع. فضّل صفقات SHORT أو ابقَ جانبًا.\n• عرضي/نطاق: لا اتجاه صافٍ — السعر عالق بين الدعم والمقاومة. تداول عكس الأطراف وتجنّب الاختراقات.\n• تقلب عالٍ: تسيطر التذبذبات اليومية الكبيرة. قاعدة عامة: قلّل الحجم بنحو 50% ووسّع أوامر الوقف.\n• تقلب منخفض: سوق هادئ ومضغوط — توقّع حركات صغيرة.\n\nيعرض 'بيانات غير كافية' عندما لا يتوفر تاريخ أسعار كافٍ للتصنيف.",
       },
     },
   },
@@ -189,7 +229,6 @@ export default [
     computedIn: ["src/intelligence/utils/psychologyPatterns.js:106"],
     related: ["dna", "grade", "entryQuality"],
     shownAt: ["src/intelligence/ui/IntelligenceUI.jsx — דשבורד · כרטיס ה-DNA · שורה"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "משמעת",
@@ -207,15 +246,24 @@ export default [
       },
       es: {
         label: "Disciplina",
-        short: "Si seguiste tu plan — stop, tamaño, objetivo — sin desviación emocional. El núcleo de la rentabilidad a largo plazo.",
+        short: "La proporción de tus operaciones cerradas que marcaste 'seguí mi plan'.",
+        example: "Ejemplo: marcaste 'sí' en 8 de 10 ⇒ 80.",
+        caveat: "Autodeclarado; una operación sin marcar no cuenta.",
+        longForm: "La proporción de tus operaciones cerradas que marcaste 'seguí mi plan' — stop, tamaño y objetivo, sin desviación emocional. Una operación sin marcar no entra en el denominador.\n\nEs autodeclarado: la app no comprueba si el stop se respetó de verdad.",
       },
       pt: {
         label: "Disciplina",
-        short: "Se seguiste o teu plano — stop, tamanho, alvo — sem desvio emocional. O núcleo da rentabilidade a longo prazo.",
+        short: "A fração das suas operações fechadas que você marcou 'segui meu plano'.",
+        example: "Exemplo: você marcou 'sim' em 8 de 10 ⇒ 80.",
+        caveat: "Autodeclarado; operação sem marcação não conta.",
+        longForm: "A fração das suas operações fechadas que você marcou 'segui meu plano' — stop, tamanho e alvo, sem desvio emocional. Uma operação sem marcação não entra no denominador.\n\nÉ autodeclarado: o app não verifica se o stop foi de fato respeitado.",
       },
       ar: {
         label: "الانضباط",
-        short: "ما إذا كنت اتّبعت خطّتك — وقف الخسارة، الحجم، الهدف — دون انحراف عاطفي. جوهر الربحية على المدى الطويل.",
+        short: "نسبة صفقاتك المغلقة التي وضعت عليها علامة 'اتبعت خطتي'.",
+        example: "مثال: وضعت 'نعم' على 8 من 10 ⇒ 80.",
+        caveat: "تقرير ذاتي؛ الصفقة غير المعلَّمة لا تُحتسب.",
+        longForm: "نسبة صفقاتك المغلقة التي وضعت عليها علامة 'اتبعت خطتي' — وقف الخسارة والحجم والهدف، دون انحراف عاطفي. الصفقة غير المعلَّمة لا تدخل في المقام.\n\nإنه تقرير ذاتي: لا يتحقق التطبيق مما إذا كان وقف الخسارة قد احتُرم فعلًا.",
       },
     },
   },
@@ -224,7 +272,6 @@ export default [
     computedIn: ["src/intelligence/core/TradeDNA.js:164"],
     related: ["dna", "riskPerTrade"],
     shownAt: ["src/intelligence/ui/IntelligenceUI.jsx — דשבורד · כרטיס ה-DNA · שורה"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "ניהול סיכון",
@@ -241,16 +288,25 @@ export default [
         longForm: "The risk score comes from your average risk per trade — distance to stop × shares, as a percentage of capital at entry. Up to 1% scores 100; each percentage point above that removes 50; 3% or more scores 0.\n\nIt does not measure whether you honored the stop or kept position size uniform — only how much you risked on average.",
       },
       es: {
-        label: "Risk",
-        short: "Mide cuán consistente eres gestionando el riesgo: tamaño de posición uniforme, respetar los stops y no superar el riesgo planificado por operación. Una puntuación baja significa riesgo inconsistente, la mayor amenaza para una cuenta.",
+        label: "Gestión del riesgo",
+        short: "Puntuación 0–100 según tu riesgo medio por operación como porcentaje del capital.",
+        example: "Ejemplo: 1% o menos ⇒ 100 · 2% ⇒ 50 · 3%+ ⇒ 0.",
+        caveat: "No mide si respetaste el stop.",
+        longForm: "La puntuación de riesgo sale de tu riesgo medio por operación — distancia al stop × acciones, como porcentaje del capital al entrar. Hasta 1% puntúa 100; cada punto porcentual por encima resta 50; 3% o más puntúa 0.\n\nNo mide si respetaste el stop ni si mantuviste un tamaño de posición uniforme — solo cuánto arriesgaste en promedio.",
       },
       pt: {
-        label: "Risk",
-        short: "Mede o quão consistente você é na gestão de risco: tamanho de posição uniforme, respeitar os stops e não exceder o risco planeado por operação. Uma pontuação baixa significa risco inconsistente — a maior ameaça a uma conta.",
+        label: "Gestão de risco",
+        short: "Pontuação 0–100 a partir do seu risco médio por operação como porcentagem do capital.",
+        example: "Exemplo: 1% ou menos ⇒ 100 · 2% ⇒ 50 · 3%+ ⇒ 0.",
+        caveat: "Não mede se você respeitou o stop.",
+        longForm: "A pontuação de risco vem do seu risco médio por operação — distância até o stop × ações, como porcentagem do capital na entrada. Até 1% vale 100; cada ponto percentual acima disso tira 50; 3% ou mais vale 0.\n\nNão mede se você respeitou o stop nem se manteve o tamanho da posição uniforme — só quanto você arriscou em média.",
       },
       ar: {
-        label: "Risk",
-        short: "يقيس مدى اتّساقك في إدارة المخاطر: حجم صفقة موحّد، واحترام أوامر وقف الخسارة، وعدم تجاوز المخاطرة المخطّطة لكل صفقة. الدرجة المنخفضة تعني مخاطرة غير متّسقة — وهي أكبر تهديد للحساب.",
+        label: "إدارة المخاطر",
+        short: "درجة 0–100 مبنية على متوسط مخاطرتك لكل صفقة كنسبة مئوية من رأس المال.",
+        example: "مثال: 1% أو أقل ⇒ 100 · 2% ⇒ 50 · 3% فأكثر ⇒ 0.",
+        caveat: "لا تقيس ما إذا كنت احترمت وقف الخسارة.",
+        longForm: "تأتي درجة المخاطرة من متوسط مخاطرتك لكل صفقة — المسافة إلى وقف الخسارة × عدد الأسهم، كنسبة مئوية من رأس المال عند الدخول. حتى 1% تكون الدرجة 100؛ وكل نقطة مئوية فوق ذلك تخصم 50؛ و3% أو أكثر تعطي 0.\n\nلا تقيس ما إذا كنت احترمت وقف الخسارة أو حافظت على حجم صفقة موحّد — فقط كم خاطرت في المتوسط.",
       },
     },
   },
@@ -259,7 +315,6 @@ export default [
     computedIn: ["src/intelligence/core/TradeDNA.js:190"],
     related: ["dna", "sharpe"],
     shownAt: ["src/intelligence/ui/IntelligenceUI.jsx — דשבורד · כרטיס ה-DNA · שורה"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "עקביות",
@@ -276,16 +331,25 @@ export default [
         longForm: "The consistency score comes from the standard deviation of R across closed trades with a stop: 1 − (standard deviation ÷ 3), and 0 from 3R up.\n\nHigh means outcomes that resemble each other; low means results that hinge on a few extreme trades. It needs at least 2 trades with an R, otherwise it shows —.",
       },
       es: {
-        label: "Consistency",
-        short: "Mide la estabilidad de tu rendimiento a lo largo del tiempo: si los resultados son uniformes o dependen de unas pocas operaciones enormes. Alta consistencia es un método fiable; baja, resultados aleatorios.",
+        label: "Consistencia",
+        short: "Puntuación 0–100 por la dispersión de tus resultados en R; menos dispersión, más puntos.",
+        example: "Ejemplo: desviación estándar 0R ⇒ 100 · 1.5R ⇒ 50 · 3R+ ⇒ 0.",
+        caveat: "Mínimo 2 operaciones con R.",
+        longForm: "La puntuación de consistencia sale de la desviación estándar del R en operaciones cerradas con stop: 1 − (desviación estándar ÷ 3), y 0 desde 3R en adelante.\n\nAlta significa resultados parecidos entre sí; baja, resultados que dependen de unas pocas operaciones extremas. Requiere al menos 2 operaciones con R; si no, muestra —.",
       },
       pt: {
-        label: "Consistency",
-        short: "Mede a estabilidade do seu desempenho ao longo do tempo: se os resultados são uniformes ou dependem de poucas operações enormes. Alta consistência é um método confiável; baixa, resultados aleatórios.",
+        label: "Consistência",
+        short: "Pontuação 0–100 a partir da dispersão dos seus resultados em R; menos dispersão pontua mais.",
+        example: "Exemplo: desvio padrão 0R ⇒ 100 · 1.5R ⇒ 50 · 3R+ ⇒ 0.",
+        caveat: "Exige 2+ operações com R.",
+        longForm: "A pontuação de consistência vem do desvio padrão do R nas operações fechadas com stop: 1 − (desvio padrão ÷ 3), e 0 a partir de 3R.\n\nAlta significa resultados parecidos entre si; baixa, resultados que dependem de poucas operações extremas. Exige pelo menos 2 operações com R; caso contrário, mostra —.",
       },
       ar: {
-        label: "Consistency",
-        short: "يقيس استقرار أدائك عبر الزمن: هل النتائج متّسقة أم تعتمد على عدد قليل من الصفقات الضخمة. الاتّساق العالي يعني منهجاً يمكن الاعتماد عليه؛ والمنخفض يعني نتائج عشوائية.",
+        label: "الاتساق",
+        short: "درجة 0–100 مبنية على تشتت نتائج R لديك؛ كلما قل التشتت ارتفعت الدرجة.",
+        example: "مثال: انحراف معياري 0R ⇒ 100 · 1.5R ⇒ 50 · 3R فأكثر ⇒ 0.",
+        caveat: "تتطلب صفقتين أو أكثر لها R.",
+        longForm: "تأتي درجة الاتساق من الانحراف المعياري لـ R في الصفقات المغلقة التي لها وقف خسارة: 1 − (الانحراف المعياري ÷ 3)، و0 من 3R فأكثر.\n\nالدرجة العالية تعني نتائج متشابهة؛ والمنخفضة تعني نتائج تعتمد على بضع صفقات متطرفة. تتطلب صفقتين على الأقل لهما R، وإلا تظهر —.",
       },
     },
   },
@@ -294,7 +358,6 @@ export default [
     computedIn: ["src/intelligence/core/TradeDNA.js:199"],
     related: ["dna", "equityCurve"],
     shownAt: ["src/intelligence/ui/IntelligenceUI.jsx — דשבורד · כרטיס ה-DNA · שורה"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "צמיחה",
@@ -311,16 +374,25 @@ export default [
         longForm: "The growth score comes from the slope of cumulative R over your last 20 closed trades with a stop. A flat slope = 50; +1R per trade or more = 100; −1R or less = 0.\n\nIt measures a trend in results, not learning: a rising score means cumulative R is climbing over your recent trades.",
       },
       es: {
-        label: "Growth",
-        short: "Mide tu tendencia de mejora: si aprendes de los datos y mejoras con el tiempo, o repites los mismos errores. Una puntuación creciente es la curva correcta para un trader en desarrollo.",
+        label: "Crecimiento",
+        short: "Puntuación 0–100 según la pendiente del R acumulado en tus últimas 20 operaciones cerradas; 50 = plano.",
+        example: "Ejemplo: R acumulado que sube ~+0.5R por operación ⇒ ~75.",
+        caveat: "Más de +1R por operación ⇒ 100; menos de −1R ⇒ 0.",
+        longForm: "La puntuación de crecimiento sale de la pendiente del R acumulado en tus últimas 20 operaciones cerradas con stop. Pendiente plana = 50; +1R por operación o más = 100; −1R o menos = 0.\n\nMide una tendencia en los resultados, no el aprendizaje: una puntuación al alza significa que el R acumulado está subiendo en tus operaciones recientes.",
       },
       pt: {
-        label: "Growth",
-        short: "Mede a sua tendência de melhoria: se aprende com os dados e melhora ao longo do tempo, ou repete os mesmos erros. Uma pontuação crescente é a curva certa para um trader em desenvolvimento.",
+        label: "Crescimento",
+        short: "Pontuação 0–100 pela inclinação do R acumulado nas suas últimas 20 operações fechadas; 50 = plano.",
+        example: "Exemplo: R acumulado subindo ~+0.5R por operação ⇒ ~75.",
+        caveat: "Acima de +1R por operação ⇒ 100; abaixo de −1R ⇒ 0.",
+        longForm: "A pontuação de crescimento vem da inclinação do R acumulado nas suas últimas 20 operações fechadas com stop. Inclinação plana = 50; +1R por operação ou mais = 100; −1R ou menos = 0.\n\nEla mede uma tendência nos resultados, não aprendizado: uma pontuação em alta significa que o R acumulado está subindo nas suas operações recentes.",
       },
       ar: {
-        label: "Growth",
-        short: "يقيس اتجاه تحسّنك: هل تتعلّم من البيانات وتتحسّن مع الوقت، أم تكرّر الأخطاء نفسها. الدرجة المتصاعدة هي المنحنى الصحيح للمتداول الذي يتطوّر.",
+        label: "النمو",
+        short: "درجة 0–100 مبنية على ميل R التراكمي في آخر 20 صفقة مغلقة لك؛ 50 = مستوٍ.",
+        example: "مثال: R تراكمي يرتفع بنحو \u200e+0.5R لكل صفقة ⇒ نحو 75.",
+        caveat: "فوق \u200e+1R لكل صفقة ⇒ 100؛ تحت \u200e−1R ⇒ 0.",
+        longForm: "تأتي درجة النمو من ميل R التراكمي في آخر 20 صفقة مغلقة لك لها وقف خسارة. الميل المستوي = 50؛ \u200e+1R لكل صفقة أو أكثر = 100؛ \u200e−1R أو أقل = 0.\n\nإنها تقيس اتجاهًا في النتائج لا التعلّم: الدرجة الصاعدة تعني أن R التراكمي يرتفع في صفقاتك الأخيرة.",
       },
     },
   },
@@ -328,7 +400,6 @@ export default [
     id: "setup",
     related: ["performanceBySetup", "breakout"],
     shownAt: ["src/components/LandingPage.jsx — דף הנחיתה · הדגשת מונח"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "סטאפ (Setup)",
@@ -342,15 +413,18 @@ export default [
       },
       es: {
         label: "Setup",
-        short: "Your entry pattern — the exact conditions under which you take a position.\nExample: Breakout, Pullback or Bull Flag.",
+        short: "Tu patrón de entrada — las condiciones exactas bajo las que abres una posición.",
+        example: "Ejemplo: Breakout, Pullback o Bull Flag.",
       },
       pt: {
         label: "Setup",
-        short: "Your entry pattern — the exact conditions under which you take a position.\nExample: Breakout, Pullback or Bull Flag.",
+        short: "Seu padrão de entrada — as condições exatas em que você abre uma posição.",
+        example: "Exemplo: Breakout, Pullback ou Bull Flag.",
       },
       ar: {
-        label: "Setup",
-        short: "Your entry pattern — the exact conditions under which you take a position.\nExample: Breakout, Pullback or Bull Flag.",
+        label: "نموذج الدخول (Setup)",
+        short: "نمط دخولك — الشروط الدقيقة التي تفتح فيها مركزًا.",
+        example: "مثال: Breakout أو Pullback أو Bull Flag.",
       },
     },
   },

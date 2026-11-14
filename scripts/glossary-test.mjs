@@ -7,8 +7,10 @@
 //   S  — הסכימה של כל מונח (5 שפות · label+short · מפתח לא מוכר = אדום)
 //   G  — כל קובץ מחולל זהה בייט-לבייט למה שהמחולל מפיק עכשיו מהמקור (sourceHash)
 //   R  — אין "?" שבור: כל term= סטטי קיים · כל אתר דינמי בלדג'ר · נקודת ייבוא אחת
-//   F  — פורמט הטקסט המוצג (גל 3 שלב 4): הגדרה במשפט אחד ≤18 מילים · "לדוגמה:"/"Example:" ·
-//        he ≤35 / en ≤40 מילים · בלי \n\n / • · LRM לפני מספר מסומן בעברית · mustContain · מקור/חישוב
+//   F  — פורמט הטקסט המוצג (גל 3 שלבים 4–5), בחמש השפות: הגדרה במשפט אחד (he/en ≤18 מילים) ·
+//        "לדוגמה:"/"Example:"/"Ejemplo:"/"Exemplo:"/"مثال:" · he ≤35 / en ≤40 מילים · es/pt/ar ≤110%
+//        מתווי en · בלי \n\n / • · LRM לפני מספר מסומן בעברית ובערבית · mustContain · מקור/חישוב ·
+//        ⛔ אותיות עבריות מחוץ ל-he
 //   W  — איפה מוצג: shownAt של כל מונח = הקבצים שבאמת מרנדרים אותו; יתום ⇔ glossaryOnly
 //   L  — לדג'רים מדויקים (מותנים · <InfoTooltip> · שפות שממתינות לתרגום). דו-כיווני:
 //        מי שמתקן בלי להזיז את השורה — מקבל אדום, וכך גם מי שמקלקל.
@@ -69,10 +71,11 @@ const CONDITIONAL = ["pullback20EMA", "bullFlag", "ORBBreakout", "VWAPReclaim", 
 // <InfoTooltip> מחוץ ל-src/components/ui. App 7 = StatCard הגנרי (1) + 6 תוויות טופס (CATEGORY_TOOLTIP — ממתין להכרעת ניב, STOP 2).
 const INFOTOOLTIP_SITES = { "SwingEdge_App.jsx": 7, "src/components/EditTradeModal.jsx": 2 };
 const STATCARD_INFO = 0; // App: StatCard info={…} — 0 מגל 3 (כרטיס ההון עבר למונח accountEquity)
-// שלב 4: es/pt/ar ממתינים לתרגום בכל 80 המונחים. שלב 5 מרוקן ⇒ השורה הופכת ל-0.
-const PENDING = ["es", "pt", "ar"];
+// שלב 5 (14.11): תורגם הכול ⇒ אף מונח לא נושא pendingTranslation. שפה ממתינה חדשה = הכרעה + שורה כאן.
+const PENDING = [];
 // פורמט
-const CAP = { he: 35, en: 40 }, DEF_CAP = 18, EX = { he: "לדוגמה:", en: "Example:" };
+const CAP = { he: 35, en: 40 }, DEF_CAP = 18, CHAR_RATIO = 1.1; // es/pt/ar: ≤110% מתווי הטקסט המוצג באנגלית
+const EX = { he: "לדוגמה:", en: "Example:", es: "Ejemplo:", pt: "Exemplo:", ar: "مثال:" };
 const MEASURED_CATS = ["performance", "analytics", "metrics"];
 const MEASURED_IDS = ["dna", "dnaRisk", "dnaConsistency", "dnaGrowth", "discipline", "edge", "antiEdge", "tilt", "marketRegime", "riskPerTrade", "riskLimits", "positionSize"];
 const SELF_RATED = { entryQuality: "דירוג שהמשתמש נותן — אין חישוב לצטט" };
@@ -205,13 +208,16 @@ check("W3", `סטאפים מותנים (מגיעים למסך רק מעסקה ש
 console.log("\nF · פורמט");
 const wc = (x) => x.trim().split(/\s+/).filter(Boolean).length;
 const live = (t) => LANGS.filter((l) => !(t.pendingTranslation ?? []).includes(l));
-const fb = { def: [], ex: [], cap: [], shape: [], lrm: [], must: [], src: [], file: [] };
+const fb = { def: [], ex: [], cap: [], shape: [], lrm: [], must: [], src: [], file: [], heb: [] };
 for (const t of terms) {
   for (const l of live(t)) {
     const x = t.i18n[l]; const shown = termText(t.id, l);
-    if (wc(x.short) > DEF_CAP || /[.!?](\s|$)[\s\S]*[.!?](\s|$)/.test(x.short) || x.short.includes("\n")) fb.def.push(`${t.id}.${l} (${wc(x.short)})`);
-    if (EX[l] && !(x.example ?? "").startsWith(EX[l])) fb.ex.push(`${t.id}.${l}`);
+    if ((CAP[l] && wc(x.short) > DEF_CAP) || /[.!?؟](\s|$)[\s\S]*[.!?؟](\s|$)/.test(x.short) || x.short.includes("\n")) fb.def.push(`${t.id}.${l} (${wc(x.short)})`);
+    if (!!x.example !== !!t.i18n.en.example || (x.example && !x.example.startsWith(EX[l]))) fb.ex.push(`${t.id}.${l}`);
     if (CAP[l] && wc(shown) > CAP[l]) fb.cap.push(`${t.id}.${l} ${wc(shown)}>${CAP[l]}`);
+    const charCap = Math.floor(termText(t.id, "en").length * CHAR_RATIO);
+    if (!CAP[l] && shown.length > charCap) fb.cap.push(`${t.id}.${l} ${shown.length}>${charCap} תווים`);
+    if (l !== "he" && /[\u0590-\u05FF]/.test(JSON.stringify(x))) fb.heb.push(`${t.id}.${l}`);
     if (/\n\n|•/.test(shown)) fb.shape.push(`${t.id}.${l}`);
     if ((l === "he" || l === "ar") && /(^|[^\u200e])[+\u2212]\d/.test(shown)) fb.lrm.push(`${t.id}.${l}`);
     for (const m of t.mustContain?.[l] ?? []) if (!shown.includes(m)) fb.must.push(`${t.id}.${l} ⇏ ${m}`);
@@ -220,14 +226,15 @@ for (const t of terms) {
   if (measured && !SELF_RATED[t.id] && !(t.computedIn?.length || t.sources?.length)) fb.src.push(t.id);
   for (const c of t.computedIn ?? []) if (!fs.existsSync(path.join(ROOT, c.split(":")[0]))) fb.file.push(`${t.id}: ${c}`);
 }
-check("F1", `הגדרה = משפט אחד ≤${DEF_CAP} מילים (he+en)`, fb.def.length === 0, fb.def.join(", "));
-check("F2", "דוגמה פותחת ב-\"לדוגמה:\" / \"Example:\" (he+en)", fb.ex.length === 0, fb.ex.join(", "));
-check("F3", `טקסט מוצג ≤${CAP.he} מילים בעברית · ≤${CAP.en} באנגלית`, fb.cap.length === 0, fb.cap.join(", "));
+check("F1", `הגדרה = משפט אחד (he/en ≤${DEF_CAP} מילים) · 5 שפות`, fb.def.length === 0, fb.def.join(", "));
+check("F2", "דוגמה קיימת כמו ב-en ופותחת ב-\"לדוגמה:\" / \"Example:\" / \"Ejemplo:\" / \"Exemplo:\" / \"مثال:\"", fb.ex.length === 0, fb.ex.join(", "));
+check("F3", `טקסט מוצג ≤${CAP.he} מילים בעברית · ≤${CAP.en} באנגלית · es/pt/ar ≤${Math.round(CHAR_RATIO * 100)}% מתווי en`, fb.cap.length === 0, fb.cap.join(", "));
 check("F4", "בלי \\n\\n ובלי • בטקסט המוצג", fb.shape.length === 0, fb.shape.join(", "));
 check("F5", "מספר מסומן (+/−) בעברית/ערבית נושא LRM לפניו", fb.lrm.length === 0, fb.lrm.join(", "));
 check("F6", "mustContain מתקיים בטקסט המוצג", fb.must.length === 0, fb.must.join(", "));
 check("F7", "כל מונח שמתאר מספר מחושב נושא computedIn או sources", fb.src.length === 0, fb.src.join(", "));
 check("F8", "כל computedIn מצביע על קובץ קיים", fb.file.length === 0, fb.file.join(", "));
+check("F9", "אין אותיות עבריות מחוץ ל-he", fb.heb.length === 0, fb.heb.join(", "));
 
 // ── L · ledgers ─────────────────────────────────────────────────────────────
 console.log("\nL · לדג'רים");

@@ -1,7 +1,7 @@
 // src/glossary/terms/chart.js — פעולות ותכונות
 // ⛔ מקור האמת היחיד למונחים האלה. עריכה כאן ⇒ `npm run glossary` באותו קומיט (test:glossary תופס סחיפה).
 // פורמט (גל 3): short = הגדרה במשפט אחד ≤18 מילים · example = "לדוגמה:"/"Example:" במספרים היפותטיים · caveat אחד לכל היותר · longForm = הטקסט המלא (מודאל המילון).
-// pendingTranslation: es/pt/ar עדיין בטקסט הישן — שלב 5.
+// 5 שפות מלאות (שלב 5, 14.11): es/pt/ar מתורגמים מ-he/en, ≤110% מתווי en. שפה שממתינה לתרגום ⇒ pendingTranslation + שורה ב-test:glossary (L3).
 
 /** @type {import("../types.js").GlossaryTerm[]} */
 export default [
@@ -9,7 +9,6 @@ export default [
     id: "chartCalcPosition",
     related: ["positionSize", "takeProfit"],
     shownAt: ["SwingEdge_App.jsx — גרף · פעולות"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "חשב פוזיציה",
@@ -25,15 +24,21 @@ export default [
       },
       es: {
         label: "Calcular Posición",
-        short: "Rellena automáticamente la Calculadora de Posición desde el gráfico actual — ticker, precio en vivo como entrada, un stop protector y un objetivo 2:1 — y luego la abre para que dimensiones la operación en un clic.",
+        short: "Rellena la calculadora de posición desde el gráfico: ticker, precio en vivo como entrada, stop y objetivo 1:2.",
+        example: "Ejemplo: entrada $50 y stop $48 ⇒ objetivo $54.",
+        longForm: "Rellena automáticamente la Calculadora de Posición desde el gráfico actual — ticker, precio en vivo como entrada, un stop protector y un objetivo 1:2 — y luego la abre para que dimensiones la operación en un clic.",
       },
       pt: {
         label: "Calcular Posição",
-        short: "Preenche automaticamente a Calculadora de Posição a partir do gráfico atual — ticker, preço ao vivo como entrada, um stop protetor e um alvo 2:1 — e depois abre-a para dimensionares a operação num clique.",
+        short: "Preenche a calculadora de posição pelo gráfico: ticker, preço ao vivo como entrada, stop e alvo 1:2.",
+        example: "Exemplo: entrada $50 e stop $48 ⇒ alvo $54.",
+        longForm: "Preenche automaticamente a Calculadora de Posição a partir do gráfico atual — ticker, preço ao vivo como entrada, um stop de proteção e um alvo 1:2 — e depois a abre para você dimensionar a operação em um clique.",
       },
       ar: {
         label: "احسب الصفقة",
-        short: "يملأ تلقائياً حاسبة الصفقة من الرسم الحالي — الرمز، السعر الحي كدخول، وقف حماية وهدف 2:1 — ثم يفتحها لتحدّد حجم الصفقة بنقرة واحدة.",
+        short: "يملأ حاسبة الصفقة من الرسم البياني: الرمز، والسعر الحي كدخول، ووقف، وهدف 1:2.",
+        example: "مثال: دخول $50 ووقف $48 ⇒ هدف $54.",
+        longForm: "يملأ تلقائياً حاسبة الصفقة من الرسم البياني الحالي — الرمز، والسعر الحي كدخول، ووقف حماية، وهدف 1:2 — ثم يفتحها لتحدّد حجم الصفقة بنقرة واحدة.",
       },
     },
   },
@@ -41,7 +46,6 @@ export default [
     id: "chartAddToJournal",
     related: ["takeProfit"],
     shownAt: ["SwingEdge_App.jsx — גרף · פעולות"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "הוסף ליומן",
@@ -57,15 +61,21 @@ export default [
       },
       es: {
         label: "Añadir al Diario",
-        short: "Inicia una nueva operación en el diario desde el gráfico actual — ticker, precio en vivo, un stop sugerido y un objetivo 2:1 pre-rellenados — lista para que la revises y guardes.",
+        short: "Abre una operación en el diario desde el gráfico, prellenada con ticker, precio en vivo, stop y objetivo 1:2.",
+        example: "Ejemplo: se rellenaron entrada $50, stop $48 y objetivo $54, y guardaste.",
+        longForm: "Inicia una nueva operación en el diario desde el gráfico actual — ticker, precio en vivo, un stop sugerido y un objetivo 1:2 prellenados — lista para que la revises y la guardes.",
       },
       pt: {
         label: "Adicionar ao Diário",
-        short: "Inicia uma nova operação no diário a partir do gráfico atual — ticker, preço ao vivo, um stop sugerido e um alvo 2:1 pré-preenchidos — pronta para reveres e guardares.",
+        short: "Abre uma operação no diário pelo gráfico, pré-preenchida com ticker, preço ao vivo, stop e alvo 1:2.",
+        example: "Exemplo: entrada $50, stop $48 e alvo $54 preenchidos, e você salvou.",
+        longForm: "Inicia uma nova operação no diário a partir do gráfico atual — ticker, preço ao vivo, um stop sugerido e um alvo 1:2 pré-preenchidos — pronta para você revisar e salvar.",
       },
       ar: {
         label: "أضف إلى اليوميّة",
-        short: "يبدأ صفقة جديدة في اليوميّة من الرسم الحالي — الرمز، السعر الحي، وقف مقترح وهدف 2:1 مملوءة مسبقاً — جاهزة لمراجعتك وحفظك.",
+        short: "يفتح صفقة في اليوميّة من الرسم البياني، معبّأة مسبقاً بالرمز والسعر الحي ووقف وهدف 1:2.",
+        example: "مثال: عُبّئت قيم الدخول $50 والوقف $48 والهدف $54، ثم حفظت.",
+        longForm: "يبدأ صفقة جديدة في اليوميّة من الرسم البياني الحالي — الرمز، والسعر الحي، ووقف مقترح، وهدف 1:2 معبّأة مسبقاً — جاهزة لتراجعها وتحفظها.",
       },
     },
   },
@@ -73,7 +83,6 @@ export default [
     id: "visionOcr",
     computedIn: ["api/ocr.js"],
     shownAt: ["src/components/LandingPage.jsx — דף הנחיתה · הדגשת מונח"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Vision OCR",
@@ -89,15 +98,21 @@ export default [
       },
       es: {
         label: "Vision OCR",
-        short: "Reads a trade from a chart screenshot and fills the fields instead of typing.\nExample: you uploaded a screenshot with entry, stop and target ⇒ the fields were filled.\nCheck the values before saving.",
+        short: "Lee una operación desde una captura del gráfico y rellena los campos en lugar de escribirlos.",
+        example: "Ejemplo: subiste una captura con entrada, stop y objetivo ⇒ los campos se rellenaron.",
+        caveat: "Revisa los valores antes de guardar.",
       },
       pt: {
         label: "Vision OCR",
-        short: "Reads a trade from a chart screenshot and fills the fields instead of typing.\nExample: you uploaded a screenshot with entry, stop and target ⇒ the fields were filled.\nCheck the values before saving.",
+        short: "Lê uma operação a partir de um print do gráfico e preenche os campos em vez de você digitar.",
+        example: "Exemplo: você enviou um print com entrada, stop e alvo ⇒ os campos foram preenchidos.",
+        caveat: "Confira os valores antes de salvar.",
       },
       ar: {
         label: "Vision OCR",
-        short: "Reads a trade from a chart screenshot and fills the fields instead of typing.\nExample: you uploaded a screenshot with entry, stop and target ⇒ the fields were filled.\nCheck the values before saving.",
+        short: "يقرأ صفقة من لقطة شاشة للرسم البياني ويملأ الحقول بدلاً من الكتابة.",
+        example: "مثال: رفعت لقطة شاشة فيها الدخول والوقف والهدف ⇒ امتلأت الحقول.",
+        caveat: "تحقّق من القيم قبل الحفظ.",
       },
     },
   },

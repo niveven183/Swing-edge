@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "sourceHash": "7597dbf08dc2e372",
+    "sourceHash": "30d651feac2a5bd6",
     "generatedBy": "scripts/build-glossary.mjs",
     "source": "src/glossary/terms/"
   },
@@ -15,9 +15,9 @@
     "description": {
       "he": "אחוז העסקאות הסגורות שהסתיימו ברווח.\nלדוגמה: 6 רווחיות מתוך 10 סגורות = 60%.\nעסקת Break-even נספרת במכנה ואינה רווח; אחוז הצלחה לבדו אינו מעיד על רווחיות.",
       "en": "The share of your closed trades that ended in profit.\nExample: 6 winners out of 10 closed trades = 60%.\nBreak-even trades count in the denominator, not as wins; win rate alone does not show profitability.",
-      "es": "La Win Rate es el porcentaje de tus operaciones cerradas que terminaron en ganancia.\n\nPor encima del 55% es sólido. Pero la win rate por sí sola no determina el éxito — un trader con 40% puede ser rentable con buenas relaciones riesgo-beneficio. Fíjate también en el Profit Factor.",
-      "pt": "A Win Rate é a percentagem das tuas operações fechadas que terminaram em lucro.\n\nAcima de 55% é sólido. Mas a win rate sozinha não determina o sucesso — um trader com 40% pode ser lucrativo com boas relações risco-retorno. Repara também no Profit Factor.",
-      "ar": "نسبة الربح (Win Rate) هي النسبة المئوية لصفقاتك المغلقة التي انتهت بربح.\n\nأعلى من 55% جيّدة. لكن نسبة الربح وحدها لا تحدّد النجاح — فمتداول بنسبة 40% قد يكون رابحاً إذا كانت نسب المخاطرة/العائد قوية. انظر أيضاً إلى Profit Factor."
+      "es": "El porcentaje de tus operaciones cerradas que terminaron en ganancia.\nEjemplo: 6 ganadoras de 10 operaciones cerradas = 60%.\nEl break-even cuenta en el denominador, no como ganancia; la Win Rate sola no indica rentabilidad.",
+      "pt": "A porcentagem das suas operações fechadas que terminaram com lucro.\nExemplo: 6 vencedoras de 10 operações fechadas = 60%.\nO break-even conta no denominador, não como ganho; a Win Rate sozinha não mostra lucratividade.",
+      "ar": "نسبة صفقاتك المغلقة التي انتهت بربح.\nمثال: 6 رابحة من أصل 10 صفقات مغلقة = 60%.\nصفقات التعادل (Break-even) تُحتسب في المقام لا كأرباح؛ وWin Rate وحدها لا تدلّ على الربحية."
     }
   },
   "profitFactor": {
@@ -31,9 +31,9 @@
     "description": {
       "he": "סך הרווחים הגולמיים חלקי סך ההפסדים הגולמיים בעסקאות הסגורות.\nלדוגמה: הרווחת $3,000 והפסדת $2,000 ⇒ 1.5; מעל 1 = הרווחת יותר משהפסדת.\nבלי אף הפסד הערך הוא ∞; מחושב לפני עמלות.",
       "en": "Gross profit divided by gross loss across your closed trades.\nExample: you won $3,000 and lost $2,000 ⇒ 1.5; above 1 means you won more than you lost.\nWith no losses at all it reads ∞; computed before commissions.",
-      "es": "Profit Factor = Ganancias Brutas Totales ÷ Pérdidas Brutas Totales.\n\n• Por encima de 1.0 = rentable\n• Por encima de 1.5 = ventaja sana\n• Por encima de 2.0 = nivel profesional\n• Por encima de 3.0 = excepcional\n\nEs una de las métricas más importantes en el trading.",
-      "pt": "Profit Factor = Lucros Brutos Totais ÷ Perdas Brutas Totais.\n\n• Acima de 1.0 = lucrativo\n• Acima de 1.5 = vantagem saudável\n• Acima de 2.0 = nível profissional\n• Acima de 3.0 = excecional\n\nÉ uma das métricas mais importantes no trading.",
-      "ar": "Profit Factor = إجمالي الأرباح ÷ إجمالي الخسائر.\n\n• أعلى من 1.0 = رابح\n• أعلى من 1.5 = أفضلية صحّية\n• أعلى من 2.0 = مستوى احترافي\n• أعلى من 3.0 = استثنائي\n\nمن أهم المقاييس في التداول."
+      "es": "Ganancia bruta dividida por la pérdida bruta de tus operaciones cerradas.\nEjemplo: ganaste $3,000 y perdiste $2,000 ⇒ 1.5; más de 1 indica que ganaste más de lo que perdiste.\nSin pérdidas marca ∞; se calcula antes de comisiones.",
+      "pt": "Lucro bruto dividido pela perda bruta das suas operações fechadas.\nExemplo: você ganhou $3,000 e perdeu $2,000 ⇒ 1.5; acima de 1 significa que você ganhou mais do que perdeu.\nSem nenhuma perda, mostra ∞; calculado antes das comissões.",
+      "ar": "إجمالي الربح مقسوماً على إجمالي الخسارة في صفقاتك المغلقة.\nمثال: ربحت $3,000 وخسرت $2,000 ⇒ 1.5؛ أعلى من 1 يعني أنك ربحت أكثر مما خسرت.\nبلا أي خسارة تكون القيمة ∞؛ ويُحسب قبل العمولات."
     }
   },
   "avgR": {
@@ -47,9 +47,9 @@
     "description": {
       "he": "ממוצע ה-R בעסקאות סגורות; R = רווח ÷ הסיכון לפי הסטופ השמור, לפי הכיוון (LONG/SHORT).\nלדוגמה: סיכנת $100 והרווחת $150 ⇒ ‎+1.5R.\nעסקה בלי סטופ מוחרגת מהממוצע ואינה נספרת כ-0R.",
       "en": "Average R of closed trades; R = profit ÷ risk at the saved stop, by direction (LONG/SHORT).\nExample: you risked $100 and made $150 ⇒ +1.5R.\nA trade without a stop is excluded, not counted as 0R.",
-      "es": "R-Multiple promedio por operación cerrada.\n\nR = ganancia de la operación ÷ riesgo inicial por acción. La ganancia sigue la dirección de la operación: en un LONG es (Salida − Entrada), en un SHORT es (Entrada − Salida) — así que un SHORT ganador siempre da un R positivo.\n\n+1.0R significa que ganaste exactamente lo que arriesgaste. Apunta a +0.3R o más como promedio mínimo. Los traders de élite promedian +1.5R a +2.5R.\n\nSolo las operaciones con stop pueden medirse en R — una operación sin stop se excluye de este promedio, no cuenta como 0R. La línea bajo el número muestra cuántas de tus operaciones cerradas cubre realmente el promedio.",
-      "pt": "R-Multiple médio por operação fechada.\n\nR = lucro da operação ÷ risco inicial por ação. O lucro segue a direção da operação: num LONG é (Saída − Entrada), num SHORT é (Entrada − Saída) — por isso um SHORT vencedor dá sempre um R positivo.\n\n+1.0R significa que ganhaste exatamente o que arriscaste. Aponta para +0.3R ou mais como média mínima. Traders de elite têm média de +1.5R a +2.5R.\n\nSó as operações com stop podem ser medidas em R — uma operação sem stop é excluída desta média, não conta como 0R. A linha por baixo do número mostra quantas das tuas operações fechadas a média cobre realmente.",
-      "ar": "متوسّط R-Multiple لكل صفقة مغلقة.\n\nR = ربح الصفقة ÷ المخاطرة الأوّلية للسهم. الربح يتبع اتّجاه الصفقة: في LONG هو (الخروج − الدخول)، وفي SHORT هو (الدخول − الخروج) — لذلك فإن SHORT الرابحة تعطي دائماً R موجباً.\n\n+1.0R يعني أنك ربحت تماماً ما خاطرت به. استهدف +0.3R أو أعلى كحدّ أدنى للمتوسّط. متداولو النخبة يحقّقون متوسّط +1.5R إلى +2.5R.\n\nالصفقات التي لها وقف خسارة فقط يمكن قياسها بـ R — الصفقة بلا وقف تُستثنى من هذا المتوسّط ولا تُحتسب كـ 0R. السطر أسفل الرقم يوضّح كم صفقة مغلقة يغطّيها المتوسّط فعلياً."
+      "es": "R promedio de operaciones cerradas; R = ganancia ÷ riesgo al stop guardado, según dirección (LONG/SHORT).\nEjemplo: arriesgaste $100 y ganaste $150 ⇒ +1.5R.\nUna operación sin stop se excluye, no cuenta como 0R.",
+      "pt": "R médio das operações fechadas; R = lucro ÷ risco no stop salvo, conforme a direção (LONG/SHORT).\nExemplo: você arriscou $100 e ganhou $150 ⇒ +1.5R.\nUma operação sem stop é excluída, não contada como 0R.",
+      "ar": "متوسّط R للصفقات المغلقة؛ R = الربح ÷ المخاطرة حتى الوقف المحفوظ، حسب الاتجاه (LONG/SHORT).\nمثال: خاطرت بـ $100 وربحت $150 ⇒ ‎+1.5R.\nالصفقة بلا وقف تُستثنى، ولا تُحتسب كـ 0R."
     }
   },
   "expectancy": {
@@ -63,25 +63,25 @@
     "description": {
       "he": "כמה R הרווחת בממוצע לעסקה סגורה, כשעסקאות Break-even נספרות במכנה.\nלדוגמה: חצי רווחים של ‎+2R וחצי הפסדים של ‎−1R ⇒ ‎+0.5R לעסקה.\nנמדד ב-R ולא בדולרים.",
       "en": "The average R you made per closed trade, with break-even trades in the denominator.\nExample: half the trades win +2R and half lose −1R ⇒ +0.5R per trade.\nMeasured in R, not dollars.",
-      "es": "Expectativa = (% Ganancias × Ganancia Media) − (% Pérdidas × Pérdida Media).\n\nTe dice el beneficio esperado en dólares por operación en promedio. Positiva = tu sistema tiene ventaja. Negativa = pierdes dinero con el tiempo sin importar las ganancias individuales.",
-      "pt": "Expectativa = (% Ganhos × Ganho Médio) − (% Perdas × Perda Média).\n\nDiz-te o lucro esperado em dólares por operação em média. Positiva = o teu sistema tem vantagem. Negativa = perdes dinheiro ao longo do tempo independentemente dos ganhos individuais.",
-      "ar": "التوقّع = (نسبة الربح × متوسّط الربح) − (نسبة الخسارة × متوسّط الخسارة).\n\nيخبرك بالربح المتوقّع بالدولار لكل صفقة في المتوسّط. موجب = نظامك يملك أفضلية. سالب = تخسر المال مع الوقت بغضّ النظر عن المكاسب الفردية."
+      "es": "El R promedio que ganaste por operación cerrada, contando el break-even en el denominador.\nEjemplo: la mitad gana +2R y la mitad pierde −1R ⇒ +0.5R por operación.\nSe mide en R, no en dólares.",
+      "pt": "O R médio que você ganhou por operação fechada, contando o break-even no denominador.\nExemplo: metade ganha +2R e metade perde −1R ⇒ +0.5R por operação.\nMedida em R, não em dólares.",
+      "ar": "متوسّط R الذي حقّقته لكل صفقة مغلقة، مع احتساب صفقات التعادل (Break-even) في المقام.\nمثال: نصف الصفقات تربح ‎+2R والنصف يخسر ‎−1R ⇒ ‎+0.5R لكل صفقة.\nيُقاس بـ R، لا بالدولار."
     }
   },
   "sharpe": {
     "label": {
       "he": "Sharpe לעסקה (R)",
       "en": "Per-trade Sharpe (R)",
-      "es": "Ratio de Sharpe",
-      "pt": "Rácio de Sharpe",
-      "ar": "مقياس شارب"
+      "es": "Sharpe por operación (R)",
+      "pt": "Sharpe por operação (R)",
+      "ar": "شارب لكل صفقة (R)"
     },
     "description": {
       "he": "ממוצע ה-R לעסקה חלקי סטיית התקן של ה-R — תשואה ליחידת תנודתיות.\nלדוגמה: ממוצע ‎+0.5R וסטיית תקן 1R ⇒ 0.5.\nבלי ריבית חסרת סיכון ובלי שנתיות — אינו בר-השוואה ל-Sharpe של קרן.",
       "en": "Mean R per trade divided by the standard deviation of R.\nExample: an average of +0.5R with a 1R standard deviation ⇒ 0.5.\nNo risk-free rate and no annualizing — not comparable to a fund's Sharpe ratio.",
-      "es": "El Ratio de Sharpe mide el rendimiento ajustado al riesgo.\n\n• Por encima de 1.0 = bueno\n• Por encima de 2.0 = excelente\n• Por encima de 3.0 = excepcional (nivel de hedge fund)\n\nUn Sharpe alto significa rendimientos consistentes sin oscilaciones bruscas. Más importante que el beneficio bruto para evaluar la calidad del sistema.",
-      "pt": "O Rácio de Sharpe mede o retorno ajustado ao risco.\n\n• Acima de 1.0 = bom\n• Acima de 2.0 = excelente\n• Acima de 3.0 = excecional (nível de hedge fund)\n\nUm Sharpe alto significa retornos consistentes sem oscilações bruscas. Mais importante que o lucro bruto para avaliar a qualidade do sistema.",
-      "ar": "يقيس مقياس شارب (Sharpe) العائد المعدّل حسب المخاطرة.\n\n• أعلى من 1.0 = جيّد\n• أعلى من 2.0 = ممتاز\n• أعلى من 3.0 = استثنائي (مستوى صناديق التحوّط)\n\nشارب المرتفع يعني عوائد متّسقة دون تقلّبات حادّة. أهمّ من الربح الخام لتقييم جودة النظام."
+      "es": "El R medio por operación dividido por la desviación estándar del R.\nEjemplo: promedio de +0.5R con desviación estándar de 1R ⇒ 0.5.\nSin tasa libre de riesgo ni anualización — no es comparable con el Sharpe de un fondo.",
+      "pt": "O R médio por operação dividido pelo desvio padrão do R.\nExemplo: média de +0.5R com desvio padrão de 1R ⇒ 0.5.\nSem taxa livre de risco e sem anualização — não é comparável ao Sharpe de um fundo.",
+      "ar": "متوسّط R لكل صفقة مقسوماً على الانحراف المعياري لـ R.\nمثال: متوسّط ‎+0.5R مع انحراف معياري 1R ⇒ 0.5.\nبلا معدّل خالٍ من المخاطر وبلا تحويل سنوي — لا يُقارَن بنسبة شارب لصندوق."
     }
   },
   "maxDD": {
@@ -95,9 +95,9 @@
     "description": {
       "he": "הירידה הגדולה ביותר, בסכום כסף, משיא ה-P&L המצטבר של העסקאות הסגורות עד השפל שאחריו.\nלדוגמה: ה-P&L המצטבר עלה ל-$2,000 וירד ל-$1,200 ⇒ $800.\nנמדד בסכום ולא באחוזים מההון.",
       "en": "The largest drop, in money, from a peak in your cumulative closed-trade P&L to the low after it.\nExample: cumulative P&L rose to $2,000 and fell to $1,200 ⇒ $800.\nMeasured as an amount, not as a percentage of capital.",
-      "es": "Drawdown Máximo — la mayor caída en dólares desde un pico en el saldo de tu cuenta hasta el punto más bajo antes de recuperarse.\n\nUn número menor significa menos rachas perdedoras grandes y mejor preservación del capital. Los drawdowns profundos son psicológicamente dañinos y difíciles de recuperar matemáticamente.",
-      "pt": "Drawdown Máximo — a maior queda em dólares desde um pico no saldo da tua conta até ao ponto mais baixo antes da recuperação.\n\nUm número menor significa menos sequências perdedoras grandes e melhor preservação de capital. Drawdowns profundos são psicologicamente prejudiciais e difíceis de recuperar matematicamente.",
-      "ar": "أقصى تراجع (Max Drawdown) — أكبر هبوط بالدولار من قمّة في رصيد حسابك إلى أدنى نقطة قبل التعافي.\n\nالرقم الأصغر يعني سلاسل خسائر كبيرة أقل وحفاظاً أفضل على رأس المال. التراجعات العميقة مؤذية نفسياً وصعبة التعافي رياضياً."
+      "es": "La mayor caída, en dinero, desde un pico de tu P&L acumulado de operaciones cerradas hasta el mínimo posterior.\nEjemplo: el P&L acumulado subió a $2,000 y cayó a $1,200 ⇒ $800.\nSe mide como monto, no como porcentaje del capital.",
+      "pt": "A maior queda, em dinheiro, de um pico do seu P&L acumulado de operações fechadas até o fundo seguinte.\nExemplo: o P&L acumulado subiu para $2,000 e caiu para $1,200 ⇒ $800.\nMedido como valor, não como porcentagem do capital.",
+      "ar": "أكبر هبوط، بالمال، من قمّة في P&L التراكمي لصفقاتك المغلقة إلى القاع الذي تلاها.\nمثال: ارتفع P&L التراكمي إلى $2,000 ثم هبط إلى $1,200 ⇒ $800.\nيُقاس كمبلغ، لا كنسبة مئوية من رأس المال."
     }
   },
   "avgWin": {
@@ -111,9 +111,9 @@
     "description": {
       "he": "הרווח הממוצע בעסקאות הסגורות שהסתיימו ברווח.\nלדוגמה: רווחים של $100 ושל $300 ⇒ $200.",
       "en": "The average profit on your closed trades that ended in profit.\nExample: wins of $100 and $300 ⇒ $200.",
-      "es": "Beneficio promedio en operaciones ganadoras.",
-      "pt": "Lucro médio em operações vencedoras.",
-      "ar": "متوسّط الربح في الصفقات الرابحة."
+      "es": "La ganancia media de tus operaciones cerradas ganadoras.\nEjemplo: ganancias de $100 y $300 ⇒ $200.",
+      "pt": "O lucro médio das suas operações fechadas que terminaram com lucro.\nExemplo: ganhos de $100 e $300 ⇒ $200.",
+      "ar": "متوسّط الربح في صفقاتك المغلقة التي انتهت بربح.\nمثال: أرباح $100 و$300 ⇒ $200."
     }
   },
   "avgLoss": {
@@ -127,9 +127,9 @@
     "description": {
       "he": "ההפסד הממוצע בעסקאות הסגורות שהסתיימו בהפסד.\nלדוגמה: הפסדים של $50 ושל $150 ⇒ $100.",
       "en": "The average loss on your closed trades that ended in a loss.\nExample: losses of $50 and $150 ⇒ $100.",
-      "es": "Pérdida promedio en operaciones perdedoras.",
-      "pt": "Perda média em operações perdedoras.",
-      "ar": "متوسّط الخسارة في الصفقات الخاسرة."
+      "es": "La pérdida media de tus operaciones cerradas perdedoras.\nEjemplo: pérdidas de $50 y $150 ⇒ $100.",
+      "pt": "A perda média das suas operações fechadas que terminaram em perda.\nExemplo: perdas de $50 e $150 ⇒ $100.",
+      "ar": "متوسّط الخسارة في صفقاتك المغلقة التي انتهت بخسارة.\nمثال: خسائر $50 و$150 ⇒ $100."
     }
   },
   "avgHold": {
@@ -143,9 +143,9 @@
     "description": {
       "he": "מספר הימים הממוצע בין הכניסה ליציאה בעסקאות סגורות.\nלדוגמה: עסקאות של 2 ושל 6 ימים ⇒ 4 ימים.\nימים קלנדריים מעוגלים; כניסה ויציאה באותו יום = 0.",
       "en": "The average number of days between entry and exit on closed trades.\nExample: trades of 2 and 6 days ⇒ 4 days.\nRounded calendar days; same-day entry and exit = 0.",
-      "es": "Periodo medio de mantenimiento por operación cerrada (en días).\n\nEl swing trading suele apuntar a mantener 2-10 días. Mantenimientos muy cortos (< 1 día) a menudo indican cerrar operaciones demasiado pronto. Mantenimientos muy largos (> 20 días) pueden sugerir evitar los stop-loss.",
-      "pt": "Período médio de manutenção por operação fechada (em dias).\n\nO swing trading costuma apontar para manter 2-10 dias. Manutenções muito curtas (< 1 dia) muitas vezes indicam fechar operações cedo demais. Manutenções muito longas (> 20 dias) podem sugerir evitar os stop-loss.",
-      "ar": "متوسّط فترة الاحتفاظ لكل صفقة مغلقة (بالأيام).\n\nيستهدف التداول المتأرجح عادةً الاحتفاظ 2-10 أيام. فترات الاحتفاظ القصيرة جداً (< يوم واحد) كثيراً ما تعني إغلاق الصفقات مبكراً. والطويلة جداً (> 20 يوماً) قد تعني تجنّب أوامر وقف الخسارة."
+      "es": "La media de días entre entrada y salida en las operaciones cerradas.\nEjemplo: operaciones de 2 y 6 días ⇒ 4 días.\nDías naturales redondeados; entrar y salir el mismo día = 0.",
+      "pt": "O número médio de dias entre a entrada e a saída nas operações fechadas.\nExemplo: operações de 2 e 6 dias ⇒ 4 dias.\nDias corridos arredondados; entrada e saída no mesmo dia = 0.",
+      "ar": "متوسّط عدد الأيام بين الدخول والخروج في الصفقات المغلقة.\nمثال: صفقتان مدّتهما 2 و6 أيام ⇒ 4 أيام.\nأيام تقويمية مقرّبة؛ الدخول والخروج في اليوم نفسه = 0."
     }
   },
   "equityCurve": {
@@ -159,105 +159,105 @@
     "description": {
       "he": "יתרת החשבון לאורך זמן: בסיס ההון ועוד ה-P&L המצטבר אחרי כל עסקה שנסגרה.\nלדוגמה: בסיס $10,000, עסקה של ‎+$200 ואחריה ‎−$50 ⇒ $10,200 ואז $10,150.\nכל נקודה היא יום סגירה; פוזיציות פתוחות לא נכללות.",
       "en": "Your account balance over time: your capital base plus cumulative P&L after each closed trade.\nExample: a $10,000 base, +$200 then −$50 ⇒ $10,200, then $10,150.\nEach point is a closing day; open positions excluded.",
-      "es": "Tu Curva de Capital muestra el saldo de la cuenta a lo largo del tiempo.\n\nUna curva suave y en ascenso constante = ventaja consistente y buena gestión del riesgo.\nPicos irregulares = tamaño de posición inconsistente o trading emocional.\nLargos periodos planos = sobreoperar sin ventaja.",
-      "pt": "A tua Curva de Capital mostra o saldo da conta ao longo do tempo.\n\nUma curva suave e em ascensão constante = vantagem consistente e boa gestão de risco.\nPicos irregulares = tamanho de posição inconsistente ou trading emocional.\nLongos períodos planos = operar em excesso sem vantagem.",
-      "ar": "تُظهر منحنى رأس المال رصيد حسابك عبر الزمن.\n\nمنحنى سلس وصاعد بثبات = أفضلية متّسقة وإدارة مخاطر جيّدة.\nقفزات حادّة = حجم صفقات غير متّسق أو تداول عاطفي.\nفترات مسطّحة طويلة = إفراط في التداول دون أفضلية."
+      "es": "El saldo de tu cuenta en el tiempo: tu capital base más el P&L acumulado tras cada operación cerrada.\nEjemplo: base de $10,000, +$200 y luego −$50 ⇒ $10,200, luego $10,150.\nCada punto es un día de cierre; posiciones abiertas excluidas.",
+      "pt": "O saldo da conta ao longo do tempo: a base de capital mais o P&L acumulado após cada operação fechada.\nExemplo: base de $10,000, +$200 e depois −$50 ⇒ $10,200, depois $10,150.\nCada ponto é um dia de fechamento; exclui posições abertas.",
+      "ar": "رصيد حسابك عبر الزمن: قاعدة رأس المال لديك مضافاً إليها P&L التراكمي بعد كل صفقة مغلقة.\nمثال: قاعدة $10,000، ثم ‎+$200 ثم ‎−$50 ⇒ $10,200 ثم $10,150.\nكل نقطة هي يوم إغلاق؛ المراكز المفتوحة مستثناة."
     }
   },
   "totalReturn": {
     "label": {
       "he": "תשואה כוללת",
       "en": "Total Return",
-      "es": "Total Return",
-      "pt": "Total Return",
-      "ar": "Total Return"
+      "es": "Rendimiento Total",
+      "pt": "Retorno Total",
+      "ar": "العائد الإجمالي"
     },
     "description": {
       "he": "ה-P&L של העסקאות הסגורות כאחוז מבסיס ההון שהגדרת.\nלדוגמה: ‎+$500 על בסיס $10,000 ⇒ ‎+5%.\nפוזיציות פתוחות לא נכללות.",
       "en": "Your closed-trade P&L as a percentage of the capital base you set.\nExample: +$500 on a $10,000 base ⇒ +5%.\nOpen positions are not included.",
-      "es": "Tu ganancia o pérdida total desde que empezaste, como porcentaje del capital inicial. La cifra principal de rendimiento, pero sin contexto de riesgo no cuenta toda la historia.",
-      "pt": "O seu lucro ou prejuízo total desde que começou, como percentagem do capital inicial. O número principal de desempenho — mas sem contexto de risco não conta a história toda.",
-      "ar": "إجمالي ربحك أو خسارتك منذ البداية، كنسبة مئوية من رأس المال الابتدائي. الرقم الرئيسي للأداء — لكنه دون سياق المخاطرة لا يروي القصة كاملة."
+      "es": "Tu P&L de operaciones cerradas como % del capital base que configuraste.\nEjemplo: +$500 sobre una base de $10,000 ⇒ +5%.\nNo incluye posiciones abiertas.",
+      "pt": "Seu P&L de operações fechadas como % da base de capital que você definiu.\nExemplo: +$500 sobre uma base de $10,000 ⇒ +5%.\nNão inclui posições abertas.",
+      "ar": "P&L صفقاتك المغلقة كنسبة مئوية من قاعدة رأس المال التي حدّدتها.\nمثال: ‎+$500 على قاعدة $10,000 ⇒ ‎+5%.\nالمراكز المفتوحة غير مشمولة."
     }
   },
   "winStreak": {
     "label": {
       "he": "רצף נוכחי",
       "en": "Current Streak",
-      "es": "Win Streak",
-      "pt": "Win Streak",
-      "ar": "Win Streak"
+      "es": "Racha Actual",
+      "pt": "Sequência Atual",
+      "ar": "السلسلة الحالية"
     },
     "description": {
       "he": "מספר העסקאות הרווחיות ברציפות עד העסקה הסגורה האחרונה.\nלדוגמה: 3 רווחים ברצף ⇒ 3; השורה מתחת מציגה את הרצף הטוב ביותר.\nרצף הפסדים מוצג כ-0, לא כמספר שלילי.",
       "en": "The number of profitable trades in a row, up to your latest closed trade.\nExample: 3 wins in a row ⇒ 3; the line below shows your best streak.\nA losing streak shows as 0, not as a negative number.",
-      "es": "El número de operaciones ganadoras seguidas. Una racha ganadora genera confianza, pero también es el momento más peligroso para el exceso de confianza y un riesgo indisciplinado.",
-      "pt": "O número de operações vencedoras seguidas. Uma sequência de vitórias gera confiança — mas também é o momento mais perigoso para o excesso de confiança e o risco indisciplinado.",
-      "ar": "عدد الصفقات الرابحة المتتالية. سلسلة الانتصارات تبني الثقة — لكنها أيضاً أخطر وقت للثقة المفرطة والمخاطرة غير المنضبطة."
+      "es": "El número de ganadoras seguidas hasta tu última operación cerrada.\nEjemplo: 3 ganadoras seguidas ⇒ 3; la línea de abajo muestra tu mejor racha.\nUna racha perdedora se muestra como 0, no como número negativo.",
+      "pt": "O número de ganhos seguidos até sua última operação fechada.\nExemplo: 3 ganhos seguidos ⇒ 3; a linha abaixo mostra sua melhor sequência.\nUma sequência de perdas aparece como 0, não como número negativo.",
+      "ar": "عدد الصفقات الرابحة المتتالية حتى آخر صفقة مغلقة لديك.\nمثال: 3 أرباح متتالية ⇒ 3؛ السطر أدناه يوضّح أفضل سلسلة لك.\nسلسلة الخسائر تظهر 0، لا كرقم سالب."
     }
   },
   "grade": {
     "label": {
       "he": "ציון חודשי",
       "en": "Monthly Grade",
-      "es": "Grade",
-      "pt": "Grade",
-      "ar": "Grade"
+      "es": "Calificación Mensual",
+      "pt": "Nota Mensal",
+      "ar": "التقييم الشهري"
     },
     "description": {
       "he": "ציון A–F לחודש: 40% אחוז הצלחה, 30% R, 20% משמעת ו-10% עקביות.\nלדוגמה: 72/100 ⇒ B (A מ-85 · B מ-70 · C מ-55 · D מ-40).\nהמשמעת נשענת על הסימון 'עקבתי אחרי התוכנית'.",
       "en": "An A–F grade for the month: 40% win rate, 30% R, 20% discipline, 10% consistency.\nExample: 72/100 ⇒ B (A 85+ · B 70+ · C 55+ · D 40+).\nDiscipline is the self-reported 'followed my plan' flag.",
-      "es": "Una puntuación ponderada (A–F) que resume la calidad de tu trading del mes: una mezcla de tasa de aciertos, múltiplo R, disciplina y consistencia. Una instantánea rápida, no un sustituto de analizar los detalles.",
-      "pt": "Uma pontuação ponderada (A–F) que resume a qualidade do seu trading no mês: uma mistura de taxa de acertos, múltiplo R, disciplina e consistência. Um retrato rápido — não substitui analisar os detalhes.",
-      "ar": "درجة مرجّحة (A–F) تلخّص جودة تداولك خلال الشهر: مزيج من نسبة النجاح ومضاعف R والانضباط والاتّساق. لقطة سريعة — لا تُغني عن التعمّق في التفاصيل."
+      "es": "Una nota A–F del mes: 40% Win Rate, 30% R, 20% disciplina, 10% consistencia.\nEjemplo: 72/100 ⇒ B (A 85+ · B 70+ · C 55+ · D 40+).\nLa disciplina es la marca autodeclarada 'seguí mi plan'.",
+      "pt": "Uma nota A–F para o mês: 40% Win Rate, 30% R, 20% disciplina, 10% consistência.\nExemplo: 72/100 ⇒ B (A 85+ · B 70+ · C 55+ · D 40+).\nDisciplina é a marcação autodeclarada 'segui meu plano'.",
+      "ar": "تقييم A–F للشهر: 40% Win Rate، و30% R، و20% انضباط، و10% اتساق.\nمثال: 72/100 ⇒ B (A 85+ · B 70+ · C 55+ · D 40+).\nالانضباط هو علامة 'اتّبعت خطّتي' التي تحدّدها بنفسك."
     }
   },
   "entryQuality": {
     "label": {
       "he": "איכות כניסה",
       "en": "Entry Quality",
-      "es": "Entry Quality",
-      "pt": "Entry Quality",
-      "ar": "Entry Quality"
+      "es": "Calidad de Entrada",
+      "pt": "Qualidade de Entrada",
+      "ar": "جودة الدخول"
     },
     "description": {
       "he": "דירוג 1–5 כוכבים שנתת לכניסה: עד כמה העיתוי, המחיר והאישור תאמו לתוכנית.\nלדוגמה: נכנסת במחיר שתכננת אחרי אישור ⇒ 5 כוכבים.\nדירוג עצמי — לא נמדד מהמחירים.",
       "en": "A 1–5 star rating you gave your entry: how well timing, price and confirmation matched the plan.\nExample: you entered at your planned price after confirmation ⇒ 5 stars.\nSelf-rated — not measured from prices.",
-      "es": "Una calificación (estrellas) de cuán bien tu entrada coincidió con el setup planificado: timing, precio y confirmación. Una calificación alta y constante indica disciplina, incluso cuando la operación pierde.",
-      "pt": "Uma classificação (estrelas) de quão bem a sua entrada correspondeu ao setup planeado: timing, preço e confirmação. Uma classificação alta e constante indica disciplina — mesmo quando a operação perde.",
-      "ar": "تقييم (بالنجوم) لمدى مطابقة دخولك للنموذج المخطّط: التوقيت، والسعر، والتأكيد. التقييم العالي المتّسق يدل على الانضباط — حتى عندما تخسر الصفقة نفسها."
+      "es": "Una valoración de 1–5 estrellas que diste a tu entrada: cuánto se ajustaron momento, precio y confirmación al plan.\nEjemplo: entraste al precio planeado tras la confirmación ⇒ 5 estrellas.\nAutoevaluada — no se mide con precios.",
+      "pt": "Uma nota de 1–5 estrelas que você deu à sua entrada: quanto timing, preço e confirmação seguiram o plano.\nExemplo: você entrou no preço planejado após a confirmação ⇒ 5 estrelas.\nAutoavaliada — não é medida pelos preços.",
+      "ar": "تقييم من 1–5 نجوم منحته لدخولك: مدى توافق التوقيت والسعر والتأكيد مع الخطة.\nمثال: دخلت عند سعرك المخطّط بعد التأكيد ⇒ 5 نجوم.\nتقييم ذاتي — لا يُقاس من الأسعار."
     }
   },
   "accountEquity": {
     "label": {
       "he": "הון החשבון",
       "en": "Account Equity",
-      "es": "Account Equity",
-      "pt": "Account Equity",
-      "ar": "Account Equity"
+      "es": "Capital de la Cuenta",
+      "pt": "Patrimônio da Conta",
+      "ar": "رأس مال الحساب"
     },
     "description": {
       "he": "בסיס ההון שהגדרת ועוד ה-P&L המצטבר מעסקאות סגורות ופתוחות.\nלדוגמה: בסיס $10,000 ועוד ‎+$600 ⇒ $10,600.\nהסיכון לעסקה מחושב מבסיס ההון הקבוע, לא מההון הנוכחי.",
       "en": "The capital base you set plus cumulative P&L from closed and open trades.\nExample: a $10,000 base plus +$600 ⇒ $10,600.\nPer-trade risk is sized from your fixed capital base, not current equity.",
-      "es": "The capital base you set plus cumulative P&L from closed and open trades.\nExample: a $10,000 base plus +$600 ⇒ $10,600.\nPer-trade risk is sized from your fixed capital base, not current equity.",
-      "pt": "The capital base you set plus cumulative P&L from closed and open trades.\nExample: a $10,000 base plus +$600 ⇒ $10,600.\nPer-trade risk is sized from your fixed capital base, not current equity.",
-      "ar": "The capital base you set plus cumulative P&L from closed and open trades.\nExample: a $10,000 base plus +$600 ⇒ $10,600.\nPer-trade risk is sized from your fixed capital base, not current equity."
+      "es": "Tu capital base configurado más el P&L acumulado de operaciones cerradas y abiertas.\nEjemplo: una base de $10,000 más +$600 ⇒ $10,600.\nEl riesgo por operación se calcula sobre tu capital base fijo, no el actual.",
+      "pt": "Sua base de capital definida mais o P&L acumulado das operações fechadas e abertas.\nExemplo: uma base de $10,000 mais +$600 ⇒ $10,600.\nO risco por operação usa sua base de capital fixa, não o patrimônio atual.",
+      "ar": "قاعدة رأس المال التي حدّدتها مضافاً إليها P&L التراكمي من الصفقات المغلقة والمفتوحة.\nمثال: قاعدة $10,000 مضافاً إليها ‎+$600 ⇒ $10,600.\nالمخاطرة لكل صفقة تُحسب من قاعدة رأس المال الثابتة، لا من رأس المال الحالي."
     }
   },
   "streakHistory": {
     "label": {
       "he": "היסטוריית רצפים",
       "en": "Streak History",
-      "es": "Streak History",
-      "pt": "Streak History",
-      "ar": "Streak History"
+      "es": "Historial de Rachas",
+      "pt": "Histórico de Sequências",
+      "ar": "سجل السلاسل"
     },
     "description": {
       "he": "רצפי הרווחים וההפסדים שלך לפי סדר הזמן, כל רצף כעמודה.\nלדוגמה: 3 רווחים ואחריהם 2 הפסדים ⇒ שתי עמודות, 3 ו-2.",
       "en": "Your winning and losing streaks in time order, one bar per streak.\nExample: 3 wins then 2 losses ⇒ two bars, 3 and 2.",
-      "es": "Un registro de tus rachas ganadoras y perdedoras a lo largo del tiempo. Revela patrones emocionales: ¿una racha perdedora te hace operar peor (tilt) o te recuperas con disciplina?",
-      "pt": "Um registo das suas sequências de vitórias e derrotas ao longo do tempo. Revela padrões emocionais: uma sequência de perdas faz você operar pior (tilt), ou você recupera com disciplina?",
-      "ar": "سجلّ لسلاسل انتصاراتك وخسائرك عبر الزمن. يكشف الأنماط العاطفية: هل تجعلك سلسلة الخسائر تتداول بشكل أسوأ (tilt)، أم تتعافى بانضباط؟"
+      "es": "Rachas ganadoras y perdedoras en orden temporal, una barra por racha.\nEjemplo: 3 ganadas, luego 2 perdidas ⇒ dos barras, 3 y 2.",
+      "pt": "Sequências de ganho e perda em ordem temporal, uma barra por sequência.\nExemplo: 3 ganhos, depois 2 perdas ⇒ duas barras, 3 e 2.",
+      "ar": "سلاسل أرباحك وخسائرك بترتيب زمني، عمود واحد لكل سلسلة.\nمثال: 3 أرباح ثم 2 خسائر ⇒ عمودان، 3 و2."
     }
   },
   "dayOfWeek": {
@@ -271,9 +271,9 @@
     "description": {
       "he": "ה-P&L המצטבר לפי היום בשבוע שבו נכנסת לעסקה.\nלדוגמה: עסקה שנפתחה בשני ונסגרה ברביעי נספרת לשני.",
       "en": "Cumulative P&L by the weekday you entered the trade.\nExample: a trade opened Monday and closed Wednesday counts for Monday.",
-      "es": "Tu ganancia/pérdida desglosada por día de la semana. Revela en qué días ganas o pierdes dinero de forma consistente — muchos traders tienen un edge oculto (o una fuga) ligado a días concretos como lunes o viernes.",
-      "pt": "O teu lucro/perda discriminado por dia da semana. Revela em que dias ganhas ou perdes dinheiro de forma consistente — muitos traders têm um edge oculto (ou uma fuga) ligado a dias específicos como segundas ou sextas.",
-      "ar": "أرباحك/خسائرك موزّعة حسب أيام الأسبوع. تكشف في أي الأيام تربح أو تخسر باستمرار — كثير من المتداولين لديهم أفضلية خفية (أو تسريب) مرتبط بأيام محدّدة كالإثنين أو الجمعة."
+      "es": "G/P acumulado según el día de la semana de entrada.\nEjemplo: operación abierta el lunes y cerrada el miércoles cuenta para el lunes.",
+      "pt": "L/P acumulado pelo dia da semana em que você entrou.\nExemplo: operação aberta na segunda e fechada na quarta conta para a segunda.",
+      "ar": "الربح/الخسارة التراكمي حسب يوم الأسبوع الذي دخلت فيه الصفقة.\nمثال: صفقة فُتحت يوم الاثنين وأُغلقت يوم الأربعاء تُحسب ليوم الاثنين."
     }
   },
   "performanceBySetup": {
@@ -287,153 +287,153 @@
     "description": {
       "he": "כרטיס לכל סטאפ שסחרת: מספר עסקאות, אחוז הצלחה ו-R כולל.\nלדוגמה: Breakout · 8 עסקאות · 50% · ‎+4R.",
       "en": "One card per setup you traded: trade count, win rate and total R.\nExample: Breakout · 8 trades · 50% · +4R.",
-      "es": "Un desglose de cada setup que operas — win rate, R total y número de operaciones. Muestra de un vistazo qué setups sostienen tu cuenta y cuáles la drenan. Tus edges y anti-edges, lado a lado.",
-      "pt": "Uma discriminação de cada setup que operas — win rate, R total e número de operações. Mostra num relance quais setups sustentam a tua conta e quais a drenam. Os teus edges e anti-edges, lado a lado.",
-      "ar": "تفصيل لكل setup تتداوله — نسبة الربح، إجمالي R، وعدد الصفقات. يُظهر بنظرة واحدة أي النماذج تحمل حسابك وأيّها يستنزفه. أفضلياتك وأنتي-أفضلياتك، جنباً إلى جنب."
+      "es": "Una tarjeta por setup operado: nº de operaciones, Win Rate y R total.\nEjemplo: Breakout · 8 operaciones · 50% · +4R.",
+      "pt": "Um card por setup operado: nº de operações, Win Rate e R total.\nExemplo: Breakout · 8 operações · 50% · +4R.",
+      "ar": "بطاقة لكل سيناريو تداولته: عدد الصفقات وWin Rate وإجمالي R.\nمثال: Breakout · 8 صفقات · 50% · ‎+4R."
     }
   },
   "winRateBySetup": {
     "label": {
       "he": "אחוז הצלחה לפי סטאפ",
       "en": "Win Rate by Setup",
-      "es": "Win Rate by Setup",
-      "pt": "Win Rate by Setup",
-      "ar": "Win Rate by Setup"
+      "es": "Win Rate por Setup",
+      "pt": "Win Rate por Setup",
+      "ar": "Win Rate حسب السيناريو"
     },
     "description": {
       "he": "גובה העמודה הוא אחוז ההצלחה של הסטאפ; המספר מעליה הוא מספר העסקאות.\nלדוגמה: עמודה סגולה = 50% ומעלה, אפורה = מתחת ל-50%.\nממוין לפי מספר העסקאות.",
       "en": "Bar height is the setup's win rate; the number above it is the trade count.\nExample: a purple bar = 50% or more, a gray bar = below 50%.\nSorted by trade count.",
-      "es": "Bar height is the setup's win rate; the number above it is the trade count.\nExample: a purple bar = 50% or more, a gray bar = below 50%.\nSorted by trade count.",
-      "pt": "Bar height is the setup's win rate; the number above it is the trade count.\nExample: a purple bar = 50% or more, a gray bar = below 50%.\nSorted by trade count.",
-      "ar": "Bar height is the setup's win rate; the number above it is the trade count.\nExample: a purple bar = 50% or more, a gray bar = below 50%.\nSorted by trade count."
+      "es": "La altura de cada barra es el Win Rate del setup; arriba, el nº de operaciones.\nEjemplo: barra morada = 50% o más, gris = menos del 50%.\nOrdenado por nº de operaciones.",
+      "pt": "A altura da barra é o Win Rate do setup; o número acima, o nº de operações.\nExemplo: barra roxa = 50% ou mais, cinza = abaixo de 50%.\nOrdenado pelo nº de operações.",
+      "ar": "ارتفاع العمود هو Win Rate السيناريو؛ والرقم فوقه هو عدد الصفقات.\nمثال: عمود بنفسجي = 50% أو أكثر، عمود رمادي = أقل من 50%.\nمرتّب حسب عدد الصفقات."
     }
   },
   "bestDay": {
     "label": {
       "he": "היום הטוב ביותר",
       "en": "Best Day",
-      "es": "Best Day",
-      "pt": "Best Day",
-      "ar": "Best Day"
+      "es": "Mejor Día",
+      "pt": "Melhor Dia",
+      "ar": "أفضل يوم"
     },
     "description": {
       "he": "יום השבוע עם ה-P&L הכולל הגבוה ביותר, לפי יום הכניסה.\nלדוגמה: שני ‎+$400, שלישי ‎+$150 ⇒ שני.\nלא מתחשב במספר העסקאות.",
       "en": "The weekday with the highest total P&L, by entry day.\nExample: Monday +$400, Tuesday +$150 ⇒ Monday.\nTrade count is not taken into account.",
-      "es": "The weekday with the highest total P&L, by entry day.\nExample: Monday +$400, Tuesday +$150 ⇒ Monday.\nTrade count is not taken into account.",
-      "pt": "The weekday with the highest total P&L, by entry day.\nExample: Monday +$400, Tuesday +$150 ⇒ Monday.\nTrade count is not taken into account.",
-      "ar": "The weekday with the highest total P&L, by entry day.\nExample: Monday +$400, Tuesday +$150 ⇒ Monday.\nTrade count is not taken into account."
+      "es": "El día de la semana con mayor G/P total, según el día de entrada.\nEjemplo: lunes +$400, martes +$150 ⇒ lunes.\nNo considera el número de operaciones.",
+      "pt": "O dia da semana com o maior L/P total, pelo dia de entrada.\nExemplo: segunda +$400, terça +$150 ⇒ segunda.\nNão leva em conta o número de operações.",
+      "ar": "يوم الأسبوع صاحب أعلى ربح/خسارة إجمالي، حسب يوم الدخول.\nمثال: الاثنين ‎+$400، الثلاثاء ‎+$150 ⇒ الاثنين.\nلا يأخذ عدد الصفقات في الحسبان."
     }
   },
   "bestSetup": {
     "label": {
       "he": "הסטאפ הטוב ביותר",
       "en": "Best Setup",
-      "es": "Best Setup",
-      "pt": "Best Setup",
-      "ar": "Best Setup"
+      "es": "Mejor Setup",
+      "pt": "Melhor Setup",
+      "ar": "أفضل سيناريو"
     },
     "description": {
       "he": "הסטאפ עם אחוז ההצלחה הגבוה ביותר; בתיקו — זה עם יותר עסקאות.\nלדוגמה: Pullback ב-70% מ-10 עסקאות קודם ל-Breakout ב-60%.\nאין סף מדגם: עסקה אחת ב-100% יכולה לזכות. Unknown לא נכלל.",
       "en": "The setup with the highest win rate; on a tie, the one with more trades.\nExample: Pullback at 70% over 10 trades ranks above Breakout at 60%.\nNo minimum sample: one trade at 100% can win. Unknown is excluded.",
-      "es": "The setup with the highest win rate; on a tie, the one with more trades.\nExample: Pullback at 70% over 10 trades ranks above Breakout at 60%.\nNo minimum sample: one trade at 100% can win. Unknown is excluded.",
-      "pt": "The setup with the highest win rate; on a tie, the one with more trades.\nExample: Pullback at 70% over 10 trades ranks above Breakout at 60%.\nNo minimum sample: one trade at 100% can win. Unknown is excluded.",
-      "ar": "The setup with the highest win rate; on a tie, the one with more trades.\nExample: Pullback at 70% over 10 trades ranks above Breakout at 60%.\nNo minimum sample: one trade at 100% can win. Unknown is excluded."
+      "es": "El setup con mayor Win Rate; si hay empate, el de más operaciones.\nEjemplo: Pullback al 70% en 10 operaciones supera a Breakout al 60%.\nSin muestra mínima: una operación al 100% puede ganar. Se excluye Unknown.",
+      "pt": "O setup com maior Win Rate; em caso de empate, o de mais operações.\nExemplo: Pullback com 70% em 10 operações supera Breakout com 60%.\nSem amostra mínima: uma operação com 100% pode vencer. Unknown fica de fora.",
+      "ar": "السيناريو صاحب أعلى Win Rate؛ وعند التعادل، صاحب العدد الأكبر من الصفقات.\nمثال: Pullback بنسبة 70% على 10 صفقات يتقدّم على Breakout بنسبة 60%.\nلا حدّ أدنى للعيّنة: صفقة واحدة بنسبة 100% قد تفوز. Unknown مستبعَد."
     }
   },
   "bestEmotion": {
     "label": {
       "he": "הרגש הטוב ביותר",
       "en": "Best Emotion",
-      "es": "Best Emotion",
-      "pt": "Best Emotion",
-      "ar": "Best Emotion"
+      "es": "Mejor Emoción",
+      "pt": "Melhor Emoção",
+      "ar": "أفضل شعور"
     },
     "description": {
       "he": "הרגש שסימנת בכניסה עם אחוז ההצלחה הגבוה ביותר; בתיקו — זה עם יותר עסקאות.\nלדוגמה: Calm ב-65% קודם ל-Confident ב-55%.\nאין סף מדגם.",
       "en": "The entry emotion you marked with the highest win rate; on a tie, the one with more trades.\nExample: Calm at 65% ranks above Confident at 55%.\nNo minimum sample.",
-      "es": "The entry emotion you marked with the highest win rate; on a tie, the one with more trades.\nExample: Calm at 65% ranks above Confident at 55%.\nNo minimum sample.",
-      "pt": "The entry emotion you marked with the highest win rate; on a tie, the one with more trades.\nExample: Calm at 65% ranks above Confident at 55%.\nNo minimum sample.",
-      "ar": "The entry emotion you marked with the highest win rate; on a tie, the one with more trades.\nExample: Calm at 65% ranks above Confident at 55%.\nNo minimum sample."
+      "es": "La emoción de entrada que marcaste con mayor Win Rate; si hay empate, la de más operaciones.\nEjemplo: Calm al 65% supera a Confident al 55%.\nSin muestra mínima.",
+      "pt": "A emoção de entrada que você marcou com maior Win Rate; em caso de empate, a de mais operações.\nExemplo: Calm com 65% supera Confident com 55%.\nSem amostra mínima.",
+      "ar": "شعور الدخول الذي حدّدته صاحب أعلى Win Rate؛ وعند التعادل، صاحب العدد الأكبر من الصفقات.\nمثال: Calm بنسبة 65% يتقدّم على Confident بنسبة 55%.\nلا حدّ أدنى للعيّنة."
     }
   },
   "rDistribution": {
     "label": {
       "he": "התפלגות R",
       "en": "R Distribution",
-      "es": "R Distribution",
-      "pt": "R Distribution",
-      "ar": "R Distribution"
+      "es": "Distribución de R",
+      "pt": "Distribuição de R",
+      "ar": "توزيع R"
     },
     "description": {
       "he": "כמה עסקאות סגורות נפלו בכל טווח R, משמאל להפסד ועד ימין לרווח.\nלדוגמה: עסקה של ‎+1.4R נספרת בטווח 1R עד 2R.\nעסקאות בלי סטופ לא נספרות.",
       "en": "How many closed trades fell in each R range, losses left to wins right.\nExample: a +1.4R trade counts in the 1R to 2R range.\nTrades without a stop are not counted.",
-      "es": "How many closed trades fell into each R range, from losses on the left to wins on the right.\nExample: a +1.4R trade counts in the 1R to 2R range.\nTrades without a stop are not counted.",
-      "pt": "How many closed trades fell into each R range, from losses on the left to wins on the right.\nExample: a +1.4R trade counts in the 1R to 2R range.\nTrades without a stop are not counted.",
-      "ar": "How many closed trades fell into each R range, from losses on the left to wins on the right.\nExample: a +1.4R trade counts in the 1R to 2R range.\nTrades without a stop are not counted."
+      "es": "Nº de operaciones cerradas por rango de R: pérdidas a la izquierda, ganancias a la derecha.\nEjemplo: una de +1.4R cae en el rango 1R a 2R.\nSin stop, la operación no se cuenta.",
+      "pt": "Nº de operações fechadas por faixa de R: perdas à esquerda, ganhos à direita.\nExemplo: uma operação de +1.4R conta na faixa de 1R a 2R.\nOperações sem stop não são contadas.",
+      "ar": "عدد الصفقات المغلقة في كل نطاق R، الخسائر يساراً والأرباح يميناً.\nمثال: صفقة بـ ‎+1.4R تُحسب في نطاق 1R إلى 2R.\nالصفقات بلا وقف خسارة لا تُحسب."
     }
   },
   "pnlByMonth": {
     "label": {
       "he": "רווח/הפסד לפי חודש",
       "en": "P&L by Month",
-      "es": "P&L by Month",
-      "pt": "P&L by Month",
-      "ar": "P&L by Month"
+      "es": "G/P por Mes",
+      "pt": "L/P por Mês",
+      "ar": "الربح/الخسارة حسب الشهر"
     },
     "description": {
       "he": "סכום ה-P&L של העסקאות הסגורות לכל חודש, לפי תאריך הכניסה.\nלדוגמה: במרץ ‎+$200, ‎−$50 ו-‎+$100 ⇒ ‎+$250.\nעסקה שלא הומרה למטבע ההון לא נספרת.",
       "en": "The sum of closed-trade P&L for each month, by entry date.\nExample: in March +$200, −$50 and +$100 ⇒ +$250.\nA trade not converted to your capital currency is not counted.",
-      "es": "The sum of closed-trade P&L for each month, by trade date.\nExample: in March +$200, −$50 and +$100 ⇒ +$250.\nA trade not converted to your capital currency is not counted.",
-      "pt": "The sum of closed-trade P&L for each month, by trade date.\nExample: in March +$200, −$50 and +$100 ⇒ +$250.\nA trade not converted to your capital currency is not counted.",
-      "ar": "The sum of closed-trade P&L for each month, by trade date.\nExample: in March +$200, −$50 and +$100 ⇒ +$250.\nA trade not converted to your capital currency is not counted."
+      "es": "Suma del G/P de operaciones cerradas por mes, según la fecha de entrada.\nEjemplo: en marzo +$200, −$50 y +$100 ⇒ +$250.\nNo cuenta la operación no convertida a la moneda de tu capital.",
+      "pt": "Soma do L/P das operações fechadas por mês, pela data de entrada.\nExemplo: em março +$200, −$50 e +$100 ⇒ +$250.\nUma operação não convertida para a moeda do seu capital não é contada.",
+      "ar": "مجموع ربح/خسارة الصفقات المغلقة لكل شهر، حسب تاريخ الدخول.\nمثال: في مارس ‎+$200 و‎−$50 و‎+$100 ⇒ ‎+$250.\nالصفقة غير المحوّلة إلى عملة رأس مالك لا تُحسب."
     }
   },
   "emotionPerformance": {
     "label": {
       "he": "ביצועים לפי רגש",
       "en": "Emotion Performance",
-      "es": "Emotion Performance",
-      "pt": "Emotion Performance",
-      "ar": "Emotion Performance"
+      "es": "Rendimiento por Emoción",
+      "pt": "Desempenho por Emoção",
+      "ar": "الأداء حسب الشعور"
     },
     "description": {
       "he": "סך ה-P&L של העסקאות הסגורות לפי הרגש שסימנת בכניסה.\nלדוגמה: FOMO · 4 עסקאות · ‎−$300.\nעסקה בלי רגש מסומן נספרת כ-Unknown.",
       "en": "Total closed-trade P&L by the emotion you marked at entry.\nExample: FOMO · 4 trades · −$300.\nA trade with no emotion marked counts as Unknown.",
-      "es": "Total closed-trade P&L by the emotion you marked at entry.\nExample: FOMO · 4 trades · −$300.\nA trade with no emotion marked counts as Unknown.",
-      "pt": "Total closed-trade P&L by the emotion you marked at entry.\nExample: FOMO · 4 trades · −$300.\nA trade with no emotion marked counts as Unknown.",
-      "ar": "Total closed-trade P&L by the emotion you marked at entry.\nExample: FOMO · 4 trades · −$300.\nA trade with no emotion marked counts as Unknown."
+      "es": "G/P total de operaciones cerradas según la emoción que marcaste al entrar.\nEjemplo: FOMO · 4 operaciones · −$300.\nSin emoción marcada, cuenta como Unknown.",
+      "pt": "L/P total das operações fechadas pela emoção que você marcou na entrada.\nExemplo: FOMO · 4 operações · −$300.\nSem emoção marcada, conta como Unknown.",
+      "ar": "إجمالي ربح/خسارة الصفقات المغلقة حسب الشعور الذي حدّدته عند الدخول.\nمثال: FOMO · 4 صفقات · ‎−$300.\nالصفقة بلا شعور محدّد تُحسب كـ Unknown."
     }
   },
   "setupMatrix": {
     "label": {
       "he": "מטריצת סטאפים",
       "en": "Setup Matrix",
-      "es": "Setup Matrix",
-      "pt": "Setup Matrix",
-      "ar": "Setup Matrix"
+      "es": "Matriz de Setups",
+      "pt": "Matriz de Setups",
+      "ar": "مصفوفة السيناريوهات"
     },
     "description": {
       "he": "טבלה לכל סטאפ: עסקאות, אחוז הצלחה, R ממוצע ו-P&L, ממוינת לפי P&L.\nלדוגמה: Breakout · 8 · 50% · ‎+0.4R · ‎+$600.",
       "en": "A table per setup: trades, win rate, average R and P&L, sorted by P&L.\nExample: Breakout · 8 · 50% · +0.4R · +$600.",
-      "es": "A table per setup: trades, win rate, average R and P&L, sorted by P&L.\nExample: Breakout · 8 · 50% · +0.4R · +$600.",
-      "pt": "A table per setup: trades, win rate, average R and P&L, sorted by P&L.\nExample: Breakout · 8 · 50% · +0.4R · +$600.",
-      "ar": "A table per setup: trades, win rate, average R and P&L, sorted by P&L.\nExample: Breakout · 8 · 50% · +0.4R · +$600."
+      "es": "Una tabla por setup: operaciones, Win Rate, R promedio y G/P, ordenada por G/P.\nEjemplo: Breakout · 8 · 50% · +0.4R · +$600.",
+      "pt": "Uma tabela por setup: operações, Win Rate, R médio e L/P, ordenada por L/P.\nExemplo: Breakout · 8 · 50% · +0.4R · +$600.",
+      "ar": "جدول لكل سيناريو: الصفقات وWin Rate ومتوسط R والربح/الخسارة، مرتّب بالربح/الخسارة.\nمثال: Breakout · 8 · 50% · ‎+0.4R · ‎+$600."
     }
   },
   "holdTimeVsPnl": {
     "label": {
       "he": "זמן החזקה מול רווח",
       "en": "Hold Time vs P&L",
-      "es": "Hold Time vs P&L",
-      "pt": "Hold Time vs P&L",
-      "ar": "Hold Time vs P&L"
+      "es": "Tiempo de Tenencia vs G/P",
+      "pt": "Tempo de Posição vs L/P",
+      "ar": "مدة الاحتفاظ مقابل الربح/الخسارة"
     },
     "description": {
       "he": "כל נקודה היא עסקה סגורה: ימי ההחזקה בציר אחד וה-P&L בציר השני.\nלדוגמה: נקודה ב-5 ימים וב-‎+$300 = עסקה שהחזקת 5 ימים והרוויחה $300.\nעסקה שלא הומרה למטבע ההון לא מוצגת.",
       "en": "Each dot is a closed trade: holding days against P&L.\nExample: a dot at 5 days and +$300 = held 5 days, made $300.\nTrades not converted to your capital currency are not shown.",
-      "es": "Each dot is a closed trade: holding days on one axis and P&L on the other.\nExample: a dot at 5 days and +$300 = a trade you held 5 days that made $300.\nA trade not converted to your capital currency is not shown.",
-      "pt": "Each dot is a closed trade: holding days on one axis and P&L on the other.\nExample: a dot at 5 days and +$300 = a trade you held 5 days that made $300.\nA trade not converted to your capital currency is not shown.",
-      "ar": "Each dot is a closed trade: holding days on one axis and P&L on the other.\nExample: a dot at 5 days and +$300 = a trade you held 5 days that made $300.\nA trade not converted to your capital currency is not shown."
+      "es": "Cada punto, una operación cerrada: días de tenencia frente a G/P.\nEjemplo: punto en 5 días y +$300 = 5 días abierta, ganó $300.\nNo se muestran operaciones sin convertir a tu moneda de capital.",
+      "pt": "Cada ponto é uma operação fechada: dias de posição contra L/P.\nExemplo: ponto em 5 dias e +$300 = mantida 5 dias, lucrou $300.\nOperações não convertidas à moeda do seu capital não aparecem.",
+      "ar": "كل نقطة صفقة مغلقة: أيام الاحتفاظ مقابل الربح/الخسارة.\nمثال: نقطة عند 5 أيام و‎+$300 = احتُفظ بها 5 أيام وربحت $300.\nالصفقات غير المحوّلة إلى عملة رأس مالك لا تُعرض."
     }
   },
   "rr": {
@@ -447,9 +447,9 @@
     "description": {
       "he": "היחס בין הסיכון לרווח הפוטנציאלי, בכתיב סיכון:סיכוי.\nלדוגמה: סטופ $2 מתחת לכניסה ויעד $6 מעליה ⇒ 1:3.",
       "en": "The ratio between your risk and the potential reward, written risk:reward.\nExample: a stop $2 below entry and a target $6 above ⇒ 1:3.",
-      "es": "Riesgo/Beneficio. Beneficio potencial vs. lo que arriesgas. 3:1 = puedes ganar 3× lo que perderías.",
-      "pt": "Risco/Retorno. Lucro potencial vs. o que arriscas. 3:1 = podes ganhar 3× o que perderias.",
-      "ar": "المخاطرة/العائد. الربح المحتمل مقابل ما تخاطر به. 3:1 = يمكنك ربح 3× ما قد تخسره."
+      "es": "La relación entre tu riesgo y el beneficio potencial, escrita riesgo:beneficio.\nEjemplo: stop $2 bajo la entrada y objetivo $6 sobre ella ⇒ 1:3.",
+      "pt": "A relação entre o seu risco e o retorno potencial, escrita risco:retorno.\nExemplo: um stop $2 abaixo da entrada e um alvo $6 acima ⇒ 1:3.",
+      "ar": "النسبة بين مخاطرتك والعائد المحتمل، تُكتب مخاطرة:عائد.\nمثال: وقف خسارة أدنى الدخول بـ $2 وهدف أعلاه بـ $6 ⇒ 1:3."
     }
   },
   "rMultiple": {
@@ -463,9 +463,9 @@
     "description": {
       "he": "תוצאת העסקה ביחידות של הסיכון לפי הסטופ השמור, לפי הכיוון: LONG (יציאה − כניסה), SHORT (כניסה − יציאה).\nלדוגמה: סיכנת $40 והרווחת $100 ⇒ ‎+2.5R.\nפער פתיחה מעבר לסטופ יכול לתת הפסד גדול מ-‎−1R.",
       "en": "Your result in units of risk at the saved stop: LONG (Exit − Entry), SHORT (Entry − Exit).\nExample: you risked $40 and made $100 ⇒ +2.5R.\nAn opening gap past the stop can lose more than −1R.",
-      "es": "R-Multiple = ganancia de la operación ÷ riesgo inicial. La ganancia sigue la dirección de la operación: en un LONG es (Salida − Entrada), en un SHORT es (Entrada − Salida) — así que un SHORT ganador siempre da un R positivo.\n\nEjemplos:\n+2R = ganaste 2× lo que arriesgaste ✓\n+1R = ganaste exactamente lo que arriesgaste ✓\n-1R = perdiste tu riesgo planificado (normal)\n-2R = el stop no se respetó (problema)\n\nSeguir el R-Multiple elimina el sesgo del dólar y te permite comparar operaciones objetivamente.",
-      "pt": "R-Multiple = lucro da operação ÷ risco inicial. O lucro segue a direção da operação: num LONG é (Saída − Entrada), num SHORT é (Entrada − Saída) — por isso um SHORT vencedor dá sempre um R positivo.\n\nExemplos:\n+2R = ganhaste 2× o que arriscaste ✓\n+1R = ganhaste exatamente o que arriscaste ✓\n-1R = perdeste o teu risco planeado (normal)\n-2R = o stop não foi respeitado (problema)\n\nAcompanhar o R-Multiple elimina o viés do dólar e permite comparar operações objetivamente.",
-      "ar": "R-Multiple = ربح الصفقة ÷ المخاطرة الأوّلية. الربح يتبع اتّجاه الصفقة: في LONG هو (الخروج − الدخول)، وفي SHORT هو (الدخول − الخروج) — لذلك فإن SHORT الرابحة تعطي دائماً R موجباً.\n\nأمثلة:\n+2R = ربحت 2× ما خاطرت به ✓\n+1R = ربحت تماماً ما خاطرت به ✓\n-1R = خسرت مخاطرتك المخطّطة (طبيعي)\n-2R = لم يُحترم وقف الخسارة (مشكلة)\n\nتتبّع R-Multiple يزيل انحياز الدولار ويتيح لك مقارنة الصفقات موضوعياً."
+      "es": "Tu resultado en unidades de riesgo del stop guardado: LONG (Salida − Entrada), SHORT (Entrada − Salida).\nEjemplo: arriesgaste $40, ganaste $100 ⇒ +2.5R.\nUn gap de apertura tras el stop puede perder más de −1R.",
+      "pt": "Seu resultado em unidades de risco no stop salvo: LONG (Saída − Entrada), SHORT (Entrada − Saída).\nExemplo: você arriscou $40 e ganhou $100 ⇒ +2.5R.\nUm gap de abertura além do stop pode perder mais que −1R.",
+      "ar": "نتيجتك بوحدات المخاطرة عند وقف الخسارة المحفوظ: LONG (الخروج − الدخول)، SHORT (الدخول − الخروج).\nمثال: خاطرت بـ $40 وربحت $100 ⇒ ‎+2.5R.\nفجوة افتتاح تتجاوز وقف الخسارة قد تخسر أكثر من ‎−1R."
     }
   },
   "mfeMae": {
@@ -479,25 +479,25 @@
     "description": {
       "he": "כמה הלכה העסקה לטובתך (MFE) וכמה נגדך (MAE) לפני שנסגרה.\nלדוגמה: נכנסת ב-$100, המחיר עלה ל-$106 וירד ל-$97 ⇒ MFE $6, MAE $3.\nנמדד רק אם מילאת את השדות בעסקה.",
       "en": "How far a trade ran in your favor (MFE) and against you (MAE) before it closed.\nExample: entry $100, high $106, low $97 ⇒ MFE $6, MAE $3.\nOnly if you filled in the fields.",
-      "es": "Cuán lejos llegó una operación a tu favor (MFE) y en tu contra (MAE) antes de cerrarse. Ayuda a afinar stops y objetivos.",
-      "pt": "Quão longe uma operação foi a teu favor (MFE) e contra ti (MAE) antes de fechar. Ajuda a afinar stops e alvos.",
-      "ar": "إلى أي مدى تحرّكت الصفقة لصالحك (MFE) وضدّك (MAE) قبل إغلاقها. يساعد في ضبط أوامر الوقف والأهداف."
+      "es": "Cuánto avanzó una operación a tu favor (MFE) y en tu contra (MAE) antes de cerrarse.\nEjemplo: entrada $100, máximo $106, mínimo $97 ⇒ MFE $6, MAE $3.\nSolo si rellenaste los campos.",
+      "pt": "Quanto uma operação andou a seu favor (MFE) e contra você (MAE) antes de fechar.\nExemplo: entrada $100, máxima $106, mínima $97 ⇒ MFE $6, MAE $3.\nSó se você preencheu os campos.",
+      "ar": "إلى أي مدى تحرّكت الصفقة لصالحك (MFE) وضدك (MAE) قبل إغلاقها.\nمثال: دخول $100، أعلى $106، أدنى $97 ⇒ MFE $6، MAE $3.\nفقط إذا ملأت الحقول."
     }
   },
   "wilson": {
     "label": {
       "he": "ציון Wilson",
       "en": "Wilson Score",
-      "es": "Wilson Score",
-      "pt": "Wilson Score",
-      "ar": "Wilson Score"
+      "es": "Puntuación Wilson",
+      "pt": "Escore de Wilson",
+      "ar": "درجة Wilson"
     },
     "description": {
       "he": "הגבול התחתון של אחוז ההצלחה ה'אמיתי' ברמת ביטחון 95% — זהיר כשיש מעט עסקאות.\nלדוגמה: 3 רווחים מ-3 = 100%, אבל הגבול התחתון כ-44%.\nמשמש לדירוג ה-Edge.",
       "en": "The lower bound of your 'true' win rate at 95% confidence — cautious when trades are few.\nExample: 3 wins out of 3 = 100%, but the lower bound is about 44%.\nUsed to rank your Edge.",
-      "es": "Una estimación cautelosa de tu win rate \"real\" cuando el tamaño de muestra es pequeño. Evita que una racha corta te engañe.",
-      "pt": "Uma estimativa cautelosa da tua win rate \"real\" quando o tamanho da amostra é pequeno. Evita que uma sequência curta te engane.",
-      "ar": "تقدير حذِر لنسبة ربحك \"الحقيقية\" عندما يكون حجم العيّنة صغيراً. يمنع سلسلة قصيرة ساخنة من خداعك."
+      "es": "El límite inferior de tu Win Rate 'real' al 95% de confianza — prudente con pocas operaciones.\nEjemplo: 3 ganadas de 3 = 100%, pero el límite inferior ronda el 44%.\nSe usa para ordenar tu Edge.",
+      "pt": "O limite inferior do seu Win Rate 'real' com 95% de confiança — cauteloso com poucas operações.\nExemplo: 3 vitórias em 3 = 100%, mas o limite inferior é cerca de 44%.\nUsado para ordenar seu Edge.",
+      "ar": "الحد الأدنى لـ Win Rate 'الحقيقي' لديك بثقة 95% — حذِر عندما تكون الصفقات قليلة.\nمثال: 3 أرباح من 3 = 100%، لكن الحد الأدنى نحو 44%.\nتُستخدم لترتيب الـ Edge الخاص بك."
     }
   },
   "rrBucket3plus": {
@@ -511,9 +511,9 @@
     "description": {
       "he": "עסקאות שהיחס המתוכנן שלהן, סטופ מול יעד, הוא 1:3 ומעלה.\nלדוגמה: סטופ $1 מתחת לכניסה ויעד $3.50 מעליה ⇒ 1:3.5 ⇒ בקבוצה.\nביחס 1:3 מספיק 25% הצלחה כדי לא להפסיד, לפני עמלות.",
       "en": "Trades whose planned ratio, stop versus target, is 1:3 or more.\nExample: a stop $1 below entry and a target $3.50 above ⇒ 1:3.5 ⇒ in the group.\nAt 1:3, a 25% win rate breaks even, before commissions.",
-      "es": "Un grupo de operaciones con una relación riesgo/beneficio de 3 o más: la recompensa potencial es al menos 3× el riesgo. Son las operaciones de mayor calidad por ratio: incluso con una tasa de aciertos baja, ganar una fracción basta para ser rentable.",
-      "pt": "Um grupo de operações com uma relação risco/retorno de 3 ou mais: o retorno potencial é pelo menos 3× o risco. São as operações de maior qualidade por rácio: mesmo com uma taxa de acertos baixa, ganhar uma fração já basta para ser lucrativo.",
-      "ar": "مجموعة صفقات بنسبة مخاطرة/عائد تبلغ 3 أو أكثر: العائد المحتمل لا يقل عن 3 أضعاف المخاطرة. هذه أعلى الصفقات جودةً من حيث النسبة: حتى مع نسبة نجاح منخفضة، يكفي الربح في جزء منها لتحقيق الربحية."
+      "es": "Operaciones con ratio planificado (stop frente a objetivo) de 1:3 o más.\nEjemplo: stop $1 bajo la entrada, objetivo $3.50 sobre ella ⇒ 1:3.5 ⇒ en el grupo.\nA 1:3, un Win Rate del 25% empata, antes de comisiones.",
+      "pt": "Operações cuja relação planejada, stop versus alvo, é 1:3 ou mais.\nExemplo: um stop $1 abaixo da entrada e um alvo $3.50 acima ⇒ 1:3.5 ⇒ no grupo.\nEm 1:3, um Win Rate de 25% empata, antes das comissões.",
+      "ar": "صفقات نسبتها المخططة، وقف الخسارة مقابل الهدف، 1:3 أو أكثر.\nمثال: وقف خسارة أدنى الدخول بـ $1 وهدف أعلاه بـ $3.50 ⇒ 1:3.5 ⇒ ضمن المجموعة.\nعند 1:3، يحقق Win Rate بنسبة 25% التعادل، قبل العمولات."
     }
   },
   "dna": {
@@ -527,9 +527,9 @@
     "description": {
       "he": "ארבעה ציונים 0–100 — ניהול סיכון, משמעת, עקביות וצמיחה — מחושבים מהעסקאות הסגורות שלך.\nלדוגמה: סיכון ממוצע של 2% לעסקה ⇒ ציון ניהול סיכון 50.\nהמשמעת נשענת על הסימון 'עקבתי אחרי התוכנית' — דיווח עצמי.",
       "en": "Four 0–100 scores — risk, discipline, consistency, growth — from your closed trades.\nExample: 2% average risk per trade ⇒ risk score 50.\nDiscipline is the self-reported 'followed my plan' flag.",
-      "es": "Tu Trading DNA mide 4 dimensiones centrales de tu personalidad como trader:\n\n• Gestión de Riesgo (0-100): Qué tan bien controlas las pérdidas\n• Disciplina (0-100): ¿Sigues tus reglas?\n• Consistencia (0-100): Resultados estables en distintas condiciones\n• Crecimiento (0-100): ¿Estás mejorando con el tiempo?\n\nBasado en tu historial real de operaciones — no en autoevaluación.",
-      "pt": "O teu Trading DNA mede 4 dimensões centrais da tua personalidade como trader:\n\n• Gestão de Risco (0-100): Quão bem controlas as perdas\n• Disciplina (0-100): Segues as tuas regras?\n• Consistência (0-100): Resultados estáveis em diferentes condições\n• Crescimento (0-100): Estás a melhorar com o tempo?\n\nBaseado no teu histórico real de operações — não em autoavaliação.",
-      "ar": "يقيس Trading DNA الخاص بك 4 أبعاد أساسية لشخصيتك كمتداول:\n\n• إدارة المخاطر (0-100): مدى تحكّمك في الخسائر\n• الانضباط (0-100): هل تتّبع قواعدك؟\n• الاتّساق (0-100): نتائج مستقرّة عبر ظروف مختلفة\n• النموّ (0-100): هل تتحسّن مع الوقت؟\n\nمبني على سجلّ صفقاتك الحقيقي — لا على التقييم الذاتي."
+      "es": "Cuatro puntuaciones 0–100 — riesgo, disciplina, consistencia, crecimiento — de tus operaciones cerradas.\nEjemplo: 2% de riesgo medio por operación ⇒ riesgo 50.\nDisciplina = la marca autodeclarada 'seguí mi plan'.",
+      "pt": "Quatro pontuações 0–100 — risco, disciplina, consistência, crescimento — das suas operações fechadas.\nExemplo: risco médio de 2% por operação ⇒ risco 50.\nDisciplina é a marcação autodeclarada 'segui meu plano'.",
+      "ar": "أربع درجات 0–100 — المخاطرة والانضباط والاتساق والنمو — من صفقاتك المغلقة.\nمثال: متوسط مخاطرة 2% لكل صفقة ⇒ درجة مخاطرة 50.\nالانضباط هو علامة 'اتبعت خطتي' التي تضعها بنفسك."
     }
   },
   "edge": {
@@ -543,9 +543,9 @@
     "description": {
       "he": "צירופי סטאפ ורגש שבהם אחוז ההצלחה וה-R שלך הכי חזקים, מדורגים לפי ציון Wilson.\nלדוגמה: Breakout + Calm · 4 רווחיות מ-5 · R ממוצע ‎+1.2R.\nדרושות 3 עסקאות לפחות; זה דירוג, לא מבחן מובהקות.",
       "en": "Setup-and-emotion pairs where your win rate and R are strongest, ranked by Wilson score.\nExample: Breakout + Calm · 4 of 5 won · average +1.2R.\nNeeds 3+ trades; a ranking, not a significance test.",
-      "es": "Tu Edge — setups donde tienes una ventaja estadísticamente significativa según tu historial real de operaciones.\n\nAlta win rate + R promedio positivo = edge real. Estos son los setups que más deberías operar. El mercado te paga por hacerlos.",
-      "pt": "O teu Edge — setups onde tens uma vantagem estatisticamente significativa segundo o teu histórico real de operações.\n\nWin rate alta + R médio positivo = edge real. Estes são os setups que mais deves operar. O mercado paga-te para os fazeres.",
-      "ar": "الـ Edge الخاص بك — نماذج دخول تملك فيها أفضلية ذات دلالة إحصائية بناءً على سجلّ صفقاتك الحقيقي.\n\nنسبة ربح عالية + متوسّط R موجب = أفضلية حقيقية. هذه النماذج هي التي يجب أن تتداولها أكثر. السوق يدفع لك مقابل تنفيذها."
+      "es": "Pares setup-emoción con tu Win Rate y tu R más fuertes, ordenados por puntuación Wilson.\nEjemplo: Breakout + Calm · 4 de 5 ganadas · media +1.2R.\nMínimo 3 operaciones; un ranking, no una prueba de significancia.",
+      "pt": "Pares setup-emoção com seu Win Rate e seu R mais fortes, ordenados pelo escore de Wilson.\nExemplo: Breakout + Calm · 4 de 5 vencedoras · média +1.2R.\nExige 3+ operações; um ranking, não teste de significância.",
+      "ar": "أزواج نموذج دخول وعاطفة يكون فيها Win Rate و R لديك في أقوى حالاتهما، مرتبة حسب درجة Wilson.\nمثال: Breakout + Calm · 4 رابحة من 5 · متوسط ‎+1.2R.\nيتطلب 3 صفقات أو أكثر؛ هذا ترتيب، لا اختبار دلالة إحصائية."
     }
   },
   "antiEdge": {
@@ -559,9 +559,9 @@
     "description": {
       "he": "צירופי סטאפ ורגש שבהם אחוז ההצלחה שלך מתחת ל-50% או ה-R הממוצע שלילי.\nלדוגמה: Breakout + FOMO · רווח אחד מ-4 · R ממוצע ‎−0.8R.\nדרושות 2 עסקאות לפחות; מוצגים עד 5.",
       "en": "Setup-and-emotion pairs where your win rate is below 50% or your average R is negative.\nExample: Breakout + FOMO · 1 win out of 4 · average R −0.8R.\nNeeds at least 2 trades; up to 5 are shown.",
-      "es": "Anti-Edge — setups donde pierdes dinero de forma consistente según tu historial de operaciones.\n\nWin rate baja + R negativo = tu anti-edge personal. O corriges estos setups (estudia por qué te fallan) o dejas de operarlos por completo.\n\nEvitar los anti-edges es tan importante como explotar los edges.",
-      "pt": "Anti-Edge — setups onde perdes dinheiro de forma consistente segundo o teu histórico de operações.\n\nWin rate baixa + R negativo = o teu anti-edge pessoal. Ou corriges estes setups (estuda por que te falham) ou deixas de os operar por completo.\n\nEvitar os anti-edges é tão importante como explorar os edges.",
-      "ar": "Anti-Edge — نماذج دخول تخسر فيها المال باستمرار بناءً على سجلّ صفقاتك.\n\nنسبة ربح منخفضة + R سالب = الأنتي-إيدج الشخصي لديك. إمّا أن تُصلح هذه النماذج (ادرس لماذا تفشل معك) أو تتوقّف عن تداولها نهائياً.\n\nتجنّب الأنتي-إيدج لا يقلّ أهمية عن استغلال الإيدج."
+      "es": "Pares de setup y emoción donde tu Win Rate está por debajo del 50% o tu R promedio es negativo.\nEjemplo: Breakout + FOMO · 1 ganada de 4 · R promedio −0.8R.\nRequiere al menos 2 operaciones; se muestran hasta 5.",
+      "pt": "Pares de setup e emoção em que seu Win Rate está abaixo de 50% ou seu R médio é negativo.\nExemplo: Breakout + FOMO · 1 vencedora em 4 · R médio −0.8R.\nExige pelo menos 2 operações; são exibidos até 5.",
+      "ar": "أزواج نموذج دخول وعاطفة يكون فيها Win Rate لديك أقل من 50% أو متوسط R سالبًا.\nمثال: Breakout + FOMO · ربح واحد من 4 · متوسط R ‎−0.8R.\nيتطلب صفقتين على الأقل؛ تُعرض حتى 5."
     }
   },
   "tilt": {
@@ -573,11 +573,11 @@
       "ar": "Tilt"
     },
     "description": {
-      "he": "מצב רגשי שמוציא אותך מהכללים שלך — לרוב אחרי הפסדים — ומוביל למסחר נקמה.\nלדוגמה: 3 הפסדים ברצף ⇒ Tilt Shield מתריע לפני העסקה הבאה.\nכלל אצבע: הפסקה אחרי 2 הפסדים רצופים.",
-      "en": "An emotional state that pushes you off your rules, usually after losses.\nExample: 3 losses in a row ⇒ Tilt Shield warns before the next trade.\nRule of thumb: take a break after 2 consecutive losses.",
-      "es": "Tilt — estado emocional que te hace desviarte de tus reglas de trading.\n\nComún tras: grandes pérdidas, perderte un gran movimiento, o una racha de ganancias que genera exceso de confianza.\n\nSeñales: aumentar el tamaño de posición, operar con más frecuencia, ignorar los stops.\n\nPrevención: pausa obligatoria tras 2+ pérdidas consecutivas.",
-      "pt": "Tilt — estado emocional que te faz desviar das tuas regras de trading.\n\nComum após: grandes perdas, perder um grande movimento, ou uma sequência de ganhos que gera excesso de confiança.\n\nSinais: aumentar o tamanho de posição, operar com mais frequência, ignorar os stops.\n\nPrevenção: pausa obrigatória após 2+ perdas consecutivas.",
-      "ar": "Tilt — حالة عاطفية تجعلك تنحرف عن قواعد تداولك.\n\nشائعة بعد: خسائر كبيرة، أو تفويت حركة كبيرة، أو سلسلة انتصارات تولّد ثقة مفرطة.\n\nالعلامات: زيادة حجم الصفقة، التداول بوتيرة أعلى، تجاهل أوامر الوقف.\n\nالوقاية: استراحة إلزامية بعد خسارتين متتاليتين أو أكثر."
+      "he": "מצב רגשי שמוציא אותך מהכללים שלך ומוביל למסחר נקמה.\nלדוגמה: 3 הפסדים ברצף ⇒ Tilt Shield מתריע לפני העסקה הבאה.\nכלל אצבע: הפסקה קצרה אחרי רצף הפסדים; Tilt Shield מתריע מ-3.",
+      "en": "An emotional state that pushes you off your rules.\nExample: 3 losses in a row ⇒ Tilt Shield warns before the next trade.\nRule of thumb: take a short break after a losing streak; Tilt Shield warns from 3.",
+      "es": "Un estado emocional que te saca de tus reglas.\nEjemplo: 3 pérdidas seguidas ⇒ Tilt Shield avisa antes de la siguiente operación.\nRegla general: pausa corta tras una racha perdedora; Tilt Shield avisa desde 3.",
+      "pt": "Um estado emocional que tira você das suas regras.\nExemplo: 3 perdas seguidas ⇒ o Tilt Shield avisa antes da próxima operação.\nRegra prática: pausa curta após uma sequência de perdas; o Tilt Shield avisa a partir de 3.",
+      "ar": "حالة عاطفية تُخرجك عن قواعدك.\nمثال: 3 خسائر متتالية ⇒ ينبّهك Tilt Shield قبل الصفقة التالية.\nقاعدة عامة: خذ استراحة قصيرة بعد سلسلة خسائر؛ ينبّه Tilt Shield ابتداءً من 3."
     }
   },
   "marketRegime": {
@@ -591,9 +591,9 @@
     "description": {
       "he": "סביבת השוק, נקראת מ-SPY/QQQ מול ממוצע 20 יום, מרוחב הסקטורים ומהתנודתיות.\nלדוגמה: מחיר מעל ממוצע 20 יום עולה ורוב הסקטורים עולים ⇒ שוק עולה.\nמבוסס מחירי שוק, לא העסקאות שלך.",
       "en": "The market environment, read from SPY/QQQ versus their 20-day average, sector breadth and volatility.\nExample: price above a rising 20-day average with most sectors rising ⇒ Bull Trend.\nBased on market prices, not your trades.",
-      "es": "Régimen de Mercado — el entorno de mercado actual, leído de la acción real del precio (no de tus operaciones). Se calcula con SPY/QQQ frente a su media de 20 días, el % de tendencia, cuántos ETF sectoriales suben (amplitud) y la volatilidad realizada.\n\n• Tendencia Alcista: Tendencia al alza — precio por encima de una media de 20 días creciente con participación amplia. Favorece breakouts y pullbacks.\n• Tendencia Bajista: Tendencia a la baja — precio por debajo de una media de 20 días decreciente, debilidad amplia. Favorece cortos o mantente al margen.\n• Lateral/Rango: Sin tendencia neta — precio atrapado entre soporte y resistencia. Opera los extremos, evita breakouts.\n• Alta Volatilidad: Dominan los fuertes vaivenes diarios. Reduce tamaño ~50% y amplía stops.\n• Baja Volatilidad: Mercado tranquilo y comprimido — espera movimientos pequeños.\n\nMuestra 'Datos insuficientes' cuando no hay suficiente historial de precios para clasificar.",
-      "pt": "Regime de Mercado — o ambiente de mercado atual, lido da ação real do preço (não das tuas operações). Calculado a partir de SPY/QQQ face à média de 20 dias, % de tendência, quantos ETF setoriais sobem (amplitude) e volatilidade realizada.\n\n• Tendência de Alta: Tendência de subida — preço acima de uma média de 20 dias ascendente com participação ampla. Favorece breakouts e pullbacks.\n• Tendência de Baixa: Tendência de descida — preço abaixo de uma média de 20 dias descendente, fraqueza ampla. Favorece vendas ou fica de fora.\n• Lateral/Range: Sem tendência líquida — preço preso entre suporte e resistência. Opera os extremos, evita breakouts.\n• Alta Volatilidade: Dominam as fortes oscilações diárias. Reduz tamanho ~50% e amplia stops.\n• Baixa Volatilidade: Mercado calmo e comprimido — espera movimentos pequenos.\n\nMostra 'Dados insuficientes' quando não há histórico de preços suficiente para classificar.",
-      "ar": "نظام السوق — بيئة السوق الحالية، تُقرأ من حركة السعر الحقيقية (وليس من صفقاتك). يُحسب من SPY/QQQ مقابل متوسّطها المتحرّك لـ20 يومًا، ونسبة الاتجاه، وكم قطاعًا يرتفع (اتساع السوق)، والتقلّب المحقَّق.\n\n• اتجاه صاعد: اتجاه صعودي — السعر فوق متوسّط 20 يومًا صاعد بمشاركة واسعة. فضّل الاختراقات والتراجعات.\n• اتجاه هابط: اتجاه هبوطي — السعر تحت متوسّط 20 يومًا هابط، ضعف واسع. فضّل البيع أو ابقَ جانبًا.\n• عرضي/نطاق: لا اتجاه صافٍ — السعر محصور بين الدعم والمقاومة. تاجر عند الأطراف وتجنّب الاختراقات.\n• تقلّب عالٍ: تسيطر التذبذبات اليومية الحادة. قلّل الحجم ~50% ووسّع أوامر الوقف.\n• تقلّب منخفض: سوق هادئ ومضغوط — توقّع حركات صغيرة.\n\nيعرض 'بيانات غير كافية' عند عدم توفّر تاريخ أسعار كافٍ للتصنيف."
+      "es": "Entorno de mercado según SPY/QQQ frente a su media de 20 días, amplitud sectorial y volatilidad.\nEjemplo: precio sobre una media de 20 días al alza y la mayoría de sectores subiendo ⇒ Tendencia Alcista.\nUsa precios de mercado, no tus operaciones.",
+      "pt": "Ambiente de mercado lido de SPY/QQQ versus a média de 20 dias, amplitude setorial e volatilidade.\nExemplo: preço acima de uma média de 20 dias em alta e a maioria dos setores subindo ⇒ Tendência de Alta.\nUsa preços de mercado, não suas operações.",
+      "ar": "بيئة السوق، تُقرأ من SPY/QQQ مقابل متوسط 20 يومًا، واتساع القطاعات، والتقلب.\nمثال: السعر فوق متوسط 20 يومًا صاعد ومعظم القطاعات ترتفع ⇒ اتجاه صاعد.\nمبني على أسعار السوق، لا على صفقاتك."
     }
   },
   "discipline": {
@@ -607,57 +607,57 @@
     "description": {
       "he": "אחוז העסקאות הסגורות שסימנת בהן 'עקבתי אחרי התוכנית'.\nלדוגמה: סימנת 'כן' ב-8 מתוך 10 ⇒ 80.\nדיווח עצמי; עסקה שלא סומנה לא נספרת.",
       "en": "The share of your closed trades you marked 'followed my plan'.\nExample: you marked 'yes' on 8 of 10 ⇒ 80.\nSelf-reported; an unmarked trade is not counted.",
-      "es": "Si seguiste tu plan — stop, tamaño, objetivo — sin desviación emocional. El núcleo de la rentabilidad a largo plazo.",
-      "pt": "Se seguiste o teu plano — stop, tamanho, alvo — sem desvio emocional. O núcleo da rentabilidade a longo prazo.",
-      "ar": "ما إذا كنت اتّبعت خطّتك — وقف الخسارة، الحجم، الهدف — دون انحراف عاطفي. جوهر الربحية على المدى الطويل."
+      "es": "La proporción de tus operaciones cerradas que marcaste 'seguí mi plan'.\nEjemplo: marcaste 'sí' en 8 de 10 ⇒ 80.\nAutodeclarado; una operación sin marcar no cuenta.",
+      "pt": "A fração das suas operações fechadas que você marcou 'segui meu plano'.\nExemplo: você marcou 'sim' em 8 de 10 ⇒ 80.\nAutodeclarado; operação sem marcação não conta.",
+      "ar": "نسبة صفقاتك المغلقة التي وضعت عليها علامة 'اتبعت خطتي'.\nمثال: وضعت 'نعم' على 8 من 10 ⇒ 80.\nتقرير ذاتي؛ الصفقة غير المعلَّمة لا تُحتسب."
     }
   },
   "dnaRisk": {
     "label": {
       "he": "ניהול סיכון",
       "en": "Risk management",
-      "es": "Risk",
-      "pt": "Risk",
-      "ar": "Risk"
+      "es": "Gestión del riesgo",
+      "pt": "Gestão de risco",
+      "ar": "إدارة المخاطر"
     },
     "description": {
       "he": "ציון 0–100 לפי הסיכון הממוצע לעסקה, כאחוז מההון בעת הכניסה.\nלדוגמה: 1% ומטה ⇒ 100 · 2% ⇒ 50 · 3% ומעלה ⇒ 0.\nלא מודד אם כיבדת את הסטופ.",
       "en": "A 0–100 score from your average risk per trade as a percentage of capital.\nExample: 1% or less ⇒ 100 · 2% ⇒ 50 · 3%+ ⇒ 0.\nDoes not measure whether you honored the stop.",
-      "es": "Mide cuán consistente eres gestionando el riesgo: tamaño de posición uniforme, respetar los stops y no superar el riesgo planificado por operación. Una puntuación baja significa riesgo inconsistente, la mayor amenaza para una cuenta.",
-      "pt": "Mede o quão consistente você é na gestão de risco: tamanho de posição uniforme, respeitar os stops e não exceder o risco planeado por operação. Uma pontuação baixa significa risco inconsistente — a maior ameaça a uma conta.",
-      "ar": "يقيس مدى اتّساقك في إدارة المخاطر: حجم صفقة موحّد، واحترام أوامر وقف الخسارة، وعدم تجاوز المخاطرة المخطّطة لكل صفقة. الدرجة المنخفضة تعني مخاطرة غير متّسقة — وهي أكبر تهديد للحساب."
+      "es": "Puntuación 0–100 según tu riesgo medio por operación como porcentaje del capital.\nEjemplo: 1% o menos ⇒ 100 · 2% ⇒ 50 · 3%+ ⇒ 0.\nNo mide si respetaste el stop.",
+      "pt": "Pontuação 0–100 a partir do seu risco médio por operação como porcentagem do capital.\nExemplo: 1% ou menos ⇒ 100 · 2% ⇒ 50 · 3%+ ⇒ 0.\nNão mede se você respeitou o stop.",
+      "ar": "درجة 0–100 مبنية على متوسط مخاطرتك لكل صفقة كنسبة مئوية من رأس المال.\nمثال: 1% أو أقل ⇒ 100 · 2% ⇒ 50 · 3% فأكثر ⇒ 0.\nلا تقيس ما إذا كنت احترمت وقف الخسارة."
     }
   },
   "dnaConsistency": {
     "label": {
       "he": "עקביות",
       "en": "Consistency",
-      "es": "Consistency",
-      "pt": "Consistency",
-      "ar": "Consistency"
+      "es": "Consistencia",
+      "pt": "Consistência",
+      "ar": "الاتساق"
     },
     "description": {
       "he": "ציון 0–100 לפי פיזור תוצאות ה-R שלך: פיזור קטן = ציון גבוה.\nלדוגמה: סטיית תקן 0R ⇒ 100 · 1.5R ⇒ 50 · 3R ומעלה ⇒ 0.\nדרושות 2 עסקאות עם R לפחות.",
       "en": "A 0–100 score from the spread of your R outcomes; less spread scores higher.\nExample: standard deviation 0R ⇒ 100 · 1.5R ⇒ 50 · 3R+ ⇒ 0.\nNeeds 2+ trades with an R.",
-      "es": "Mide la estabilidad de tu rendimiento a lo largo del tiempo: si los resultados son uniformes o dependen de unas pocas operaciones enormes. Alta consistencia es un método fiable; baja, resultados aleatorios.",
-      "pt": "Mede a estabilidade do seu desempenho ao longo do tempo: se os resultados são uniformes ou dependem de poucas operações enormes. Alta consistência é um método confiável; baixa, resultados aleatórios.",
-      "ar": "يقيس استقرار أدائك عبر الزمن: هل النتائج متّسقة أم تعتمد على عدد قليل من الصفقات الضخمة. الاتّساق العالي يعني منهجاً يمكن الاعتماد عليه؛ والمنخفض يعني نتائج عشوائية."
+      "es": "Puntuación 0–100 por la dispersión de tus resultados en R; menos dispersión, más puntos.\nEjemplo: desviación estándar 0R ⇒ 100 · 1.5R ⇒ 50 · 3R+ ⇒ 0.\nMínimo 2 operaciones con R.",
+      "pt": "Pontuação 0–100 a partir da dispersão dos seus resultados em R; menos dispersão pontua mais.\nExemplo: desvio padrão 0R ⇒ 100 · 1.5R ⇒ 50 · 3R+ ⇒ 0.\nExige 2+ operações com R.",
+      "ar": "درجة 0–100 مبنية على تشتت نتائج R لديك؛ كلما قل التشتت ارتفعت الدرجة.\nمثال: انحراف معياري 0R ⇒ 100 · 1.5R ⇒ 50 · 3R فأكثر ⇒ 0.\nتتطلب صفقتين أو أكثر لها R."
     }
   },
   "dnaGrowth": {
     "label": {
       "he": "צמיחה",
       "en": "Growth",
-      "es": "Growth",
-      "pt": "Growth",
-      "ar": "Growth"
+      "es": "Crecimiento",
+      "pt": "Crescimento",
+      "ar": "النمو"
     },
     "description": {
       "he": "ציון 0–100 לפי שיפוע ה-R המצטבר ב-20 העסקאות הסגורות האחרונות; 50 = שטוח.\nלדוגמה: R מצטבר שעולה בכ-‎+0.5R לעסקה ⇒ כ-75.\nמעל ‎+1R לעסקה ⇒ 100; מתחת ל-‎−1R ⇒ 0.",
       "en": "A 0–100 score from the slope of cumulative R over your last 20 closed trades; 50 = flat.\nExample: cumulative R rising about +0.5R per trade ⇒ about 75.\nAbove +1R per trade ⇒ 100; below −1R ⇒ 0.",
-      "es": "Mide tu tendencia de mejora: si aprendes de los datos y mejoras con el tiempo, o repites los mismos errores. Una puntuación creciente es la curva correcta para un trader en desarrollo.",
-      "pt": "Mede a sua tendência de melhoria: se aprende com os dados e melhora ao longo do tempo, ou repete os mesmos erros. Uma pontuação crescente é a curva certa para um trader em desenvolvimento.",
-      "ar": "يقيس اتجاه تحسّنك: هل تتعلّم من البيانات وتتحسّن مع الوقت، أم تكرّر الأخطاء نفسها. الدرجة المتصاعدة هي المنحنى الصحيح للمتداول الذي يتطوّر."
+      "es": "Puntuación 0–100 según la pendiente del R acumulado en tus últimas 20 operaciones cerradas; 50 = plano.\nEjemplo: R acumulado que sube ~+0.5R por operación ⇒ ~75.\nMás de +1R por operación ⇒ 100; menos de −1R ⇒ 0.",
+      "pt": "Pontuação 0–100 pela inclinação do R acumulado nas suas últimas 20 operações fechadas; 50 = plano.\nExemplo: R acumulado subindo ~+0.5R por operação ⇒ ~75.\nAcima de +1R por operação ⇒ 100; abaixo de −1R ⇒ 0.",
+      "ar": "درجة 0–100 مبنية على ميل R التراكمي في آخر 20 صفقة مغلقة لك؛ 50 = مستوٍ.\nمثال: R تراكمي يرتفع بنحو ‎+0.5R لكل صفقة ⇒ نحو 75.\nفوق ‎+1R لكل صفقة ⇒ 100؛ تحت ‎−1R ⇒ 0."
     }
   },
   "setup": {
@@ -666,14 +666,14 @@
       "en": "Setup",
       "es": "Setup",
       "pt": "Setup",
-      "ar": "Setup"
+      "ar": "نموذج الدخول (Setup)"
     },
     "description": {
       "he": "תבנית הכניסה לעסקה — התנאים המדויקים שבהם נכנסת לפוזיציה.\nלדוגמה: Breakout, Pullback או Bull Flag.",
       "en": "Your entry pattern — the exact conditions under which you take a position.\nExample: Breakout, Pullback or Bull Flag.",
-      "es": "Your entry pattern — the exact conditions under which you take a position.\nExample: Breakout, Pullback or Bull Flag.",
-      "pt": "Your entry pattern — the exact conditions under which you take a position.\nExample: Breakout, Pullback or Bull Flag.",
-      "ar": "Your entry pattern — the exact conditions under which you take a position.\nExample: Breakout, Pullback or Bull Flag."
+      "es": "Tu patrón de entrada — las condiciones exactas bajo las que abres una posición.\nEjemplo: Breakout, Pullback o Bull Flag.",
+      "pt": "Seu padrão de entrada — as condições exatas em que você abre uma posição.\nExemplo: Breakout, Pullback ou Bull Flag.",
+      "ar": "نمط دخولك — الشروط الدقيقة التي تفتح فيها مركزًا.\nمثال: Breakout أو Pullback أو Bull Flag."
     }
   },
   "riskPerTrade": {
@@ -687,9 +687,9 @@
     "description": {
       "he": "כמה אחוזים מההון קבעת שתפסיד בעסקה אחת אם הסטופ נפגע.\nלדוגמה: הון $10,000 וסיכון 1% ⇒ הפסד מקסימלי $100.\nכלל אצבע: עד 2% לעסקה (Elder).",
       "en": "The percentage of capital you chose to lose on one trade if the stop is hit.\nExample: $10,000 capital and 1% risk ⇒ a $100 maximum loss.\nRule of thumb: up to 2% per trade (Elder).",
-      "es": "Riesgo máximo por operación como % del total de la cuenta.\n\nEstándar profesional:\n• 1% por operación = conservador, sostenible\n• 2% por operación = moderado, aún aceptable\n• 5%+ por operación = territorio de apuestas\n\nEl 'riesgo de ruina' aumenta exponencialmente por encima del 2% por operación.",
-      "pt": "Risco máximo por operação como % do total da conta.\n\nPadrão profissional:\n• 1% por operação = conservador, sustentável\n• 2% por operação = moderado, ainda aceitável\n• 5%+ por operação = território de apostas\n\nO 'risco de ruína' aumenta exponencialmente acima de 2% por operação.",
-      "ar": "أقصى مخاطرة لكل صفقة كنسبة % من إجمالي الحساب.\n\nالمعيار الاحترافي:\n• 1% لكل صفقة = متحفّظ، مستدام\n• 2% لكل صفقة = معتدل، لا يزال مقبولاً\n• 5%+ لكل صفقة = منطقة مقامرة\n\n'مخاطر الإفلاس' ترتفع أُسّياً فوق 2% لكل صفقة."
+      "es": "El % del capital que elegiste perder en una operación si se toca el stop.\nEjemplo: capital de $10,000 y 1% de riesgo ⇒ pérdida máxima de $100.\nRegla general: hasta 2% por operación (Elder).",
+      "pt": "O % do capital que você escolheu perder numa operação se o stop for atingido.\nExemplo: capital de $10,000 e risco de 1% ⇒ perda máxima de $100.\nRegra prática: até 2% por operação (Elder).",
+      "ar": "نسبة رأس المال التي اخترت خسارتها في صفقة واحدة إذا ضُرب وقف الخسارة.\nمثال: رأس مال $10,000 ومخاطرة 1% ⇒ خسارة قصوى $100.\nقاعدة عامة: حتى 2% لكل صفقة (Elder)."
     }
   },
   "riskLimits": {
@@ -703,9 +703,9 @@
     "description": {
       "he": "שתי תקרות: הסיכון לעסקה שבחרת, ותקרה לכל הפוזיציות הפתוחות — פי 2, בין 3% ל-5%.\nלדוגמה: 1% ⇒ 3% · 2% ⇒ 4% · 3% ⇒ 5%.\nהתקרה ÷ סיכון לעסקה = פוזיציות מלאות במקביל.",
       "en": "Your per-trade risk, plus a cap on all open positions: 2× it, between 3% and 5%.\nExample: 1% ⇒ 3% · 2% ⇒ 4% · 3% ⇒ 5%.\nCap ÷ per-trade risk = how many full-size positions fit at once.",
-      "es": "Dos límites funcionan juntos:\n\n• Riesgo/Operación — lo máximo que arriesgas en una sola posición. Tú lo eliges en Ajustes.\n• Riesgo Máximo Permitido — lo máximo que arriesgas en TODAS las posiciones abiertas combinadas. Se deriva del Riesgo/Operación: el doble, nunca por debajo del 3% ni por encima del 5%.\n\nDivide el Riesgo Máximo Permitido entre el Riesgo/Operación para saber cuántas posiciones de tamaño completo puedes mantener a la vez.",
-      "pt": "Dois limites funcionam juntos:\n\n• Risco/Operação — o máximo que arriscas numa única posição. És tu que o escolhes nas Definições.\n• Risco Máximo Permitido — o máximo que arriscas em TODAS as posições abertas combinadas. É derivado do Risco/Operação: o dobro, nunca abaixo de 3% nem acima de 5%.\n\nDivide o Risco Máximo Permitido pelo Risco/Operação para saberes quantas posições de tamanho completo podes manter ao mesmo tempo.",
-      "ar": "حدّان يعملان معاً:\n\n• المخاطرة/الصفقة — أقصى ما تخاطر به في صفقة واحدة. أنت تختارها من الإعدادات.\n• أقصى مخاطرة مسموحة — أقصى ما تخاطر به في جميع المراكز المفتوحة مجتمعةً. تُشتقّ من المخاطرة/الصفقة: ضعفها، لا تقلّ عن 3% ولا تزيد عن 5%.\n\nاقسم أقصى مخاطرة مسموحة على المخاطرة/الصفقة لتعرف كم مركزاً بحجم كامل يمكنك الاحتفاظ به في آنٍ واحد."
+      "es": "Tu riesgo por operación y un tope para todas las posiciones abiertas: el doble, entre 3% y 5%.\nEjemplo: 1% ⇒ 3% · 2% ⇒ 4% · 3% ⇒ 5%.\nTope ÷ riesgo por operación = cuántas posiciones completas caben.",
+      "pt": "Seu risco por operação e um teto para todas as posições abertas: o dobro, entre 3% e 5%.\nExemplo: 1% ⇒ 3% · 2% ⇒ 4% · 3% ⇒ 5%.\nTeto ÷ risco por operação = quantas posições completas cabem juntas.",
+      "ar": "مخاطرتك لكل صفقة، مع سقف لجميع المراكز المفتوحة: ضعفها، بين 3% و5%.\nمثال: 1% ⇒ 3% · 2% ⇒ 4% · 3% ⇒ 5%.\nالسقف ÷ المخاطرة لكل صفقة = عدد المراكز الكاملة الممكنة في آنٍ واحد."
     }
   },
   "positionSize": {
@@ -719,9 +719,9 @@
     "description": {
       "he": "מספר המניות = (הון × אחוז סיכון) ÷ המרחק בין הכניסה לסטופ.\nלדוגמה: $10,000 × 1% = $100; כניסה $100 וסטופ $97 ⇒ 33 מניות.\nתמיד מעוגל כלפי מטה.",
       "en": "Shares = (capital × risk %) ÷ the distance between entry and stop.\nExample: $10,000 × 1% = $100; entry $100 and stop $97 ⇒ 33 shares.\nAlways rounded down.",
-      "es": "Tamaño de Posición = (Tamaño de Cuenta × % Riesgo) ÷ (Entrada − Stop Loss)\n\nEjemplo: cuenta de $10,000, 1% de riesgo, entrada $100, stop $97:\nPosición = $100 ÷ $3 = 33 acciones\n\nCalcula siempre antes de entrar. Nunca dimensiones por intuición.",
-      "pt": "Tamanho de Posição = (Tamanho da Conta × % Risco) ÷ (Entrada − Stop Loss)\n\nExemplo: conta de $10,000, 1% de risco, entrada $100, stop $97:\nPosição = $100 ÷ $3 = 33 ações\n\nCalcula sempre antes de entrar. Nunca dimensiones por intuição.",
-      "ar": "حجم الصفقة = (حجم الحساب × % المخاطرة) ÷ (الدخول − وقف الخسارة)\n\nمثال: حساب $10,000، مخاطرة 1%، دخول $100، وقف $97:\nالصفقة = $100 ÷ $3 = 33 سهماً\n\nاحسب دائماً قبل الدخول. لا تحدّد الحجم بالإحساس أبداً."
+      "es": "Acciones = (capital × % de riesgo) ÷ distancia entre entrada y stop.\nEjemplo: $10,000 × 1% = $100; entrada $100 y stop $97 ⇒ 33 acciones.\nSiempre redondeado hacia abajo.",
+      "pt": "Ações = (capital × % de risco) ÷ a distância entre a entrada e o stop.\nExemplo: $10,000 × 1% = $100; entrada $100 e stop $97 ⇒ 33 ações.\nSempre arredondado para baixo.",
+      "ar": "عدد الأسهم = (رأس المال × نسبة المخاطرة) ÷ المسافة بين الدخول ووقف الخسارة.\nمثال: $10,000 × 1% = $100؛ دخول $100 ووقف $97 ⇒ 33 سهماً.\nيُقرَّب دائماً للأسفل."
     }
   },
   "stopLoss": {
@@ -730,14 +730,14 @@
       "en": "Stop Loss",
       "es": "Stop Loss",
       "pt": "Stop Loss",
-      "ar": "Stop Loss"
+      "ar": "وقف الخسارة"
     },
     "description": {
       "he": "המחיר שקבעת מראש ליציאה מעסקה מפסידה, כדי להגביל את ההפסד לסיכון שתכננת.\nלדוגמה: LONG בכניסה $50 וסטופ מתחת לתמיכה ב-$48 ⇒ סיכון $2 למניה.\nה-R וגודל הפוזיציה מחושבים מהסטופ השמור בעסקה.",
       "en": "The price you set in advance to exit a losing trade, capping the loss at your plan.\nExample: LONG at $50, stop below support at $48 ⇒ $2 risk per share.\nR and position size use the saved stop.",
-      "es": "Stop Loss — el nivel de precio donde sales de una operación perdedora para evitar pérdidas mayores.\n\nColócalo en un nivel técnico lógico:\n• Por debajo de un soporte clave (operaciones largas)\n• Por encima de una resistencia clave (operaciones cortas)\n• Nunca arbitrario (p. ej., 'solo $0.50 bajo la entrada')\n\nUn stop loss no es opcional — es la base de la gestión del riesgo.",
-      "pt": "Stop Loss — o nível de preço onde sais de uma operação perdedora para evitar perdas maiores.\n\nColoca-o num nível técnico lógico:\n• Abaixo de um suporte chave (operações compradas)\n• Acima de uma resistência chave (operações vendidas)\n• Nunca arbitrário (ex.: 'só $0.50 abaixo da entrada')\n\nUm stop loss não é opcional — é a base da gestão de risco.",
-      "ar": "Stop Loss — مستوى السعر الذي تخرج عنده من صفقة خاسرة لتفادي خسائر أكبر.\n\nضعه عند مستوى فنّي منطقي:\n• أسفل دعم رئيسي (صفقات الشراء)\n• أعلى مقاومة رئيسية (صفقات البيع)\n• ليس عشوائياً أبداً (مثلاً 'فقط $0.50 تحت الدخول')\n\nوقف الخسارة ليس اختيارياً — إنه أساس إدارة المخاطر."
+      "es": "El precio fijado antes para salir de una operación perdedora, limitando la pérdida a tu plan.\nEjemplo: LONG a $50, stop bajo soporte en $48 ⇒ riesgo $2 por acción.\nR y tamaño de posición usan el stop guardado.",
+      "pt": "O preço que você define antes para sair de uma operação perdedora, limitando a perda ao plano.\nExemplo: LONG a $50, stop abaixo do suporte em $48 ⇒ $2 de risco por ação.\nR e tamanho da posição usam o stop salvo.",
+      "ar": "السعر الذي تحدّده مسبقاً للخروج من صفقة خاسرة، فتبقى الخسارة ضمن خطتك.\nمثال: LONG عند $50، ووقف تحت الدعم عند $48 ⇒ مخاطرة $2 للسهم.\nيعتمد R وحجم المركز على الوقف المحفوظ."
     }
   },
   "takeProfit": {
@@ -751,9 +751,9 @@
     "description": {
       "he": "מחיר היעד שקבעת לסגירת עסקה מנצחת.\nלדוגמה: כניסה $100 וסטופ $98 ⇒ יעד ברירת המחדל $104 (1:2).\nברירת המחדל בגרף ובמאמן היא 1:2.",
       "en": "The target price you set to close a winning trade.\nExample: entry $100 and stop $98 ⇒ a default target of $104 (1:2).\nThe default on the chart and in the coach is 1:2.",
-      "es": "Take Profit — tu precio objetivo para salir de una operación ganadora.\n\nRegla mínima: El objetivo debe ser al menos 1.5× tu riesgo (1.5R).\n\nBuena práctica:\n• Salida escalonada: toma 50% en 1R, mantén el resto hasta el objetivo\n• Usa niveles técnicos (resistencia, máximos previos)\n• Nunca muevas el objetivo más abajo cuando vas ganando",
-      "pt": "Take Profit — o teu preço-alvo para sair de uma operação vencedora.\n\nRegra mínima: O alvo deve ser pelo menos 1.5× o teu risco (1.5R).\n\nBoa prática:\n• Saída escalonada: tira 50% em 1R, mantém o resto até ao alvo\n• Usa níveis técnicos (resistência, máximos anteriores)\n• Nunca movas o alvo para baixo quando estás a ganhar",
-      "ar": "Take Profit — السعر المستهدف للخروج من صفقة رابحة.\n\nالقاعدة الدنيا: يجب أن يكون الهدف 1.5× مخاطرتك على الأقل (1.5R).\n\nأفضل ممارسة:\n• خروج تدريجي: خذ 50% عند 1R، واحتفظ بالباقي حتى الهدف\n• استخدم مستويات فنّية (مقاومة، قمم سابقة)\n• لا تحرّك الهدف للأسفل أبداً وأنت رابح"
+      "es": "El precio objetivo que fijas para cerrar una operación ganadora.\nEjemplo: entrada $100 y stop $98 ⇒ objetivo por defecto $104 (1:2).\nPor defecto, en el gráfico y en el coach, es 1:2.",
+      "pt": "O preço-alvo que você define para fechar uma operação vencedora.\nExemplo: entrada $100 e stop $98 ⇒ alvo padrão de $104 (1:2).\nO padrão no gráfico e no coach é 1:2.",
+      "ar": "السعر المستهدف الذي تحدّده لإغلاق صفقة رابحة.\nمثال: دخول $100 ووقف $98 ⇒ هدف افتراضي $104 (1:2).\nالافتراضي في الرسم البياني وفي المدرّب هو 1:2."
     }
   },
   "breakout": {
@@ -767,9 +767,9 @@
     "description": {
       "he": "כניסה כשהמחיר פורץ מעל רמת התנגדות מרכזית, רצוי במחזור מסחר עולה.\nלדוגמה: התנגדות ב-$50 ונר יומי שנסגר ב-$51 במחזור מסחר כפול מהממוצע.",
       "en": "Entering when price breaks above a key resistance level, ideally on rising volume.\nExample: resistance at $50 and a daily close at $51 on twice the average volume.",
-      "es": "Precio rompiendo por encima de un nivel de resistencia clave con volumen. Funciona mejor en mercados con tendencia.",
-      "pt": "Preço rompendo acima de um nível de resistência chave com volume. Funciona melhor em mercados com tendência.",
-      "ar": "السعر يخترق فوق مستوى مقاومة رئيسي مع حجم تداول. يعمل بأفضل شكل في الأسواق ذات الاتجاه."
+      "es": "Entrar cuando el precio rompe una resistencia clave, idealmente con volumen creciente.\nEjemplo: resistencia en $50 y cierre diario en $51 con el doble del volumen medio.",
+      "pt": "Entrar quando o preço rompe uma resistência chave, idealmente com volume crescente.\nExemplo: resistência em $50 e fechamento diário em $51 com o dobro do volume médio.",
+      "ar": "الدخول عندما يخترق السعر مستوى مقاومة رئيسياً، ويُفضّل مع حجم تداول متزايد.\nمثال: مقاومة عند $50 وإغلاق يومي عند $51 بضعف متوسط حجم التداول."
     }
   },
   "pullback": {
@@ -783,9 +783,9 @@
     "description": {
       "he": "כניסה כשמחיר במגמת עלייה נסוג לתמיכה ואז ממשיך לעלות.\nלדוגמה: עלייה מ-$40 ל-$50, נסיגה לממוצע הנע ב-$46 וכניסה שם.",
       "en": "Entering when an uptrending price pulls back to support and then resumes higher.\nExample: a run from $40 to $50, a pullback to the moving average at $46, entry there.",
-      "es": "Comprar cuando un precio en tendencia alcista retrocede temporalmente hacia un soporte —una media móvil, un nivel de ruptura previo o una línea de tendencia— y luego retoma el alza. Entrar en el retroceso da mejor precio y un stop más ajustado que perseguir.",
-      "pt": "Comprar quando um preço em tendência de alta recua temporariamente em direção a um suporte — uma média móvel, um nível de rompimento anterior ou uma linha de tendência — e depois retoma a alta. Entrar no recuo dá melhor preço e um stop mais apertado do que perseguir.",
-      "ar": "الشراء عندما يتراجع سعر في اتجاه صاعد مؤقتاً نحو دعم — متوسط متحرك، أو مستوى اختراق سابق، أو خط اتجاه — ثم يستأنف صعوده. الدخول عند التراجع يمنح سعراً أفضل ووقف خسارة أضيق من المطاردة."
+      "es": "Entrar cuando un precio en tendencia alcista retrocede a un soporte y luego retoma el alza.\nEjemplo: subida de $40 a $50, retroceso a la media móvil en $46 y entrada ahí.",
+      "pt": "Entrar quando um preço em tendência de alta recua até um suporte e depois retoma a alta.\nExemplo: alta de $40 para $50, recuo até a média móvel em $46 e entrada ali.",
+      "ar": "الدخول عندما يتراجع سعر في اتجاه صاعد إلى دعم ثم يستأنف صعوده.\nمثال: صعود من $40 إلى $50، ثم تراجع إلى المتوسط المتحرك عند $46، والدخول هناك."
     }
   },
   "bullFlag": {
@@ -799,9 +799,9 @@
     "description": {
       "he": "התכנסות צרה, יורדת קלות, אחרי עלייה חדה — במחזור מסחר מצטמצם.\nלדוגמה: עלייה מ-$20 ל-$26, ואז 5 ימים בטווח $25–$26.",
       "en": "A tight, slightly falling consolidation after a sharp rise, on shrinking volume.\nExample: a rise from $20 to $26, then 5 days in a $25–$26 range.",
-      "es": "Consolidación estrecha tras un movimiento brusco al alza. El volumen debe contraerse durante la bandera.",
-      "pt": "Consolidação estreita após um movimento brusco de alta. O volume deve contrair durante a bandeira.",
-      "ar": "تماسك ضيّق بعد حركة صعودية حادّة. يجب أن ينكمش حجم التداول أثناء تكوّن العلم."
+      "es": "Consolidación estrecha y levemente bajista tras una fuerte subida, con volumen decreciente.\nEjemplo: subida de $20 a $26 y luego 5 días en un rango de $25–$26.",
+      "pt": "Consolidação estreita e levemente descendente após uma alta forte, com volume em queda.\nExemplo: alta de $20 para $26 e depois 5 dias em uma faixa de $25–$26.",
+      "ar": "تماسك ضيّق ومائل قليلاً للهبوط بعد صعود حاد، مع انكماش حجم التداول.\nمثال: صعود من $20 إلى $26، ثم 5 أيام في نطاق $25–$26."
     }
   },
   "ORBBreakout": {
@@ -815,9 +815,9 @@
     "description": {
       "he": "פריצת השיא או השפל של הדקות הראשונות של המסחר — 5, 15 או 30 דקות.\nלדוגמה: טווח 15 הדקות הראשונות $30–$31 ⇒ כניסה מעל $31.",
       "en": "A break of the high or low of the first 5, 15 or 30 minutes of trading.\nExample: a first-15-minute range of $30–$31 ⇒ entry above $31.",
-      "es": "Opening Range Breakout — ruptura del máximo/mínimo de los primeros 15-30 min. Fuerte en días de tendencia.",
-      "pt": "Opening Range Breakout — rompimento da máxima/mínima dos primeiros 15-30 min. Forte em dias de tendência.",
-      "ar": "Opening Range Breakout — اختراق قمة/قاع أول 15-30 دقيقة. قوي في أيام الاتجاه."
+      "es": "Ruptura del máximo o mínimo de los primeros 5, 15 o 30 minutos de sesión.\nEjemplo: rango de $30–$31 en los primeros 15 minutos ⇒ entrada sobre $31.",
+      "pt": "Rompimento da máxima ou mínima dos primeiros 5, 15 ou 30 minutos do pregão.\nExemplo: faixa de $30–$31 nos primeiros 15 min ⇒ entrada acima de $31.",
+      "ar": "اختراق قمة أو قاع أول 5 أو 15 أو 30 دقيقة من التداول.\nمثال: نطاق $30–$31 في أول 15 دقيقة ⇒ الدخول فوق $31."
     }
   },
   "VWAPReclaim": {
@@ -831,9 +831,9 @@
     "description": {
       "he": "המחיר חוזר מעל ה-VWAP — הממוצע המשוקלל במחזור המסחר של היום — אחרי שירד מתחתיו.\nלדוגמה: VWAP ב-$40, ירידה ל-$39.50 וחזרה מעל $40 במחזור מסחר.",
       "en": "Price reclaims VWAP — the day's volume-weighted average price — after dipping below it.\nExample: VWAP at $40, a dip to $39.50, then back above $40 on volume.",
-      "es": "El precio recupera el VWAP tras una caída matinal con volumen. Indica compra institucional.",
-      "pt": "O preço recupera o VWAP após uma queda matinal com volume. Indica compra institucional.",
-      "ar": "السعر يستعيد الـ VWAP بعد هبوط صباحي مع حجم تداول. يشير إلى شراء مؤسّسي."
+      "es": "El precio recupera el VWAP — el precio medio del día ponderado por volumen — tras caer por debajo.\nEjemplo: VWAP en $40, caída a $39.50 y regreso sobre $40 con volumen.",
+      "pt": "O preço recupera o VWAP — o preço médio do dia ponderado por volume — após cair abaixo dele.\nExemplo: VWAP em $40, queda para $39.50 e volta acima de $40 com volume.",
+      "ar": "يستعيد السعر الـ VWAP — متوسط سعر اليوم المرجّح بحجم التداول — بعد هبوطه دونه.\nمثال: VWAP عند $40، هبوط إلى $39.50، ثم عودة فوق $40 مع حجم تداول."
     }
   },
   "higherLow": {
@@ -847,9 +847,9 @@
     "description": {
       "he": "כל תיקון נעצר מעל השפל הקודם — הסימן של מגמת עלייה.\nלדוגמה: שפלים ב-$45, ואז $47, ואז $49.",
       "en": "Each pullback stops above the previous low — the mark of an uptrend.\nExample: lows at $45, then $47, then $49.",
-      "es": "Cada retroceso forma un mínimo más alto que el anterior. El setup más limpio en tendencia alcista.",
-      "pt": "Cada recuo forma um mínimo mais alto que o anterior. O setup mais limpo em tendência de alta.",
-      "ar": "كل تراجع يصنع قاعاً أعلى من السابق. أنظف نموذج في الاتجاه الصاعد."
+      "es": "Cada retroceso para sobre el mínimo previo — señal de tendencia alcista.\nEjemplo: mínimos en $45, luego $47, luego $49.",
+      "pt": "Cada recuo para acima da mínima anterior — marca de tendência de alta.\nExemplo: mínimas em $45, depois $47, depois $49.",
+      "ar": "كل تراجع يتوقف فوق القاع السابق — علامة الاتجاه الصاعد.\nمثال: قيعان عند $45، ثم $47، ثم $49."
     }
   },
   "cupAndHandle": {
@@ -863,9 +863,9 @@
     "description": {
       "he": "התבססות בצורת U, ואחריה ירידה קצרה ורדודה (ידית) לפני פריצה.\nלדוגמה: ירידה מ-$60 ל-$48, חזרה ל-$59, ידית עד $56 ופריצה מעל $59.",
       "en": "A U-shaped base followed by a short, shallow dip (the handle) before a breakout.\nExample: a fall from $60 to $48, back to $59, a handle down to $56, a break above $59.",
-      "es": "Consolidación en forma de U con un asa estrecha a la derecha. Patrón de continuación clásico.",
-      "pt": "Consolidação em forma de U com uma alça estreita à direita. Padrão de continuação clássico.",
-      "ar": "تماسك على شكل حرف U مع مقبض ضيّق على اليمين. نموذج استمرار كلاسيكي."
+      "es": "Una base en forma de U seguida de una caída corta y poco profunda (el asa) antes de la ruptura.\nEjemplo: caída de $60 a $48, regreso a $59, asa hasta $56 y ruptura sobre $59.",
+      "pt": "Uma base em forma de U seguida de uma queda curta e rasa (a alça) antes do rompimento.\nExemplo: queda de $60 para $48, volta a $59, alça até $56 e rompimento acima de $59.",
+      "ar": "قاعدة على شكل حرف U يتبعها تراجع قصير وضحل (المقبض) قبل الاختراق.\nمثال: هبوط من $60 إلى $48، عودة إلى $59، مقبض حتى $56، ثم اختراق فوق $59."
     }
   },
   "failedBreakout": {
@@ -879,9 +879,9 @@
     "description": {
       "he": "פריצה שחוזרת מהר מתחת לרמה שנפרצה — מלכודת לקונים מאוחרים.\nלדוגמה: פריצה ל-$51 מעל $50, ותוך יום חזרה ל-$49 ⇒ SHORT.",
       "en": "A breakout that quickly falls back below the broken level — a trap for late buyers.\nExample: a break to $51 above $50, back to $49 within a day ⇒ SHORT.",
-      "es": "Ruptura que se revierte rápidamente. Trampa para compradores tardíos — corto al recuperar el nivel de ruptura.",
-      "pt": "Rompimento que se reverte rapidamente. Armadilha para compradores atrasados — vendido ao recuperar o nível de rompimento.",
-      "ar": "اختراق ينعكس بسرعة. فخّ للمشترين المتأخّرين — بيع عند العودة تحت مستوى الاختراق."
+      "es": "Una ruptura que vuelve rápido por debajo del nivel roto — una trampa para compradores tardíos.\nEjemplo: ruptura a $51 sobre $50 y vuelta a $49 en un día ⇒ SHORT.",
+      "pt": "Rompimento que volta rápido abaixo do nível rompido — armadilha para compradores atrasados.\nExemplo: rompimento para $51 acima de $50 e volta a $49 em um dia ⇒ SHORT.",
+      "ar": "اختراق يعود سريعاً تحت المستوى المخترَق — فخّ للمشترين المتأخرين.\nمثال: اختراق إلى $51 فوق $50، ثم عودة إلى $49 خلال يوم ⇒ SHORT."
     }
   },
   "overextendedFade": {
@@ -895,9 +895,9 @@
     "description": {
       "he": "עסקה נגד המגמה כשהמחיר רחוק באופן חריג מעל ה-20 EMA.\nלדוגמה: מניה ב-$60 כשה-20 EMA ב-$52 ⇒ SHORT לכיוון הממוצע.\nאין במערכת סף ל'רחוק' — הוא שלך.",
       "en": "A counter-trend trade when price is unusually far above the 20 EMA.\nExample: a stock at $60 with the 20 EMA at $52 ⇒ SHORT toward the average.\nThe app sets no threshold for 'far' — it is yours.",
-      "es": "Operación contra-tendencia cuando el precio está 8%+ sobre la 20 EMA con RSI alto. Requiere paciencia.",
-      "pt": "Operação contra-tendência quando o preço está 8%+ acima da 20 EMA com RSI alto. Exige paciência.",
-      "ar": "صفقة عكس الاتجاه عندما يكون السعر أعلى بـ 8%+ من الـ 20 EMA مع RSI مرتفع. تتطلّب صبراً."
+      "es": "Operación contra tendencia cuando el precio está inusualmente lejos sobre la 20 EMA.\nEjemplo: acción en $60 con la 20 EMA en $52 ⇒ SHORT hacia la media.\nLa app no fija un umbral para 'lejos' — lo decides tú.",
+      "pt": "Operação contra a tendência com o preço incomumente distante acima da 20 EMA.\nExemplo: ação a $60 com a 20 EMA em $52 ⇒ SHORT em direção à média.\nO app não define um limite para 'distante' — quem decide é você.",
+      "ar": "صفقة عكس الاتجاه عندما يكون السعر بعيداً بشكل غير معتاد فوق الـ 20 EMA.\nمثال: سهم عند $60 والـ 20 EMA عند $52 ⇒ SHORT نحو المتوسط.\nلا يحدد التطبيق عتبة لـ'بعيد' — العتبة لك."
     }
   },
   "EMABounce50": {
@@ -911,9 +911,9 @@
     "description": {
       "he": "תיקון לממוצע הנע האקספוננציאלי של 50 יום בגרף יומי, וקפיצה ממנו.\nלדוגמה: 50 EMA ב-$80, שפל יומי $80.20 וסגירה ב-$82.",
       "en": "A pullback to the 50-day exponential moving average on a daily chart, and a bounce off it.\nExample: 50 EMA at $80, a daily low of $80.20 and a close at $82.",
-      "es": "Retroceso a la 50 EMA en gráfico diario. Soporte importante en tendencias alcistas fuertes.",
-      "pt": "Recuo à 50 EMA no gráfico diário. Suporte importante em tendências de alta fortes.",
-      "ar": "تراجع إلى الـ 50 EMA على الرسم اليومي. دعم مهم في الاتجاهات الصاعدة القوية."
+      "es": "Un retroceso a la media móvil exponencial de 50 días en el gráfico diario, y un rebote en ella.\nEjemplo: 50 EMA en $80, mínimo diario de $80.20 y cierre en $82.",
+      "pt": "Um recuo até a média móvel exponencial de 50 dias no gráfico diário, e um repique a partir dela.\nExemplo: 50 EMA em $80, mínima diária de $80.20 e fechamento em $82.",
+      "ar": "تراجع إلى المتوسط المتحرك الأسي لـ 50 يوماً على الرسم اليومي، ثم ارتداد منه.\nمثال: 50 EMA عند $80، قاع يومي $80.20، وإغلاق عند $82."
     }
   },
   "trendContinuation": {
@@ -927,9 +927,9 @@
     "description": {
       "he": "כניסה בתיקון רדוד ל-9 EMA בתוך מגמה קיימת.\nלדוגמה: נסיגה ל-9 EMA ב-$30.10, כניסה ב-$30.30 וסטופ ב-$29.80.",
       "en": "Entering on a shallow pullback to the 9 EMA within an established trend.\nExample: a pullback to the 9 EMA at $30.10, entry at $30.30, stop at $29.80.",
-      "es": "Entrada en un retroceso superficial a la 9 EMA en una tendencia establecida. Stops ajustados, R alto.",
-      "pt": "Entrada num recuo superficial à 9 EMA numa tendência estabelecida. Stops apertados, R alto.",
-      "ar": "الدخول عند تراجع سطحي إلى الـ 9 EMA في اتجاه راسخ. أوامر وقف ضيّقة، R مرتفع."
+      "es": "Entrar en un retroceso superficial a la 9 EMA dentro de una tendencia establecida.\nEjemplo: retroceso a la 9 EMA en $30.10, entrada en $30.30 y stop en $29.80.",
+      "pt": "Entrar em um recuo raso até a 9 EMA dentro de uma tendência estabelecida.\nExemplo: recuo até a 9 EMA em $30.10, entrada em $30.30 e stop em $29.80.",
+      "ar": "الدخول عند تراجع سطحي إلى الـ 9 EMA ضمن اتجاه راسخ.\nمثال: تراجع إلى الـ 9 EMA عند $30.10، دخول عند $30.30، ووقف عند $29.80."
     }
   },
   "gapAndGo": {
@@ -943,9 +943,9 @@
     "description": {
       "he": "מניה שפתחה בפער כלפי מעלה וממשיכה לעלות בלי לסגור את הפער.\nלדוגמה: סגירה ב-$20, פתיחה ב-$22 ושיא יומי $24 בלי לרדת מתחת ל-$22.",
       "en": "A stock that gaps up at the open and keeps rising without filling the gap.\nExample: a $20 close, a $22 open and a $24 high without trading below $22.",
-      "es": "La acción abre con hueco al alza y continúa sin rellenarlo. Mejor con un catalizador de noticias.",
-      "pt": "A ação abre com gap de alta e continua sem preenchê-lo. Melhor com um catalisador de notícias.",
-      "ar": "يفتح السهم بفجوة صعودية ويواصل دون ملئها. أفضل مع محفّز إخباري."
+      "es": "Una acción que abre con hueco al alza y sigue subiendo sin cerrar el hueco.\nEjemplo: cierre en $20, apertura en $22 y máximo de $24 sin cotizar por debajo de $22.",
+      "pt": "Uma ação que abre com gap de alta e continua subindo sem fechar o gap.\nExemplo: fechamento em $20, abertura em $22 e máxima de $24 sem negociar abaixo de $22.",
+      "ar": "سهم يفتح بفجوة صعودية ويواصل الصعود دون ملء الفجوة.\nمثال: إغلاق عند $20، افتتاح عند $22، وقمة $24 دون التداول تحت $22."
     }
   },
   "earningsGapPlay": {
@@ -959,9 +959,9 @@
     "description": {
       "he": "מסחר בכיוון הפער שנפתח אחרי דוח רבעוני — למעלה או למטה.\nלדוגמה: פער ‎+6% ⇒ LONG מעל שיא הפתיחה; פער ‎−6% ⇒ SHORT מתחת לשפל הפתיחה.",
       "en": "Trading in the direction of the gap that opens after an earnings report — up or down.\nExample: a +6% gap ⇒ LONG above the opening high; a −6% gap ⇒ SHORT below the opening low.",
-      "es": "Operar la reacción del hueco tras resultados. Mantén las ganadoras, cubre a la primera señal de compra.",
-      "pt": "Operar a reação do gap após resultados. Mantenha as vencedoras, cubra ao primeiro sinal de compra.",
-      "ar": "تداول رد فعل الفجوة بعد نتائج الأرباح. احتفظ بالرابحة، وأغلق عند أول إشارة شراء."
+      "es": "Operar en la dirección del hueco tras un informe de resultados, al alza o a la baja.\nEjemplo: hueco +6% ⇒ LONG sobre el máximo de apertura; hueco −6% ⇒ SHORT bajo el mínimo de apertura.",
+      "pt": "Operar na direção do gap que abre após a divulgação de resultados, para cima ou para baixo.\nExemplo: gap +6% ⇒ LONG acima da máxima de abertura; gap −6% ⇒ SHORT abaixo da mínima de abertura.",
+      "ar": "التداول في اتجاه الفجوة التي تفتح بعد تقرير الأرباح — صعوداً أو هبوطاً.\nمثال: فجوة ‎+6% ⇒ LONG فوق قمة الافتتاح؛ فجوة ‎−6% ⇒ SHORT تحت قاع الافتتاح."
     }
   },
   "rangeBreakout": {
@@ -975,9 +975,9 @@
     "description": {
       "he": "יציאה מטווח מחירים שנמשך ימים או שבועות.\nלדוגמה: 3 שבועות בין $40 ל-$44, ואז סגירה ב-$45.",
       "en": "A break out of a price range that lasted days or weeks.\nExample: 3 weeks between $40 and $44, then a close at $45.",
-      "es": "El precio rompe un rango de varios días/semanas. Más fiable cuando el volumen se expande.",
-      "pt": "O preço rompe um range de vários dias/semanas. Mais confiável quando o volume se expande.",
-      "ar": "السعر يكسر نطاقاً امتدّ أياماً/أسابيع. أكثر موثوقية عندما يتوسّع حجم التداول."
+      "es": "Salida de un rango de precios que duró días o semanas.\nEjemplo: 3 semanas entre $40 y $44 y luego un cierre en $45.",
+      "pt": "Saída de uma faixa de preço que durou dias ou semanas.\nExemplo: 3 semanas entre $40 e $44 e depois um fechamento em $45.",
+      "ar": "خروج من نطاق سعري استمر أياماً أو أسابيع.\nمثال: 3 أسابيع بين $40 و$44، ثم إغلاق عند $45."
     }
   },
   "postEarningsStrength": {
@@ -991,9 +991,9 @@
     "description": {
       "he": "מניה שמחזיקה מעל פער עלייה בימים שאחרי דוח חיובי.\nלדוגמה: פער מ-$50 ל-$56, ו-5 ימים מעל $55.",
       "en": "A stock that holds above an upside gap in the days after a strong report.\nExample: a gap from $50 to $56, then 5 days above $55.",
-      "es": "La acción se mantiene sobre el hueco alcista tras superar resultados. Señal de acumulación institucional.",
-      "pt": "A ação mantém-se acima do gap de alta após superar resultados. Sinal de acumulação institucional.",
-      "ar": "يحافظ السهم على البقاء فوق الفجوة الصعودية بعد تجاوز التوقّعات. إشارة تجميع مؤسّسي."
+      "es": "Acción que se mantiene sobre un hueco alcista en los días tras un buen informe.\nEjemplo: hueco de $50 a $56 y luego 5 días sobre $55.",
+      "pt": "Ação que se mantém acima de um gap de alta nos dias após um balanço forte.\nExemplo: gap de $50 para $56 e depois 5 dias acima de $55.",
+      "ar": "سهم يبقى فوق فجوة صعودية في الأيام التي تلي تقريراً قوياً.\nمثال: فجوة من $50 إلى $56، ثم 5 أيام فوق $55."
     }
   },
   "powerHourBreak": {
@@ -1007,9 +1007,9 @@
     "description": {
       "he": "פריצה בשעת המסחר האחרונה, 15:00–16:00 לפי שעון ניו יורק (בדרך כלל 22:00–23:00 שעון ישראל).\nלדוגמה: שיא יומי $70 נפרץ ב-15:20 ⇒ כניסה ב-$70.10.",
       "en": "A breakout in the last trading hour, 3–4 pm New York time.\nExample: a $70 daily high broken at 3:20 pm ⇒ entry at $70.10.",
-      "es": "Ruptura en la última hora (15:00-16:00 ET). Posicionamiento institucional hacia el cierre.",
-      "pt": "Rompimento na última hora (15:00-16:00 ET). Posicionamento institucional rumo ao fecho.",
-      "ar": "اختراق في الساعة الأخيرة (15:00-16:00 ET). تموضع مؤسّسي قبيل الإغلاق."
+      "es": "Ruptura en la última hora de sesión, 15:00–16:00 en Nueva York.\nEjemplo: máximo diario de $70 roto a las 15:20 ⇒ entrada en $70.10.",
+      "pt": "Rompimento na última hora do pregão, 15h–16h em Nova York.\nExemplo: máxima diária de $70 rompida às 15h20 ⇒ entrada em $70.10.",
+      "ar": "اختراق في آخر ساعة تداول، 15:00–16:00 بتوقيت نيويورك.\nمثال: كسر القمة اليومية $70 عند 15:20 ⇒ الدخول عند $70.10."
     }
   },
   "MOCFade": {
@@ -1023,9 +1023,9 @@
     "description": {
       "he": "מסחר נגד תנועה חדה לקראת הסגירה (Market-On-Close), בציפייה לתיקון למחרת.\nלדוגמה: עלייה של ‎+4% בשעה האחרונה ⇒ SHORT לקראת הסגירה.\nב-NYSE פקודות MOC נכנסות עד 15:50 לפי שעון ניו יורק.",
       "en": "Trading against a sharp move into the close (Market-On-Close), expecting a next-day pullback.\nExample: a +4% move in the last hour ⇒ SHORT into the close.\nOn the NYSE, MOC orders are accepted until 3:50 p.m. New York time.",
-      "es": "Fade de Market-On-Close. Operar contra movimientos extendidos hacia el cierre para un giro al día siguiente.",
-      "pt": "Fade de Market-On-Close. Operar contra movimentos estendidos rumo ao fecho para uma reversão no dia seguinte.",
-      "ar": "Fade على إغلاق السوق. التداول عكس الحركات الممتدّة قبيل الإغلاق توقّعاً لانعكاس في اليوم التالي."
+      "es": "Operar contra un movimiento brusco al cierre (Market-On-Close), esperando un retroceso al día siguiente.\nEjemplo: +4% en la última hora ⇒ SHORT hacia el cierre.\nEn la NYSE, las órdenes MOC se aceptan hasta las 15:50 hora de Nueva York.",
+      "pt": "Operar contra um movimento forte rumo ao fechamento (Market-On-Close), esperando uma correção no dia seguinte.\nExemplo: +4% na última hora ⇒ SHORT rumo ao fechamento.\nNa NYSE, ordens MOC são aceitas até 15h50, horário de Nova York.",
+      "ar": "التداول عكس حركة حادة قبيل الإغلاق (Market-On-Close)، توقعاً لتراجع في اليوم التالي.\nمثال: حركة ‎+4% في الساعة الأخيرة ⇒ SHORT قبيل الإغلاق.\nفي NYSE تُقبل أوامر MOC حتى 15:50 بتوقيت نيويورك."
     }
   },
   "overnightHold": {
@@ -1039,9 +1039,9 @@
     "description": {
       "he": "עסקה שהשארת פתוחה אחרי סגירת יום המסחר.\nלדוגמה: קנית ב-$30 ב-15:30, והמניה פתחה למחרת ב-$28 ⇒ פער נגדך.\nסטופ לא מגן מפני פער בפתיחה.",
       "en": "A trade you left open past the trading-day close.\nExample: you bought at $30 at 3:30 p.m. and the stock opened at $28 the next day ⇒ a gap against you.\nA stop does not protect against an opening gap.",
-      "es": "Operación mantenida toda la noche. Mayor potencial de recompensa pero expuesta al riesgo de hueco.",
-      "pt": "Operação mantida durante a noite. Maior potencial de retorno mas exposta ao risco de gap.",
-      "ar": "صفقة محتفظ بها طوال الليل. إمكانية ربح أعلى لكنها معرّضة لمخاطر الفجوة."
+      "es": "Una operación que dejaste abierta después del cierre de la sesión.\nEjemplo: compraste a $30 a las 15:30 y la acción abrió a $28 al día siguiente ⇒ hueco en tu contra.\nUn stop no protege frente a un hueco de apertura.",
+      "pt": "Uma operação que você deixou aberta depois do fechamento do pregão.\nExemplo: você comprou a $30 às 15h30 e a ação abriu a $28 no dia seguinte ⇒ um gap contra você.\nUm stop não protege contra um gap de abertura.",
+      "ar": "صفقة تركتها مفتوحة بعد إغلاق يوم التداول.\nمثال: اشتريت عند $30 الساعة 15:30، وافتتح السهم عند $28 في اليوم التالي ⇒ فجوة ضدك.\nوقف الخسارة لا يحمي من فجوة الافتتاح."
     }
   },
   "overnightReversal": {
@@ -1055,9 +1055,9 @@
     "description": {
       "he": "מסחר נגד תנועת הלילה בפתיחת המסחר, אחרי אישור.\nלדוגמה: פער ‎−3% בפתיחה והמחיר חוזר מעל מחיר הפתיחה ⇒ LONG.",
       "en": "Trading against the overnight move at the open, after confirmation.\nExample: a −3% gap at the open and price back above the opening price ⇒ LONG.",
-      "es": "Operar el giro del movimiento nocturno en la apertura. Contra-tendencia, requiere confirmación.",
-      "pt": "Operar a reversão do movimento noturno na abertura. Contra-tendência, exige confirmação.",
-      "ar": "تداول انعكاس حركة الليل عند افتتاح السوق. عكس الاتجاه، يتطلّب تأكيداً."
+      "es": "Operar contra el movimiento nocturno en la apertura, tras confirmación.\nEjemplo: hueco de −3% al abrir y el precio vuelve sobre el precio de apertura ⇒ LONG.",
+      "pt": "Operar contra o movimento noturno na abertura, após confirmação.\nExemplo: gap de −3% na abertura e o preço volta acima do preço de abertura ⇒ LONG.",
+      "ar": "التداول عكس حركة الليل عند الافتتاح، بعد التأكيد.\nمثال: فجوة ‎−3% عند الافتتاح وعودة السعر فوق سعر الافتتاح ⇒ LONG."
     }
   },
   "supportBounce": {
@@ -1071,9 +1071,9 @@
     "description": {
       "he": "כניסה כשהמחיר יורד לרמת תמיכה מוכרת ומתהפך כלפי מעלה.\nלדוגמה: תמיכה ב-$25, שפל $25.10, כניסה ב-$25.60 וסטופ ב-$24.80.",
       "en": "Entering when price drops to a known support level and turns up.\nExample: support at $25, a low of $25.10, entry at $25.60, stop at $24.80.",
-      "es": "Comprar cuando el precio cae a un nivel de soporte conocido y rebota al alza. La lógica: los compradores defienden el nivel. El stop va debajo del soporte; si se rompe, la tesis queda anulada.",
-      "pt": "Comprar quando o preço cai a um nível de suporte conhecido e reverte para cima. A lógica: os compradores defendem o nível. O stop fica abaixo do suporte; se romper, a tese é anulada.",
-      "ar": "الشراء عندما يهبط السعر إلى مستوى دعم معروف ثم ينعكس صعوداً. المنطق: المشترون يدافعون عن المستوى. يوضع وقف الخسارة أسفل الدعم — وإذا انكسر، تسقط الفكرة."
+      "es": "Entrar cuando el precio cae a un nivel de soporte conocido y gira al alza.\nEjemplo: soporte en $25, mínimo $25.10, entrada en $25.60 y stop en $24.80.",
+      "pt": "Entrar quando o preço cai até um nível de suporte conhecido e vira para cima.\nExemplo: suporte em $25, mínima $25.10, entrada em $25.60, stop em $24.80.",
+      "ar": "الدخول عندما يهبط السعر إلى مستوى دعم معروف ثم ينعطف صعوداً.\nمثال: دعم عند $25، قاع $25.10، دخول عند $25.60، ووقف عند $24.80."
     }
   },
   "resistanceBreak": {
@@ -1087,9 +1087,9 @@
     "description": {
       "he": "כניסה כשהמחיר פורץ רמת התנגדות ספציפית שעצרה אותו בעבר.\nלדוגמה: נעצר פעמיים ב-$80, ואז נסגר ב-$81 במחזור מסחר גבוה.",
       "en": "Entering when price breaks a specific resistance level that stopped it before.\nExample: stopped twice at $80, then a close at $81 on high volume.",
-      "es": "Entrar cuando el precio rompe por encima de un nivel de resistencia que antes lo frenaba, idealmente con volumen alto. La ruptura indica que los compradores tomaron el control. Se diferencia de un Breakout genérico por enfocarse en un nivel específico.",
-      "pt": "Entrar quando o preço rompe acima de um nível de resistência que antes o travava, idealmente com volume alto. O rompimento sinaliza que os compradores assumiram o controlo. Difere de um Breakout genérico por focar num nível específico.",
-      "ar": "الدخول عندما يخترق السعر مستوى مقاومة كان يكبحه سابقاً، ويُفضّل بحجم تداول عالٍ. الاختراق يشير إلى أن المشترين سيطروا. يختلف عن الـ Breakout العام بتركيزه على مستوى محدّد."
+      "es": "Entrar cuando el precio rompe un nivel de resistencia concreto que antes lo frenó.\nEjemplo: se frenó dos veces en $80 y luego cerró en $81 con volumen alto.",
+      "pt": "Entrar quando o preço rompe um nível de resistência específico que o travou antes.\nExemplo: travou duas vezes em $80 e depois fechou em $81 com volume alto.",
+      "ar": "الدخول عندما يخترق السعر مستوى مقاومة محدداً أوقفه من قبل.\nمثال: توقف مرتين عند $80، ثم أغلق عند $81 بحجم تداول مرتفع."
     }
   },
   "pullback20EMA": {
@@ -1103,9 +1103,9 @@
     "description": {
       "he": "כניסה כשמחיר במגמת עלייה נסוג לממוצע הנע האקספוננציאלי של 20 תקופות ומתהפך.\nלדוגמה: 20 EMA ב-$40, שפל $40.15 וסגירה ב-$41.",
       "en": "Entering when an uptrending price pulls back to the 20-period exponential moving average and turns.\nExample: 20 EMA at $40, a low of $40.15 and a close at $41.",
-      "es": "Comprar cuando un precio en tendencia alcista retrocede a la media móvil de 20 períodos y rebota. La 20 EMA actúa como soporte dinámico; este setup combina tendencia con un punto de entrada preciso.",
-      "pt": "Comprar quando um preço em tendência de alta recua à média móvel de 20 períodos e ressalta. A 20 EMA atua como suporte dinâmico; este setup combina tendência com um ponto de entrada preciso.",
-      "ar": "الشراء عندما يرتد سعر في اتجاه صاعد إلى المتوسط المتحرك لـ 20 فترة ثم يرتدّ منه. يعمل الـ 20 EMA كدعم ديناميكي؛ ويجمع هذا النموذج بين الاتجاه ونقطة دخول دقيقة."
+      "es": "Entrar cuando un precio en tendencia alcista retrocede a la media móvil exponencial de 20 períodos y gira.\nEjemplo: 20 EMA en $40, mínimo de $40.15 y cierre en $41.",
+      "pt": "Entrar quando um preço em tendência de alta recua até a média móvel exponencial de 20 períodos e vira.\nExemplo: 20 EMA em $40, mínima de $40.15 e fechamento em $41.",
+      "ar": "الدخول عندما يتراجع سعر في اتجاه صاعد إلى المتوسط المتحرك الأسي لـ 20 فترة ثم ينعطف.\nمثال: 20 EMA عند $40، قاع $40.15، وإغلاق عند $41."
     }
   },
   "emotionConfident": {
@@ -1119,9 +1119,9 @@
     "description": {
       "he": "ביטחון שנשען על סטאפ תקף ועל ניתוח, לא על רצף רווחים.\nלדוגמה: כל התנאים שכתבת התקיימו ונכנסת בגודל הרגיל.\nאחרי רצף רווחים — בדוק שזה לא ביטחון-יתר.",
       "en": "Confidence grounded in a valid setup and analysis, not in a winning streak.\nExample: every condition you wrote down was met and you entered at normal size.\nAfter a winning streak, check that it is not overconfidence.",
-      "es": "Confianza basada en el análisis, no en la arrogancia. Sobre un setup válido impulsa una ejecución disciplinada; si se convierte en exceso de confianza tras una racha ganadora, se vuelve peligrosa.",
-      "pt": "Confiança baseada na análise, não em arrogância. Sobre um setup válido gera execução disciplinada; se virar excesso de confiança após uma sequência de vitórias, torna-se arriscada.",
-      "ar": "ثقة مبنية على التحليل وليست غروراً. عندما تستند إلى نموذج دخول صحيح تؤدي إلى تنفيذ منضبط؛ وعندما تتحول إلى ثقة مفرطة بعد سلسلة انتصارات تصبح خطيرة."
+      "es": "Confianza basada en un setup válido y en el análisis, no en una racha ganadora.\nEjemplo: se cumplieron todas las condiciones que anotaste y entraste con tu tamaño normal.\nTras una racha ganadora, comprueba que no sea exceso de confianza.",
+      "pt": "Confiança apoiada em setup válido e análise, não em sequência de ganhos.\nExemplo: todas as condições que você anotou se cumpriram e você entrou no tamanho normal.\nApós uma sequência de ganhos, veja se não é excesso de confiança.",
+      "ar": "ثقة مبنية على نموذج دخول صحيح وعلى التحليل، لا على سلسلة أرباح.\nمثال: تحققت كل الشروط التي دوّنتها ودخلت بحجمك المعتاد.\nبعد سلسلة أرباح، تحقّق من أنها ليست ثقة مفرطة."
     }
   },
   "emotionCalm": {
@@ -1135,9 +1135,9 @@
     "description": {
       "he": "נכנסת בלי לחץ ובלי מרדף, לפי התוכנית.\nלדוגמה: חיכית למחיר שתכננת והצבת סטופ ויעד מראש.",
       "en": "You entered without pressure or chasing, according to plan.\nExample: you waited for your planned price and set the stop and target in advance.",
-      "es": "El estado emocional óptimo para un trader. La calma te permite seguir tu plan sin perseguir ni entrar en pánico. Las operaciones abiertas con calma tienden a respetar su stop y objetivo.",
-      "pt": "O estado emocional ideal para um trader. A calma permite seguir o seu plano sem perseguir nem entrar em pânico. Operações abertas com calma tendem a respeitar o stop e o alvo.",
-      "ar": "الحالة العاطفية المثلى للمتداول. الهدوء يتيح لك اتّباع خطتك دون مطاردة أو ذعر. الصفقات التي تُفتح بهدوء تميل إلى احترام وقف الخسارة والهدف."
+      "es": "Entraste sin presión y sin perseguir el movimiento, según el plan.\nEjemplo: esperaste tu precio planificado y fijaste el stop y el objetivo de antemano.",
+      "pt": "Você entrou sem pressão e sem correr atrás, de acordo com o plano.\nExemplo: você esperou o preço planejado e definiu o stop e o alvo com antecedência.",
+      "ar": "دخلت دون ضغط ودون مطاردة، وفقًا للخطة.\nمثال: انتظرت السعر الذي خططت له وحددت وقف الخسارة والهدف مسبقًا."
     }
   },
   "emotionPatient": {
@@ -1151,9 +1151,9 @@
     "description": {
       "he": "חיכית לסטאפ שעומד בכל הקריטריונים שלך, במקום להיכנס לכל תנועה.\nלדוגמה: דילגת על שתי פריצות חלשות ונכנסת בשלישית.",
       "en": "You waited for a setup that met all your criteria instead of entering every move.\nExample: you skipped two weak breakouts and took the third.",
-      "es": "Esperar un setup que realmente cumpla tus criterios en lugar de entrar en cada movimiento. La paciencia suele ser lo que separa a un trader rentable de uno perdedor: filtra las operaciones de baja calidad.",
-      "pt": "Esperar por um setup que realmente cumpra os seus critérios em vez de entrar em cada movimento. A paciência costuma ser o que separa um trader lucrativo de um perdedor — filtra operações de baixa qualidade.",
-      "ar": "انتظار نموذج دخول يستوفي معاييرك فعلاً بدلاً من الدخول في كل حركة. الصبر غالباً ما يفصل بين المتداول الرابح والخاسر، فهو يُصفّي الصفقات منخفضة الجودة."
+      "es": "Esperaste un setup que cumpliera todos tus criterios en vez de entrar en cada movimiento.\nEjemplo: omitiste dos breakouts débiles y tomaste el tercero.",
+      "pt": "Esperou um setup que cumprisse todos os seus critérios em vez de entrar em cada movimento.\nExemplo: você pulou dois breakouts fracos e pegou o terceiro.",
+      "ar": "انتظرت نموذج دخول يستوفي كل معاييرك بدلًا من الدخول في كل حركة.\nمثال: تجاوزت اختراقين ضعيفين ودخلت في الثالث."
     }
   },
   "emotionNeutral": {
@@ -1167,9 +1167,9 @@
     "description": {
       "he": "נכנסת בלי מטען רגשי — לא נלהב ולא חושש.\nלדוגמה: עוד עסקה מתוך התוכנית, בלי ציפייה מיוחדת.",
       "en": "You entered with no emotional charge — neither excited nor fearful.\nExample: one more trade from the plan, with no special expectation.",
-      "es": "Entrar sin carga emocional, ni eufórico ni temeroso. Un estado estable que permite decisiones objetivas basadas en datos. Una buena base, aunque menos afilada que \"Calm\".",
-      "pt": "Entrar sem carga emocional — nem eufórico nem receoso. Um estado estável que permite decisões objetivas e baseadas em dados. Uma boa base, ainda que menos afiada que \"Calm\".",
-      "ar": "الدخول دون شحنة عاطفية، لا متحمّس ولا خائف. حالة مستقرة تتيح قرارات موضوعية مبنية على البيانات. أساس جيّد، وإن كان أقل حدّة من \"Calm\"."
+      "es": "Entraste sin carga emocional — ni entusiasmado ni temeroso.\nEjemplo: una operación más del plan, sin una expectativa especial.",
+      "pt": "Você entrou sem carga emocional — nem empolgado nem com medo.\nExemplo: mais uma operação do plano, sem expectativa especial.",
+      "ar": "دخلت دون شحنة عاطفية — لا متحمسًا ولا خائفًا.\nمثال: صفقة أخرى من الخطة، دون توقّع خاص."
     }
   },
   "emotionHesitant": {
@@ -1183,9 +1183,9 @@
     "description": {
       "he": "היססת בכניסה — לרוב כשהסטאפ לא ברור או שהביטחון נמוך.\nלדוגמה: חיכית לעוד נר ונכנסת $0.50 מעל המחיר שתכננת.",
       "en": "You hesitated at entry — usually when the setup is unclear or confidence is low.\nExample: you waited for one more candle and entered $0.50 above your planned price.",
-      "es": "Vacilación en la entrada, normalmente señal de que el setup no está claro o la confianza es baja. Las entradas vacilantes suelen implicar entrar tarde, poner el stop demasiado ajustado o salir antes por miedo.",
-      "pt": "Hesitação na entrada — geralmente sinal de que o setup não está claro ou a confiança está baixa. Entradas hesitantes tendem a significar entrar tarde, colocar o stop apertado demais ou sair cedo por medo.",
-      "ar": "التردّد عند الدخول، وغالباً ما يكون علامة على أن نموذج الدخول غير واضح أو أن الثقة منخفضة. الدخول المتردّد يميل إلى التأخّر في الدخول، أو وضع وقف خسارة ضيّق جداً، أو الخروج مبكراً بدافع الخوف."
+      "es": "Dudaste al entrar — normalmente cuando el setup no está claro o la confianza es baja.\nEjemplo: esperaste una vela más y entraste $0.50 por encima de tu precio planificado.",
+      "pt": "Você hesitou na entrada — geralmente quando o setup não está claro ou a confiança está baixa.\nExemplo: você esperou mais um candle e entrou $0.50 acima do preço planejado.",
+      "ar": "تردّدت عند الدخول — غالبًا عندما يكون نموذج الدخول غير واضح أو الثقة منخفضة.\nمثال: انتظرت شمعة أخرى ودخلت أعلى من سعرك المخطط بـ $0.50."
     }
   },
   "emotionNervous": {
@@ -1199,9 +1199,9 @@
     "description": {
       "he": "מתח שהעיב על שיקול הדעת שלך בזמן העסקה.\nלדוגמה: בדקת את המחיר כל דקה והזזת את הסטופ פעמיים.\nלעיתים סימן שהפוזיציה גדולה מדי.",
       "en": "Tension that clouded your judgment during the trade.\nExample: you checked the price every minute and moved the stop twice.\nSometimes a sign the position is too large.",
-      "es": "Tensión que nubla la toma de decisiones. El nerviosismo lleva a revisar el precio de forma obsesiva, mover el stop y salir impulsivamente. Suele indicar una posición demasiado grande o falta de confianza en el setup.",
-      "pt": "Tensão que prejudica a tomada de decisão. O nervosismo leva a verificar o preço de forma obsessiva, mexer no stop e sair por impulso. Costuma indicar uma posição grande demais ou falta de confiança no setup.",
-      "ar": "توتّر يُشوّش اتخاذ القرار. العصبية تؤدي إلى مراقبة السعر بهوس، وتحريك وقف الخسارة، والخروج المتسرّع. وغالباً ما تدل على أن حجم الصفقة كبير جداً أو عدم الثقة في نموذج الدخول."
+      "es": "Tensión que nubló tu juicio durante la operación.\nEjemplo: revisaste el precio cada minuto y moviste el stop dos veces.\nA veces indica que la posición es demasiado grande.",
+      "pt": "Tensão que turvou seu julgamento durante a operação.\nExemplo: você checou o preço a cada minuto e moveu o stop duas vezes.\nÀs vezes indica que a posição está grande demais.",
+      "ar": "توتّر شوّش حكمك أثناء الصفقة.\nمثال: كنت تتحقق من السعر كل دقيقة وحرّكت وقف الخسارة مرتين.\nأحيانًا علامة على أن حجم الصفقة كبير جدًا."
     }
   },
   "emotionFOMO": {
@@ -1215,9 +1215,9 @@
     "description": {
       "he": "נכנסת כי המחיר זז חזק ופחדת להחמיץ, בלי סטאפ תקף.\nלדוגמה: המניה עלתה ‎+6% ונכנסת בשיא בלי סטופ ברור.",
       "en": "You entered because price moved hard and you feared missing out, with no valid setup.\nExample: the stock was up +6% and you entered at the high with no clear stop.",
-      "es": "\"Miedo a quedarse fuera\" — entrar en una operación solo porque el precio se movió con fuerza, sin un setup válido. Uno de los patrones más destructivos: entrada tardía, perseguir el precio y un stop lejano. Una señal de alerta.",
-      "pt": "\"Medo de ficar de fora\" — entrar numa operação só porque o preço se moveu com força, sem um setup válido. Um dos padrões mais destrutivos: entrada tardia, perseguir o preço e um stop distante. Um sinal de alerta.",
-      "ar": "\"الخوف من تفويت الفرصة\" — الدخول في صفقة لمجرّد أن السعر تحرّك بحدّة، دون نموذج دخول صحيح. من أكثر الأنماط تدميراً: دخول متأخّر، ومطاردة السعر، ووقف خسارة بعيد. علامة تحذير."
+      "es": "Entraste porque el precio se movió fuerte y temías quedarte fuera, sin un setup válido.\nEjemplo: la acción subía +6% y entraste en el máximo sin un stop claro.",
+      "pt": "Você entrou porque o preço se moveu forte e teve medo de ficar de fora, sem um setup válido.\nExemplo: a ação subia +6% e você entrou na máxima sem um stop claro.",
+      "ar": "دخلت لأن السعر تحرّك بقوة وخشيت أن تفوتك الفرصة، دون نموذج دخول صحيح.\nمثال: كان السهم مرتفعًا ‎+6% ودخلت عند القمة دون وقف خسارة واضح."
     }
   },
   "emotionAngry": {
@@ -1231,9 +1231,9 @@
     "description": {
       "he": "כעס אחרי הפסד שדחף אותך להחזיר אותו מיד — מסחר נקמה.\nלדוגמה: הפסדת $200 ופתחת מיד עסקה בגודל כפול.",
       "en": "Anger after a loss that pushed you to win it back at once — revenge trading.\nExample: you lost $200 and immediately opened a trade at double size.",
-      "es": "Ira tras una pérdida — el combustible del \"trading de venganza\". En este estado el trader intenta recuperar la pérdida de inmediato, aumenta el riesgo y entra en malas operaciones. Así se revientan las cuentas. Detente.",
-      "pt": "Raiva após uma perda — o combustível do \"trading de vingança\". Nesse estado o trader tenta recuperar a perda de imediato, aumenta o risco e faz operações ruins. É assim que se destroem contas. Pare.",
-      "ar": "الغضب بعد الخسارة — وقود \"التداول الانتقامي\". في هذه الحالة يحاول المتداول استعادة خسارته فوراً، فيرفع المخاطرة ويدخل صفقات سيئة. هكذا تُدمَّر الحسابات. توقّف."
+      "es": "Ira tras una pérdida que te empujó a recuperarla enseguida — trading de venganza.\nEjemplo: perdiste $200 y enseguida abriste una operación del doble de tamaño.",
+      "pt": "Raiva após uma perda que levou você a recuperá-la na hora — trading de vingança.\nExemplo: você perdeu $200 e abriu na hora uma operação com o dobro do tamanho.",
+      "ar": "غضب بعد خسارة دفعك إلى استعادتها فورًا — التداول الانتقامي.\nمثال: خسرت $200 وفتحت فورًا صفقة بضعف الحجم."
     }
   },
   "chartCalcPosition": {
@@ -1247,9 +1247,9 @@
     "description": {
       "he": "ממלא את מחשבון הפוזיציה מהגרף: טיקר, מחיר חי ככניסה, סטופ ויעד 1:2.\nלדוגמה: כניסה $50 וסטופ $48 ⇒ יעד $54.",
       "en": "Fills the position calculator from the chart: ticker, live price as entry, a stop and a 1:2 target.\nExample: entry $50 and stop $48 ⇒ target $54.",
-      "es": "Rellena automáticamente la Calculadora de Posición desde el gráfico actual — ticker, precio en vivo como entrada, un stop protector y un objetivo 2:1 — y luego la abre para que dimensiones la operación en un clic.",
-      "pt": "Preenche automaticamente a Calculadora de Posição a partir do gráfico atual — ticker, preço ao vivo como entrada, um stop protetor e um alvo 2:1 — e depois abre-a para dimensionares a operação num clique.",
-      "ar": "يملأ تلقائياً حاسبة الصفقة من الرسم الحالي — الرمز، السعر الحي كدخول، وقف حماية وهدف 2:1 — ثم يفتحها لتحدّد حجم الصفقة بنقرة واحدة."
+      "es": "Rellena la calculadora de posición desde el gráfico: ticker, precio en vivo como entrada, stop y objetivo 1:2.\nEjemplo: entrada $50 y stop $48 ⇒ objetivo $54.",
+      "pt": "Preenche a calculadora de posição pelo gráfico: ticker, preço ao vivo como entrada, stop e alvo 1:2.\nExemplo: entrada $50 e stop $48 ⇒ alvo $54.",
+      "ar": "يملأ حاسبة الصفقة من الرسم البياني: الرمز، والسعر الحي كدخول، ووقف، وهدف 1:2.\nمثال: دخول $50 ووقف $48 ⇒ هدف $54."
     }
   },
   "chartAddToJournal": {
@@ -1263,9 +1263,9 @@
     "description": {
       "he": "פותח עסקה חדשה ביומן מהגרף — טיקר, מחיר חי, סטופ מוצע ויעד 1:2 — לבדיקה ושמירה.\nלדוגמה: כניסה $50, סטופ $48 ויעד $54 ממולאים, ושמרת.",
       "en": "Opens a journal trade from the chart, prefilled with ticker, live price, a stop and a 1:2 target.\nExample: entry $50, stop $48 and target $54 filled in, and you saved.",
-      "es": "Inicia una nueva operación en el diario desde el gráfico actual — ticker, precio en vivo, un stop sugerido y un objetivo 2:1 pre-rellenados — lista para que la revises y guardes.",
-      "pt": "Inicia uma nova operação no diário a partir do gráfico atual — ticker, preço ao vivo, um stop sugerido e um alvo 2:1 pré-preenchidos — pronta para reveres e guardares.",
-      "ar": "يبدأ صفقة جديدة في اليوميّة من الرسم الحالي — الرمز، السعر الحي، وقف مقترح وهدف 2:1 مملوءة مسبقاً — جاهزة لمراجعتك وحفظك."
+      "es": "Abre una operación en el diario desde el gráfico, prellenada con ticker, precio en vivo, stop y objetivo 1:2.\nEjemplo: se rellenaron entrada $50, stop $48 y objetivo $54, y guardaste.",
+      "pt": "Abre uma operação no diário pelo gráfico, pré-preenchida com ticker, preço ao vivo, stop e alvo 1:2.\nExemplo: entrada $50, stop $48 e alvo $54 preenchidos, e você salvou.",
+      "ar": "يفتح صفقة في اليوميّة من الرسم البياني، معبّأة مسبقاً بالرمز والسعر الحي ووقف وهدف 1:2.\nمثال: عُبّئت قيم الدخول $50 والوقف $48 والهدف $54، ثم حفظت."
     }
   },
   "visionOcr": {
@@ -1279,9 +1279,9 @@
     "description": {
       "he": "קורא עסקה מצילום מסך של הגרף וממלא את השדות במקום הקלדה.\nלדוגמה: העלית צילום עם כניסה, סטופ ויעד ⇒ השדות התמלאו.\nבדוק את הערכים לפני השמירה.",
       "en": "Reads a trade from a chart screenshot and fills the fields instead of typing.\nExample: you uploaded a screenshot with entry, stop and target ⇒ the fields were filled.\nCheck the values before saving.",
-      "es": "Reads a trade from a chart screenshot and fills the fields instead of typing.\nExample: you uploaded a screenshot with entry, stop and target ⇒ the fields were filled.\nCheck the values before saving.",
-      "pt": "Reads a trade from a chart screenshot and fills the fields instead of typing.\nExample: you uploaded a screenshot with entry, stop and target ⇒ the fields were filled.\nCheck the values before saving.",
-      "ar": "Reads a trade from a chart screenshot and fills the fields instead of typing.\nExample: you uploaded a screenshot with entry, stop and target ⇒ the fields were filled.\nCheck the values before saving."
+      "es": "Lee una operación desde una captura del gráfico y rellena los campos en lugar de escribirlos.\nEjemplo: subiste una captura con entrada, stop y objetivo ⇒ los campos se rellenaron.\nRevisa los valores antes de guardar.",
+      "pt": "Lê uma operação a partir de um print do gráfico e preenche os campos em vez de você digitar.\nExemplo: você enviou um print com entrada, stop e alvo ⇒ os campos foram preenchidos.\nConfira os valores antes de salvar.",
+      "ar": "يقرأ صفقة من لقطة شاشة للرسم البياني ويملأ الحقول بدلاً من الكتابة.\nمثال: رفعت لقطة شاشة فيها الدخول والوقف والهدف ⇒ امتلأت الحقول.\nتحقّق من القيم قبل الحفظ."
     }
   }
 }

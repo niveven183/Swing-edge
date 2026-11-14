@@ -1,7 +1,7 @@
 // src/glossary/terms/setups.js — סטאפים
 // ⛔ מקור האמת היחיד למונחים האלה. עריכה כאן ⇒ `npm run glossary` באותו קומיט (test:glossary תופס סחיפה).
 // פורמט (גל 3): short = הגדרה במשפט אחד ≤18 מילים · example = "לדוגמה:"/"Example:" במספרים היפותטיים · caveat אחד לכל היותר · longForm = הטקסט המלא (מודאל המילון).
-// pendingTranslation: es/pt/ar עדיין בטקסט הישן — שלב 5.
+// 5 שפות מלאות (שלב 5, 14.11): es/pt/ar מתורגמים מ-he/en, ≤110% מתווי en. שפה שממתינה לתרגום ⇒ pendingTranslation + שורה ב-test:glossary (L3).
 // aliases: שמות תצוגה (מנורמלים: lowercase · & ⇒ and · לא-אלפאנומרי ⇒ רווח) שמטריצת הסטאפים ממפה למונח.
 // ⛔ במכוון בלי alias ⇒ resolveSetupKey מחזיר null (בלי "?"): Crypto (סוג נכס) · Other (סל) · Retest/Breakdown (סורק בלבד, אף פעם לא trade.setup).
 
@@ -12,7 +12,6 @@ export default [
     aliases: ["breakout"],
     sources: ["MURPHY"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מטריצת סטאפים · תג סטאפ ביומן", "src/components/DayTradesModal.jsx — יומן יומי · תג סטאפ"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Breakout",
@@ -28,15 +27,21 @@ export default [
       },
       es: {
         label: "Breakout",
-        short: "Precio rompiendo por encima de un nivel de resistencia clave con volumen. Funciona mejor en mercados con tendencia.",
+        short: "Entrar cuando el precio rompe una resistencia clave, idealmente con volumen creciente.",
+        example: "Ejemplo: resistencia en $50 y cierre diario en $51 con el doble del volumen medio.",
+        longForm: "Precio que rompe por encima de un nivel de resistencia clave con volumen. Funciona mejor en mercados con tendencia.",
       },
       pt: {
         label: "Breakout",
-        short: "Preço rompendo acima de um nível de resistência chave com volume. Funciona melhor em mercados com tendência.",
+        short: "Entrar quando o preço rompe uma resistência chave, idealmente com volume crescente.",
+        example: "Exemplo: resistência em $50 e fechamento diário em $51 com o dobro do volume médio.",
+        longForm: "Preço rompendo acima de um nível de resistência chave com volume. Funciona melhor em mercados com tendência.",
       },
       ar: {
         label: "Breakout",
-        short: "السعر يخترق فوق مستوى مقاومة رئيسي مع حجم تداول. يعمل بأفضل شكل في الأسواق ذات الاتجاه.",
+        short: "الدخول عندما يخترق السعر مستوى مقاومة رئيسياً، ويُفضّل مع حجم تداول متزايد.",
+        example: "مثال: مقاومة عند $50 وإغلاق يومي عند $51 بضعف متوسط حجم التداول.",
+        longForm: "السعر يخترق مستوى مقاومة رئيسياً مع حجم تداول. يعمل بأفضل شكل في الأسواق ذات الاتجاه.",
       },
     },
   },
@@ -45,7 +50,6 @@ export default [
     aliases: ["pullback"],
     sources: ["MURPHY"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מטריצת סטאפים · תג סטאפ ביומן", "src/components/DayTradesModal.jsx — יומן יומי · תג סטאפ"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Pullback",
@@ -61,15 +65,21 @@ export default [
       },
       es: {
         label: "Pullback",
-        short: "Comprar cuando un precio en tendencia alcista retrocede temporalmente hacia un soporte —una media móvil, un nivel de ruptura previo o una línea de tendencia— y luego retoma el alza. Entrar en el retroceso da mejor precio y un stop más ajustado que perseguir.",
+        short: "Entrar cuando un precio en tendencia alcista retrocede a un soporte y luego retoma el alza.",
+        example: "Ejemplo: subida de $40 a $50, retroceso a la media móvil en $46 y entrada ahí.",
+        longForm: "Comprar cuando un precio en tendencia alcista retrocede temporalmente hacia un soporte — una media móvil, un nivel de ruptura previo o una línea de tendencia — y luego retoma el alza. Entrar en el retroceso da mejor precio y un stop más ajustado que perseguir el precio.",
       },
       pt: {
         label: "Pullback",
-        short: "Comprar quando um preço em tendência de alta recua temporariamente em direção a um suporte — uma média móvel, um nível de rompimento anterior ou uma linha de tendência — e depois retoma a alta. Entrar no recuo dá melhor preço e um stop mais apertado do que perseguir.",
+        short: "Entrar quando um preço em tendência de alta recua até um suporte e depois retoma a alta.",
+        example: "Exemplo: alta de $40 para $50, recuo até a média móvel em $46 e entrada ali.",
+        longForm: "Comprar quando um preço em tendência de alta recua temporariamente em direção a um suporte — uma média móvel, um nível de rompimento anterior ou uma linha de tendência — e depois retoma a alta. Entrar no recuo dá um preço melhor e um stop mais curto do que correr atrás do preço.",
       },
       ar: {
         label: "Pullback",
-        short: "الشراء عندما يتراجع سعر في اتجاه صاعد مؤقتاً نحو دعم — متوسط متحرك، أو مستوى اختراق سابق، أو خط اتجاه — ثم يستأنف صعوده. الدخول عند التراجع يمنح سعراً أفضل ووقف خسارة أضيق من المطاردة.",
+        short: "الدخول عندما يتراجع سعر في اتجاه صاعد إلى دعم ثم يستأنف صعوده.",
+        example: "مثال: صعود من $40 إلى $50، ثم تراجع إلى المتوسط المتحرك عند $46، والدخول هناك.",
+        longForm: "الشراء عندما يتراجع سعر في اتجاه صاعد مؤقتاً نحو دعم — متوسط متحرك، أو مستوى اختراق سابق، أو خط اتجاه — ثم يستأنف صعوده. الدخول عند التراجع يمنح سعراً أفضل ووقف خسارة أضيق من مطاردة السعر.",
       },
     },
   },
@@ -78,7 +88,6 @@ export default [
     aliases: ["bull flag"],
     sources: ["BULK"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מטריצת סטאפים · תג סטאפ ביומן", "src/components/DayTradesModal.jsx — יומן יומי · תג סטאפ"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Bull Flag",
@@ -94,15 +103,21 @@ export default [
       },
       es: {
         label: "Bull Flag",
-        short: "Consolidación estrecha tras un movimiento brusco al alza. El volumen debe contraerse durante la bandera.",
+        short: "Consolidación estrecha y levemente bajista tras una fuerte subida, con volumen decreciente.",
+        example: "Ejemplo: subida de $20 a $26 y luego 5 días en un rango de $25–$26.",
+        longForm: "Consolidación estrecha tras un fuerte movimiento al alza. El volumen debería contraerse durante la bandera.",
       },
       pt: {
         label: "Bull Flag",
-        short: "Consolidação estreita após um movimento brusco de alta. O volume deve contrair durante a bandeira.",
+        short: "Consolidação estreita e levemente descendente após uma alta forte, com volume em queda.",
+        example: "Exemplo: alta de $20 para $26 e depois 5 dias em uma faixa de $25–$26.",
+        longForm: "Consolidação estreita após um forte movimento de alta. O volume deve diminuir durante a bandeira.",
       },
       ar: {
         label: "Bull Flag",
-        short: "تماسك ضيّق بعد حركة صعودية حادّة. يجب أن ينكمش حجم التداول أثناء تكوّن العلم.",
+        short: "تماسك ضيّق ومائل قليلاً للهبوط بعد صعود حاد، مع انكماش حجم التداول.",
+        example: "مثال: صعود من $20 إلى $26، ثم 5 أيام في نطاق $25–$26.",
+        longForm: "تماسك ضيّق بعد حركة صعودية حادّة. يجب أن ينكمش حجم التداول أثناء تكوّن العلم.",
       },
     },
   },
@@ -111,7 +126,6 @@ export default [
     aliases: ["orb breakout"],
     sources: ["CRABEL"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מטריצת סטאפים · תג סטאפ ביומן", "src/components/DayTradesModal.jsx — יומן יומי · תג סטאפ"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "ORB Breakout",
@@ -127,15 +141,21 @@ export default [
       },
       es: {
         label: "ORB Breakout",
-        short: "Opening Range Breakout — ruptura del máximo/mínimo de los primeros 15-30 min. Fuerte en días de tendencia.",
+        short: "Ruptura del máximo o mínimo de los primeros 5, 15 o 30 minutos de sesión.",
+        example: "Ejemplo: rango de $30–$31 en los primeros 15 minutos ⇒ entrada sobre $31.",
+        longForm: "Opening Range Breakout — ruptura del máximo/mínimo de los primeros 5, 15 o 30 minutos. Fuerte en días de tendencia.",
       },
       pt: {
         label: "ORB Breakout",
-        short: "Opening Range Breakout — rompimento da máxima/mínima dos primeiros 15-30 min. Forte em dias de tendência.",
+        short: "Rompimento da máxima ou mínima dos primeiros 5, 15 ou 30 minutos do pregão.",
+        example: "Exemplo: faixa de $30–$31 nos primeiros 15 min ⇒ entrada acima de $31.",
+        longForm: "Opening Range Breakout — rompimento da máxima/mínima dos primeiros 5, 15 ou 30 minutos. Forte em dias de tendência.",
       },
       ar: {
         label: "ORB Breakout",
-        short: "Opening Range Breakout — اختراق قمة/قاع أول 15-30 دقيقة. قوي في أيام الاتجاه.",
+        short: "اختراق قمة أو قاع أول 5 أو 15 أو 30 دقيقة من التداول.",
+        example: "مثال: نطاق $30–$31 في أول 15 دقيقة ⇒ الدخول فوق $31.",
+        longForm: "Opening Range Breakout — اختراق قمة/قاع أول 5 أو 15 أو 30 دقيقة. قوي في أيام الاتجاه.",
       },
     },
   },
@@ -144,7 +164,6 @@ export default [
     aliases: ["vwap reclaim"],
     sources: ["STOCKCHARTS"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מטריצת סטאפים · תג סטאפ ביומן", "src/components/DayTradesModal.jsx — יומן יומי · תג סטאפ"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "VWAP Reclaim",
@@ -160,15 +179,21 @@ export default [
       },
       es: {
         label: "VWAP Reclaim",
-        short: "El precio recupera el VWAP tras una caída matinal con volumen. Indica compra institucional.",
+        short: "El precio recupera el VWAP — el precio medio del día ponderado por volumen — tras caer por debajo.",
+        example: "Ejemplo: VWAP en $40, caída a $39.50 y regreso sobre $40 con volumen.",
+        longForm: "El precio recupera el VWAP tras una caída matinal, con volumen.",
       },
       pt: {
         label: "VWAP Reclaim",
-        short: "O preço recupera o VWAP após uma queda matinal com volume. Indica compra institucional.",
+        short: "O preço recupera o VWAP — o preço médio do dia ponderado por volume — após cair abaixo dele.",
+        example: "Exemplo: VWAP em $40, queda para $39.50 e volta acima de $40 com volume.",
+        longForm: "O preço recupera o VWAP após uma queda pela manhã, com volume.",
       },
       ar: {
         label: "VWAP Reclaim",
-        short: "السعر يستعيد الـ VWAP بعد هبوط صباحي مع حجم تداول. يشير إلى شراء مؤسّسي.",
+        short: "يستعيد السعر الـ VWAP — متوسط سعر اليوم المرجّح بحجم التداول — بعد هبوطه دونه.",
+        example: "مثال: VWAP عند $40، هبوط إلى $39.50، ثم عودة فوق $40 مع حجم تداول.",
+        longForm: "السعر يستعيد الـ VWAP بعد هبوط صباحي، مع حجم تداول.",
       },
     },
   },
@@ -177,7 +202,6 @@ export default [
     aliases: ["higher low"],
     sources: ["MURPHY"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מטריצת סטאפים · תג סטאפ ביומן", "src/components/DayTradesModal.jsx — יומן יומי · תג סטאפ"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Higher Low",
@@ -193,15 +217,21 @@ export default [
       },
       es: {
         label: "Higher Low",
-        short: "Cada retroceso forma un mínimo más alto que el anterior. El setup más limpio en tendencia alcista.",
+        short: "Cada retroceso para sobre el mínimo previo — señal de tendencia alcista.",
+        example: "Ejemplo: mínimos en $45, luego $47, luego $49.",
+        longForm: "Cada retroceso forma un mínimo más alto que el anterior. El setup más limpio en tendencia alcista.",
       },
       pt: {
         label: "Higher Low",
-        short: "Cada recuo forma um mínimo mais alto que o anterior. O setup mais limpo em tendência de alta.",
+        short: "Cada recuo para acima da mínima anterior — marca de tendência de alta.",
+        example: "Exemplo: mínimas em $45, depois $47, depois $49.",
+        longForm: "Cada recuo faz uma mínima mais alta que a anterior. O setup mais limpo em tendência de alta.",
       },
       ar: {
         label: "Higher Low",
-        short: "كل تراجع يصنع قاعاً أعلى من السابق. أنظف نموذج في الاتجاه الصاعد.",
+        short: "كل تراجع يتوقف فوق القاع السابق — علامة الاتجاه الصاعد.",
+        example: "مثال: قيعان عند $45، ثم $47، ثم $49.",
+        longForm: "كل تراجع يصنع قاعاً أعلى من السابق. أنظف نموذج في الاتجاه الصاعد.",
       },
     },
   },
@@ -210,7 +240,6 @@ export default [
     aliases: ["cup and handle"],
     sources: ["ONEIL"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מטריצת סטאפים · תג סטאפ ביומן", "src/components/DayTradesModal.jsx — יומן יומי · תג סטאפ"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Cup & Handle",
@@ -226,15 +255,21 @@ export default [
       },
       es: {
         label: "Cup & Handle",
-        short: "Consolidación en forma de U con un asa estrecha a la derecha. Patrón de continuación clásico.",
+        short: "Una base en forma de U seguida de una caída corta y poco profunda (el asa) antes de la ruptura.",
+        example: "Ejemplo: caída de $60 a $48, regreso a $59, asa hasta $56 y ruptura sobre $59.",
+        longForm: "Consolidación en forma de U con un asa estrecha a la derecha. Patrón de continuación clásico.",
       },
       pt: {
         label: "Cup & Handle",
-        short: "Consolidação em forma de U com uma alça estreita à direita. Padrão de continuação clássico.",
+        short: "Uma base em forma de U seguida de uma queda curta e rasa (a alça) antes do rompimento.",
+        example: "Exemplo: queda de $60 para $48, volta a $59, alça até $56 e rompimento acima de $59.",
+        longForm: "Consolidação em forma de U com uma alça estreita à direita. Padrão de continuação clássico.",
       },
       ar: {
         label: "Cup & Handle",
-        short: "تماسك على شكل حرف U مع مقبض ضيّق على اليمين. نموذج استمرار كلاسيكي.",
+        short: "قاعدة على شكل حرف U يتبعها تراجع قصير وضحل (المقبض) قبل الاختراق.",
+        example: "مثال: هبوط من $60 إلى $48، عودة إلى $59، مقبض حتى $56، ثم اختراق فوق $59.",
+        longForm: "تماسك على شكل حرف U مع مقبض ضيّق على اليمين. نموذج استمرار كلاسيكي.",
       },
     },
   },
@@ -243,7 +278,6 @@ export default [
     aliases: ["failed breakout"],
     sources: ["BULK"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מטריצת סטאפים · תג סטאפ ביומן", "src/components/DayTradesModal.jsx — יומן יומי · תג סטאפ"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Failed Breakout",
@@ -255,19 +289,25 @@ export default [
         label: "Failed Breakout",
         short: "A breakout that quickly falls back below the broken level — a trap for late buyers.",
         example: "Example: a break to $51 above $50, back to $49 within a day ⇒ SHORT.",
-        longForm: "Breakout that quickly reverses. Trap for late buyers — short on reclaim of breakout level.",
+        longForm: "Breakout that quickly reverses. Trap for late buyers — SHORT when price falls back below the breakout level.",
       },
       es: {
         label: "Failed Breakout",
-        short: "Ruptura que se revierte rápidamente. Trampa para compradores tardíos — corto al recuperar el nivel de ruptura.",
+        short: "Una ruptura que vuelve rápido por debajo del nivel roto — una trampa para compradores tardíos.",
+        example: "Ejemplo: ruptura a $51 sobre $50 y vuelta a $49 en un día ⇒ SHORT.",
+        longForm: "Ruptura que se revierte rápidamente. Trampa para compradores tardíos — SHORT al volver por debajo del nivel de ruptura.",
       },
       pt: {
         label: "Failed Breakout",
-        short: "Rompimento que se reverte rapidamente. Armadilha para compradores atrasados — vendido ao recuperar o nível de rompimento.",
+        short: "Rompimento que volta rápido abaixo do nível rompido — armadilha para compradores atrasados.",
+        example: "Exemplo: rompimento para $51 acima de $50 e volta a $49 em um dia ⇒ SHORT.",
+        longForm: "Rompimento que se reverte rapidamente. Armadilha para compradores atrasados — SHORT na volta para baixo do nível de rompimento.",
       },
       ar: {
         label: "Failed Breakout",
-        short: "اختراق ينعكس بسرعة. فخّ للمشترين المتأخّرين — بيع عند العودة تحت مستوى الاختراق.",
+        short: "اختراق يعود سريعاً تحت المستوى المخترَق — فخّ للمشترين المتأخرين.",
+        example: "مثال: اختراق إلى $51 فوق $50، ثم عودة إلى $49 خلال يوم ⇒ SHORT.",
+        longForm: "اختراق ينعكس بسرعة. فخّ للمشترين المتأخّرين — SHORT عند العودة تحت مستوى الاختراق.",
       },
     },
   },
@@ -275,7 +315,6 @@ export default [
     id: "overextendedFade",
     aliases: ["overextended fade"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מטריצת סטאפים · תג סטאפ ביומן", "src/components/DayTradesModal.jsx — יומן יומי · תג סטאפ"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Overextended Fade",
@@ -293,15 +332,24 @@ export default [
       },
       es: {
         label: "Overextended Fade",
-        short: "Operación contra-tendencia cuando el precio está 8%+ sobre la 20 EMA con RSI alto. Requiere paciencia.",
+        short: "Operación contra tendencia cuando el precio está inusualmente lejos sobre la 20 EMA.",
+        example: "Ejemplo: acción en $60 con la 20 EMA en $52 ⇒ SHORT hacia la media.",
+        caveat: "La app no fija un umbral para 'lejos' — lo decides tú.",
+        longForm: "Operación contra la tendencia cuando el precio está inusualmente lejos por encima de la 20 EMA, a menudo con un RSI alto. Requiere paciencia.",
       },
       pt: {
         label: "Overextended Fade",
-        short: "Operação contra-tendência quando o preço está 8%+ acima da 20 EMA com RSI alto. Exige paciência.",
+        short: "Operação contra a tendência com o preço incomumente distante acima da 20 EMA.",
+        example: "Exemplo: ação a $60 com a 20 EMA em $52 ⇒ SHORT em direção à média.",
+        caveat: "O app não define um limite para 'distante' — quem decide é você.",
+        longForm: "Operação contra a tendência quando o preço está incomumente distante acima da 20 EMA, muitas vezes com RSI alto. Exige paciência.",
       },
       ar: {
         label: "Overextended Fade",
-        short: "صفقة عكس الاتجاه عندما يكون السعر أعلى بـ 8%+ من الـ 20 EMA مع RSI مرتفع. تتطلّب صبراً.",
+        short: "صفقة عكس الاتجاه عندما يكون السعر بعيداً بشكل غير معتاد فوق الـ 20 EMA.",
+        example: "مثال: سهم عند $60 والـ 20 EMA عند $52 ⇒ SHORT نحو المتوسط.",
+        caveat: "لا يحدد التطبيق عتبة لـ'بعيد' — العتبة لك.",
+        longForm: "صفقة عكس الاتجاه عندما يكون السعر بعيداً بشكل غير معتاد فوق الـ 20 EMA، غالباً مع RSI مرتفع. تتطلّب صبراً.",
       },
     },
   },
@@ -309,7 +357,6 @@ export default [
     id: "EMABounce50",
     aliases: ["ema bounce 50", "50 ema bounce"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מטריצת סטאפים · תג סטאפ ביומן", "src/components/DayTradesModal.jsx — יומן יומי · תג סטאפ"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "50 EMA Bounce",
@@ -325,15 +372,21 @@ export default [
       },
       es: {
         label: "50 EMA Bounce",
-        short: "Retroceso a la 50 EMA en gráfico diario. Soporte importante en tendencias alcistas fuertes.",
+        short: "Un retroceso a la media móvil exponencial de 50 días en el gráfico diario, y un rebote en ella.",
+        example: "Ejemplo: 50 EMA en $80, mínimo diario de $80.20 y cierre en $82.",
+        longForm: "Retroceso a la 50 EMA en el gráfico diario. Soporte importante en tendencias alcistas fuertes.",
       },
       pt: {
         label: "50 EMA Bounce",
-        short: "Recuo à 50 EMA no gráfico diário. Suporte importante em tendências de alta fortes.",
+        short: "Um recuo até a média móvel exponencial de 50 dias no gráfico diário, e um repique a partir dela.",
+        example: "Exemplo: 50 EMA em $80, mínima diária de $80.20 e fechamento em $82.",
+        longForm: "Recuo até a 50 EMA no gráfico diário. Suporte importante em tendências de alta fortes.",
       },
       ar: {
         label: "50 EMA Bounce",
-        short: "تراجع إلى الـ 50 EMA على الرسم اليومي. دعم مهم في الاتجاهات الصاعدة القوية.",
+        short: "تراجع إلى المتوسط المتحرك الأسي لـ 50 يوماً على الرسم اليومي، ثم ارتداد منه.",
+        example: "مثال: 50 EMA عند $80، قاع يومي $80.20، وإغلاق عند $82.",
+        longForm: "تراجع إلى الـ 50 EMA على الرسم اليومي. دعم مهم في الاتجاهات الصاعدة القوية.",
       },
     },
   },
@@ -341,7 +394,6 @@ export default [
     id: "trendContinuation",
     aliases: ["trend continuation"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מטריצת סטאפים · תג סטאפ ביומן", "src/components/DayTradesModal.jsx — יומן יומי · תג סטאפ"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Trend Continuation",
@@ -357,15 +409,21 @@ export default [
       },
       es: {
         label: "Trend Continuation",
-        short: "Entrada en un retroceso superficial a la 9 EMA en una tendencia establecida. Stops ajustados, R alto.",
+        short: "Entrar en un retroceso superficial a la 9 EMA dentro de una tendencia establecida.",
+        example: "Ejemplo: retroceso a la 9 EMA en $30.10, entrada en $30.30 y stop en $29.80.",
+        longForm: "Entrada en un retroceso superficial a la 9 EMA en una tendencia establecida. Stops ajustados, R alto.",
       },
       pt: {
         label: "Trend Continuation",
-        short: "Entrada num recuo superficial à 9 EMA numa tendência estabelecida. Stops apertados, R alto.",
+        short: "Entrar em um recuo raso até a 9 EMA dentro de uma tendência estabelecida.",
+        example: "Exemplo: recuo até a 9 EMA em $30.10, entrada em $30.30 e stop em $29.80.",
+        longForm: "Entrada em um recuo raso até a 9 EMA em uma tendência estabelecida. Stops curtos, R alto.",
       },
       ar: {
         label: "Trend Continuation",
-        short: "الدخول عند تراجع سطحي إلى الـ 9 EMA في اتجاه راسخ. أوامر وقف ضيّقة، R مرتفع.",
+        short: "الدخول عند تراجع سطحي إلى الـ 9 EMA ضمن اتجاه راسخ.",
+        example: "مثال: تراجع إلى الـ 9 EMA عند $30.10، دخول عند $30.30، ووقف عند $29.80.",
+        longForm: "الدخول عند تراجع سطحي إلى الـ 9 EMA في اتجاه راسخ. أوامر وقف ضيّقة، R مرتفع.",
       },
     },
   },
@@ -373,7 +431,6 @@ export default [
     id: "gapAndGo",
     aliases: ["gap and go"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מטריצת סטאפים · תג סטאפ ביומן", "src/components/DayTradesModal.jsx — יומן יומי · תג סטאפ"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Gap & Go",
@@ -389,15 +446,21 @@ export default [
       },
       es: {
         label: "Gap & Go",
-        short: "La acción abre con hueco al alza y continúa sin rellenarlo. Mejor con un catalizador de noticias.",
+        short: "Una acción que abre con hueco al alza y sigue subiendo sin cerrar el hueco.",
+        example: "Ejemplo: cierre en $20, apertura en $22 y máximo de $24 sin cotizar por debajo de $22.",
+        longForm: "La acción abre con hueco al alza y sigue subiendo sin rellenarlo. Mejor con un catalizador de noticias.",
       },
       pt: {
         label: "Gap & Go",
-        short: "A ação abre com gap de alta e continua sem preenchê-lo. Melhor com um catalisador de notícias.",
+        short: "Uma ação que abre com gap de alta e continua subindo sem fechar o gap.",
+        example: "Exemplo: fechamento em $20, abertura em $22 e máxima de $24 sem negociar abaixo de $22.",
+        longForm: "A ação abre com gap de alta e continua subindo sem preenchê-lo. Melhor com um catalisador de notícias.",
       },
       ar: {
         label: "Gap & Go",
-        short: "يفتح السهم بفجوة صعودية ويواصل دون ملئها. أفضل مع محفّز إخباري.",
+        short: "سهم يفتح بفجوة صعودية ويواصل الصعود دون ملء الفجوة.",
+        example: "مثال: إغلاق عند $20، افتتاح عند $22، وقمة $24 دون التداول تحت $22.",
+        longForm: "يفتح السهم بفجوة صعودية ويواصل الصعود دون ملئها. الأفضل مع محفّز إخباري.",
       },
     },
   },
@@ -405,7 +468,6 @@ export default [
     id: "earningsGapPlay",
     aliases: ["earnings gap play"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מטריצת סטאפים · תג סטאפ ביומן", "src/components/DayTradesModal.jsx — יומן יומי · תג סטאפ"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Earnings Gap Play",
@@ -421,15 +483,21 @@ export default [
       },
       es: {
         label: "Earnings Gap Play",
-        short: "Operar la reacción del hueco tras resultados. Mantén las ganadoras, cubre a la primera señal de compra.",
+        short: "Operar en la dirección del hueco tras un informe de resultados, al alza o a la baja.",
+        example: "Ejemplo: hueco +6% ⇒ LONG sobre el máximo de apertura; hueco −6% ⇒ SHORT bajo el mínimo de apertura.",
+        longForm: "Opera la reacción del hueco tras los resultados, en cualquier dirección: hueco al alza — LONG sobre el máximo de apertura; hueco a la baja — SHORT bajo el mínimo de apertura. Mantén las ganadoras y sal a la primera señal de un movimiento en tu contra.",
       },
       pt: {
         label: "Earnings Gap Play",
-        short: "Operar a reação do gap após resultados. Mantenha as vencedoras, cubra ao primeiro sinal de compra.",
+        short: "Operar na direção do gap que abre após a divulgação de resultados, para cima ou para baixo.",
+        example: "Exemplo: gap +6% ⇒ LONG acima da máxima de abertura; gap −6% ⇒ SHORT abaixo da mínima de abertura.",
+        longForm: "Opere a reação do gap após os resultados, em qualquer direção: gap de alta — LONG acima da máxima de abertura; gap de baixa — SHORT abaixo da mínima de abertura. Segure as vencedoras e saia ao primeiro sinal de um movimento contra você.",
       },
       ar: {
         label: "Earnings Gap Play",
-        short: "تداول رد فعل الفجوة بعد نتائج الأرباح. احتفظ بالرابحة، وأغلق عند أول إشارة شراء.",
+        short: "التداول في اتجاه الفجوة التي تفتح بعد تقرير الأرباح — صعوداً أو هبوطاً.",
+        example: "مثال: فجوة \u200e+6% ⇒ LONG فوق قمة الافتتاح؛ فجوة \u200e−6% ⇒ SHORT تحت قاع الافتتاح.",
+        longForm: "تداول رد فعل الفجوة بعد نتائج الأرباح، في أي اتجاه: فجوة صعودية — LONG فوق قمة الافتتاح؛ فجوة هبوطية — SHORT تحت قاع الافتتاح. احتفظ بالصفقات الرابحة واخرج عند أول إشارة لحركة ضدك.",
       },
     },
   },
@@ -437,7 +505,6 @@ export default [
     id: "rangeBreakout",
     aliases: ["range breakout"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מטריצת סטאפים · תג סטאפ ביומן", "src/components/DayTradesModal.jsx — יומן יומי · תג סטאפ"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Range Breakout",
@@ -453,15 +520,21 @@ export default [
       },
       es: {
         label: "Range Breakout",
-        short: "El precio rompe un rango de varios días/semanas. Más fiable cuando el volumen se expande.",
+        short: "Salida de un rango de precios que duró días o semanas.",
+        example: "Ejemplo: 3 semanas entre $40 y $44 y luego un cierre en $45.",
+        longForm: "El precio rompe un rango de varios días/semanas. Más fiable cuando el volumen se expande.",
       },
       pt: {
         label: "Range Breakout",
-        short: "O preço rompe um range de vários dias/semanas. Mais confiável quando o volume se expande.",
+        short: "Saída de uma faixa de preço que durou dias ou semanas.",
+        example: "Exemplo: 3 semanas entre $40 e $44 e depois um fechamento em $45.",
+        longForm: "O preço rompe uma faixa de vários dias/semanas. Mais confiável quando o volume se expande.",
       },
       ar: {
         label: "Range Breakout",
-        short: "السعر يكسر نطاقاً امتدّ أياماً/أسابيع. أكثر موثوقية عندما يتوسّع حجم التداول.",
+        short: "خروج من نطاق سعري استمر أياماً أو أسابيع.",
+        example: "مثال: 3 أسابيع بين $40 و$44، ثم إغلاق عند $45.",
+        longForm: "السعر يكسر نطاقاً امتدّ أياماً/أسابيع. أكثر موثوقية عندما يتوسّع حجم التداول.",
       },
     },
   },
@@ -469,7 +542,6 @@ export default [
     id: "postEarningsStrength",
     aliases: ["post earnings strength"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מטריצת סטאפים · תג סטאפ ביומן", "src/components/DayTradesModal.jsx — יומן יומי · תג סטאפ"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Post-Earnings Strength",
@@ -485,15 +557,21 @@ export default [
       },
       es: {
         label: "Post-Earnings Strength",
-        short: "La acción se mantiene sobre el hueco alcista tras superar resultados. Señal de acumulación institucional.",
+        short: "Acción que se mantiene sobre un hueco alcista en los días tras un buen informe.",
+        example: "Ejemplo: hueco de $50 a $56 y luego 5 días sobre $55.",
+        longForm: "La acción se mantiene sobre el hueco alcista tras superar las expectativas de resultados. Señal de acumulación institucional.",
       },
       pt: {
         label: "Post-Earnings Strength",
-        short: "A ação mantém-se acima do gap de alta após superar resultados. Sinal de acumulação institucional.",
+        short: "Ação que se mantém acima de um gap de alta nos dias após um balanço forte.",
+        example: "Exemplo: gap de $50 para $56 e depois 5 dias acima de $55.",
+        longForm: "A ação se mantém acima do gap de alta após resultados acima do esperado. Sinal de acumulação institucional.",
       },
       ar: {
         label: "Post-Earnings Strength",
-        short: "يحافظ السهم على البقاء فوق الفجوة الصعودية بعد تجاوز التوقّعات. إشارة تجميع مؤسّسي.",
+        short: "سهم يبقى فوق فجوة صعودية في الأيام التي تلي تقريراً قوياً.",
+        example: "مثال: فجوة من $50 إلى $56، ثم 5 أيام فوق $55.",
+        longForm: "يحافظ السهم على البقاء فوق الفجوة الصعودية بعد تجاوز التوقّعات. إشارة تجميع مؤسّسي.",
       },
     },
   },
@@ -502,7 +580,6 @@ export default [
     aliases: ["power hour break"],
     sources: ["NYSE"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מטריצת סטאפים · תג סטאפ ביומן", "src/components/DayTradesModal.jsx — יומן יומי · תג סטאפ"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Power Hour Break",
@@ -518,15 +595,21 @@ export default [
       },
       es: {
         label: "Power Hour Break",
-        short: "Ruptura en la última hora (15:00-16:00 ET). Posicionamiento institucional hacia el cierre.",
+        short: "Ruptura en la última hora de sesión, 15:00–16:00 en Nueva York.",
+        example: "Ejemplo: máximo diario de $70 roto a las 15:20 ⇒ entrada en $70.10.",
+        longForm: "Ruptura en la última hora (15:00-16:00 ET). Posicionamiento institucional de cara al cierre.",
       },
       pt: {
         label: "Power Hour Break",
-        short: "Rompimento na última hora (15:00-16:00 ET). Posicionamento institucional rumo ao fecho.",
+        short: "Rompimento na última hora do pregão, 15h–16h em Nova York.",
+        example: "Exemplo: máxima diária de $70 rompida às 15h20 ⇒ entrada em $70.10.",
+        longForm: "Rompimento na última hora (15h-16h ET). Posicionamento institucional rumo ao fechamento.",
       },
       ar: {
         label: "Power Hour Break",
-        short: "اختراق في الساعة الأخيرة (15:00-16:00 ET). تموضع مؤسّسي قبيل الإغلاق.",
+        short: "اختراق في آخر ساعة تداول، 15:00–16:00 بتوقيت نيويورك.",
+        example: "مثال: كسر القمة اليومية $70 عند 15:20 ⇒ الدخول عند $70.10.",
+        longForm: "اختراق في الساعة الأخيرة (15:00-16:00 ET). تموضع مؤسّسي قبيل الإغلاق.",
       },
     },
   },
@@ -535,7 +618,6 @@ export default [
     aliases: ["moc fade"],
     sources: ["NYSE"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מטריצת סטאפים · תג סטאפ ביומן", "src/components/DayTradesModal.jsx — יומן יומי · תג סטאפ"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "MOC Fade",
@@ -553,15 +635,24 @@ export default [
       },
       es: {
         label: "MOC Fade",
-        short: "Fade de Market-On-Close. Operar contra movimientos extendidos hacia el cierre para un giro al día siguiente.",
+        short: "Operar contra un movimiento brusco al cierre (Market-On-Close), esperando un retroceso al día siguiente.",
+        example: "Ejemplo: +4% en la última hora ⇒ SHORT hacia el cierre.",
+        caveat: "En la NYSE, las órdenes MOC se aceptan hasta las 15:50 hora de Nueva York.",
+        longForm: "Fade de Market-On-Close. Operar contra movimientos extendidos hacia el cierre, buscando un giro al día siguiente.",
       },
       pt: {
         label: "MOC Fade",
-        short: "Fade de Market-On-Close. Operar contra movimentos estendidos rumo ao fecho para uma reversão no dia seguinte.",
+        short: "Operar contra um movimento forte rumo ao fechamento (Market-On-Close), esperando uma correção no dia seguinte.",
+        example: "Exemplo: +4% na última hora ⇒ SHORT rumo ao fechamento.",
+        caveat: "Na NYSE, ordens MOC são aceitas até 15h50, horário de Nova York.",
+        longForm: "Fade de Market-On-Close. Operar contra movimentos estendidos rumo ao fechamento, buscando uma reversão no dia seguinte.",
       },
       ar: {
         label: "MOC Fade",
-        short: "Fade على إغلاق السوق. التداول عكس الحركات الممتدّة قبيل الإغلاق توقّعاً لانعكاس في اليوم التالي.",
+        short: "التداول عكس حركة حادة قبيل الإغلاق (Market-On-Close)، توقعاً لتراجع في اليوم التالي.",
+        example: "مثال: حركة \u200e+4% في الساعة الأخيرة ⇒ SHORT قبيل الإغلاق.",
+        caveat: "في NYSE تُقبل أوامر MOC حتى 15:50 بتوقيت نيويورك.",
+        longForm: "Fade عند إغلاق السوق (Market-On-Close). التداول عكس الحركات الممتدّة قبيل الإغلاق توقّعاً لانعكاس في اليوم التالي.",
       },
     },
   },
@@ -569,7 +660,6 @@ export default [
     id: "overnightHold",
     aliases: ["overnight hold"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מטריצת סטאפים · תג סטאפ ביומן", "src/components/DayTradesModal.jsx — יומן יומי · תג סטאפ"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Overnight Hold",
@@ -587,15 +677,24 @@ export default [
       },
       es: {
         label: "Overnight Hold",
-        short: "Operación mantenida toda la noche. Mayor potencial de recompensa pero expuesta al riesgo de hueco.",
+        short: "Una operación que dejaste abierta después del cierre de la sesión.",
+        example: "Ejemplo: compraste a $30 a las 15:30 y la acción abrió a $28 al día siguiente ⇒ hueco en tu contra.",
+        caveat: "Un stop no protege frente a un hueco de apertura.",
+        longForm: "Operación mantenida durante la noche. Mayor potencial de ganancia, pero expuesta al riesgo de hueco.",
       },
       pt: {
         label: "Overnight Hold",
-        short: "Operação mantida durante a noite. Maior potencial de retorno mas exposta ao risco de gap.",
+        short: "Uma operação que você deixou aberta depois do fechamento do pregão.",
+        example: "Exemplo: você comprou a $30 às 15h30 e a ação abriu a $28 no dia seguinte ⇒ um gap contra você.",
+        caveat: "Um stop não protege contra um gap de abertura.",
+        longForm: "Operação mantida durante a noite. Maior potencial de ganho, mas exposta ao risco de gap.",
       },
       ar: {
         label: "Overnight Hold",
-        short: "صفقة محتفظ بها طوال الليل. إمكانية ربح أعلى لكنها معرّضة لمخاطر الفجوة.",
+        short: "صفقة تركتها مفتوحة بعد إغلاق يوم التداول.",
+        example: "مثال: اشتريت عند $30 الساعة 15:30، وافتتح السهم عند $28 في اليوم التالي ⇒ فجوة ضدك.",
+        caveat: "وقف الخسارة لا يحمي من فجوة الافتتاح.",
+        longForm: "صفقة محتفظ بها طوال الليل. إمكانية ربح أعلى لكنها معرّضة لمخاطر الفجوة.",
       },
     },
   },
@@ -603,7 +702,6 @@ export default [
     id: "overnightReversal",
     aliases: ["overnight reversal"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מטריצת סטאפים · תג סטאפ ביומן", "src/components/DayTradesModal.jsx — יומן יומי · תג סטאפ"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Overnight Reversal",
@@ -619,15 +717,21 @@ export default [
       },
       es: {
         label: "Overnight Reversal",
-        short: "Operar el giro del movimiento nocturno en la apertura. Contra-tendencia, requiere confirmación.",
+        short: "Operar contra el movimiento nocturno en la apertura, tras confirmación.",
+        example: "Ejemplo: hueco de −3% al abrir y el precio vuelve sobre el precio de apertura ⇒ LONG.",
+        longForm: "Operar el giro del movimiento nocturno en la apertura del mercado. Contra la tendencia, requiere confirmación.",
       },
       pt: {
         label: "Overnight Reversal",
-        short: "Operar a reversão do movimento noturno na abertura. Contra-tendência, exige confirmação.",
+        short: "Operar contra o movimento noturno na abertura, após confirmação.",
+        example: "Exemplo: gap de −3% na abertura e o preço volta acima do preço de abertura ⇒ LONG.",
+        longForm: "Operar a reversão do movimento noturno na abertura do mercado. Contra a tendência, exige confirmação.",
       },
       ar: {
         label: "Overnight Reversal",
-        short: "تداول انعكاس حركة الليل عند افتتاح السوق. عكس الاتجاه، يتطلّب تأكيداً.",
+        short: "التداول عكس حركة الليل عند الافتتاح، بعد التأكيد.",
+        example: "مثال: فجوة \u200e−3% عند الافتتاح وعودة السعر فوق سعر الافتتاح ⇒ LONG.",
+        longForm: "تداول انعكاس حركة الليل عند افتتاح السوق. عكس الاتجاه، يتطلّب تأكيداً.",
       },
     },
   },
@@ -636,7 +740,6 @@ export default [
     aliases: ["support bounce"],
     sources: ["MURPHY"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מטריצת סטאפים · תג סטאפ ביומן", "src/components/DayTradesModal.jsx — יומן יומי · תג סטאפ"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Support Bounce",
@@ -652,15 +755,21 @@ export default [
       },
       es: {
         label: "Support Bounce",
-        short: "Comprar cuando el precio cae a un nivel de soporte conocido y rebota al alza. La lógica: los compradores defienden el nivel. El stop va debajo del soporte; si se rompe, la tesis queda anulada.",
+        short: "Entrar cuando el precio cae a un nivel de soporte conocido y gira al alza.",
+        example: "Ejemplo: soporte en $25, mínimo $25.10, entrada en $25.60 y stop en $24.80.",
+        longForm: "Comprar cuando el precio cae a un nivel de soporte conocido y se gira al alza. La lógica: los compradores defienden el nivel. El stop va por debajo del soporte — si se rompe, la tesis queda anulada.",
       },
       pt: {
         label: "Support Bounce",
-        short: "Comprar quando o preço cai a um nível de suporte conhecido e reverte para cima. A lógica: os compradores defendem o nível. O stop fica abaixo do suporte; se romper, a tese é anulada.",
+        short: "Entrar quando o preço cai até um nível de suporte conhecido e vira para cima.",
+        example: "Exemplo: suporte em $25, mínima $25.10, entrada em $25.60, stop em $24.80.",
+        longForm: "Comprar quando o preço cai até um nível de suporte conhecido e reverte para cima. A lógica: os compradores defendem o nível. O stop fica abaixo do suporte — se ele romper, a tese é anulada.",
       },
       ar: {
         label: "Support Bounce",
-        short: "الشراء عندما يهبط السعر إلى مستوى دعم معروف ثم ينعكس صعوداً. المنطق: المشترون يدافعون عن المستوى. يوضع وقف الخسارة أسفل الدعم — وإذا انكسر، تسقط الفكرة.",
+        short: "الدخول عندما يهبط السعر إلى مستوى دعم معروف ثم ينعطف صعوداً.",
+        example: "مثال: دعم عند $25، قاع $25.10، دخول عند $25.60، ووقف عند $24.80.",
+        longForm: "الشراء عندما يهبط السعر إلى مستوى دعم معروف ثم ينعكس صعوداً. المنطق: المشترون يدافعون عن المستوى. يوضع وقف الخسارة أسفل الدعم — وإذا انكسر، تسقط الفكرة.",
       },
     },
   },
@@ -669,7 +778,6 @@ export default [
     aliases: ["resistance break"],
     sources: ["MURPHY"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מטריצת סטאפים · תג סטאפ ביומן", "src/components/DayTradesModal.jsx — יומן יומי · תג סטאפ"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Resistance Break",
@@ -685,15 +793,21 @@ export default [
       },
       es: {
         label: "Resistance Break",
-        short: "Entrar cuando el precio rompe por encima de un nivel de resistencia que antes lo frenaba, idealmente con volumen alto. La ruptura indica que los compradores tomaron el control. Se diferencia de un Breakout genérico por enfocarse en un nivel específico.",
+        short: "Entrar cuando el precio rompe un nivel de resistencia concreto que antes lo frenó.",
+        example: "Ejemplo: se frenó dos veces en $80 y luego cerró en $81 con volumen alto.",
+        longForm: "Entrar cuando el precio rompe por encima de un nivel de resistencia que antes lo frenaba, idealmente con volumen alto. La ruptura indica que los compradores tomaron el control. Se diferencia de un Breakout genérico en que apunta a un nivel específico.",
       },
       pt: {
         label: "Resistance Break",
-        short: "Entrar quando o preço rompe acima de um nível de resistência que antes o travava, idealmente com volume alto. O rompimento sinaliza que os compradores assumiram o controlo. Difere de um Breakout genérico por focar num nível específico.",
+        short: "Entrar quando o preço rompe um nível de resistência específico que o travou antes.",
+        example: "Exemplo: travou duas vezes em $80 e depois fechou em $81 com volume alto.",
+        longForm: "Entrar quando o preço rompe acima de um nível de resistência que antes o travava, idealmente com volume alto. O rompimento sinaliza que os compradores assumiram o controle. Difere de um Breakout genérico por mirar em um nível específico.",
       },
       ar: {
         label: "Resistance Break",
-        short: "الدخول عندما يخترق السعر مستوى مقاومة كان يكبحه سابقاً، ويُفضّل بحجم تداول عالٍ. الاختراق يشير إلى أن المشترين سيطروا. يختلف عن الـ Breakout العام بتركيزه على مستوى محدّد.",
+        short: "الدخول عندما يخترق السعر مستوى مقاومة محدداً أوقفه من قبل.",
+        example: "مثال: توقف مرتين عند $80، ثم أغلق عند $81 بحجم تداول مرتفع.",
+        longForm: "الدخول عندما يخترق السعر مستوى مقاومة كان يكبحه سابقاً، ويُفضّل بحجم تداول عالٍ. الاختراق يشير إلى أن المشترين سيطروا. يختلف عن الـ Breakout العام بتركيزه على مستوى محدّد.",
       },
     },
   },
@@ -701,7 +815,6 @@ export default [
     id: "pullback20EMA",
     aliases: ["pullback to 20 ema"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מטריצת סטאפים · תג סטאפ ביומן", "src/components/DayTradesModal.jsx — יומן יומי · תג סטאפ"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Pullback to 20 EMA",
@@ -717,15 +830,21 @@ export default [
       },
       es: {
         label: "Pullback to 20 EMA",
-        short: "Comprar cuando un precio en tendencia alcista retrocede a la media móvil de 20 períodos y rebota. La 20 EMA actúa como soporte dinámico; este setup combina tendencia con un punto de entrada preciso.",
+        short: "Entrar cuando un precio en tendencia alcista retrocede a la media móvil exponencial de 20 períodos y gira.",
+        example: "Ejemplo: 20 EMA en $40, mínimo de $40.15 y cierre en $41.",
+        longForm: "Comprar cuando un precio en tendencia alcista retrocede a la media móvil de 20 períodos y rebota. La 20 EMA actúa como soporte dinámico; este setup combina tendencia con un punto de entrada preciso.",
       },
       pt: {
         label: "Pullback to 20 EMA",
-        short: "Comprar quando um preço em tendência de alta recua à média móvel de 20 períodos e ressalta. A 20 EMA atua como suporte dinâmico; este setup combina tendência com um ponto de entrada preciso.",
+        short: "Entrar quando um preço em tendência de alta recua até a média móvel exponencial de 20 períodos e vira.",
+        example: "Exemplo: 20 EMA em $40, mínima de $40.15 e fechamento em $41.",
+        longForm: "Comprar quando um preço em tendência de alta recua até a média móvel de 20 períodos e repica. A 20 EMA atua como suporte dinâmico; este setup combina tendência com um ponto de entrada preciso.",
       },
       ar: {
         label: "Pullback to 20 EMA",
-        short: "الشراء عندما يرتد سعر في اتجاه صاعد إلى المتوسط المتحرك لـ 20 فترة ثم يرتدّ منه. يعمل الـ 20 EMA كدعم ديناميكي؛ ويجمع هذا النموذج بين الاتجاه ونقطة دخول دقيقة.",
+        short: "الدخول عندما يتراجع سعر في اتجاه صاعد إلى المتوسط المتحرك الأسي لـ 20 فترة ثم ينعطف.",
+        example: "مثال: 20 EMA عند $40، قاع $40.15، وإغلاق عند $41.",
+        longForm: "الشراء عندما يتراجع سعر في اتجاه صاعد إلى المتوسط المتحرك لـ 20 فترة ثم يرتدّ منه. يعمل الـ 20 EMA كدعم ديناميكي؛ ويجمع هذا النموذج بين الاتجاه ونقطة دخول دقيقة.",
       },
     },
   },

@@ -1,7 +1,7 @@
 // src/glossary/terms/emotions.js — רגשות
 // ⛔ מקור האמת היחיד למונחים האלה. עריכה כאן ⇒ `npm run glossary` באותו קומיט (test:glossary תופס סחיפה).
 // פורמט (גל 3): short = הגדרה במשפט אחד ≤18 מילים · example = "לדוגמה:"/"Example:" במספרים היפותטיים · caveat אחד לכל היותר · longForm = הטקסט המלא (מודאל המילון).
-// pendingTranslation: es/pt/ar עדיין בטקסט הישן — שלב 5.
+// 5 שפות מלאות (שלב 5, 14.11): es/pt/ar מתורגמים מ-he/en, ≤110% מתווי en. שפה שממתינה לתרגום ⇒ pendingTranslation + שורה ב-test:glossary (L3).
 
 /** @type {import("../types.js").GlossaryTerm[]} */
 export default [
@@ -9,7 +9,6 @@ export default [
     id: "emotionConfident",
     sources: ["DOUGLAS"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מקרא ביצועים לפי רגש"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Confident",
@@ -27,15 +26,24 @@ export default [
       },
       es: {
         label: "Confident",
-        short: "Confianza basada en el análisis, no en la arrogancia. Sobre un setup válido impulsa una ejecución disciplinada; si se convierte en exceso de confianza tras una racha ganadora, se vuelve peligrosa.",
+        short: "Confianza basada en un setup válido y en el análisis, no en una racha ganadora.",
+        example: "Ejemplo: se cumplieron todas las condiciones que anotaste y entraste con tu tamaño normal.",
+        caveat: "Tras una racha ganadora, comprueba que no sea exceso de confianza.",
+        longForm: "Confianza basada en el análisis, no en la bravuconería. Cuando se apoya en un setup válido impulsa una ejecución disciplinada; cuando se convierte en exceso de confianza tras una racha ganadora, se vuelve arriesgada.",
       },
       pt: {
         label: "Confident",
-        short: "Confiança baseada na análise, não em arrogância. Sobre um setup válido gera execução disciplinada; se virar excesso de confiança após uma sequência de vitórias, torna-se arriscada.",
+        short: "Confiança apoiada em setup válido e análise, não em sequência de ganhos.",
+        example: "Exemplo: todas as condições que você anotou se cumpriram e você entrou no tamanho normal.",
+        caveat: "Após uma sequência de ganhos, veja se não é excesso de confiança.",
+        longForm: "Confiança baseada na análise, não em bravata. Quando se apoia em um setup válido, leva a uma execução disciplinada; quando vira excesso de confiança após uma sequência de ganhos, torna-se arriscada.",
       },
       ar: {
         label: "Confident",
-        short: "ثقة مبنية على التحليل وليست غروراً. عندما تستند إلى نموذج دخول صحيح تؤدي إلى تنفيذ منضبط؛ وعندما تتحول إلى ثقة مفرطة بعد سلسلة انتصارات تصبح خطيرة.",
+        short: "ثقة مبنية على نموذج دخول صحيح وعلى التحليل، لا على سلسلة أرباح.",
+        example: "مثال: تحققت كل الشروط التي دوّنتها ودخلت بحجمك المعتاد.",
+        caveat: "بعد سلسلة أرباح، تحقّق من أنها ليست ثقة مفرطة.",
+        longForm: "ثقة مبنية على التحليل لا على التهوّر. عندما تستند إلى نموذج دخول صحيح تقود إلى تنفيذ منضبط؛ وعندما تنقلب إلى ثقة مفرطة بعد سلسلة أرباح تصبح محفوفة بالمخاطر.",
       },
     },
   },
@@ -43,7 +51,6 @@ export default [
     id: "emotionCalm",
     sources: ["DOUGLAS"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מקרא ביצועים לפי רגש"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Calm",
@@ -59,22 +66,27 @@ export default [
       },
       es: {
         label: "Calm",
-        short: "El estado emocional óptimo para un trader. La calma te permite seguir tu plan sin perseguir ni entrar en pánico. Las operaciones abiertas con calma tienden a respetar su stop y objetivo.",
+        short: "Entraste sin presión y sin perseguir el movimiento, según el plan.",
+        example: "Ejemplo: esperaste tu precio planificado y fijaste el stop y el objetivo de antemano.",
+        longForm: "El estado emocional óptimo para un trader. La calma te permite seguir tu plan sin perseguir ni entrar en pánico. Las operaciones abiertas con calma tienden a respetar su stop y su objetivo.",
       },
       pt: {
         label: "Calm",
-        short: "O estado emocional ideal para um trader. A calma permite seguir o seu plano sem perseguir nem entrar em pânico. Operações abertas com calma tendem a respeitar o stop e o alvo.",
+        short: "Você entrou sem pressão e sem correr atrás, de acordo com o plano.",
+        example: "Exemplo: você esperou o preço planejado e definiu o stop e o alvo com antecedência.",
+        longForm: "O estado emocional ideal para um trader. A calma permite seguir seu plano sem correr atrás nem entrar em pânico. Operações abertas com calma tendem a respeitar o stop e o alvo.",
       },
       ar: {
         label: "Calm",
-        short: "الحالة العاطفية المثلى للمتداول. الهدوء يتيح لك اتّباع خطتك دون مطاردة أو ذعر. الصفقات التي تُفتح بهدوء تميل إلى احترام وقف الخسارة والهدف.",
+        short: "دخلت دون ضغط ودون مطاردة، وفقًا للخطة.",
+        example: "مثال: انتظرت السعر الذي خططت له وحددت وقف الخسارة والهدف مسبقًا.",
+        longForm: "الحالة العاطفية المثلى للمتداول. الهدوء يتيح لك اتباع خطتك دون مطاردة أو ذعر. الصفقات التي تُفتح بهدوء تميل إلى احترام وقف الخسارة والهدف.",
       },
     },
   },
   {
     id: "emotionPatient",
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מקרא ביצועים לפי רגש"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Patient",
@@ -90,22 +102,27 @@ export default [
       },
       es: {
         label: "Patient",
-        short: "Esperar un setup que realmente cumpla tus criterios en lugar de entrar en cada movimiento. La paciencia suele ser lo que separa a un trader rentable de uno perdedor: filtra las operaciones de baja calidad.",
+        short: "Esperaste un setup que cumpliera todos tus criterios en vez de entrar en cada movimiento.",
+        example: "Ejemplo: omitiste dos breakouts débiles y tomaste el tercero.",
+        longForm: "Esperar un setup que realmente cumpla tus criterios en lugar de entrar en cada movimiento. La paciencia suele ser lo que separa a un trader rentable de uno perdedor — filtra las operaciones de baja calidad.",
       },
       pt: {
         label: "Patient",
-        short: "Esperar por um setup que realmente cumpra os seus critérios em vez de entrar em cada movimento. A paciência costuma ser o que separa um trader lucrativo de um perdedor — filtra operações de baixa qualidade.",
+        short: "Esperou um setup que cumprisse todos os seus critérios em vez de entrar em cada movimento.",
+        example: "Exemplo: você pulou dois breakouts fracos e pegou o terceiro.",
+        longForm: "Esperar um setup que realmente cumpra seus critérios em vez de entrar em cada movimento. A paciência costuma ser o que separa um trader lucrativo de um perdedor — ela filtra operações de baixa qualidade.",
       },
       ar: {
         label: "Patient",
-        short: "انتظار نموذج دخول يستوفي معاييرك فعلاً بدلاً من الدخول في كل حركة. الصبر غالباً ما يفصل بين المتداول الرابح والخاسر، فهو يُصفّي الصفقات منخفضة الجودة.",
+        short: "انتظرت نموذج دخول يستوفي كل معاييرك بدلًا من الدخول في كل حركة.",
+        example: "مثال: تجاوزت اختراقين ضعيفين ودخلت في الثالث.",
+        longForm: "انتظار نموذج دخول يستوفي معاييرك فعلًا بدلًا من الدخول في كل حركة. الصبر غالبًا ما يفصل بين المتداول الرابح والخاسر — فهو يُصفّي الصفقات منخفضة الجودة.",
       },
     },
   },
   {
     id: "emotionNeutral",
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מקרא ביצועים לפי רגש"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Neutral",
@@ -121,22 +138,27 @@ export default [
       },
       es: {
         label: "Neutral",
-        short: "Entrar sin carga emocional, ni eufórico ni temeroso. Un estado estable que permite decisiones objetivas basadas en datos. Una buena base, aunque menos afilada que \"Calm\".",
+        short: "Entraste sin carga emocional — ni entusiasmado ni temeroso.",
+        example: "Ejemplo: una operación más del plan, sin una expectativa especial.",
+        longForm: "Entrar sin carga emocional — ni entusiasmado ni temeroso. Un estado estable que permite decisiones objetivas basadas en datos. Una base sólida, aunque menos afilada que \"Calm\".",
       },
       pt: {
         label: "Neutral",
-        short: "Entrar sem carga emocional — nem eufórico nem receoso. Um estado estável que permite decisões objetivas e baseadas em dados. Uma boa base, ainda que menos afiada que \"Calm\".",
+        short: "Você entrou sem carga emocional — nem empolgado nem com medo.",
+        example: "Exemplo: mais uma operação do plano, sem expectativa especial.",
+        longForm: "Entrar sem carga emocional — nem empolgado nem com medo. Um estado estável que permite decisões objetivas, baseadas em dados. Uma base sólida, ainda que menos afiada que \"Calm\".",
       },
       ar: {
         label: "Neutral",
-        short: "الدخول دون شحنة عاطفية، لا متحمّس ولا خائف. حالة مستقرة تتيح قرارات موضوعية مبنية على البيانات. أساس جيّد، وإن كان أقل حدّة من \"Calm\".",
+        short: "دخلت دون شحنة عاطفية — لا متحمسًا ولا خائفًا.",
+        example: "مثال: صفقة أخرى من الخطة، دون توقّع خاص.",
+        longForm: "الدخول دون شحنة عاطفية — لا متحمسًا ولا خائفًا. حالة مستقرة تتيح قرارات موضوعية مبنية على البيانات. أساس متين، وإن كان أقل حدّة من \"Calm\".",
       },
     },
   },
   {
     id: "emotionHesitant",
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מקרא ביצועים לפי רגש"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Hesitant",
@@ -152,22 +174,27 @@ export default [
       },
       es: {
         label: "Hesitant",
-        short: "Vacilación en la entrada, normalmente señal de que el setup no está claro o la confianza es baja. Las entradas vacilantes suelen implicar entrar tarde, poner el stop demasiado ajustado o salir antes por miedo.",
+        short: "Dudaste al entrar — normalmente cuando el setup no está claro o la confianza es baja.",
+        example: "Ejemplo: esperaste una vela más y entraste $0.50 por encima de tu precio planificado.",
+        longForm: "Vacilación en la entrada — normalmente señal de que el setup no está claro o la confianza es baja. Las entradas vacilantes suelen implicar entrar tarde, poner el stop demasiado ajustado o salir antes por miedo.",
       },
       pt: {
         label: "Hesitant",
-        short: "Hesitação na entrada — geralmente sinal de que o setup não está claro ou a confiança está baixa. Entradas hesitantes tendem a significar entrar tarde, colocar o stop apertado demais ou sair cedo por medo.",
+        short: "Você hesitou na entrada — geralmente quando o setup não está claro ou a confiança está baixa.",
+        example: "Exemplo: você esperou mais um candle e entrou $0.50 acima do preço planejado.",
+        longForm: "Hesitação na entrada — geralmente sinal de que o setup não está claro ou de que a confiança está baixa. Entradas hesitantes tendem a significar entrar tarde, colocar o stop apertado demais ou sair cedo por medo.",
       },
       ar: {
         label: "Hesitant",
-        short: "التردّد عند الدخول، وغالباً ما يكون علامة على أن نموذج الدخول غير واضح أو أن الثقة منخفضة. الدخول المتردّد يميل إلى التأخّر في الدخول، أو وضع وقف خسارة ضيّق جداً، أو الخروج مبكراً بدافع الخوف.",
+        short: "تردّدت عند الدخول — غالبًا عندما يكون نموذج الدخول غير واضح أو الثقة منخفضة.",
+        example: "مثال: انتظرت شمعة أخرى ودخلت أعلى من سعرك المخطط بـ $0.50.",
+        longForm: "التردّد عند الدخول — غالبًا علامة على أن نموذج الدخول غير واضح أو أن الثقة منخفضة. الدخول المتردّد يعني عادةً الدخول متأخرًا، أو وضع وقف خسارة ضيّق جدًا، أو الخروج مبكرًا بدافع الخوف.",
       },
     },
   },
   {
     id: "emotionNervous",
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מקרא ביצועים לפי רגש"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Nervous",
@@ -185,22 +212,30 @@ export default [
       },
       es: {
         label: "Nervous",
-        short: "Tensión que nubla la toma de decisiones. El nerviosismo lleva a revisar el precio de forma obsesiva, mover el stop y salir impulsivamente. Suele indicar una posición demasiado grande o falta de confianza en el setup.",
+        short: "Tensión que nubló tu juicio durante la operación.",
+        example: "Ejemplo: revisaste el precio cada minuto y moviste el stop dos veces.",
+        caveat: "A veces indica que la posición es demasiado grande.",
+        longForm: "Tensión que nubla la toma de decisiones. El nerviosismo lleva a revisar el precio de forma obsesiva, mover el stop y salir por impulso. Suele indicar que la posición es demasiado grande o que no confías en el setup.",
       },
       pt: {
         label: "Nervous",
-        short: "Tensão que prejudica a tomada de decisão. O nervosismo leva a verificar o preço de forma obsessiva, mexer no stop e sair por impulso. Costuma indicar uma posição grande demais ou falta de confiança no setup.",
+        short: "Tensão que turvou seu julgamento durante a operação.",
+        example: "Exemplo: você checou o preço a cada minuto e moveu o stop duas vezes.",
+        caveat: "Às vezes indica que a posição está grande demais.",
+        longForm: "Tensão que atrapalha a tomada de decisão. O nervosismo leva a checar o preço de forma obsessiva, mexer no stop e sair por impulso. Muitas vezes indica que a posição está grande demais ou que você não confia no setup.",
       },
       ar: {
         label: "Nervous",
-        short: "توتّر يُشوّش اتخاذ القرار. العصبية تؤدي إلى مراقبة السعر بهوس، وتحريك وقف الخسارة، والخروج المتسرّع. وغالباً ما تدل على أن حجم الصفقة كبير جداً أو عدم الثقة في نموذج الدخول.",
+        short: "توتّر شوّش حكمك أثناء الصفقة.",
+        example: "مثال: كنت تتحقق من السعر كل دقيقة وحرّكت وقف الخسارة مرتين.",
+        caveat: "أحيانًا علامة على أن حجم الصفقة كبير جدًا.",
+        longForm: "توتّر يُشوّش اتخاذ القرار. العصبية تؤدي إلى مراقبة السعر بهوس، وتحريك وقف الخسارة، والخروج المتسرّع. وغالبًا ما تدل على أن حجم الصفقة كبير جدًا أو على عدم الثقة في نموذج الدخول.",
       },
     },
   },
   {
     id: "emotionFOMO",
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מקרא ביצועים לפי רגש"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "FOMO",
@@ -216,15 +251,21 @@ export default [
       },
       es: {
         label: "FOMO",
-        short: "\"Miedo a quedarse fuera\" — entrar en una operación solo porque el precio se movió con fuerza, sin un setup válido. Uno de los patrones más destructivos: entrada tardía, perseguir el precio y un stop lejano. Una señal de alerta.",
+        short: "Entraste porque el precio se movió fuerte y temías quedarte fuera, sin un setup válido.",
+        example: "Ejemplo: la acción subía +6% y entraste en el máximo sin un stop claro.",
+        longForm: "\"Miedo a quedarse fuera\" (Fear Of Missing Out) — entrar en una operación solo porque el precio se movió con fuerza, sin un setup válido. Uno de los patrones más destructivos: entrada tardía, perseguir el precio y un stop lejano. Una señal de alerta.",
       },
       pt: {
         label: "FOMO",
-        short: "\"Medo de ficar de fora\" — entrar numa operação só porque o preço se moveu com força, sem um setup válido. Um dos padrões mais destrutivos: entrada tardia, perseguir o preço e um stop distante. Um sinal de alerta.",
+        short: "Você entrou porque o preço se moveu forte e teve medo de ficar de fora, sem um setup válido.",
+        example: "Exemplo: a ação subia +6% e você entrou na máxima sem um stop claro.",
+        longForm: "\"Medo de ficar de fora\" (Fear Of Missing Out) — entrar em uma operação só porque o preço se moveu com força, sem um setup válido. Um dos padrões mais destrutivos: entrada tardia, correr atrás do preço e um stop distante. Um sinal de alerta.",
       },
       ar: {
         label: "FOMO",
-        short: "\"الخوف من تفويت الفرصة\" — الدخول في صفقة لمجرّد أن السعر تحرّك بحدّة، دون نموذج دخول صحيح. من أكثر الأنماط تدميراً: دخول متأخّر، ومطاردة السعر، ووقف خسارة بعيد. علامة تحذير.",
+        short: "دخلت لأن السعر تحرّك بقوة وخشيت أن تفوتك الفرصة، دون نموذج دخول صحيح.",
+        example: "مثال: كان السهم مرتفعًا \u200e+6% ودخلت عند القمة دون وقف خسارة واضح.",
+        longForm: "\"الخوف من تفويت الفرصة\" (Fear Of Missing Out) — الدخول في صفقة لمجرد أن السعر تحرّك بحدّة، دون نموذج دخول صحيح. من أكثر الأنماط تدميرًا: دخول متأخر، ومطاردة السعر، ووقف خسارة بعيد. علامة تحذير.",
       },
     },
   },
@@ -232,7 +273,6 @@ export default [
     id: "emotionAngry",
     sources: ["STEEN"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · מקרא ביצועים לפי רגש"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Angry",
@@ -248,15 +288,21 @@ export default [
       },
       es: {
         label: "Angry",
-        short: "Ira tras una pérdida — el combustible del \"trading de venganza\". En este estado el trader intenta recuperar la pérdida de inmediato, aumenta el riesgo y entra en malas operaciones. Así se revientan las cuentas. Detente.",
+        short: "Ira tras una pérdida que te empujó a recuperarla enseguida — trading de venganza.",
+        example: "Ejemplo: perdiste $200 y enseguida abriste una operación del doble de tamaño.",
+        longForm: "Ira tras una pérdida — el combustible del \"trading de venganza\". En este estado el trader intenta recuperar una pérdida de inmediato, aumenta el riesgo y entra en malas operaciones. Así es como se revientan las cuentas. Detente.",
       },
       pt: {
         label: "Angry",
-        short: "Raiva após uma perda — o combustível do \"trading de vingança\". Nesse estado o trader tenta recuperar a perda de imediato, aumenta o risco e faz operações ruins. É assim que se destroem contas. Pare.",
+        short: "Raiva após uma perda que levou você a recuperá-la na hora — trading de vingança.",
+        example: "Exemplo: você perdeu $200 e abriu na hora uma operação com o dobro do tamanho.",
+        longForm: "Raiva após uma perda — o combustível do \"trading de vingança\". Nesse estado o trader tenta recuperar uma perda imediatamente, aumenta o risco e faz operações ruins. É assim que contas quebram. Pare.",
       },
       ar: {
         label: "Angry",
-        short: "الغضب بعد الخسارة — وقود \"التداول الانتقامي\". في هذه الحالة يحاول المتداول استعادة خسارته فوراً، فيرفع المخاطرة ويدخل صفقات سيئة. هكذا تُدمَّر الحسابات. توقّف.",
+        short: "غضب بعد خسارة دفعك إلى استعادتها فورًا — التداول الانتقامي.",
+        example: "مثال: خسرت $200 وفتحت فورًا صفقة بضعف الحجم.",
+        longForm: "الغضب بعد الخسارة — وقود \"التداول الانتقامي\". في هذه الحالة يحاول المتداول استعادة خسارته فورًا، فيرفع المخاطرة ويدخل صفقات سيئة. هكذا تنهار الحسابات. توقّف.",
       },
     },
   },

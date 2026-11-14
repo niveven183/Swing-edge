@@ -1,246 +1,371 @@
 {
-  "sourceHash": "7597dbf08dc2e372",
+  "sourceHash": "30d651feac2a5bd6",
   "lang": "pt",
   "terms": {
     "winRate": {
-      "short": "A Win Rate é a percentagem das tuas operações fechadas que terminaram em lucro.\n\nAcima de 55% é sólido. Mas a win rate sozinha não determina o sucesso — um trader com 40% pode ser lucrativo com boas relações risco-retorno. Repara também no Profit Factor."
+      "short": "A porcentagem das suas operações fechadas que terminaram com lucro.",
+      "example": "Exemplo: 6 vencedoras de 10 operações fechadas = 60%.",
+      "caveat": "O break-even conta no denominador, não como ganho; a Win Rate sozinha não mostra lucratividade."
     },
     "profitFactor": {
-      "short": "Profit Factor = Lucros Brutos Totais ÷ Perdas Brutas Totais.\n\n• Acima de 1.0 = lucrativo\n• Acima de 1.5 = vantagem saudável\n• Acima de 2.0 = nível profissional\n• Acima de 3.0 = excecional\n\nÉ uma das métricas mais importantes no trading."
+      "short": "Lucro bruto dividido pela perda bruta das suas operações fechadas.",
+      "example": "Exemplo: você ganhou $3,000 e perdeu $2,000 ⇒ 1.5; acima de 1 significa que você ganhou mais do que perdeu.",
+      "caveat": "Sem nenhuma perda, mostra ∞; calculado antes das comissões."
     },
     "avgR": {
-      "short": "R-Multiple médio por operação fechada.\n\nR = lucro da operação ÷ risco inicial por ação. O lucro segue a direção da operação: num LONG é (Saída − Entrada), num SHORT é (Entrada − Saída) — por isso um SHORT vencedor dá sempre um R positivo.\n\n+1.0R significa que ganhaste exatamente o que arriscaste. Aponta para +0.3R ou mais como média mínima. Traders de elite têm média de +1.5R a +2.5R.\n\nSó as operações com stop podem ser medidas em R — uma operação sem stop é excluída desta média, não conta como 0R. A linha por baixo do número mostra quantas das tuas operações fechadas a média cobre realmente."
+      "short": "R médio das operações fechadas; R = lucro ÷ risco no stop salvo, conforme a direção (LONG/SHORT).",
+      "example": "Exemplo: você arriscou $100 e ganhou $150 ⇒ +1.5R.",
+      "caveat": "Uma operação sem stop é excluída, não contada como 0R."
     },
     "expectancy": {
-      "short": "Expectativa = (% Ganhos × Ganho Médio) − (% Perdas × Perda Média).\n\nDiz-te o lucro esperado em dólares por operação em média. Positiva = o teu sistema tem vantagem. Negativa = perdes dinheiro ao longo do tempo independentemente dos ganhos individuais."
+      "short": "O R médio que você ganhou por operação fechada, contando o break-even no denominador.",
+      "example": "Exemplo: metade ganha +2R e metade perde −1R ⇒ +0.5R por operação.",
+      "caveat": "Medida em R, não em dólares."
     },
     "sharpe": {
-      "short": "O Rácio de Sharpe mede o retorno ajustado ao risco.\n\n• Acima de 1.0 = bom\n• Acima de 2.0 = excelente\n• Acima de 3.0 = excecional (nível de hedge fund)\n\nUm Sharpe alto significa retornos consistentes sem oscilações bruscas. Mais importante que o lucro bruto para avaliar a qualidade do sistema."
+      "short": "O R médio por operação dividido pelo desvio padrão do R.",
+      "example": "Exemplo: média de +0.5R com desvio padrão de 1R ⇒ 0.5.",
+      "caveat": "Sem taxa livre de risco e sem anualização — não é comparável ao Sharpe de um fundo."
     },
     "maxDD": {
-      "short": "Drawdown Máximo — a maior queda em dólares desde um pico no saldo da tua conta até ao ponto mais baixo antes da recuperação.\n\nUm número menor significa menos sequências perdedoras grandes e melhor preservação de capital. Drawdowns profundos são psicologicamente prejudiciais e difíceis de recuperar matematicamente."
+      "short": "A maior queda, em dinheiro, de um pico do seu P&L acumulado de operações fechadas até o fundo seguinte.",
+      "example": "Exemplo: o P&L acumulado subiu para $2,000 e caiu para $1,200 ⇒ $800.",
+      "caveat": "Medido como valor, não como porcentagem do capital."
     },
     "avgWin": {
-      "short": "Lucro médio em operações vencedoras."
+      "short": "O lucro médio das suas operações fechadas que terminaram com lucro.",
+      "example": "Exemplo: ganhos de $100 e $300 ⇒ $200."
     },
     "avgLoss": {
-      "short": "Perda média em operações perdedoras."
+      "short": "A perda média das suas operações fechadas que terminaram em perda.",
+      "example": "Exemplo: perdas de $50 e $150 ⇒ $100."
     },
     "avgHold": {
-      "short": "Período médio de manutenção por operação fechada (em dias).\n\nO swing trading costuma apontar para manter 2-10 dias. Manutenções muito curtas (< 1 dia) muitas vezes indicam fechar operações cedo demais. Manutenções muito longas (> 20 dias) podem sugerir evitar os stop-loss."
+      "short": "O número médio de dias entre a entrada e a saída nas operações fechadas.",
+      "example": "Exemplo: operações de 2 e 6 dias ⇒ 4 dias.",
+      "caveat": "Dias corridos arredondados; entrada e saída no mesmo dia = 0."
     },
     "equityCurve": {
-      "short": "A tua Curva de Capital mostra o saldo da conta ao longo do tempo.\n\nUma curva suave e em ascensão constante = vantagem consistente e boa gestão de risco.\nPicos irregulares = tamanho de posição inconsistente ou trading emocional.\nLongos períodos planos = operar em excesso sem vantagem."
+      "short": "O saldo da conta ao longo do tempo: a base de capital mais o P&L acumulado após cada operação fechada.",
+      "example": "Exemplo: base de $10,000, +$200 e depois −$50 ⇒ $10,200, depois $10,150.",
+      "caveat": "Cada ponto é um dia de fechamento; exclui posições abertas."
     },
     "totalReturn": {
-      "short": "O seu lucro ou prejuízo total desde que começou, como percentagem do capital inicial. O número principal de desempenho — mas sem contexto de risco não conta a história toda."
+      "short": "Seu P&L de operações fechadas como % da base de capital que você definiu.",
+      "example": "Exemplo: +$500 sobre uma base de $10,000 ⇒ +5%.",
+      "caveat": "Não inclui posições abertas."
     },
     "winStreak": {
-      "short": "O número de operações vencedoras seguidas. Uma sequência de vitórias gera confiança — mas também é o momento mais perigoso para o excesso de confiança e o risco indisciplinado."
+      "short": "O número de ganhos seguidos até sua última operação fechada.",
+      "example": "Exemplo: 3 ganhos seguidos ⇒ 3; a linha abaixo mostra sua melhor sequência.",
+      "caveat": "Uma sequência de perdas aparece como 0, não como número negativo."
     },
     "grade": {
-      "short": "Uma pontuação ponderada (A–F) que resume a qualidade do seu trading no mês: uma mistura de taxa de acertos, múltiplo R, disciplina e consistência. Um retrato rápido — não substitui analisar os detalhes."
+      "short": "Uma nota A–F para o mês: 40% Win Rate, 30% R, 20% disciplina, 10% consistência.",
+      "example": "Exemplo: 72/100 ⇒ B (A 85+ · B 70+ · C 55+ · D 40+).",
+      "caveat": "Disciplina é a marcação autodeclarada 'segui meu plano'."
     },
     "entryQuality": {
-      "short": "Uma classificação (estrelas) de quão bem a sua entrada correspondeu ao setup planeado: timing, preço e confirmação. Uma classificação alta e constante indica disciplina — mesmo quando a operação perde."
+      "short": "Uma nota de 1–5 estrelas que você deu à sua entrada: quanto timing, preço e confirmação seguiram o plano.",
+      "example": "Exemplo: você entrou no preço planejado após a confirmação ⇒ 5 estrelas.",
+      "caveat": "Autoavaliada — não é medida pelos preços."
     },
     "accountEquity": {
-      "short": "The capital base you set plus cumulative P&L from closed and open trades.\nExample: a $10,000 base plus +$600 ⇒ $10,600.\nPer-trade risk is sized from your fixed capital base, not current equity."
+      "short": "Sua base de capital definida mais o P&L acumulado das operações fechadas e abertas.",
+      "example": "Exemplo: uma base de $10,000 mais +$600 ⇒ $10,600.",
+      "caveat": "O risco por operação usa sua base de capital fixa, não o patrimônio atual."
     },
     "streakHistory": {
-      "short": "Um registo das suas sequências de vitórias e derrotas ao longo do tempo. Revela padrões emocionais: uma sequência de perdas faz você operar pior (tilt), ou você recupera com disciplina?"
+      "short": "Sequências de ganho e perda em ordem temporal, uma barra por sequência.",
+      "example": "Exemplo: 3 ganhos, depois 2 perdas ⇒ duas barras, 3 e 2."
     },
     "dayOfWeek": {
-      "short": "O teu lucro/perda discriminado por dia da semana. Revela em que dias ganhas ou perdes dinheiro de forma consistente — muitos traders têm um edge oculto (ou uma fuga) ligado a dias específicos como segundas ou sextas."
+      "short": "L/P acumulado pelo dia da semana em que você entrou.",
+      "example": "Exemplo: operação aberta na segunda e fechada na quarta conta para a segunda."
     },
     "performanceBySetup": {
-      "short": "Uma discriminação de cada setup que operas — win rate, R total e número de operações. Mostra num relance quais setups sustentam a tua conta e quais a drenam. Os teus edges e anti-edges, lado a lado."
+      "short": "Um card por setup operado: nº de operações, Win Rate e R total.",
+      "example": "Exemplo: Breakout · 8 operações · 50% · +4R."
     },
     "winRateBySetup": {
-      "short": "Bar height is the setup's win rate; the number above it is the trade count.\nExample: a purple bar = 50% or more, a gray bar = below 50%.\nSorted by trade count."
+      "short": "A altura da barra é o Win Rate do setup; o número acima, o nº de operações.",
+      "example": "Exemplo: barra roxa = 50% ou mais, cinza = abaixo de 50%.",
+      "caveat": "Ordenado pelo nº de operações."
     },
     "bestDay": {
-      "short": "The weekday with the highest total P&L, by entry day.\nExample: Monday +$400, Tuesday +$150 ⇒ Monday.\nTrade count is not taken into account."
+      "short": "O dia da semana com o maior L/P total, pelo dia de entrada.",
+      "example": "Exemplo: segunda +$400, terça +$150 ⇒ segunda.",
+      "caveat": "Não leva em conta o número de operações."
     },
     "bestSetup": {
-      "short": "The setup with the highest win rate; on a tie, the one with more trades.\nExample: Pullback at 70% over 10 trades ranks above Breakout at 60%.\nNo minimum sample: one trade at 100% can win. Unknown is excluded."
+      "short": "O setup com maior Win Rate; em caso de empate, o de mais operações.",
+      "example": "Exemplo: Pullback com 70% em 10 operações supera Breakout com 60%.",
+      "caveat": "Sem amostra mínima: uma operação com 100% pode vencer. Unknown fica de fora."
     },
     "bestEmotion": {
-      "short": "The entry emotion you marked with the highest win rate; on a tie, the one with more trades.\nExample: Calm at 65% ranks above Confident at 55%.\nNo minimum sample."
+      "short": "A emoção de entrada que você marcou com maior Win Rate; em caso de empate, a de mais operações.",
+      "example": "Exemplo: Calm com 65% supera Confident com 55%.",
+      "caveat": "Sem amostra mínima."
     },
     "rDistribution": {
-      "short": "How many closed trades fell into each R range, from losses on the left to wins on the right.\nExample: a +1.4R trade counts in the 1R to 2R range.\nTrades without a stop are not counted."
+      "short": "Nº de operações fechadas por faixa de R: perdas à esquerda, ganhos à direita.",
+      "example": "Exemplo: uma operação de +1.4R conta na faixa de 1R a 2R.",
+      "caveat": "Operações sem stop não são contadas."
     },
     "pnlByMonth": {
-      "short": "The sum of closed-trade P&L for each month, by trade date.\nExample: in March +$200, −$50 and +$100 ⇒ +$250.\nA trade not converted to your capital currency is not counted."
+      "short": "Soma do L/P das operações fechadas por mês, pela data de entrada.",
+      "example": "Exemplo: em março +$200, −$50 e +$100 ⇒ +$250.",
+      "caveat": "Uma operação não convertida para a moeda do seu capital não é contada."
     },
     "emotionPerformance": {
-      "short": "Total closed-trade P&L by the emotion you marked at entry.\nExample: FOMO · 4 trades · −$300.\nA trade with no emotion marked counts as Unknown."
+      "short": "L/P total das operações fechadas pela emoção que você marcou na entrada.",
+      "example": "Exemplo: FOMO · 4 operações · −$300.",
+      "caveat": "Sem emoção marcada, conta como Unknown."
     },
     "setupMatrix": {
-      "short": "A table per setup: trades, win rate, average R and P&L, sorted by P&L.\nExample: Breakout · 8 · 50% · +0.4R · +$600."
+      "short": "Uma tabela por setup: operações, Win Rate, R médio e L/P, ordenada por L/P.",
+      "example": "Exemplo: Breakout · 8 · 50% · +0.4R · +$600."
     },
     "holdTimeVsPnl": {
-      "short": "Each dot is a closed trade: holding days on one axis and P&L on the other.\nExample: a dot at 5 days and +$300 = a trade you held 5 days that made $300.\nA trade not converted to your capital currency is not shown."
+      "short": "Cada ponto é uma operação fechada: dias de posição contra L/P.",
+      "example": "Exemplo: ponto em 5 dias e +$300 = mantida 5 dias, lucrou $300.",
+      "caveat": "Operações não convertidas à moeda do seu capital não aparecem."
     },
     "rr": {
-      "short": "Risco/Retorno. Lucro potencial vs. o que arriscas. 3:1 = podes ganhar 3× o que perderias."
+      "short": "A relação entre o seu risco e o retorno potencial, escrita risco:retorno.",
+      "example": "Exemplo: um stop $2 abaixo da entrada e um alvo $6 acima ⇒ 1:3."
     },
     "rMultiple": {
-      "short": "R-Multiple = lucro da operação ÷ risco inicial. O lucro segue a direção da operação: num LONG é (Saída − Entrada), num SHORT é (Entrada − Saída) — por isso um SHORT vencedor dá sempre um R positivo.\n\nExemplos:\n+2R = ganhaste 2× o que arriscaste ✓\n+1R = ganhaste exatamente o que arriscaste ✓\n-1R = perdeste o teu risco planeado (normal)\n-2R = o stop não foi respeitado (problema)\n\nAcompanhar o R-Multiple elimina o viés do dólar e permite comparar operações objetivamente."
+      "short": "Seu resultado em unidades de risco no stop salvo: LONG (Saída − Entrada), SHORT (Entrada − Saída).",
+      "example": "Exemplo: você arriscou $40 e ganhou $100 ⇒ +2.5R.",
+      "caveat": "Um gap de abertura além do stop pode perder mais que −1R."
     },
     "mfeMae": {
-      "short": "Quão longe uma operação foi a teu favor (MFE) e contra ti (MAE) antes de fechar. Ajuda a afinar stops e alvos."
+      "short": "Quanto uma operação andou a seu favor (MFE) e contra você (MAE) antes de fechar.",
+      "example": "Exemplo: entrada $100, máxima $106, mínima $97 ⇒ MFE $6, MAE $3.",
+      "caveat": "Só se você preencheu os campos."
     },
     "wilson": {
-      "short": "Uma estimativa cautelosa da tua win rate \"real\" quando o tamanho da amostra é pequeno. Evita que uma sequência curta te engane."
+      "short": "O limite inferior do seu Win Rate 'real' com 95% de confiança — cauteloso com poucas operações.",
+      "example": "Exemplo: 3 vitórias em 3 = 100%, mas o limite inferior é cerca de 44%.",
+      "caveat": "Usado para ordenar seu Edge."
     },
     "rrBucket3plus": {
-      "short": "Um grupo de operações com uma relação risco/retorno de 3 ou mais: o retorno potencial é pelo menos 3× o risco. São as operações de maior qualidade por rácio: mesmo com uma taxa de acertos baixa, ganhar uma fração já basta para ser lucrativo."
+      "short": "Operações cuja relação planejada, stop versus alvo, é 1:3 ou mais.",
+      "example": "Exemplo: um stop $1 abaixo da entrada e um alvo $3.50 acima ⇒ 1:3.5 ⇒ no grupo.",
+      "caveat": "Em 1:3, um Win Rate de 25% empata, antes das comissões."
     },
     "dna": {
-      "short": "O teu Trading DNA mede 4 dimensões centrais da tua personalidade como trader:\n\n• Gestão de Risco (0-100): Quão bem controlas as perdas\n• Disciplina (0-100): Segues as tuas regras?\n• Consistência (0-100): Resultados estáveis em diferentes condições\n• Crescimento (0-100): Estás a melhorar com o tempo?\n\nBaseado no teu histórico real de operações — não em autoavaliação."
+      "short": "Quatro pontuações 0–100 — risco, disciplina, consistência, crescimento — das suas operações fechadas.",
+      "example": "Exemplo: risco médio de 2% por operação ⇒ risco 50.",
+      "caveat": "Disciplina é a marcação autodeclarada 'segui meu plano'."
     },
     "edge": {
-      "short": "O teu Edge — setups onde tens uma vantagem estatisticamente significativa segundo o teu histórico real de operações.\n\nWin rate alta + R médio positivo = edge real. Estes são os setups que mais deves operar. O mercado paga-te para os fazeres."
+      "short": "Pares setup-emoção com seu Win Rate e seu R mais fortes, ordenados pelo escore de Wilson.",
+      "example": "Exemplo: Breakout + Calm · 4 de 5 vencedoras · média +1.2R.",
+      "caveat": "Exige 3+ operações; um ranking, não teste de significância."
     },
     "antiEdge": {
-      "short": "Anti-Edge — setups onde perdes dinheiro de forma consistente segundo o teu histórico de operações.\n\nWin rate baixa + R negativo = o teu anti-edge pessoal. Ou corriges estes setups (estuda por que te falham) ou deixas de os operar por completo.\n\nEvitar os anti-edges é tão importante como explorar os edges."
+      "short": "Pares de setup e emoção em que seu Win Rate está abaixo de 50% ou seu R médio é negativo.",
+      "example": "Exemplo: Breakout + FOMO · 1 vencedora em 4 · R médio −0.8R.",
+      "caveat": "Exige pelo menos 2 operações; são exibidos até 5."
     },
     "tilt": {
-      "short": "Tilt — estado emocional que te faz desviar das tuas regras de trading.\n\nComum após: grandes perdas, perder um grande movimento, ou uma sequência de ganhos que gera excesso de confiança.\n\nSinais: aumentar o tamanho de posição, operar com mais frequência, ignorar os stops.\n\nPrevenção: pausa obrigatória após 2+ perdas consecutivas."
+      "short": "Um estado emocional que tira você das suas regras.",
+      "example": "Exemplo: 3 perdas seguidas ⇒ o Tilt Shield avisa antes da próxima operação.",
+      "caveat": "Regra prática: pausa curta após uma sequência de perdas; o Tilt Shield avisa a partir de 3."
     },
     "marketRegime": {
-      "short": "Regime de Mercado — o ambiente de mercado atual, lido da ação real do preço (não das tuas operações). Calculado a partir de SPY/QQQ face à média de 20 dias, % de tendência, quantos ETF setoriais sobem (amplitude) e volatilidade realizada.\n\n• Tendência de Alta: Tendência de subida — preço acima de uma média de 20 dias ascendente com participação ampla. Favorece breakouts e pullbacks.\n• Tendência de Baixa: Tendência de descida — preço abaixo de uma média de 20 dias descendente, fraqueza ampla. Favorece vendas ou fica de fora.\n• Lateral/Range: Sem tendência líquida — preço preso entre suporte e resistência. Opera os extremos, evita breakouts.\n• Alta Volatilidade: Dominam as fortes oscilações diárias. Reduz tamanho ~50% e amplia stops.\n• Baixa Volatilidade: Mercado calmo e comprimido — espera movimentos pequenos.\n\nMostra 'Dados insuficientes' quando não há histórico de preços suficiente para classificar."
+      "short": "Ambiente de mercado lido de SPY/QQQ versus a média de 20 dias, amplitude setorial e volatilidade.",
+      "example": "Exemplo: preço acima de uma média de 20 dias em alta e a maioria dos setores subindo ⇒ Tendência de Alta.",
+      "caveat": "Usa preços de mercado, não suas operações."
     },
     "discipline": {
-      "short": "Se seguiste o teu plano — stop, tamanho, alvo — sem desvio emocional. O núcleo da rentabilidade a longo prazo."
+      "short": "A fração das suas operações fechadas que você marcou 'segui meu plano'.",
+      "example": "Exemplo: você marcou 'sim' em 8 de 10 ⇒ 80.",
+      "caveat": "Autodeclarado; operação sem marcação não conta."
     },
     "dnaRisk": {
-      "short": "Mede o quão consistente você é na gestão de risco: tamanho de posição uniforme, respeitar os stops e não exceder o risco planeado por operação. Uma pontuação baixa significa risco inconsistente — a maior ameaça a uma conta."
+      "short": "Pontuação 0–100 a partir do seu risco médio por operação como porcentagem do capital.",
+      "example": "Exemplo: 1% ou menos ⇒ 100 · 2% ⇒ 50 · 3%+ ⇒ 0.",
+      "caveat": "Não mede se você respeitou o stop."
     },
     "dnaConsistency": {
-      "short": "Mede a estabilidade do seu desempenho ao longo do tempo: se os resultados são uniformes ou dependem de poucas operações enormes. Alta consistência é um método confiável; baixa, resultados aleatórios."
+      "short": "Pontuação 0–100 a partir da dispersão dos seus resultados em R; menos dispersão pontua mais.",
+      "example": "Exemplo: desvio padrão 0R ⇒ 100 · 1.5R ⇒ 50 · 3R+ ⇒ 0.",
+      "caveat": "Exige 2+ operações com R."
     },
     "dnaGrowth": {
-      "short": "Mede a sua tendência de melhoria: se aprende com os dados e melhora ao longo do tempo, ou repete os mesmos erros. Uma pontuação crescente é a curva certa para um trader em desenvolvimento."
+      "short": "Pontuação 0–100 pela inclinação do R acumulado nas suas últimas 20 operações fechadas; 50 = plano.",
+      "example": "Exemplo: R acumulado subindo ~+0.5R por operação ⇒ ~75.",
+      "caveat": "Acima de +1R por operação ⇒ 100; abaixo de −1R ⇒ 0."
     },
     "setup": {
-      "short": "Your entry pattern — the exact conditions under which you take a position.\nExample: Breakout, Pullback or Bull Flag."
+      "short": "Seu padrão de entrada — as condições exatas em que você abre uma posição.",
+      "example": "Exemplo: Breakout, Pullback ou Bull Flag."
     },
     "riskPerTrade": {
-      "short": "Risco máximo por operação como % do total da conta.\n\nPadrão profissional:\n• 1% por operação = conservador, sustentável\n• 2% por operação = moderado, ainda aceitável\n• 5%+ por operação = território de apostas\n\nO 'risco de ruína' aumenta exponencialmente acima de 2% por operação."
+      "short": "O % do capital que você escolheu perder numa operação se o stop for atingido.",
+      "example": "Exemplo: capital de $10,000 e risco de 1% ⇒ perda máxima de $100.",
+      "caveat": "Regra prática: até 2% por operação (Elder)."
     },
     "riskLimits": {
-      "short": "Dois limites funcionam juntos:\n\n• Risco/Operação — o máximo que arriscas numa única posição. És tu que o escolhes nas Definições.\n• Risco Máximo Permitido — o máximo que arriscas em TODAS as posições abertas combinadas. É derivado do Risco/Operação: o dobro, nunca abaixo de 3% nem acima de 5%.\n\nDivide o Risco Máximo Permitido pelo Risco/Operação para saberes quantas posições de tamanho completo podes manter ao mesmo tempo."
+      "short": "Seu risco por operação e um teto para todas as posições abertas: o dobro, entre 3% e 5%.",
+      "example": "Exemplo: 1% ⇒ 3% · 2% ⇒ 4% · 3% ⇒ 5%.",
+      "caveat": "Teto ÷ risco por operação = quantas posições completas cabem juntas."
     },
     "positionSize": {
-      "short": "Tamanho de Posição = (Tamanho da Conta × % Risco) ÷ (Entrada − Stop Loss)\n\nExemplo: conta de $10,000, 1% de risco, entrada $100, stop $97:\nPosição = $100 ÷ $3 = 33 ações\n\nCalcula sempre antes de entrar. Nunca dimensiones por intuição."
+      "short": "Ações = (capital × % de risco) ÷ a distância entre a entrada e o stop.",
+      "example": "Exemplo: $10,000 × 1% = $100; entrada $100 e stop $97 ⇒ 33 ações.",
+      "caveat": "Sempre arredondado para baixo."
     },
     "stopLoss": {
-      "short": "Stop Loss — o nível de preço onde sais de uma operação perdedora para evitar perdas maiores.\n\nColoca-o num nível técnico lógico:\n• Abaixo de um suporte chave (operações compradas)\n• Acima de uma resistência chave (operações vendidas)\n• Nunca arbitrário (ex.: 'só $0.50 abaixo da entrada')\n\nUm stop loss não é opcional — é a base da gestão de risco."
+      "short": "O preço que você define antes para sair de uma operação perdedora, limitando a perda ao plano.",
+      "example": "Exemplo: LONG a $50, stop abaixo do suporte em $48 ⇒ $2 de risco por ação.",
+      "caveat": "R e tamanho da posição usam o stop salvo."
     },
     "takeProfit": {
-      "short": "Take Profit — o teu preço-alvo para sair de uma operação vencedora.\n\nRegra mínima: O alvo deve ser pelo menos 1.5× o teu risco (1.5R).\n\nBoa prática:\n• Saída escalonada: tira 50% em 1R, mantém o resto até ao alvo\n• Usa níveis técnicos (resistência, máximos anteriores)\n• Nunca movas o alvo para baixo quando estás a ganhar"
+      "short": "O preço-alvo que você define para fechar uma operação vencedora.",
+      "example": "Exemplo: entrada $100 e stop $98 ⇒ alvo padrão de $104 (1:2).",
+      "caveat": "O padrão no gráfico e no coach é 1:2."
     },
     "breakout": {
-      "short": "Preço rompendo acima de um nível de resistência chave com volume. Funciona melhor em mercados com tendência."
+      "short": "Entrar quando o preço rompe uma resistência chave, idealmente com volume crescente.",
+      "example": "Exemplo: resistência em $50 e fechamento diário em $51 com o dobro do volume médio."
     },
     "pullback": {
-      "short": "Comprar quando um preço em tendência de alta recua temporariamente em direção a um suporte — uma média móvel, um nível de rompimento anterior ou uma linha de tendência — e depois retoma a alta. Entrar no recuo dá melhor preço e um stop mais apertado do que perseguir."
+      "short": "Entrar quando um preço em tendência de alta recua até um suporte e depois retoma a alta.",
+      "example": "Exemplo: alta de $40 para $50, recuo até a média móvel em $46 e entrada ali."
     },
     "bullFlag": {
-      "short": "Consolidação estreita após um movimento brusco de alta. O volume deve contrair durante a bandeira."
+      "short": "Consolidação estreita e levemente descendente após uma alta forte, com volume em queda.",
+      "example": "Exemplo: alta de $20 para $26 e depois 5 dias em uma faixa de $25–$26."
     },
     "ORBBreakout": {
-      "short": "Opening Range Breakout — rompimento da máxima/mínima dos primeiros 15-30 min. Forte em dias de tendência."
+      "short": "Rompimento da máxima ou mínima dos primeiros 5, 15 ou 30 minutos do pregão.",
+      "example": "Exemplo: faixa de $30–$31 nos primeiros 15 min ⇒ entrada acima de $31."
     },
     "VWAPReclaim": {
-      "short": "O preço recupera o VWAP após uma queda matinal com volume. Indica compra institucional."
+      "short": "O preço recupera o VWAP — o preço médio do dia ponderado por volume — após cair abaixo dele.",
+      "example": "Exemplo: VWAP em $40, queda para $39.50 e volta acima de $40 com volume."
     },
     "higherLow": {
-      "short": "Cada recuo forma um mínimo mais alto que o anterior. O setup mais limpo em tendência de alta."
+      "short": "Cada recuo para acima da mínima anterior — marca de tendência de alta.",
+      "example": "Exemplo: mínimas em $45, depois $47, depois $49."
     },
     "cupAndHandle": {
-      "short": "Consolidação em forma de U com uma alça estreita à direita. Padrão de continuação clássico."
+      "short": "Uma base em forma de U seguida de uma queda curta e rasa (a alça) antes do rompimento.",
+      "example": "Exemplo: queda de $60 para $48, volta a $59, alça até $56 e rompimento acima de $59."
     },
     "failedBreakout": {
-      "short": "Rompimento que se reverte rapidamente. Armadilha para compradores atrasados — vendido ao recuperar o nível de rompimento."
+      "short": "Rompimento que volta rápido abaixo do nível rompido — armadilha para compradores atrasados.",
+      "example": "Exemplo: rompimento para $51 acima de $50 e volta a $49 em um dia ⇒ SHORT."
     },
     "overextendedFade": {
-      "short": "Operação contra-tendência quando o preço está 8%+ acima da 20 EMA com RSI alto. Exige paciência."
+      "short": "Operação contra a tendência com o preço incomumente distante acima da 20 EMA.",
+      "example": "Exemplo: ação a $60 com a 20 EMA em $52 ⇒ SHORT em direção à média.",
+      "caveat": "O app não define um limite para 'distante' — quem decide é você."
     },
     "EMABounce50": {
-      "short": "Recuo à 50 EMA no gráfico diário. Suporte importante em tendências de alta fortes."
+      "short": "Um recuo até a média móvel exponencial de 50 dias no gráfico diário, e um repique a partir dela.",
+      "example": "Exemplo: 50 EMA em $80, mínima diária de $80.20 e fechamento em $82."
     },
     "trendContinuation": {
-      "short": "Entrada num recuo superficial à 9 EMA numa tendência estabelecida. Stops apertados, R alto."
+      "short": "Entrar em um recuo raso até a 9 EMA dentro de uma tendência estabelecida.",
+      "example": "Exemplo: recuo até a 9 EMA em $30.10, entrada em $30.30 e stop em $29.80."
     },
     "gapAndGo": {
-      "short": "A ação abre com gap de alta e continua sem preenchê-lo. Melhor com um catalisador de notícias."
+      "short": "Uma ação que abre com gap de alta e continua subindo sem fechar o gap.",
+      "example": "Exemplo: fechamento em $20, abertura em $22 e máxima de $24 sem negociar abaixo de $22."
     },
     "earningsGapPlay": {
-      "short": "Operar a reação do gap após resultados. Mantenha as vencedoras, cubra ao primeiro sinal de compra."
+      "short": "Operar na direção do gap que abre após a divulgação de resultados, para cima ou para baixo.",
+      "example": "Exemplo: gap +6% ⇒ LONG acima da máxima de abertura; gap −6% ⇒ SHORT abaixo da mínima de abertura."
     },
     "rangeBreakout": {
-      "short": "O preço rompe um range de vários dias/semanas. Mais confiável quando o volume se expande."
+      "short": "Saída de uma faixa de preço que durou dias ou semanas.",
+      "example": "Exemplo: 3 semanas entre $40 e $44 e depois um fechamento em $45."
     },
     "postEarningsStrength": {
-      "short": "A ação mantém-se acima do gap de alta após superar resultados. Sinal de acumulação institucional."
+      "short": "Ação que se mantém acima de um gap de alta nos dias após um balanço forte.",
+      "example": "Exemplo: gap de $50 para $56 e depois 5 dias acima de $55."
     },
     "powerHourBreak": {
-      "short": "Rompimento na última hora (15:00-16:00 ET). Posicionamento institucional rumo ao fecho."
+      "short": "Rompimento na última hora do pregão, 15h–16h em Nova York.",
+      "example": "Exemplo: máxima diária de $70 rompida às 15h20 ⇒ entrada em $70.10."
     },
     "MOCFade": {
-      "short": "Fade de Market-On-Close. Operar contra movimentos estendidos rumo ao fecho para uma reversão no dia seguinte."
+      "short": "Operar contra um movimento forte rumo ao fechamento (Market-On-Close), esperando uma correção no dia seguinte.",
+      "example": "Exemplo: +4% na última hora ⇒ SHORT rumo ao fechamento.",
+      "caveat": "Na NYSE, ordens MOC são aceitas até 15h50, horário de Nova York."
     },
     "overnightHold": {
-      "short": "Operação mantida durante a noite. Maior potencial de retorno mas exposta ao risco de gap."
+      "short": "Uma operação que você deixou aberta depois do fechamento do pregão.",
+      "example": "Exemplo: você comprou a $30 às 15h30 e a ação abriu a $28 no dia seguinte ⇒ um gap contra você.",
+      "caveat": "Um stop não protege contra um gap de abertura."
     },
     "overnightReversal": {
-      "short": "Operar a reversão do movimento noturno na abertura. Contra-tendência, exige confirmação."
+      "short": "Operar contra o movimento noturno na abertura, após confirmação.",
+      "example": "Exemplo: gap de −3% na abertura e o preço volta acima do preço de abertura ⇒ LONG."
     },
     "supportBounce": {
-      "short": "Comprar quando o preço cai a um nível de suporte conhecido e reverte para cima. A lógica: os compradores defendem o nível. O stop fica abaixo do suporte; se romper, a tese é anulada."
+      "short": "Entrar quando o preço cai até um nível de suporte conhecido e vira para cima.",
+      "example": "Exemplo: suporte em $25, mínima $25.10, entrada em $25.60, stop em $24.80."
     },
     "resistanceBreak": {
-      "short": "Entrar quando o preço rompe acima de um nível de resistência que antes o travava, idealmente com volume alto. O rompimento sinaliza que os compradores assumiram o controlo. Difere de um Breakout genérico por focar num nível específico."
+      "short": "Entrar quando o preço rompe um nível de resistência específico que o travou antes.",
+      "example": "Exemplo: travou duas vezes em $80 e depois fechou em $81 com volume alto."
     },
     "pullback20EMA": {
-      "short": "Comprar quando um preço em tendência de alta recua à média móvel de 20 períodos e ressalta. A 20 EMA atua como suporte dinâmico; este setup combina tendência com um ponto de entrada preciso."
+      "short": "Entrar quando um preço em tendência de alta recua até a média móvel exponencial de 20 períodos e vira.",
+      "example": "Exemplo: 20 EMA em $40, mínima de $40.15 e fechamento em $41."
     },
     "emotionConfident": {
-      "short": "Confiança baseada na análise, não em arrogância. Sobre um setup válido gera execução disciplinada; se virar excesso de confiança após uma sequência de vitórias, torna-se arriscada."
+      "short": "Confiança apoiada em setup válido e análise, não em sequência de ganhos.",
+      "example": "Exemplo: todas as condições que você anotou se cumpriram e você entrou no tamanho normal.",
+      "caveat": "Após uma sequência de ganhos, veja se não é excesso de confiança."
     },
     "emotionCalm": {
-      "short": "O estado emocional ideal para um trader. A calma permite seguir o seu plano sem perseguir nem entrar em pânico. Operações abertas com calma tendem a respeitar o stop e o alvo."
+      "short": "Você entrou sem pressão e sem correr atrás, de acordo com o plano.",
+      "example": "Exemplo: você esperou o preço planejado e definiu o stop e o alvo com antecedência."
     },
     "emotionPatient": {
-      "short": "Esperar por um setup que realmente cumpra os seus critérios em vez de entrar em cada movimento. A paciência costuma ser o que separa um trader lucrativo de um perdedor — filtra operações de baixa qualidade."
+      "short": "Esperou um setup que cumprisse todos os seus critérios em vez de entrar em cada movimento.",
+      "example": "Exemplo: você pulou dois breakouts fracos e pegou o terceiro."
     },
     "emotionNeutral": {
-      "short": "Entrar sem carga emocional — nem eufórico nem receoso. Um estado estável que permite decisões objetivas e baseadas em dados. Uma boa base, ainda que menos afiada que \"Calm\"."
+      "short": "Você entrou sem carga emocional — nem empolgado nem com medo.",
+      "example": "Exemplo: mais uma operação do plano, sem expectativa especial."
     },
     "emotionHesitant": {
-      "short": "Hesitação na entrada — geralmente sinal de que o setup não está claro ou a confiança está baixa. Entradas hesitantes tendem a significar entrar tarde, colocar o stop apertado demais ou sair cedo por medo."
+      "short": "Você hesitou na entrada — geralmente quando o setup não está claro ou a confiança está baixa.",
+      "example": "Exemplo: você esperou mais um candle e entrou $0.50 acima do preço planejado."
     },
     "emotionNervous": {
-      "short": "Tensão que prejudica a tomada de decisão. O nervosismo leva a verificar o preço de forma obsessiva, mexer no stop e sair por impulso. Costuma indicar uma posição grande demais ou falta de confiança no setup."
+      "short": "Tensão que turvou seu julgamento durante a operação.",
+      "example": "Exemplo: você checou o preço a cada minuto e moveu o stop duas vezes.",
+      "caveat": "Às vezes indica que a posição está grande demais."
     },
     "emotionFOMO": {
-      "short": "\"Medo de ficar de fora\" — entrar numa operação só porque o preço se moveu com força, sem um setup válido. Um dos padrões mais destrutivos: entrada tardia, perseguir o preço e um stop distante. Um sinal de alerta."
+      "short": "Você entrou porque o preço se moveu forte e teve medo de ficar de fora, sem um setup válido.",
+      "example": "Exemplo: a ação subia +6% e você entrou na máxima sem um stop claro."
     },
     "emotionAngry": {
-      "short": "Raiva após uma perda — o combustível do \"trading de vingança\". Nesse estado o trader tenta recuperar a perda de imediato, aumenta o risco e faz operações ruins. É assim que se destroem contas. Pare."
+      "short": "Raiva após uma perda que levou você a recuperá-la na hora — trading de vingança.",
+      "example": "Exemplo: você perdeu $200 e abriu na hora uma operação com o dobro do tamanho."
     },
     "chartCalcPosition": {
-      "short": "Preenche automaticamente a Calculadora de Posição a partir do gráfico atual — ticker, preço ao vivo como entrada, um stop protetor e um alvo 2:1 — e depois abre-a para dimensionares a operação num clique."
+      "short": "Preenche a calculadora de posição pelo gráfico: ticker, preço ao vivo como entrada, stop e alvo 1:2.",
+      "example": "Exemplo: entrada $50 e stop $48 ⇒ alvo $54."
     },
     "chartAddToJournal": {
-      "short": "Inicia uma nova operação no diário a partir do gráfico atual — ticker, preço ao vivo, um stop sugerido e um alvo 2:1 pré-preenchidos — pronta para reveres e guardares."
+      "short": "Abre uma operação no diário pelo gráfico, pré-preenchida com ticker, preço ao vivo, stop e alvo 1:2.",
+      "example": "Exemplo: entrada $50, stop $48 e alvo $54 preenchidos, e você salvou."
     },
     "visionOcr": {
-      "short": "Reads a trade from a chart screenshot and fills the fields instead of typing.\nExample: you uploaded a screenshot with entry, stop and target ⇒ the fields were filled.\nCheck the values before saving."
+      "short": "Lê uma operação a partir de um print do gráfico e preenche os campos em vez de você digitar.",
+      "example": "Exemplo: você enviou um print com entrada, stop e alvo ⇒ os campos foram preenchidos.",
+      "caveat": "Confira os valores antes de salvar."
     }
   }
 }

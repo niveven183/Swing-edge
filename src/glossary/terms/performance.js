@@ -1,7 +1,7 @@
 // src/glossary/terms/performance.js — מדדי ביצוע
 // ⛔ מקור האמת היחיד למונחים האלה. עריכה כאן ⇒ `npm run glossary` באותו קומיט (test:glossary תופס סחיפה).
 // פורמט (גל 3): short = הגדרה במשפט אחד ≤18 מילים · example = "לדוגמה:"/"Example:" במספרים היפותטיים · caveat אחד לכל היותר · longForm = הטקסט המלא (מודאל המילון).
-// pendingTranslation: es/pt/ar עדיין בטקסט הישן — שלב 5.
+// 5 שפות מלאות (שלב 5, 14.11): es/pt/ar מתורגמים מ-he/en, ≤110% מתווי en. שפה שממתינה לתרגום ⇒ pendingTranslation + שורה ב-test:glossary (L3).
 
 /** @type {import("../types.js").GlossaryTerm[]} */
 export default [
@@ -10,7 +10,6 @@ export default [
     computedIn: ["src/lib/tradingStats.js"],
     related: ["profitFactor", "avgR"],
     shownAt: ["SwingEdge_App.jsx — דשבורד · כרטיס KPI · אנליטיקס", "src/components/MonthlyReportTab.jsx — דוח חודשי · כרטיס", "src/components/LandingPage.jsx — דף הנחיתה · הדגשת מונח"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "אחוז הצלחה",
@@ -28,15 +27,24 @@ export default [
       },
       es: {
         label: "Tasa de Acierto",
-        short: "La Win Rate es el porcentaje de tus operaciones cerradas que terminaron en ganancia.\n\nPor encima del 55% es sólido. Pero la win rate por sí sola no determina el éxito — un trader con 40% puede ser rentable con buenas relaciones riesgo-beneficio. Fíjate también en el Profit Factor.",
+        short: "El porcentaje de tus operaciones cerradas que terminaron en ganancia.",
+        example: "Ejemplo: 6 ganadoras de 10 operaciones cerradas = 60%.",
+        caveat: "El break-even cuenta en el denominador, no como ganancia; la Win Rate sola no indica rentabilidad.",
+        longForm: "La Win Rate es el porcentaje de tus operaciones cerradas que terminaron en ganancia. Una operación en break-even cuenta en el denominador y no es una ganancia — la línea bajo el número muestra cuántas hubo.\n\nLa Win Rate por sí sola no decide la rentabilidad: un trader con 40% puede ser rentable cuando la ganancia media es mayor que la pérdida media. Fíjate también en el Profit Factor y en el R Promedio.",
       },
       pt: {
         label: "Taxa de Acerto",
-        short: "A Win Rate é a percentagem das tuas operações fechadas que terminaram em lucro.\n\nAcima de 55% é sólido. Mas a win rate sozinha não determina o sucesso — um trader com 40% pode ser lucrativo com boas relações risco-retorno. Repara também no Profit Factor.",
+        short: "A porcentagem das suas operações fechadas que terminaram com lucro.",
+        example: "Exemplo: 6 vencedoras de 10 operações fechadas = 60%.",
+        caveat: "O break-even conta no denominador, não como ganho; a Win Rate sozinha não mostra lucratividade.",
+        longForm: "A Win Rate é a porcentagem das suas operações fechadas que terminaram com lucro. Uma operação no break-even conta no denominador e não é um ganho — a linha abaixo do número mostra quantas houve.\n\nA Win Rate sozinha não define a lucratividade: um trader com 40% pode ser lucrativo quando o ganho médio é maior que a perda média. Olhe também o Profit Factor e o R Médio.",
       },
       ar: {
         label: "نسبة الربح",
-        short: "نسبة الربح (Win Rate) هي النسبة المئوية لصفقاتك المغلقة التي انتهت بربح.\n\nأعلى من 55% جيّدة. لكن نسبة الربح وحدها لا تحدّد النجاح — فمتداول بنسبة 40% قد يكون رابحاً إذا كانت نسب المخاطرة/العائد قوية. انظر أيضاً إلى Profit Factor.",
+        short: "نسبة صفقاتك المغلقة التي انتهت بربح.",
+        example: "مثال: 6 رابحة من أصل 10 صفقات مغلقة = 60%.",
+        caveat: "صفقات التعادل (Break-even) تُحتسب في المقام لا كأرباح؛ وWin Rate وحدها لا تدلّ على الربحية.",
+        longForm: "Win Rate هي النسبة المئوية لصفقاتك المغلقة التي انتهت بربح. صفقة التعادل (Break-even) تُحتسب في المقام وليست ربحاً — السطر أسفل الرقم يوضّح كم صفقة منها كانت.\n\nWin Rate وحدها لا تحدّد الربحية: متداول بنسبة 40% قد يكون رابحاً عندما يكون متوسّط الربح أكبر من متوسّط الخسارة. انظر أيضاً إلى Profit Factor ومتوسّط R.",
       },
     },
   },
@@ -46,7 +54,6 @@ export default [
     sources: ["TRADESTATION"],
     related: ["winRate", "avgWin", "avgLoss"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · כרטיס"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Profit Factor",
@@ -64,15 +71,24 @@ export default [
       },
       es: {
         label: "Profit Factor",
-        short: "Profit Factor = Ganancias Brutas Totales ÷ Pérdidas Brutas Totales.\n\n• Por encima de 1.0 = rentable\n• Por encima de 1.5 = ventaja sana\n• Por encima de 2.0 = nivel profesional\n• Por encima de 3.0 = excepcional\n\nEs una de las métricas más importantes en el trading.",
+        short: "Ganancia bruta dividida por la pérdida bruta de tus operaciones cerradas.",
+        example: "Ejemplo: ganaste $3,000 y perdiste $2,000 ⇒ 1.5; más de 1 indica que ganaste más de lo que perdiste.",
+        caveat: "Sin pérdidas marca ∞; se calcula antes de comisiones.",
+        longForm: "Profit Factor = ganancia bruta total ÷ pérdida bruta total, en operaciones cerradas.\n\nPor encima de 1 tu trading ganó dinero neto; por debajo de 1 perdió. Sin ninguna operación perdedora no hay entre qué dividir, así que muestra ∞. Se calcula antes de comisiones — la app no tiene un modelo de comisiones.",
       },
       pt: {
         label: "Profit Factor",
-        short: "Profit Factor = Lucros Brutos Totais ÷ Perdas Brutas Totais.\n\n• Acima de 1.0 = lucrativo\n• Acima de 1.5 = vantagem saudável\n• Acima de 2.0 = nível profissional\n• Acima de 3.0 = excecional\n\nÉ uma das métricas mais importantes no trading.",
+        short: "Lucro bruto dividido pela perda bruta das suas operações fechadas.",
+        example: "Exemplo: você ganhou $3,000 e perdeu $2,000 ⇒ 1.5; acima de 1 significa que você ganhou mais do que perdeu.",
+        caveat: "Sem nenhuma perda, mostra ∞; calculado antes das comissões.",
+        longForm: "Profit Factor = lucro bruto total ÷ perda bruta total, nas operações fechadas.\n\nAcima de 1, seu trading teve lucro líquido; abaixo de 1, teve prejuízo. Sem nenhuma operação perdedora não há pelo que dividir, então mostra ∞. É calculado antes das comissões — o app não tem um modelo de comissões.",
       },
       ar: {
         label: "Profit Factor",
-        short: "Profit Factor = إجمالي الأرباح ÷ إجمالي الخسائر.\n\n• أعلى من 1.0 = رابح\n• أعلى من 1.5 = أفضلية صحّية\n• أعلى من 2.0 = مستوى احترافي\n• أعلى من 3.0 = استثنائي\n\nمن أهم المقاييس في التداول.",
+        short: "إجمالي الربح مقسوماً على إجمالي الخسارة في صفقاتك المغلقة.",
+        example: "مثال: ربحت $3,000 وخسرت $2,000 ⇒ 1.5؛ أعلى من 1 يعني أنك ربحت أكثر مما خسرت.",
+        caveat: "بلا أي خسارة تكون القيمة ∞؛ ويُحسب قبل العمولات.",
+        longForm: "Profit Factor = مجموع الأرباح الإجمالية ÷ مجموع الخسائر الإجمالية، في الصفقات المغلقة.\n\nأعلى من 1 يعني أن تداولك حقّق ربحاً صافياً؛ وأقل من 1 يعني أنه خسر. بلا أي صفقة خاسرة لا يوجد ما يُقسم عليه، فتظهر القيمة ∞. يُحسب قبل العمولات — التطبيق لا يتضمّن نموذجاً للعمولات.",
       },
     },
   },
@@ -82,8 +98,7 @@ export default [
     sources: ["THARP"],
     related: ["rMultiple", "stopLoss"],
     shownAt: ["SwingEdge_App.jsx — דשבורד · כרטיס KPI · אנליטיקס", "src/components/MonthlyReportTab.jsx — דוח חודשי · כרטיס"],
-    pendingTranslation: ["es", "pt", "ar"],
-    mustContain: { he: ["LONG", "SHORT", "0R"], en: ["LONG", "SHORT", "0R"] },
+    mustContain: { he: ["LONG", "SHORT", "0R"], en: ["LONG", "SHORT", "0R"], es: ["LONG", "SHORT", "0R"], pt: ["LONG", "SHORT", "0R"], ar: ["LONG", "SHORT", "0R"] },
     i18n: {
       he: {
         label: "R ממוצע",
@@ -101,15 +116,24 @@ export default [
       },
       es: {
         label: "R Promedio",
-        short: "R-Multiple promedio por operación cerrada.\n\nR = ganancia de la operación ÷ riesgo inicial por acción. La ganancia sigue la dirección de la operación: en un LONG es (Salida − Entrada), en un SHORT es (Entrada − Salida) — así que un SHORT ganador siempre da un R positivo.\n\n+1.0R significa que ganaste exactamente lo que arriesgaste. Apunta a +0.3R o más como promedio mínimo. Los traders de élite promedian +1.5R a +2.5R.\n\nSolo las operaciones con stop pueden medirse en R — una operación sin stop se excluye de este promedio, no cuenta como 0R. La línea bajo el número muestra cuántas de tus operaciones cerradas cubre realmente el promedio.",
+        short: "R promedio de operaciones cerradas; R = ganancia ÷ riesgo al stop guardado, según dirección (LONG/SHORT).",
+        example: "Ejemplo: arriesgaste $100 y ganaste $150 ⇒ +1.5R.",
+        caveat: "Una operación sin stop se excluye, no cuenta como 0R.",
+        longForm: "R-Multiple promedio por operación cerrada.\n\nR = ganancia de la operación ÷ riesgo por acción al stop guardado. La ganancia sigue la dirección de la operación: en un LONG es (Salida − Entrada), en un SHORT es (Entrada − Salida) — así que un SHORT ganador siempre da un R positivo. +1.0R significa que ganaste exactamente lo que arriesgaste.\n\nSolo las operaciones que tenían stop pueden medirse en R — una operación sin stop se excluye de este promedio, no cuenta como 0R. La línea bajo el número muestra cuántas de tus operaciones cerradas cubre realmente el promedio.",
       },
       pt: {
         label: "R Médio",
-        short: "R-Multiple médio por operação fechada.\n\nR = lucro da operação ÷ risco inicial por ação. O lucro segue a direção da operação: num LONG é (Saída − Entrada), num SHORT é (Entrada − Saída) — por isso um SHORT vencedor dá sempre um R positivo.\n\n+1.0R significa que ganhaste exatamente o que arriscaste. Aponta para +0.3R ou mais como média mínima. Traders de elite têm média de +1.5R a +2.5R.\n\nSó as operações com stop podem ser medidas em R — uma operação sem stop é excluída desta média, não conta como 0R. A linha por baixo do número mostra quantas das tuas operações fechadas a média cobre realmente.",
+        short: "R médio das operações fechadas; R = lucro ÷ risco no stop salvo, conforme a direção (LONG/SHORT).",
+        example: "Exemplo: você arriscou $100 e ganhou $150 ⇒ +1.5R.",
+        caveat: "Uma operação sem stop é excluída, não contada como 0R.",
+        longForm: "R-Multiple médio por operação fechada.\n\nR = lucro da operação ÷ risco por ação no stop salvo. O lucro segue a direção da operação: em um LONG é (Saída − Entrada), em um SHORT é (Entrada − Saída) — por isso um SHORT vencedor sempre dá um R positivo. +1.0R significa que você ganhou exatamente o que arriscou.\n\nSó operações que tinham stop podem ser medidas em R — uma operação sem stop é excluída desta média, não contada como 0R. A linha abaixo do número mostra quantas das suas operações fechadas a média realmente cobre.",
       },
       ar: {
         label: "متوسّط R",
-        short: "متوسّط R-Multiple لكل صفقة مغلقة.\n\nR = ربح الصفقة ÷ المخاطرة الأوّلية للسهم. الربح يتبع اتّجاه الصفقة: في LONG هو (الخروج − الدخول)، وفي SHORT هو (الدخول − الخروج) — لذلك فإن SHORT الرابحة تعطي دائماً R موجباً.\n\n+1.0R يعني أنك ربحت تماماً ما خاطرت به. استهدف +0.3R أو أعلى كحدّ أدنى للمتوسّط. متداولو النخبة يحقّقون متوسّط +1.5R إلى +2.5R.\n\nالصفقات التي لها وقف خسارة فقط يمكن قياسها بـ R — الصفقة بلا وقف تُستثنى من هذا المتوسّط ولا تُحتسب كـ 0R. السطر أسفل الرقم يوضّح كم صفقة مغلقة يغطّيها المتوسّط فعلياً.",
+        short: "متوسّط R للصفقات المغلقة؛ R = الربح ÷ المخاطرة حتى الوقف المحفوظ، حسب الاتجاه (LONG/SHORT).",
+        example: "مثال: خاطرت بـ $100 وربحت $150 ⇒ \u200e+1.5R.",
+        caveat: "الصفقة بلا وقف تُستثنى، ولا تُحتسب كـ 0R.",
+        longForm: "متوسّط R-Multiple لكل صفقة مغلقة.\n\nR = ربح الصفقة ÷ المخاطرة للسهم حتى الوقف المحفوظ. الربح يتبع اتجاه الصفقة: في LONG هو (الخروج − الدخول)، وفي SHORT هو (الدخول − الخروج) — لذلك فإن SHORT الرابحة تعطي دائماً R موجباً. \u200e+1.0R يعني أنك ربحت تماماً ما خاطرت به.\n\nفقط الصفقات التي كان لها وقف يمكن قياسها بـ R — الصفقة بلا وقف تُستثنى من هذا المتوسّط ولا تُحتسب كـ 0R. السطر أسفل الرقم يوضّح كم من صفقاتك المغلقة يغطّيها المتوسّط فعلياً.",
       },
     },
   },
@@ -118,7 +142,6 @@ export default [
     computedIn: ["src/intelligence/utils/statisticalModels.js:156"],
     sources: ["THARP"],
     related: ["avgR", "winRate"],
-    pendingTranslation: ["es", "pt", "ar"],
     glossaryOnly: "מחושב ב-TradeDNA.metrics בלבד; אין מסך שמציג את הערך (הכרעת ניב 13.11)",
     i18n: {
       he: {
@@ -137,15 +160,24 @@ export default [
       },
       es: {
         label: "Expectativa",
-        short: "Expectativa = (% Ganancias × Ganancia Media) − (% Pérdidas × Pérdida Media).\n\nTe dice el beneficio esperado en dólares por operación en promedio. Positiva = tu sistema tiene ventaja. Negativa = pierdes dinero con el tiempo sin importar las ganancias individuales.",
+        short: "El R promedio que ganaste por operación cerrada, contando el break-even en el denominador.",
+        example: "Ejemplo: la mitad gana +2R y la mitad pierde −1R ⇒ +0.5R por operación.",
+        caveat: "Se mide en R, no en dólares.",
+        longForm: "Expectativa = (% de ganadoras × R medio ganador) − (% de perdedoras × R medio perdedor), con las operaciones en break-even en el denominador.\n\nMuestra cuántos R esperas ganar por operación en promedio. Positiva significa que tienes ventaja (edge); negativa significa que pierdes con el tiempo sin importar las ganancias individuales. Se mide en R, no en dólares, así que no depende del tamaño de la posición.",
       },
       pt: {
         label: "Expectativa",
-        short: "Expectativa = (% Ganhos × Ganho Médio) − (% Perdas × Perda Média).\n\nDiz-te o lucro esperado em dólares por operação em média. Positiva = o teu sistema tem vantagem. Negativa = perdes dinheiro ao longo do tempo independentemente dos ganhos individuais.",
+        short: "O R médio que você ganhou por operação fechada, contando o break-even no denominador.",
+        example: "Exemplo: metade ganha +2R e metade perde −1R ⇒ +0.5R por operação.",
+        caveat: "Medida em R, não em dólares.",
+        longForm: "Expectativa = (% de vencedoras × R médio vencedor) − (% de perdedoras × R médio perdedor), com as operações no break-even no denominador.\n\nMostra quantos R você espera ganhar por operação, em média. Positiva significa que você tem vantagem (edge); negativa significa que você perde com o tempo, independentemente de ganhos individuais. É medida em R, não em dólares, então não depende do tamanho da posição.",
       },
       ar: {
         label: "التوقّع",
-        short: "التوقّع = (نسبة الربح × متوسّط الربح) − (نسبة الخسارة × متوسّط الخسارة).\n\nيخبرك بالربح المتوقّع بالدولار لكل صفقة في المتوسّط. موجب = نظامك يملك أفضلية. سالب = تخسر المال مع الوقت بغضّ النظر عن المكاسب الفردية.",
+        short: "متوسّط R الذي حقّقته لكل صفقة مغلقة، مع احتساب صفقات التعادل (Break-even) في المقام.",
+        example: "مثال: نصف الصفقات تربح \u200e+2R والنصف يخسر \u200e−1R ⇒ \u200e+0.5R لكل صفقة.",
+        caveat: "يُقاس بـ R، لا بالدولار.",
+        longForm: "التوقّع = (نسبة الربح × متوسّط R الرابح) − (نسبة الخسارة × متوسّط R الخاسر)، مع احتساب صفقات التعادل (Break-even) في المقام.\n\nيوضّح كم R تتوقّع أن تربح في المتوسّط لكل صفقة. الموجب يعني أن لديك أفضلية (Edge)؛ والسالب يعني أنك تخسر مع الوقت بغضّ النظر عن الأرباح الفردية. يُقاس بـ R لا بالدولار، لذلك لا يعتمد على حجم الصفقة.",
       },
     },
   },
@@ -154,7 +186,6 @@ export default [
     computedIn: ["src/intelligence/utils/statisticalModels.js:195"],
     sources: ["SHARPE"],
     related: ["avgR", "dnaConsistency"],
-    pendingTranslation: ["es", "pt", "ar"],
     glossaryOnly: "מחושב ב-TradeDNA.metrics בלבד; אין מסך שמציג את הערך (הכרעת ניב 13.11)",
     i18n: {
       he: {
@@ -172,16 +203,25 @@ export default [
         longForm: "Per-trade Sharpe = mean R ÷ standard deviation of R, over closed trades.\n\nIt is a variant of the Sharpe ratio (Sharpe, 1994), which divides excess return by its variability. Here there is no risk-free rate and no annualizing — the unit is a trade, not a year — so the number is not comparable to a fund's or an index's Sharpe ratio. Higher means R outcomes that are steadier relative to their mean.",
       },
       es: {
-        label: "Ratio de Sharpe",
-        short: "El Ratio de Sharpe mide el rendimiento ajustado al riesgo.\n\n• Por encima de 1.0 = bueno\n• Por encima de 2.0 = excelente\n• Por encima de 3.0 = excepcional (nivel de hedge fund)\n\nUn Sharpe alto significa rendimientos consistentes sin oscilaciones bruscas. Más importante que el beneficio bruto para evaluar la calidad del sistema.",
+        label: "Sharpe por operación (R)",
+        short: "El R medio por operación dividido por la desviación estándar del R.",
+        example: "Ejemplo: promedio de +0.5R con desviación estándar de 1R ⇒ 0.5.",
+        caveat: "Sin tasa libre de riesgo ni anualización — no es comparable con el Sharpe de un fondo.",
+        longForm: "Sharpe por operación = R medio ÷ desviación estándar del R, sobre las operaciones cerradas.\n\nEs una variante del ratio de Sharpe (Sharpe, 1994), que divide el rendimiento excedente por su variabilidad. Aquí no hay tasa libre de riesgo ni anualización — la unidad es una operación, no un año — así que el número no es comparable con el ratio de Sharpe de un fondo o de un índice. Más alto significa resultados en R más estables en relación con su media.",
       },
       pt: {
-        label: "Rácio de Sharpe",
-        short: "O Rácio de Sharpe mede o retorno ajustado ao risco.\n\n• Acima de 1.0 = bom\n• Acima de 2.0 = excelente\n• Acima de 3.0 = excecional (nível de hedge fund)\n\nUm Sharpe alto significa retornos consistentes sem oscilações bruscas. Mais importante que o lucro bruto para avaliar a qualidade do sistema.",
+        label: "Sharpe por operação (R)",
+        short: "O R médio por operação dividido pelo desvio padrão do R.",
+        example: "Exemplo: média de +0.5R com desvio padrão de 1R ⇒ 0.5.",
+        caveat: "Sem taxa livre de risco e sem anualização — não é comparável ao Sharpe de um fundo.",
+        longForm: "Sharpe por operação = R médio ÷ desvio padrão do R, nas operações fechadas.\n\nÉ uma variante do índice de Sharpe (Sharpe, 1994), que divide o retorno excedente pela sua variabilidade. Aqui não há taxa livre de risco nem anualização — a unidade é uma operação, não um ano — então o número não é comparável ao índice de Sharpe de um fundo ou de um índice. Mais alto significa resultados em R mais estáveis em relação à média.",
       },
       ar: {
-        label: "مقياس شارب",
-        short: "يقيس مقياس شارب (Sharpe) العائد المعدّل حسب المخاطرة.\n\n• أعلى من 1.0 = جيّد\n• أعلى من 2.0 = ممتاز\n• أعلى من 3.0 = استثنائي (مستوى صناديق التحوّط)\n\nشارب المرتفع يعني عوائد متّسقة دون تقلّبات حادّة. أهمّ من الربح الخام لتقييم جودة النظام.",
+        label: "شارب لكل صفقة (R)",
+        short: "متوسّط R لكل صفقة مقسوماً على الانحراف المعياري لـ R.",
+        example: "مثال: متوسّط \u200e+0.5R مع انحراف معياري 1R ⇒ 0.5.",
+        caveat: "بلا معدّل خالٍ من المخاطر وبلا تحويل سنوي — لا يُقارَن بنسبة شارب لصندوق.",
+        longForm: "شارب لكل صفقة = متوسّط R ÷ الانحراف المعياري لـ R، على الصفقات المغلقة.\n\nهو صيغة من نسبة شارب (Sharpe, 1994) التي تقسم العائد الزائد على تقلّبه. هنا لا يوجد معدّل خالٍ من المخاطر ولا تحويل سنوي — الوحدة صفقة لا سنة — لذلك لا يُقارَن الرقم بنسبة شارب لصندوق أو لمؤشّر. القيمة الأعلى تعني نتائج R أكثر ثباتاً قياساً بمتوسّطها.",
       },
     },
   },
@@ -191,7 +231,6 @@ export default [
     sources: ["CFA"],
     related: ["equityCurve"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · כרטיס"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "ירידה מקסימלית",
@@ -209,15 +248,24 @@ export default [
       },
       es: {
         label: "Drawdown Máximo",
-        short: "Drawdown Máximo — la mayor caída en dólares desde un pico en el saldo de tu cuenta hasta el punto más bajo antes de recuperarse.\n\nUn número menor significa menos rachas perdedoras grandes y mejor preservación del capital. Los drawdowns profundos son psicológicamente dañinos y difíciles de recuperar matemáticamente.",
+        short: "La mayor caída, en dinero, desde un pico de tu P&L acumulado de operaciones cerradas hasta el mínimo posterior.",
+        example: "Ejemplo: el P&L acumulado subió a $2,000 y cayó a $1,200 ⇒ $800.",
+        caveat: "Se mide como monto, no como porcentaje del capital.",
+        longForm: "Drawdown máximo — la mayor caída, en dinero, desde un pico de tu P&L acumulado de operaciones cerradas hasta el mínimo que le siguió.\n\nEstá en tu moneda de visualización, no en porcentaje del capital. Más pequeño significa mejor preservación del capital. De los drawdowns profundos cuesta recuperarse: tras una caída del 25% necesitas una ganancia de alrededor del 33% para volver al pico.",
       },
       pt: {
         label: "Drawdown Máximo",
-        short: "Drawdown Máximo — a maior queda em dólares desde um pico no saldo da tua conta até ao ponto mais baixo antes da recuperação.\n\nUm número menor significa menos sequências perdedoras grandes e melhor preservação de capital. Drawdowns profundos são psicologicamente prejudiciais e difíceis de recuperar matematicamente.",
+        short: "A maior queda, em dinheiro, de um pico do seu P&L acumulado de operações fechadas até o fundo seguinte.",
+        example: "Exemplo: o P&L acumulado subiu para $2,000 e caiu para $1,200 ⇒ $800.",
+        caveat: "Medido como valor, não como porcentagem do capital.",
+        longForm: "Drawdown máximo — a maior queda, em dinheiro, de um pico do seu P&L acumulado de operações fechadas até o fundo que veio depois.\n\nEstá na sua moeda de exibição, não em porcentagem do capital. Menor significa melhor preservação de capital. Drawdowns profundos são difíceis de recuperar: depois de uma queda de 25%, você precisa de um ganho de cerca de 33% para voltar ao pico.",
       },
       ar: {
         label: "أقصى تراجع",
-        short: "أقصى تراجع (Max Drawdown) — أكبر هبوط بالدولار من قمّة في رصيد حسابك إلى أدنى نقطة قبل التعافي.\n\nالرقم الأصغر يعني سلاسل خسائر كبيرة أقل وحفاظاً أفضل على رأس المال. التراجعات العميقة مؤذية نفسياً وصعبة التعافي رياضياً.",
+        short: "أكبر هبوط، بالمال، من قمّة في P&L التراكمي لصفقاتك المغلقة إلى القاع الذي تلاها.",
+        example: "مثال: ارتفع P&L التراكمي إلى $2,000 ثم هبط إلى $1,200 ⇒ $800.",
+        caveat: "يُقاس كمبلغ، لا كنسبة مئوية من رأس المال.",
+        longForm: "أقصى تراجع (Max Drawdown) — أكبر هبوط، بالمال، من قمّة في P&L التراكمي لصفقاتك المغلقة إلى القاع الذي تلاها.\n\nيُعرض بعملة العرض لديك، لا كنسبة مئوية من رأس المال. كلما كان أصغر كان الحفاظ على رأس المال أفضل. التراجعات العميقة يصعب التعافي منها: بعد هبوط 25% تحتاج إلى ربح يقارب 33% للعودة إلى القمّة.",
       },
     },
   },
@@ -226,7 +274,6 @@ export default [
     computedIn: ["src/lib/tradingStats.js"],
     related: ["avgLoss", "profitFactor"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · כרטיס"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "רווח ממוצע",
@@ -242,15 +289,21 @@ export default [
       },
       es: {
         label: "Ganancia Media",
-        short: "Beneficio promedio en operaciones ganadoras.",
+        short: "La ganancia media de tus operaciones cerradas ganadoras.",
+        example: "Ejemplo: ganancias de $100 y $300 ⇒ $200.",
+        longForm: "Ganancia media de las operaciones ganadoras.",
       },
       pt: {
         label: "Ganho Médio",
-        short: "Lucro médio em operações vencedoras.",
+        short: "O lucro médio das suas operações fechadas que terminaram com lucro.",
+        example: "Exemplo: ganhos de $100 e $300 ⇒ $200.",
+        longForm: "Lucro médio das operações vencedoras.",
       },
       ar: {
         label: "متوسّط الربح",
-        short: "متوسّط الربح في الصفقات الرابحة.",
+        short: "متوسّط الربح في صفقاتك المغلقة التي انتهت بربح.",
+        example: "مثال: أرباح $100 و$300 ⇒ $200.",
+        longForm: "متوسّط الربح في الصفقات الرابحة.",
       },
     },
   },
@@ -259,7 +312,6 @@ export default [
     computedIn: ["src/lib/tradingStats.js"],
     related: ["avgWin", "profitFactor"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · כרטיס"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "הפסד ממוצע",
@@ -275,15 +327,21 @@ export default [
       },
       es: {
         label: "Pérdida Media",
-        short: "Pérdida promedio en operaciones perdedoras.",
+        short: "La pérdida media de tus operaciones cerradas perdedoras.",
+        example: "Ejemplo: pérdidas de $50 y $150 ⇒ $100.",
+        longForm: "Pérdida media de las operaciones perdedoras.",
       },
       pt: {
         label: "Perda Média",
-        short: "Perda média em operações perdedoras.",
+        short: "A perda média das suas operações fechadas que terminaram em perda.",
+        example: "Exemplo: perdas de $50 e $150 ⇒ $100.",
+        longForm: "Perda média das operações perdedoras.",
       },
       ar: {
         label: "متوسّط الخسارة",
-        short: "متوسّط الخسارة في الصفقات الخاسرة.",
+        short: "متوسّط الخسارة في صفقاتك المغلقة التي انتهت بخسارة.",
+        example: "مثال: خسائر $50 و$150 ⇒ $100.",
+        longForm: "متوسّط الخسارة في الصفقات الخاسرة.",
       },
     },
   },
@@ -292,7 +350,6 @@ export default [
     computedIn: ["src/utils.js:48"],
     related: ["holdTimeVsPnl"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · כרטיס"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "זמן החזקה ממוצע",
@@ -310,15 +367,24 @@ export default [
       },
       es: {
         label: "Tiempo Medio",
-        short: "Periodo medio de mantenimiento por operación cerrada (en días).\n\nEl swing trading suele apuntar a mantener 2-10 días. Mantenimientos muy cortos (< 1 día) a menudo indican cerrar operaciones demasiado pronto. Mantenimientos muy largos (> 20 días) pueden sugerir evitar los stop-loss.",
+        short: "La media de días entre entrada y salida en las operaciones cerradas.",
+        example: "Ejemplo: operaciones de 2 y 6 días ⇒ 4 días.",
+        caveat: "Días naturales redondeados; entrar y salir el mismo día = 0.",
+        longForm: "Período de tenencia medio por operación cerrada, en días naturales redondeados. Una operación abierta y cerrada el mismo día cuenta como 0.\n\nCompáralo con el gráfico Hold Time vs P&L en Analytics: muestra si son tus tenencias más largas o más cortas las que ganan dinero.",
       },
       pt: {
         label: "Tempo Médio",
-        short: "Período médio de manutenção por operação fechada (em dias).\n\nO swing trading costuma apontar para manter 2-10 dias. Manutenções muito curtas (< 1 dia) muitas vezes indicam fechar operações cedo demais. Manutenções muito longas (> 20 dias) podem sugerir evitar os stop-loss.",
+        short: "O número médio de dias entre a entrada e a saída nas operações fechadas.",
+        example: "Exemplo: operações de 2 e 6 dias ⇒ 4 dias.",
+        caveat: "Dias corridos arredondados; entrada e saída no mesmo dia = 0.",
+        longForm: "Período médio de permanência por operação fechada, em dias corridos arredondados. Uma operação aberta e fechada no mesmo dia conta como 0.\n\nCompare com o gráfico Hold Time vs P&L em Analytics: ele mostra se são suas permanências mais longas ou mais curtas que dão lucro.",
       },
       ar: {
         label: "متوسّط مدّة الاحتفاظ",
-        short: "متوسّط فترة الاحتفاظ لكل صفقة مغلقة (بالأيام).\n\nيستهدف التداول المتأرجح عادةً الاحتفاظ 2-10 أيام. فترات الاحتفاظ القصيرة جداً (< يوم واحد) كثيراً ما تعني إغلاق الصفقات مبكراً. والطويلة جداً (> 20 يوماً) قد تعني تجنّب أوامر وقف الخسارة.",
+        short: "متوسّط عدد الأيام بين الدخول والخروج في الصفقات المغلقة.",
+        example: "مثال: صفقتان مدّتهما 2 و6 أيام ⇒ 4 أيام.",
+        caveat: "أيام تقويمية مقرّبة؛ الدخول والخروج في اليوم نفسه = 0.",
+        longForm: "متوسّط مدّة الاحتفاظ لكل صفقة مغلقة، بالأيام التقويمية المقرّبة. الصفقة التي فُتحت وأُغلقت في اليوم نفسه تُحتسب 0.\n\nقارنه بمخطّط Hold Time vs P&L في Analytics: يوضّح ما إذا كانت فترات الاحتفاظ الأطول أم الأقصر هي التي تحقّق الربح.",
       },
     },
   },
@@ -327,7 +393,6 @@ export default [
     computedIn: ["src/lib/tradingStats.js:392"],
     related: ["maxDD", "accountEquity"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · גרף"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "עקומת הון",
@@ -345,15 +410,24 @@ export default [
       },
       es: {
         label: "Curva de Capital",
-        short: "Tu Curva de Capital muestra el saldo de la cuenta a lo largo del tiempo.\n\nUna curva suave y en ascenso constante = ventaja consistente y buena gestión del riesgo.\nPicos irregulares = tamaño de posición inconsistente o trading emocional.\nLargos periodos planos = sobreoperar sin ventaja.",
+        short: "El saldo de tu cuenta en el tiempo: tu capital base más el P&L acumulado tras cada operación cerrada.",
+        example: "Ejemplo: base de $10,000, +$200 y luego −$50 ⇒ $10,200, luego $10,150.",
+        caveat: "Cada punto es un día de cierre; posiciones abiertas excluidas.",
+        longForm: "Tu Curva de Capital muestra el saldo de la cuenta en el tiempo: el capital base que configuraste más el P&L acumulado, un punto por operación cerrada, según el día de cierre.\n\nUna curva que sube de forma gradual significa ganancias que se acumulan sin caídas bruscas. Los saltos bruscos en cualquier dirección suelen indicar un tamaño de posición cambiante. Las posiciones abiertas no se incluyen.",
       },
       pt: {
         label: "Curva de Capital",
-        short: "A tua Curva de Capital mostra o saldo da conta ao longo do tempo.\n\nUma curva suave e em ascensão constante = vantagem consistente e boa gestão de risco.\nPicos irregulares = tamanho de posição inconsistente ou trading emocional.\nLongos períodos planos = operar em excesso sem vantagem.",
+        short: "O saldo da conta ao longo do tempo: a base de capital mais o P&L acumulado após cada operação fechada.",
+        example: "Exemplo: base de $10,000, +$200 e depois −$50 ⇒ $10,200, depois $10,150.",
+        caveat: "Cada ponto é um dia de fechamento; exclui posições abertas.",
+        longForm: "Sua Curva de Capital mostra o saldo da conta ao longo do tempo: a base de capital que você definiu mais o P&L acumulado, um ponto por operação fechada, pelo dia de fechamento.\n\nUma curva que sobe de forma gradual significa ganhos se acumulando sem quedas bruscas. Saltos bruscos em qualquer direção geralmente indicam mudança no tamanho da posição. Posições abertas não são incluídas.",
       },
       ar: {
         label: "منحنى رأس المال",
-        short: "تُظهر منحنى رأس المال رصيد حسابك عبر الزمن.\n\nمنحنى سلس وصاعد بثبات = أفضلية متّسقة وإدارة مخاطر جيّدة.\nقفزات حادّة = حجم صفقات غير متّسق أو تداول عاطفي.\nفترات مسطّحة طويلة = إفراط في التداول دون أفضلية.",
+        short: "رصيد حسابك عبر الزمن: قاعدة رأس المال لديك مضافاً إليها P&L التراكمي بعد كل صفقة مغلقة.",
+        example: "مثال: قاعدة $10,000، ثم \u200e+$200 ثم \u200e−$50 ⇒ $10,200 ثم $10,150.",
+        caveat: "كل نقطة هي يوم إغلاق؛ المراكز المفتوحة مستثناة.",
+        longForm: "منحنى رأس المال يوضّح رصيد الحساب عبر الزمن: قاعدة رأس المال التي حدّدتها مضافاً إليها P&L التراكمي، نقطة لكل صفقة مغلقة، حسب يوم الإغلاق.\n\nالمنحنى الذي يرتفع تدريجياً يعني أرباحاً تتراكم بلا هبوط حادّ. القفزات الحادّة في أي اتجاه تشير عادةً إلى تغيّر حجم الصفقة. المراكز المفتوحة غير مشمولة.",
       },
     },
   },
@@ -362,7 +436,6 @@ export default [
     computedIn: ["src/lib/tradingStats.js:343"],
     related: ["accountEquity", "equityCurve"],
     shownAt: ["SwingEdge_App.jsx — אנליטיקס · כרטיס"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "תשואה כוללת",
@@ -379,16 +452,25 @@ export default [
         longForm: "Your total profit or loss from closed trades, as a percentage of the capital base you set. Open positions are not included.\n\nIt is the headline performance number — but without risk context (max drawdown, average R) it does not tell the whole story.",
       },
       es: {
-        label: "Total Return",
-        short: "Tu ganancia o pérdida total desde que empezaste, como porcentaje del capital inicial. La cifra principal de rendimiento, pero sin contexto de riesgo no cuenta toda la historia.",
+        label: "Rendimiento Total",
+        short: "Tu P&L de operaciones cerradas como % del capital base que configuraste.",
+        example: "Ejemplo: +$500 sobre una base de $10,000 ⇒ +5%.",
+        caveat: "No incluye posiciones abiertas.",
+        longForm: "Tu ganancia o pérdida total de operaciones cerradas, como porcentaje del capital base que configuraste. Las posiciones abiertas no se incluyen.\n\nEs el número principal de rendimiento — pero sin contexto de riesgo (drawdown máximo, R promedio) no cuenta toda la historia.",
       },
       pt: {
-        label: "Total Return",
-        short: "O seu lucro ou prejuízo total desde que começou, como percentagem do capital inicial. O número principal de desempenho — mas sem contexto de risco não conta a história toda.",
+        label: "Retorno Total",
+        short: "Seu P&L de operações fechadas como % da base de capital que você definiu.",
+        example: "Exemplo: +$500 sobre uma base de $10,000 ⇒ +5%.",
+        caveat: "Não inclui posições abertas.",
+        longForm: "Seu lucro ou prejuízo total das operações fechadas, como porcentagem da base de capital que você definiu. Posições abertas não são incluídas.\n\nÉ o principal número de desempenho — mas sem contexto de risco (drawdown máximo, R médio) não conta a história toda.",
       },
       ar: {
-        label: "Total Return",
-        short: "إجمالي ربحك أو خسارتك منذ البداية، كنسبة مئوية من رأس المال الابتدائي. الرقم الرئيسي للأداء — لكنه دون سياق المخاطرة لا يروي القصة كاملة.",
+        label: "العائد الإجمالي",
+        short: "P&L صفقاتك المغلقة كنسبة مئوية من قاعدة رأس المال التي حدّدتها.",
+        example: "مثال: \u200e+$500 على قاعدة $10,000 ⇒ \u200e+5%.",
+        caveat: "المراكز المفتوحة غير مشمولة.",
+        longForm: "إجمالي ربحك أو خسارتك من الصفقات المغلقة، كنسبة مئوية من قاعدة رأس المال التي حدّدتها. المراكز المفتوحة غير مشمولة.\n\nإنه الرقم الرئيسي للأداء — لكن بدون سياق المخاطرة (أقصى تراجع، متوسّط R) لا يروي القصة كاملة.",
       },
     },
   },
@@ -397,7 +479,6 @@ export default [
     computedIn: ["SwingEdge_App.jsx:2961"],
     related: ["streakHistory", "tilt"],
     shownAt: ["SwingEdge_App.jsx — דשבורד · כרטיס הרצף"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "רצף נוכחי",
@@ -414,16 +495,25 @@ export default [
         longForm: "The number of profitable trades in a row, up to your latest closed trade. When the latest trade lost, the card shows 0 — a losing streak is not shown here as a negative number; it appears in Streak History in Analytics.\n\nA winning streak builds confidence, but it is also a common time for overconfidence and unplanned increases in risk.",
       },
       es: {
-        label: "Win Streak",
-        short: "El número de operaciones ganadoras seguidas. Una racha ganadora genera confianza, pero también es el momento más peligroso para el exceso de confianza y un riesgo indisciplinado.",
+        label: "Racha Actual",
+        short: "El número de ganadoras seguidas hasta tu última operación cerrada.",
+        example: "Ejemplo: 3 ganadoras seguidas ⇒ 3; la línea de abajo muestra tu mejor racha.",
+        caveat: "Una racha perdedora se muestra como 0, no como número negativo.",
+        longForm: "El número de operaciones ganadoras seguidas hasta tu última operación cerrada. Cuando la última operación perdió, la tarjeta muestra 0 — una racha perdedora no se muestra aquí como número negativo; aparece en Streak History en Analytics.\n\nUna racha ganadora genera confianza, pero también es un momento habitual de exceso de confianza y de aumentos de riesgo no planificados.",
       },
       pt: {
-        label: "Win Streak",
-        short: "O número de operações vencedoras seguidas. Uma sequência de vitórias gera confiança — mas também é o momento mais perigoso para o excesso de confiança e o risco indisciplinado.",
+        label: "Sequência Atual",
+        short: "O número de ganhos seguidos até sua última operação fechada.",
+        example: "Exemplo: 3 ganhos seguidos ⇒ 3; a linha abaixo mostra sua melhor sequência.",
+        caveat: "Uma sequência de perdas aparece como 0, não como número negativo.",
+        longForm: "O número de operações lucrativas seguidas, até sua última operação fechada. Quando a última operação teve prejuízo, o card mostra 0 — uma sequência de perdas não aparece aqui como número negativo; ela aparece em Streak History em Analytics.\n\nUma sequência de ganhos gera confiança, mas também é um momento comum de excesso de confiança e de aumentos de risco não planejados.",
       },
       ar: {
-        label: "Win Streak",
-        short: "عدد الصفقات الرابحة المتتالية. سلسلة الانتصارات تبني الثقة — لكنها أيضاً أخطر وقت للثقة المفرطة والمخاطرة غير المنضبطة.",
+        label: "السلسلة الحالية",
+        short: "عدد الصفقات الرابحة المتتالية حتى آخر صفقة مغلقة لديك.",
+        example: "مثال: 3 أرباح متتالية ⇒ 3؛ السطر أدناه يوضّح أفضل سلسلة لك.",
+        caveat: "سلسلة الخسائر تظهر 0، لا كرقم سالب.",
+        longForm: "عدد الصفقات الرابحة المتتالية حتى آخر صفقة مغلقة لديك. عندما تكون آخر صفقة خاسرة، تُظهر البطاقة 0 — سلسلة الخسائر لا تُعرض هنا كرقم سالب، بل تظهر في Streak History ضمن Analytics.\n\nسلسلة الأرباح تبني الثقة، لكنها أيضاً وقت شائع للإفراط في الثقة ولزيادات غير مخطّط لها في المخاطرة.",
       },
     },
   },
@@ -432,7 +522,6 @@ export default [
     computedIn: ["src/intelligence/core/MonthlyReport.js:172"],
     related: ["winRate", "avgR", "discipline", "dnaConsistency"],
     shownAt: ["src/components/MonthlyReportTab.jsx — דוח חודשי · ציון"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "ציון חודשי",
@@ -449,16 +538,25 @@ export default [
         longForm: "A weighted grade for the month: 40% win rate, 30% R, 20% discipline and 10% consistency, on a 0–100 scale. A from 85, B from 70, C from 55, D from 40, and F below.\n\nThe discipline part relies on the 'followed my plan' flag on your trades — a self-report. It is a quick snapshot, not a substitute for digging into the details.",
       },
       es: {
-        label: "Grade",
-        short: "Una puntuación ponderada (A–F) que resume la calidad de tu trading del mes: una mezcla de tasa de aciertos, múltiplo R, disciplina y consistencia. Una instantánea rápida, no un sustituto de analizar los detalles.",
+        label: "Calificación Mensual",
+        short: "Una nota A–F del mes: 40% Win Rate, 30% R, 20% disciplina, 10% consistencia.",
+        example: "Ejemplo: 72/100 ⇒ B (A 85+ · B 70+ · C 55+ · D 40+).",
+        caveat: "La disciplina es la marca autodeclarada 'seguí mi plan'.",
+        longForm: "Una calificación ponderada del mes: 40% Win Rate, 30% R, 20% disciplina y 10% consistencia, en una escala de 0–100. A desde 85, B desde 70, C desde 55, D desde 40 y F por debajo.\n\nLa parte de disciplina se basa en la marca 'seguí mi plan' de tus operaciones — una autodeclaración. Es una foto rápida, no un sustituto de analizar los detalles.",
       },
       pt: {
-        label: "Grade",
-        short: "Uma pontuação ponderada (A–F) que resume a qualidade do seu trading no mês: uma mistura de taxa de acertos, múltiplo R, disciplina e consistência. Um retrato rápido — não substitui analisar os detalhes.",
+        label: "Nota Mensal",
+        short: "Uma nota A–F para o mês: 40% Win Rate, 30% R, 20% disciplina, 10% consistência.",
+        example: "Exemplo: 72/100 ⇒ B (A 85+ · B 70+ · C 55+ · D 40+).",
+        caveat: "Disciplina é a marcação autodeclarada 'segui meu plano'.",
+        longForm: "Uma nota ponderada para o mês: 40% Win Rate, 30% R, 20% disciplina e 10% consistência, em uma escala de 0–100. A a partir de 85, B a partir de 70, C a partir de 55, D a partir de 40, e F abaixo disso.\n\nA parte de disciplina depende da marcação 'segui meu plano' nas suas operações — uma autoavaliação. É um retrato rápido, não um substituto para analisar os detalhes.",
       },
       ar: {
-        label: "Grade",
-        short: "درجة مرجّحة (A–F) تلخّص جودة تداولك خلال الشهر: مزيج من نسبة النجاح ومضاعف R والانضباط والاتّساق. لقطة سريعة — لا تُغني عن التعمّق في التفاصيل.",
+        label: "التقييم الشهري",
+        short: "تقييم A–F للشهر: 40% Win Rate، و30% R، و20% انضباط، و10% اتساق.",
+        example: "مثال: 72/100 ⇒ B (A 85+ · B 70+ · C 55+ · D 40+).",
+        caveat: "الانضباط هو علامة 'اتّبعت خطّتي' التي تحدّدها بنفسك.",
+        longForm: "تقييم مرجّح للشهر: 40% Win Rate، و30% R، و20% انضباط، و10% اتساق، على مقياس 0–100. A من 85، وB من 70، وC من 55، وD من 40، وF لما دون ذلك.\n\nجزء الانضباط يعتمد على علامة 'اتّبعت خطّتي' في صفقاتك — وهي تقييم ذاتي. إنه لمحة سريعة، وليس بديلاً عن التعمّق في التفاصيل.",
       },
     },
   },
@@ -466,7 +564,6 @@ export default [
     id: "entryQuality",
     related: ["discipline"],
     shownAt: ["SwingEdge_App.jsx — טופס עסקה · מנתח עסקה", "src/components/EditTradeModal.jsx — עריכת עסקה"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "איכות כניסה",
@@ -483,16 +580,25 @@ export default [
         longForm: "A (star) rating of how well your entry matched the planned setup: timing, price and confirmation. The rating is yours — the app does not measure it from prices.\n\nA consistently high rating signals discipline — even when the trade itself loses.",
       },
       es: {
-        label: "Entry Quality",
-        short: "Una calificación (estrellas) de cuán bien tu entrada coincidió con el setup planificado: timing, precio y confirmación. Una calificación alta y constante indica disciplina, incluso cuando la operación pierde.",
+        label: "Calidad de Entrada",
+        short: "Una valoración de 1–5 estrellas que diste a tu entrada: cuánto se ajustaron momento, precio y confirmación al plan.",
+        example: "Ejemplo: entraste al precio planeado tras la confirmación ⇒ 5 estrellas.",
+        caveat: "Autoevaluada — no se mide con precios.",
+        longForm: "Una valoración (en estrellas) de cuánto se ajustó tu entrada al setup planificado: momento, precio y confirmación. La valoración es tuya — la app no la mide a partir de precios.\n\nUna valoración alta y constante indica disciplina — incluso cuando la operación en sí pierde.",
       },
       pt: {
-        label: "Entry Quality",
-        short: "Uma classificação (estrelas) de quão bem a sua entrada correspondeu ao setup planeado: timing, preço e confirmação. Uma classificação alta e constante indica disciplina — mesmo quando a operação perde.",
+        label: "Qualidade de Entrada",
+        short: "Uma nota de 1–5 estrelas que você deu à sua entrada: quanto timing, preço e confirmação seguiram o plano.",
+        example: "Exemplo: você entrou no preço planejado após a confirmação ⇒ 5 estrelas.",
+        caveat: "Autoavaliada — não é medida pelos preços.",
+        longForm: "Uma avaliação (em estrelas) de quanto sua entrada seguiu o setup planejado: timing, preço e confirmação. A avaliação é sua — o app não a mede pelos preços.\n\nUma avaliação consistentemente alta sinaliza disciplina — mesmo quando a operação em si dá prejuízo.",
       },
       ar: {
-        label: "Entry Quality",
-        short: "تقييم (بالنجوم) لمدى مطابقة دخولك للنموذج المخطّط: التوقيت، والسعر، والتأكيد. التقييم العالي المتّسق يدل على الانضباط — حتى عندما تخسر الصفقة نفسها.",
+        label: "جودة الدخول",
+        short: "تقييم من 1–5 نجوم منحته لدخولك: مدى توافق التوقيت والسعر والتأكيد مع الخطة.",
+        example: "مثال: دخلت عند سعرك المخطّط بعد التأكيد ⇒ 5 نجوم.",
+        caveat: "تقييم ذاتي — لا يُقاس من الأسعار.",
+        longForm: "تقييم (بالنجوم) لمدى توافق دخولك مع الإعداد (Setup) المخطّط: التوقيت والسعر والتأكيد. التقييم منك — التطبيق لا يقيسه من الأسعار.\n\nالتقييم المرتفع باستمرار يشير إلى الانضباط — حتى عندما تخسر الصفقة نفسها.",
       },
     },
   },
@@ -501,7 +607,6 @@ export default [
     computedIn: ["src/lib/equityState.js"],
     related: ["equityCurve", "riskPerTrade"],
     shownAt: ["SwingEdge_App.jsx — דשבורד · כרטיס ההון"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "הון החשבון",
@@ -516,16 +621,22 @@ export default [
         caveat: "Per-trade risk is sized from your fixed capital base, not current equity.",
       },
       es: {
-        label: "Account Equity",
-        short: "The capital base you set plus cumulative P&L from closed and open trades.\nExample: a $10,000 base plus +$600 ⇒ $10,600.\nPer-trade risk is sized from your fixed capital base, not current equity.",
+        label: "Capital de la Cuenta",
+        short: "Tu capital base configurado más el P&L acumulado de operaciones cerradas y abiertas.",
+        example: "Ejemplo: una base de $10,000 más +$600 ⇒ $10,600.",
+        caveat: "El riesgo por operación se calcula sobre tu capital base fijo, no el actual.",
       },
       pt: {
-        label: "Account Equity",
-        short: "The capital base you set plus cumulative P&L from closed and open trades.\nExample: a $10,000 base plus +$600 ⇒ $10,600.\nPer-trade risk is sized from your fixed capital base, not current equity.",
+        label: "Patrimônio da Conta",
+        short: "Sua base de capital definida mais o P&L acumulado das operações fechadas e abertas.",
+        example: "Exemplo: uma base de $10,000 mais +$600 ⇒ $10,600.",
+        caveat: "O risco por operação usa sua base de capital fixa, não o patrimônio atual.",
       },
       ar: {
-        label: "Account Equity",
-        short: "The capital base you set plus cumulative P&L from closed and open trades.\nExample: a $10,000 base plus +$600 ⇒ $10,600.\nPer-trade risk is sized from your fixed capital base, not current equity.",
+        label: "رأس مال الحساب",
+        short: "قاعدة رأس المال التي حدّدتها مضافاً إليها P&L التراكمي من الصفقات المغلقة والمفتوحة.",
+        example: "مثال: قاعدة $10,000 مضافاً إليها \u200e+$600 ⇒ $10,600.",
+        caveat: "المخاطرة لكل صفقة تُحسب من قاعدة رأس المال الثابتة، لا من رأس المال الحالي.",
       },
     },
   },

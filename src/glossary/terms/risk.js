@@ -1,7 +1,7 @@
 // src/glossary/terms/risk.js — ניהול סיכון
 // ⛔ מקור האמת היחיד למונחים האלה. עריכה כאן ⇒ `npm run glossary` באותו קומיט (test:glossary תופס סחיפה).
 // פורמט (גל 3): short = הגדרה במשפט אחד ≤18 מילים · example = "לדוגמה:"/"Example:" במספרים היפותטיים · caveat אחד לכל היותר · longForm = הטקסט המלא (מודאל המילון).
-// pendingTranslation: es/pt/ar עדיין בטקסט הישן — שלב 5.
+// 5 שפות מלאות (שלב 5, 14.11): es/pt/ar מתורגמים מ-he/en, ≤110% מתווי en. שפה שממתינה לתרגום ⇒ pendingTranslation + שורה ב-test:glossary (L3).
 
 /** @type {import("../types.js").GlossaryTerm[]} */
 export default [
@@ -11,7 +11,6 @@ export default [
     sources: ["ELDER"],
     related: ["riskLimits", "positionSize"],
     shownAt: ["SwingEdge_App.jsx — הגדרות · סיכון לעסקה"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "סיכון לעסקה",
@@ -29,15 +28,24 @@ export default [
       },
       es: {
         label: "Riesgo por Operación",
-        short: "Riesgo máximo por operación como % del total de la cuenta.\n\nEstándar profesional:\n• 1% por operación = conservador, sostenible\n• 2% por operación = moderado, aún aceptable\n• 5%+ por operación = territorio de apuestas\n\nEl 'riesgo de ruina' aumenta exponencialmente por encima del 2% por operación.",
+        short: "El % del capital que elegiste perder en una operación si se toca el stop.",
+        example: "Ejemplo: capital de $10,000 y 1% de riesgo ⇒ pérdida máxima de $100.",
+        caveat: "Regla general: hasta 2% por operación (Elder).",
+        longForm: "Riesgo máximo por operación como porcentaje de tu capital base: lo que pierdes si se toca el stop. De él se derivan el tamaño de posición y el tope para todas las posiciones abiertas.\n\nRegla general: hasta 2% por operación (Elder). Muchos traders profesionales arriesgan cerca del 1%.",
       },
       pt: {
         label: "Risco por Operação",
-        short: "Risco máximo por operação como % do total da conta.\n\nPadrão profissional:\n• 1% por operação = conservador, sustentável\n• 2% por operação = moderado, ainda aceitável\n• 5%+ por operação = território de apostas\n\nO 'risco de ruína' aumenta exponencialmente acima de 2% por operação.",
+        short: "O % do capital que você escolheu perder numa operação se o stop for atingido.",
+        example: "Exemplo: capital de $10,000 e risco de 1% ⇒ perda máxima de $100.",
+        caveat: "Regra prática: até 2% por operação (Elder).",
+        longForm: "Risco máximo por operação como porcentagem da sua base de capital: o que você perde se o stop for atingido. O tamanho da posição e o teto para todas as posições abertas derivam dele.\n\nRegra prática: até 2% por operação (Elder). Muitos traders profissionais arriscam perto de 1%.",
       },
       ar: {
         label: "المخاطرة لكل صفقة",
-        short: "أقصى مخاطرة لكل صفقة كنسبة % من إجمالي الحساب.\n\nالمعيار الاحترافي:\n• 1% لكل صفقة = متحفّظ، مستدام\n• 2% لكل صفقة = معتدل، لا يزال مقبولاً\n• 5%+ لكل صفقة = منطقة مقامرة\n\n'مخاطر الإفلاس' ترتفع أُسّياً فوق 2% لكل صفقة.",
+        short: "نسبة رأس المال التي اخترت خسارتها في صفقة واحدة إذا ضُرب وقف الخسارة.",
+        example: "مثال: رأس مال $10,000 ومخاطرة 1% ⇒ خسارة قصوى $100.",
+        caveat: "قاعدة عامة: حتى 2% لكل صفقة (Elder).",
+        longForm: "أقصى مخاطرة لكل صفقة كنسبة من قاعدة رأس مالك: ما تخسره إذا ضُرب وقف الخسارة. منها يُشتقّ حجم المركز والسقف لجميع المراكز المفتوحة.\n\nقاعدة عامة: حتى 2% لكل صفقة (Elder). كثير من المتداولين المحترفين يخاطرون بما يقارب 1%.",
       },
     },
   },
@@ -47,8 +55,7 @@ export default [
     sources: ["ELDER"],
     related: ["riskPerTrade"],
     shownAt: ["SwingEdge_App.jsx — דשבורד · לוח סיכון · הגדרות"],
-    pendingTranslation: ["es", "pt", "ar"],
-    mustContain: { he: ["3%", "5%"], en: ["3%", "5%"] },
+    mustContain: { he: ["3%", "5%"], en: ["3%", "5%"], es: ["3%", "5%"], pt: ["3%", "5%"], ar: ["3%", "5%"] },
     i18n: {
       he: {
         label: "תקרות סיכון",
@@ -66,15 +73,24 @@ export default [
       },
       es: {
         label: "Límites de Riesgo",
-        short: "Dos límites funcionan juntos:\n\n• Riesgo/Operación — lo máximo que arriesgas en una sola posición. Tú lo eliges en Ajustes.\n• Riesgo Máximo Permitido — lo máximo que arriesgas en TODAS las posiciones abiertas combinadas. Se deriva del Riesgo/Operación: el doble, nunca por debajo del 3% ni por encima del 5%.\n\nDivide el Riesgo Máximo Permitido entre el Riesgo/Operación para saber cuántas posiciones de tamaño completo puedes mantener a la vez.",
+        short: "Tu riesgo por operación y un tope para todas las posiciones abiertas: el doble, entre 3% y 5%.",
+        example: "Ejemplo: 1% ⇒ 3% · 2% ⇒ 4% · 3% ⇒ 5%.",
+        caveat: "Tope ÷ riesgo por operación = cuántas posiciones completas caben.",
+        longForm: "Dos límites funcionan juntos:\n\n• Riesgo/Operación — lo máximo que arriesgas en una sola posición. Lo eliges en Ajustes.\n• Riesgo Máximo Permitido — lo máximo que arriesgas en TODAS las posiciones abiertas combinadas. Se deriva del Riesgo/Operación: el doble de ese valor, nunca por debajo del 3% ni por encima del 5%.\n\nDivide el Riesgo Máximo Permitido entre el Riesgo/Operación para ver cuántas posiciones de tamaño completo puedes mantener a la vez.",
       },
       pt: {
         label: "Limites de Risco",
-        short: "Dois limites funcionam juntos:\n\n• Risco/Operação — o máximo que arriscas numa única posição. És tu que o escolhes nas Definições.\n• Risco Máximo Permitido — o máximo que arriscas em TODAS as posições abertas combinadas. É derivado do Risco/Operação: o dobro, nunca abaixo de 3% nem acima de 5%.\n\nDivide o Risco Máximo Permitido pelo Risco/Operação para saberes quantas posições de tamanho completo podes manter ao mesmo tempo.",
+        short: "Seu risco por operação e um teto para todas as posições abertas: o dobro, entre 3% e 5%.",
+        example: "Exemplo: 1% ⇒ 3% · 2% ⇒ 4% · 3% ⇒ 5%.",
+        caveat: "Teto ÷ risco por operação = quantas posições completas cabem juntas.",
+        longForm: "Dois limites funcionam juntos:\n\n• Risco/Operação — o máximo que você arrisca em uma única posição. Você o escolhe em Configurações.\n• Risco Máximo Permitido — o máximo que você arrisca em TODAS as posições abertas combinadas. É derivado do Risco/Operação: o dobro desse valor, nunca abaixo de 3% nem acima de 5%.\n\nDivida o Risco Máximo Permitido pelo Risco/Operação para ver quantas posições de tamanho completo você pode manter ao mesmo tempo.",
       },
       ar: {
         label: "حدود المخاطرة",
-        short: "حدّان يعملان معاً:\n\n• المخاطرة/الصفقة — أقصى ما تخاطر به في صفقة واحدة. أنت تختارها من الإعدادات.\n• أقصى مخاطرة مسموحة — أقصى ما تخاطر به في جميع المراكز المفتوحة مجتمعةً. تُشتقّ من المخاطرة/الصفقة: ضعفها، لا تقلّ عن 3% ولا تزيد عن 5%.\n\nاقسم أقصى مخاطرة مسموحة على المخاطرة/الصفقة لتعرف كم مركزاً بحجم كامل يمكنك الاحتفاظ به في آنٍ واحد.",
+        short: "مخاطرتك لكل صفقة، مع سقف لجميع المراكز المفتوحة: ضعفها، بين 3% و5%.",
+        example: "مثال: 1% ⇒ 3% · 2% ⇒ 4% · 3% ⇒ 5%.",
+        caveat: "السقف ÷ المخاطرة لكل صفقة = عدد المراكز الكاملة الممكنة في آنٍ واحد.",
+        longForm: "حدّان يعملان معاً:\n\n• المخاطرة/الصفقة — أقصى ما تخاطر به في مركز واحد. أنت تختارها من الإعدادات.\n• أقصى مخاطرة مسموحة — أقصى ما تخاطر به في جميع المراكز المفتوحة مجتمعةً. تُشتقّ من المخاطرة/الصفقة: ضعف تلك القيمة، لا تقلّ أبداً عن 3% ولا تزيد عن 5%.\n\nاقسم أقصى مخاطرة مسموحة على المخاطرة/الصفقة لترى كم مركزاً بحجم كامل يمكنك الاحتفاظ به في آنٍ واحد.",
       },
     },
   },
@@ -84,7 +100,6 @@ export default [
     sources: ["ELDER", "THARP"],
     related: ["riskPerTrade", "stopLoss"],
     shownAt: ["SwingEdge_App.jsx — מחשבון פוזיציה"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "גודל פוזיציה",
@@ -102,15 +117,24 @@ export default [
       },
       es: {
         label: "Tamaño de Posición",
-        short: "Tamaño de Posición = (Tamaño de Cuenta × % Riesgo) ÷ (Entrada − Stop Loss)\n\nEjemplo: cuenta de $10,000, 1% de riesgo, entrada $100, stop $97:\nPosición = $100 ÷ $3 = 33 acciones\n\nCalcula siempre antes de entrar. Nunca dimensiones por intuición.",
+        short: "Acciones = (capital × % de riesgo) ÷ distancia entre entrada y stop.",
+        example: "Ejemplo: $10,000 × 1% = $100; entrada $100 y stop $97 ⇒ 33 acciones.",
+        caveat: "Siempre redondeado hacia abajo.",
+        longForm: "Tamaño de Posición = (Tamaño de Cuenta × % de Riesgo) ÷ (Entrada − Stop Loss)\n\nEjemplo: cuenta de $10,000, 1% de riesgo, entrada $100, stop $97:\nPosición = $100 ÷ $3 = 33 acciones\n\nCalcula siempre antes de entrar. Nunca dimensiones por intuición.",
       },
       pt: {
         label: "Tamanho de Posição",
-        short: "Tamanho de Posição = (Tamanho da Conta × % Risco) ÷ (Entrada − Stop Loss)\n\nExemplo: conta de $10,000, 1% de risco, entrada $100, stop $97:\nPosição = $100 ÷ $3 = 33 ações\n\nCalcula sempre antes de entrar. Nunca dimensiones por intuição.",
+        short: "Ações = (capital × % de risco) ÷ a distância entre a entrada e o stop.",
+        example: "Exemplo: $10,000 × 1% = $100; entrada $100 e stop $97 ⇒ 33 ações.",
+        caveat: "Sempre arredondado para baixo.",
+        longForm: "Tamanho de Posição = (Tamanho da Conta × % de Risco) ÷ (Entrada − Stop Loss)\n\nExemplo: conta de $10,000, risco de 1%, entrada $100, stop $97:\nPosição = $100 ÷ $3 = 33 ações\n\nSempre calcule antes de entrar. Nunca defina o tamanho pela intuição.",
       },
       ar: {
         label: "حجم الصفقة",
-        short: "حجم الصفقة = (حجم الحساب × % المخاطرة) ÷ (الدخول − وقف الخسارة)\n\nمثال: حساب $10,000، مخاطرة 1%، دخول $100، وقف $97:\nالصفقة = $100 ÷ $3 = 33 سهماً\n\nاحسب دائماً قبل الدخول. لا تحدّد الحجم بالإحساس أبداً.",
+        short: "عدد الأسهم = (رأس المال × نسبة المخاطرة) ÷ المسافة بين الدخول ووقف الخسارة.",
+        example: "مثال: $10,000 × 1% = $100؛ دخول $100 ووقف $97 ⇒ 33 سهماً.",
+        caveat: "يُقرَّب دائماً للأسفل.",
+        longForm: "حجم الصفقة = (حجم الحساب × % المخاطرة) ÷ (الدخول − وقف الخسارة)\n\nمثال: حساب $10,000، مخاطرة 1%، دخول $100، وقف $97:\nالصفقة = $100 ÷ $3 = 33 سهماً\n\nاحسب دائماً قبل الدخول. لا تحدّد الحجم بالإحساس أبداً.",
       },
     },
   },
@@ -118,7 +142,6 @@ export default [
     id: "stopLoss",
     related: ["rMultiple", "positionSize", "takeProfit"],
     shownAt: ["SwingEdge_App.jsx — יומן · שורת עסקה", "src/components/EditTradeModal.jsx — עריכת עסקה"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "סטופ לוס",
@@ -136,15 +159,24 @@ export default [
       },
       es: {
         label: "Stop Loss",
-        short: "Stop Loss — el nivel de precio donde sales de una operación perdedora para evitar pérdidas mayores.\n\nColócalo en un nivel técnico lógico:\n• Por debajo de un soporte clave (operaciones largas)\n• Por encima de una resistencia clave (operaciones cortas)\n• Nunca arbitrario (p. ej., 'solo $0.50 bajo la entrada')\n\nUn stop loss no es opcional — es la base de la gestión del riesgo.",
+        short: "El precio fijado antes para salir de una operación perdedora, limitando la pérdida a tu plan.",
+        example: "Ejemplo: LONG a $50, stop bajo soporte en $48 ⇒ riesgo $2 por acción.",
+        caveat: "R y tamaño de posición usan el stop guardado.",
+        longForm: "Stop Loss — el nivel de precio donde sales de una operación perdedora para evitar pérdidas mayores.\n\nColócalo en un nivel técnico lógico:\n• Por debajo de un soporte clave (operaciones LONG)\n• Por encima de una resistencia clave (operaciones SHORT)\n• Nunca arbitrario (p. ej., 'solo $0.50 por debajo de la entrada')\n\nEl R y el tamaño de posición se calculan a partir del stop guardado en la operación.",
       },
       pt: {
         label: "Stop Loss",
-        short: "Stop Loss — o nível de preço onde sais de uma operação perdedora para evitar perdas maiores.\n\nColoca-o num nível técnico lógico:\n• Abaixo de um suporte chave (operações compradas)\n• Acima de uma resistência chave (operações vendidas)\n• Nunca arbitrário (ex.: 'só $0.50 abaixo da entrada')\n\nUm stop loss não é opcional — é a base da gestão de risco.",
+        short: "O preço que você define antes para sair de uma operação perdedora, limitando a perda ao plano.",
+        example: "Exemplo: LONG a $50, stop abaixo do suporte em $48 ⇒ $2 de risco por ação.",
+        caveat: "R e tamanho da posição usam o stop salvo.",
+        longForm: "Stop Loss — o nível de preço em que você sai de uma operação perdedora para evitar perdas maiores.\n\nColoque-o em um nível técnico lógico:\n• Abaixo de um suporte-chave (operações LONG)\n• Acima de uma resistência-chave (operações SHORT)\n• Nunca arbitrário (ex.: 'só $0.50 abaixo da entrada')\n\nO R e o tamanho da posição são calculados a partir do stop salvo na operação.",
       },
       ar: {
-        label: "Stop Loss",
-        short: "Stop Loss — مستوى السعر الذي تخرج عنده من صفقة خاسرة لتفادي خسائر أكبر.\n\nضعه عند مستوى فنّي منطقي:\n• أسفل دعم رئيسي (صفقات الشراء)\n• أعلى مقاومة رئيسية (صفقات البيع)\n• ليس عشوائياً أبداً (مثلاً 'فقط $0.50 تحت الدخول')\n\nوقف الخسارة ليس اختيارياً — إنه أساس إدارة المخاطر.",
+        label: "وقف الخسارة",
+        short: "السعر الذي تحدّده مسبقاً للخروج من صفقة خاسرة، فتبقى الخسارة ضمن خطتك.",
+        example: "مثال: LONG عند $50، ووقف تحت الدعم عند $48 ⇒ مخاطرة $2 للسهم.",
+        caveat: "يعتمد R وحجم المركز على الوقف المحفوظ.",
+        longForm: "وقف الخسارة — مستوى السعر الذي تخرج عنده من صفقة خاسرة لتفادي خسائر أكبر.\n\nضعه عند مستوى فنّي منطقي:\n• أسفل دعم رئيسي (صفقات LONG)\n• أعلى مقاومة رئيسية (صفقات SHORT)\n• ليس عشوائياً أبداً (مثلاً 'فقط $0.50 تحت الدخول')\n\nيُحسب R وحجم المركز من الوقف المحفوظ في الصفقة.",
       },
     },
   },
@@ -152,7 +184,6 @@ export default [
     id: "takeProfit",
     related: ["rr", "stopLoss", "chartCalcPosition"],
     shownAt: ["SwingEdge_App.jsx — יומן · שורת עסקה", "src/components/EditTradeModal.jsx — עריכת עסקה"],
-    pendingTranslation: ["es", "pt", "ar"],
     i18n: {
       he: {
         label: "Take Profit",
@@ -170,15 +201,24 @@ export default [
       },
       es: {
         label: "Take Profit",
-        short: "Take Profit — tu precio objetivo para salir de una operación ganadora.\n\nRegla mínima: El objetivo debe ser al menos 1.5× tu riesgo (1.5R).\n\nBuena práctica:\n• Salida escalonada: toma 50% en 1R, mantén el resto hasta el objetivo\n• Usa niveles técnicos (resistencia, máximos previos)\n• Nunca muevas el objetivo más abajo cuando vas ganando",
+        short: "El precio objetivo que fijas para cerrar una operación ganadora.",
+        example: "Ejemplo: entrada $100 y stop $98 ⇒ objetivo por defecto $104 (1:2).",
+        caveat: "Por defecto, en el gráfico y en el coach, es 1:2.",
+        longForm: "Take Profit — tu precio objetivo para salir de una operación ganadora.\n\nEl valor por defecto de la app, en las acciones del gráfico y en el coach, es una relación 1:2: un objetivo al doble de distancia que el stop.\n\nPráctica común:\n• Salida escalonada: una parte en 1R, el resto hasta el objetivo\n• Usa niveles técnicos (resistencia, máximos previos)\n• Nunca bajes el objetivo mientras la operación va ganando",
       },
       pt: {
         label: "Take Profit",
-        short: "Take Profit — o teu preço-alvo para sair de uma operação vencedora.\n\nRegra mínima: O alvo deve ser pelo menos 1.5× o teu risco (1.5R).\n\nBoa prática:\n• Saída escalonada: tira 50% em 1R, mantém o resto até ao alvo\n• Usa níveis técnicos (resistência, máximos anteriores)\n• Nunca movas o alvo para baixo quando estás a ganhar",
+        short: "O preço-alvo que você define para fechar uma operação vencedora.",
+        example: "Exemplo: entrada $100 e stop $98 ⇒ alvo padrão de $104 (1:2).",
+        caveat: "O padrão no gráfico e no coach é 1:2.",
+        longForm: "Take Profit — seu preço-alvo para sair de uma operação vencedora.\n\nO padrão do app, nas ações do gráfico e no coach, é uma relação 1:2: um alvo duas vezes mais distante que o stop.\n\nPrática comum:\n• Saída escalonada: parte em 1R, o resto até o alvo\n• Use níveis técnicos (resistência, máximas anteriores)\n• Nunca abaixe o alvo enquanto a operação estiver ganhando",
       },
       ar: {
         label: "Take Profit",
-        short: "Take Profit — السعر المستهدف للخروج من صفقة رابحة.\n\nالقاعدة الدنيا: يجب أن يكون الهدف 1.5× مخاطرتك على الأقل (1.5R).\n\nأفضل ممارسة:\n• خروج تدريجي: خذ 50% عند 1R، واحتفظ بالباقي حتى الهدف\n• استخدم مستويات فنّية (مقاومة، قمم سابقة)\n• لا تحرّك الهدف للأسفل أبداً وأنت رابح",
+        short: "السعر المستهدف الذي تحدّده لإغلاق صفقة رابحة.",
+        example: "مثال: دخول $100 ووقف $98 ⇒ هدف افتراضي $104 (1:2).",
+        caveat: "الافتراضي في الرسم البياني وفي المدرّب هو 1:2.",
+        longForm: "Take Profit — السعر المستهدف للخروج من صفقة رابحة.\n\nالافتراضي في التطبيق، في إجراءات الرسم البياني وفي المدرّب، هو نسبة 1:2: هدف على ضعف مسافة الوقف.\n\nالممارسة الشائعة:\n• خروج تدريجي: جزء عند 1R، والباقي حتى الهدف\n• استخدم مستويات فنّية (مقاومة، قمم سابقة)\n• لا تخفّض الهدف أبداً بينما الصفقة رابحة",
       },
     },
   },
